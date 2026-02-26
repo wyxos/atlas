@@ -160,7 +160,7 @@ describe('choosePromotedMediaCandidate', () => {
 });
 
 describe('installHotkeys', () => {
-  it('uses the event target media over pointer stack fallback for reactions', () => {
+  it('uses event target media when valid and falls back to point-resolved media when target is invalid', () => {
     const small = document.createElement('img');
     small.src = 'https://example.com/small.jpg';
     document.body.appendChild(small);
@@ -178,15 +178,18 @@ describe('installHotkeys', () => {
     Object.defineProperty(large, 'naturalWidth', { value: 400, configurable: true });
     Object.defineProperty(large, 'naturalHeight', { value: 560, configurable: true });
 
+    let pointerStack: Element[] = [small];
     Object.defineProperty(document, 'elementsFromPoint', {
-      value: () => [small],
+      value: () => pointerStack,
       configurable: true,
     });
 
-    let reactedUrl: string | null = null;
+    const reactedUrls: string[] = [];
     const sendMessageSafe = (message: unknown, callback: (response: { ok?: boolean; data?: unknown }) => void) => {
       const payload = (message as { payload?: { url?: string } }).payload;
-      reactedUrl = payload?.url ?? null;
+      if (payload?.url) {
+        reactedUrls.push(payload.url);
+      }
       callback({ ok: true, data: {} });
     };
 
@@ -199,7 +202,7 @@ describe('installHotkeys', () => {
       },
       {
         rootId: 'atlas-downloader-root',
-        minWidth: 200,
+        minWidth: 320,
         maxMetadataLen: 255,
         limitString: (value) => String(value ?? ''),
         sourceFromMediaUrl: () => 'web',
@@ -220,7 +223,37 @@ describe('installHotkeys', () => {
       })
     );
 
-    expect(reactedUrl).toBe('https://example.com/large.jpg');
+    expect(reactedUrls).toEqual(['https://example.com/large.jpg']);
+
+    const targetIcon = document.createElement('img');
+    targetIcon.src = 'https://example.com/icon.png';
+    Object.defineProperty(targetIcon, 'naturalWidth', { value: 24, configurable: true });
+    Object.defineProperty(targetIcon, 'naturalHeight', { value: 24, configurable: true });
+    setRect(targetIcon, rect(100, 100, 24, 24));
+    document.body.appendChild(targetIcon);
+
+    const video = document.createElement('video');
+    video.src = 'https://video.example.com/fb-reel.mp4';
+    Object.defineProperty(video, 'videoWidth', { value: 1080, configurable: true });
+    Object.defineProperty(video, 'videoHeight', { value: 1920, configurable: true });
+    setRect(video, rect(0, 0, 720, 1200));
+    document.body.appendChild(video);
+
+    pointerStack = [targetIcon, video];
+    expect(resolveMediaAtPoint(110, 110, 'atlas-downloader-root')).toBe(video);
+
+    targetIcon.dispatchEvent(
+      new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        altKey: true,
+        button: 1,
+        clientX: 110,
+        clientY: 110,
+      })
+    );
+
+    expect(reactedUrls).toEqual(['https://example.com/large.jpg', 'https://video.example.com/fb-reel.mp4']);
   });
 });
 
