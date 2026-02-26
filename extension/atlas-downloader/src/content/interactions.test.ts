@@ -127,6 +127,25 @@ describe('resolveMediaAtPoint', () => {
     const resolved = resolveMediaAtPoint(100, 100, 'atlas-downloader-root');
     expect(resolved).toBe(large);
   });
+
+  it('prefers video over larger image when both overlap pointer', () => {
+    const wrapper = document.createElement('div');
+    const poster = document.createElement('img');
+    const reel = document.createElement('video');
+    wrapper.append(poster, reel);
+    document.body.appendChild(wrapper);
+
+    setRect(poster, rect(0, 0, 677, 1203));
+    setRect(reel, rect(0, 0, 360, 640));
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [wrapper],
+      configurable: true,
+    });
+
+    const resolved = resolveMediaAtPoint(100, 100, 'atlas-downloader-root');
+    expect(resolved).toBe(reel);
+  });
 });
 
 describe('choosePromotedMediaCandidate', () => {
@@ -155,6 +174,18 @@ describe('choosePromotedMediaCandidate', () => {
     setRect(nearby, rect(360, 10, 330, 330));
 
     const promoted = choosePromotedMediaCandidate(current, 'atlas-downloader-root');
+    expect(promoted).toBeNull();
+  });
+
+  it('does not promote active video to larger image candidate', () => {
+    const video = document.createElement('video');
+    const image = document.createElement('img');
+    document.body.append(video, image);
+
+    setRect(video, rect(0, 0, 360, 640));
+    setRect(image, rect(0, 0, 677, 1203));
+
+    const promoted = choosePromotedMediaCandidate(video, 'atlas-downloader-root');
     expect(promoted).toBeNull();
   });
 });
