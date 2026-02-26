@@ -16,14 +16,6 @@ type NoiseFilterRule =
   | { kind: 'urlPattern'; regex: RegExp }
   | { kind: 'urlContains'; needle: string };
 
-const DEFAULT_MEDIA_NOISE_FILTERS = [
-  'host:st.deviantart.net',
-  'url:*wixmp.com*/crop/w_92,h_92*',
-  'url:*wixmp.com*/crop/w_150,h_150*',
-  'url:*wixmp.com*/fit/w_150,h_150*',
-];
-
-const defaultNoiseRules = parseNoiseFilterRules(DEFAULT_MEDIA_NOISE_FILTERS.join('\n'));
 let customNoiseRules: NoiseFilterRule[] = [];
 
 export function safeUrl(value: string): string {
@@ -489,7 +481,7 @@ function isExcludedNoiseMediaUrl(url: string): boolean {
     return false;
   }
 
-  const rules = [...defaultNoiseRules, ...customNoiseRules];
+  const rules = customNoiseRules;
   const hostname = safeHostname(normalizedUrl);
 
   for (const rule of rules) {
