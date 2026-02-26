@@ -1312,8 +1312,7 @@ export function runContentScript() {
         });
       };
 
-      const hasExistingReaction = Boolean(item.atlas?.reaction?.type);
-      if (type !== 'dislike' && item.atlas?.downloaded && hasExistingReaction) {
+      if (type !== 'dislike' && item.atlas?.downloaded) {
         chooseDialog({
           title: 'Already downloaded',
           message: 'This file is already downloaded. Re-download before updating the reaction?',
