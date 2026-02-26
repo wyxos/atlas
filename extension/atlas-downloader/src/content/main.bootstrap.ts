@@ -8,6 +8,8 @@ import {
   configureMediaNoiseFilters,
 } from './items';
 import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from './interactions';
+import { buildLookupKeys } from './lookupKeys';
+import { createSendMessageSafe } from './messaging';
 import { isHostExcluded, isHostMatch, parseExcludedDomains, resolveHost, stripHash } from './network';
 import { isOpenTabHighlightEligibleUrl, normalizeOpenTabUrl } from './openTabUrl';
 import {
@@ -20,7 +22,8 @@ import {
   syncReactionIconBadges,
   syncOpenTabIconBadges,
 } from './pageMarkers';
-import { applyReactionStatusUpdateFromPayload, isHashSpecificReferrerLookupKey } from './statusUpdates';
+import { applyReactionStatusUpdateFromPayload } from './statusUpdates';
+import { normalizeDownloadedAt, normalizeProgress } from './statusMeta';
 import { shouldIgnoreMutationBatch } from './mutationGuard';
 import { BLACKLIST_ACTION, REACTIONS } from './reactions';
 import {
@@ -118,21 +121,6 @@ export function runContentScript() {
   const openTabUrlSet = new Set<string>();
   let minMediaWidth = DEFAULT_MIN_MEDIA_WIDTH;
 
-  function buildLookupVariants(...values: Array<string | null | undefined>): string[] {
-    const keys = new Set<string>();
-    for (const value of values) {
-      const raw = (value || '').trim();
-      if (!raw) {
-        continue;
-      }
-
-      keys.add(raw);
-      keys.add(stripHash(raw));
-    }
-
-    return [...keys].filter(Boolean);
-  }
-
   function limitString(value, max) {
     const v = typeof value === 'string' ? value : '';
     if (v.length <= max) return v;
@@ -180,33 +168,6 @@ export function runContentScript() {
     return true;
   }
 
-  function normalizeProgress(value: unknown): number | null {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      return null;
-    }
-
-    return Math.max(0, Math.min(100, parsed));
-  }
-
-  function normalizeDownloadedAt(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-
-    const date = new Date(trimmed);
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-
-    return trimmed;
-  }
-
   function getCachedAtlasStatus(url: string) {
     const rawKey = (url || '').trim();
     const fallbackKey = stripHash(rawKey);
@@ -235,7 +196,7 @@ export function runContentScript() {
       } | null
     ) => void
   ) {
-    const lookupCandidates = buildLookupVariants(url, referrerUrl || '');
+    const lookupCandidates = buildLookupKeys(url, referrerUrl || '');
     if (lookupCandidates.length === 0) {
       callback(null);
       return;
@@ -262,7 +223,7 @@ export function runContentScript() {
         if (!resultUrl) {
           continue;
         }
-        for (const key of buildLookupVariants(resultUrl)) {
+        for (const key of buildLookupKeys(resultUrl)) {
           if (!byUrl.has(key)) {
             byUrl.set(key, result);
           }
@@ -443,35 +404,10 @@ export function runContentScript() {
 
     let showToast = createToastFn(root);
     let chooseDialog = createDialogChooser(root);
-    const sendMessageSafe = (
-      message: unknown,
-      callback: (response: unknown) => void
-    ) => {
-      try {
-        chrome.runtime.sendMessage(message, callback);
-      } catch (error) {
-        const messageText = (() => {
-          if (error instanceof Error) {
-            return error.message;
-          }
-
-          if (error && typeof error === 'object' && 'message' in error) {
-            const messageValue = (error as { message?: unknown }).message;
-            return typeof messageValue === 'string' ? messageValue : String(messageValue);
-          }
-
-          return String(error);
-        })();
-
-        if (messageText.includes('Extension context invalidated')) {
-          showToast('Atlas extension was reloaded. Refresh this tab.', 'danger');
-        } else {
-          showToast('Atlas extension error. Refresh this tab.', 'danger');
-        }
-
-        callback(null);
-      }
-    };
+    const sendMessageSafe = createSendMessageSafe(
+      (message, callback) => chrome.runtime.sendMessage(message, callback),
+      (message, tone) => showToast(message, tone)
+    );
 
     shadow.appendChild(root);
     (document.body || document.documentElement).appendChild(host);
@@ -627,10 +563,10 @@ export function runContentScript() {
 
       const originalLookup = typeof data.original === 'string' ? data.original.trim() : '';
       const referrerLookup = typeof data.referrer_url === 'string' ? data.referrer_url.trim() : '';
-      const lookupCandidates = new Set<string>(buildLookupVariants(originalLookup, referrerLookup));
+      const lookupCandidates = new Set<string>(buildLookupKeys(originalLookup, referrerLookup));
 
       const mappedLookup = transferId ? (lookupByTransferId.get(transferId) ?? '') : '';
-      for (const lookup of buildLookupVariants(mappedLookup)) {
+      for (const lookup of buildLookupKeys(mappedLookup)) {
         lookupCandidates.add(lookup);
       }
 
@@ -817,7 +753,7 @@ export function runContentScript() {
         const reactionType = custom.detail?.reactionType ? String(custom.detail.reactionType) : null;
         const explicitUrl = typeof custom.detail?.url === 'string' ? custom.detail.url : '';
         const resolvedUrl = explicitUrl || (custom.detail?.media ? buildItemFromElement(custom.detail.media, minMediaWidth)?.url || '' : '');
-        const lookupKeys = buildLookupVariants(resolvedUrl);
+        const lookupKeys = buildLookupKeys(resolvedUrl);
         const lookupKeySet = new Set(lookupKeys);
         const lookup = lookupKeys[0] || '';
 
@@ -1096,10 +1032,7 @@ export function runContentScript() {
     function itemLookupKeys(item) {
       const url = (item?.url || '').trim();
       const referrerUrl = (item?.referrer_url || '').trim();
-      const prioritizeReferrer = referrerUrl.includes('#image-');
-      return prioritizeReferrer
-        ? buildLookupVariants(referrerUrl, url)
-        : buildLookupVariants(url, referrerUrl);
+      return buildLookupKeys(url, referrerUrl);
     }
 
     function itemLookupUrl(item) {
@@ -1135,7 +1068,7 @@ export function runContentScript() {
             continue;
           }
 
-          for (const key of buildLookupVariants(resultUrl)) {
+          for (const key of buildLookupKeys(resultUrl)) {
             if (!byUrl.has(key)) {
               byUrl.set(key, result);
             }
@@ -1740,9 +1673,7 @@ export function runContentScript() {
         const statusLookupKeys = collectStatusLookupKeysForMarkerNode(node);
         for (const key of statusLookupKeys) {
           urls.add(key);
-          if (!isHashSpecificReferrerLookupKey(key)) {
-            urls.add(stripHash(key));
-          }
+          urls.add(stripHash(key));
         }
       }
 

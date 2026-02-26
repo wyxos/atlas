@@ -455,48 +455,6 @@
   white-space: nowrap;
 }
 
-.atlas-shadow-root .atlas-downloader-post-indicator {
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  background: rgba(2, 132, 199, 0.2);
-  color: #e0f2fe;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.atlas-shadow-root .atlas-downloader-post-indicator:hover {
-  background: rgba(14, 165, 233, 0.26);
-}
-
-.atlas-shadow-root .atlas-downloader-post-indicator:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.atlas-shadow-root .atlas-downloader-post-indicator.pending {
-  color: transparent;
-  position: relative;
-}
-
-.atlas-shadow-root .atlas-downloader-post-indicator.pending::after {
-  content: '';
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
-  margin-top: -5px;
-  border-radius: 999px;
-  border: 2px solid rgba(224, 242, 254, 0.35);
-  border-top-color: #e0f2fe;
-  animation: atlas-spin 0.75s linear infinite;
-}
-
 .atlas-shadow-root .atlas-downloader-media-status {
   display: block;
   flex: 1 0 100%;

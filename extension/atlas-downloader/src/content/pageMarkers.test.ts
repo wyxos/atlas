@@ -47,11 +47,11 @@ describe('page markers', () => {
     expect(cache.has('https://example.com/stale')).toBe(false);
   });
 
-  it('keeps #image-N cache entries hash-specific to avoid page-wide marker bleed', () => {
+  it('normalizes hash-fragment cache entries to hashless keys', () => {
     const now = Date.now();
     const cache = new Map([
       [
-        'https://www.deviantart.com/user/art/example-123#image-1',
+        'https://example.com/post#image-1',
         {
           exists: true,
           downloaded: false,
@@ -63,8 +63,8 @@ describe('page markers', () => {
     ]);
 
     const statusByUrl = buildStatusMapFromCache(cache, 30_000, stripHash);
-    expect(statusByUrl.has('https://www.deviantart.com/user/art/example-123#image-1')).toBe(true);
-    expect(statusByUrl.has('https://www.deviantart.com/user/art/example-123')).toBe(false);
+    expect(statusByUrl.has('https://example.com/post#image-1')).toBe(true);
+    expect(statusByUrl.has('https://example.com/post')).toBe(true);
   });
 
   it('merges sheet statuses and resolves lookups', () => {

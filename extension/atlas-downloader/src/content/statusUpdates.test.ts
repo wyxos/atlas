@@ -3,19 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   applyReactionStatusUpdateFromPayload,
   collectReactionStatusLookupKeys,
-  isHashSpecificReferrerLookupKey,
 } from './statusUpdates';
 
-describe('isHashSpecificReferrerLookupKey', () => {
-  it('identifies #image-N fragments', () => {
-    expect(isHashSpecificReferrerLookupKey('https://example.com/post#image-1')).toBe(true);
-    expect(isHashSpecificReferrerLookupKey('https://example.com/post#image-20')).toBe(true);
-    expect(isHashSpecificReferrerLookupKey('https://example.com/post#details')).toBe(false);
-  });
-});
-
 describe('collectReactionStatusLookupKeys', () => {
-  it('keeps #image-N referrers hash-specific while normalizing others', () => {
+  it('normalizes hash and non-hash lookup keys', () => {
     const lookupKeys = collectReactionStatusLookupKeys({
       url: 'https://images.example.com/media/a.jpg',
       referrerUrl: 'https://example.com/post#image-2',
@@ -24,9 +15,9 @@ describe('collectReactionStatusLookupKeys', () => {
 
     expect(lookupKeys).toContain('https://images.example.com/media/a.jpg');
     expect(lookupKeys).toContain('https://example.com/post#image-2');
+    expect(lookupKeys).toContain('https://example.com/post');
     expect(lookupKeys).toContain('https://images.example.com/preview/a-thumb.jpg#fragment');
     expect(lookupKeys).toContain('https://images.example.com/preview/a-thumb.jpg');
-    expect(lookupKeys).not.toContain('https://example.com/post');
   });
 });
 

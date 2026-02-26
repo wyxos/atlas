@@ -21,10 +21,6 @@ const props = defineProps<{
   progressVisible: boolean;
   progressPercent: number;
   progressState: 'queued' | 'active' | 'done' | null;
-  postVisible: boolean;
-  postDisabled: boolean;
-  postPending: boolean;
-  postCount: number;
   buttons: ToolbarButton[];
 }>();
 
@@ -32,8 +28,6 @@ const emit = defineEmits<{
   pointerEnter: [];
   pointerLeave: [];
   reaction: [type: string];
-  postQueue: [reactionType: 'like' | 'love' | 'funny'];
-  postHint: [];
 }>();
 
 const toolbarStyle = computed(() => {
@@ -64,41 +58,6 @@ function onReactionClick(type: string, event: MouseEvent): void {
   swallow(event);
   emit('reaction', type);
 }
-
-function onPostPointerDown(event: PointerEvent): void {
-  if (!event.altKey || (event.button !== 0 && event.button !== 1)) {
-    return;
-  }
-
-  swallow(event);
-  emit('postQueue', event.button === 1 ? 'love' : 'like');
-}
-
-function onPostContextMenu(event: MouseEvent): void {
-  if (!event.altKey) {
-    return;
-  }
-
-  swallow(event);
-  emit('postQueue', 'like');
-}
-
-function onPostAuxClick(event: MouseEvent): void {
-  if (!event.altKey || event.button !== 1) {
-    return;
-  }
-
-  swallow(event);
-}
-
-function onPostClick(event: MouseEvent): void {
-  swallow(event);
-  if (event.altKey) {
-    return;
-  }
-
-  emit('postHint');
-}
 </script>
 
 <template>
@@ -114,21 +73,6 @@ function onPostClick(event: MouseEvent): void {
     <span class="atlas-downloader-media-resolution" :hidden="!resolutionText">
       {{ resolutionText }}
     </span>
-
-    <button
-      type="button"
-      class="atlas-downloader-post-indicator"
-      :class="{ pending: postPending }"
-      :hidden="!postVisible"
-      :disabled="postDisabled"
-      title="DeviantArt post: Alt+Left=Like, Alt+Middle=Love (favorite) queue"
-      @pointerdown="onPostPointerDown"
-      @contextmenu="onPostContextMenu"
-      @auxclick="onPostAuxClick"
-      @click="onPostClick"
-    >
-      {{ postVisible ? `POST x${postCount}` : 'POST' }}
-    </button>
 
     <button
       v-for="button in buttons"
