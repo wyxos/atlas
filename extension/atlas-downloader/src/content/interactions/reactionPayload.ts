@@ -41,9 +41,18 @@ function buildReactionPayloadFromItem(
   };
 }
 
-function isBlobOrDataUrl(url: string): boolean {
-  const value = (url || '').trim().toLowerCase();
-  return value.startsWith('blob:') || value.startsWith('data:');
+function isHttpVideoUrl(url: string): boolean {
+  const value = (url || '').trim();
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(value, window.location.href);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 export function buildReactionPayloadFromMedia(
@@ -66,7 +75,7 @@ export function buildReactionPayloadFromMedia(
   }
 
   const rawSrc = media.currentSrc || media.src || '';
-  if (!isBlobOrDataUrl(rawSrc)) {
+  if (isHttpVideoUrl(rawSrc)) {
     return null;
   }
 
