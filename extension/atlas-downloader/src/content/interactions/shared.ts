@@ -177,8 +177,8 @@ function pickLargestMediaDescendantAtPoint(
     return null;
   }
 
-  let best: { media: Element; area: number } | null = null;
-  for (const descendant of descendants) {
+  let best: { media: Element; area: number; stackIndex: number; inModal: boolean } | null = null;
+  for (const [stackIndex, descendant] of Array.from(descendants).entries()) {
     const rect = descendant.getBoundingClientRect();
     if (
       rect.width <= 0
@@ -191,13 +191,20 @@ function pickLargestMediaDescendantAtPoint(
       continue;
     }
 
-    const area = rect.width * rect.height;
-    if (!best || area > best.area) {
-      best = { media: descendant, area };
+    const candidateAtPoint = {
+      media: descendant,
+      area: rect.width * rect.height,
+      stackIndex,
+      inModal: isElementInModal(descendant),
+    };
+
+    best = selectPreferredPointCandidate(best, candidateAtPoint);
+    if (!best) {
+      best = candidateAtPoint;
     }
   }
 
-  return best;
+  return best ? { media: best.media, area: best.area } : null;
 }
 
 type PointMediaCandidate = {
@@ -206,6 +213,24 @@ type PointMediaCandidate = {
   stackIndex: number;
   inModal: boolean;
 };
+
+const VIDEO_PREFERENCE_AREA_RATIO = 0.2;
+
+function selectPreferredMediaTypeCandidate<T extends { media: Element; area: number }>(current: T, next: T): T | null {
+  const currentIsVideo = current.media.tagName === 'VIDEO';
+  const nextIsVideo = next.media.tagName === 'VIDEO';
+  if (currentIsVideo === nextIsVideo) {
+    return null;
+  }
+
+  const videoCandidate = currentIsVideo ? current : next;
+  const imageCandidate = currentIsVideo ? next : current;
+  if (videoCandidate.area >= imageCandidate.area * VIDEO_PREFERENCE_AREA_RATIO) {
+    return videoCandidate;
+  }
+
+  return null;
+}
 
 function selectPreferredPointCandidate(
   current: PointMediaCandidate | null,
@@ -217,6 +242,11 @@ function selectPreferredPointCandidate(
 
   if (current.inModal !== next.inModal) {
     return next.inModal ? next : current;
+  }
+
+  const typePreferred = selectPreferredMediaTypeCandidate(current, next);
+  if (typePreferred) {
+    return typePreferred;
   }
 
   if (next.area !== current.area) {
@@ -302,9 +332,12 @@ export function choosePromotedMediaCandidate(currentMedia: Element | null, rootI
 
   const currentArea = currentMedia ? getElementViewportArea(currentMedia) : 0;
   const currentIsModal = currentMedia ? isElementInModal(currentMedia) : false;
+  const currentIsVideo = currentMedia?.tagName === 'VIDEO';
 
   let bestModal: { media: Element; area: number } | null = null;
+  let bestModalVideo: { media: Element; area: number } | null = null;
   let bestAny: { media: Element; area: number } | null = null;
+  let bestVideo: { media: Element; area: number } | null = null;
 
   for (const media of candidates) {
     const area = getElementViewportArea(media);
@@ -316,8 +349,36 @@ export function choosePromotedMediaCandidate(currentMedia: Element | null, rootI
       bestAny = { media, area };
     }
 
+    if (media.tagName === 'VIDEO' && (!bestVideo || area > bestVideo.area)) {
+      bestVideo = { media, area };
+    }
+
     if (isElementInModal(media) && (!bestModal || area > bestModal.area)) {
       bestModal = { media, area };
+    }
+
+    if (media.tagName === 'VIDEO' && isElementInModal(media) && (!bestModalVideo || area > bestModalVideo.area)) {
+      bestModalVideo = { media, area };
+    }
+  }
+
+  if (currentIsVideo) {
+    if (bestModalVideo && bestModalVideo.media !== currentMedia) {
+      if (!currentIsModal || bestModalVideo.area > currentArea * 1.05) {
+        return bestModalVideo.media;
+      }
+    }
+
+    if (bestVideo && bestVideo.media !== currentMedia && bestVideo.area > currentArea * 1.2) {
+      return bestVideo.media;
+    }
+
+    return null;
+  }
+
+  if (bestModalVideo && bestModalVideo.media !== currentMedia) {
+    if (!currentIsModal || bestModalVideo.area > currentArea * 1.05) {
+      return bestModalVideo.media;
     }
   }
 
@@ -325,6 +386,10 @@ export function choosePromotedMediaCandidate(currentMedia: Element | null, rootI
     if (!currentIsModal || bestModal.area > currentArea * 1.1) {
       return bestModal.media;
     }
+  }
+
+  if (bestVideo && bestVideo.media !== currentMedia && bestVideo.area > currentArea * 1.1) {
+    return bestVideo.media;
   }
 
   if (bestAny && bestAny.media !== currentMedia && bestAny.area > currentArea * 1.6) {
