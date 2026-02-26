@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolveDeviantArtPostContext } from './deviantartPost';
 import {
   choosePromotedMediaCandidate,
   formatDownloadedAtUtc,
@@ -9,6 +10,14 @@ import {
   resolveOverlayProgressPercent,
   resolveMediaAtPoint,
 } from './interactions';
+
+vi.mock('./deviantartPost', async () => {
+  const actual = await vi.importActual<typeof import('./deviantartPost')>('./deviantartPost');
+  return {
+    ...actual,
+    resolveDeviantArtPostContext: vi.fn(actual.resolveDeviantArtPostContext),
+  };
+});
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
   const right = left + width;
@@ -44,6 +53,7 @@ const originalElementFromPoint = document.elementFromPoint;
 afterEach(() => {
   document.head.innerHTML = '';
   document.body.innerHTML = '';
+  vi.clearAllMocks();
   Object.defineProperty(document, 'elementsFromPoint', {
     value: originalElementsFromPoint,
     configurable: true,
@@ -314,6 +324,130 @@ describe('installMediaReactionOverlay', () => {
     expect(capturedUrl).toBe('https://cdn.example.com/thumb.jpg');
     expect(capturedReferrer).toBe(`${window.location.origin}/other-file`);
     expect(capturedReferrer).not.toBe(window.location.href);
+  });
+
+  it('uses #image-N referrer lookup for deviantart post image variants', () => {
+    setLocation('/forgebond/art/sample-piece-1301970367');
+
+    const root = document.createElement('div');
+    const styledRoot = document.createElement('div');
+    styledRoot.className = 'atlas-shadow-root';
+    root.appendChild(styledRoot);
+    document.body.appendChild(root);
+
+    const mockedResolvePostContext = vi.mocked(resolveDeviantArtPostContext);
+    mockedResolvePostContext.mockReturnValue({
+      groupKey: '766a0888-86ea-4f29-9b04-380d564d6217',
+      entries: [
+        {
+          assetKey: 'dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78',
+          previewUrl:
+            'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_1.jpg',
+          baseUrl:
+            'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_1.jpg',
+          width: 1536,
+          height: 2304,
+          maxWidth: 1536,
+          maxHeight: 2304,
+        },
+        {
+          assetKey: 'dlj5qrk-6f4fb563-4381-45cb-a66f-6f0ea27095e6',
+          previewUrl:
+            'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrk-6f4fb563-4381-45cb-a66f-6f0ea27095e6.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_2.jpg',
+          baseUrl:
+            'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrk-6f4fb563-4381-45cb-a66f-6f0ea27095e6.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_2.jpg',
+          width: 1536,
+          height: 2304,
+          maxWidth: 1536,
+          maxHeight: 2304,
+        },
+      ],
+      entryByAssetKey: new Map([
+        [
+          'dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78',
+          {
+            assetKey: 'dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78',
+            previewUrl:
+              'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_1.jpg',
+            baseUrl:
+              'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_1.jpg',
+            width: 1536,
+            height: 2304,
+            maxWidth: 1536,
+            maxHeight: 2304,
+          },
+        ],
+        [
+          'dlj5qrk-6f4fb563-4381-45cb-a66f-6f0ea27095e6',
+          {
+            assetKey: 'dlj5qrk-6f4fb563-4381-45cb-a66f-6f0ea27095e6',
+            previewUrl:
+              'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrk-6f4fb563-4381-45cb-a66f-6f0ea27095e6.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_2.jpg',
+            baseUrl:
+              'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrk-6f4fb563-4381-45cb-a66f-6f0ea27095e6.jpg/v1/fit/w_1536,h_2304,q_70,strp/post_image_2.jpg',
+            width: 1536,
+            height: 2304,
+            maxWidth: 1536,
+            maxHeight: 2304,
+          },
+        ],
+      ]),
+    });
+
+    const modal = document.createElement('div');
+    modal.className = 'lightbox-modal';
+    const activeModalImage = document.createElement('img');
+    activeModalImage.src =
+      'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/766a0888-86ea-4f29-9b04-380d564d6217/dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78.jpg';
+    Object.defineProperty(activeModalImage, 'naturalWidth', { value: 1536, configurable: true });
+    Object.defineProperty(activeModalImage, 'naturalHeight', { value: 2304, configurable: true });
+    setRect(activeModalImage, rect(0, 0, 420, 640));
+    modal.appendChild(activeModalImage);
+    document.body.appendChild(modal);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [activeModalImage],
+      configurable: true,
+    });
+
+    let capturedUrl: string | null = null;
+    let capturedReferrer: string | null = null;
+    installMediaReactionOverlay(
+      {
+        root,
+        showToast: () => {},
+        sendMessageSafe: (_message, callback) => callback({ ok: true, data: {} }),
+        isSheetOpen: () => false,
+        chooseDialog: async () => 'cancel',
+      },
+      {
+        rootId: 'atlas-downloader-root',
+        minWidth: 0,
+        maxMetadataLen: 255,
+        limitString: (value) => String(value ?? ''),
+        sourceFromMediaUrl: () => 'web',
+        fetchAtlasStatus: (_send, url, referrerUrl, callback) => {
+          capturedUrl = url;
+          capturedReferrer = referrerUrl;
+          callback(null);
+        },
+        atlasStatusCache: new Map(),
+        getCachedAtlasStatus: () => null,
+      }
+    );
+
+    activeModalImage.dispatchEvent(
+      new MouseEvent('pointerover', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 10,
+        clientY: 10,
+      })
+    );
+
+    expect(mockedResolvePostContext).toHaveBeenCalled();
+    expect(capturedUrl).toContain('dlj5qrj-b445b5e5-ee27-42e6-b3d7-72a46dfa9b78.jpg');
+    expect(capturedReferrer).toBe(`${window.location.origin}/forgebond/art/sample-piece-1301970367#image-1`);
   });
 });
 
