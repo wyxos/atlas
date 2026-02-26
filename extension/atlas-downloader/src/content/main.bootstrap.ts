@@ -192,6 +192,7 @@ export function runContentScript() {
       status: {
         exists: boolean;
         downloaded: boolean;
+        failed?: boolean;
         blacklisted: boolean;
         reactionType: string | null;
         downloadProgress?: number | null;
@@ -239,6 +240,7 @@ export function runContentScript() {
         | {
           exists?: unknown;
           downloaded?: unknown;
+          failed?: unknown;
           blacklisted?: unknown;
           reaction?: { type?: unknown } | null;
           download_progress?: unknown;
@@ -253,6 +255,7 @@ export function runContentScript() {
       const status = {
         exists: Boolean(match.exists),
         downloaded: Boolean(match.downloaded),
+        failed: Boolean(match.failed),
         blacklisted: Boolean(match.blacklisted),
         reactionType: match.reaction?.type ? String(match.reaction.type) : null,
         downloadProgress: normalizeProgress(match.download_progress),
@@ -584,6 +587,7 @@ export function runContentScript() {
         atlasStatusCache.set(lookup, {
           exists: true,
           downloaded,
+          failed,
           blacklisted: cached ? Boolean(cached.blacklisted) : false,
           reactionType: cached?.reactionType ?? null,
           downloadProgress: downloaded ? 100 : failed ? 0 : progress ?? cached?.downloadProgress ?? null,
@@ -606,6 +610,7 @@ export function runContentScript() {
         item.atlas = {
           exists: true,
           downloaded,
+          failed,
           blacklisted: item.atlas?.blacklisted ?? false,
           file_id: item.atlas?.file_id ?? null,
           reaction: item.atlas?.reaction ?? null,
@@ -1078,6 +1083,7 @@ export function runContentScript() {
             | {
               exists?: unknown;
               downloaded?: unknown;
+              failed?: unknown;
               blacklisted?: unknown;
               file_id?: unknown;
               reaction?: { type?: unknown } | null;
@@ -1092,20 +1098,35 @@ export function runContentScript() {
           item.atlas = {
             exists: Boolean(match.exists),
             downloaded: Boolean(match.downloaded),
+            failed: Boolean(match.failed),
             blacklisted: Boolean(match.blacklisted),
             file_id: match.file_id ?? null,
             reaction: match.reaction ?? null,
           };
           const reactionType = item.atlas.reaction?.type ? String(item.atlas.reaction.type) : null;
-          const isQueuedReaction = item.atlas.exists && !item.atlas.downloaded && Boolean(reactionType) && reactionType !== 'dislike';
-          const hasTerminalAtlasState = item.atlas.downloaded || item.atlas.blacklisted || !isQueuedReaction;
+          const isQueuedReaction =
+            item.atlas.exists
+            && !item.atlas.downloaded
+            && !item.atlas.failed
+            && Boolean(reactionType)
+            && reactionType !== 'dislike';
+          const hasTerminalAtlasState = item.atlas.downloaded || item.atlas.blacklisted || item.atlas.failed || !isQueuedReaction;
 
-          if (hasTerminalAtlasState) {
+          if (item.atlas.failed) {
+            item.status = 'Failed';
+            item.statusClass = 'err';
+          } else if (hasTerminalAtlasState) {
             item.status = '';
             item.statusClass = '';
           }
 
-          if (item.atlas.exists && !item.atlas.downloaded && item.atlas.reaction?.type && item.atlas.reaction.type !== 'dislike') {
+          if (
+            item.atlas.exists
+            && !item.atlas.downloaded
+            && !item.atlas.failed
+            && item.atlas.reaction?.type
+            && item.atlas.reaction.type !== 'dislike'
+          ) {
             item.reactionQueued = item.atlas.reaction.type;
             for (const lookup of lookups) {
               queuedLookupUrls.add(lookup);
@@ -1120,6 +1141,7 @@ export function runContentScript() {
           const status = {
             exists: Boolean(match.exists),
             downloaded: Boolean(match.downloaded),
+            failed: Boolean(match.failed),
             blacklisted: Boolean(match.blacklisted),
             reactionType: match.reaction?.type ? String(match.reaction.type) : null,
             downloadProgress: normalizeProgress(match.download_progress),
@@ -1194,6 +1216,7 @@ export function runContentScript() {
           item.atlas = {
             exists: Boolean(file),
             downloaded: Boolean(file?.downloaded),
+            failed: false,
             blacklisted: Boolean(file?.blacklisted_at),
             file_id: file?.id ?? null,
             reaction: data?.reaction ?? null,
@@ -1203,6 +1226,7 @@ export function runContentScript() {
           const status = {
             exists: item.atlas.exists,
             downloaded: item.atlas.downloaded,
+            failed: false,
             blacklisted: item.atlas.blacklisted,
             reactionType: item.atlas.reaction?.type ? String(item.atlas.reaction.type) : null,
             downloadProgress: normalizeProgress(file?.download_progress),
@@ -1316,6 +1340,7 @@ export function runContentScript() {
             item.atlas = {
               exists: Boolean(file),
               downloaded: Boolean(file?.downloaded),
+              failed: false,
               blacklisted: Boolean(file?.blacklisted_at),
               file_id: file?.id ?? null,
               reaction: null,
@@ -1325,6 +1350,7 @@ export function runContentScript() {
             const status = {
               exists: item.atlas.exists,
               downloaded: item.atlas.downloaded,
+              failed: false,
               blacklisted: item.atlas.blacklisted,
               reactionType: null,
               downloadProgress: normalizeProgress(file?.download_progress),
@@ -1419,6 +1445,7 @@ export function runContentScript() {
               item.atlas = {
                 exists: Boolean(file),
                 downloaded: Boolean(file?.downloaded),
+                failed: false,
                 blacklisted: Boolean(file?.blacklisted_at),
                 file_id: file?.id ?? null,
                 reaction: item.atlas?.reaction ?? null,
@@ -1428,6 +1455,7 @@ export function runContentScript() {
                 const status = {
                   exists: item.atlas.exists,
                   downloaded: item.atlas.downloaded,
+                  failed: false,
                   blacklisted: item.atlas.blacklisted,
                   reactionType: item.atlas.reaction?.type ? String(item.atlas.reaction.type) : null,
                   downloadProgress: normalizeProgress(file?.download_progress),
@@ -1703,6 +1731,7 @@ export function runContentScript() {
           atlasStatusCache.set(String(match.url), {
             exists: Boolean(match.exists),
             downloaded: Boolean(match.downloaded),
+            failed: Boolean(match.failed),
             blacklisted: Boolean(match.blacklisted),
             reactionType: match.reaction?.type ? String(match.reaction.type) : null,
             downloadProgress: normalizeProgress(match.download_progress),

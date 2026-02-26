@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DownloadTransferStatus;
 use App\Http\Requests\CheckExternalFilesRequest;
 use App\Http\Requests\DeleteExternalFileDownloadRequest;
 use App\Http\Requests\ReactExternalFileRequest;
 use App\Http\Requests\StoreExternalFileRequest;
 use App\Http\Resources\FileResource;
+use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\DownloadedFileResetService;
@@ -146,6 +148,7 @@ class ExternalFilesController extends Controller
             }
         }
         $files = $filesByUrl->concat($filesByReferrer)->unique('id')->values();
+        $latestTransfersByFileId = $this->latestTransfersByFileId($files);
 
         foreach ($filesByLookup as $lookup => $candidates) {
             if (! isset($allowedLookupSet[$lookup])) {
@@ -170,7 +173,7 @@ class ExternalFilesController extends Controller
                 ->keyBy('file_id');
         }
 
-        $results = array_map(function (string $url) use ($filesByLookup, $reactionsByFileId): array {
+        $results = array_map(function (string $url) use ($filesByLookup, $reactionsByFileId, $latestTransfersByFileId): array {
             $rawLookupUrl = trim($url);
             $lookupUrl = $this->stripFragment($rawLookupUrl);
             /** @var Collection<int, File> $exactCandidates */
@@ -180,12 +183,21 @@ class ExternalFilesController extends Controller
                 ? $exactCandidates
                 : collect($filesByLookup[$lookupUrl] ?? [])->unique('id')->values();
             $downloadedCandidate = $candidates->first(fn (File $candidate): bool => (bool) $candidate->downloaded);
+            $latestTransfer = $candidates
+                ->map(fn (File $candidate) => $latestTransfersByFileId->get($candidate->id))
+                ->filter(fn ($transfer) => $transfer instanceof DownloadTransfer)
+                ->sortByDesc(fn (DownloadTransfer $transfer) => $transfer->id)
+                ->first();
             $downloadedAt = optional(
                 $candidates
                     ->filter(fn (File $candidate): bool => $candidate->downloaded_at !== null)
                     ->sortByDesc(fn (File $candidate): int => $candidate->downloaded_at?->getTimestamp() ?? 0)
                     ->first()
             )->downloaded_at?->toIso8601String();
+            $isDownloaded = $candidates->contains(fn (File $candidate): bool => (bool) $candidate->downloaded);
+            $isFailed = ! $isDownloaded
+                && $latestTransfer instanceof DownloadTransfer
+                && in_array((string) $latestTransfer->status, [DownloadTransferStatus::FAILED, DownloadTransferStatus::CANCELED], true);
             $file = $this->pickBestCheckMatch($candidates, $rawLookupUrl, $lookupUrl, $reactionsByFileId);
             $reaction = $file ? $reactionsByFileId->get($file->id) : null;
             if (! $reaction) {
@@ -205,7 +217,9 @@ class ExternalFilesController extends Controller
             return [
                 'url' => $url,
                 'exists' => $candidates->isNotEmpty(),
-                'downloaded' => $candidates->contains(fn (File $candidate): bool => (bool) $candidate->downloaded),
+                'downloaded' => $isDownloaded,
+                'failed' => $isFailed,
+                'failed_at' => $isFailed ? $latestTransfer?->failed_at?->toIso8601String() : null,
                 'downloaded_at' => $downloadedAt ?: $downloadedCandidate?->updated_at?->toIso8601String(),
                 'download_progress' => (int) $candidates->max(fn (File $candidate): int => (int) ($candidate->download_progress ?? 0)),
                 'blacklisted' => $candidates->contains(fn (File $candidate): bool => $candidate->blacklisted_at !== null),
@@ -451,5 +465,31 @@ class ExternalFilesController extends Controller
                 ->all())
             ->unique('id')
             ->values();
+    }
+
+    /**
+     * @param  Collection<int, File>  $files
+     * @return Collection<int, DownloadTransfer>
+     */
+    private function latestTransfersByFileId(Collection $files): Collection
+    {
+        $fileIds = $files
+            ->pluck('id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($fileIds === []) {
+            return collect();
+        }
+
+        return DownloadTransfer::query()
+            ->whereIn('file_id', $fileIds)
+            ->orderByDesc('id')
+            ->get(['id', 'file_id', 'status', 'failed_at'])
+            ->unique('file_id')
+            ->keyBy('file_id');
     }
 }
