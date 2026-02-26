@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildItemFromElement, collectLookupKeysForNode, configureMediaNoiseFilters } from './items';
+import { DEFAULT_MEDIA_NOISE_FILTERS_TEXT } from '../shared/settingsDefaults';
 
 function setLocation(url: string) {
   const next = new URL(url, window.location.origin);
@@ -84,6 +85,7 @@ describe('items', () => {
 
   it('excludes built-in deviantart noise hosts', () => {
     setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
+    configureMediaNoiseFilters(DEFAULT_MEDIA_NOISE_FILTERS_TEXT);
     const img = document.createElement('img');
     img.src = 'https://st.deviantart.net/eclipse/popups/hover-component/2024/deviation-2x.png';
     setImageSize(img, 700, 700);

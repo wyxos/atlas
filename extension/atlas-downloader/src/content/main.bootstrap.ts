@@ -1,6 +1,7 @@
 import './content.css';
 import { createApp, h, reactive } from 'vue';
 import { registrableDomainFromUrl } from '../shared/domain';
+import { DEFAULT_MEDIA_NOISE_FILTERS_TEXT } from '../shared/settingsDefaults';
 import {
   buildDirectPageCandidate,
   buildItemFromElement,
@@ -76,6 +77,10 @@ declare const chrome: ChromeApi;
 type AtlasTestWindow = Window & {
   __ATLAS_TEST_SHADOW_MODE?: unknown;
 };
+
+function resolveNoiseFiltersSetting(value: unknown): string {
+  return typeof value === 'string' ? value : DEFAULT_MEDIA_NOISE_FILTERS_TEXT;
+}
 
 export function runContentScript() {
   const DEFAULT_MIN_MEDIA_WIDTH = 0;
@@ -311,7 +316,7 @@ export function runContentScript() {
 
     try {
       chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
-        configureMediaNoiseFilters(data.atlasMediaNoiseFilters || '');
+        configureMediaNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
         minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
         const baseHost = resolveHost(data.atlasBaseUrl || '');
@@ -338,7 +343,7 @@ export function runContentScript() {
     }
 
     if ('atlasMediaNoiseFilters' in changes) {
-      configureMediaNoiseFilters(changes.atlasMediaNoiseFilters?.newValue || '');
+      configureMediaNoiseFilters(resolveNoiseFiltersSetting(changes.atlasMediaNoiseFilters?.newValue));
     }
 
     if ('atlasMinMediaWidth' in changes) {
@@ -347,7 +352,7 @@ export function runContentScript() {
   });
 
   chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
-    configureMediaNoiseFilters(data.atlasMediaNoiseFilters || '');
+    configureMediaNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
     minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
     const baseHost = resolveHost(data.atlasBaseUrl || '');

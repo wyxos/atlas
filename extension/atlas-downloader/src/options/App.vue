@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref} from 'vue';
+import { DEFAULT_MEDIA_NOISE_FILTERS } from '../shared/settingsDefaults';
 import {
   Check,
   Eye,
@@ -106,6 +107,15 @@ const mediaNoiseFiltersString = computed(() =>
     .filter(Boolean)
     .join('\n')
 );
+
+const noiseFiltersPlaceholder = computed(() => {
+  const [first = '', second = ''] = DEFAULT_MEDIA_NOISE_FILTERS;
+  if (first && second) {
+    return `${first} or ${second}`;
+  }
+
+  return first || 'host:example.com';
+});
 
 const realtimeStateLabel = computed(() => {
   switch (realtimeStatus.value.state) {
@@ -266,6 +276,10 @@ function parseNoiseFilters(raw: string): string[] {
     .filter((v) => v && !v.startsWith('#'))
     .map(normalizeNoiseFilter)
     .filter(Boolean);
+}
+
+function resolveNoiseFiltersSetting(value: unknown): string {
+  return typeof value === 'string' ? value : DEFAULT_MEDIA_NOISE_FILTERS.join('\n');
 }
 
 function normalizeNoiseFilter(input: string): string {
@@ -461,7 +475,7 @@ onMounted(() => {
       .sort((a, b) => a.localeCompare(b))
       .map((v) => ({value: v, isEditing: false, draft: v}));
 
-    const parsedNoiseFilters = parseNoiseFilters(data.atlasMediaNoiseFilters || '');
+    const parsedNoiseFilters = parseNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
     noiseFilters.value = parsedNoiseFilters
       .sort((a, b) => a.localeCompare(b))
       .map((v) => ({value: v, isEditing: false, draft: v}));
@@ -702,7 +716,7 @@ onUnmounted(() => {
                 id="addNoiseFilter"
                 v-model="addNoiseFilter"
                 class="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
-                placeholder="host:st.deviantart.net or url:*w_92,h_92*"
+                :placeholder="noiseFiltersPlaceholder"
                 @keydown.enter.prevent="addNoiseFiltersFromInput"
               />
               <button
