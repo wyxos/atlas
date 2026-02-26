@@ -70,3 +70,58 @@ it('falls back to yt-dlp when a video url resolves to HTML', function () {
 
     Bus::assertNotDispatched(DownloadTransferSingleStream::class);
 });
+
+it('falls back to yt-dlp when HEAD probe is unavailable for a video url', function () {
+    Bus::fake([
+        DownloadTransferYtDlp::class,
+        DownloadTransferSingleStream::class,
+    ]);
+
+    $url = 'https://x.com/devops_nk/status/2027073988082741620';
+
+    Http::fake(function (Request $request) use ($url) {
+        if ($request->method() !== 'HEAD') {
+            throw new RuntimeException('Unexpected HTTP method: '.$request->method());
+        }
+
+        if ((string) $request->url() !== $url) {
+            throw new RuntimeException('Unexpected URL: '.$request->url());
+        }
+
+        return Http::response('', 403);
+    });
+
+    $file = File::factory()->create([
+        'source' => 'Extension',
+        'url' => $url,
+        'referrer_url' => $url,
+        'downloaded' => false,
+        'path' => null,
+        'listing_metadata' => ['tag_name' => 'video', 'page_url' => $url],
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'x.com',
+        'status' => DownloadTransferStatus::QUEUED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 0,
+    ]);
+
+    PrepareDownloadTransfer::dispatchSync($transfer->id);
+
+    $transfer->refresh();
+    expect($transfer->status)->toBe(DownloadTransferStatus::DOWNLOADING);
+
+    $file->refresh();
+    expect(data_get($file->listing_metadata, 'download_via'))->toBe('yt-dlp');
+    expect(data_get($file->listing_metadata, 'download_via_reason'))->toBe('head-probe-unavailable');
+
+    Bus::assertDispatched(DownloadTransferYtDlp::class, function (DownloadTransferYtDlp $job) use ($transfer) {
+        return $job->downloadTransferId === $transfer->id;
+    });
+
+    Bus::assertNotDispatched(DownloadTransferSingleStream::class);
+});

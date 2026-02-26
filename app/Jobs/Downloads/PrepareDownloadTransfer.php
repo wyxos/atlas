@@ -101,14 +101,17 @@ class PrepareDownloadTransfer implements ShouldQueue
             $contentType = $head->header('Content-Type');
             $contentLength = $head->header('Content-Length');
             $acceptRanges = $head->header('Accept-Ranges');
+            $headStatus = $head->status();
+            $headMime = is_string($contentType)
+                ? strtolower(trim(explode(';', $contentType, 2)[0]))
+                : '';
 
             $tagName = data_get($transfer->file->listing_metadata, 'tag_name');
-            if (is_string($contentType)) {
-                $mime = strtolower(trim(explode(';', $contentType, 2)[0]));
-
-                // Some "video" URLs are actually HTML pages (e.g. YouTube embeds). For videos/iframes, prefer
-                // yt-dlp so we don't "download" HTML and mark it as completed.
-                if (in_array($tagName, ['video', 'iframe'], true) && in_array($mime, ['text/html', 'application/xhtml+xml'], true)) {
+            if (in_array($tagName, ['video', 'iframe'], true)) {
+                // For video/iframe sources, treat blocked/empty HEAD probes like HTML pages and force yt-dlp.
+                $headLooksLikeHtml = in_array($headMime, ['text/html', 'application/xhtml+xml'], true);
+                $headProbeUnavailable = $headStatus >= 400 || $headMime === '';
+                if ($headLooksLikeHtml || $headProbeUnavailable) {
                     try {
                         $metadata = $transfer->file->listing_metadata;
                         if ($metadata instanceof \Illuminate\Support\Collection) {
@@ -119,7 +122,9 @@ class PrepareDownloadTransfer implements ShouldQueue
                         }
 
                         $metadata['download_via'] = 'yt-dlp';
-                        $metadata['download_via_reason'] = 'content-type-html';
+                        $metadata['download_via_reason'] = $headLooksLikeHtml
+                            ? 'content-type-html'
+                            : 'head-probe-unavailable';
 
                         $transfer->file->forceFill([
                             'listing_metadata' => $metadata,
