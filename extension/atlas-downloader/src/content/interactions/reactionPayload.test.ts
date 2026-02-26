@@ -37,4 +37,16 @@ describe('buildReactionPayloadFromMedia', () => {
     expect(payload).not.toBeNull();
     expect(payload?.width).toBe(640);
   });
+
+  it('falls back to page-url yt-dlp mode when video has a non-http source', () => {
+    const video = document.createElement('video');
+    video.src = 'mediastream:facebook-reel';
+    Object.defineProperty(video, 'videoWidth', { value: 720, configurable: true });
+    Object.defineProperty(video, 'videoHeight', { value: 1280, configurable: true });
+
+    const payload = buildReactionPayloadFromMedia(video, 'like', makeDeps(320));
+    expect(payload).not.toBeNull();
+    expect(payload?.url).toBe(window.location.href);
+    expect(payload?.download_via).toBe('yt-dlp');
+  });
 });
