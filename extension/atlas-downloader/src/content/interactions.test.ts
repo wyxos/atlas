@@ -467,6 +467,18 @@ describe('formatOverlayDownloadMeta', () => {
       })
     ).toBe('Queued');
   });
+
+  it('shows failed state when download failed', () => {
+    expect(
+      formatOverlayDownloadMeta({
+        exists: true,
+        downloaded: false,
+        failed: true,
+        blacklisted: false,
+        reactionType: 'like',
+      })
+    ).toBe('Failed');
+  });
 });
 
 describe('formatDownloadedAtUtc', () => {
@@ -505,6 +517,16 @@ describe('resolveOverlayProgressPercent', () => {
         downloaded: false,
         blacklisted: true,
         reactionType: 'dislike',
+      })
+    ).toBeNull();
+
+    expect(
+      resolveOverlayProgressPercent({
+        exists: true,
+        downloaded: false,
+        failed: true,
+        blacklisted: false,
+        reactionType: 'like',
       })
     ).toBeNull();
 

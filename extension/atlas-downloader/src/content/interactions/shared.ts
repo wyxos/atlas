@@ -7,6 +7,7 @@ export const LOCATION_CHANGE_EVENT = 'atlas-location-change';
 export type AtlasStatus = {
   exists: boolean;
   downloaded: boolean;
+  failed?: boolean;
   blacklisted: boolean;
   reactionType: string | null;
   downloadProgress?: number | null;
@@ -135,6 +136,10 @@ export function formatOverlayDownloadMeta(status: AtlasStatus | null): string {
     return downloadedAt ? `Downloaded ${downloadedAt}` : 'Downloaded';
   }
 
+  if (status.failed) {
+    return 'Failed';
+  }
+
   const progress = normalizeProgress(status.downloadProgress);
   if (progress !== null && progress > 0 && progress < 100) {
     return `Downloading ${Math.round(progress)}%`;
@@ -154,6 +159,10 @@ export function resolveOverlayProgressPercent(status: AtlasStatus | null): numbe
 
   if (status.downloaded) {
     return 100;
+  }
+
+  if (status.failed) {
+    return null;
   }
 
   if (status.blacklisted || status.reactionType === 'dislike') {
