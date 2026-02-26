@@ -11,7 +11,7 @@ import {
 import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from './interactions';
 import { buildLookupKeys } from './lookupKeys';
 import { createSendMessageSafe } from './messaging';
-import { isHostExcluded, isHostMatch, parseExcludedDomains, resolveHost, stripHash } from './network';
+import { stripHash } from './network';
 import { isOpenTabHighlightEligibleUrl, normalizeOpenTabUrl } from './openTabUrl';
 import {
   buildStatusMapFromCache,
@@ -39,8 +39,6 @@ import { resolveSheetReactionPrompt } from './main/reactionPrompt';
 import SheetModal from './ui-vue/SheetModal.vue';
 
 type ContentSettings = {
-  atlasBaseUrl?: string;
-  atlasExcludedDomains?: string;
   atlasMediaNoiseFilters?: string;
   atlasMinMediaWidth?: unknown;
 };
@@ -84,7 +82,7 @@ function resolveNoiseFiltersSetting(value: unknown): string {
 
 export function runContentScript() {
   const DEFAULT_MIN_MEDIA_WIDTH = 0;
-  const CONTENT_SETTINGS_KEYS = ['atlasBaseUrl', 'atlasExcludedDomains', 'atlasMediaNoiseFilters', 'atlasMinMediaWidth'];
+  const CONTENT_SETTINGS_KEYS = ['atlasMediaNoiseFilters', 'atlasMinMediaWidth'];
   // Keep extension metadata short; some Atlas deployments validate at 500 chars.
   const MAX_METADATA_LEN = 500;
   const ROOT_ID = 'atlas-downloader-root';
@@ -319,16 +317,6 @@ export function runContentScript() {
         configureMediaNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
         minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
-        const baseHost = resolveHost(data.atlasBaseUrl || '');
-        if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
-          return;
-        }
-
-        const excluded = parseExcludedDomains(data.atlasExcludedDomains || '');
-        if (isHostExcluded(window.location.hostname, excluded)) {
-          return;
-        }
-
         mountUi();
         openSheet?.();
       });
@@ -354,16 +342,6 @@ export function runContentScript() {
   chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
     configureMediaNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
     minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
-
-    const baseHost = resolveHost(data.atlasBaseUrl || '');
-    if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
-      return;
-    }
-
-    const excluded = parseExcludedDomains(data.atlasExcludedDomains || '');
-    if (isHostExcluded(window.location.hostname, excluded)) {
-      return;
-    }
 
     if (IS_TOP_WINDOW) {
       mountUi();
@@ -423,6 +401,15 @@ export function runContentScript() {
     let reactingItemType: string | null = null;
     let debugTargetUrl: string | null = null;
     let markerSyncTimer: number | null = null;
+    const scheduleMarkerSync = (delayMs = 300) => {
+      if (markerSyncTimer !== null) {
+        window.clearTimeout(markerSyncTimer);
+      }
+      markerSyncTimer = window.setTimeout(() => {
+        markerSyncTimer = null;
+        syncAtlasStatusForPageMarkers();
+      }, delayMs);
+    };
     const queuedLookupUrls = new Set<string>();
     const lookupByTransferId = new Map<number, string>();
     // Enable hotkeys immediately after UI mounts; event delegation makes it work for dynamic content too.
@@ -548,6 +535,7 @@ export function runContentScript() {
       }
 
       const data = payload as {
+        event?: unknown;
         transferId?: unknown;
         status?: unknown;
         percent?: unknown;
@@ -560,11 +548,16 @@ export function runContentScript() {
       };
 
       const transferId = Number.isFinite(Number(data.transferId)) ? Number(data.transferId) : null;
+      const eventName = typeof data.event === 'string' ? data.event : '';
       const status = typeof data.status === 'string' ? data.status : '';
       const progress = normalizeProgress(data.percent);
       const downloaded = Boolean(data.downloaded) || status === 'completed' || typeof data.finished_at === 'string';
       const failed = Boolean(data.failed) || status === 'failed' || status === 'canceled' || typeof data.failed_at === 'string';
       const downloadedAt = downloaded ? normalizeDownloadedAt(data.finished_at) : null;
+      const isStartEvent =
+        eventName === 'DownloadTransferCreated'
+        || eventName === 'DownloadTransferQueued';
+      const isEndEvent = downloaded || failed;
 
       const originalLookup = typeof data.original === 'string' ? data.original.trim() : '';
       const referrerLookup = typeof data.referrer_url === 'string' ? data.referrer_url.trim() : '';
@@ -646,6 +639,10 @@ export function runContentScript() {
 
       if (cacheUpdated) {
         window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
+      }
+
+      if (isStartEvent || isEndEvent) {
+        scheduleMarkerSync(isEndEvent ? 120 : 220);
       }
 
       if (!changed) {
@@ -828,15 +825,6 @@ export function runContentScript() {
       true
     );
 
-    const scheduleMarkerSync = (delayMs = 300) => {
-      if (markerSyncTimer !== null) {
-        window.clearTimeout(markerSyncTimer);
-      }
-      markerSyncTimer = window.setTimeout(() => {
-        markerSyncTimer = null;
-        syncAtlasStatusForPageMarkers();
-      }, delayMs);
-    };
     let reactionBadgeSyncFrame: number | null = null;
     const syncReactionBadgesFromDom = () => {
       syncReactionIconBadges(

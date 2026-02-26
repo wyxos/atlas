@@ -10,7 +10,6 @@ import { buildReactionBroadcastEvent, type ReactionBroadcastEvent } from './reac
 type AtlasSettings = {
   atlasBaseUrl?: string;
   atlasToken?: string;
-  atlasExcludedDomains?: string;
 };
 
 type ChromeRuntime = {
@@ -165,11 +164,9 @@ const DEFAULT_ICON_FILES: Record<number, string> = {
   48: 'icon-48.png',
 };
 const DEFAULT_ICON_PATHS = resolveIconPaths(DEFAULT_ICON_FILES);
-const RED_TINT = 'rgba(220, 38, 38, 0.78)';
 
 const MENU_OPEN_OPTIONS = 'atlas-open-options';
 const MENU_OPEN_SITE = 'atlas-open-site';
-const MENU_BLACKLIST_DOMAIN = 'atlas-blacklist-domain';
 const MENU_RELOAD_EXTENSION = 'atlas-reload-extension';
 const MESSAGE_REALTIME_STATUS_REQUEST = 'atlas-realtime-status-request';
 const MESSAGE_REALTIME_STATUS_CHANGED = 'atlas-realtime-status-changed';
@@ -227,7 +224,6 @@ type RealtimeConnectionStatus = {
   updatedAt: number;
 };
 
-let excludedIconImageDataPromise: Promise<Record<number, ImageData> | null> | null = null;
 let realtimeClient: Pusher | null = null;
 let realtimeChannel: Pusher.Channel | null = null;
 let realtimeConfigSignature = '';
@@ -308,11 +304,6 @@ chrome.runtime.onInstalled.addListener(() => {
       contexts: ['action'],
     });
     chrome.contextMenus.create({
-      id: MENU_BLACKLIST_DOMAIN,
-      title: 'Blacklist this domain',
-      contexts: ['action'],
-    });
-    chrome.contextMenus.create({
       id: MENU_RELOAD_EXTENSION,
       title: 'Reload extension (check updates)',
       contexts: ['action'],
@@ -332,7 +323,7 @@ chrome.runtime.onStartup.addListener(() => {
   scheduleOpenTabsBroadcast(80);
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId === MENU_OPEN_OPTIONS) {
     chrome.runtime.openOptionsPage();
     return;
@@ -349,11 +340,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       // Opening a new tab doesn't require tab permission.
       chrome.tabs.create({ url: baseUrl });
     });
-    return;
-  }
-
-  if (info.menuItemId === MENU_BLACKLIST_DOMAIN) {
-    void blacklistDomainFromTab(tab);
     return;
   }
 
@@ -422,7 +408,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     return;
   }
 
-  void refreshActionForTab(tabId, tab?.url || changeInfo.url || '');
+  void refreshActionForTab(tabId);
 
   if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
     scheduleOpenTabsBroadcast(100);
@@ -444,12 +430,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   ) {
     void ensureRealtimeConnection(true);
   }
-
-  if (!Object.prototype.hasOwnProperty.call(changes, 'atlasExcludedDomains')) {
-    return;
-  }
-
-  void refreshActionForActiveTab();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -536,27 +516,6 @@ void refreshActionForActiveTab();
 void ensureRealtimeConnection();
 scheduleOpenTabsBroadcast(100);
 
-async function blacklistDomainFromTab(tab?: ChromeTab) {
-  const tabId = tab?.id;
-  const tabUrl = typeof tab?.url === 'string' ? tab.url : '';
-  const host = resolveHost(tabUrl);
-  if (!host) {
-    return;
-  }
-
-  const settings = await chrome.storage.sync.get(['atlasExcludedDomains']);
-  const excludedHosts = parseExcludedDomains(settings.atlasExcludedDomains || '');
-  if (!isHostExcluded(host, excludedHosts)) {
-    excludedHosts.push(host);
-    const next = [...new Set(excludedHosts)].sort((a, b) => a.localeCompare(b));
-    await chrome.storage.sync.set({ atlasExcludedDomains: next.join('\n') });
-  }
-
-  if (tabId) {
-    await refreshActionForTab(tabId, tabUrl);
-  }
-}
-
 function reloadExtension() {
   let didReload = false;
 
@@ -593,7 +552,7 @@ async function refreshActionForActiveTab() {
       return;
     }
 
-    await refreshActionForTab(activeTab.id, activeTab.url || '');
+    await refreshActionForTab(activeTab.id);
   } catch {
     // Ignore transient tab/query failures.
   }
@@ -601,34 +560,14 @@ async function refreshActionForActiveTab() {
 
 async function refreshActionForTabId(tabId: number) {
   try {
-    const tab = await chrome.tabs.get(tabId);
-    await refreshActionForTab(tabId, tab?.url || '');
+    await chrome.tabs.get(tabId);
+    await refreshActionForTab(tabId);
   } catch {
     // Ignore tabs that disappear mid-refresh.
   }
 }
 
-async function refreshActionForTab(tabId: number, tabUrl: string) {
-  const host = resolveHost(tabUrl);
-  if (!host) {
-    setActionDefault(tabId);
-    return;
-  }
-
-  let isExcluded = false;
-  try {
-    const settings = await chrome.storage.sync.get(['atlasExcludedDomains']);
-    const excludedHosts = parseExcludedDomains(settings.atlasExcludedDomains || '');
-    isExcluded = isHostExcluded(host, excludedHosts);
-  } catch {
-    isExcluded = false;
-  }
-
-  if (isExcluded) {
-    await setActionExcluded(tabId);
-    return;
-  }
-
+async function refreshActionForTab(tabId: number) {
   setActionDefault(tabId);
 }
 
@@ -737,93 +676,6 @@ function setActionDefault(tabId: number) {
   chrome.action.setTitle({ tabId, title: DEFAULT_ACTION_TITLE });
 }
 
-async function setActionExcluded(tabId: number) {
-  const redIcon = await getExcludedIconImageData();
-  if (redIcon) {
-    setActionIcon({
-      tabId,
-      imageData: {
-        16: redIcon[16],
-        32: redIcon[32],
-        48: redIcon[48],
-      },
-    });
-    chrome.action.setBadgeText({ tabId, text: '' });
-  } else {
-    // Fallback for environments that don't support dynamic icon imageData.
-    setActionIcon({ tabId, path: DEFAULT_ICON_PATHS });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: '#dc2626' });
-    chrome.action.setBadgeText({ tabId, text: 'OFF' });
-  }
-
-  chrome.action.setTitle({ tabId, title: 'Atlas Downloader (domain excluded)' });
-}
-
-async function getExcludedIconImageData(): Promise<Record<number, ImageData> | null> {
-  if (excludedIconImageDataPromise) {
-    return excludedIconImageDataPromise;
-  }
-
-  excludedIconImageDataPromise = buildExcludedIconImageData();
-  return excludedIconImageDataPromise;
-}
-
-async function buildExcludedIconImageData(): Promise<Record<number, ImageData> | null> {
-  if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap !== 'function') {
-    return null;
-  }
-
-  try {
-    const result: Record<number, ImageData> = {};
-    for (const size of [16, 32, 48]) {
-      const iconPath = DEFAULT_ICON_PATHS[size];
-      const response = await fetch(iconPath);
-      if (!response.ok) {
-        return null;
-      }
-
-      const blob = await response.blob();
-      const bitmap = await createImageBitmap(blob);
-      const canvas = new OffscreenCanvas(size, size);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        bitmap.close?.();
-        return null;
-      }
-
-      ctx.clearRect(0, 0, size, size);
-      ctx.drawImage(bitmap, 0, 0, size, size);
-      bitmap.close?.();
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = RED_TINT;
-      ctx.fillRect(0, 0, size, size);
-      ctx.globalCompositeOperation = 'source-over';
-      result[size] = ctx.getImageData(0, 0, size, size);
-    }
-
-    return result;
-  } catch {
-    return null;
-  }
-}
-
-function parseExcludedDomains(value: string): string[] {
-  if (!value || typeof value !== 'string') {
-    return [];
-  }
-
-  return value
-    .split(/[\n,]/g)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry && !entry.startsWith('#'))
-    .map((entry) => {
-      const wildcard = entry.startsWith('*.') ? entry.slice(2) : entry;
-      return wildcard.toLowerCase();
-    })
-    .map((entry) => resolveHost(entry) || entry.replace(/^\.+/, '').trim())
-    .filter(Boolean);
-}
-
 function resolveHost(value: string): string {
   if (!value || typeof value !== 'string') {
     return '';
@@ -840,25 +692,6 @@ function resolveHost(value: string): string {
   } catch {
     return '';
   }
-}
-
-function isHostExcluded(currentHost: string, excludedHosts: string[]): boolean {
-  const current = (currentHost || '').toLowerCase();
-  if (!current) {
-    return false;
-  }
-
-  for (const host of excludedHosts) {
-    if (!host) {
-      continue;
-    }
-
-    if (current === host || current.endsWith(`.${host}`)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 async function ensureRealtimeConnection(forceRestart = false) {
