@@ -103,7 +103,12 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   installLocationChangeObserver();
 
   const toolbarMount = document.createElement('div');
-  options.root.appendChild(toolbarMount);
+  const styledRoot = options.root.querySelector('.atlas-shadow-root');
+  if (styledRoot instanceof HTMLElement) {
+    styledRoot.appendChild(toolbarMount);
+  } else {
+    options.root.appendChild(toolbarMount);
+  }
 
   let activeMedia: Element | null = null;
   let activeKey: string | null = null;
