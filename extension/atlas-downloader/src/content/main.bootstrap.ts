@@ -31,6 +31,7 @@ import {
 } from './ui';
 import { mountHotkeysOnly as mountHotkeysOnlyModule } from './main/mountHotkeysOnly';
 import { collectCandidates as collectCandidatesModule } from './main/collectCandidates';
+import { resolveSheetReactionPrompt } from './main/reactionPrompt';
 import SheetModal from './ui-vue/SheetModal.vue';
 
 type ContentSettings = {
@@ -1312,34 +1313,20 @@ export function runContentScript() {
         });
       };
 
-      if (type !== 'dislike' && item.atlas?.downloaded) {
-        chooseDialog({
-          title: 'Already downloaded',
-          message: 'This file is already downloaded. Re-download before updating the reaction?',
-          confirmLabel: 'Re-download',
-          cancelLabel: 'Keep existing file',
-          alternateLabel: 'Cancel',
-        }).then((choice) => {
+      const prompt = resolveSheetReactionPrompt(
+        type,
+        Boolean(item.atlas?.downloaded),
+        Boolean(options.blacklist)
+      );
+      if (prompt) {
+        chooseDialog(prompt).then((choice) => {
           if (choice === 'alternate') {
             showToast('Cancelled.');
             return;
           }
-          proceed(choice === 'confirm' ? { force_download: true } : {});
-        });
-        return;
-      }
 
-      if (type === 'dislike' && item.atlas?.downloaded) {
-        chooseDialog({
-          title: options.blacklist ? 'Blacklist file' : 'Dislike file',
-          message: 'Delete the downloaded file before applying this action?',
-          confirmLabel: 'Delete then proceed',
-          cancelLabel: 'Keep file and proceed',
-          alternateLabel: 'Cancel',
-          danger: true,
-        }).then((choice) => {
-          if (choice === 'alternate') {
-            showToast('Cancelled.');
+          if (prompt.kind === 're-download') {
+            proceed(choice === 'confirm' ? { force_download: true } : {});
             return;
           }
 
