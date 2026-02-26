@@ -7,6 +7,13 @@ export default defineConfig({
   base: './',
   root: path.resolve(__dirname, 'src/options'),
   plugins: [vue(), tailwind()],
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    __DEV__: JSON.stringify(false),
+    __VUE_OPTIONS_API__: JSON.stringify(true),
+    __VUE_PROD_DEVTOOLS__: JSON.stringify(false),
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: JSON.stringify(false),
+  },
   publicDir: false,
   build: {
     outDir: path.resolve(__dirname, 'dist'),
