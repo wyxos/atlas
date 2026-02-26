@@ -165,7 +165,6 @@ const DEFAULT_ICON_FILES: Record<number, string> = {
 };
 const DEFAULT_ICON_PATHS = resolveIconPaths(DEFAULT_ICON_FILES);
 
-const MENU_OPEN_OPTIONS = 'atlas-open-options';
 const MENU_OPEN_SITE = 'atlas-open-site';
 const MENU_RELOAD_EXTENSION = 'atlas-reload-extension';
 const MESSAGE_REALTIME_STATUS_REQUEST = 'atlas-realtime-status-request';
@@ -294,11 +293,6 @@ chrome.runtime.onInstalled.addListener(() => {
   // Right click on the extension toolbar icon shows this menu (in addition to Chrome's built-ins).
   try {
     chrome.contextMenus.create({
-      id: MENU_OPEN_OPTIONS,
-      title: 'Options',
-      contexts: ['action'],
-    });
-    chrome.contextMenus.create({
       id: MENU_OPEN_SITE,
       title: 'Open Atlas',
       contexts: ['action'],
@@ -324,11 +318,6 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === MENU_OPEN_OPTIONS) {
-    chrome.runtime.openOptionsPage();
-    return;
-  }
-
   if (info.menuItemId === MENU_OPEN_SITE) {
     chrome.storage.sync.get(['atlasBaseUrl']).then((settings) => {
       const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
