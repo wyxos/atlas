@@ -256,6 +256,55 @@ describe('installMediaReactionOverlay', () => {
     expect(toolbar).toBeTruthy();
   });
 
+  it('does not open the floating toolbar for media narrower than configured min width', () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+
+    const img = document.createElement('img');
+    img.src = 'https://cdn.example.com/small.jpg';
+    Object.defineProperty(img, 'naturalWidth', { value: 260, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 260, configurable: true });
+    setRect(img, rect(0, 0, 260, 260));
+    document.body.appendChild(img);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [img],
+      configurable: true,
+    });
+
+    installMediaReactionOverlay(
+      {
+        root,
+        showToast: () => {},
+        sendMessageSafe: (_message, callback) => callback({ ok: true, data: {} }),
+        isSheetOpen: () => false,
+        chooseDialog: async () => 'cancel',
+      },
+      {
+        rootId: 'atlas-downloader-root',
+        minWidth: 320,
+        maxMetadataLen: 255,
+        limitString: (value) => String(value ?? ''),
+        sourceFromMediaUrl: () => 'web',
+        fetchAtlasStatus: (_send, _url, _referrerUrl, callback) => callback(null),
+        atlasStatusCache: new Map(),
+        getCachedAtlasStatus: () => null,
+      }
+    );
+
+    img.dispatchEvent(
+      new MouseEvent('pointerover', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 10,
+        clientY: 10,
+      })
+    );
+
+    const toolbar = root.querySelector('.atlas-downloader-media-toolbar');
+    expect(toolbar?.classList.contains('open')).toBe(false);
+  });
+
   it('uses hovered anchor href (including relative links) for status referrer lookups', () => {
     setLocation('/some-file');
 

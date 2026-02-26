@@ -60,6 +60,11 @@ export function buildReactionPayloadFromMedia(
     return null;
   }
 
+  const width = media.videoWidth || media.clientWidth || null;
+  if (width && width < deps.minWidth) {
+    return null;
+  }
+
   const rawSrc = media.currentSrc || media.src || '';
   if (!isBlobOrDataUrl(rawSrc)) {
     return null;
@@ -72,7 +77,7 @@ export function buildReactionPayloadFromMedia(
     referrer_url: pageUrl,
     page_title: deps.limitString(document.title, deps.maxMetadataLen),
     tag_name: 'video',
-    width: media.videoWidth || media.clientWidth || null,
+    width,
     height: media.videoHeight || media.clientHeight || null,
     alt: '',
     preview_url: media.poster || '',
