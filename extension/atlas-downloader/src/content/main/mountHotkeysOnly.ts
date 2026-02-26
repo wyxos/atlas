@@ -1,4 +1,5 @@
 import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from '../interactions';
+import { createSendMessageSafe } from '../messaging';
 import { createDialogChooser, createToastFn } from '../ui';
 
 type SendMessage = (message: unknown, callback: (response: unknown) => void) => void;
@@ -70,35 +71,7 @@ export function mountHotkeysOnly(deps: MountHotkeysOnlyDeps) {
 
   const showToast = createToastFn(root);
   const chooseDialog = createDialogChooser(root);
-  const sendMessageSafe = (
-    message: unknown,
-    callback: (response: unknown) => void
-  ) => {
-    try {
-      deps.sendMessage(message, callback);
-    } catch (error) {
-      const messageText = (() => {
-        if (error instanceof Error) {
-          return error.message;
-        }
-
-        if (error && typeof error === 'object' && 'message' in error) {
-          const messageValue = (error as { message?: unknown }).message;
-          return typeof messageValue === 'string' ? messageValue : String(messageValue);
-        }
-
-        return String(error);
-      })();
-
-      if (messageText.includes('Extension context invalidated')) {
-        showToast('Atlas extension was reloaded. Refresh this tab.', 'danger');
-      } else {
-        showToast('Atlas extension error. Refresh this tab.', 'danger');
-      }
-
-      callback(null);
-    }
-  };
+  const sendMessageSafe = createSendMessageSafe(deps.sendMessage, showToast);
 
   shadow.appendChild(root);
   (document.body || document.documentElement).appendChild(host);

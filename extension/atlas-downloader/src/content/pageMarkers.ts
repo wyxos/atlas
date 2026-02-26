@@ -161,17 +161,6 @@ function appendBadge(host: HTMLElement, kind: 'reaction' | 'open-tab', className
   host.appendChild(badge);
 }
 
-function isHashSpecificReferrerLookupKey(value: string): boolean {
-  const trimmed = (value || '').trim();
-  const hashIndex = trimmed.indexOf('#');
-  if (hashIndex < 0) {
-    return false;
-  }
-
-  const fragment = trimmed.slice(hashIndex + 1).toLowerCase();
-  return /^image-\d+$/.test(fragment);
-}
-
 export function clearNodeMarkerAttributes(nodes: Iterable<Element>): void {
   const nodeList = Array.from(nodes);
 
@@ -207,9 +196,7 @@ export function buildStatusMapFromCache<T extends CacheEntry>(
     };
 
     statusByUrl.set(url, status);
-    if (!isHashSpecificReferrerLookupKey(url)) {
-      statusByUrl.set(stripHash(url), status);
-    }
+    statusByUrl.set(stripHash(url), status);
   }
 
   return statusByUrl;

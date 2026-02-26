@@ -1,4 +1,5 @@
-import { stripHash } from './network';
+import { buildLookupKeys } from './lookupKeys';
+import { normalizeDownloadedAt, normalizeProgress } from './statusMeta';
 
 export type AtlasStatusCacheEntry = {
   exists: boolean;
@@ -21,63 +22,12 @@ type ReactionStatusPayload = {
   downloadedAt?: unknown;
 };
 
-function normalizeProgress(value: unknown): number | null {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return null;
-  }
-
-  return Math.max(0, Math.min(100, parsed));
-}
-
-function normalizeDownloadedAt(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const date = new Date(trimmed);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return trimmed;
-}
-
-export function isHashSpecificReferrerLookupKey(value: string): boolean {
-  const trimmed = (value || '').trim();
-  const hashIndex = trimmed.indexOf('#');
-  if (hashIndex < 0) {
-    return false;
-  }
-
-  const fragment = trimmed.slice(hashIndex + 1).toLowerCase();
-  return /^image-\d+$/.test(fragment);
-}
-
-function addLookupKey(lookupKeys: Set<string>, rawValue: string): void {
-  const key = rawValue.trim();
-  if (!key) {
-    return;
-  }
-
-  lookupKeys.add(key);
-  if (!isHashSpecificReferrerLookupKey(key)) {
-    lookupKeys.add(stripHash(key));
-  }
-}
-
 export function collectReactionStatusLookupKeys(payload: ReactionStatusPayload): string[] {
-  const lookupKeys = new Set<string>();
-  addLookupKey(lookupKeys, typeof payload.url === 'string' ? payload.url : '');
-  addLookupKey(lookupKeys, typeof payload.referrerUrl === 'string' ? payload.referrerUrl : '');
-  addLookupKey(lookupKeys, typeof payload.previewUrl === 'string' ? payload.previewUrl : '');
-
-  return [...lookupKeys].filter(Boolean);
+  return buildLookupKeys(
+    typeof payload.url === 'string' ? payload.url : '',
+    typeof payload.referrerUrl === 'string' ? payload.referrerUrl : '',
+    typeof payload.previewUrl === 'string' ? payload.previewUrl : ''
+  );
 }
 
 export function applyReactionStatusUpdateFromPayload(

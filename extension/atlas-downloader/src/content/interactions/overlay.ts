@@ -1,11 +1,6 @@
-import { buildItemFromElement, collectLookupKeysForNode } from '../items';
+import { collectLookupKeysForNode } from '../items';
+import { buildLookupKeys } from '../lookupKeys';
 import { createApp, h, reactive } from 'vue';
-import {
-  resolveBestDeviantArtPostDownloadUrl,
-  resolveDeviantArtPostContext,
-  resolveWixAssetKey,
-  type DeviantArtPostContext,
-} from '../deviantartPost';
 import { BLACKLIST_ACTION, REACTIONS } from '../reactions';
 import OverlayToolbar from '../ui-vue/OverlayToolbar.vue';
 import {
@@ -16,12 +11,11 @@ import {
   parseFileStatusMeta,
   resolveMediaAtPoint,
   resolveOverlayProgressPercent,
-  sendMessageSafeAsync,
-  type AtlasBatchResponse,
   type AtlasStatus,
   type InteractionDependencies,
   type OverlayOptions,
 } from './shared';
+import { buildReactionPayloadFromMedia } from './reactionPayload';
 
 type AtlasWindow = Window & {
   __atlasLocationObserverInstalled?: boolean;
@@ -53,52 +47,6 @@ function installLocationChangeObserver() {
   window.addEventListener('hashchange', emit, true);
 }
 
-function buildOverlayReactionPayload(
-  media: Element,
-  reactionType: string,
-  deps: InteractionDependencies
-) {
-  const item = buildItemFromElement(media, deps.minWidth);
-  if (item) {
-    const sourceLookupUrl = item.referrer_url || window.location.href || item.url;
-    return {
-      type: reactionType,
-      url: item.url,
-      referrer_url: item.referrer_url || window.location.href,
-      page_title: deps.limitString(document.title, deps.maxMetadataLen),
-      tag_name: item.tag_name,
-      width: item.width,
-      height: item.height,
-      alt: deps.limitString(item.alt || '', deps.maxMetadataLen),
-      preview_url: item.preview_url || '',
-      source: deps.sourceFromMediaUrl(sourceLookupUrl),
-    };
-  }
-
-  if (media instanceof HTMLVideoElement) {
-    const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
-    if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
-      const pageUrl = window.location.href;
-
-      return {
-        type: reactionType,
-        url: pageUrl,
-        referrer_url: pageUrl,
-        page_title: deps.limitString(document.title, deps.maxMetadataLen),
-        tag_name: 'video',
-        width: media.videoWidth || media.clientWidth || null,
-        height: media.videoHeight || media.clientHeight || null,
-        alt: '',
-        preview_url: media.poster || '',
-        source: deps.sourceFromMediaUrl(pageUrl),
-        download_via: 'yt-dlp',
-      };
-    }
-  }
-
-  return null;
-}
-
 export function installMediaReactionOverlay(options: OverlayOptions, deps: InteractionDependencies) {
   installLocationChangeObserver();
 
@@ -122,8 +70,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   let pointerY = -1;
   let refreshMediaContextFrame: number | null = null;
   let activeLocationHref = window.location.href;
-  let activePostContext: DeviantArtPostContext | null = null;
-  let postDownloadBusy = false;
   let toolbarHovered = false;
 
   const overlayState = reactive({
@@ -135,10 +81,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     progressVisible: false,
     progressPercent: 0,
     progressState: null as 'queued' | 'active' | 'done' | null,
-    postVisible: false,
-    postDisabled: true,
-    postPending: false,
-    postCount: 0,
     buttons: [...REACTIONS, BLACKLIST_ACTION].map((reaction) => ({
       type: reaction.type,
       className: reaction.className,
@@ -155,23 +97,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   for (const button of overlayState.buttons) {
     buttonsByType.set(button.type, button);
   }
-  const buildLookupKeys = (...values: Array<string | null | undefined>): string[] => {
-    const keys = new Set<string>();
-    for (const value of values) {
-      const raw = (value || '').trim();
-      if (!raw) {
-        continue;
-      }
-
-      keys.add(raw);
-      const hashlessIndex = raw.indexOf('#');
-      if (hashlessIndex > 0) {
-        keys.add(raw.slice(0, hashlessIndex));
-      }
-    }
-
-    return [...keys];
-  };
   const getCachedForActiveKeys = (): AtlasStatus | null => {
     for (const key of activeLookupKeys) {
       const cached = deps.getCachedAtlasStatus(key);
@@ -214,21 +139,12 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     overlayState.progressState = progress <= 0 ? 'queued' : progress >= 100 ? 'done' : 'active';
     overlayState.progressPercent = Math.max(0, Math.min(100, progress));
   };
-  const syncPostIndicatorState = () => {
-    const count = activePostContext?.entries.length ?? 0;
-    const visible = count > 1;
-    overlayState.postVisible = visible;
-    overlayState.postDisabled = !visible || postDownloadBusy || toolbarBusy;
-    overlayState.postPending = postDownloadBusy;
-    overlayState.postCount = visible ? count : 0;
-  };
   const syncToolbarButtonState = () => {
     const locked = toolbarBusy || toolbarQueuedType !== null;
     for (const [type, button] of buttonsByType.entries()) {
       button.disabled = locked;
       button.pending = toolbarBusy && toolbarPendingType === type;
     }
-    syncPostIndicatorState();
   };
   const setToolbarBusy = (busy: boolean, pendingType: string | null = null) => {
     toolbarBusy = busy;
@@ -288,9 +204,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
     activeLocationHref = currentHref;
-    activePostContext = null;
-    postDownloadBusy = false;
-    syncPostIndicatorState();
     clearPendingOverlayState();
     hide(true);
   };
@@ -314,7 +227,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     activeMedia = null;
     activeKey = null;
     activeLookupKeys = [];
-    activePostContext = null;
     toolbarHovered = false;
     overlayState.open = false;
     overlayState.left = null;
@@ -322,7 +234,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     setToolbarResolution(null, null);
     setToolbarStatusMeta(null);
     setToolbarActive(null);
-    syncPostIndicatorState();
   };
 
   const scheduleHide = () => {
@@ -336,116 +247,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         hide();
       });
     });
-  };
-
-  const queueActivePostDownloads = async (reactionType: 'like' | 'love' | 'funny' = 'like') => {
-    if (postDownloadBusy) {
-      return;
-    }
-
-    let context = activePostContext;
-    if (!context || context.entries.length <= 1) {
-      options.showToast('Scanning post media…');
-      const refreshedContext = resolveDeviantArtPostContext(window.location.href, activeMedia);
-      if (refreshedContext) {
-        activePostContext = refreshedContext;
-        context = refreshedContext;
-        syncPostIndicatorState();
-      }
-    }
-
-    if (!context || context.entries.length <= 1) {
-      options.showToast('No DeviantArt post images found.');
-      return;
-    }
-
-    const basePageUrl = window.location.href.split('#')[0] || window.location.href;
-    const payloads = context.entries.map((entry, index) => {
-      const url = resolveBestDeviantArtPostDownloadUrl(entry) || entry.baseUrl;
-      const referrerHash = `${basePageUrl}#image-${index + 1}`;
-      return {
-        url,
-        referrer_url: referrerHash,
-        page_title: deps.limitString(document.title, deps.maxMetadataLen),
-        tag_name: 'img',
-        width: entry.maxWidth ?? entry.width ?? null,
-        height: entry.maxHeight ?? entry.height ?? null,
-        alt: '',
-        preview_url: entry.previewUrl || entry.baseUrl || '',
-        source: deps.sourceFromMediaUrl(referrerHash || basePageUrl || url),
-        reaction_type: reactionType,
-      };
-    });
-
-    if (payloads.length === 0) {
-      options.showToast('No downloadable post images found.');
-      return;
-    }
-
-    postDownloadBusy = true;
-    syncPostIndicatorState();
-
-    try {
-      const response = (await sendMessageSafeAsync(options.sendMessageSafe, {
-        type: 'atlas-download-batch',
-        payloads,
-      })) as AtlasBatchResponse | null | undefined;
-
-      const rawResults = Array.isArray(response?.results) ? response.results : [];
-      const okResults = rawResults.filter((result) => Boolean(result?.ok));
-      const successCount = rawResults.length > 0 ? okResults.length : response?.ok ? payloads.length : 0;
-
-      if (successCount <= 0) {
-        options.showToast(response?.error || 'Batch download failed.', 'danger');
-        return;
-      }
-
-      const now = Date.now();
-      const cacheCount = rawResults.length > 0 ? Math.min(rawResults.length, payloads.length) : payloads.length;
-      for (let index = 0; index < cacheCount; index += 1) {
-        const result = rawResults[index];
-        if (rawResults.length > 0 && !result?.ok) {
-          continue;
-        }
-
-        const payload = payloads[index];
-        if (!payload?.url) {
-          continue;
-        }
-
-        const file = result?.data?.file || null;
-        const fileMeta = parseFileStatusMeta(file);
-        const nextStatus = {
-          exists: true,
-          downloaded: Boolean(file?.downloaded),
-          blacklisted: Boolean(file?.blacklisted_at),
-          reactionType: String(payload.reaction_type || 'like'),
-          downloadProgress: fileMeta.downloadProgress,
-          downloadedAt: fileMeta.downloadedAt,
-          ts: now,
-        };
-        for (const key of buildLookupKeys(payload.url, payload.preview_url, payload.referrer_url)) {
-          deps.atlasStatusCache.set(key, nextStatus);
-        }
-      }
-
-      window.dispatchEvent(new Event('atlas-status-cache-updated'));
-      if (activeLookupKeys.length > 0) {
-        const cached = getCachedForActiveKeys();
-        setToolbarStatusMeta(cached);
-        setToolbarQueued(cached?.reactionType ?? null, cached?.downloaded ?? null);
-      }
-
-      if (successCount < payloads.length) {
-        options.showToast(`Queued ${successCount}/${payloads.length} post image downloads in Atlas.`);
-        return;
-      }
-
-      options.showToast(`Queued ${successCount} post image download(s) in Atlas.`);
-    } finally {
-      postDownloadBusy = false;
-      syncPostIndicatorState();
-    }
   };
 
   const handleToolbarReaction = (reactionType: string) => {
@@ -464,7 +265,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
 
     const atlasReactionType = reaction.type === BLACKLIST_ACTION.type ? 'dislike' : reaction.type;
-    const payload = buildOverlayReactionPayload(activeMedia, atlasReactionType, deps);
+    const payload = buildReactionPayloadFromMedia(activeMedia, atlasReactionType, deps);
     if (!payload) {
       options.showToast('No valid media URL found.');
       return;
@@ -506,16 +307,17 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
               : reaction.type;
           const fileMeta = parseFileStatusMeta(file);
 
-          if (checkKey) {
-            deps.atlasStatusCache.set(checkKey, {
-              exists: Boolean(file),
-              downloaded: Boolean(file?.downloaded),
-              blacklisted: Boolean(file?.blacklisted_at),
-              reactionType: newReactionType,
-              downloadProgress: fileMeta.downloadProgress,
-              downloadedAt: fileMeta.downloadedAt,
-              ts: Date.now(),
-            });
+          const nextStatus = {
+            exists: Boolean(file),
+            downloaded: Boolean(file?.downloaded),
+            blacklisted: Boolean(file?.blacklisted_at),
+            reactionType: newReactionType,
+            downloadProgress: fileMeta.downloadProgress,
+            downloadedAt: fileMeta.downloadedAt,
+            ts: Date.now(),
+          };
+          for (const lookupKey of buildLookupKeys(payload.url, payload.preview_url, payload.referrer_url)) {
+            deps.atlasStatusCache.set(lookupKey, nextStatus);
           }
 
           setToolbarActive(newReactionType);
@@ -575,10 +377,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
           progressVisible: overlayState.progressVisible,
           progressPercent: overlayState.progressPercent,
           progressState: overlayState.progressState,
-          postVisible: overlayState.postVisible,
-          postDisabled: overlayState.postDisabled,
-          postPending: overlayState.postPending,
-          postCount: overlayState.postCount,
           buttons: overlayState.buttons,
           onPointerEnter: () => {
             toolbarHovered = true;
@@ -589,12 +387,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
             scheduleHide();
           },
           onReaction: handleToolbarReaction,
-          onPostQueue: (reactionType: 'like' | 'love' | 'funny') => {
-            void queueActivePostDownloads(reactionType);
-          },
-          onPostHint: () => {
-            options.showToast('POST: Alt+Left queues as Like, Alt+Middle queues as Love.');
-          },
         });
     },
   }).mount(toolbarMount);
@@ -634,7 +426,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     handleLocationChange();
 
     // Validate this media has a usable URL (or is a supported video fallback) before showing.
-    const previewPayload = buildOverlayReactionPayload(media, 'like', deps);
+    const previewPayload = buildReactionPayloadFromMedia(media, 'like', deps);
     if (!previewPayload) {
       hide();
       return;
@@ -654,25 +446,11 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     const primaryLookupKey = nextKey || mediaLookupKeys[0] || null;
     const secondaryLookupKey =
       mediaLookupKeys.find((lookupKey) => lookupKey !== primaryLookupKey) || previewPayload.referrer_url || null;
-    const pageBaseUrl = window.location.href.split('#')[0] || window.location.href;
-    let postReferrerLookupKey: string | null = null;
 
     activeMedia = media;
-    const activeAssetKey = resolveWixAssetKey(previewPayload.url || '');
-    const postContext = resolveDeviantArtPostContext(window.location.href, media);
-    if (postContext && activeAssetKey && postContext.entryByAssetKey.has(activeAssetKey)) {
-      activePostContext = postContext;
-      const postIndex = postContext.entries.findIndex((entry) => entry.assetKey === activeAssetKey);
-      if (postIndex >= 0) {
-        postReferrerLookupKey = `${pageBaseUrl}#image-${postIndex + 1}`;
-      }
-    } else {
-      activePostContext = null;
-    }
-    activeLookupKeys = buildLookupKeys(primaryLookupKey, secondaryLookupKey, postReferrerLookupKey);
+    activeLookupKeys = buildLookupKeys(primaryLookupKey, secondaryLookupKey);
     activeKey = activeLookupKeys[0] || null;
     setToolbarResolution(previewPayload.width, previewPayload.height);
-    syncPostIndicatorState();
     overlayState.open = true;
     updatePosition();
 
@@ -687,7 +465,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         setToolbarStatusMeta(cached);
       } else {
         const requestUrl = primaryLookupKey || '';
-        const requestReferrer = postReferrerLookupKey || secondaryLookupKey || window.location.href;
+        const requestReferrer = secondaryLookupKey || window.location.href;
         const requestKeys = [...activeLookupKeys];
         deps.fetchAtlasStatus(options.sendMessageSafe, requestUrl, requestReferrer, (status) => {
           if (!status) return;
