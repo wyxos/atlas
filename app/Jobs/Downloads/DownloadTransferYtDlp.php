@@ -136,10 +136,12 @@ class DownloadTransferYtDlp implements ShouldQueue
 
     private function failTransfer(DownloadTransfer $transfer, string $message): void
     {
+        $normalizedMessage = $this->normalizeFailureMessage($message);
+
         DownloadTransfer::query()->whereKey($transfer->id)->update([
             'status' => DownloadTransferStatus::FAILED,
             'failed_at' => now(),
-            'error' => $message !== '' ? $message : 'yt-dlp failed.',
+            'error' => $normalizedMessage !== '' ? $normalizedMessage : 'yt-dlp failed.',
         ]);
 
         $updated = DownloadTransfer::query()->find($transfer->id);
@@ -154,5 +156,23 @@ class DownloadTransferYtDlp implements ShouldQueue
         }
 
         PumpDomainDownloads::dispatch((string) $transfer->domain);
+    }
+
+    private function normalizeFailureMessage(string $message): string
+    {
+        $trimmed = trim($message);
+        if ($trimmed === '') {
+            return 'yt-dlp failed.';
+        }
+
+        $lower = strtolower($trimmed);
+        if (
+            str_contains($lower, 'no video could be found in this tweet')
+            || str_contains($lower, 'requested tweet may only be available for registered users')
+        ) {
+            return $trimmed.' Configure DOWNLOADS_YT_DLP_COOKIES_PATH (or DOWNLOADS_YT_DLP_COOKIES_FROM_BROWSER) for authenticated access.';
+        }
+
+        return $trimmed;
     }
 }

@@ -31,6 +31,14 @@ return [
 
     'yt_dlp_timeout_seconds' => (int) env('DOWNLOADS_YT_DLP_TIMEOUT_SECONDS', 1800),
 
+    // Optional Netscape cookie file path for authenticated yt-dlp runs
+    // (useful for age-restricted/auth-required media on X/Twitter/Facebook).
+    'yt_dlp_cookies_path' => env('DOWNLOADS_YT_DLP_COOKIES_PATH'),
+
+    // Optional browser cookie source for yt-dlp (e.g. "firefox", "chrome", "edge").
+    // Used only when DOWNLOADS_YT_DLP_COOKIES_PATH is not set.
+    'yt_dlp_cookies_from_browser' => env('DOWNLOADS_YT_DLP_COOKIES_FROM_BROWSER'),
+
     'extension_token' => env('ATLAS_EXTENSION_TOKEN'),
 
     // User used for extension-triggered reactions/downloads.

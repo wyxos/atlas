@@ -11,6 +11,8 @@ class YtDlpCommandBuilder
     {
         $ytDlp = (string) config('downloads.yt_dlp_path', 'yt-dlp');
         $ffmpeg = (string) config('downloads.ffmpeg_path', 'ffmpeg');
+        $cookiesPath = trim((string) config('downloads.yt_dlp_cookies_path', ''));
+        $cookiesFromBrowser = trim((string) config('downloads.yt_dlp_cookies_from_browser', ''));
 
         $args = [
             $ytDlp,
@@ -21,6 +23,14 @@ class YtDlpCommandBuilder
         if ($ffmpeg !== '') {
             $args[] = '--ffmpeg-location';
             $args[] = $ffmpeg;
+        }
+
+        if ($cookiesPath !== '') {
+            $args[] = '--cookies';
+            $args[] = $cookiesPath;
+        } elseif ($cookiesFromBrowser !== '') {
+            $args[] = '--cookies-from-browser';
+            $args[] = $cookiesFromBrowser;
         }
 
         // Prefer mp4+m4a when available (usually browser-friendly), otherwise fall back to "best".
