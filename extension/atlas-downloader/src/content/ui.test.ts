@@ -35,6 +35,17 @@ describe('ensurePageMarkerStyles', () => {
     ensurePageMarkerStyles();
     expect(document.querySelectorAll('#atlas-downloader-page-markers')).toHaveLength(1);
   });
+
+  it('includes dimming styles for reacted and open-tab anchor media', () => {
+    ensurePageMarkerStyles();
+
+    const style = document.getElementById('atlas-downloader-page-markers');
+    expect(style?.textContent).toContain('a[href] img[data-atlas-state="reacted"]');
+    expect(style?.textContent).toContain('a[href] video[data-atlas-state="reacted"]');
+    expect(style?.textContent).toContain('a[href] img[data-atlas-open-tab="1"]');
+    expect(style?.textContent).toContain('a[href] video[data-atlas-open-tab="1"]');
+    expect(style?.textContent).toContain('opacity: 0.3;');
+  });
 });
 
 describe('showDuplicateTabBlockedModal', () => {
