@@ -65,6 +65,7 @@ test('authenticated user can fetch audio details batch for ids', function () {
         'mime_type' => 'audio/mpeg',
         'title' => null,
         'filename' => 'fallback-track.mp3',
+        'source' => 'Spotify',
     ]);
     $audio->metadata()->create([
         'payload' => [
@@ -84,6 +85,7 @@ test('authenticated user can fetch audio details batch for ids', function () {
             [
                 'id' => $audio->id,
                 'title' => 'Song Title',
+                'source' => 'Spotify',
                 'artists' => ['Artist A', 'Artist B'],
                 'albums' => ['Album Name'],
             ],

@@ -78,6 +78,7 @@ class AudioIdListingService
      *     items: list<array{
      *         id: int,
      *         title: string|null,
+     *         source: string|null,
      *         artists: list<string>,
      *         albums: list<string>
      *     }>
@@ -95,7 +96,7 @@ class AudioIdListingService
         }
 
         $filesById = File::query()
-            ->select(['id', 'title', 'filename'])
+            ->select(['id', 'title', 'filename', 'source'])
             ->whereIn('id', $ids)
             ->where('mime_type', 'like', 'audio/%')
             ->with([
@@ -149,10 +150,12 @@ class AudioIdListingService
             $albums = array_values(array_unique([...$albums, ...$containerAlbums]));
 
             $title = trim((string) (data_get($payload, 'title') ?? $file->title ?? $file->filename ?? ''));
+            $source = trim((string) ($file->source ?? ''));
 
             $items[] = [
                 'id' => (int) $file->id,
                 'title' => $title !== '' ? $title : null,
+                'source' => $source !== '' ? $source : null,
                 'artists' => $artists,
                 'albums' => $albums,
             ];
