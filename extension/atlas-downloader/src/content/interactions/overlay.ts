@@ -195,8 +195,9 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     if (!toolbarBusy) {
       return;
     }
-    emitOverlayReactionState(false, null, activeKey || null);
+    const pendingUrl = activeKey || null;
     setToolbarBusy(false, null);
+    emitOverlayReactionState(false, null, pendingUrl);
   };
   const handleLocationChange = () => {
     const currentHref = window.location.href;
@@ -422,6 +423,10 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       hide();
       return;
     }
+    if (!media.isConnected) {
+      hide(true);
+      return;
+    }
 
     handleLocationChange();
 
@@ -549,7 +554,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         reactionType?: string | null;
       }>;
       const media = custom.detail?.media;
-      if (!(media instanceof Element)) {
+      if (!(media instanceof Element) || !media.isConnected) {
         return;
       }
 
