@@ -22,6 +22,12 @@ function run(command) {
   execSync(command, { cwd: rootDir, stdio: 'inherit' });
 }
 
+function runAndCapture(command) {
+  return execSync(command, { cwd: rootDir, stdio: ['ignore', 'pipe', 'pipe'] })
+    .toString('utf8')
+    .trim();
+}
+
 function parseArgs(argv) {
   const allowed = new Set(['patch', 'minor', 'major']);
   let part = 'patch';
@@ -98,8 +104,43 @@ function readEnvValue(key) {
   return '';
 }
 
+function isWindowsAbsolutePath(value) {
+  return /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function isWsl() {
+  if (process.platform !== 'linux') {
+    return false;
+  }
+
+  if (process.env.WSL_DISTRO_NAME) {
+    return true;
+  }
+
+  try {
+    const version = readFileSync('/proc/version', 'utf8').toLowerCase();
+    return version.includes('microsoft');
+  } catch {
+    return false;
+  }
+}
+
+function normalizeSyncDir(syncDir) {
+  const trimmed = (syncDir || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (isWsl() && isWindowsAbsolutePath(trimmed)) {
+    // Accept Windows drive paths in WSL and convert them for local filesystem APIs.
+    return runAndCapture(`wslpath -u "${trimmed.replace(/"/g, '\\"')}"`);
+  }
+
+  return resolve(rootDir, trimmed);
+}
+
 function syncExtension(syncDir) {
-  const resolvedSyncDir = resolve(rootDir, syncDir);
+  const resolvedSyncDir = normalizeSyncDir(syncDir);
   const normalizedSyncDir = resolvedSyncDir.replace(/[\\/]+$/, '');
   const normalizedExtensionDir = extensionDir.replace(/[\\/]+$/, '');
 
