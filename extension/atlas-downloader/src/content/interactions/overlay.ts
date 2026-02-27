@@ -497,6 +497,15 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     if (pointerX >= 0 && pointerY >= 0) {
       const resolved = findMediaAtPoint(pointerX, pointerY);
       if (resolved && !resolved.closest?.(`#${deps.rootId}`)) {
+        if (activeMedia && resolved === activeMedia) {
+          const promoted = choosePromotedMediaCandidate(activeMedia, deps.rootId);
+          if (promoted && promoted !== activeMedia) {
+            cancelHide();
+            showFor(promoted);
+            return;
+          }
+        }
+
         cancelHide();
         showFor(resolved);
         return;
