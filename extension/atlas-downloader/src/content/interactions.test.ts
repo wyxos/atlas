@@ -496,6 +496,88 @@ describe('installMediaReactionOverlay', () => {
     expect(toolbar?.classList.contains('open')).toBe(false);
   });
 
+  it('promotes to larger modal media after click even when pointer still resolves thumbnail', () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+
+    const thumb = document.createElement('img');
+    thumb.src = 'https://cdn.example.com/thumb.jpg';
+    Object.defineProperty(thumb, 'naturalWidth', { value: 180, configurable: true });
+    Object.defineProperty(thumb, 'naturalHeight', { value: 180, configurable: true });
+    setRect(thumb, rect(20, 20, 180, 180));
+    document.body.appendChild(thumb);
+
+    const modal = document.createElement('div');
+    modal.className = 'lightbox-modal';
+    const large = document.createElement('img');
+    large.src = 'https://cdn.example.com/large.jpg';
+    Object.defineProperty(large, 'naturalWidth', { value: 620, configurable: true });
+    Object.defineProperty(large, 'naturalHeight', { value: 980, configurable: true });
+    setRect(large, rect(280, 40, 620, 980));
+    modal.appendChild(large);
+    document.body.appendChild(modal);
+
+    // Simulate the real glitch: pointer stack still points to the thumbnail after click.
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [thumb],
+      configurable: true,
+    });
+
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback): number => {
+        callback(0);
+        return 1;
+      });
+
+    const requestedUrls: string[] = [];
+    installMediaReactionOverlay(
+      {
+        root,
+        showToast: () => {},
+        sendMessageSafe: (_message, callback) => callback({ ok: true, data: {} }),
+        isSheetOpen: () => false,
+        chooseDialog: async () => 'cancel',
+      },
+      {
+        rootId: 'atlas-downloader-root',
+        minWidth: 0,
+        maxMetadataLen: 255,
+        limitString: (value) => String(value ?? ''),
+        sourceFromMediaUrl: () => 'web',
+        fetchAtlasStatus: (_send, url, _referrerUrl, callback) => {
+          requestedUrls.push(url);
+          callback(null);
+        },
+        atlasStatusCache: new Map(),
+        getCachedAtlasStatus: () => null,
+      }
+    );
+
+    thumb.dispatchEvent(
+      new MouseEvent('pointerover', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 60,
+        clientY: 60,
+      })
+    );
+
+    thumb.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 60,
+        clientY: 60,
+      })
+    );
+
+    expect(requestedUrls).toContain('https://cdn.example.com/thumb.jpg');
+    expect(requestedUrls).toContain('https://cdn.example.com/large.jpg');
+
+    requestAnimationFrameSpy.mockRestore();
+  });
+
 });
 
 describe('formatOverlayDownloadMeta', () => {
