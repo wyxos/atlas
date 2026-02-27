@@ -271,12 +271,12 @@ export function ensurePageMarkerStyles() {
 }
 a[href] img[data-atlas-state="reacted"],
 a[href] video[data-atlas-state="reacted"] {
-  opacity: 0.5;
+  opacity: 0.3;
 }
 .atlas-downloader-reaction-badge {
   width: 50px;
   height: 50px;
-  border-radius: 999px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -309,7 +309,7 @@ a[href] video[data-atlas-state="reacted"] {
 .atlas-downloader-open-tab-badge {
   width: 50px;
   height: 50px;
-  border-radius: 999px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
