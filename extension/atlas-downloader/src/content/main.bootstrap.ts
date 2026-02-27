@@ -10,7 +10,7 @@ import {
 } from './items';
 import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from './interactions';
 import { buildLookupKeys } from './lookupKeys';
-import { createSendMessageSafe } from './messaging';
+import { createSendMessageSafe, type AtlasRequestTraceEntry } from './messaging';
 import { stripHash } from './network';
 import { isOpenTabHighlightEligibleUrl, normalizeOpenTabUrl } from './openTabUrl';
 import {
@@ -120,6 +120,7 @@ export function runContentScript() {
   const REACTION_UPDATED_EVENT = 'atlas-reaction-updated';
 
   const ATLAS_STATUS_TTL_MS = 30_000;
+  const MAX_REQUEST_TRACE = 12;
   const atlasStatusCache = new Map<string, AtlasStatusCacheEntry>();
   const openTabUrlSet = new Set<string>();
   let minMediaWidth = DEFAULT_MIN_MEDIA_WIDTH;
@@ -390,10 +391,6 @@ export function runContentScript() {
 
     let showToast = createToastFn(root);
     let chooseDialog = createDialogChooser(root);
-    const sendMessageSafe = createSendMessageSafe(
-      (message, callback) => chrome.runtime.sendMessage(message, callback),
-      (message, tone) => showToast(message, tone)
-    );
 
     shadow.appendChild(root);
     (document.body || document.documentElement).appendChild(host);
@@ -439,9 +436,29 @@ export function runContentScript() {
       checkAtlasDisabled: true,
       selectAllDisabled: true,
       selectNoneDisabled: true,
+      requestTrace: [] as AtlasRequestTraceEntry[],
       debugTargetUrl: null as string | null,
       debugPayloads: {} as Record<string, unknown>,
     });
+    const upsertRequestTrace = (entry: AtlasRequestTraceEntry) => {
+      const existingIndex = sheetState.requestTrace.findIndex((item) => item.id === entry.id);
+      if (existingIndex === -1) {
+        sheetState.requestTrace = [entry, ...sheetState.requestTrace].slice(0, MAX_REQUEST_TRACE);
+        return;
+      }
+
+      const next = [...sheetState.requestTrace];
+      next[existingIndex] = entry;
+      sheetState.requestTrace = next;
+    };
+    const sendMessageSafe = createSendMessageSafe(
+      (message, callback) => chrome.runtime.sendMessage(message, callback),
+      (message, tone) => showToast(message, tone),
+      {
+        onStart: upsertRequestTrace,
+        onFinish: upsertRequestTrace,
+      }
+    );
 
     const onCloseModal = () => closeModal();
     const onRefresh = () => refreshList();
@@ -517,6 +534,7 @@ export function runContentScript() {
             checkAtlasDisabled: sheetState.checkAtlasDisabled,
             selectAllDisabled: sheetState.selectAllDisabled,
             selectNoneDisabled: sheetState.selectNoneDisabled,
+            requestTrace: sheetState.requestTrace,
             debugTargetUrl: sheetState.debugTargetUrl,
             debugPayloads: sheetState.debugPayloads,
             reactions: REACTIONS,
