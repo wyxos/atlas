@@ -431,6 +431,71 @@ describe('installMediaReactionOverlay', () => {
     expect(capturedReferrer).not.toBe(window.location.href);
   });
 
+  it('does not recurse when pending state clears for detached media', () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+
+    const img = document.createElement('img');
+    img.src = 'https://cdn.example.com/photo.jpg';
+    Object.defineProperty(img, 'naturalWidth', { value: 640, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 640, configurable: true });
+    setRect(img, rect(0, 0, 640, 640));
+    document.body.appendChild(img);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [img],
+      configurable: true,
+    });
+
+    installMediaReactionOverlay(
+      {
+        root,
+        showToast: () => {},
+        sendMessageSafe: (_message, callback) => callback({ ok: true, data: {} }),
+        isSheetOpen: () => false,
+        chooseDialog: async () => 'cancel',
+      },
+      {
+        rootId: 'atlas-downloader-root',
+        minWidth: 0,
+        maxMetadataLen: 255,
+        limitString: (value) => String(value ?? ''),
+        sourceFromMediaUrl: () => 'web',
+        fetchAtlasStatus: (_send, _url, _referrerUrl, callback) => callback(null),
+        atlasStatusCache: new Map(),
+        getCachedAtlasStatus: () => null,
+      }
+    );
+
+    img.dispatchEvent(
+      new MouseEvent('pointerover', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 10,
+        clientY: 10,
+      })
+    );
+
+    window.dispatchEvent(
+      new CustomEvent('atlas-shortcut-reaction-state', {
+        detail: {
+          media: img,
+          pending: true,
+          reactionType: 'like',
+          url: img.src,
+        },
+      })
+    );
+
+    img.remove();
+    setRect(img, rect(0, 0, 0, 0));
+
+    expect(() => window.dispatchEvent(new Event('resize'))).not.toThrow();
+
+    const toolbar = root.querySelector('.atlas-downloader-media-toolbar');
+    expect(toolbar?.classList.contains('open')).toBe(false);
+  });
+
 });
 
 describe('formatOverlayDownloadMeta', () => {
