@@ -85,7 +85,14 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
   } => {
     const candidates = resolveEventMediaCandidates(event);
     for (const candidate of candidates) {
-      const payload = buildReactionPayloadFromMedia(candidate, reactionType, deps);
+      const payloadDeps =
+        candidate instanceof HTMLVideoElement
+          ? {
+              ...deps,
+              minWidth: 0,
+            }
+          : deps;
+      const payload = buildReactionPayloadFromMedia(candidate, reactionType, payloadDeps);
       if (payload) {
         return { media: candidate, payload };
       }

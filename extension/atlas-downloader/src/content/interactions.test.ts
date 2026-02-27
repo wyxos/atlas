@@ -265,8 +265,9 @@ describe('installHotkeys', () => {
 
     const video = document.createElement('video');
     video.src = 'https://video.example.com/fb-reel.mp4';
-    Object.defineProperty(video, 'videoWidth', { value: 1080, configurable: true });
-    Object.defineProperty(video, 'videoHeight', { value: 1920, configurable: true });
+    // minWidth is 320 in this test; keep intrinsic width below that to verify hotkeys bypass it.
+    Object.defineProperty(video, 'videoWidth', { value: 240, configurable: true });
+    Object.defineProperty(video, 'videoHeight', { value: 426, configurable: true });
     setRect(video, rect(0, 0, 720, 1200));
     document.body.appendChild(video);
 
