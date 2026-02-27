@@ -252,6 +252,7 @@ After any code changes, always run frontend linting and report the result:
 - Environment assumption: commands run from WSL on a Windows host where Laravel Herd manages primary PHP/Laravel services.
 - Before PHP/Laravel tasks, verify runtime resolution (`which php`, `php -v`).
 - In this workspace, `php` may resolve to a WSL shim (`/home/wyxos/.local/bin/php`) that forwards to `cmd.exe`; if Windows interop is unavailable, PHP/Artisan/Pint/tests cannot run from this shell.
+- Git hooks run under `sh` and call `php` directly; if hook-time PHP fails with `UtilBindVsockAnyPort`, run PHP checks explicitly via `cmd.exe /C ...` and commit with `--no-verify` only after those checks pass.
 - If binaries/services are not available in WSL PATH, use Windows/Herd-aware invocation paths as needed.
 - For DB/service operations, confirm whether runtime/services are Windows-hosted before executing maintenance/debug commands.
 - Playwright browser runs in WSL require system Chromium deps; if launch fails with missing `libnspr4.so` (or similar), install required packages before relying on browser automation.
