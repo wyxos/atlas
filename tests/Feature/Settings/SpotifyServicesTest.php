@@ -3,6 +3,7 @@
 use App\Models\SpotifyToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
@@ -142,5 +143,28 @@ test('spotify disconnect endpoint removes spotify token', function () {
     $response->assertSuccessful();
     $response->assertJsonPath('spotify.connected', false);
     $response->assertJsonPath('message', 'Spotify disconnected.');
+    expect(SpotifyToken::query()->where('user_id', $user->id)->exists())->toBeFalse();
+});
+
+test('spotify status handles unreadable encrypted token and marks reconnect required', function () {
+    $user = User::factory()->create();
+
+    DB::table('spotify_tokens')->insert([
+        'user_id' => $user->id,
+        'access_token' => 'not-a-valid-encrypted-payload',
+        'refresh_token' => 'not-a-valid-encrypted-payload',
+        'scope' => 'playlist-read-private',
+        'expires_at' => now()->addHour(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/settings/services');
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('spotify.connected', false);
+    $response->assertJsonPath('spotify.needs_reconnect', true);
+    $response->assertJsonPath('spotify.session_valid', false);
+    $response->assertJsonPath('spotify.can_refresh', false);
     expect(SpotifyToken::query()->where('user_id', $user->id)->exists())->toBeFalse();
 });
