@@ -552,21 +552,26 @@ function upsertDownload(item: DownloadItem) {
     downloads.value = next;
 }
 
-function applyQueuedPayload(payload: DownloadQueuedPayload) {
-    const id = payload.id ?? payload.downloadTransferId;
+function applyQueuedPayload(payload: unknown) {
+    if (!payload || typeof payload !== 'object') {
+        return;
+    }
+
+    const value = payload as DownloadQueuedPayload;
+    const id = value.id ?? value.downloadTransferId;
     if (!id) return;
     const existing = downloads.value.find((item) => item.id === id);
 
     const item: DownloadItem = {
         id,
-        status: payload.status,
-        created_at: payload.created_at ?? existing?.created_at ?? null,
-        queued_at: payload.queued_at ?? null,
-        started_at: payload.started_at ?? null,
-        finished_at: payload.finished_at ?? null,
-        failed_at: payload.failed_at ?? null,
-        percent: payload.percent ?? 0,
-        error: payload.error ?? existing?.error ?? null,
+        status: value.status,
+        created_at: value.created_at ?? existing?.created_at ?? null,
+        queued_at: value.queued_at ?? null,
+        started_at: value.started_at ?? null,
+        finished_at: value.finished_at ?? null,
+        failed_at: value.failed_at ?? null,
+        percent: value.percent ?? 0,
+        error: value.error ?? existing?.error ?? null,
     };
 
     upsertDownload(item);
@@ -575,49 +580,58 @@ function applyQueuedPayload(payload: DownloadQueuedPayload) {
     detailsById.value = {
         ...detailsById.value,
         [id]: {
-            path: payload.path ?? existingDetails.path ?? null,
-            absolute_path: payload.absolute_path ?? existingDetails.absolute_path ?? null,
-            original: payload.original ?? existingDetails.original ?? null,
-            referrer_url: payload.referrer_url ?? existingDetails.referrer_url ?? null,
-            preview: payload.preview ?? existingDetails.preview ?? null,
-            size: payload.size ?? existingDetails.size ?? null,
-            filename: payload.filename ?? existingDetails.filename ?? null,
+            path: value.path ?? existingDetails.path ?? null,
+            absolute_path: value.absolute_path ?? existingDetails.absolute_path ?? null,
+            original: value.original ?? existingDetails.original ?? null,
+            referrer_url: value.referrer_url ?? existingDetails.referrer_url ?? null,
+            preview: value.preview ?? existingDetails.preview ?? null,
+            size: value.size ?? existingDetails.size ?? null,
+            filename: value.filename ?? existingDetails.filename ?? null,
         },
     };
 }
 
-function applyProgressPayload(payload: DownloadProgressPayload) {
-    const id = payload.downloadTransferId;
+function applyProgressPayload(payload: unknown) {
+    if (!payload || typeof payload !== 'object') {
+        return;
+    }
+
+    const value = payload as DownloadProgressPayload;
+    const id = value.downloadTransferId;
+    if (!id) {
+        return;
+    }
+
     updateDownload(id, (current) => ({
         ...current,
-        status: payload.status,
-        percent: normalizeProgress(payload.percent),
-        created_at: payload.created_at ?? current.created_at ?? null,
-        queued_at: payload.queued_at ?? current.queued_at ?? null,
-        started_at: payload.started_at ?? current.started_at ?? null,
-        finished_at: payload.finished_at ?? current.finished_at ?? null,
-        failed_at: payload.failed_at ?? current.failed_at ?? null,
-        error: payload.error ?? current.error ?? null,
+        status: value.status,
+        percent: normalizeProgress(value.percent),
+        created_at: value.created_at ?? current.created_at ?? null,
+        queued_at: value.queued_at ?? current.queued_at ?? null,
+        started_at: value.started_at ?? current.started_at ?? null,
+        finished_at: value.finished_at ?? current.finished_at ?? null,
+        failed_at: value.failed_at ?? current.failed_at ?? null,
+        error: value.error ?? current.error ?? null,
     }));
     if (
-        payload.path !== undefined
-        || payload.absolute_path !== undefined
-        || payload.original !== undefined
-        || payload.referrer_url !== undefined
-        || payload.preview !== undefined
-        || payload.size !== undefined
-        || payload.filename !== undefined
+        value.path !== undefined
+        || value.absolute_path !== undefined
+        || value.original !== undefined
+        || value.referrer_url !== undefined
+        || value.preview !== undefined
+        || value.size !== undefined
+        || value.filename !== undefined
     ) {
         detailsById.value = {
             ...detailsById.value,
             [id]: {
-                path: payload.path ?? detailsById.value[id]?.path ?? null,
-                absolute_path: payload.absolute_path ?? detailsById.value[id]?.absolute_path ?? null,
-                original: payload.original ?? detailsById.value[id]?.original ?? null,
-                referrer_url: payload.referrer_url ?? detailsById.value[id]?.referrer_url ?? null,
-                preview: payload.preview ?? detailsById.value[id]?.preview ?? null,
-                size: payload.size ?? detailsById.value[id]?.size ?? null,
-                filename: payload.filename ?? detailsById.value[id]?.filename ?? null,
+                path: value.path ?? detailsById.value[id]?.path ?? null,
+                absolute_path: value.absolute_path ?? detailsById.value[id]?.absolute_path ?? null,
+                original: value.original ?? detailsById.value[id]?.original ?? null,
+                referrer_url: value.referrer_url ?? detailsById.value[id]?.referrer_url ?? null,
+                preview: value.preview ?? detailsById.value[id]?.preview ?? null,
+                size: value.size ?? detailsById.value[id]?.size ?? null,
+                filename: value.filename ?? detailsById.value[id]?.filename ?? null,
             },
         };
     }
@@ -628,13 +642,13 @@ function startEchoListeners() {
     if (!echo) return;
     echoChannel = echo.private(SOCKET_CHANNEL);
     echoChannel.listen('.DownloadTransferCreated', (payload: unknown) => {
-        applyQueuedPayload(payload as DownloadQueuedPayload);
+        applyQueuedPayload(payload);
     });
     echoChannel.listen('.DownloadTransferQueued', (payload: unknown) => {
-        applyQueuedPayload(payload as DownloadQueuedPayload);
+        applyQueuedPayload(payload);
     });
     echoChannel.listen('.DownloadTransferProgressUpdated', (payload: unknown) => {
-        applyProgressPayload(payload as DownloadProgressPayload);
+        applyProgressPayload(payload);
     });
 }
 

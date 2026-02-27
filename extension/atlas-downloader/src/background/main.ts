@@ -266,10 +266,11 @@ function settleAsyncResult(result: unknown): void {
 
 function sendTabMessage(tabId: number, message: unknown): void {
   try {
-    chrome.tabs.sendMessage(tabId, message, () => {
+    const result = chrome.tabs.sendMessage(tabId, message, () => {
       // Read and ignore callback errors to avoid noisy "Unchecked runtime.lastError".
       void chrome.runtime.lastError;
     });
+    settleAsyncResult(result);
   } catch {
     // Ignore tabs without a matching content script.
   }
@@ -292,6 +293,22 @@ function setActionIcon(details: {
     settleAsyncResult(chrome.action.setIcon(details));
   } catch {
     // Ignore icon updates on transient/restricted tabs.
+  }
+}
+
+function setActionBadgeText(details: { tabId?: number; text: string }): void {
+  try {
+    settleAsyncResult(chrome.action.setBadgeText(details));
+  } catch {
+    // Ignore badge updates on transient/restricted tabs.
+  }
+}
+
+function setActionTitle(details: { tabId?: number; title: string }): void {
+  try {
+    settleAsyncResult(chrome.action.setTitle(details));
+  } catch {
+    // Ignore title updates on transient/restricted tabs.
   }
 }
 
@@ -667,8 +684,8 @@ async function broadcastOpenTabsState(): Promise<void> {
 
 function setActionDefault(tabId: number) {
   setActionIcon({ tabId, path: DEFAULT_ICON_PATHS });
-  chrome.action.setBadgeText({ tabId, text: '' });
-  chrome.action.setTitle({ tabId, title: DEFAULT_ACTION_TITLE });
+  setActionBadgeText({ tabId, text: '' });
+  setActionTitle({ tabId, title: DEFAULT_ACTION_TITLE });
 }
 
 function resolveHost(value: string): string {
