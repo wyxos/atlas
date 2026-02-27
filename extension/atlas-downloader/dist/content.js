@@ -59,7 +59,9 @@
   pointer-events: none;
 }
 a[href] img[data-atlas-state="reacted"],
-a[href] video[data-atlas-state="reacted"] {
+a[href] video[data-atlas-state="reacted"],
+a[href] img[data-atlas-open-tab="1"],
+a[href] video[data-atlas-open-tab="1"] {
   opacity: 0.3;
 }
 .atlas-downloader-reaction-badge {
