@@ -409,8 +409,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
 
-    const top = clamp(rect.top + 8, 8, window.innerHeight - 8);
-    const left = clamp(rect.right - 8, 8, window.innerWidth - 8);
+    const left = clamp(rect.left + (rect.width / 2), 8, window.innerWidth - 8);
+    const top = clamp(rect.bottom - 8, 8, window.innerHeight - 8);
     overlayState.top = top;
     overlayState.left = left;
   };
