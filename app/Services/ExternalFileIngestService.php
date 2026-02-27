@@ -17,11 +17,11 @@ class ExternalFileIngestService
         $pageUrl = trim((string) ($payload['referrer_url'] ?? ''));
         $downloadVia = $payload['download_via'] ?? null;
         $authContext = ExtensionAuthContext::sanitize($payload['auth_context'] ?? null);
+        $providedFilename = $this->sanitizeFilename((string) ($payload['filename'] ?? ''));
 
         // Canonical file identity is url. referrer_url is provenance and may be non-unique.
         $url = $this->stripFragment($url);
         $referrerUrl = $pageUrl !== '' ? $pageUrl : $url;
-        $filename = $this->resolveFilename($payload['filename'] ?? null, $url);
         $ext = $payload['ext'] ?? FileTypeDetector::extensionFromUrl($url);
         $mimeType = $payload['mime_type'] ?? FileTypeDetector::mimeFromUrl($url);
 
@@ -43,6 +43,7 @@ class ExternalFileIngestService
         for ($attempt = 1; $attempt <= $maxSaveAttempts; $attempt++) {
             $file = $this->findFileByUrl($url, $urlHash);
             $isNew = $file === null;
+            $filename = $this->resolveFilename($providedFilename, $file?->filename);
 
             if (! $file) {
                 $file = new File;
@@ -120,18 +121,19 @@ class ExternalFileIngestService
         ];
     }
 
-    private function resolveFilename(?string $candidate, string $url): string
+    private function resolveFilename(?string $candidate, ?string $existing): string
     {
         $candidate = trim((string) $candidate);
         if ($candidate !== '') {
             return $this->sanitizeFilename($candidate);
         }
 
-        $path = parse_url($url, PHP_URL_PATH);
-        $base = $path ? pathinfo($path, PATHINFO_FILENAME) : '';
-        $base = $this->sanitizeFilename($base);
+        $existing = trim((string) $existing);
+        if ($existing !== '') {
+            return $this->sanitizeFilename($existing);
+        }
 
-        return $base !== '' ? $base : Str::random(40);
+        return Str::random(40);
     }
 
     private function sanitizeFilename(string $name): string

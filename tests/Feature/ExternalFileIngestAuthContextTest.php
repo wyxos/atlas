@@ -36,4 +36,5 @@ it('stores sanitized extension auth_context in listing metadata', function () {
     expect($file)->not->toBeNull();
     expect(data_get($file->listing_metadata, 'auth_context.user_agent'))->toBe('AtlasTestAgent/1.0');
     expect(data_get($file->listing_metadata, 'auth_context.cookies.0.name'))->toBe('auth_token');
+    expect($file->filename)->toMatch('/^[A-Za-z0-9]{40}$/');
 });

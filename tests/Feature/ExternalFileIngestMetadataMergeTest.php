@@ -39,4 +39,5 @@ it('preserves existing listing metadata keys when new ingests omit them', functi
 
     expect(data_get($file->listing_metadata, 'download_via'))->toBe('yt-dlp');
     expect(data_get($file->listing_metadata, 'download_via_reason'))->toBe('content-type-html');
+    expect($file->filename)->toBe('QTpf6orkalY');
 });
