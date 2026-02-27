@@ -53,6 +53,7 @@ Extension gotcha:
 - Marker rule for outlines: mark standalone `img`/`video` nodes by media URL only (skip media inside anchors), and use `a[href]` lookups only when the anchor contains `img`/`video`; apply marker attributes/outlines to the child media element, not the anchor element itself.
 - Overlay hover status lookups on thumbnail media inside anchors must include the anchor URL (resolved absolute, including relative hrefs) and avoid defaulting referrer lookups to the current page URL, otherwise widget state can bleed from the main page media.
 - If marker rendering injects DOM nodes into page content (for example border spans/badges), update `mutationGuard` so those nodes/hosts are treated as atlas-owned mutations; otherwise the content `MutationObserver` can loop and freeze the tab.
+- In overlay pending-state cleanup, clear local busy state before dispatching `atlas-shortcut-reaction-state` updates, and ignore detached (`!isConnected`) media in overlay sync handlers; otherwise detached nodes can trigger recursive `showFor` loops and `Maximum call stack size exceeded`.
 - If content-script UI is migrated to Vue components, keep `@vitejs/plugin-vue` enabled in `extension/atlas-downloader/vite.content.config.ts`; otherwise `dist/content.js` builds will fail on `.vue` imports.
 - For extension bundles that include Vue runtime code (`content`/`options`), define `process.env.NODE_ENV` in the Vite config (`define`) so browser extension scripts do not crash on `process is not defined`.
 
