@@ -87,7 +87,7 @@ const realtimeStatus = ref<RealtimeConnectionStatus>({
 
 const addNoiseFilter = ref('');
 const noiseFilters = ref<EditableDomain[]>([]);
-const minMediaWidth = ref('0');
+const minMediaWidth = ref('300');
 let realtimePollTimer: ReturnType<typeof setInterval> | null = null;
 let realtimeMessageListener: ((message: unknown) => void) | null = null;
 
@@ -291,7 +291,7 @@ function removeNoiseFilter(index: number): void {
 function normalizeMinMediaWidth(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
-    return 0;
+    return 300;
   }
 
   return Math.max(0, Math.floor(parsed));
@@ -515,11 +515,11 @@ onUnmounted(() => {
               min="0"
               step="1"
               class="w-full rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
-              placeholder="0"
+              placeholder="300"
               @blur="normalizeMinMediaWidthInput"
             />
             <p class="mt-2 text-xs text-slate-400">
-              Media narrower than this value are ignored. Default is <span class="font-mono">0</span>.
+              Media narrower than this value are ignored. Default is <span class="font-mono">300</span>.
             </p>
           </div>
 

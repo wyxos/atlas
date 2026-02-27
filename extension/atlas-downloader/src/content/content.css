@@ -425,7 +425,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  transform: translateX(-100%);
+  transform: translate(-50%, -100%);
   display: none;
   align-items: center;
   flex-wrap: wrap;
@@ -437,7 +437,7 @@
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(10px);
   pointer-events: auto;
-  min-width: min(320px, calc(100vw - 16px));
+  width: 320px;
   max-width: calc(100vw - 16px);
 }
 

@@ -81,7 +81,7 @@ function resolveNoiseFiltersSetting(value: unknown): string {
 }
 
 export function runContentScript() {
-  const DEFAULT_MIN_MEDIA_WIDTH = 0;
+  const DEFAULT_MIN_MEDIA_WIDTH = 300;
   const CONTENT_SETTINGS_KEYS = ['atlasMediaNoiseFilters', 'atlasMinMediaWidth'];
   // Keep extension metadata short; some Atlas deployments validate at 500 chars.
   const MAX_METADATA_LEN = 500;

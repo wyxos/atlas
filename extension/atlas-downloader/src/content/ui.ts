@@ -254,9 +254,9 @@ export function ensurePageMarkerStyles() {
   pointer-events: none;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(56, 189, 248, 0.55);
-  background: rgba(2, 6, 23, 0.9);
-  color: #e0f2fe;
+  border: 1px solid rgba(239, 68, 68, 0.7);
+  background: rgba(185, 28, 28, 0.94);
+  color: #fee2e2;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -269,9 +269,13 @@ export function ensurePageMarkerStyles() {
   z-index: 2;
   pointer-events: none;
 }
+a[href] img[data-atlas-state="reacted"],
+a[href] video[data-atlas-state="reacted"] {
+  opacity: 0.5;
+}
 .atlas-downloader-reaction-badge {
-  width: 20px;
-  height: 20px;
+  width: 50px;
+  height: 50px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -282,8 +286,8 @@ export function ensurePageMarkerStyles() {
   color: #fff;
 }
 .atlas-downloader-reaction-badge svg {
-  width: 12px;
-  height: 12px;
+  width: 28px;
+  height: 28px;
   fill: none !important;
   stroke: currentColor !important;
   stroke-width: 2;
@@ -303,8 +307,8 @@ export function ensurePageMarkerStyles() {
   background: rgba(51, 65, 85, 0.95);
 }
 .atlas-downloader-open-tab-badge {
-  width: 20px;
-  height: 20px;
+  width: 50px;
+  height: 50px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -315,8 +319,8 @@ export function ensurePageMarkerStyles() {
   color: #ecfdf5;
 }
 .atlas-downloader-open-tab-badge svg {
-  width: 12px;
-  height: 12px;
+  width: 28px;
+  height: 28px;
   fill: none !important;
   stroke: currentColor !important;
   stroke-width: 2;
