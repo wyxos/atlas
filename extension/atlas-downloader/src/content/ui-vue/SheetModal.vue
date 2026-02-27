@@ -32,6 +32,15 @@ type ReactionAction = {
   pathDs: string[];
 };
 
+type RequestTraceItem = {
+  id: number;
+  messageType: string;
+  path: string;
+  state: 'executing' | 'completed' | 'failed';
+  startedAt: number;
+  finishedAt: number | null;
+};
+
 const props = defineProps<{
   open: boolean;
   version: string;
@@ -42,6 +51,7 @@ const props = defineProps<{
   checkAtlasDisabled: boolean;
   selectAllDisabled: boolean;
   selectNoneDisabled: boolean;
+  requestTrace: RequestTraceItem[];
   debugTargetUrl: string | null;
   debugPayloads: Record<string, unknown>;
   reactions: ReactionAction[];
@@ -135,6 +145,24 @@ function onSelectionChange(index: number, event: Event): void {
 
   emit('updateSelected', index, target.checked);
 }
+
+function formatRequestTime(timestamp: number | null): string {
+  if (!timestamp) {
+    return '';
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+}
 </script>
 
 <template>
@@ -205,6 +233,30 @@ function onSelectionChange(index: number, event: Event): void {
       </div>
 
       <div class="atlas-downloader-meta">{{ metaText }}</div>
+      <div
+        v-if="requestTrace.length > 0"
+        class="atlas-downloader-request-trace"
+        aria-live="polite"
+      >
+        <div class="atlas-downloader-request-trace-title">Request activity</div>
+        <ul class="atlas-downloader-request-trace-list">
+          <li
+            v-for="request in requestTrace"
+            :key="request.id"
+            class="atlas-downloader-request-trace-item"
+          >
+            <span class="atlas-downloader-request-trace-path" :title="request.path">
+              {{ request.path }}
+            </span>
+            <span class="atlas-downloader-request-trace-state" :data-state="request.state">
+              {{ request.state }}
+            </span>
+            <span class="atlas-downloader-request-trace-time">
+              {{ formatRequestTime(request.finishedAt ?? request.startedAt) }}
+            </span>
+          </li>
+        </ul>
+      </div>
       <div class="atlas-downloader-list">
         <div
           v-if="items.length === 0"

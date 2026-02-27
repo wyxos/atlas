@@ -34,6 +34,16 @@ function buildProps() {
     checkAtlasDisabled: false,
     selectAllDisabled: false,
     selectNoneDisabled: false,
+    requestTrace: [
+      {
+        id: 1,
+        messageType: 'atlas-react',
+        path: '/api/extension/files/react',
+        state: 'executing',
+        startedAt: 1_700_000_000_000,
+        finishedAt: null,
+      },
+    ],
     debugTargetUrl: null,
     debugPayloads: {},
     reactions: [
@@ -69,5 +79,12 @@ describe('SheetModal', () => {
 
     await wrapper.find('.atlas-downloader-reaction-btn.like').trigger('click');
     expect(wrapper.emitted('react')).toEqual([[0, 'like']]);
+  });
+
+  it('renders request trace path and state', () => {
+    const wrapper = mount(SheetModal, { props: buildProps() });
+
+    expect(wrapper.find('.atlas-downloader-request-trace-path').text()).toContain('/api/extension/files/react');
+    expect(wrapper.find('.atlas-downloader-request-trace-state').text()).toContain('executing');
   });
 });
