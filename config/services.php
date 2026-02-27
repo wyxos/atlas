@@ -44,4 +44,14 @@ return [
         'user_agent' => env('WALLHAVEN_USER_AGENT', 'Atlas/1.0 (+https://wallhaven.cc)'),
     ],
 
+    'spotify' => [
+        'client_id' => env('SPOTIFY_CLIENT_ID'),
+        'client_secret' => env('SPOTIFY_CLIENT_SECRET'),
+        'redirect_uri' => env('SPOTIFY_REDIRECT_URI', rtrim((string) env('APP_URL', ''), '/').'/auth/spotify/callback'),
+        'scopes' => env('SPOTIFY_SCOPES', 'user-read-email user-read-private playlist-read-private playlist-read-collaborative streaming user-read-playback-state user-modify-playback-state user-read-currently-playing'),
+        'authorize_url' => env('SPOTIFY_AUTHORIZE_URL', 'https://accounts.spotify.com/authorize'),
+        'token_url' => env('SPOTIFY_TOKEN_URL', 'https://accounts.spotify.com/api/token'),
+        'api_base_url' => env('SPOTIFY_API_BASE_URL', 'https://api.spotify.com/v1'),
+    ],
+
 ];

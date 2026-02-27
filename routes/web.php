@@ -90,7 +90,19 @@ Route::options('/api/extension/broadcasting/auth', function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+    Route::get('/auth/spotify/redirect', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyRedirect'])
+        ->name('auth.spotify.redirect');
+    Route::get('/auth/spotify/callback', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyCallback'])
+        ->name('auth.spotify.callback');
+
     // API routes (must come before SPA catch-all)
+    Route::get('/api/settings/services', [\App\Http\Controllers\SettingsServicesController::class, 'index'])
+        ->name('api.settings.services.index');
+    Route::post('/api/settings/services/spotify/refresh', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyRefresh'])
+        ->name('api.settings.services.spotify.refresh');
+    Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])
+        ->name('api.settings.services.spotify.disconnect');
+
     Route::post('/profile/password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::delete('/profile/account', [\App\Http\Controllers\ProfileController::class, 'deleteAccount'])->name('profile.account.delete');
     Route::get('/api/users', [\App\Http\Controllers\UsersController::class, 'index'])->name('api.users.index');
