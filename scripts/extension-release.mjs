@@ -139,6 +139,10 @@ function normalizeSyncDir(syncDir) {
   return resolve(rootDir, trimmed);
 }
 
+function shouldDisplayWindowsSyncDir(syncDir) {
+  return isWsl() && isWindowsAbsolutePath((syncDir || '').trim());
+}
+
 function syncExtension(syncDir) {
   const resolvedSyncDir = normalizeSyncDir(syncDir);
   const normalizedSyncDir = resolvedSyncDir.replace(/[\\/]+$/, '');
@@ -199,7 +203,8 @@ function main() {
   }
 
   const syncedTo = syncExtension(syncDir);
-  console.log(`Extension synced to ${syncedTo}`);
+  const syncDisplayPath = shouldDisplayWindowsSyncDir(syncDir) ? syncDir.trim() : syncedTo;
+  console.log(`Extension synced to ${syncDisplayPath}`);
 }
 
 main();
