@@ -35,7 +35,7 @@ class SpotifyOAuthService
             'connected' => $token !== null,
             'session_valid' => false,
             'needs_reconnect' => false,
-            'can_refresh' => $token?->refresh_token !== null && trim((string) $token->refresh_token) !== '',
+            'can_refresh' => false,
             'scopes' => $this->normalizeScopes($token?->scope),
             'expires_at' => $token?->expires_at?->toISOString(),
             'expires_in_seconds' => $this->expiresInSeconds($token),
@@ -49,12 +49,15 @@ class SpotifyOAuthService
         }
 
         try {
+            $base['can_refresh'] = $this->decryptedTokenValueOrEmpty($token, 'refresh_token') !== '';
             $token = $this->refreshStoredToken($token);
+            $accessToken = $this->decryptedTokenValueOrEmpty($token, 'access_token');
+
             $base['session_valid'] = true;
             $base['expires_at'] = $token->expires_at?->toISOString();
             $base['expires_in_seconds'] = $this->expiresInSeconds($token);
             $base['scopes'] = $this->normalizeScopes($token->scope);
-            $base['account'] = $this->fetchCurrentUserProfile($token->access_token);
+            $base['account'] = $this->fetchCurrentUserProfile($accessToken);
 
             return $base;
         } catch (SpotifyOAuthException $exception) {
@@ -202,7 +205,7 @@ class SpotifyOAuthService
             return $token;
         }
 
-        $refreshToken = trim((string) $token->refresh_token);
+        $refreshToken = $this->decryptedTokenValueOrEmpty($token, 'refresh_token');
         if ($refreshToken === '') {
             throw new SpotifyOAuthException('Missing Spotify refresh token. Please reconnect Spotify.', true);
         }
@@ -244,7 +247,7 @@ class SpotifyOAuthService
         $existing = $this->tokenForUser($user);
         $refreshToken = trim((string) Arr::get($payload, 'refresh_token', ''));
         if ($refreshToken === '') {
-            $refreshToken = trim((string) ($existing?->refresh_token ?? ''));
+            $refreshToken = $existing ? $this->decryptedTokenValueOrEmpty($existing, 'refresh_token') : '';
         }
 
         $scope = trim((string) Arr::get($payload, 'scope', ''));
@@ -505,5 +508,14 @@ class SpotifyOAuthService
     private function apiBaseUrl(): string
     {
         return trim((string) config('services.spotify.api_base_url', 'https://api.spotify.com/v1'));
+    }
+
+    private function decryptedTokenValueOrEmpty(SpotifyToken $token, string $attribute): string
+    {
+        try {
+            return trim((string) $token->getAttribute($attribute));
+        } catch (Throwable $exception) {
+            throw new SpotifyOAuthException('Stored Spotify credentials are invalid. Please reconnect Spotify.', true);
+        }
     }
 }
