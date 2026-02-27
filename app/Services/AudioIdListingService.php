@@ -25,7 +25,7 @@ class AudioIdListingService
             : max(0, $maxId);
 
         $rows = DB::table('files')
-            ->select('id')
+            ->select(['id', 'source'])
             ->where('mime_type', 'like', 'audio/%')
             ->where('id', '>', $afterId)
             ->where('id', '<=', $maxId)
@@ -40,6 +40,11 @@ class AudioIdListingService
             static fn ($row): int => (int) $row->id,
             $chunk->all(),
         );
+        $sourcesById = [];
+        foreach ($chunk as $row) {
+            $source = trim((string) ($row->source ?? ''));
+            $sourcesById[(int) $row->id] = $source !== '' ? $source : null;
+        }
 
         $nextAfterId = $hasMore && $ids !== []
             ? $ids[array_key_last($ids)]
@@ -56,6 +61,7 @@ class AudioIdListingService
 
         return [
             'ids' => $ids,
+            'sources' => $sourcesById,
             'cursor' => [
                 'after_id' => $afterId,
                 'next_after_id' => $nextAfterId,

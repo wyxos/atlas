@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
 import VirtualList from '../components/VirtualList.vue';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type AudioIdsResponse = {
     ids: number[];
+    sources: Record<number, string | null>;
     cursor: {
         after_id: number;
         next_after_id: number | null;
@@ -36,15 +39,22 @@ type AudioDetail = {
     albums: string[];
 };
 
+type AudioSourceFilter = 'all' | 'spotify' | 'local';
+
 const PER_PAGE = 100;
 const SCROLL_IDLE_MS = 180;
+const PROGRESS_HIDE_DELAY_MS = 350;
 
 const audioIds = ref<number[]>([]);
+const sourceById = ref<Record<number, string | null>>({});
 const loadedPages = ref(0);
 const totalPages = ref(0);
 const totalAudioFiles = ref(0);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
+const isFilterSheetOpen = ref(false);
+const activeFilter = ref<AudioSourceFilter>('all');
+const showProgressPanel = ref(true);
 const visibleIds = ref<number[]>([]);
 const detailsById = ref<Record<number, AudioDetail>>({});
 
@@ -56,10 +66,42 @@ const progressPercent = computed(() => {
     return Math.round((loadedPages.value / totalPages.value) * 100);
 });
 
+const filteredAudioIds = computed(() => {
+    if (activeFilter.value === 'all') {
+        return audioIds.value;
+    }
+
+    return audioIds.value.filter((id) => {
+        const source = sourceForAudioId(id);
+        if (!source) {
+            return false;
+        }
+
+        if (activeFilter.value === 'spotify') {
+            return source.toLowerCase() === 'spotify';
+        }
+
+        return source.toLowerCase() === 'local';
+    });
+});
+
+const activeFilterLabel = computed(() => {
+    if (activeFilter.value === 'spotify') {
+        return 'Spotify';
+    }
+
+    if (activeFilter.value === 'local') {
+        return 'Local';
+    }
+
+    return 'All';
+});
+
 let isDisposed = false;
 let activeRequestToken = 0;
 let idleTimeout: ReturnType<typeof setTimeout> | null = null;
 let detailsAbortController: AbortController | null = null;
+let progressHideTimeout: ReturnType<typeof setTimeout> | null = null;
 
 async function fetchChunk(afterId: number, maxId: number | null): Promise<AudioIdsResponse> {
     const params = {
@@ -78,11 +120,13 @@ async function loadAllAudioIds(): Promise<void> {
     isLoading.value = true;
     error.value = null;
     audioIds.value = [];
+    sourceById.value = {};
     loadedPages.value = 0;
     totalPages.value = 0;
     totalAudioFiles.value = 0;
     visibleIds.value = [];
     detailsById.value = {};
+    showProgressPanel.value = true;
 
     try {
         let afterId = 0;
@@ -102,6 +146,10 @@ async function loadAllAudioIds(): Promise<void> {
             }
 
             audioIds.value.push(...nextChunk.ids);
+            sourceById.value = {
+                ...sourceById.value,
+                ...nextChunk.sources,
+            };
             if (totalPages.value > 0) {
                 loadedPages.value = Math.min(totalPages.value, loadedPages.value + 1);
             }
@@ -145,7 +193,11 @@ function detailSubtitle(audioId: number): string {
 function detailSource(audioId: number): string | null {
     const source = detailsById.value[audioId]?.source?.trim();
 
-    return source && source !== '' ? source : null;
+    return source && source !== '' ? source : sourceById.value[audioId] ?? null;
+}
+
+function sourceForAudioId(audioId: number): string | null {
+    return detailSource(audioId);
 }
 
 function isSpotifySource(source: string | null): boolean {
@@ -263,10 +315,34 @@ onMounted(() => {
     void loadAllAudioIds();
 });
 
+watch([isLoading, progressPercent], ([loading, percent]) => {
+    if (loading || percent < 100) {
+        showProgressPanel.value = true;
+        if (progressHideTimeout) {
+            clearTimeout(progressHideTimeout);
+            progressHideTimeout = null;
+        }
+
+        return;
+    }
+
+    if (progressHideTimeout) {
+        clearTimeout(progressHideTimeout);
+    }
+
+    progressHideTimeout = setTimeout(() => {
+        showProgressPanel.value = false;
+        progressHideTimeout = null;
+    }, PROGRESS_HIDE_DELAY_MS);
+}, { immediate: true });
+
 onUnmounted(() => {
     isDisposed = true;
     if (idleTimeout) {
         clearTimeout(idleTimeout);
+    }
+    if (progressHideTimeout) {
+        clearTimeout(progressHideTimeout);
     }
     cancelActiveRequest();
 });
@@ -275,39 +351,107 @@ onUnmounted(() => {
 <template>
     <PageLayout>
         <div class="w-full">
-            <div class="mb-6">
-                <h4 class="text-2xl font-semibold text-regal-navy-100 mb-2">Audio</h4>
-                <p class="text-blue-slate-300">All audio file IDs</p>
+            <div class="mb-6 flex items-start justify-between gap-4">
+                <div>
+                    <h4 class="text-2xl font-semibold text-regal-navy-100 mb-2">Audio</h4>
+                    <p class="text-blue-slate-300">All audio file IDs</p>
+                </div>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-test="audio-filter-cta"
+                    class="shrink-0"
+                    @click="isFilterSheetOpen = true"
+                >
+                    Filter: {{ activeFilterLabel }}
+                </Button>
             </div>
 
-            <div class="mb-4 rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-4">
-                <div class="mb-2 flex items-center justify-between text-sm text-twilight-indigo-100">
-                    <span>Pages: {{ loadedPages }} / {{ totalPages }}</span>
-                    <span>{{ progressPercent }}%</span>
+            <Sheet v-model:open="isFilterSheetOpen">
+                <SheetContent side="right" class="w-full sm:max-w-sm">
+                    <SheetHeader>
+                        <SheetTitle>Audio Filter</SheetTitle>
+                    </SheetHeader>
+                    <div class="mt-6 space-y-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-twilight-indigo-200">Source</p>
+                        <div class="inline-flex rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-1">
+                            <Button
+                                type="button"
+                                size="sm"
+                                :variant="activeFilter === 'all' ? 'default' : 'ghost'"
+                                data-test="audio-filter-all"
+                                @click="activeFilter = 'all'"
+                            >
+                                All
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                :variant="activeFilter === 'spotify' ? 'default' : 'ghost'"
+                                data-test="audio-filter-spotify"
+                                @click="activeFilter = 'spotify'"
+                            >
+                                Spotify
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                :variant="activeFilter === 'local' ? 'default' : 'ghost'"
+                                data-test="audio-filter-local"
+                                @click="activeFilter = 'local'"
+                            >
+                                Local
+                            </Button>
+                        </div>
+                        <p class="text-xs text-blue-slate-300">
+                            Showing {{ filteredAudioIds.length }} of {{ audioIds.length }}
+                        </p>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            <Transition
+                enter-active-class="transition-all duration-250 ease-out"
+                enter-from-class="-translate-y-2 opacity-0"
+                enter-to-class="translate-y-0 opacity-100"
+                leave-active-class="transition-all duration-350 ease-in"
+                leave-from-class="translate-y-0 opacity-100 max-h-32"
+                leave-to-class="-translate-y-3 opacity-0 max-h-0"
+            >
+                <div
+                    v-if="showProgressPanel"
+                    class="mb-4 overflow-hidden rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-4"
+                    data-test="audio-progress-panel"
+                >
+                    <div class="mb-2 flex items-center justify-between text-sm text-twilight-indigo-100">
+                        <span>Pages: {{ loadedPages }} / {{ totalPages }}</span>
+                        <span>{{ progressPercent }}%</span>
+                    </div>
+                    <div class="h-2 w-full rounded-full bg-twilight-indigo-600">
+                        <div
+                            class="h-2 rounded-full bg-smart-blue-400 transition-[width] duration-200"
+                            :style="{ width: `${progressPercent}%` }"
+                        />
+                    </div>
+                    <div class="mt-2 text-xs text-blue-slate-300">
+                        IDs loaded: {{ audioIds.length }} / {{ totalAudioFiles }}
+                        <span v-if="isLoading" class="ml-2">Loading...</span>
+                    </div>
                 </div>
-                <div class="h-2 w-full rounded-full bg-twilight-indigo-600">
-                    <div
-                        class="h-2 rounded-full bg-smart-blue-400 transition-[width] duration-200"
-                        :style="{ width: `${progressPercent}%` }"
-                    />
-                </div>
-                <div class="mt-2 text-xs text-blue-slate-300">
-                    IDs loaded: {{ audioIds.length }} / {{ totalAudioFiles }}
-                    <span v-if="isLoading" class="ml-2">Loading...</span>
-                </div>
-            </div>
+            </Transition>
 
             <div v-if="error" class="rounded-lg border border-danger-500 bg-prussian-blue-700 p-4 text-danger-200">
                 {{ error }}
             </div>
             <div v-else class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700">
                 <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>
-                <div v-else-if="audioIds.length === 0" class="p-4 text-twilight-indigo-100">
-                    No audio files found.
+                <div v-else-if="filteredAudioIds.length === 0" class="p-4 text-twilight-indigo-100">
+                    No audio files match this filter.
                 </div>
                 <VirtualList
                     v-else
-                    :items="audioIds"
+                    :items="filteredAudioIds"
                     :item-height="64"
                     :overscan="4"
                     container-class="max-h-[70vh] overflow-y-auto"

@@ -5,6 +5,7 @@ import VirtualList from '../components/VirtualList.vue';
 
 type AudioIdsResponse = {
     ids: number[];
+    sources: Record<number, string | null>;
     cursor: {
         after_id: number;
         next_after_id: number | null;
@@ -74,6 +75,9 @@ describe('Audio', () => {
                 return Promise.resolve({
                     data: {
                         ids: [101],
+                        sources: {
+                            101: 'Spotify',
+                        },
                         cursor: {
                             after_id: 0,
                             next_after_id: 101,
@@ -134,6 +138,9 @@ describe('Audio', () => {
         pageTwo.resolve({
             data: {
                 ids: [202],
+                sources: {
+                    202: 'YouTube',
+                },
                 cursor: {
                     after_id: 101,
                     next_after_id: 202,
@@ -163,6 +170,9 @@ describe('Audio', () => {
         pageThree.resolve({
             data: {
                 ids: [303],
+                sources: {
+                    303: null,
+                },
                 cursor: {
                     after_id: 202,
                     next_after_id: null,
@@ -204,6 +214,7 @@ describe('Audio', () => {
         mockAxios.get.mockResolvedValue({
             data: {
                 ids,
+                sources: Object.fromEntries(ids.map((id) => [id, id % 2 === 0 ? 'Spotify' : 'local'])),
                 cursor: {
                     after_id: 0,
                     next_after_id: null,

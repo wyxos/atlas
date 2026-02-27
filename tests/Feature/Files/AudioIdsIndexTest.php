@@ -31,6 +31,8 @@ test('authenticated user can fetch cursor-paginated audio ids only', function ()
             'total_pages' => 2,
         ],
     ]);
+    $response->assertJsonPath('sources.'.$audioOne->id, $audioOne->source);
+    $response->assertJsonPath('sources.'.$audioTwo->id, $audioTwo->source);
 
     $cursor = $response->json('cursor');
 
@@ -50,6 +52,7 @@ test('authenticated user can fetch cursor-paginated audio ids only', function ()
             'total_pages' => null,
         ],
     ]);
+    $nextChunk->assertJsonPath('sources.'.$audioThree->id, $audioThree->source);
 });
 
 test('guest cannot fetch audio ids', function () {
