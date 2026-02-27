@@ -35,6 +35,28 @@ test('extension react returns json and dispatches download for positive reaction
     Queue::assertPushed(DownloadFile::class);
 });
 
+test('extension react defaults filename to random string when filename is not provided', function () {
+    Queue::fake();
+
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/react', [
+            'type' => 'like',
+            'url' => 'https://images.example.com/generated/this-looks-like-a-title-from-site.webp',
+            'source' => 'Extension',
+        ]);
+
+    $response->assertOk();
+    $fileId = (int) $response->json('file.id');
+    $file = File::query()->findOrFail($fileId);
+
+    expect($file->filename)->toMatch('/^[A-Za-z0-9]{40}$/');
+});
+
 test('extension react does not dispatch download for dislike', function () {
     Queue::fake();
 
