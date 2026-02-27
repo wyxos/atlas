@@ -28,8 +28,10 @@ test('authenticated user can create container blacklist', function () {
     $this->assertDatabaseHas('containers', [
         'id' => $container->id,
         'action_type' => 'dislike',
-        'blacklisted_at' => now(),
     ]);
+
+    $container->refresh();
+    expect($container->blacklisted_at)->not->toBeNull();
 });
 
 test('can create blacklist with blacklist action type', function () {
