@@ -31,11 +31,6 @@ const appName = computed(() => {
     return metaTag?.getAttribute('content') || 'Atlas';
 });
 
-const isAdmin = computed(() => {
-    const metaTag = document.querySelector('meta[name="user-is-admin"]');
-    return metaTag?.getAttribute('content') === '1';
-});
-
 const appVersion = packageInfo.version ?? 'dev';
 
 function handleLogout() {
@@ -51,13 +46,6 @@ function handleLogout() {
         <component :is="layout" :user-name="userName" :app-name="appName" :app-version="appVersion" @logout="handleLogout">
             <router-view />
         </component>
-        <a
-            v-if="isAdmin"
-            href="/horizon"
-            class="fixed bottom-4 right-4 rounded-full border border-twilight-indigo-500/60 bg-prussian-blue-800/80 px-3 py-1 text-xs font-semibold text-twilight-indigo-100 shadow-lg transition-colors hover:border-smart-blue-400/60 hover:text-white"
-        >
-            Horizon
-        </a>
     </div>
 </template>
 

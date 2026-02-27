@@ -13,6 +13,7 @@ import {
     Video,
     Image,
     Download,
+    Activity,
 } from 'lucide-vue-next';
 import AppHeader from '../components/AppHeader.vue';
 import AtlasIcon from '../components/AtlasIcon.vue';
@@ -42,6 +43,11 @@ const appName = computed(() => {
 });
 
 const appVersion = computed(() => props.appVersion || 'dev');
+const isAdmin = computed(() => {
+    const metaTag = document.querySelector('meta[name="user-is-admin"]');
+
+    return metaTag?.getAttribute('content') === '1';
+});
 
 // On mobile/tablet, menu starts closed; on desktop, it starts open
 const isMenuOpen = ref(window.innerWidth >= 1024);
@@ -172,6 +178,17 @@ onUnmounted(() => {
                             {{ item.label }}
                         </span>
                     </router-link>
+                    <a
+                        v-if="isAdmin"
+                        href="/horizon"
+                        @click="handleMenuItemClick"
+                        class="flex items-center gap-3 px-3 py-2 h-10 rounded-lg bg-transparent transition-colors text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white"
+                    >
+                        <Activity class="w-5 h-5 flex-shrink-0" />
+                        <span v-show="isMenuOpen" class="text-sm font-medium whitespace-nowrap transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'">
+                            Horizon
+                        </span>
+                    </a>
                 </div>
             </nav>
 

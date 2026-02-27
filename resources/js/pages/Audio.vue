@@ -23,6 +23,7 @@ type AudioDetailsResponse = {
     items: Array<{
         id: number;
         title: string | null;
+        source: string | null;
         artists: string[];
         albums: string[];
     }>;
@@ -30,6 +31,7 @@ type AudioDetailsResponse = {
 
 type AudioDetail = {
     title: string | null;
+    source: string | null;
     artists: string[];
     albums: string[];
 };
@@ -140,6 +142,26 @@ function detailSubtitle(audioId: number): string {
     return `${artists} • ${albums}`;
 }
 
+function detailSource(audioId: number): string | null {
+    const source = detailsById.value[audioId]?.source?.trim();
+
+    return source && source !== '' ? source : null;
+}
+
+function isSpotifySource(source: string | null): boolean {
+    return source !== null && source.toLowerCase() === 'spotify';
+}
+
+function isSpotifyTrack(audioId: number): boolean {
+    return isSpotifySource(detailSource(audioId));
+}
+
+function sourceTooltip(audioId: number): string {
+    const source = detailSource(audioId);
+
+    return source ? `Source: ${source}` : 'Source: Unknown';
+}
+
 function cancelActiveRequest() {
     if (detailsAbortController) {
         detailsAbortController.abort();
@@ -206,6 +228,7 @@ async function fetchVisibleDetails(): Promise<void> {
             returnedIds.add(item.id);
             nextDetails[item.id] = {
                 title: item.title,
+                source: item.source,
                 artists: item.artists,
                 albums: item.albums,
             };
@@ -218,6 +241,7 @@ async function fetchVisibleDetails(): Promise<void> {
 
             nextDetails[id] = {
                 title: null,
+                source: null,
                 artists: [],
                 albums: [],
             };
@@ -299,7 +323,16 @@ onUnmounted(() => {
                             >
                                 <p class="font-mono text-xs text-blue-slate-300">#{{ audioId }}</p>
                                 <template v-if="hasDetails(audioId)">
-                                    <p class="truncate text-sm">{{ detailTitle(audioId) }}</p>
+                                    <div class="flex min-w-0 items-center gap-2">
+                                        <p class="truncate text-sm">{{ detailTitle(audioId) }}</p>
+                                        <span
+                                            v-if="isSpotifyTrack(audioId)"
+                                            class="inline-flex shrink-0 items-center rounded border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100"
+                                            :title="sourceTooltip(audioId)"
+                                        >
+                                            Spotify
+                                        </span>
+                                    </div>
                                     <p class="truncate text-xs text-blue-slate-300">{{ detailSubtitle(audioId) }}</p>
                                 </template>
                                 <template v-else>

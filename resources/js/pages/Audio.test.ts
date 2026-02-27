@@ -22,6 +22,7 @@ type AudioDetailsResponse = {
     items: Array<{
         id: number;
         title: string | null;
+        source: string | null;
         artists: string[];
         albums: string[];
     }>;
@@ -102,9 +103,9 @@ describe('Audio', () => {
         mockAxios.post.mockResolvedValue({
             data: {
                 items: [
-                    { id: 101, title: 'Track 101', artists: ['Artist A'], albums: ['Album A'] },
-                    { id: 202, title: 'Track 202', artists: ['Artist B'], albums: ['Album B'] },
-                    { id: 303, title: 'Track 303', artists: ['Artist C'], albums: ['Album C'] },
+                    { id: 101, title: 'Track 101', source: 'Spotify', artists: ['Artist A'], albums: ['Album A'] },
+                    { id: 202, title: 'Track 202', source: 'YouTube', artists: ['Artist B'], albums: ['Album B'] },
+                    { id: 303, title: 'Track 303', source: null, artists: ['Artist C'], albums: ['Album C'] },
                 ],
             } satisfies AudioDetailsResponse,
         });
@@ -191,6 +192,8 @@ describe('Audio', () => {
             signal: expect.any(AbortSignal),
         }));
         expect(wrapper.text()).toContain('Track 101');
+        expect(wrapper.text()).toContain('Spotify');
+        expect(wrapper.text()).not.toContain('Not Spotify');
         expect(wrapper.text()).toContain('Artist A');
         expect(wrapper.text()).toContain('Album A');
     });
@@ -220,6 +223,7 @@ describe('Audio', () => {
                 items: payload.ids.map((id) => ({
                     id,
                     title: `Track ${id}`,
+                    source: id % 2 === 0 ? 'Spotify' : 'Local',
                     artists: [`Artist ${id}`],
                     albums: [`Album ${id}`],
                 })),
