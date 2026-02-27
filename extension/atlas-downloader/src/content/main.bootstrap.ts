@@ -404,6 +404,7 @@ export function runContentScript() {
     let reactingItemType: string | null = null;
     let debugTargetUrl: string | null = null;
     let markerSyncTimer: number | null = null;
+    let markerApplyTimer: number | null = null;
     const scheduleMarkerSync = (delayMs = 300) => {
       if (markerSyncTimer !== null) {
         window.clearTimeout(markerSyncTimer);
@@ -411,6 +412,16 @@ export function runContentScript() {
       markerSyncTimer = window.setTimeout(() => {
         markerSyncTimer = null;
         syncAtlasStatusForPageMarkers();
+      }, delayMs);
+    };
+    const scheduleMarkerApply = (delayMs = 80) => {
+      if (markerApplyTimer !== null) {
+        return;
+      }
+
+      markerApplyTimer = window.setTimeout(() => {
+        markerApplyTimer = null;
+        applyPageMarkers(items);
       }, delayMs);
     };
     const queuedLookupUrls = new Set<string>();
@@ -656,7 +667,7 @@ export function runContentScript() {
 
       renderList();
       setReady(summaryText());
-      applyPageMarkers(items);
+      scheduleMarkerApply(20);
     };
 
     document.addEventListener('keydown', (event) => {
@@ -861,19 +872,67 @@ export function runContentScript() {
       });
     };
 
+    const mutationTouchesMarkerTargets = (mutations: MutationRecord[]): boolean => {
+      const nodeTouchesMarkerTargets = (node: Node): boolean => {
+        if (!(node instanceof Element)) {
+          return false;
+        }
+
+        if (node.matches('img, video, a[href], source')) {
+          return true;
+        }
+
+        return node.querySelector('img, video, a[href], source') !== null;
+      };
+
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (!(target instanceof Element)) {
+            continue;
+          }
+
+          if (target.matches('img, video, a[href], source') || target.closest('img, video, a[href]')) {
+            return true;
+          }
+
+          continue;
+        }
+
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) {
+            if (nodeTouchesMarkerTargets(node)) {
+              return true;
+            }
+          }
+          for (const node of mutation.removedNodes) {
+            if (nodeTouchesMarkerTargets(node)) {
+              return true;
+            }
+          }
+        }
+      }
+
+      return false;
+    };
+
     const mutationObserver = new MutationObserver((mutations) => {
       if (shouldIgnoreMutationBatch(mutations, ROOT_ID)) {
         return;
       }
 
-      applyPageMarkers(items);
+      if (!mutationTouchesMarkerTargets(mutations)) {
+        return;
+      }
+
+      scheduleMarkerApply(100);
       scheduleMarkerSync(450);
     });
     mutationObserver.observe(document.documentElement, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['src', 'srcset', 'href', 'style', 'class'],
+      attributeFilter: ['src', 'srcset', 'href'],
     });
 
     window.addEventListener('pageshow', () => scheduleMarkerSync(80), true);
@@ -897,7 +956,7 @@ export function runContentScript() {
       }
 
       if (applyOpenTabUrls(payload.urls)) {
-        applyPageMarkers(items);
+        scheduleMarkerApply(40);
       }
     });
 
@@ -1156,9 +1215,9 @@ export function runContentScript() {
           if (match.downloaded) downloadedCount += 1;
         }
 
-        renderList();
-        setReady(summaryText());
-        applyPageMarkers(items);
+      renderList();
+      setReady(summaryText());
+      scheduleMarkerApply(20);
         window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
 
         if (!silent) {
@@ -1712,13 +1771,13 @@ export function runContentScript() {
     function syncAtlasStatusForPageMarkers() {
       const urls = collectPageMarkerUrls();
       if (urls.length === 0) {
-        applyPageMarkers(items);
+        scheduleMarkerApply(20);
         return;
       }
 
       sendMessageSafe({ type: 'atlas-check-batch', urls }, (response) => {
         if (!response?.ok) {
-          applyPageMarkers(items);
+          scheduleMarkerApply(20);
           return;
         }
 
@@ -1740,7 +1799,7 @@ export function runContentScript() {
           });
         }
 
-        applyPageMarkers(items);
+        scheduleMarkerApply(20);
         window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
       });
     }
@@ -1748,7 +1807,7 @@ export function runContentScript() {
     window.addEventListener(
       STATUS_CACHE_UPDATED_EVENT,
       () => {
-        applyPageMarkers(items);
+        scheduleMarkerApply(20);
       },
       true
     );

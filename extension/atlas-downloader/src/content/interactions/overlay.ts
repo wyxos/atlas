@@ -523,6 +523,14 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       if (options.isSheetOpen()) return;
       if (!(event.target instanceof Element)) return;
       if (isOwnUiEvent(event)) return;
+      const target = event.target;
+      const directMedia = target.closest?.('img, video');
+      if (!directMedia) {
+        const anchor = target.closest?.('a[href]');
+        if (!anchor || !anchor.querySelector('img, video')) {
+          return;
+        }
+      }
 
       const media = findMediaAtPoint(event.clientX, event.clientY);
       if (!media) return;
@@ -628,7 +636,55 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   window.addEventListener(LOCATION_CHANGE_EVENT, handleLocationChange, true);
   window.addEventListener('blur', hide);
   window.addEventListener('focus', scheduleMediaContextRefresh, true);
-  const observer = new MutationObserver(() => {
+  const mutationTouchesOverlayTargets = (mutations: MutationRecord[]): boolean => {
+    const nodeTouchesOverlayTargets = (node: Node): boolean => {
+      if (!(node instanceof Element)) {
+        return false;
+      }
+
+      if (node.matches('img, video, source')) {
+        return true;
+      }
+
+      return node.querySelector('img, video, source') !== null;
+    };
+
+    for (const mutation of mutations) {
+      if (mutation.type === 'attributes') {
+        const target = mutation.target;
+        if (!(target instanceof Element)) {
+          continue;
+        }
+
+        if (target.matches('img, video, source') || target.closest('img, video')) {
+          return true;
+        }
+
+        continue;
+      }
+
+      if (mutation.type === 'childList') {
+        for (const node of mutation.addedNodes) {
+          if (nodeTouchesOverlayTargets(node)) {
+            return true;
+          }
+        }
+        for (const node of mutation.removedNodes) {
+          if (nodeTouchesOverlayTargets(node)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  const observer = new MutationObserver((mutations) => {
+    if (!mutationTouchesOverlayTargets(mutations)) {
+      return;
+    }
+
     handleLocationChange();
     scheduleMediaContextRefresh();
   });
@@ -636,6 +692,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ['src', 'srcset', 'style', 'class'],
+    attributeFilter: ['src', 'srcset'],
   });
 }
