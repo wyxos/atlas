@@ -9,10 +9,10 @@ function reactionColor(match: ExtensionMatchResult): string {
         return '#ef4444';
     }
     if (match.reaction === 'like') {
-        return '#3b82f6';
+        return '#0466c8';
     }
     if (match.reaction === 'dislike') {
-        return '#f97316';
+        return '#6b7280';
     }
     if (match.reaction === 'funny') {
         return '#eab308';
@@ -96,16 +96,16 @@ function ensureBadge(wrapper: HTMLDivElement): HTMLDivElement {
     const badge = document.createElement('div');
     badge.setAttribute(BADGE_ATTR, '1');
     badge.style.position = 'absolute';
-    badge.style.left = '6px';
-    badge.style.bottom = '6px';
-    badge.style.minWidth = '18px';
-    badge.style.height = '18px';
-    badge.style.padding = '0 4px';
+    badge.style.right = '8px';
+    badge.style.bottom = '8px';
+    badge.style.width = '50px';
+    badge.style.height = '50px';
+    badge.style.padding = '0';
     badge.style.borderRadius = '9999px';
     badge.style.display = 'flex';
     badge.style.alignItems = 'center';
     badge.style.justifyContent = 'center';
-    badge.style.fontSize = '12px';
+    badge.style.fontSize = '24px';
     badge.style.lineHeight = '1';
     badge.style.fontWeight = '700';
     badge.style.background = 'rgba(15, 23, 42, 0.85)';
