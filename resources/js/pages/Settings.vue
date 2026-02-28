@@ -60,12 +60,10 @@ type SettingsServicesResponse = {
 };
 
 const spotifyService = ref<SpotifyServiceStatus | null>(null);
-const extensionApiKey = ref('');
 const extensionApiKeyConfigured = ref(false);
 const extensionDefaultDomain = ref('https://atlas.test');
 const extensionNotice = ref('');
 const extensionNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
-const isExtensionApiKeySaving = ref(false);
 const isExtensionApiKeyGenerating = ref(false);
 const spotifyIsConnected = computed(() => spotifyService.value?.connected === true);
 const spotifyNeedsReconnect = computed(() => spotifyService.value?.needs_reconnect === true);
@@ -153,31 +151,6 @@ async function fetchServices(): Promise<void> {
     }
 }
 
-async function handleSaveExtensionApiKey(): Promise<void> {
-    extensionNotice.value = '';
-    const normalizedApiKey = extensionApiKey.value.trim();
-
-    if (normalizedApiKey === '') {
-        setExtensionNotice('API key is required.', 'error');
-        return;
-    }
-
-    isExtensionApiKeySaving.value = true;
-    try {
-        await window.axios.post('/api/settings/extension', {
-            api_key: normalizedApiKey,
-        });
-        extensionApiKeyConfigured.value = true;
-        extensionApiKey.value = '';
-        setExtensionNotice('Extension API key saved.', 'success');
-    } catch (error: unknown) {
-        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        setExtensionNotice(responseMessage || 'Failed to save extension API key.', 'error');
-    } finally {
-        isExtensionApiKeySaving.value = false;
-    }
-}
-
 async function handleGenerateExtensionApiKey(): Promise<void> {
     extensionNotice.value = '';
     isExtensionApiKeyGenerating.value = true;
@@ -188,34 +161,18 @@ async function handleGenerateExtensionApiKey(): Promise<void> {
         );
 
         extensionApiKeyConfigured.value = data.api_key_configured === true;
-        extensionApiKey.value = data.api_key;
 
         try {
             await navigator.clipboard.writeText(data.api_key);
             setExtensionNotice('New API key generated, saved, and copied to clipboard.', 'success');
         } catch {
-            setExtensionNotice('New API key generated and saved. Copy it from the field below.', 'neutral');
+            setExtensionNotice('New API key generated and saved, but clipboard copy failed.', 'error');
         }
     } catch (error: unknown) {
         const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
         setExtensionNotice(responseMessage || 'Failed to generate extension API key.', 'error');
     } finally {
         isExtensionApiKeyGenerating.value = false;
-    }
-}
-
-async function handleCopyExtensionApiKey(): Promise<void> {
-    const currentApiKey = extensionApiKey.value.trim();
-    if (currentApiKey === '') {
-        setExtensionNotice('No API key available to copy.', 'error');
-        return;
-    }
-
-    try {
-        await navigator.clipboard.writeText(currentApiKey);
-        setExtensionNotice('API key copied to clipboard.', 'success');
-    } catch {
-        setExtensionNotice('Clipboard copy failed. Copy the key manually.', 'error');
     }
 }
 
@@ -435,56 +392,24 @@ onMounted(() => {
                         </Button>
                     </div>
 
-                    <form class="space-y-4 mb-4" @submit.prevent="handleSaveExtensionApiKey">
-                        <div class="grid gap-2">
-                            <label class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">
-                                Extension API Key
-                            </label>
-                            <input
-                                v-model="extensionApiKey"
-                                type="password"
-                                autocomplete="off"
-                                placeholder="Enter or rotate extension API key"
-                                class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                            />
-                            <p class="text-xs text-twilight-indigo-300">
-                                Use this same key in the extension options page.
-                            </p>
-                        </div>
-
-                        <div class="flex flex-wrap items-center gap-2">
-                            <Button type="submit" size="sm" :loading="isExtensionApiKeySaving">
-                                Save API Key
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                :loading="isExtensionApiKeyGenerating"
-                                :disabled="isExtensionApiKeySaving"
-                                @click="handleGenerateExtensionApiKey"
-                            >
-                                Generate, Save & Copy
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                :disabled="extensionApiKey.trim() === ''"
-                                @click="handleCopyExtensionApiKey"
-                            >
-                                Copy
-                            </Button>
-                            <span
-                                class="text-xs px-2 py-1 rounded-full border"
-                                :class="extensionApiKeyConfigured
-                                    ? 'border-smart-blue-400 text-smart-blue-200 bg-smart-blue-500/10'
-                                    : 'border-twilight-indigo-500 text-twilight-indigo-200 bg-prussian-blue-700/60'"
-                            >
-                                {{ extensionApiKeyConfigured ? 'Configured' : 'Not configured' }}
-                            </span>
-                        </div>
-                    </form>
+                    <div class="flex flex-wrap items-center gap-2 mb-4">
+                        <Button
+                            type="button"
+                            size="sm"
+                            :loading="isExtensionApiKeyGenerating"
+                            @click="handleGenerateExtensionApiKey"
+                        >
+                            Generate API Key
+                        </Button>
+                        <span
+                            class="text-xs px-2 py-1 rounded-full border"
+                            :class="extensionApiKeyConfigured
+                                ? 'border-smart-blue-400 text-smart-blue-200 bg-smart-blue-500/10'
+                                : 'border-twilight-indigo-500 text-twilight-indigo-200 bg-prussian-blue-700/60'"
+                        >
+                            {{ extensionApiKeyConfigured ? 'Configured' : 'Not configured' }}
+                        </span>
+                    </div>
 
                     <p
                         v-if="extensionNotice"
