@@ -30,6 +30,8 @@ test-results/
 /resources/js/wayfinder
 /resources/js/actions
 /resources/js/routes
+/extension/dist
+/public/downloads/atlas-extension*.zip
 package-lock.json
 .zephyr/
 /tasks
