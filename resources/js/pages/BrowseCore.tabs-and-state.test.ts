@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
@@ -378,3 +379,4 @@ describe('Browse - Core', () => {
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('page=1'));
     });
 });
+

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { vi, beforeEach } from 'vitest';
 import { mount as baseMount, flushPromises } from '@vue/test-utils';
 import { cloneVNode, defineComponent, h, nextTick, ref } from 'vue';
@@ -377,3 +378,4 @@ export {
     mockInitialize,
     capturedOpenContainerTab,
 };
+
