@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { ref } from 'vue';
+import JsonTree from './JsonTree.vue';
+
 type AtlasReaction = {
   type?: unknown;
 };
@@ -39,7 +42,13 @@ type RequestTraceItem = {
   state: 'executing' | 'completed' | 'failed';
   startedAt: number;
   finishedAt: number | null;
+  durationMs?: number | null;
+  payload?: unknown;
+  response?: unknown;
+  errorMessage?: string | null;
 };
+
+type SheetTab = 'files' | 'requests';
 
 const props = defineProps<{
   open: boolean;
@@ -73,9 +82,14 @@ const emit = defineEmits<{
   toggleDebug: [index: number];
 }>();
 
+const activeTab = ref<SheetTab>('files');
+
+function setActiveTab(tab: SheetTab): void {
+  activeTab.value = tab;
+}
+
 function formatSubline(item: SheetItem): string {
-  const dims =
-    item.width && item.height ? `${item.width}×${item.height}` : 'size unknown';
+  const dims = item.width && item.height ? `${item.width}x${item.height}` : 'size unknown';
   const host = safeHost(item.url);
   return host ? `${dims} • ${host}` : dims;
 }
@@ -163,6 +177,31 @@ function formatRequestTime(timestamp: number | null): string {
     hour12: false,
   });
 }
+
+function formatDuration(request: RequestTraceItem): string {
+  if (typeof request.durationMs === 'number' && Number.isFinite(request.durationMs)) {
+    return `${Math.max(0, Math.round(request.durationMs))} ms`;
+  }
+
+  if (!request.finishedAt) {
+    return 'Running';
+  }
+
+  const delta = request.finishedAt - request.startedAt;
+  if (!Number.isFinite(delta)) {
+    return '';
+  }
+
+  return `${Math.max(0, Math.round(delta))} ms`;
+}
+
+function requestHasExpandableData(request: RequestTraceItem): boolean {
+  return (
+    request.payload !== undefined
+    || request.response !== undefined
+    || (typeof request.errorMessage === 'string' && request.errorMessage.trim() !== '')
+  );
+}
 </script>
 
 <template>
@@ -233,31 +272,31 @@ function formatRequestTime(timestamp: number | null): string {
       </div>
 
       <div class="atlas-downloader-meta">{{ metaText }}</div>
-      <div
-        v-if="requestTrace.length > 0"
-        class="atlas-downloader-request-trace"
-        aria-live="polite"
-      >
-        <div class="atlas-downloader-request-trace-title">Request activity</div>
-        <ul class="atlas-downloader-request-trace-list">
-          <li
-            v-for="request in requestTrace"
-            :key="request.id"
-            class="atlas-downloader-request-trace-item"
-          >
-            <span class="atlas-downloader-request-trace-path" :title="request.path">
-              {{ request.path }}
-            </span>
-            <span class="atlas-downloader-request-trace-state" :data-state="request.state">
-              {{ request.state }}
-            </span>
-            <span class="atlas-downloader-request-trace-time">
-              {{ formatRequestTime(request.finishedAt ?? request.startedAt) }}
-            </span>
-          </li>
-        </ul>
+
+      <div class="atlas-downloader-tabs" role="tablist" aria-label="Atlas sheet sections">
+        <button
+          type="button"
+          class="atlas-downloader-tab"
+          :class="{ active: activeTab === 'files' }"
+          role="tab"
+          :aria-selected="activeTab === 'files'"
+          @click="setActiveTab('files')"
+        >
+          Files ({{ items.length }})
+        </button>
+        <button
+          type="button"
+          class="atlas-downloader-tab"
+          :class="{ active: activeTab === 'requests' }"
+          role="tab"
+          :aria-selected="activeTab === 'requests'"
+          @click="setActiveTab('requests')"
+        >
+          Requests ({{ requestTrace.length }})
+        </button>
       </div>
-      <div class="atlas-downloader-list">
+
+      <div v-if="activeTab === 'files'" class="atlas-downloader-list" role="tabpanel">
         <div
           v-if="items.length === 0"
           style="padding: 10px 12px; color: #94a3b8; font-size: 12px;"
@@ -273,108 +312,159 @@ function formatRequestTime(timestamp: number | null): string {
             :class="{ selected: item.selected }"
             @click="emit('toggleRow', item.index)"
           >
-          <input
-            type="checkbox"
-            :checked="item.selected"
-            @click.stop
-            @change="onSelectionChange(item.index, $event)"
-          />
-
-          <div class="atlas-downloader-preview">
-            <img
-              v-if="item.preview_url"
-              :src="item.preview_url"
-              loading="lazy"
-              alt=""
+            <input
+              type="checkbox"
+              :checked="item.selected"
+              @click.stop
+              @change="onSelectionChange(item.index, $event)"
             >
-          </div>
 
-          <div class="atlas-downloader-info">
-            <div class="atlas-downloader-kind">{{ item.tag_name }}</div>
-            <div class="atlas-downloader-url" :title="item.url">{{ item.url }}</div>
-            <div class="atlas-downloader-sub">{{ formatSubline(item) }}</div>
-
-            <div class="atlas-downloader-reactions">
-              <button
-                v-for="reaction in reactions"
-                :key="reaction.type"
-                type="button"
-                :class="reactionButtonClass(item, reaction)"
-                :aria-label="reaction.label"
-                :title="reaction.label"
-                :disabled="isItemBusy(item)"
-                @click.stop="emit('react', item.index, reaction.type)"
+            <div class="atlas-downloader-preview">
+              <img
+                v-if="item.preview_url"
+                :src="item.preview_url"
+                loading="lazy"
+                alt=""
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    v-for="pathD in reaction.pathDs"
-                    :key="pathD"
-                    :d="pathD"
-                  />
-                </svg>
-              </button>
-
-              <button
-                type="button"
-                :class="blacklistButtonClass(item)"
-                :aria-label="blacklistAction.label"
-                :title="blacklistAction.label"
-                :disabled="isItemBusy(item)"
-                @click.stop="emit('blacklist', item.index)"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    v-for="pathD in blacklistAction.pathDs"
-                    :key="pathD"
-                    :d="pathD"
-                  />
-                </svg>
-              </button>
-
-              <button
-                v-if="item.atlas?.downloaded"
-                type="button"
-                :class="deleteButtonClass(item)"
-                aria-label="Delete download"
-                title="Delete download"
-                :disabled="isItemBusy(item)"
-                @click.stop="emit('deleteDownload', item.index)"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4h8v2" />
-                  <path d="M8 10v8" />
-                  <path d="M12 10v8" />
-                  <path d="M16 10v8" />
-                  <path d="M6 6l1 14h10l1-14" />
-                </svg>
-              </button>
-
-              <button
-                type="button"
-                class="atlas-downloader-debug-toggle"
-                :class="{ active: debugTargetUrl === item.url }"
-                @click.stop="emit('toggleDebug', item.index)"
-              >
-                {{ debugTargetUrl === item.url ? 'Hide debug' : 'Debug' }}
-              </button>
             </div>
 
-            <details
-              v-if="debugTargetUrl === item.url"
-              class="atlas-downloader-debug"
-              open
-            >
-              <summary>Debug payload</summary>
-              <pre class="atlas-downloader-json-tree">{{ JSON.stringify(debugPayloads[item.url] ?? {}, null, 2) }}</pre>
-            </details>
-          </div>
+            <div class="atlas-downloader-info">
+              <div class="atlas-downloader-kind">{{ item.tag_name }}</div>
+              <div class="atlas-downloader-url" :title="item.url">{{ item.url }}</div>
+              <div class="atlas-downloader-sub">{{ formatSubline(item) }}</div>
 
-          <div class="atlas-downloader-status" :class="getDisplayStatus(item).className">
-            {{ getDisplayStatus(item).text }}
-          </div>
+              <div class="atlas-downloader-reactions">
+                <button
+                  v-for="reaction in reactions"
+                  :key="reaction.type"
+                  type="button"
+                  :class="reactionButtonClass(item, reaction)"
+                  :aria-label="reaction.label"
+                  :title="reaction.label"
+                  :disabled="isItemBusy(item)"
+                  @click.stop="emit('react', item.index, reaction.type)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      v-for="pathD in reaction.pathDs"
+                      :key="pathD"
+                      :d="pathD"
+                    />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  :class="blacklistButtonClass(item)"
+                  :aria-label="blacklistAction.label"
+                  :title="blacklistAction.label"
+                  :disabled="isItemBusy(item)"
+                  @click.stop="emit('blacklist', item.index)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      v-for="pathD in blacklistAction.pathDs"
+                      :key="pathD"
+                      :d="pathD"
+                    />
+                  </svg>
+                </button>
+
+                <button
+                  v-if="item.atlas?.downloaded"
+                  type="button"
+                  :class="deleteButtonClass(item)"
+                  aria-label="Delete download"
+                  title="Delete download"
+                  :disabled="isItemBusy(item)"
+                  @click.stop="emit('deleteDownload', item.index)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M8 10v8" />
+                    <path d="M12 10v8" />
+                    <path d="M16 10v8" />
+                    <path d="M6 6l1 14h10l1-14" />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  class="atlas-downloader-debug-toggle"
+                  :class="{ active: debugTargetUrl === item.url }"
+                  @click.stop="emit('toggleDebug', item.index)"
+                >
+                  {{ debugTargetUrl === item.url ? 'Hide debug' : 'Debug' }}
+                </button>
+              </div>
+
+              <details
+                v-if="debugTargetUrl === item.url"
+                class="atlas-downloader-debug"
+                open
+              >
+                <summary>Debug payload</summary>
+                <JsonTree :value="debugPayloads[item.url] ?? {}" :expanded="true" />
+              </details>
+            </div>
+
+            <div class="atlas-downloader-status" :class="getDisplayStatus(item).className">
+              {{ getDisplayStatus(item).text }}
+            </div>
           </div>
         </template>
+      </div>
+
+      <div v-else class="atlas-downloader-requests-panel" role="tabpanel" aria-live="polite">
+        <div v-if="requestTrace.length === 0" class="atlas-downloader-requests-empty">
+          No requests yet.
+        </div>
+
+        <ul v-else class="atlas-downloader-requests-list">
+          <li
+            v-for="request in requestTrace"
+            :key="request.id"
+            class="atlas-downloader-requests-item"
+          >
+            <details
+              class="atlas-downloader-request-entry"
+              :open="request.state === 'executing'"
+            >
+              <summary class="atlas-downloader-request-summary">
+                <span class="atlas-downloader-request-path" :title="request.path">{{ request.path }}</span>
+                <span class="atlas-downloader-request-state" :data-state="request.state">{{ request.state }}</span>
+                <span class="atlas-downloader-request-duration">{{ formatDuration(request) }}</span>
+                <span class="atlas-downloader-request-at">{{ formatRequestTime(request.finishedAt ?? request.startedAt) }}</span>
+              </summary>
+
+              <div class="atlas-downloader-request-body">
+                <div class="atlas-downloader-request-message-type">
+                  {{ request.messageType }}
+                </div>
+
+                <div v-if="requestHasExpandableData(request)" class="atlas-downloader-request-json-grid">
+                  <section class="atlas-downloader-request-json-block">
+                    <h4>Payload</h4>
+                    <JsonTree :value="request.payload ?? null" :expanded="true" />
+                  </section>
+
+                  <section class="atlas-downloader-request-json-block">
+                    <h4>Response</h4>
+                    <JsonTree :value="request.response ?? null" :expanded="true" />
+                  </section>
+                </div>
+
+                <div
+                  v-if="request.errorMessage"
+                  class="atlas-downloader-request-error"
+                >
+                  {{ request.errorMessage }}
+                </div>
+              </div>
+            </details>
+          </li>
+        </ul>
       </div>
     </div>
   </div>

@@ -62,6 +62,9 @@ type ChromeRuntime = {
     addListener: (callback: (message: unknown) => void) => void;
   };
   getManifest: () => { version?: string };
+  lastError?: {
+    message?: string;
+  };
 };
 
 type ChromeApi = {
@@ -115,12 +118,17 @@ export function runContentScript() {
       : 'closed';
   })();
 
-  let openSheet: (() => void) | null = null;
+  let setSheetOpenFromGlobalState: ((open: boolean) => void) | null = null;
+  let toggleGlobalSheetState: (() => void) | null = null;
   let handleRealtimeDownloadEvent: ((payload: unknown) => void) | null = null;
   let syncOpenTabMarkers: (() => void) | null = null;
   const STATUS_CACHE_UPDATED_EVENT = 'atlas-status-cache-updated';
   const OPEN_TABS_UPDATED_EVENT = 'atlas-open-tabs-updated';
   const REACTION_UPDATED_EVENT = 'atlas-reaction-updated';
+  const SHEET_STATE_CHANGED_EVENT = 'atlas-sheet-state-changed';
+  const SHEET_STATE_GET_MESSAGE = 'atlas-sheet-state-get';
+  const SHEET_STATE_SET_MESSAGE = 'atlas-sheet-state-set';
+  const SHEET_STATE_TOGGLE_MESSAGE = 'atlas-sheet-state-toggle';
 
   const ATLAS_STATUS_TTL_MS = 30_000;
   const MAX_REQUEST_TRACE = 12;
@@ -211,7 +219,13 @@ export function runContentScript() {
       return;
     }
 
-    const msg = message as { type?: unknown; payload?: unknown; url?: unknown; urls?: unknown };
+    const msg = message as {
+      type?: unknown;
+      payload?: unknown;
+      url?: unknown;
+      urls?: unknown;
+      open?: unknown;
+    };
     if (msg.type === 'atlas-download-event') {
       handleRealtimeDownloadEvent?.(msg.payload);
       return;
@@ -228,6 +242,26 @@ export function runContentScript() {
     if (msg.type === OPEN_TABS_UPDATED_EVENT) {
       if (applyOpenTabUrls(msg.urls)) {
         syncOpenTabMarkers?.();
+      }
+      return;
+    }
+
+    if (msg.type === SHEET_STATE_CHANGED_EVENT) {
+      if (!IS_TOP_WINDOW) {
+        return;
+      }
+
+      const nextOpen = msg.open === true;
+      try {
+        chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
+          configureDomainIncludeRules(resolveDomainIncludeRulesSetting(data.atlasDomainIncludeRules));
+          minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
+
+          mountUi();
+          setSheetOpenFromGlobalState?.(nextOpen);
+        });
+      } catch {
+        // Happens if the extension was reloaded while this tab stayed open.
       }
       return;
     }
@@ -250,13 +284,13 @@ export function runContentScript() {
       return;
     }
 
-      try {
+    try {
       chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
         configureDomainIncludeRules(resolveDomainIncludeRulesSetting(data.atlasDomainIncludeRules));
         minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
         mountUi();
-        openSheet?.();
+        toggleGlobalSheetState?.();
       });
     } catch {
       // Happens if the extension was reloaded while this tab stayed open.
@@ -647,25 +681,76 @@ export function runContentScript() {
       reactToItem(target, hotkeyType, { closeOnSuccess: true });
     });
 
-    function openModal() {
+    const syncGlobalSheetState = (open: boolean) => {
+      try {
+        chrome.runtime.sendMessage({ type: SHEET_STATE_SET_MESSAGE, open }, () => {
+          // Read and ignore callback errors.
+          void chrome.runtime.lastError;
+        });
+      } catch {
+        // Ignore extension context errors when reloading.
+      }
+    };
+    const requestGlobalSheetToggle = () => {
+      try {
+        chrome.runtime.sendMessage({ type: SHEET_STATE_TOGGLE_MESSAGE }, () => {
+          // Read and ignore callback errors.
+          void chrome.runtime.lastError;
+        });
+      } catch {
+        // Ignore extension context errors when reloading.
+      }
+    };
+
+    function openModal(options: { syncGlobal?: boolean; refresh?: boolean } = {}) {
+      const syncGlobal = options.syncGlobal !== false;
+      const refresh = options.refresh !== false;
+
       sheetState.open = true;
-      refreshList();
+      if (refresh) {
+        refreshList();
+      }
+
+      if (syncGlobal) {
+        syncGlobalSheetState(true);
+      }
     }
 
-    function toggleModal() {
-      if (sheetState.open) {
-        closeModal();
+    function closeModal(options: { syncGlobal?: boolean } = {}) {
+      const syncGlobal = options.syncGlobal !== false;
+      sheetState.open = false;
+
+      if (syncGlobal) {
+        syncGlobalSheetState(false);
+      }
+    }
+
+    setSheetOpenFromGlobalState = (open) => {
+      if (open) {
+        openModal({ syncGlobal: false, refresh: true });
         return;
       }
 
-      openModal();
-    }
+      closeModal({ syncGlobal: false });
+    };
+    toggleGlobalSheetState = requestGlobalSheetToggle;
 
-    function closeModal() {
-      sheetState.open = false;
-    }
+    try {
+      chrome.runtime.sendMessage({ type: SHEET_STATE_GET_MESSAGE }, (response: unknown) => {
+        if (!response || typeof response !== 'object') {
+          return;
+        }
 
-    openSheet = toggleModal;
+        const open = (response as { open?: unknown }).open;
+        if (typeof open !== 'boolean') {
+          return;
+        }
+
+        setSheetOpenFromGlobalState?.(open);
+      });
+    } catch {
+      // Ignore extension context errors when reloading.
+    }
 
     installHotkeys({
       showToast,

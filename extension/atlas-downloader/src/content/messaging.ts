@@ -10,6 +10,10 @@ export type AtlasRequestTraceEntry = {
   state: AtlasRequestState;
   startedAt: number;
   finishedAt: number | null;
+  durationMs: number | null;
+  payload: unknown;
+  response: unknown;
+  errorMessage: string | null;
 };
 
 type RequestTracker = {
@@ -42,6 +46,56 @@ function resolveRequestMeta(message: unknown): { messageType: string; path: stri
   };
 }
 
+function toTraceSnapshot(value: unknown): unknown {
+  const seen = new WeakSet<object>();
+  const replacer = (_key: string, current: unknown): unknown => {
+    if (current === undefined) {
+      return '[undefined]';
+    }
+
+    if (typeof current === 'bigint') {
+      return current.toString();
+    }
+
+    if (typeof current === 'function') {
+      return '[function]';
+    }
+
+    if (typeof current === 'symbol') {
+      return String(current);
+    }
+
+    if (current && typeof current === 'object') {
+      if (seen.has(current as object)) {
+        return '[circular]';
+      }
+
+      seen.add(current as object);
+    }
+
+    return current;
+  };
+
+  try {
+    const serialized = JSON.stringify(value, replacer);
+    if (serialized === undefined) {
+      return value === undefined ? '[undefined]' : String(value);
+    }
+
+    return JSON.parse(serialized) as unknown;
+  } catch {
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+        stack: value.stack ?? null,
+      };
+    }
+
+    return String(value);
+  }
+}
+
 export function createSendMessageSafe(
   sendMessage: SendMessage,
   showToast: ShowToast,
@@ -51,47 +105,60 @@ export function createSendMessageSafe(
 
   return (message: unknown, callback: (response: unknown) => void) => {
     const meta = resolveRequestMeta(message);
+    const startedAt = Date.now();
     requestId += 1;
     const requestEntry: AtlasRequestTraceEntry = {
       id: requestId,
       messageType: meta.messageType,
       path: meta.path,
       state: 'executing',
-      startedAt: Date.now(),
+      startedAt,
       finishedAt: null,
+      durationMs: null,
+      payload: toTraceSnapshot(message),
+      response: null,
+      errorMessage: null,
     };
     requestTracker?.onStart?.(requestEntry);
 
     let finished = false;
-    const finishRequest = (state: AtlasRequestState) => {
+    const finishRequest = (
+      state: AtlasRequestState,
+      response: unknown = null,
+      errorMessage: string | null = null
+    ) => {
       if (finished) {
         return;
       }
 
       finished = true;
+      const finishedAt = Date.now();
       requestTracker?.onFinish?.({
         ...requestEntry,
         state,
-        finishedAt: Date.now(),
+        finishedAt,
+        durationMs: Math.max(0, finishedAt - startedAt),
+        response: toTraceSnapshot(response),
+        errorMessage,
       });
     };
 
     try {
       sendMessage(message, (response) => {
         if (!response) {
-          finishRequest('failed');
+          finishRequest('failed', response, 'Empty extension response');
           callback(response);
           return;
         }
 
         if (typeof response === 'object' && response !== null && 'ok' in response) {
           const ok = Boolean((response as { ok?: unknown }).ok);
-          finishRequest(ok ? 'completed' : 'failed');
+          finishRequest(ok ? 'completed' : 'failed', response, ok ? null : 'Request returned ok=false');
           callback(response);
           return;
         }
 
-        finishRequest('completed');
+        finishRequest('completed', response);
         callback(response);
       });
     } catch (error) {
@@ -114,7 +181,7 @@ export function createSendMessageSafe(
         showToast('Atlas extension error. Refresh this tab.', 'danger');
       }
 
-      finishRequest('failed');
+      finishRequest('failed', null, messageText);
       callback(null);
     }
   };
