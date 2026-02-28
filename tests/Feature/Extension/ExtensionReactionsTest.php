@@ -46,7 +46,6 @@ test('extension reactions endpoint creates file applies reaction and queues down
         'url' => 'https://cdn.example.test/media/new-file.jpg',
         'referrer_url' => 'https://www.example.test/post/123',
         'referrer_url_hash_aware' => 'https://www.example.test/post/123#media-id-42',
-        'preview_url' => 'https://cdn.example.test/media/new-file-preview.jpg',
     ]);
 
     $response->assertSuccessful();
@@ -55,13 +54,13 @@ test('extension reactions endpoint creates file applies reaction and queues down
     $response->assertJsonPath('download.downloaded_at', null);
     $response->assertJsonPath('file.url', 'https://cdn.example.test/media/new-file.jpg');
     $response->assertJsonPath('file.referrer_url', 'https://www.example.test/post/123#media-id-42');
-    $response->assertJsonPath('file.preview_url', 'https://cdn.example.test/media/new-file-preview.jpg');
+    $response->assertJsonPath('file.preview_url', 'https://cdn.example.test/media/new-file.jpg');
 
     $file = File::query()->where('url', 'https://cdn.example.test/media/new-file.jpg')->first();
     expect($file)->not->toBeNull();
     expect($file?->source)->toBe('extension');
     expect($file?->referrer_url)->toBe('https://www.example.test/post/123#media-id-42');
-    expect($file?->preview_url)->toBe('https://cdn.example.test/media/new-file-preview.jpg');
+    expect($file?->preview_url)->toBe('https://cdn.example.test/media/new-file.jpg');
 
     $reaction = Reaction::query()
         ->where('user_id', $user->id)

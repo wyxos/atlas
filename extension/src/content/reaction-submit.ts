@@ -76,7 +76,6 @@ export async function submitBadgeReaction(
                 type: reactionType,
                 url: mediaUrl,
                 referrer_url_hash_aware: window.location.href,
-                preview_url: mediaUrl,
             }),
         });
 
