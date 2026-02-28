@@ -32,6 +32,8 @@ Route::get('/api/extension/ping', [\App\Http\Controllers\ExtensionApiController:
     ->name('api.extension.ping');
 Route::post('/api/extension/matches', [\App\Http\Controllers\ExtensionApiController::class, 'matches'])
     ->name('api.extension.matches');
+Route::post('/api/extension/badges/checks', [\App\Http\Controllers\ExtensionApiController::class, 'badgeChecks'])
+    ->name('api.extension.badges.checks');
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');

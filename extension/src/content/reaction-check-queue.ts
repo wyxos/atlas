@@ -14,13 +14,12 @@ export type BadgeMatchResult = {
 type MatchQueueItem = {
     key: string;
     mediaUrl: string;
-    referrerUrl: string | null;
     resolve: (result: BadgeMatchResult) => void;
     promise: Promise<BadgeMatchResult>;
 };
 
 type MatchResponseItem = {
-    id?: unknown;
+    request_id?: unknown;
     exists?: unknown;
     reaction?: unknown;
     reacted_at?: unknown;
@@ -57,7 +56,7 @@ function stringOrNull(value: unknown): string | null {
 }
 
 async function requestBatch(batch: MatchQueueItem[]): Promise<Map<string, BadgeMatchResult>> {
-    const keyByCandidateId = new Map<string, string>();
+    const keyByRequestId = new Map<string, string>();
 
     try {
         const stored = await getStoredOptions();
@@ -65,27 +64,18 @@ async function requestBatch(batch: MatchQueueItem[]): Promise<Map<string, BadgeM
             return new Map();
         }
 
-        const items: Array<{ candidate_id: string; type: 'media' | 'referrer'; url: string }> = [];
+        const items: Array<{ request_id: string; url: string }> = [];
 
         batch.forEach((entry, index) => {
-            const candidateId = `candidate-${index}`;
-            keyByCandidateId.set(candidateId, entry.key);
+            const requestId = `req-${index}`;
+            keyByRequestId.set(requestId, entry.key);
             items.push({
-                candidate_id: candidateId,
-                type: 'media',
+                request_id: requestId,
                 url: entry.mediaUrl,
             });
-
-            if (entry.referrerUrl !== null) {
-                items.push({
-                    candidate_id: candidateId,
-                    type: 'referrer',
-                    url: entry.referrerUrl,
-                });
-            }
         });
 
-        const response = await fetch(`${stored.atlasDomain}/api/extension/matches`, {
+        const response = await fetch(`${stored.atlasDomain}/api/extension/badges/checks`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -105,12 +95,12 @@ async function requestBatch(batch: MatchQueueItem[]): Promise<Map<string, BadgeM
 
         const output = new Map<string, BadgeMatchResult>();
         for (const row of payload.matches as MatchResponseItem[]) {
-            const candidateId = stringOrNull(row.id);
-            if (candidateId === null) {
+            const requestId = stringOrNull(row.request_id);
+            if (requestId === null) {
                 continue;
             }
 
-            const key = keyByCandidateId.get(candidateId);
+            const key = keyByRequestId.get(requestId);
             if (!key) {
                 continue;
             }
@@ -167,7 +157,7 @@ function scheduleFlush(): void {
     }, BATCH_DELAY_MS);
 }
 
-export function enqueueReactionCheck(mediaUrl: string | null, referrerUrl: string | null): Promise<BadgeMatchResult> {
+export function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatchResult> {
     const normalizedMediaUrl = normalizeUrl(mediaUrl);
     if (normalizedMediaUrl === null) {
         return Promise.resolve(emptyResult());
@@ -184,8 +174,6 @@ export function enqueueReactionCheck(mediaUrl: string | null, referrerUrl: strin
         return inFlight;
     }
 
-    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
-
     let resolver: (result: BadgeMatchResult) => void = () => {};
     const promise = new Promise<BadgeMatchResult>((resolve) => {
         resolver = resolve;
@@ -194,7 +182,6 @@ export function enqueueReactionCheck(mediaUrl: string | null, referrerUrl: strin
     pendingByKey.set(key, {
         key,
         mediaUrl: normalizedMediaUrl,
-        referrerUrl: normalizedReferrerUrl,
         resolve: resolver,
         promise,
     });

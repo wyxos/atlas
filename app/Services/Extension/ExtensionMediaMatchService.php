@@ -10,6 +10,63 @@ use Illuminate\Support\Collection;
 class ExtensionMediaMatchService
 {
     /**
+     * @param  array<int, array{request_id: string, url: string}>  $items
+     * @return array<int, array{request_id: string, request_index: int, url: string, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
+     */
+    public function badgeChecks(array $items): array
+    {
+        $normalizedItems = collect($items)->values()->map(function (array $item, int $index): array {
+            return [
+                'request_id' => (string) ($item['request_id'] ?? ''),
+                'request_index' => $index,
+                'url' => $this->normalizeUrl($item['url'] ?? null),
+            ];
+        })->filter(fn (array $item): bool => $item['request_id'] !== '' && $item['url'] !== null)->values();
+
+        if ($normalizedItems->isEmpty()) {
+            return [];
+        }
+
+        $urls = $normalizedItems->pluck('url')->filter()->unique()->values();
+        $filesByUrl = $this->filesByUrl($urls);
+
+        $matchedFilesById = $filesByUrl
+            ->mapWithKeys(fn (File $file): array => [$file->id => $file]);
+
+        $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values());
+
+        return $normalizedItems->map(function (array $item) use ($filesByUrl, $reactionsByFileId): array {
+            /** @var File|null $file */
+            $file = $filesByUrl->get((string) $item['url']);
+            if (! $file) {
+                return [
+                    'request_id' => (string) $item['request_id'],
+                    'request_index' => (int) $item['request_index'],
+                    'url' => (string) $item['url'],
+                    'exists' => false,
+                    'reaction' => null,
+                    'reacted_at' => null,
+                    'downloaded_at' => null,
+                    'blacklisted_at' => null,
+                ];
+            }
+
+            $reaction = $reactionsByFileId->get($file->id);
+
+            return [
+                'request_id' => (string) $item['request_id'],
+                'request_index' => (int) $item['request_index'],
+                'url' => (string) $item['url'],
+                'exists' => true,
+                'reaction' => $reaction['type'] ?? null,
+                'reacted_at' => $reaction['reacted_at'] ?? null,
+                'downloaded_at' => $file->downloaded_at?->toIso8601String(),
+                'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
+            ];
+        })->values()->all();
+    }
+
+    /**
      * @param  array<int, array{candidate_id: string, type: string, url: string}>  $items
      * @return array<int, array{id: string, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
