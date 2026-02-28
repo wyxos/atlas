@@ -1,43 +1,19 @@
 <script setup lang="ts">
-/* global chrome */
 import { onMounted, ref } from 'vue';
-
-const STORAGE_KEYS = {
-    atlasDomain: 'atlasDomain',
-    apiToken: 'apiToken',
-} as const;
-
-const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
+import {
+    DEFAULT_ATLAS_DOMAIN,
+    getStoredOptions,
+    normalizeDomain,
+    saveStoredOptions,
+    validateDomain,
+} from './atlas-options';
 
 const atlasDomain = ref(DEFAULT_ATLAS_DOMAIN);
 const apiToken = ref('');
 const errorMessage = ref('');
 const isSaved = ref(false);
 
-function normalizeDomain(input: string): string {
-    return input.trim().replace(/\/+$/, '');
-}
-
-function validateDomain(input: string): string | null {
-    if (input === '') {
-        return 'Atlas domain is required.';
-    }
-
-    if (! /^https?:\/\//i.test(input)) {
-        return 'Atlas domain must start with http:// or https://.';
-    }
-
-    try {
-        // Ensures host/protocol shape is valid.
-        new URL(input);
-    } catch {
-        return 'Atlas domain is not a valid URL.';
-    }
-
-    return null;
-}
-
-function saveOptions(): void {
+async function saveOptions(): Promise<void> {
     isSaved.value = false;
     errorMessage.value = '';
 
@@ -50,37 +26,26 @@ function saveOptions(): void {
     }
 
     atlasDomain.value = normalizedDomain;
-
-    chrome.storage.local.set(
-        {
-            [STORAGE_KEYS.atlasDomain]: normalizedDomain,
-            [STORAGE_KEYS.apiToken]: apiToken.value.trim(),
-        },
-        () => {
-            if (chrome.runtime.lastError) {
-                errorMessage.value = chrome.runtime.lastError.message;
-                return;
-            }
-
-            isSaved.value = true;
-            setTimeout(() => {
-                isSaved.value = false;
-            }, 2000);
-        },
-    );
+    try {
+        await saveStoredOptions(normalizedDomain, apiToken.value);
+        isSaved.value = true;
+        setTimeout(() => {
+            isSaved.value = false;
+        }, 2000);
+    } catch (error) {
+        errorMessage.value = error instanceof Error ? error.message : 'Failed to save extension options.';
+    }
 }
 
 onMounted(() => {
-    chrome.storage.local.get([STORAGE_KEYS.atlasDomain, STORAGE_KEYS.apiToken], (stored) => {
-        if (chrome.runtime.lastError) {
-            errorMessage.value = chrome.runtime.lastError.message;
-            return;
-        }
-
-        const storedDomain = typeof stored.atlasDomain === 'string' ? normalizeDomain(stored.atlasDomain) : '';
-        atlasDomain.value = storedDomain !== '' ? storedDomain : DEFAULT_ATLAS_DOMAIN;
-        apiToken.value = typeof stored.apiToken === 'string' ? stored.apiToken : '';
-    });
+    void getStoredOptions()
+        .then((stored) => {
+            atlasDomain.value = stored.atlasDomain;
+            apiToken.value = stored.apiToken;
+        })
+        .catch((error) => {
+            errorMessage.value = error instanceof Error ? error.message : 'Failed to load extension options.';
+        });
 });
 </script>
 

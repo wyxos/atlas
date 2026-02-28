@@ -27,6 +27,7 @@ Route::get('/api/csrf', function () {
     return response()->noContent();
 })->name('api.csrf');
 
+// Public extension auth probe. Kept in web.php with SPA-style /api prefix; no api middleware throttling is applied.
 Route::get('/api/extension/ping', [\App\Http\Controllers\SettingsServicesController::class, 'extensionPing'])
     ->name('api.extension.ping');
 
@@ -43,6 +44,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.services.index');
     Route::post('/api/settings/extension', [\App\Http\Controllers\SettingsServicesController::class, 'extensionApiKeyStore'])
         ->name('api.settings.extension.store');
+    Route::post('/api/settings/extension/generate', [\App\Http\Controllers\SettingsServicesController::class, 'extensionApiKeyGenerate'])
+        ->name('api.settings.extension.generate');
     Route::post('/api/settings/services/spotify/refresh', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyRefresh'])
         ->name('api.settings.services.spotify.refresh');
     Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])

@@ -38,6 +38,17 @@ class SettingsServicesController extends Controller
         ]);
     }
 
+    public function extensionApiKeyGenerate(ExtensionApiKeyService $extensionApiKey): JsonResponse
+    {
+        $generatedApiKey = $extensionApiKey->generateAndSave();
+
+        return response()->json([
+            'api_key' => $generatedApiKey,
+            'api_key_configured' => true,
+            'message' => 'Extension API key generated.',
+        ]);
+    }
+
     public function extensionPing(Request $request, ExtensionApiKeyService $extensionApiKey): JsonResponse
     {
         $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));

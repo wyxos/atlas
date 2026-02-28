@@ -14,6 +14,12 @@ test('guest cannot save extension api key', function () {
     $response->assertUnauthorized();
 });
 
+test('guest cannot generate extension api key', function () {
+    $response = $this->postJson('/api/settings/extension/generate');
+
+    $response->assertUnauthorized();
+});
+
 test('authenticated user can save extension api key hash', function () {
     $user = User::factory()->create();
 
@@ -30,6 +36,25 @@ test('authenticated user can save extension api key hash', function () {
         ->value('value');
 
     expect($stored)->toBe(hash('sha256', 'secret-key-123'));
+});
+
+test('authenticated user can generate and save extension api key hash', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/settings/extension/generate');
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('api_key_configured', true);
+    $generated = (string) $response->json('api_key');
+    expect($generated)->not->toBe('');
+    expect(str_starts_with($generated, 'atlas_'))->toBeTrue();
+
+    $stored = DB::table('settings')
+        ->where('key', 'extension.api_key_hash')
+        ->where('machine', '')
+        ->value('value');
+
+    expect($stored)->toBe(hash('sha256', $generated));
 });
 
 test('settings services includes extension api key status', function () {

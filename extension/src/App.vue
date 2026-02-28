@@ -2,36 +2,18 @@
 /* global chrome */
 import { onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
+import { getStoredOptions } from './atlas-options';
 
 const extensionVersion = __ATLAS_EXTENSION_VERSION__;
-const STORAGE_KEYS = {
-    atlasDomain: 'atlasDomain',
-    apiToken: 'apiToken',
-} as const;
-const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
 
 const statusLabel = ref('Checking');
 const statusDetail = ref('Validating extension API access.');
 
-function normalizeDomain(input: string): string {
-    return input.trim().replace(/\/+$/, '');
-}
-
 async function checkApiConnection(): Promise<void> {
     try {
-        const stored = await new Promise<Record<string, unknown>>((resolve, reject) => {
-            chrome.storage.local.get([STORAGE_KEYS.atlasDomain, STORAGE_KEYS.apiToken], (result) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                    return;
-                }
-
-                resolve(result);
-            });
-        });
-        const atlasDomain = normalizeDomain(typeof stored.atlasDomain === 'string' ? stored.atlasDomain : '');
-        const apiToken = typeof stored.apiToken === 'string' ? stored.apiToken.trim() : '';
-        const domain = atlasDomain !== '' ? atlasDomain : DEFAULT_ATLAS_DOMAIN;
+        const stored = await getStoredOptions();
+        const domain = stored.atlasDomain;
+        const apiToken = stored.apiToken;
 
         if (apiToken === '') {
             statusLabel.value = 'Setup required';
