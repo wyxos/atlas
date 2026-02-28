@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref} from 'vue';
-import { DEFAULT_MEDIA_NOISE_FILTERS } from '../shared/settingsDefaults';
+import { DEFAULT_DOMAIN_INCLUDE_RULES, DEFAULT_DOMAIN_INCLUDE_RULES_TEXT } from '../shared/settingsDefaults';
+import {
+  isValidPatternSource,
+  normalizeDomainInput,
+  normalizePatternInput,
+  parseDomainRules,
+  serializeDomainRules,
+  toEditableDomainRule,
+  type EditableDomainRule,
+} from './composables/useDomainIncludeRules';
 import {
   Check,
   Eye,
@@ -14,7 +23,7 @@ import {
 type Settings = {
   atlasBaseUrl?: string;
   atlasToken?: string;
-  atlasMediaNoiseFilters?: string;
+  atlasDomainIncludeRules?: string;
   atlasMinMediaWidth?: unknown;
 };
 
@@ -38,12 +47,6 @@ type ChromeApi = {
 };
 
 declare const chrome: ChromeApi;
-
-type EditableDomain = {
-  value: string;
-  isEditing: boolean;
-  draft: string;
-};
 
 type RealtimeConnectionState =
   | 'not-configured'
@@ -85,26 +88,20 @@ const realtimeStatus = ref<RealtimeConnectionStatus>({
   updatedAt: Date.now(),
 });
 
-const addNoiseFilter = ref('');
-const noiseFilters = ref<EditableDomain[]>([]);
+const addDomain = ref('');
+const domainRules = ref<EditableDomainRule[]>([]);
 const minMediaWidth = ref('300');
 let realtimePollTimer: ReturnType<typeof setInterval> | null = null;
 let realtimeMessageListener: ((message: unknown) => void) | null = null;
 
-const mediaNoiseFiltersString = computed(() =>
-  noiseFilters.value
-    .map((d) => d.value)
-    .filter(Boolean)
-    .join('\n')
-);
+const domainPlaceholder = computed(() => {
+  const first = DEFAULT_DOMAIN_INCLUDE_RULES[0]?.domain || '';
+  return first || 'example.com';
+});
 
-const noiseFiltersPlaceholder = computed(() => {
-  const [first = '', second = ''] = DEFAULT_MEDIA_NOISE_FILTERS;
-  if (first && second) {
-    return `${first} or ${second}`;
-  }
-
-  return first || 'host:example.com';
+const patternPlaceholder = computed(() => {
+  const first = DEFAULT_DOMAIN_INCLUDE_RULES[0]?.patterns?.[0] || '';
+  return first || '.*\\/art\\/.*';
 });
 
 const realtimeStateLabel = computed(() => {
@@ -160,132 +157,210 @@ function setStatus(message: string): void {
   status.value = message;
   window.setTimeout(() => {
     if (status.value === message) status.value = '';
-  }, 1600);
+  }, 1800);
 }
 
 function normalizeDomain(input: string): string {
-  let v = (input || '').trim().toLowerCase();
-  if (!v) return '';
-
-  if (v.startsWith('*.')) v = v.slice(2);
-
-  if (/^https?:\/\//i.test(v)) {
-    try {
-      return new URL(v).hostname.toLowerCase();
-    } catch {
-      return '';
-    }
-  }
-
-  v = v.replace(/\/.*$/, '');
-  v = v.replace(/^\.+/, '');
-  return v;
+  return normalizeDomainInput(input);
 }
 
-function parseNoiseFilters(raw: string): string[] {
-  if (!raw) return [];
-  return raw
-    .split(/[\n,]/g)
-    .map((v) => v.trim())
-    .filter((v) => v && !v.startsWith('#'))
-    .map(normalizeNoiseFilter)
+function normalizePattern(input: string): string {
+  return normalizePatternInput(input);
+}
+
+function isValidPattern(source: string): boolean {
+  return isValidPatternSource(source);
+}
+
+function resolveDomainRulesSetting(value: unknown): string {
+  return typeof value === 'string' ? value : DEFAULT_DOMAIN_INCLUDE_RULES_TEXT;
+}
+
+function addDomainRule(): void {
+  const domain = normalizeDomain(addDomain.value);
+  if (!domain) {
+    return;
+  }
+
+  const exists = domainRules.value.some((rule) => rule.domain === domain);
+  if (exists) {
+    setStatus('Domain already exists.');
+    return;
+  }
+
+  domainRules.value.push(toEditableDomainRule({ domain, patterns: [] }));
+  domainRules.value.sort((a, b) => a.domain.localeCompare(b.domain));
+  addDomain.value = '';
+  setStatus('Domain added.');
+}
+
+function removeDomainRule(index: number): void {
+  domainRules.value.splice(index, 1);
+}
+
+function startDomainEdit(index: number): void {
+  const rule = domainRules.value[index];
+  if (!rule) {
+    return;
+  }
+
+  rule.isEditingDomain = true;
+  rule.draftDomain = rule.domain;
+}
+
+function cancelDomainEdit(index: number): void {
+  const rule = domainRules.value[index];
+  if (!rule) {
+    return;
+  }
+
+  rule.isEditingDomain = false;
+  rule.draftDomain = rule.domain;
+}
+
+function saveDomainEdit(index: number): void {
+  const rule = domainRules.value[index];
+  if (!rule) {
+    return;
+  }
+
+  const nextDomain = normalizeDomain(rule.draftDomain);
+  if (!nextDomain) {
+    setStatus('Domain cannot be empty.');
+    rule.isEditingDomain = false;
+    rule.draftDomain = rule.domain;
+    return;
+  }
+
+  const duplicateIndex = domainRules.value.findIndex((item, i) => item.domain === nextDomain && i !== index);
+  if (duplicateIndex !== -1) {
+    setStatus('Domain already exists.');
+    rule.isEditingDomain = false;
+    rule.draftDomain = rule.domain;
+    return;
+  }
+
+  rule.domain = nextDomain;
+  rule.draftDomain = nextDomain;
+  rule.isEditingDomain = false;
+  domainRules.value.sort((a, b) => a.domain.localeCompare(b.domain));
+}
+
+function addPatternsToRule(index: number): void {
+  const rule = domainRules.value[index];
+  if (!rule) {
+    return;
+  }
+
+  const parts = rule.addPattern
+    .split(/[\n,]+/g)
+    .map((value) => normalizePattern(value))
     .filter(Boolean);
-}
 
-function resolveNoiseFiltersSetting(value: unknown): string {
-  return typeof value === 'string' ? value : DEFAULT_MEDIA_NOISE_FILTERS.join('\n');
-}
-
-function normalizeNoiseFilter(input: string): string {
-  const raw = (input || '').trim();
-  if (!raw) {
-    return '';
+  if (parts.length === 0) {
+    return;
   }
 
-  const lower = raw.toLowerCase();
-  if (lower.startsWith('host:')) {
-    const host = normalizeDomain(raw.slice(5));
-    return host ? `host:${host}` : '';
-  }
-
-  if (lower.startsWith('url:')) {
-    const pattern = raw.slice(4).trim().toLowerCase();
-    return pattern ? `url:${pattern}` : '';
-  }
-
-  const host = normalizeDomain(raw);
-  if (host) {
-    return `host:${host}`;
-  }
-
-  const pattern = raw.toLowerCase();
-  return pattern ? `url:${pattern}` : '';
-}
-
-function addNoiseFiltersFromInput(): void {
-  const parts = (addNoiseFilter.value || '')
-    .split(/[\n, ]+/g)
-    .map((v) => v.trim())
-    .filter(Boolean)
-    .map(normalizeNoiseFilter)
-    .filter(Boolean);
-
-  if (parts.length === 0) return;
-
-  const existing = new Set(noiseFilters.value.map((d) => d.value));
+  const existing = new Set(rule.patterns.map((pattern) => pattern.value));
   let added = 0;
+  let invalid = 0;
 
-  for (const part of parts) {
-    if (existing.has(part)) continue;
-    noiseFilters.value.push({value: part, isEditing: false, draft: part});
-    existing.add(part);
+  for (const source of parts) {
+    if (!isValidPattern(source)) {
+      invalid += 1;
+      continue;
+    }
+
+    if (existing.has(source)) {
+      continue;
+    }
+
+    rule.patterns.push({
+      value: source,
+      isEditing: false,
+      draft: source,
+    });
+    existing.add(source);
     added += 1;
   }
 
-  noiseFilters.value.sort((a, b) => a.value.localeCompare(b.value));
-  addNoiseFilter.value = '';
-  if (added > 0) setStatus(`Added ${added} media noise filter${added === 1 ? '' : 's'}.`);
+  rule.patterns.sort((a, b) => a.value.localeCompare(b.value));
+  rule.addPattern = '';
+
+  if (invalid > 0 && added === 0) {
+    setStatus('Pattern is not a valid regex.');
+    return;
+  }
+
+  if (invalid > 0) {
+    setStatus(`Added ${added} pattern${added === 1 ? '' : 's'} (${invalid} invalid).`);
+    return;
+  }
+
+  if (added > 0) {
+    setStatus(`Added ${added} pattern${added === 1 ? '' : 's'}.`);
+  }
 }
 
-function startNoiseFilterEdit(index: number): void {
-  const item = noiseFilters.value[index];
-  if (!item) return;
-  item.isEditing = true;
-  item.draft = item.value;
+function startPatternEdit(ruleIndex: number, patternIndex: number): void {
+  const pattern = domainRules.value[ruleIndex]?.patterns[patternIndex];
+  if (!pattern) {
+    return;
+  }
+
+  pattern.isEditing = true;
+  pattern.draft = pattern.value;
 }
 
-function cancelNoiseFilterEdit(index: number): void {
-  const item = noiseFilters.value[index];
-  if (!item) return;
-  item.isEditing = false;
-  item.draft = item.value;
+function cancelPatternEdit(ruleIndex: number, patternIndex: number): void {
+  const pattern = domainRules.value[ruleIndex]?.patterns[patternIndex];
+  if (!pattern) {
+    return;
+  }
+
+  pattern.isEditing = false;
+  pattern.draft = pattern.value;
 }
 
-function saveNoiseFilterEdit(index: number): void {
-  const item = noiseFilters.value[index];
-  if (!item) return;
+function savePatternEdit(ruleIndex: number, patternIndex: number): void {
+  const rule = domainRules.value[ruleIndex];
+  const pattern = rule?.patterns[patternIndex];
+  if (!rule || !pattern) {
+    return;
+  }
 
-  const next = normalizeNoiseFilter(item.draft);
-  item.isEditing = false;
-
+  const next = normalizePattern(pattern.draft);
   if (!next) {
-    noiseFilters.value.splice(index, 1);
+    rule.patterns.splice(patternIndex, 1);
     return;
   }
 
-  const existsAt = noiseFilters.value.findIndex((d, i) => d.value === next && i !== index);
-  if (existsAt !== -1) {
-    noiseFilters.value.splice(index, 1);
+  if (!isValidPattern(next)) {
+    pattern.isEditing = false;
+    pattern.draft = pattern.value;
+    setStatus('Pattern is not a valid regex.');
     return;
   }
 
-  item.value = next;
-  item.draft = next;
-  noiseFilters.value.sort((a, b) => a.value.localeCompare(b.value));
+  const duplicate = rule.patterns.findIndex((entry, index) => entry.value === next && index !== patternIndex);
+  if (duplicate !== -1) {
+    rule.patterns.splice(patternIndex, 1);
+    return;
+  }
+
+  pattern.value = next;
+  pattern.draft = next;
+  pattern.isEditing = false;
+  rule.patterns.sort((a, b) => a.value.localeCompare(b.value));
 }
 
-function removeNoiseFilter(index: number): void {
-  noiseFilters.value.splice(index, 1);
+function removePattern(ruleIndex: number, patternIndex: number): void {
+  const rule = domainRules.value[ruleIndex];
+  if (!rule) {
+    return;
+  }
+
+  rule.patterns.splice(patternIndex, 1);
 }
 
 function normalizeMinMediaWidth(value: unknown): number {
@@ -361,11 +436,11 @@ function requestRealtimeStatus(): void {
 async function saveSettings(): Promise<void> {
   const atlasBaseUrl = baseUrl.value.trim();
   const atlasToken = token.value.trim();
-  const atlasMediaNoiseFilters = mediaNoiseFiltersString.value.trim();
+  const atlasDomainIncludeRules = JSON.stringify(serializeDomainRules(domainRules.value));
   const atlasMinMediaWidth = normalizeMinMediaWidth(minMediaWidth.value);
   minMediaWidth.value = String(atlasMinMediaWidth);
 
-  chrome.storage.sync.set({atlasBaseUrl, atlasToken, atlasMediaNoiseFilters, atlasMinMediaWidth}, () => {
+  chrome.storage.sync.set({atlasBaseUrl, atlasToken, atlasDomainIncludeRules, atlasMinMediaWidth}, () => {
     setStatus('Settings saved.');
     requestRealtimeStatus();
   });
@@ -378,15 +453,15 @@ onMounted(() => {
     extensionVersion.value = '';
   }
 
-  chrome.storage.sync.get(['atlasBaseUrl', 'atlasToken', 'atlasMediaNoiseFilters', 'atlasMinMediaWidth'], (data) => {
+  chrome.storage.sync.get(['atlasBaseUrl', 'atlasToken', 'atlasDomainIncludeRules', 'atlasMinMediaWidth'], (data) => {
     baseUrl.value = data.atlasBaseUrl || '';
     token.value = data.atlasToken || '';
     minMediaWidth.value = String(normalizeMinMediaWidth(data.atlasMinMediaWidth));
 
-    const parsedNoiseFilters = parseNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
-    noiseFilters.value = parsedNoiseFilters
-      .sort((a, b) => a.localeCompare(b))
-      .map((v) => ({value: v, isEditing: false, draft: v}));
+    const parsedRules = parseDomainRules(resolveDomainRulesSetting(data.atlasDomainIncludeRules));
+    domainRules.value = parsedRules
+      .sort((a, b) => a.domain.localeCompare(b.domain))
+      .map((rule) => toEditableDomainRule(rule));
   });
 
   realtimeMessageListener = (message: unknown) => {
@@ -524,95 +599,177 @@ onUnmounted(() => {
           </div>
 
           <div>
-            <label for="addNoiseFilter" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Media noise filters
+            <label for="addDomain" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Domain include regex rules
             </label>
             <div class="flex items-center gap-2">
               <input
-                id="addNoiseFilter"
-                v-model="addNoiseFilter"
+                id="addDomain"
+                v-model="addDomain"
                 class="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
-                :placeholder="noiseFiltersPlaceholder"
-                @keydown.enter.prevent="addNoiseFiltersFromInput"
+                :placeholder="domainPlaceholder"
+                @keydown.enter.prevent="addDomainRule"
               />
               <button
                 type="button"
                 class="grid size-10 place-items-center rounded-xl bg-sky-400 text-slate-950 hover:bg-sky-300"
-                @click="addNoiseFiltersFromInput"
-                aria-label="Add noise filter"
-                title="Add noise filter"
+                @click="addDomainRule"
+                aria-label="Add domain"
+                title="Add domain"
               >
                 <Plus class="size-5" />
               </button>
             </div>
 
-            <div class="mt-3 overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-950/25">
-              <div v-if="noiseFilters.length === 0" class="px-3 py-3 text-xs text-slate-400">
-                No custom media noise filters.
+            <div class="mt-3 space-y-3">
+              <div v-if="domainRules.length === 0" class="rounded-xl border border-slate-700/50 bg-slate-950/25 px-3 py-3 text-xs text-slate-400">
+                No domains configured.
               </div>
-              <ul v-else class="divide-y divide-slate-700/50">
-                <li v-for="(filter, i) in noiseFilters" :key="filter.value" class="flex items-center gap-2 px-3 py-2.5">
-                  <template v-if="filter.isEditing">
+
+              <div
+                v-for="(rule, ruleIndex) in domainRules"
+                :key="rule.domain"
+                class="rounded-2xl border border-slate-700/50 bg-slate-950/25 p-3"
+              >
+                <div class="mb-3 flex items-center gap-2">
+                  <template v-if="rule.isEditingDomain">
                     <input
-                      v-model="filter.draft"
+                      v-model="rule.draftDomain"
                       class="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
-                      aria-label="Edit media noise filter"
-                      @keydown.enter.prevent="saveNoiseFilterEdit(i)"
-                      @keydown.esc.prevent="cancelNoiseFilterEdit(i)"
+                      @keydown.enter.prevent="saveDomainEdit(ruleIndex)"
+                      @keydown.esc.prevent="cancelDomainEdit(ruleIndex)"
                     />
-                    <div class="flex gap-2">
-                      <button
-                        type="button"
-                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
-                        @click="saveNoiseFilterEdit(i)"
-                        aria-label="Save"
-                        title="Save"
-                      >
-                        <Check class="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
-                        @click="cancelNoiseFilterEdit(i)"
-                        aria-label="Cancel"
-                        title="Cancel"
-                      >
-                        <X class="size-4" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                      @click="saveDomainEdit(ruleIndex)"
+                      aria-label="Save domain"
+                      title="Save domain"
+                    >
+                      <Check class="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                      @click="cancelDomainEdit(ruleIndex)"
+                      aria-label="Cancel domain edit"
+                      title="Cancel domain edit"
+                    >
+                      <X class="size-4" />
+                    </button>
                   </template>
+
                   <template v-else>
-                    <div class="min-w-0 flex-1 truncate font-mono text-sm text-slate-100" :title="filter.value">
-                      {{ filter.value }}
+                    <div class="min-w-0 flex-1 truncate font-mono text-sm text-slate-100" :title="rule.domain">
+                      {{ rule.domain }}
                     </div>
-                    <div class="flex gap-2">
-                      <button
-                        type="button"
-                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
-                        @click="startNoiseFilterEdit(i)"
-                        aria-label="Edit"
-                        title="Edit"
-                      >
-                        <Pencil class="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
-                        @click="removeNoiseFilter(i)"
-                        aria-label="Delete"
-                        title="Delete"
-                      >
-                        <Trash2 class="size-4" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                      @click="startDomainEdit(ruleIndex)"
+                      aria-label="Edit domain"
+                      title="Edit domain"
+                    >
+                      <Pencil class="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                      @click="removeDomainRule(ruleIndex)"
+                      aria-label="Delete domain"
+                      title="Delete domain"
+                    >
+                      <Trash2 class="size-4" />
+                    </button>
                   </template>
-                </li>
-              </ul>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="rule.addPattern"
+                    class="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
+                    :placeholder="patternPlaceholder"
+                    @keydown.enter.prevent="addPatternsToRule(ruleIndex)"
+                  />
+                  <button
+                    type="button"
+                    class="grid size-9 place-items-center rounded-xl bg-sky-400 text-slate-950 hover:bg-sky-300"
+                    @click="addPatternsToRule(ruleIndex)"
+                    aria-label="Add pattern"
+                    title="Add pattern"
+                  >
+                    <Plus class="size-4" />
+                  </button>
+                </div>
+
+                <div class="mt-3 overflow-hidden rounded-xl border border-slate-700/50 bg-slate-950/40">
+                  <div v-if="rule.patterns.length === 0" class="px-3 py-3 text-xs text-slate-400">
+                    No patterns defined. Fallback scanning will apply for this domain.
+                  </div>
+                  <ul v-else class="divide-y divide-slate-700/50">
+                    <li
+                      v-for="(pattern, patternIndex) in rule.patterns"
+                      :key="pattern.value"
+                      class="flex items-center gap-2 px-3 py-2.5"
+                    >
+                      <template v-if="pattern.isEditing">
+                        <input
+                          v-model="pattern.draft"
+                          class="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
+                          @keydown.enter.prevent="savePatternEdit(ruleIndex, patternIndex)"
+                          @keydown.esc.prevent="cancelPatternEdit(ruleIndex, patternIndex)"
+                        />
+                        <button
+                          type="button"
+                          class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                          @click="savePatternEdit(ruleIndex, patternIndex)"
+                          aria-label="Save pattern"
+                          title="Save pattern"
+                        >
+                          <Check class="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                          @click="cancelPatternEdit(ruleIndex, patternIndex)"
+                          aria-label="Cancel pattern edit"
+                          title="Cancel pattern edit"
+                        >
+                          <X class="size-4" />
+                        </button>
+                      </template>
+
+                      <template v-else>
+                        <div class="min-w-0 flex-1 truncate font-mono text-sm text-slate-100" :title="pattern.value">
+                          {{ pattern.value }}
+                        </div>
+                        <button
+                          type="button"
+                          class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                          @click="startPatternEdit(ruleIndex, patternIndex)"
+                          aria-label="Edit pattern"
+                          title="Edit pattern"
+                        >
+                          <Pencil class="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                          @click="removePattern(ruleIndex, patternIndex)"
+                          aria-label="Delete pattern"
+                          title="Delete pattern"
+                        >
+                          <Trash2 class="size-4" />
+                        </button>
+                      </template>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
 
             <p class="mt-2 text-xs text-slate-400">
-              Format: <span class="font-mono">host:example.com</span> or <span class="font-mono">url:*pattern*</span>.
-              Bare domains are normalized to <span class="font-mono">host:</span>.
+              Rules are selected by the current page domain. Regex patterns are matched against full candidate URLs regardless of candidate host.
             </p>
           </div>
         </div>
