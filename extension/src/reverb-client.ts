@@ -37,13 +37,14 @@ async function createPusher(config: ReverbConfig): Promise<PusherLike> {
     const PusherCtor = (module as { default?: unknown }).default ?? module;
 
     return new (PusherCtor as new (key: string, options: Record<string, unknown>) => PusherLike)(config.key, {
+        cluster: 'mt1',
         wsHost: config.host,
         wsPort: config.port,
         wssPort: config.port,
+        wsPath: '/app',
         forceTLS: config.scheme === 'https',
         enabledTransports: config.scheme === 'https' ? ['wss'] : ['ws'],
         disableStats: true,
-        cluster: undefined,
     });
 }
 
