@@ -39,6 +39,8 @@ describe('scan-media', () => {
 
         const anchored = document.getElementById('anchored') as HTMLImageElement;
         const standalone = document.getElementById('standalone') as HTMLImageElement;
+        const anchor = anchored.closest('a') as HTMLAnchorElement;
+        markVisible(anchor);
         markVisible(anchored);
         markVisible(standalone);
 
@@ -58,6 +60,25 @@ describe('scan-media', () => {
             configurable: true,
             value: () => ({ ...visibleRect(), width: 0 }),
         });
+
+        const candidates = scanMediaCandidates(300, rules);
+        expect(candidates).toHaveLength(0);
+    });
+
+    it('requires anchor visibility for anchored media candidates', () => {
+        document.body.innerHTML = `
+            <a id="hidden-anchor" href="https://www.deviantart.com/u/art/work-hidden">
+                <img id="anchored-hidden" src="https://images-wixmp.com/f/image-hidden.jpg" />
+            </a>
+        `;
+
+        const anchor = document.getElementById('hidden-anchor') as HTMLAnchorElement;
+        const anchored = document.getElementById('anchored-hidden') as HTMLImageElement;
+        Object.defineProperty(anchor, 'getBoundingClientRect', {
+            configurable: true,
+            value: () => ({ ...visibleRect(), width: 0 }),
+        });
+        markVisible(anchored);
 
         const candidates = scanMediaCandidates(300, rules);
         expect(candidates).toHaveLength(0);

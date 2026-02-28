@@ -122,7 +122,7 @@ class ExtensionMediaMatchService
 
         $hashes = $urls->map(fn (string $url): string => hash('sha256', $url))->all();
 
-        return File::query()
+        $byUrl = File::query()
             ->select(['id', 'url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
             ->whereIn('url_hash', $hashes)
             ->orderByDesc('updated_at')
@@ -130,6 +130,26 @@ class ExtensionMediaMatchService
             ->filter(fn (File $file): bool => is_string($file->url) && $file->url !== '')
             ->unique('url')
             ->keyBy('url');
+
+        $missingUrls = $urls
+            ->filter(fn (string $url): bool => ! $byUrl->has($url))
+            ->values();
+
+        if ($missingUrls->isNotEmpty()) {
+            // Fallback for legacy rows missing url_hash: exact url lookup for unresolved keys only.
+            $fallbackByUrl = File::query()
+                ->select(['id', 'url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
+                ->whereIn('url', $missingUrls->all())
+                ->orderByDesc('updated_at')
+                ->get()
+                ->filter(fn (File $file): bool => is_string($file->url) && $file->url !== '')
+                ->unique('url')
+                ->keyBy('url');
+
+            $byUrl = $byUrl->union($fallbackByUrl);
+        }
+
+        return $byUrl;
     }
 
     /**
@@ -144,7 +164,7 @@ class ExtensionMediaMatchService
 
         $hashes = $urls->map(fn (string $url): string => hash('sha256', $url))->all();
 
-        return File::query()
+        $byReferrerUrl = File::query()
             ->select(['id', 'referrer_url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
             ->whereIn('referrer_url_hash', $hashes)
             ->orderByDesc('updated_at')
@@ -152,6 +172,26 @@ class ExtensionMediaMatchService
             ->filter(fn (File $file): bool => is_string($file->referrer_url) && $file->referrer_url !== '')
             ->unique('referrer_url')
             ->keyBy('referrer_url');
+
+        $missingUrls = $urls
+            ->filter(fn (string $url): bool => ! $byReferrerUrl->has($url))
+            ->values();
+
+        if ($missingUrls->isNotEmpty()) {
+            // Fallback for legacy rows missing referrer_url_hash: exact referrer lookup for unresolved keys only.
+            $fallbackByReferrerUrl = File::query()
+                ->select(['id', 'referrer_url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
+                ->whereIn('referrer_url', $missingUrls->all())
+                ->orderByDesc('updated_at')
+                ->get()
+                ->filter(fn (File $file): bool => is_string($file->referrer_url) && $file->referrer_url !== '')
+                ->unique('referrer_url')
+                ->keyBy('referrer_url');
+
+            $byReferrerUrl = $byReferrerUrl->union($fallbackByReferrerUrl);
+        }
+
+        return $byReferrerUrl;
     }
 
     /**
