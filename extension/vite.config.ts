@@ -38,6 +38,7 @@ export default defineConfig({
                 popup: path.resolve(extensionRoot, 'popup.html'),
                 options: path.resolve(extensionRoot, 'options.html'),
                 background: path.resolve(extensionRoot, 'src/background.ts'),
+                content: path.resolve(extensionRoot, 'src/content-main.ts'),
             },
             output: {
                 entryFileNames: '[name].js',
