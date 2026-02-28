@@ -30,7 +30,7 @@ class SettingsServicesController extends Controller
             'api_key' => ['required', 'string', 'min:8', 'max:255'],
         ]);
 
-        $extensionApiKey->save(trim((string) $validated['api_key']));
+        $extensionApiKey->save(trim((string) $validated['api_key']), (int) $request->user()->id);
 
         return response()->json([
             'api_key_configured' => true,
@@ -38,9 +38,9 @@ class SettingsServicesController extends Controller
         ]);
     }
 
-    public function extensionApiKeyGenerate(ExtensionApiKeyService $extensionApiKey): JsonResponse
+    public function extensionApiKeyGenerate(Request $request, ExtensionApiKeyService $extensionApiKey): JsonResponse
     {
-        $generatedApiKey = $extensionApiKey->generateAndSave();
+        $generatedApiKey = $extensionApiKey->generateAndSave((int) $request->user()->id);
 
         return response()->json([
             'api_key' => $generatedApiKey,

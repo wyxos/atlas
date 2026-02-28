@@ -36,6 +36,13 @@ test('authenticated user can save extension api key hash', function () {
         ->value('value');
 
     expect($stored)->toBe(hash('sha256', 'secret-key-123'));
+
+    $storedUserId = DB::table('settings')
+        ->where('key', 'extension.api_key_user_id')
+        ->where('machine', '')
+        ->value('value');
+
+    expect($storedUserId)->toBe((string) $user->id);
 });
 
 test('authenticated user can generate and save extension api key hash', function () {
@@ -55,6 +62,13 @@ test('authenticated user can generate and save extension api key hash', function
         ->value('value');
 
     expect($stored)->toBe(hash('sha256', $generated));
+
+    $storedUserId = DB::table('settings')
+        ->where('key', 'extension.api_key_user_id')
+        ->where('machine', '')
+        ->value('value');
+
+    expect($storedUserId)->toBe((string) $user->id);
 });
 
 test('settings services includes extension api key status', function () {

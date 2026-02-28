@@ -32,7 +32,8 @@ class ExtensionApiController extends Controller
         ExtensionApiKeyService $extensionApiKey,
         ExtensionMediaMatchService $mediaMatchService,
     ): JsonResponse {
-        if (! $this->hasValidApiKey($request, $extensionApiKey)) {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
             ], 401);
@@ -45,7 +46,7 @@ class ExtensionApiController extends Controller
             'items.*.url' => ['required', 'string', 'max:4096'],
         ]);
 
-        $matches = $mediaMatchService->match($validated['items']);
+        $matches = $mediaMatchService->match($validated['items'], (int) $user->id);
 
         return response()->json([
             'matches' => $matches,
@@ -57,7 +58,8 @@ class ExtensionApiController extends Controller
         ExtensionApiKeyService $extensionApiKey,
         ExtensionMediaMatchService $mediaMatchService,
     ): JsonResponse {
-        if (! $this->hasValidApiKey($request, $extensionApiKey)) {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
             ], 401);
@@ -69,7 +71,7 @@ class ExtensionApiController extends Controller
             'items.*.url_hash' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
         ]);
 
-        $matches = $mediaMatchService->badgeChecks($validated['items']);
+        $matches = $mediaMatchService->badgeChecks($validated['items'], (int) $user->id);
 
         return response()->json([
             'matches' => $matches,
@@ -79,10 +81,10 @@ class ExtensionApiController extends Controller
     public function react(
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
-        ExtensionMediaMatchService $mediaMatchService,
         FileReactionService $fileReactionService,
     ): JsonResponse {
-        if (! $this->hasValidApiKey($request, $extensionApiKey)) {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
             ], 401);
@@ -94,13 +96,6 @@ class ExtensionApiController extends Controller
             'referrer_url' => ['nullable', 'string', 'max:4096'],
             'referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
         ]);
-
-        $user = $mediaMatchService->resolveReactionUser();
-        if (! $user) {
-            return response()->json([
-                'message' => 'No extension reaction user is configured.',
-            ], 422);
-        }
 
         $url = $this->normalizeUrl($validated['url']);
         if ($url === null) {
@@ -144,6 +139,16 @@ class ExtensionApiController extends Controller
         $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
 
         return $apiKey !== '' && $extensionApiKey->matches($apiKey);
+    }
+
+    private function resolveExtensionUser(Request $request, ExtensionApiKeyService $extensionApiKey): ?\App\Models\User
+    {
+        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
+        if ($apiKey === '') {
+            return null;
+        }
+
+        return $extensionApiKey->resolveUserForApiKey($apiKey);
     }
 
     private function normalizeUrl(?string $url): ?string
