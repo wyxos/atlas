@@ -14,7 +14,7 @@ test('content script applies overlays and requests matches', async ({ page }) =>
             matchRules: [
                 {
                     domain: 'deviantart.com',
-                    regexes: ['/art/', 'images-wix'],
+                    regexes: ['.*\\/art\\/.*', '.*images-wix.*'],
                 },
             ],
         };

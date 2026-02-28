@@ -6,18 +6,18 @@ describe('match-rules', () => {
         expect(DEFAULT_MATCH_RULES).toEqual([
             {
                 domain: 'deviantart.com',
-                regexes: ['/art/', 'images-wix'],
+                regexes: ['.*\\/art\\/.*', '.*images-wix.*'],
             },
         ]);
     });
 
     it('normalizes domains and removes duplicate regexes', () => {
         const normalized = normalizeMatchRules([
-            { domain: '  DeviantArt.COM ', regexes: ['images-wix', 'images-wix', '  /art/  '] },
+            { domain: '  DeviantArt.COM ', regexes: ['.*images-wix.*', '.*images-wix.*', '  .*\\/art\\/.*  '] },
         ]);
 
         expect(normalized).toEqual([
-            { domain: 'deviantart.com', regexes: ['images-wix', '/art/'] },
+            { domain: 'deviantart.com', regexes: ['.*images-wix.*', '.*\\/art\\/.*'] },
         ]);
     });
 
@@ -25,7 +25,7 @@ describe('match-rules', () => {
         const rules = [
             {
                 domain: 'deviantart.com',
-                regexes: ['/art/', 'images-wix'],
+                regexes: ['.*\\/art\\/.*', '.*images-wix.*'],
             },
         ];
 
@@ -37,11 +37,11 @@ describe('match-rules', () => {
 
     it('parses stored rule arrays', () => {
         const parsed = parseStoredMatchRules([
-            { domain: 'DeviantArt.com', regexes: ['images-wix'] },
+            { domain: 'DeviantArt.com', regexes: ['.*images-wix.*'] },
         ]);
 
         expect(parsed).toEqual([
-            { domain: 'deviantart.com', regexes: ['images-wix'] },
+            { domain: 'deviantart.com', regexes: ['.*images-wix.*'] },
         ]);
     });
 });
