@@ -226,7 +226,7 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                                     <input
                                         v-model="rule.regexes[regexIndex]"
                                         type="text"
-                                        placeholder="Regex pattern (e.g. /art/)"
+                                        placeholder="Regex pattern (e.g. .*\\/art\\/.*)"
                                         class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
                                     />
                                     <button

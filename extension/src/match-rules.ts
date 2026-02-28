@@ -6,7 +6,7 @@ export type UrlMatchRule = {
 export const DEFAULT_MATCH_RULES: UrlMatchRule[] = [
     {
         domain: 'deviantart.com',
-        regexes: ['/art/', 'images-wix'],
+        regexes: ['.*\\/art\\/.*', '.*images-wix.*'],
     },
 ];
 
