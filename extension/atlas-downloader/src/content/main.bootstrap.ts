@@ -1,12 +1,13 @@
 import './content.css';
 import { createApp, h, reactive } from 'vue';
 import { registrableDomainFromUrl } from '../shared/domain';
-import { DEFAULT_MEDIA_NOISE_FILTERS_TEXT } from '../shared/settingsDefaults';
+import { DEFAULT_DOMAIN_INCLUDE_RULES_TEXT } from '../shared/settingsDefaults';
 import {
   buildDirectPageCandidate,
   buildItemFromElement,
   collectLookupKeysForNode,
-  configureMediaNoiseFilters,
+  configureDomainIncludeRules,
+  filterEligibleLookupUrls,
 } from './items';
 import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from './interactions';
 import { buildLookupKeys } from './lookupKeys';
@@ -36,10 +37,12 @@ import {
 import { mountHotkeysOnly as mountHotkeysOnlyModule } from './main/mountHotkeysOnly';
 import { collectCandidates as collectCandidatesModule } from './main/collectCandidates';
 import { resolveSheetReactionPrompt } from './main/reactionPrompt';
+import { buildItemLookupKeys, buildPrimaryItemLookupUrl } from './main/itemLookup';
+import { fetchAtlasStatus as fetchAtlasStatusFromCache, getCachedAtlasStatus as getCachedAtlasStatusFromCache } from './main/statusCache';
 import SheetModal from './ui-vue/SheetModal.vue';
 
 type ContentSettings = {
-  atlasMediaNoiseFilters?: string;
+  atlasDomainIncludeRules?: string;
   atlasMinMediaWidth?: unknown;
 };
 
@@ -76,13 +79,13 @@ type AtlasTestWindow = Window & {
   __ATLAS_TEST_SHADOW_MODE?: unknown;
 };
 
-function resolveNoiseFiltersSetting(value: unknown): string {
-  return typeof value === 'string' ? value : DEFAULT_MEDIA_NOISE_FILTERS_TEXT;
+function resolveDomainIncludeRulesSetting(value: unknown): string {
+  return typeof value === 'string' ? value : DEFAULT_DOMAIN_INCLUDE_RULES_TEXT;
 }
 
 export function runContentScript() {
   const DEFAULT_MIN_MEDIA_WIDTH = 300;
-  const CONTENT_SETTINGS_KEYS = ['atlasMediaNoiseFilters', 'atlasMinMediaWidth'];
+  const CONTENT_SETTINGS_KEYS = ['atlasDomainIncludeRules', 'atlasMinMediaWidth'];
   // Keep extension metadata short; some Atlas deployments validate at 500 chars.
   const MAX_METADATA_LEN = 500;
   const ROOT_ID = 'atlas-downloader-root';
@@ -173,16 +176,7 @@ export function runContentScript() {
   }
 
   function getCachedAtlasStatus(url: string) {
-    const rawKey = (url || '').trim();
-    const fallbackKey = stripHash(rawKey);
-    const cached = atlasStatusCache.get(rawKey) ?? atlasStatusCache.get(fallbackKey);
-    if (!cached) return null;
-    if (Date.now() - cached.ts > ATLAS_STATUS_TTL_MS) {
-      atlasStatusCache.delete(rawKey);
-      atlasStatusCache.delete(fallbackKey);
-      return null;
-    }
-    return cached;
+    return getCachedAtlasStatusFromCache(atlasStatusCache, ATLAS_STATUS_TTL_MS, url);
   }
 
   function fetchAtlasStatus(
@@ -201,74 +195,14 @@ export function runContentScript() {
       } | null
     ) => void
   ) {
-    const lookupCandidates = buildLookupKeys(url, referrerUrl || '');
-    if (lookupCandidates.length === 0) {
-      callback(null);
-      return;
-    }
-
-    for (const lookup of lookupCandidates) {
-      const cached = getCachedAtlasStatus(lookup);
-      if (cached) {
-        callback(cached);
-        return;
-      }
-    }
-
-    sendMessageSafe({ type: 'atlas-check-batch', urls: lookupCandidates }, (response) => {
-      if (!response || !response.ok) {
-        callback(null);
-        return;
-      }
-
-      const results = Array.isArray(response.data?.results) ? response.data.results : [];
-      const byUrl = new Map<string, unknown>();
-      for (const result of results) {
-        const resultUrl = typeof result?.url === 'string' ? String(result.url) : '';
-        if (!resultUrl) {
-          continue;
-        }
-        for (const key of buildLookupKeys(resultUrl)) {
-          if (!byUrl.has(key)) {
-            byUrl.set(key, result);
-          }
-        }
-      }
-
-      const match = lookupCandidates
-        .map((lookup) => byUrl.get(lookup))
-        .find((value) => Boolean(value)) as
-        | {
-          exists?: unknown;
-          downloaded?: unknown;
-          failed?: unknown;
-          blacklisted?: unknown;
-          reaction?: { type?: unknown } | null;
-          download_progress?: unknown;
-          downloaded_at?: unknown;
-        }
-        | null;
-      if (!match) {
-        callback(null);
-        return;
-      }
-
-      const status = {
-        exists: Boolean(match.exists),
-        downloaded: Boolean(match.downloaded),
-        failed: Boolean(match.failed),
-        blacklisted: Boolean(match.blacklisted),
-        reactionType: match.reaction?.type ? String(match.reaction.type) : null,
-        downloadProgress: normalizeProgress(match.download_progress),
-        downloadedAt: normalizeDownloadedAt(match.downloaded_at),
-        ts: Date.now(),
-      };
-
-      for (const lookup of lookupCandidates) {
-        atlasStatusCache.set(lookup, status);
-      }
-      callback(status);
-    });
+    fetchAtlasStatusFromCache(
+      atlasStatusCache,
+      ATLAS_STATUS_TTL_MS,
+      sendMessageSafe,
+      url,
+      referrerUrl,
+      callback
+    );
   }
 
   // Allow background-triggered actions (toolbar click / command shortcut) to toggle the sheet.
@@ -316,9 +250,9 @@ export function runContentScript() {
       return;
     }
 
-    try {
+      try {
       chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
-        configureMediaNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
+        configureDomainIncludeRules(resolveDomainIncludeRulesSetting(data.atlasDomainIncludeRules));
         minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
         mountUi();
@@ -334,8 +268,8 @@ export function runContentScript() {
       return;
     }
 
-    if ('atlasMediaNoiseFilters' in changes) {
-      configureMediaNoiseFilters(resolveNoiseFiltersSetting(changes.atlasMediaNoiseFilters?.newValue));
+    if ('atlasDomainIncludeRules' in changes) {
+      configureDomainIncludeRules(resolveDomainIncludeRulesSetting(changes.atlasDomainIncludeRules?.newValue));
     }
 
     if ('atlasMinMediaWidth' in changes) {
@@ -344,7 +278,7 @@ export function runContentScript() {
   });
 
   chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
-    configureMediaNoiseFilters(resolveNoiseFiltersSetting(data.atlasMediaNoiseFilters));
+    configureDomainIncludeRules(resolveDomainIncludeRulesSetting(data.atlasDomainIncludeRules));
     minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
     if (IS_TOP_WINDOW) {
@@ -1105,17 +1039,17 @@ export function runContentScript() {
     }
 
     function itemLookupKeys(item) {
-      const url = (item?.url || '').trim();
-      const referrerUrl = (item?.referrer_url || '').trim();
-      return buildLookupKeys(url, referrerUrl);
+      return buildItemLookupKeys(item);
     }
 
     function itemLookupUrl(item) {
-      return itemLookupKeys(item)[0] || '';
+      return buildPrimaryItemLookupUrl(item);
     }
 
     function checkAtlasStatus(silent) {
-      const urls = [...new Set(items.flatMap((item) => itemLookupKeys(item)).filter(Boolean))];
+      const urls = filterEligibleLookupUrls(
+        [...new Set(items.flatMap((item) => itemLookupKeys(item)).filter(Boolean))]
+      );
       if (urls.length === 0) {
         return;
       }
@@ -1784,10 +1718,8 @@ export function runContentScript() {
       return [...urls].filter(Boolean);
     }
 
-    // collectLookupKeysForNode moved to items.ts
-
     function syncAtlasStatusForPageMarkers() {
-      const urls = collectPageMarkerUrls();
+      const urls = filterEligibleLookupUrls(collectPageMarkerUrls());
       if (urls.length === 0) {
         scheduleMarkerApply(20);
         return;
@@ -1840,10 +1772,4 @@ export function runContentScript() {
       onProgress
     );
   }
-
-  // buildItemFromElement moved to items.ts
-
-  // buildDirectPageCandidate helpers moved to items.ts
-
-  // UI and interaction helpers moved to dedicated modules.
 }

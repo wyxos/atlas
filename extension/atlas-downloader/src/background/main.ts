@@ -7,6 +7,7 @@ import {
 import { attachAuthContextToPayload, type BrowserCookie } from './authContext';
 import { collectOpenTabUrls } from './openTabs';
 import { buildReactionBroadcastEvent, type ReactionBroadcastEvent } from './reactionEvent';
+import { networkErrorMessage, normalizeBaseUrl, resolveMessageType } from './utils';
 
 type AtlasSettings = {
   atlasBaseUrl?: string;
@@ -887,15 +888,6 @@ function scheduleRealtimeReconnect(
   }, delayMs);
 }
 
-function resolveMessageType(message: unknown): string | null {
-  if (!message || typeof message !== 'object') {
-    return null;
-  }
-
-  const type = (message as { type?: unknown }).type;
-  return typeof type === 'string' ? type : null;
-}
-
 function updateRealtimeStatus(
   next: Omit<RealtimeConnectionStatus, 'updatedAt'>,
 ): void {
@@ -1351,19 +1343,6 @@ async function handleDeleteDownloadWithSettings(payload: unknown, settings: Atla
   };
 }
 
-function normalizeBaseUrl(input: string) {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  const withScheme = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
-
-  return withScheme.replace(/\/+$/, '');
-}
-
 async function safeJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
@@ -1384,16 +1363,4 @@ async function fetchWithTimeout(input: string, init: RequestInit): Promise<Respo
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-function networkErrorMessage(error: unknown): string {
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return 'Atlas request timed out. Please try again.';
-  }
-
-  if (error instanceof Error && error.message) {
-    return `Atlas request failed: ${error.message}`;
-  }
-
-  return 'Atlas request failed. Please try again.';
 }

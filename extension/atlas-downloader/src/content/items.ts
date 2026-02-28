@@ -1,4 +1,5 @@
 import { resolveAbsoluteUrl } from './media';
+import { normalizeDomain, parseDomainIncludeRules } from '../shared/domainIncludeRules';
 
 type MediaItem = {
   tag_name: 'img' | 'video';
@@ -11,19 +12,66 @@ type MediaItem = {
   download_via?: string;
 };
 
-type NoiseFilterRule =
-  | { kind: 'host'; host: string }
-  | { kind: 'urlPattern'; regex: RegExp }
-  | { kind: 'urlContains'; needle: string };
+type DomainIncludeRule = {
+  domain: string;
+  regexes: RegExp[];
+};
 
-let customNoiseRules: NoiseFilterRule[] = [];
+let domainIncludeRules: DomainIncludeRule[] = [];
+let activePageRule: DomainIncludeRule | null = null;
 
 export function safeUrl(value: string): string {
   return resolveAbsoluteUrl(value, window.location.href);
 }
 
-export function configureMediaNoiseFilters(rawFilters: unknown): void {
-  customNoiseRules = parseNoiseFilterRules(rawFilters);
+export function configureDomainIncludeRules(rawRules: unknown): void {
+  domainIncludeRules = toCompiledDomainIncludeRules(rawRules);
+  activePageRule = resolveActiveRule(window.location.href, domainIncludeRules);
+}
+
+export function filterEligibleLookupUrls(rawUrls: unknown): string[] {
+  if (!Array.isArray(rawUrls)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const eligible: string[] = [];
+  for (const value of rawUrls) {
+    if (typeof value !== 'string') {
+      continue;
+    }
+
+    const url = value.trim();
+    if (!url || seen.has(url)) {
+      continue;
+    }
+
+    seen.add(url);
+    if (isEligibleCandidateUrl(url)) {
+      eligible.push(url);
+    }
+  }
+
+  return eligible;
+}
+
+export function isEligibleCandidateUrl(value: string): boolean {
+  const raw = (value || '').trim();
+  if (!raw) {
+    return false;
+  }
+
+  const parsed = safeHttpUrl(raw);
+  if (!parsed) {
+    return false;
+  }
+
+  const rule = activePageRule;
+  if (rule && rule.regexes.length > 0) {
+    return rule.regexes.some((regex) => regex.test(raw));
+  }
+
+  return !isBareDomainRootUrl(parsed);
 }
 
 export function getVideoUrl(video: HTMLVideoElement): string {
@@ -55,7 +103,7 @@ export function buildItemFromElement(element: Element, minWidth: number): MediaI
     const img = element as HTMLImageElement;
     const rawSrc = (img.currentSrc || img.src || img.getAttribute('src') || '').trim();
     const url = safeUrl(rawSrc);
-    if (url && isExcludedNoiseMediaUrl(url)) {
+    if (url && !isEligibleCandidateUrl(url)) {
       return null;
     }
 
@@ -70,7 +118,7 @@ export function buildItemFromElement(element: Element, minWidth: number): MediaI
       if (!fallback || (!rawSrc.toLowerCase().startsWith('blob:') && !rawSrc.toLowerCase().startsWith('data:'))) {
         return null;
       }
-      if (isExcludedNoiseMediaUrl(fallback)) {
+      if (!isEligibleCandidateUrl(fallback)) {
         return null;
       }
 
@@ -105,13 +153,17 @@ export function buildItemFromElement(element: Element, minWidth: number): MediaI
     }
 
     const url = getVideoUrl(video);
-    if (url && isExcludedNoiseMediaUrl(url)) {
+    if (url && !isEligibleCandidateUrl(url)) {
       return null;
     }
     if (!url) {
       const rawSrc = (video.currentSrc || video.src || '').trim().toLowerCase();
       if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
         const pageUrl = window.location.href;
+        if (!isEligibleCandidateUrl(pageUrl)) {
+          return null;
+        }
+
         return {
           tag_name: 'video',
           url: pageUrl,
@@ -158,6 +210,10 @@ export function buildDirectPageCandidate(): MediaItem | null {
   }
 
   if (lowerLocation.startsWith('http://') || lowerLocation.startsWith('https://')) {
+    if (!isEligibleCandidateUrl(locationUrl)) {
+      return null;
+    }
+
     return {
       tag_name: lowerLocation.match(/\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i) ? 'video' : 'img',
       url: locationUrl,
@@ -171,7 +227,7 @@ export function buildDirectPageCandidate(): MediaItem | null {
 
   if (lowerLocation.startsWith('blob:') || lowerLocation.startsWith('data:')) {
     const fallback = safeUrl(document.referrer) || '';
-    if (!fallback) {
+    if (!fallback || !isEligibleCandidateUrl(fallback)) {
       return null;
     }
 
@@ -232,7 +288,7 @@ export function collectLookupKeysForNode(node: Element, options: CollectLookupKe
     keys.add(pageUrl);
   }
 
-  return [...keys];
+  return filterEligibleLookupUrls([...keys]);
 }
 
 function resolveAnchorLookupUrl(rawHref: string): string {
@@ -241,7 +297,6 @@ function resolveAnchorLookupUrl(rawHref: string): string {
     return '';
   }
 
-  // Hash-only links ("#...") are page controls, not media/page provenance.
   if (href.startsWith('#')) {
     return '';
   }
@@ -394,7 +449,6 @@ function extractDimensionsFromUrl(rawUrl: string): { width: number | null; heigh
   let width = widthToken;
   const height = heightToken;
 
-  // Common CDN suffix: `-414w-2x` means effective width 828.
   const retinaWidthMatch = text.match(/-(\d{2,5})w-(\d)x(?=$|[./?&_-])/i);
   if (retinaWidthMatch) {
     const baseWidth = parseInt(retinaWidthMatch[1], 10);
@@ -475,36 +529,40 @@ function toPositiveDimension(value: unknown): number | null {
   return rounded > 0 ? rounded : null;
 }
 
-function isExcludedNoiseMediaUrl(url: string): boolean {
-  const normalizedUrl = (url || '').trim().toLowerCase();
-  if (!normalizedUrl) {
-    return false;
+function toCompiledDomainIncludeRules(rawRules: unknown): DomainIncludeRule[] {
+  const parsedRules = parseDomainIncludeRules(rawRules);
+  return parsedRules.map((rule) => ({
+    domain: rule.domain,
+    regexes: rule.patterns
+      .map((pattern) => {
+        try {
+          return new RegExp(pattern, 'i');
+        } catch {
+          return null;
+        }
+      })
+      .filter((regex): regex is RegExp => regex !== null),
+  }));
+}
+
+function resolveActiveRule(pageUrl: string, rules: DomainIncludeRule[]): DomainIncludeRule | null {
+  const pageHost = safeHostname(pageUrl);
+  if (!pageHost) {
+    return null;
   }
 
-  const rules = customNoiseRules;
-  const hostname = safeHostname(normalizedUrl);
-
+  let best: DomainIncludeRule | null = null;
   for (const rule of rules) {
-    if (rule.kind === 'host') {
-      if (hostMatches(hostname, rule.host)) {
-        return true;
-      }
+    if (!domainMatchesHost(rule.domain, pageHost)) {
       continue;
     }
 
-    if (rule.kind === 'urlPattern') {
-      if (rule.regex.test(normalizedUrl)) {
-        return true;
-      }
-      continue;
-    }
-
-    if (normalizedUrl.includes(rule.needle)) {
-      return true;
+    if (!best || rule.domain.length > best.domain.length) {
+      best = rule;
     }
   }
 
-  return false;
+  return best;
 }
 
 function safeHostname(url: string): string {
@@ -515,96 +573,29 @@ function safeHostname(url: string): string {
   }
 }
 
-function hostMatches(currentHost: string, blockedHost: string): boolean {
-  const current = (currentHost || '').trim().toLowerCase();
-  const blocked = (blockedHost || '').trim().toLowerCase();
-  if (!current || !blocked) {
+function domainMatchesHost(domain: string, host: string): boolean {
+  const normalizedDomain = normalizeDomain(domain);
+  const normalizedHost = normalizeDomain(host);
+  if (!normalizedDomain || !normalizedHost) {
     return false;
   }
 
-  return current === blocked || current.endsWith(`.${blocked}`);
+  return normalizedHost === normalizedDomain || normalizedHost.endsWith(`.${normalizedDomain}`);
 }
 
-function parseNoiseFilterRules(rawFilters: unknown): NoiseFilterRule[] {
-  if (!rawFilters || typeof rawFilters !== 'string') {
-    return [];
-  }
-
-  return rawFilters
-    .split(/[\n,]/g)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== '' && !entry.startsWith('#'))
-    .map((entry) => toNoiseFilterRule(entry))
-    .filter((rule): rule is NoiseFilterRule => rule !== null);
-}
-
-function toNoiseFilterRule(rawEntry: string): NoiseFilterRule | null {
-  const entry = rawEntry.trim();
-  if (!entry) {
-    return null;
-  }
-
-  const lower = entry.toLowerCase();
-  if (lower.startsWith('host:')) {
-    const host = resolveHostLike(entry.slice(5));
-    return host ? { kind: 'host', host } : null;
-  }
-
-  if (lower.startsWith('url:')) {
-    return buildUrlNoiseRule(entry.slice(4));
-  }
-
-  const host = resolveHostLike(entry);
-  if (host) {
-    return { kind: 'host', host };
-  }
-
-  return buildUrlNoiseRule(entry);
-}
-
-function buildUrlNoiseRule(rawPattern: string): NoiseFilterRule | null {
-  const value = rawPattern.trim().toLowerCase();
-  if (!value) {
-    return null;
-  }
-
-  if (!value.includes('*')) {
-    return { kind: 'urlContains', needle: value };
-  }
-
-  const source = wildcardToRegexSource(value);
+function safeHttpUrl(url: string): URL | null {
   try {
-    return { kind: 'urlPattern', regex: new RegExp(source, 'i') };
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    return parsed;
   } catch {
     return null;
   }
 }
 
-function wildcardToRegexSource(pattern: string): string {
-  return pattern
-    .split('*')
-    .map((part) => escapeRegex(part))
-    .join('.*');
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function resolveHostLike(value: string): string {
-  const trimmed = (value || '').trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  const withoutWildcardPrefix = trimmed.startsWith('*.') ? trimmed.slice(2) : trimmed;
-  const withScheme = /^https?:\/\//i.test(withoutWildcardPrefix)
-    ? withoutWildcardPrefix
-    : `https://${withoutWildcardPrefix}`;
-
-  try {
-    return new URL(withScheme).hostname.toLowerCase();
-  } catch {
-    return '';
-  }
+function isBareDomainRootUrl(url: URL): boolean {
+  return (url.pathname === '/' || url.pathname === '') && url.search === '';
 }

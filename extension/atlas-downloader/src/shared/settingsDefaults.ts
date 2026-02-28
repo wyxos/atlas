@@ -1,8 +1,14 @@
-export const DEFAULT_MEDIA_NOISE_FILTERS = [
-  'host:st.deviantart.net',
-  'url:*wixmp.com*/crop/w_92,h_92*',
-  'url:*wixmp.com*/crop/w_150,h_150*',
-  'url:*wixmp.com*/fit/w_150,h_150*',
-] as const;
+import type { DomainIncludeRule } from './domainIncludeRules';
 
-export const DEFAULT_MEDIA_NOISE_FILTERS_TEXT = DEFAULT_MEDIA_NOISE_FILTERS.join('\n');
+export const DEFAULT_DOMAIN_INCLUDE_RULES: DomainIncludeRule[] = [
+  {
+    domain: 'deviantart.com',
+    patterns: [
+      '.*\\/art\\/.*',
+      '.*deviationid=.*',
+      '.*\\/v1\\/fill\\/.*strp\\/.*',
+    ],
+  },
+];
+
+export const DEFAULT_DOMAIN_INCLUDE_RULES_TEXT = JSON.stringify(DEFAULT_DOMAIN_INCLUDE_RULES);

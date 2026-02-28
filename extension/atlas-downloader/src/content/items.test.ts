@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildItemFromElement, collectLookupKeysForNode, configureMediaNoiseFilters } from './items';
-import { DEFAULT_MEDIA_NOISE_FILTERS_TEXT } from '../shared/settingsDefaults';
+import { buildItemFromElement, collectLookupKeysForNode, configureDomainIncludeRules } from './items';
+import { DEFAULT_DOMAIN_INCLUDE_RULES_TEXT } from '../shared/settingsDefaults';
 
 function setLocation(url: string) {
   const next = new URL(url, window.location.origin);
@@ -20,7 +20,7 @@ function setVideoSize(video: HTMLVideoElement, width: number, height: number) {
 
 describe('items', () => {
   afterEach(() => {
-    configureMediaNoiseFilters('');
+    configureDomainIncludeRules('[]');
   });
 
   it('builds image items with page referrer and absolute urls', () => {
@@ -83,14 +83,44 @@ describe('items', () => {
     expect(item?.height).toBe(1427);
   });
 
-  it('excludes built-in deviantart noise hosts', () => {
+  it('applies default domain include regex rules on deviantart pages', () => {
     setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
-    configureMediaNoiseFilters(DEFAULT_MEDIA_NOISE_FILTERS_TEXT);
-    const img = document.createElement('img');
-    img.src = 'https://st.deviantart.net/eclipse/popups/hover-component/2024/deviation-2x.png';
-    setImageSize(img, 700, 700);
+    const defaults = JSON.parse(DEFAULT_DOMAIN_INCLUDE_RULES_TEXT) as Array<{ domain: string; patterns: string[] }>;
+    configureDomainIncludeRules(
+      JSON.stringify(
+        defaults.map((rule) => ({
+          ...rule,
+          domain: 'localhost',
+        }))
+      )
+    );
 
-    expect(buildItemFromElement(img, 200)).toBeNull();
+    const includeImg = document.createElement('img');
+    includeImg.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/example.jpg/v1/fill/w_1280,h_720,q_75,strp/example-fullview.jpg?token=abc';
+    setImageSize(includeImg, 1280, 720);
+
+    const excludeImg = document.createElement('img');
+    excludeImg.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/example.jpg/v1/crop/w_92,h_92,q_70,strp/example-thumb.jpg?token=abc';
+    setImageSize(excludeImg, 1280, 720);
+
+    expect(buildItemFromElement(includeImg, 200)).not.toBeNull();
+    expect(buildItemFromElement(excludeImg, 200)).toBeNull();
+  });
+
+  it('falls back to allow-all mode when no domain rules are configured (except bare roots)', () => {
+    setLocation('https://example.com/page');
+    configureDomainIncludeRules('[]');
+
+    const img = document.createElement('img');
+    img.src = 'https://cdn.example.com/media/foo.png';
+    setImageSize(img, 600, 600);
+
+    const root = document.createElement('img');
+    root.src = 'https://x.com/';
+    setImageSize(root, 600, 600);
+
+    expect(buildItemFromElement(img, 200)).not.toBeNull();
+    expect(buildItemFromElement(root, 200)).toBeNull();
   });
 
   it('filters images below 200px when min size is 200', () => {
@@ -128,31 +158,6 @@ describe('items', () => {
     expect(item).not.toBeNull();
     expect(item?.width).toBe(1125);
     expect(item?.height).toBe(2007);
-  });
-
-  it('does not bypass minimum size for modal-contained thumbnails', () => {
-    setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
-
-    const modal = document.createElement('div');
-    modal.className = 'lightbox-modal';
-    const img = document.createElement('img');
-    img.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/example/v1/fit/w_150,h_150,q_70,strp/thumb.jpg';
-    setImageSize(img, 150, 150);
-    modal.appendChild(img);
-    document.body.appendChild(modal);
-
-    expect(buildItemFromElement(img, 200)).toBeNull();
-  });
-
-  it('applies custom media noise filters', () => {
-    setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
-    configureMediaNoiseFilters('url:*orange_hair_squad__go*');
-
-    const img = document.createElement('img');
-    img.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/8eee0575-fbad-44dc-aafe-d4ebbaa3ce43/dlib667-5de41a77-dec1-4f4a-bd6a-4f6bd2ed7912.png/v1/fit/w_828,h_1212,q_70,strp/orange_hair_squad__go__by_chrisis_ai_dlib667-414w-2x.jpg?token=abc';
-    setImageSize(img, 828, 1212);
-
-    expect(buildItemFromElement(img, 200)).toBeNull();
   });
 
   it('builds video items', () => {
