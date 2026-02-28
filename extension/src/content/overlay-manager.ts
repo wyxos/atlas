@@ -47,6 +47,7 @@ export class OverlayManager {
     private ensureBadge(media: MediaElement): HTMLDivElement {
         const existing = this.badgesByMedia.get(media);
         if (existing) {
+            this.attachBadgeToMediaParent(media, existing);
             return existing;
         }
 
@@ -60,10 +61,25 @@ export class OverlayManager {
         badge.style.borderRadius = '8px';
         badge.style.boxSizing = 'border-box';
         badge.style.pointerEvents = 'none';
-        badge.style.zIndex = '2147483647';
-        document.body.appendChild(badge);
+        badge.style.zIndex = '10';
+        this.attachBadgeToMediaParent(media, badge);
         this.badgesByMedia.set(media, badge);
         return badge;
+    }
+
+    private attachBadgeToMediaParent(media: MediaElement, badge: HTMLDivElement): void {
+        const parent = media.parentElement;
+        if (!parent) {
+            return;
+        }
+
+        if (window.getComputedStyle(parent).position === 'static') {
+            parent.style.position = 'relative';
+        }
+
+        if (badge.parentElement !== parent || badge.previousElementSibling !== media) {
+            media.insertAdjacentElement('afterend', badge);
+        }
     }
 
     private position(media: MediaElement): void {
@@ -79,8 +95,8 @@ export class OverlayManager {
             return;
         }
 
-        const left = window.scrollX + rect.left + ((rect.width - 320) / 2);
-        const top = window.scrollY + rect.top + rect.height - 48;
+        const left = media.offsetLeft + ((media.offsetWidth - 320) / 2);
+        const top = media.offsetTop + media.offsetHeight - 48;
         badge.style.display = 'block';
         badge.style.left = `${Math.round(left)}px`;
         badge.style.top = `${Math.round(top)}px`;
