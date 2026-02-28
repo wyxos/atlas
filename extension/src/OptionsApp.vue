@@ -8,15 +8,21 @@ import {
     getStoredOptions,
     normalizeDomain,
     saveStoredOptions,
-    type UrlMatchRule,
     validateDomain,
 } from './atlas-options';
+import {
+    normalizeMatchRules,
+    type UrlMatchRule,
+    validateDomainRule,
+    validateRegexPattern,
+} from './match-rules';
 
 const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 const atlasDomain = ref(DEFAULT_ATLAS_DOMAIN);
 const apiToken = ref('');
 const showApiToken = ref(false);
-const matchRulesText = ref('');
+const matchRules = ref<UrlMatchRule[]>([]);
+const newRuleDomain = ref('');
 const errorMessage = ref('');
 const isSaved = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
@@ -40,20 +46,37 @@ async function saveOptions(): Promise<void> {
         return;
     }
 
-    const parsedRules = parseMatchRulesText(matchRulesText.value);
-    if (parsedRules.error) {
-        errorMessage.value = parsedRules.error;
-        return;
+    const normalizedRules = normalizeMatchRules(matchRules.value);
+    for (const rule of normalizedRules) {
+        const ruleDomainError = validateDomainRule(rule.domain);
+        if (ruleDomainError !== null) {
+            errorMessage.value = ruleDomainError;
+            return;
+        }
+
+        if (rule.regexes.length === 0) {
+            errorMessage.value = `Domain "${rule.domain}" must have at least one regex.`;
+            return;
+        }
+
+        for (const regex of rule.regexes) {
+            const regexError = validateRegexPattern(regex);
+            if (regexError !== null) {
+                errorMessage.value = regexError;
+                return;
+            }
+        }
     }
 
     atlasDomain.value = normalizedDomain;
     try {
-        await saveStoredOptions(normalizedDomain, apiToken.value, parsedRules.rules);
+        await saveStoredOptions(normalizedDomain, apiToken.value, normalizedRules);
         isSaved.value = true;
         await refreshApiConnectionStatus();
         setTimeout(() => {
             isSaved.value = false;
         }, 2000);
+        errorMessage.value = '';
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : 'Failed to save extension options.';
     }
@@ -64,7 +87,10 @@ onMounted(() => {
         .then((stored) => {
             atlasDomain.value = stored.atlasDomain;
             apiToken.value = stored.apiToken;
-            matchRulesText.value = formatMatchRules(stored.matchRules);
+            matchRules.value = stored.matchRules.map((rule) => ({
+                domain: rule.domain,
+                regexes: [...rule.regexes],
+            }));
             void refreshApiConnectionStatus();
         })
         .catch((error) => {
@@ -72,54 +98,37 @@ onMounted(() => {
         });
 });
 
-function formatMatchRules(rules: UrlMatchRule[]): string {
-    return rules
-        .flatMap((rule) => rule.regexes.map((regex) => `${rule.domain}|${regex}`))
-        .join('\n');
-}
-
-function parseMatchRulesText(input: string): { rules: UrlMatchRule[]; error: string | null } {
-    const grouped = new Map<string, string[]>();
-    const lines = input
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line !== '');
-
-    for (const line of lines) {
-        const separatorIndex = line.indexOf('|');
-        if (separatorIndex <= 0 || separatorIndex === line.length - 1) {
-            return { rules: [], error: `Invalid rule format: "${line}". Use domain|regex.` };
-        }
-
-        const domain = line.slice(0, separatorIndex).trim().toLowerCase();
-        const regexPattern = line.slice(separatorIndex + 1).trim();
-
-        if (domain === '' || regexPattern === '') {
-            return { rules: [], error: `Invalid rule format: "${line}". Use domain|regex.` };
-        }
-
-        try {
-            // Validate regex at save time so content script never throws on invalid patterns.
-             
-            new RegExp(regexPattern, 'i');
-        } catch {
-            return { rules: [], error: `Invalid regex in rule: "${line}".` };
-        }
-
-        if (!grouped.has(domain)) {
-            grouped.set(domain, []);
-        }
-
-        grouped.get(domain)!.push(regexPattern);
+function addRuleDomain(): void {
+    const domain = newRuleDomain.value.trim().toLowerCase();
+    const domainError = validateDomainRule(domain);
+    if (domainError !== null) {
+        errorMessage.value = domainError;
+        return;
     }
 
-    return {
-        rules: Array.from(grouped.entries()).map(([domain, regexes]) => ({
-            domain,
-            regexes: Array.from(new Set(regexes)),
-        })),
-        error: null,
-    };
+    if (matchRules.value.some((rule) => rule.domain === domain)) {
+        errorMessage.value = `Domain "${domain}" already exists.`;
+        return;
+    }
+
+    matchRules.value.push({
+        domain,
+        regexes: [''],
+    });
+    newRuleDomain.value = '';
+    errorMessage.value = '';
+}
+
+function removeRuleDomain(index: number): void {
+    matchRules.value.splice(index, 1);
+}
+
+function addRegex(domainIndex: number): void {
+    matchRules.value[domainIndex].regexes.push('');
+}
+
+function removeRegex(domainIndex: number, regexIndex: number): void {
+    matchRules.value[domainIndex].regexes.splice(regexIndex, 1);
 }
 </script>
 
@@ -169,20 +178,80 @@ function parseMatchRulesText(input: string): { rules: UrlMatchRule[]; error: str
                     </div>
                 </label>
 
-                <label class="block space-y-1">
-                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">
-                        URL Match Rules
-                    </span>
-                    <textarea
-                        v-model="matchRulesText"
-                        rows="8"
-                        placeholder="deviantart.com|^https://(www\\.)?deviantart\\.com/.+\nimages-wixmp.com|^https://images-wixmp\\.com/.+"
-                        class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                    />
+                <div class="space-y-2">
+                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">URL Match Rules</span>
+                    <div class="flex items-center gap-2">
+                        <input
+                            v-model="newRuleDomain"
+                            type="text"
+                            placeholder="Add domain (e.g. deviantart.com)"
+                            class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                        />
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
+                            @click="addRuleDomain"
+                        >
+                            Add Domain
+                        </button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div
+                            v-for="(rule, domainIndex) in matchRules"
+                            :key="`${rule.domain}-${domainIndex}`"
+                            class="rounded-md border border-smart-blue-500/30 bg-prussian-blue-800/40 p-3 space-y-2"
+                        >
+                            <div class="flex items-center gap-2">
+                                <input
+                                    v-model="rule.domain"
+                                    type="text"
+                                    class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                                />
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center justify-center rounded-md border border-danger-500/60 bg-danger-500/20 px-2 py-1 text-xs font-medium text-danger-100 transition hover:bg-danger-500/30"
+                                    @click="removeRuleDomain(domainIndex)"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+
+                            <div class="space-y-2">
+                                <div
+                                    v-for="(_, regexIndex) in rule.regexes"
+                                    :key="`${rule.domain}-${regexIndex}`"
+                                    class="flex items-center gap-2"
+                                >
+                                    <input
+                                        v-model="rule.regexes[regexIndex]"
+                                        type="text"
+                                        placeholder="Regex pattern (e.g. /art/)"
+                                        class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center justify-center rounded-md border border-danger-500/60 bg-danger-500/20 px-2 py-1 text-xs font-medium text-danger-100 transition hover:bg-danger-500/30"
+                                        @click="removeRegex(domainIndex, regexIndex)"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-2 py-1 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
+                                    @click="addRegex(domainIndex)"
+                                >
+                                    Add Regex
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <p class="text-xs text-twilight-indigo-300">
-                        One rule per line: <code>domain|regex</code>. Subdomains are included.
+                        Subdomains are included. URLs are sent only when one of the domain regex rules matches.
                     </p>
-                </label>
+                </div>
 
                 <div class="flex items-center gap-3">
                     <button

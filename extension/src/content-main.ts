@@ -8,6 +8,11 @@ const RESCAN_DELAY_MS = 500;
 let rescanTimeoutId: number | null = null;
 let isRunning = false;
 let rerunRequested = false;
+const processedSignatures = new WeakMap<Element, string>();
+
+function candidateSignature(candidate: { payload: { media_url: string | null; anchor_url: string | null; page_url: string | null } }): string {
+    return [candidate.payload.media_url ?? '', candidate.payload.anchor_url ?? '', candidate.payload.page_url ?? ''].join('|');
+}
 
 async function runScanAndRender(): Promise<void> {
     if (isRunning) {
@@ -27,9 +32,24 @@ async function runScanAndRender(): Promise<void> {
             }
 
             const candidates = scanMediaCandidates(SCAN_LIMIT, settings.matchRules);
-            const payload = candidates.map((candidate) => candidate.payload);
+            const unsentCandidates = candidates.filter((candidate) => {
+                const signature = candidateSignature(candidate);
+                const previousSignature = processedSignatures.get(candidate.element);
+                if (previousSignature === signature) {
+                    return false;
+                }
+
+                processedSignatures.set(candidate.element, signature);
+                return true;
+            });
+
+            if (unsentCandidates.length === 0) {
+                continue;
+            }
+
+            const payload = unsentCandidates.map((candidate) => candidate.payload);
             const matches = await fetchExtensionMatches(settings.atlasDomain, settings.apiToken, payload);
-            renderMatches(candidates, matches);
+            renderMatches(unsentCandidates, matches);
         } while (rerunRequested);
     } catch {
         // Ignore content-side network/runtime failures; next mutation tick will retry.
@@ -62,8 +82,14 @@ function installMutationObserver(): void {
     });
 }
 
+function installViewportListeners(): void {
+    window.addEventListener('scroll', scheduleScan, { passive: true });
+    window.addEventListener('resize', scheduleScan, { passive: true });
+}
+
 function bootstrap(): void {
     installMutationObserver();
+    installViewportListeners();
     void runScanAndRender();
 }
 

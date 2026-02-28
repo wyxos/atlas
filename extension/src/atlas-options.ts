@@ -1,4 +1,6 @@
 /* global chrome */
+import { DEFAULT_MATCH_RULES, parseStoredMatchRules, type UrlMatchRule } from './match-rules';
+
 export const STORAGE_KEYS = {
     atlasDomain: 'atlasDomain',
     apiToken: 'apiToken',
@@ -6,11 +8,6 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
-
-export type UrlMatchRule = {
-    domain: string;
-    regexes: string[];
-};
 
 export function normalizeDomain(input: string): string {
     return input.trim().replace(/\/+$/, '');
@@ -49,7 +46,11 @@ export function getStoredOptions(): Promise<{ atlasDomain: string; apiToken: str
                 const apiToken = typeof stored.apiToken === 'string' ? stored.apiToken.trim() : '';
                 const matchRules = parseStoredMatchRules(stored.matchRules);
 
-                resolve({ atlasDomain, apiToken, matchRules });
+                resolve({
+                    atlasDomain,
+                    apiToken,
+                    matchRules: matchRules.length > 0 ? matchRules : DEFAULT_MATCH_RULES,
+                });
             },
         );
     });
@@ -73,35 +74,4 @@ export function saveStoredOptions(atlasDomain: string, apiToken: string, matchRu
             },
         );
     });
-}
-
-function parseStoredMatchRules(value: unknown): UrlMatchRule[] {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-
-    return value
-        .map((entry): UrlMatchRule | null => {
-            if (typeof entry !== 'object' || entry === null) {
-                return null;
-            }
-
-            const domain = typeof (entry as { domain?: unknown }).domain === 'string'
-                ? ((entry as { domain: string }).domain).trim().toLowerCase()
-                : '';
-
-            const regexes = Array.isArray((entry as { regexes?: unknown }).regexes)
-                ? ((entry as { regexes: unknown[] }).regexes)
-                    .filter((regex): regex is string => typeof regex === 'string')
-                    .map((regex) => regex.trim())
-                    .filter((regex) => regex !== '')
-                : [];
-
-            if (domain === '' || regexes.length === 0) {
-                return null;
-            }
-
-            return { domain, regexes };
-        })
-        .filter((entry): entry is UrlMatchRule => entry !== null);
 }
