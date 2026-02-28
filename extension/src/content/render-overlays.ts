@@ -4,7 +4,6 @@ const WRAPPER_ATTR = 'data-atlas-overlay-wrapper';
 const BADGE_ATTR = 'data-atlas-overlay-badge';
 const APPLIED_ATTR = 'data-atlas-overlay-applied';
 const REACTION_BAR_ATTR = 'data-atlas-overlay-reaction-bar';
-const HOVER_BOUND_ATTR = 'data-atlas-overlay-hover-bound';
 
 type ReactionWidgetItem = {
     ariaLabel: string;
@@ -169,19 +168,12 @@ function createReactionButton(item: ReactionWidgetItem): HTMLButtonElement {
     button.style.borderRadius = '6px';
     button.style.background = 'transparent';
     button.style.color = '#ffffff';
-    button.style.cursor = 'pointer';
+    button.style.cursor = 'default';
     button.style.display = 'inline-flex';
     button.style.alignItems = 'center';
     button.style.justifyContent = 'center';
     button.style.transition = 'color 120ms ease, background 120ms ease';
     button.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${item.svg}</svg>`;
-
-    button.addEventListener('mouseenter', () => {
-        button.style.color = item.color;
-    });
-    button.addEventListener('mouseleave', () => {
-        button.style.color = '#ffffff';
-    });
 
     return button;
 }
@@ -215,28 +207,7 @@ function ensureStandaloneReactionBar(wrapper: HTMLDivElement): HTMLDivElement {
         bar.appendChild(createReactionButton(item));
     }
 
-    if (wrapper.getAttribute(HOVER_BOUND_ATTR) !== '1') {
-        wrapper.setAttribute(HOVER_BOUND_ATTR, '1');
-        const showBar = () => {
-            bar.style.opacity = '1';
-            bar.style.pointerEvents = 'auto';
-        };
-        const hideBar = () => {
-            bar.style.opacity = '0';
-            bar.style.pointerEvents = 'none';
-        };
-
-        wrapper.addEventListener('mouseover', showBar);
-        wrapper.addEventListener('mousemove', showBar, { passive: true });
-        wrapper.addEventListener('mouseleave', hideBar);
-    }
-
     wrapper.appendChild(bar);
-    if (wrapper.matches(':hover') || wrapper.querySelector('img:hover,video:hover') !== null) {
-        bar.style.opacity = '1';
-        bar.style.pointerEvents = 'auto';
-    }
-
     return bar;
 }
 

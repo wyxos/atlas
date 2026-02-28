@@ -3,10 +3,13 @@ import { renderMatches } from './content/render-overlays';
 import { scanMediaCandidates } from './content/scan-media';
 
 const SCAN_LIMIT = 300;
+const WRAPPER_SELECTOR = '[data-atlas-overlay-wrapper="1"]';
+const BAR_SELECTOR = '[data-atlas-overlay-reaction-bar="1"]';
 
 let rescanQueued = false;
 let isRunning = false;
 let rerunRequested = false;
+let activeReactionBar: HTMLElement | null = null;
 const processedSignatures = new WeakMap<Element, string>();
 
 function candidateSignature(candidate: { mediaUrl: string | null; anchorUrl: string | null }): string {
@@ -120,6 +123,39 @@ function installInteractionListeners(): void {
         if (target.closest('img,video') !== null) {
             scheduleScan();
         }
+    }, { capture: true, passive: true });
+
+    document.addEventListener('pointermove', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        const media = target.closest('img,video');
+        const wrapper = media?.closest(WRAPPER_SELECTOR);
+        const nextBar = wrapper?.querySelector<HTMLElement>(BAR_SELECTOR) ?? null;
+
+        if (activeReactionBar === nextBar) {
+            return;
+        }
+
+        if (activeReactionBar) {
+            activeReactionBar.style.opacity = '0';
+        }
+
+        activeReactionBar = nextBar;
+        if (activeReactionBar) {
+            activeReactionBar.style.opacity = '1';
+        }
+    }, { capture: true, passive: true });
+
+    document.addEventListener('pointerleave', () => {
+        if (!activeReactionBar) {
+            return;
+        }
+
+        activeReactionBar.style.opacity = '0';
+        activeReactionBar = null;
     }, { capture: true, passive: true });
 }
 
