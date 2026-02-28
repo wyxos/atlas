@@ -1,0 +1,19 @@
+[agents]
+max_threads = 6
+max_depth = 1
+
+[agents.explorer]
+description = "Read-only codebase explorer for locating Laravel + Vue execution paths and gathering evidence."
+config_file = "agents/explorer.toml"
+
+[agents.worker]
+description = "Implementation-focused agent for scoped code changes in assigned files only."
+config_file = "agents/worker.toml"
+
+[agents.reviewer]
+description = "Read-only reviewer focused on correctness, regressions, security, and missing tests."
+config_file = "agents/reviewer.toml"
+
+[agents.monitor]
+description = "Long-running task monitor for polling/waiting and reporting status without drift."
+config_file = "agents/monitor.toml"
