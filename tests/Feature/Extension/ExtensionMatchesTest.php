@@ -85,3 +85,53 @@ test('extension matches endpoint returns status for matched and unmatched media'
     $response->assertJsonPath('matches.1.id', 'atlas-2');
     $response->assertJsonPath('matches.1.exists', false);
 });
+
+test('extension matches prefers media url match over referrer fallback for same candidate', function () {
+    $user = User::factory()->create();
+    config(['downloads.extension_user_id' => $user->id]);
+    setExtensionApiKey('valid-api-key');
+
+    $mediaMatch = File::factory()->create([
+        'url' => 'https://images-wixmp.com/f/media-priority.jpg',
+        'referrer_url' => 'https://www.deviantart.com/artist/art/media-priority',
+    ]);
+
+    $referrerMatch = File::factory()->create([
+        'url' => 'https://images-wixmp.com/f/other.jpg',
+        'referrer_url' => 'https://www.deviantart.com/artist/art/referrer-priority',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $mediaMatch->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $referrerMatch->id,
+        'user_id' => $user->id,
+        'type' => 'dislike',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/matches', [
+        'items' => [
+            [
+                'candidate_id' => 'atlas-priority',
+                'type' => 'media',
+                'url' => 'https://images-wixmp.com/f/media-priority.jpg',
+            ],
+            [
+                'candidate_id' => 'atlas-priority',
+                'type' => 'referrer',
+                'url' => 'https://www.deviantart.com/artist/art/referrer-priority',
+            ],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('matches.0.id', 'atlas-priority');
+    $response->assertJsonPath('matches.0.exists', true);
+    $response->assertJsonPath('matches.0.reaction', 'love');
+});

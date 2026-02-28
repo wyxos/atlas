@@ -25,7 +25,7 @@ export async function fetchExtensionMatches(
     });
 
     if (!response.ok) {
-        return new Map();
+        throw new Error(`Extension matches request failed with status ${response.status}.`);
     }
 
     const data = (await response.json()) as { matches?: ExtensionMatchResult[] };

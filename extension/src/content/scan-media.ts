@@ -45,6 +45,7 @@ function collectAnchoredMedia(
     seen: Set<Element>,
     candidates: MediaCandidate[],
     matchRules: UrlMatchRule[],
+    pageHostname: string,
 ): void {
     const anchors = document.querySelectorAll('a[href]');
     for (const anchor of anchors) {
@@ -61,8 +62,8 @@ function collectAnchoredMedia(
 
             seen.add(mediaElement);
             const mediaUrl = normalizeUrl(resolveMediaUrl(mediaElement));
-            const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules) ? mediaUrl : null;
-            const validAnchorUrl = urlMatchesAnyRule(anchorUrl, matchRules) ? anchorUrl : null;
+            const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules, pageHostname) ? mediaUrl : null;
+            const validAnchorUrl = urlMatchesAnyRule(anchorUrl, matchRules, pageHostname) ? anchorUrl : null;
             candidates.push({
                 element: mediaElement,
                 id: '',
@@ -77,6 +78,7 @@ function collectStandaloneMedia(
     seen: Set<Element>,
     candidates: MediaCandidate[],
     matchRules: UrlMatchRule[],
+    pageHostname: string,
 ): void {
     const mediaElements = document.querySelectorAll('img,video');
     for (const mediaElement of mediaElements) {
@@ -93,7 +95,7 @@ function collectStandaloneMedia(
 
         seen.add(mediaElement);
         const mediaUrl = normalizeUrl(resolveMediaUrl(mediaElement));
-        const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules) ? mediaUrl : null;
+        const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules, pageHostname) ? mediaUrl : null;
         candidates.push({
             element: mediaElement,
             id: '',
@@ -104,11 +106,12 @@ function collectStandaloneMedia(
 }
 
 export function scanMediaCandidates(limit = 300, matchRules: UrlMatchRule[] = []): MediaCandidate[] {
+    const pageHostname = window.location.hostname;
     const seen = new Set<Element>();
     const candidates: MediaCandidate[] = [];
 
-    collectAnchoredMedia(seen, candidates, matchRules);
-    collectStandaloneMedia(seen, candidates, matchRules);
+    collectAnchoredMedia(seen, candidates, matchRules, pageHostname);
+    collectStandaloneMedia(seen, candidates, matchRules, pageHostname);
 
     return candidates
         .filter((candidate) => candidate.mediaUrl !== null || candidate.anchorUrl !== null)
