@@ -7,7 +7,9 @@ const STORAGE_KEYS = {
     apiToken: 'apiToken',
 } as const;
 
-const atlasDomain = ref('');
+const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
+
+const atlasDomain = ref(DEFAULT_ATLAS_DOMAIN);
 const apiToken = ref('');
 const errorMessage = ref('');
 const isSaved = ref(false);
@@ -75,7 +77,8 @@ onMounted(() => {
             return;
         }
 
-        atlasDomain.value = typeof stored.atlasDomain === 'string' ? normalizeDomain(stored.atlasDomain) : '';
+        const storedDomain = typeof stored.atlasDomain === 'string' ? normalizeDomain(stored.atlasDomain) : '';
+        atlasDomain.value = storedDomain !== '' ? storedDomain : DEFAULT_ATLAS_DOMAIN;
         apiToken.value = typeof stored.apiToken === 'string' ? stored.apiToken : '';
     });
 });
@@ -86,7 +89,7 @@ onMounted(() => {
         <section class="mx-auto max-w-xl rounded-lg border border-smart-blue-500/30 bg-prussian-blue-700/60 p-4 space-y-4">
             <header class="space-y-1">
                 <h1 class="text-base font-semibold text-regal-navy-100">Atlas Extension Options</h1>
-                <p class="text-sm text-twilight-indigo-200">Configure your Atlas endpoint and API token.</p>
+                <p class="text-sm text-twilight-indigo-200">Configure your Atlas endpoint and API key.</p>
             </header>
 
             <form class="space-y-4" @submit.prevent="saveOptions">
@@ -101,7 +104,7 @@ onMounted(() => {
                 </label>
 
                 <label class="block space-y-1">
-                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">API Token</span>
+                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">API Key</span>
                     <input
                         v-model="apiToken"
                         type="password"
