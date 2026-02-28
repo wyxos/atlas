@@ -66,6 +66,7 @@ const extensionDefaultDomain = ref('https://atlas.test');
 const extensionNotice = ref('');
 const extensionNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
 const isExtensionApiKeySaving = ref(false);
+const isExtensionApiKeyGenerating = ref(false);
 const spotifyIsConnected = computed(() => spotifyService.value?.connected === true);
 const spotifyNeedsReconnect = computed(() => spotifyService.value?.needs_reconnect === true);
 const spotifyIsConfigured = computed(() => spotifyService.value?.configured === true);
@@ -174,6 +175,47 @@ async function handleSaveExtensionApiKey(): Promise<void> {
         setExtensionNotice(responseMessage || 'Failed to save extension API key.', 'error');
     } finally {
         isExtensionApiKeySaving.value = false;
+    }
+}
+
+async function handleGenerateExtensionApiKey(): Promise<void> {
+    extensionNotice.value = '';
+    isExtensionApiKeyGenerating.value = true;
+
+    try {
+        const { data } = await window.axios.post<{ api_key: string; api_key_configured: boolean }>(
+            '/api/settings/extension/generate',
+        );
+
+        extensionApiKeyConfigured.value = data.api_key_configured === true;
+        extensionApiKey.value = data.api_key;
+
+        try {
+            await navigator.clipboard.writeText(data.api_key);
+            setExtensionNotice('New API key generated, saved, and copied to clipboard.', 'success');
+        } catch {
+            setExtensionNotice('New API key generated and saved. Copy it from the field below.', 'neutral');
+        }
+    } catch (error: unknown) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setExtensionNotice(responseMessage || 'Failed to generate extension API key.', 'error');
+    } finally {
+        isExtensionApiKeyGenerating.value = false;
+    }
+}
+
+async function handleCopyExtensionApiKey(): Promise<void> {
+    const currentApiKey = extensionApiKey.value.trim();
+    if (currentApiKey === '') {
+        setExtensionNotice('No API key available to copy.', 'error');
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(currentApiKey);
+        setExtensionNotice('API key copied to clipboard.', 'success');
+    } catch {
+        setExtensionNotice('Clipboard copy failed. Copy the key manually.', 'error');
     }
 }
 
@@ -413,6 +455,25 @@ onMounted(() => {
                         <div class="flex flex-wrap items-center gap-2">
                             <Button type="submit" size="sm" :loading="isExtensionApiKeySaving">
                                 Save API Key
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                :loading="isExtensionApiKeyGenerating"
+                                :disabled="isExtensionApiKeySaving"
+                                @click="handleGenerateExtensionApiKey"
+                            >
+                                Generate, Save & Copy
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="extensionApiKey.trim() === ''"
+                                @click="handleCopyExtensionApiKey"
+                            >
+                                Copy
                             </Button>
                             <span
                                 class="text-xs px-2 py-1 rounded-full border"

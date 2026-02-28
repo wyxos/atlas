@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ExtensionApiKeyService
 {
@@ -31,6 +32,14 @@ class ExtensionApiKeyService
                 'updated_at' => $now,
             ]
         );
+    }
+
+    public function generateAndSave(): string
+    {
+        $generatedKey = 'atlas_'.Str::random(48);
+        $this->save($generatedKey);
+
+        return $generatedKey;
     }
 
     public function matches(string $rawApiKey): bool
