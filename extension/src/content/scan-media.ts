@@ -44,7 +44,6 @@ function isElementVisibleInViewport(element: Element): boolean {
 function collectAnchoredMedia(
     seen: Set<Element>,
     candidates: MediaCandidate[],
-    pageUrl: string,
     matchRules: UrlMatchRule[],
 ): void {
     const anchors = document.querySelectorAll('a[href]');
@@ -64,16 +63,11 @@ function collectAnchoredMedia(
             const mediaUrl = normalizeUrl(resolveMediaUrl(mediaElement));
             const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules) ? mediaUrl : null;
             const validAnchorUrl = urlMatchesAnyRule(anchorUrl, matchRules) ? anchorUrl : null;
-            const validPageUrl = urlMatchesAnyRule(pageUrl, matchRules) ? pageUrl : null;
-
             candidates.push({
                 element: mediaElement,
-                payload: {
-                    id: '',
-                    anchor_url: validAnchorUrl,
-                    media_url: validMediaUrl,
-                    page_url: validPageUrl,
-                },
+                id: '',
+                anchorUrl: validAnchorUrl,
+                mediaUrl: validMediaUrl,
             });
         }
     }
@@ -82,7 +76,6 @@ function collectAnchoredMedia(
 function collectStandaloneMedia(
     seen: Set<Element>,
     candidates: MediaCandidate[],
-    pageUrl: string,
     matchRules: UrlMatchRule[],
 ): void {
     const mediaElements = document.querySelectorAll('img,video');
@@ -101,36 +94,27 @@ function collectStandaloneMedia(
         seen.add(mediaElement);
         const mediaUrl = normalizeUrl(resolveMediaUrl(mediaElement));
         const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules) ? mediaUrl : null;
-        const validPageUrl = urlMatchesAnyRule(pageUrl, matchRules) ? pageUrl : null;
-
         candidates.push({
             element: mediaElement,
-            payload: {
-                id: '',
-                anchor_url: null,
-                media_url: validMediaUrl,
-                page_url: validPageUrl,
-            },
+            id: '',
+            anchorUrl: null,
+            mediaUrl: validMediaUrl,
         });
     }
 }
 
 export function scanMediaCandidates(limit = 300, matchRules: UrlMatchRule[] = []): MediaCandidate[] {
-    const pageUrl = normalizeUrl(window.location.href) ?? window.location.href;
     const seen = new Set<Element>();
     const candidates: MediaCandidate[] = [];
 
-    collectAnchoredMedia(seen, candidates, pageUrl, matchRules);
-    collectStandaloneMedia(seen, candidates, pageUrl, matchRules);
+    collectAnchoredMedia(seen, candidates, matchRules);
+    collectStandaloneMedia(seen, candidates, matchRules);
 
     return candidates
-        .filter((candidate) => candidate.payload.media_url !== null || candidate.payload.anchor_url !== null)
+        .filter((candidate) => candidate.mediaUrl !== null || candidate.anchorUrl !== null)
         .slice(0, limit)
         .map((candidate, index) => ({
             ...candidate,
-            payload: {
-                ...candidate.payload,
-                id: `atlas-${index}`,
-            },
+            id: `atlas-${index}`,
         }));
 }

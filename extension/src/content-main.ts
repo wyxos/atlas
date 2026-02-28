@@ -10,8 +10,8 @@ let isRunning = false;
 let rerunRequested = false;
 const processedSignatures = new WeakMap<Element, string>();
 
-function candidateSignature(candidate: { payload: { media_url: string | null; anchor_url: string | null; page_url: string | null } }): string {
-    return [candidate.payload.media_url ?? '', candidate.payload.anchor_url ?? '', candidate.payload.page_url ?? ''].join('|');
+function candidateSignature(candidate: { mediaUrl: string | null; anchorUrl: string | null }): string {
+    return [candidate.mediaUrl ?? '', candidate.anchorUrl ?? ''].join('|');
 }
 
 async function runScanAndRender(): Promise<void> {
@@ -47,7 +47,27 @@ async function runScanAndRender(): Promise<void> {
                 continue;
             }
 
-            const payload = unsentCandidates.map((candidate) => candidate.payload);
+            const payload = unsentCandidates.flatMap((candidate) => {
+                const entries = [];
+
+                if (candidate.mediaUrl) {
+                    entries.push({
+                        candidate_id: candidate.id,
+                        type: 'media' as const,
+                        url: candidate.mediaUrl,
+                    });
+                }
+
+                if (candidate.anchorUrl) {
+                    entries.push({
+                        candidate_id: candidate.id,
+                        type: 'referrer' as const,
+                        url: candidate.anchorUrl,
+                    });
+                }
+
+                return entries;
+            });
             const matches = await fetchExtensionMatches(settings.atlasDomain, settings.apiToken, payload);
             renderMatches(unsentCandidates, matches);
         } while (rerunRequested);
