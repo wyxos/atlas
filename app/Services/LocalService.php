@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Local\LocalFetchParams;
+use App\Services\Local\LocalScoutSearchBuilder;
 use Illuminate\Support\Facades\Cache;
 
 class LocalService extends BaseService
@@ -126,102 +127,17 @@ class LocalService extends BaseService
             );
         }
 
-        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted, $blacklistType, $sort, $seed, $maxPreviewed, $fileTypes) {
-            $search = $params['search'] ?? '';
-            if ($search === '') {
-                $search = config('scout.driver') === 'typesense' ? '*' : '';
-            }
-            $builder = File::search($search);
-
-            // Filter by source if provided and not 'all'
-            if ($source && $source !== 'all') {
-                $builder->where('source', $source);
-            }
-
-            // Filter by downloaded tri-state
-            if ($downloaded === 'yes') {
-                $builder->where('downloaded', true);
-            } elseif ($downloaded === 'no') {
-                $builder->where('downloaded', false);
-            }
-
-            // Filter by blacklisted tri-state
-            if ($blacklisted === 'yes') {
-                $builder->where('blacklisted', true);
-            } elseif ($blacklisted === 'no') {
-                $builder->where('blacklisted', false);
-            }
-
-            // Blacklist type (manual/auto) - only makes sense when blacklisted is allowed.
-            if (in_array($blacklistType, ['manual', 'auto'], true)) {
-                $builder->where('blacklisted', true);
-                $builder->where('blacklist_type', $blacklistType);
-            }
-
-            // Cap previewed_count (optional).
-            if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
-                $builder->where('previewed_count', ['<=', $maxPreviewed]);
-            }
-
-            // File type filter (optional, based on indexed mime_group).
-            // Values: array of {all,image,video,audio,other}; "all" disables the filter.
-            if (! in_array('all', $fileTypes, true)) {
-                if (count($fileTypes) === 1) {
-                    $builder->where('mime_group', $fileTypes[0]);
-                } else {
-                    // Scout's TypesenseEngine treats array values passed to `where()` as a raw token concat,
-                    // so multi-select must use whereIn() to generate `field:=[a, b]`.
-                    $builder->whereIn('mime_group', $fileTypes);
-                }
-            }
-
-            // Sorting (Typesense supports special sort fields like _rand(seed)).
-            $driver = config('scout.driver');
-            if ($sort === 'random' && $driver === 'typesense') {
-                $rand = $seed && $seed > 0 ? "_rand({$seed})" : '_rand()';
-                $builder->orderBy($rand, 'desc');
-            } elseif ($sort === 'created_at_asc') {
-                $builder->orderBy('created_at', 'asc');
-            } elseif ($sort === 'created_at') {
-                $builder->orderBy('created_at', 'desc');
-            } elseif ($sort === 'updated_at') {
-                $builder->orderBy('updated_at', 'desc');
-            } elseif ($sort === 'updated_at_asc') {
-                $builder->orderBy('updated_at', 'asc');
-            } elseif ($sort === 'blacklisted_at') {
-                $builder->orderBy('blacklisted_at', 'desc')
-                    ->orderBy('updated_at', 'desc');
-            } elseif ($sort === 'blacklisted_at_asc') {
-                $builder->orderBy('blacklisted_at', 'asc')
-                    ->orderBy('updated_at', 'asc');
-            } elseif ($sort === 'downloaded_at_asc') {
-                $builder->orderBy('downloaded_at', 'asc')
-                    ->orderBy('updated_at', 'asc');
-            } else {
-                // Default sort: newest downloads first, then recently updated.
-                $builder->orderBy('downloaded_at', 'desc')
-                    ->orderBy('updated_at', 'desc');
-            }
-
-            // Important: do NOT set a Scout query callback here.
-            // When a query callback is present, Scout will attempt to compute pagination totals by
-            // enumerating IDs (bounded by Scout's max_total_results, default 1000), which makes the
-            // "Total" shown in local browse incorrect for large datasets. We load metadata after the
-            // fact in Browser.php for local mode, per-page.
-
-            return $builder;
-        };
-
-        // Auto-dislike tri-state filter (optional).
-        $applyAutoDislikedFilter = function ($builder) use ($autoDisliked) {
-            if ($autoDisliked === 'yes') {
-                $builder->where('auto_disliked', true);
-            } elseif ($autoDisliked === 'no') {
-                $builder->where('auto_disliked', false);
-            }
-
-            return $builder;
-        };
+        $buildSearch = fn () => LocalScoutSearchBuilder::build(
+            params: $this->params,
+            source: $source,
+            downloaded: $downloaded,
+            blacklisted: $blacklisted,
+            blacklistType: $blacklistType,
+            sort: $sort,
+            seed: $seed,
+            maxPreviewed: $maxPreviewed,
+            fileTypes: $fileTypes,
+        );
 
         // Unreacted: files you have not reacted to. This is per-user and depends on reacted_user_ids.
         if ($reactionMode === 'unreacted') {
@@ -236,7 +152,7 @@ class LocalService extends BaseService
                 ];
             }
 
-            $pagination = $applyAutoDislikedFilter($buildSearch())
+            $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
                 ->whereNotIn('reacted_user_ids', [(string) $userId])
                 ->paginate($limit, 'page', $page);
 
@@ -262,7 +178,7 @@ class LocalService extends BaseService
                 ];
             }
 
-            $pagination = $applyAutoDislikedFilter($buildSearch())
+            $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
                 ->where('reacted_user_ids', (string) $userId)
                 // Reacted excludes dislikes by definition.
                 ->whereNotIn('dislike_user_ids', [(string) $userId])
@@ -291,7 +207,7 @@ class LocalService extends BaseService
 
             if (count($reactionTypes) === 1) {
                 $reactionField = "{$reactionTypes[0]}_user_ids";
-                $pagination = $applyAutoDislikedFilter($buildSearch())
+                $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
                     ->where($reactionField, (string) $userId)
                     ->paginate($limit, 'page', $page);
 
@@ -323,7 +239,7 @@ class LocalService extends BaseService
 
             foreach ($reactionTypes as $type) {
                 $reactionField = "{$type}_user_ids";
-                $pagination = $applyAutoDislikedFilter($buildSearch())
+                $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
                     ->where($reactionField, (string) $userId)
                     ->paginate($targetLimit, 'page', 1);
 
@@ -402,7 +318,8 @@ class LocalService extends BaseService
             ];
         }
 
-        $pagination = $applyAutoDislikedFilter($buildSearch())->paginate($limit, 'page', $page);
+        $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
+            ->paginate($limit, 'page', $page);
         $files = collect($pagination->items());
         $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
 
