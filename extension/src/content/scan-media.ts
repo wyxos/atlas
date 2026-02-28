@@ -49,6 +49,10 @@ function collectAnchoredMedia(
 ): void {
     const anchors = document.querySelectorAll('a[href]');
     for (const anchor of anchors) {
+        if (!isElementVisibleInViewport(anchor)) {
+            continue;
+        }
+
         const anchorUrl = normalizeUrl((anchor as HTMLAnchorElement).href);
         const mediaElements = anchor.querySelectorAll('img,video');
 

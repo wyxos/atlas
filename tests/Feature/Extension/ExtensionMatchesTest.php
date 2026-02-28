@@ -135,3 +135,32 @@ test('extension matches prefers media url match over referrer fallback for same 
     $response->assertJsonPath('matches.0.exists', true);
     $response->assertJsonPath('matches.0.reaction', 'love');
 });
+
+test('extension matches resolves legacy rows without hash columns via exact url fallback', function () {
+    setExtensionApiKey('valid-api-key');
+
+    $file = File::factory()->create([
+        'url' => 'https://images-wixmp.com/f/legacy-null-hash.jpg',
+        'referrer_url' => 'https://www.deviantart.com/artist/art/legacy-null-hash',
+    ]);
+
+    $file->url_hash = null;
+    $file->referrer_url_hash = null;
+    $file->saveQuietly();
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/matches', [
+        'items' => [
+            [
+                'candidate_id' => 'atlas-legacy',
+                'type' => 'media',
+                'url' => 'https://images-wixmp.com/f/legacy-null-hash.jpg',
+            ],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('matches.0.id', 'atlas-legacy');
+    $response->assertJsonPath('matches.0.exists', true);
+});
