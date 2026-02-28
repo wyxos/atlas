@@ -4,6 +4,7 @@ import { Ban, Download, Heart, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-ne
 import { formatMatchTimestamp } from './match-timestamp';
 import { resolveMediaResolution, resolveMediaUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
+import { submitBadgeReaction } from './reaction-submit';
 
 type MountedBadge = {
     element: HTMLDivElement;
@@ -35,6 +36,9 @@ const reactionButtonStyle = {
     borderRadius: '4px',
     padding: '4px',
     cursor: 'pointer',
+    border: 'none',
+    background: 'transparent',
+    transition: 'background-color 160ms ease, color 160ms ease, opacity 160ms ease',
 } as const;
 
 const spinnerStyle = {
@@ -45,6 +49,25 @@ const spinnerStyle = {
     borderRadius: '999px',
     animation: 'atlas-badge-spin 0.9s linear infinite',
 } as const;
+
+const reactionPalette: Record<BadgeReactionType, { activeBackground: string; hoverColor: string }> = {
+    love: {
+        activeBackground: '#ef4444',
+        hoverColor: '#f87171',
+    },
+    like: {
+        activeBackground: '#0466c8',
+        hoverColor: '#0f85fa',
+    },
+    dislike: {
+        activeBackground: '#6b7280',
+        hoverColor: '#9ca3af',
+    },
+    funny: {
+        activeBackground: '#eab308',
+        hoverColor: '#facc15',
+    },
+};
 
 function ensureRuntimeStyles(): void {
     if (document.getElementById(BADGE_STYLE_ID)) {
@@ -85,6 +108,7 @@ const AtlasReactionBadge = defineComponent({
         const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
         const mediaResolution = ref<string | null>(null);
         const hoveredReaction = ref<BadgeReactionType | null>(null);
+        const isSubmittingReaction = ref(false);
         let isActive = true;
         const timestampText = computed(() => {
             const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
@@ -140,19 +164,40 @@ const AtlasReactionBadge = defineComponent({
         });
 
         function iconColor(type: BadgeReactionType, activeReaction: BadgeReactionType | null): string {
+            if (activeReaction === type) {
+                return '#ffffff';
+            }
+
             if (hoveredReaction.value === type) {
-                return '#ffffff';
+                return reactionPalette[type].hoverColor;
             }
 
-            if (activeReaction !== type) {
-                return '#ffffff';
+            return '#ffffff';
+        }
+
+        async function handleReactionClick(type: BadgeReactionType): Promise<void> {
+            if (isSubmittingReaction.value || isChecking.value) {
+                return;
             }
 
-            if (type === 'dislike') {
-                return '#f87171';
-            }
+            isSubmittingReaction.value = true;
 
-            return '#4ade80';
+            try {
+                const result = await submitBadgeReaction(props.media, type);
+                if (!isActive || !result.ok) {
+                    return;
+                }
+
+                matchResult.value = {
+                    ...matchResult.value,
+                    exists: result.exists || matchResult.value.exists,
+                    reaction: result.reaction,
+                };
+            } finally {
+                if (isActive) {
+                    isSubmittingReaction.value = false;
+                }
+            }
         }
 
         return () => {
@@ -188,6 +233,9 @@ const AtlasReactionBadge = defineComponent({
                             'button',
                             {
                                 type: 'button',
+                                onClick: () => {
+                                    void handleReactionClick(reactionType);
+                                },
                                 onMouseenter: () => {
                                     hoveredReaction.value = reactionType;
                                 },
@@ -198,14 +246,11 @@ const AtlasReactionBadge = defineComponent({
                                 },
                                 style: {
                                     ...reactionButtonStyle,
-                                    border: activeReaction === reactionType || hoveredReaction.value === reactionType
-                                        ? '1px solid rgba(255,255,255,0.8)'
-                                        : '1px solid transparent',
                                     background: activeReaction === reactionType
-                                        ? 'rgba(255,255,255,0.18)'
-                                        : hoveredReaction.value === reactionType
-                                            ? 'rgba(255,255,255,0.12)'
-                                            : 'transparent',
+                                        ? reactionPalette[reactionType].activeBackground
+                                        : 'transparent',
+                                    opacity: isSubmittingReaction.value ? 0.75 : 1,
+                                    cursor: isSubmittingReaction.value ? 'wait' : 'pointer',
                                 },
                             },
                             [
