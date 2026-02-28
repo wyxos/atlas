@@ -24,6 +24,7 @@ const servicesNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
 const isServicesLoading = ref(false);
 const isSpotifyRefreshing = ref(false);
 const isSpotifyDisconnecting = ref(false);
+const browserExtensionDownloadUrl = '/settings/browser-extension/download';
 
 type SpotifyServiceAccount = {
     id: string | null;
@@ -332,6 +333,26 @@ onMounted(() => {
                                 : 'text-twilight-indigo-200'"
                     >
                         {{ servicesNotice }}
+                    </p>
+                </div>
+
+                <div class="border border-smart-blue-500/30 rounded-lg p-6 bg-prussian-blue-700/50">
+                    <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+                        <div>
+                            <h5 class="text-lg font-semibold text-smart-blue-300 mb-2">Browser Extension</h5>
+                            <p class="text-twilight-indigo-200">
+                                Download the latest Atlas browser extension package.
+                            </p>
+                        </div>
+                        <Button as-child variant="secondary">
+                            <a :href="browserExtensionDownloadUrl">
+                                Download Extension
+                            </a>
+                        </Button>
+                    </div>
+
+                    <p class="text-xs text-twilight-indigo-300">
+                        The download endpoint always serves the latest backend-published version.
                     </p>
                 </div>
 
