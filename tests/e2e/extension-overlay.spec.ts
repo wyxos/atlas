@@ -101,8 +101,8 @@ test('standalone widget follows image to modal without extra synthetic clicks', 
     await page.mouse.move(0, 0);
     await largeImage.hover();
     await page.evaluate(() => {
-        const wrapper = document.querySelector('img[alt="fixture-large"]')?.closest('[data-atlas-overlay-wrapper="1"]');
-        wrapper?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        const large = document.querySelector('img[alt="fixture-large"]');
+        large?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' }));
     });
 
     const largeWrapper = page.locator('img[alt="fixture-large"]').locator('xpath=ancestor::*[@data-atlas-overlay-wrapper="1"][1]');
