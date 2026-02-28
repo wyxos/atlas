@@ -1,16 +1,17 @@
 import { getStoredOptions } from './atlas-options';
 import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './match-rules';
 
-const WRAPPER_ATTR = 'data-atlas-media-wrapper';
 const BADGE_ATTR = 'data-atlas-media-red-badge';
 const APPLIED_ATTR = 'data-atlas-media-red-applied';
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 
 type MediaElement = HTMLImageElement | HTMLVideoElement;
-type OverlayTarget = MediaElement | HTMLPictureElement;
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
+const badgesByMedia = new WeakMap<MediaElement, HTMLDivElement>();
+const activeMedia = new Set<MediaElement>();
+let repositionQueued = false;
 
 function isMediaElement(element: Element): element is MediaElement {
     return element instanceof HTMLImageElement || element instanceof HTMLVideoElement;
@@ -50,39 +51,8 @@ function mediaMatchesRules(element: MediaElement): boolean {
     return mediaUrl !== null && urlMatchesAnyRule(mediaUrl, currentRules, currentPageHostname);
 }
 
-function resolveOverlayTarget(media: MediaElement): OverlayTarget {
-    if (media.parentElement instanceof HTMLPictureElement) {
-        return media.parentElement;
-    }
-
-    return media;
-}
-
-function createWrapper(target: OverlayTarget): HTMLDivElement {
-    const wrapper = document.createElement('div');
-    wrapper.setAttribute(WRAPPER_ATTR, '1');
-    wrapper.style.position = 'relative';
-    wrapper.style.display = window.getComputedStyle(target).display === 'block' ? 'block' : 'inline-block';
-    return wrapper;
-}
-
-function ensureWrapper(target: OverlayTarget): HTMLDivElement {
-    const parent = target.parentElement;
-    if (parent instanceof HTMLDivElement && parent.getAttribute(WRAPPER_ATTR) === '1') {
-        return parent;
-    }
-
-    const wrapper = createWrapper(target);
-    if (parent) {
-        parent.insertBefore(wrapper, target);
-        wrapper.appendChild(target);
-    }
-
-    return wrapper;
-}
-
-function ensureBadge(wrapper: HTMLDivElement): HTMLDivElement {
-    const existing = wrapper.querySelector<HTMLDivElement>(`[${BADGE_ATTR}="1"]`);
+function ensureBadge(media: MediaElement): HTMLDivElement {
+    const existing = badgesByMedia.get(media);
     if (existing) {
         return existing;
     }
@@ -90,9 +60,6 @@ function ensureBadge(wrapper: HTMLDivElement): HTMLDivElement {
     const badge = document.createElement('div');
     badge.setAttribute(BADGE_ATTR, '1');
     badge.style.position = 'absolute';
-    badge.style.left = '50%';
-    badge.style.bottom = '8px';
-    badge.style.transform = 'translateX(-50%)';
     badge.style.width = '320px';
     badge.style.height = '40px';
     badge.style.background = '#dc2626';
@@ -101,41 +68,70 @@ function ensureBadge(wrapper: HTMLDivElement): HTMLDivElement {
     badge.style.boxSizing = 'border-box';
     badge.style.pointerEvents = 'none';
     badge.style.zIndex = '2147483647';
-
-    wrapper.appendChild(badge);
+    document.body.appendChild(badge);
+    badgesByMedia.set(media, badge);
     return badge;
 }
 
-function unwrapTarget(target: OverlayTarget, media: MediaElement): void {
-    const wrapper = target.parentElement;
-    if (!(wrapper instanceof HTMLDivElement) || wrapper.getAttribute(WRAPPER_ATTR) !== '1') {
-        media.removeAttribute(APPLIED_ATTR);
-        return;
+function removeIndicator(media: MediaElement): void {
+    activeMedia.delete(media);
+    const badge = badgesByMedia.get(media);
+    if (badge) {
+        badge.remove();
+        badgesByMedia.delete(media);
     }
-
-    const parent = wrapper.parentElement;
-    if (!parent) {
-        media.removeAttribute(APPLIED_ATTR);
-        return;
-    }
-
-    const wrapperNextSibling = wrapper.nextSibling;
-    wrapper.remove();
-    parent.insertBefore(target, wrapperNextSibling);
     media.removeAttribute(APPLIED_ATTR);
 }
 
+function positionBadge(media: MediaElement): void {
+    const badge = ensureBadge(media);
+    const rect = media.getBoundingClientRect();
+    const style = window.getComputedStyle(media);
+    const isHidden = style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0;
+    const hasSize = rect.width > 0 && rect.height > 0;
+    const isOnScreen = rect.bottom >= 0 && rect.right >= 0 && rect.top <= window.innerHeight && rect.left <= window.innerWidth;
+
+    if (isHidden || !hasSize || !isOnScreen) {
+        badge.style.display = 'none';
+        return;
+    }
+
+    const left = window.scrollX + rect.left + ((rect.width - 320) / 2);
+    const top = window.scrollY + rect.top + rect.height - 48;
+    badge.style.display = 'block';
+    badge.style.left = `${Math.round(left)}px`;
+    badge.style.top = `${Math.round(top)}px`;
+}
+
+function scheduleReposition(): void {
+    if (repositionQueued) {
+        return;
+    }
+
+    repositionQueued = true;
+    window.requestAnimationFrame(() => {
+        repositionQueued = false;
+
+        for (const media of Array.from(activeMedia)) {
+            if (!media.isConnected) {
+                removeIndicator(media);
+                continue;
+            }
+
+            positionBadge(media);
+        }
+    });
+}
+
 function applyIndicator(media: MediaElement): void {
-    const target = resolveOverlayTarget(media);
-    const wrapper = ensureWrapper(target);
-    ensureBadge(wrapper);
+    activeMedia.add(media);
     media.setAttribute(APPLIED_ATTR, '1');
+    positionBadge(media);
 }
 
 function processMedia(media: MediaElement): void {
     if (media.closest('a[href]') !== null) {
-        const anchoredTarget = resolveOverlayTarget(media);
-        unwrapTarget(anchoredTarget, media);
+        removeIndicator(media);
         return;
     }
 
@@ -144,8 +140,7 @@ function processMedia(media: MediaElement): void {
         return;
     }
 
-    const target = resolveOverlayTarget(media);
-    unwrapTarget(target, media);
+    removeIndicator(media);
 }
 
 function processNodeAndDescendants(node: Node): void {
@@ -181,10 +176,12 @@ function installMutationObserver(): void {
                 for (const addedNode of mutation.addedNodes) {
                     processNodeAndDescendants(addedNode);
                 }
+                scheduleReposition();
             }
 
             if (mutation.type === 'attributes' && mutation.target instanceof Element && isMediaElement(mutation.target)) {
                 processMedia(mutation.target);
+                scheduleReposition();
             }
 
             if (mutation.type === 'attributes' && mutation.target instanceof HTMLSourceElement) {
@@ -192,12 +189,14 @@ function installMutationObserver(): void {
                 const pictureImg = pictureParent?.querySelector('img');
                 if (pictureImg && isMediaElement(pictureImg)) {
                     processMedia(pictureImg);
+                    scheduleReposition();
                     continue;
                 }
 
                 const videoParent = mutation.target.closest('video');
                 if (videoParent && isMediaElement(videoParent)) {
                     processMedia(videoParent);
+                    scheduleReposition();
                 }
             }
         }
@@ -221,6 +220,11 @@ function installStorageListener(): void {
     });
 }
 
+function installViewportListeners(): void {
+    window.addEventListener('scroll', scheduleReposition, { passive: true });
+    window.addEventListener('resize', scheduleReposition, { passive: true });
+}
+
 async function loadRulesAndProcess(): Promise<void> {
     try {
         const stored = await getStoredOptions();
@@ -236,6 +240,7 @@ async function loadRulesAndProcess(): Promise<void> {
 function bootstrap(): void {
     installMutationObserver();
     installStorageListener();
+    installViewportListeners();
     void loadRulesAndProcess();
 }
 
