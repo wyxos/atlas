@@ -50,7 +50,7 @@ export class OverlayManager {
             return existingHost.element;
         }
 
-        const badgeHost = createReactionBadgeHost();
+        const badgeHost = createReactionBadgeHost(media);
         const badge = badgeHost.element;
         badge.setAttribute(BADGE_ATTR, '1');
         badge.style.position = 'absolute';
@@ -58,7 +58,7 @@ export class OverlayManager {
         badge.style.bottom = '8px';
         badge.style.transform = 'translateX(-50%)';
         badge.style.borderRadius = '8px';
-        badge.style.pointerEvents = 'none';
+        badge.style.pointerEvents = 'auto';
         badge.style.zIndex = '10';
         this.syncBadgePlacement(media, badge);
         this.badgesByMedia.set(media, badgeHost);
