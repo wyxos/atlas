@@ -27,10 +27,12 @@ type MatchResponseItem = {
     blacklisted_at?: unknown;
 };
 
-const BATCH_DELAY_MS = 24;
+const BATCH_DELAY_MS = 10;
+const RESULT_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const pendingByKey = new Map<string, MatchQueueItem>();
 const inFlightByKey = new Map<string, Promise<BadgeMatchResult>>();
+const resultCacheByKey = new Map<string, { result: BadgeMatchResult; cachedAt: number }>();
 let flushTimer: number | null = null;
 
 function emptyResult(): BadgeMatchResult {
@@ -133,6 +135,14 @@ async function flushQueue(): Promise<void> {
     for (const entry of batch) {
         const promise = responsePromise
             .then((results) => results.get(entry.key) ?? emptyResult())
+            .then((result) => {
+                resultCacheByKey.set(entry.key, {
+                    result,
+                    cachedAt: Date.now(),
+                });
+
+                return result;
+            })
             .finally(() => {
                 inFlightByKey.delete(entry.key);
             });
@@ -164,6 +174,11 @@ export function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatc
     }
 
     const key = normalizedMediaUrl;
+    const cached = resultCacheByKey.get(key);
+    if (cached && (Date.now() - cached.cachedAt) < RESULT_CACHE_TTL_MS) {
+        return Promise.resolve(cached.result);
+    }
+
     const queued = pendingByKey.get(key);
     if (queued) {
         return queued.promise;

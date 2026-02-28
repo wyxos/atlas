@@ -53,7 +53,10 @@ function ensureRuntimeStyles(): void {
 
     const style = document.createElement('style');
     style.id = BADGE_STYLE_ID;
-    style.textContent = '@keyframes atlas-badge-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    style.textContent = `
+@keyframes atlas-badge-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes atlas-badge-pulse { 0%,100% { opacity: .45; } 50% { opacity: .9; } }
+`;
     document.head.appendChild(style);
 }
 
@@ -80,7 +83,8 @@ const AtlasReactionBadge = defineComponent({
 
         const isChecking = ref(true);
         const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
-        const mediaResolution = ref('');
+        const mediaResolution = ref<string | null>(null);
+        const hoveredReaction = ref<BadgeReactionType | null>(null);
         let isActive = true;
         const timestampText = computed(() => {
             const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
@@ -104,7 +108,7 @@ const AtlasReactionBadge = defineComponent({
 
         function syncResolution(): void {
             const resolved = resolveMediaResolution(props.media);
-            mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : 'Unknown';
+            mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
         }
 
         const onMediaUpdate = (): void => {
@@ -136,6 +140,10 @@ const AtlasReactionBadge = defineComponent({
         });
 
         function iconColor(type: BadgeReactionType, activeReaction: BadgeReactionType | null): string {
+            if (hoveredReaction.value === type) {
+                return '#ffffff';
+            }
+
             if (activeReaction !== type) {
                 return '#ffffff';
             }
@@ -180,10 +188,24 @@ const AtlasReactionBadge = defineComponent({
                             'button',
                             {
                                 type: 'button',
+                                onMouseenter: () => {
+                                    hoveredReaction.value = reactionType;
+                                },
+                                onMouseleave: () => {
+                                    if (hoveredReaction.value === reactionType) {
+                                        hoveredReaction.value = null;
+                                    }
+                                },
                                 style: {
                                     ...reactionButtonStyle,
-                                    border: activeReaction === reactionType ? '1px solid rgba(255,255,255,0.8)' : '1px solid transparent',
-                                    background: activeReaction === reactionType ? 'rgba(255,255,255,0.18)' : 'transparent',
+                                    border: activeReaction === reactionType || hoveredReaction.value === reactionType
+                                        ? '1px solid rgba(255,255,255,0.8)'
+                                        : '1px solid transparent',
+                                    background: activeReaction === reactionType
+                                        ? 'rgba(255,255,255,0.18)'
+                                        : hoveredReaction.value === reactionType
+                                            ? 'rgba(255,255,255,0.12)'
+                                            : 'transparent',
                                 },
                             },
                             [
@@ -230,7 +252,17 @@ const AtlasReactionBadge = defineComponent({
                             },
                         },
                         [
-                            h('span', `Res ${mediaResolution.value}`),
+                            mediaResolution.value
+                                ? h('span', `Res ${mediaResolution.value}`)
+                                : h('span', {
+                                    style: {
+                                        width: '72px',
+                                        height: '12px',
+                                        borderRadius: '999px',
+                                        background: 'rgba(255, 255, 255, 0.2)',
+                                        animation: 'atlas-badge-pulse 1.4s ease-in-out infinite',
+                                    },
+                                }),
                             timestampText.value === null
                                 ? null
                                 : h(
