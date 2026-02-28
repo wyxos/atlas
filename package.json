@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "build:extension": "vite build --config extension/vite.config.ts",
+    "build:extension": "vite build --config extension/vite.config.ts && vite build --config extension/vite.content.config.ts",
     "package:extension": "npm run build:extension && php scripts/package-extension.php",
     "package:extension:local": "npm run build:extension && php scripts/package-extension.php --bump=patch --output-dir=\"EXTENSION_LOCAL_PACKAGE_DIR\" --extract-dir=\"EXTENSION_LOCAL_PACKAGE_DIR\"",
     "dev": "vite",
@@ -13,7 +13,7 @@
     "check": "npm run check:project && npm run backend:lint && npm run backend:test",
     "check:project": "npm run guard:files-table-migrations && npm run lint:project && npm run typecheck && npm run test:project",
     "guard:files-table-migrations": "node scripts/guard-files-table-migrations.mjs",
-    "lint": "eslint resources/js extension/src scripts vite.config.js extension/vite.config.ts vitest.config.js playwright.config.ts --fix",
+    "lint": "eslint resources/js extension/src scripts vite.config.js extension/vite.config.ts extension/vite.content.config.ts vitest.config.js playwright.config.ts --fix",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
     "test": "npm run test:project",
     "test:project": "vitest run --reporter=dot -c vitest.project.config.js --passWithNoTests",

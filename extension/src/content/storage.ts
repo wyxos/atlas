@@ -1,5 +1,5 @@
 /* global chrome */
-import { DEFAULT_MATCH_RULES, parseStoredMatchRules, type UrlMatchRule } from '../match-rules';
+import { DEFAULT_MATCH_RULES, parseStoredMatchRules, type UrlMatchRule } from './match-rules';
 
 const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
 

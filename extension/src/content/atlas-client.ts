@@ -1,5 +1,5 @@
 import { getContentStoredOptions } from './storage';
-import type { UrlMatchRule } from '../match-rules';
+import type { UrlMatchRule } from './match-rules';
 import type { ExtensionMatchResult, MediaCandidatePayload } from './types';
 
 export async function fetchExtensionMatches(
