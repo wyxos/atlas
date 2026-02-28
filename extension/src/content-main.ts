@@ -109,9 +109,34 @@ function installViewportListeners(): void {
     window.addEventListener('resize', scheduleScan, { passive: true });
 }
 
+function installInteractionListeners(): void {
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        if (target.closest('img,video,a[href]') !== null) {
+            scheduleScan();
+        }
+    }, { capture: true });
+
+    document.addEventListener('mouseover', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        if (target.closest('img,video') !== null) {
+            scheduleScan();
+        }
+    }, { capture: true, passive: true });
+}
+
 function bootstrap(): void {
     installMutationObserver();
     installViewportListeners();
+    installInteractionListeners();
     void runScanAndRender();
 }
 
