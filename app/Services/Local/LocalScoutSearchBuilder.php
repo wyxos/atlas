@@ -61,8 +61,7 @@ class LocalScoutSearchBuilder
             }
         }
 
-        $driver = config('scout.driver');
-        if ($sort === 'random' && $driver === 'typesense') {
+        if ($sort === 'random') {
             $rand = $seed && $seed > 0 ? "_rand({$seed})" : '_rand()';
             $builder->orderBy($rand, 'desc');
         } elseif ($sort === 'created_at_asc') {

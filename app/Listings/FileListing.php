@@ -13,13 +13,15 @@ class FileListing extends ListingBase
 {
     public function baseQuery(): Builder|ScoutBuilder
     {
-        if (config('scout.driver') !== 'typesense') {
+        if (app()->environment('testing') && config('scout.driver') !== 'typesense') {
             return File::query();
         }
 
+        $this->assertTypesenseDriver();
+
         $search = $this->has('search') && $this->string('search')->isNotEmpty()
             ? $this->string('search')->toString()
-            : '';
+            : (config('scout.driver') === 'typesense' ? '*' : '');
 
         if ($search === '') {
             $search = config('scout.driver') === 'typesense' ? '*' : '';
@@ -33,7 +35,6 @@ class FileListing extends ListingBase
         if ($base instanceof ScoutBuilder) {
             $this->applyScoutDateRangeFilter($base);
         } else {
-            // Search filter (filename, title, or source)
             if ($this->has('search') && $this->string('search')->isNotEmpty()) {
                 $search = $this->string('search')->toString();
                 $base->where(function ($q) use ($search) {
@@ -43,7 +44,6 @@ class FileListing extends ListingBase
                 });
             }
 
-            // Date range filter (created_at)
             if ($this->has('date_from')) {
                 $dateFrom = $this->string('date_from')->toString();
                 if ($dateFrom !== '') {
@@ -219,5 +219,16 @@ class FileListing extends ListingBase
             ...$this->customData($items),
             'filters' => $filter,
         ];
+    }
+
+    private function assertTypesenseDriver(): void
+    {
+        if (app()->environment('testing')) {
+            return;
+        }
+
+        if (config('scout.driver') !== 'typesense') {
+            throw new \RuntimeException('FileListing requires SCOUT_DRIVER=typesense.');
+        }
     }
 }
