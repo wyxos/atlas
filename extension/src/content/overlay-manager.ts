@@ -6,12 +6,12 @@ const APPLIED_ATTR = 'data-atlas-media-red-applied';
 export class OverlayManager {
     private readonly badgesByMedia = new WeakMap<MediaElement, HTMLDivElement>();
     private readonly activeMedia = new Set<MediaElement>();
-    private repositionQueued = false;
 
     apply(media: MediaElement): void {
         this.activeMedia.add(media);
         media.setAttribute(APPLIED_ATTR, '1');
-        this.position(media);
+        const badge = this.ensureBadge(media);
+        this.syncBadgePlacement(media, badge);
     }
 
     remove(media: MediaElement): void {
@@ -25,35 +25,30 @@ export class OverlayManager {
     }
 
     scheduleReposition(): void {
-        if (this.repositionQueued) {
-            return;
-        }
-
-        this.repositionQueued = true;
-        window.requestAnimationFrame(() => {
-            this.repositionQueued = false;
-
-            for (const media of Array.from(this.activeMedia)) {
-                if (!media.isConnected) {
-                    this.remove(media);
-                    continue;
-                }
-
-                this.position(media);
+        for (const media of Array.from(this.activeMedia)) {
+            if (!media.isConnected) {
+                this.remove(media);
+                continue;
             }
-        });
+
+            const badge = this.ensureBadge(media);
+            this.syncBadgePlacement(media, badge);
+        }
     }
 
     private ensureBadge(media: MediaElement): HTMLDivElement {
         const existing = this.badgesByMedia.get(media);
         if (existing) {
-            this.attachBadgeToMediaParent(media, existing);
+            this.syncBadgePlacement(media, existing);
             return existing;
         }
 
         const badge = document.createElement('div');
         badge.setAttribute(BADGE_ATTR, '1');
         badge.style.position = 'absolute';
+        badge.style.left = '50%';
+        badge.style.bottom = '8px';
+        badge.style.transform = 'translateX(-50%)';
         badge.style.width = '320px';
         badge.style.height = '40px';
         badge.style.background = '#dc2626';
@@ -62,12 +57,12 @@ export class OverlayManager {
         badge.style.boxSizing = 'border-box';
         badge.style.pointerEvents = 'none';
         badge.style.zIndex = '10';
-        this.attachBadgeToMediaParent(media, badge);
+        this.syncBadgePlacement(media, badge);
         this.badgesByMedia.set(media, badge);
         return badge;
     }
 
-    private attachBadgeToMediaParent(media: MediaElement, badge: HTMLDivElement): void {
+    private syncBadgePlacement(media: MediaElement, badge: HTMLDivElement): void {
         const parent = media.parentElement;
         if (!parent) {
             return;
@@ -80,25 +75,6 @@ export class OverlayManager {
         if (badge.parentElement !== parent || badge.previousElementSibling !== media) {
             media.insertAdjacentElement('afterend', badge);
         }
-    }
-
-    private position(media: MediaElement): void {
-        const badge = this.ensureBadge(media);
-        const rect = media.getBoundingClientRect();
-        const style = window.getComputedStyle(media);
-        const isHidden = style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0;
-        const hasSize = rect.width > 0 && rect.height > 0;
-        const isOnScreen = rect.bottom >= 0 && rect.right >= 0 && rect.top <= window.innerHeight && rect.left <= window.innerWidth;
-
-        if (isHidden || !hasSize || !isOnScreen) {
-            badge.style.display = 'none';
-            return;
-        }
-
-        const left = media.offsetLeft + ((media.offsetWidth - 320) / 2);
-        const top = media.offsetTop + media.offsetHeight - 48;
         badge.style.display = 'block';
-        badge.style.left = `${Math.round(left)}px`;
-        badge.style.top = `${Math.round(top)}px`;
     }
 }
