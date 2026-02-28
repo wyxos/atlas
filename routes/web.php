@@ -27,66 +27,6 @@ Route::get('/api/csrf', function () {
     return response()->noContent();
 })->name('api.csrf');
 
-Route::post('/api/extension/files', [\App\Http\Controllers\ExternalFilesController::class, 'store'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
-    ->name('api.extension.files.store');
-Route::options('/api/extension/files', function () {
-    return response()->noContent()
-        ->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-Route::post('/api/extension/files/react', [\App\Http\Controllers\ExternalFilesController::class, 'react'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
-    ->name('api.extension.files.react');
-Route::options('/api/extension/files/react', function () {
-    return response()->noContent()
-        ->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-Route::post('/api/extension/files/check', [\App\Http\Controllers\ExternalFilesController::class, 'check'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
-    ->name('api.extension.files.check');
-Route::options('/api/extension/files/check', function () {
-    return response()->noContent()
-        ->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-Route::post('/api/extension/files/delete-download', [\App\Http\Controllers\ExternalFilesController::class, 'deleteDownload'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
-    ->name('api.extension.files.delete-download');
-Route::options('/api/extension/files/delete-download', function () {
-    return response()->noContent()
-        ->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-Route::get('/api/extension/realtime', [\App\Http\Controllers\ExtensionRealtimeController::class, 'config'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
-    ->name('api.extension.realtime.config');
-Route::options('/api/extension/realtime', function () {
-    return response()->noContent()
-        ->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-Route::post('/api/extension/broadcasting/auth', [\App\Http\Controllers\ExtensionRealtimeController::class, 'auth'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
-    ->name('api.extension.realtime.auth');
-Route::options('/api/extension/broadcasting/auth', function () {
-    return response()->noContent()
-        ->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
@@ -149,9 +89,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/download-transfers/bulk-delete', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyBatch'])->name('api.download-transfers.destroy-batch');
     Route::delete('/api/download-transfers/{downloadTransfer}/disk', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyWithDisk'])->name('api.download-transfers.destroy-disk');
     Route::delete('/api/download-transfers/{downloadTransfer}', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroy'])->name('api.download-transfers.destroy');
-    Route::get('/downloads/atlas-extension.zip', [\App\Http\Controllers\ExtensionDownloadController::class, 'download'])
-        ->name('downloads.atlas-extension');
-
     // Moderation Rules
     Route::get('/api/moderation-rules', [\App\Http\Controllers\ModerationRuleController::class, 'index'])->name('api.moderation-rules.index');
     Route::post('/api/moderation-rules', [\App\Http\Controllers\ModerationRuleController::class, 'store'])->name('api.moderation-rules.store');

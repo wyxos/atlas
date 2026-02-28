@@ -15,15 +15,10 @@ import {
 import { deleteAll as deleteAllTabs } from '@/actions/App/Http/Controllers/TabController';
 import { deleteAll as deleteAllFiles } from '@/actions/App/Http/Controllers/FilesController';
 import { AlertTriangle } from 'lucide-vue-next';
-import extensionManifest from '../../../extension/atlas-downloader/manifest.json';
 
 const router = useRouter();
 const resetDialogOpen = ref(false);
 const isResetting = ref(false);
-const extensionDialogOpen = ref(false);
-const extensionVersion = computed(() => extensionManifest.version ?? 'dev');
-const extensionDownloadUrl = '/downloads/atlas-extension.zip';
-const extensionCopyStatus = ref('');
 const servicesNotice = ref('');
 const servicesNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
 const isServicesLoading = ref(false);
@@ -179,32 +174,6 @@ async function handleDisconnectSpotify(): Promise<void> {
         await fetchServices();
     } finally {
         isSpotifyDisconnecting.value = false;
-    }
-}
-
-async function copyToClipboard(value: string, label: string): Promise<void> {
-    try {
-        if (navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(value);
-        } else {
-            const textarea = document.createElement('textarea');
-            textarea.value = value;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            textarea.remove();
-        }
-
-        extensionCopyStatus.value = `${label} copied.`;
-    } catch (error) {
-        console.error('Failed to copy:', error);
-        extensionCopyStatus.value = `Unable to copy ${label.toLowerCase()}.`;
-    } finally {
-        window.setTimeout(() => {
-            extensionCopyStatus.value = '';
-        }, 2000);
     }
 }
 
@@ -366,22 +335,6 @@ onMounted(() => {
                     </p>
                 </div>
 
-                <div class="border border-smart-blue-500/30 rounded-lg p-6 bg-prussian-blue-700/50">
-                    <h5 class="text-lg font-semibold text-smart-blue-300 mb-2">Atlas Browser Extension</h5>
-                    <p class="text-twilight-indigo-200 mb-4">
-                        Install the extension to send large images and videos directly to Atlas from any site.
-                    </p>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <Button @click="extensionDialogOpen = true" variant="outline">
-                            Install Extension
-                        </Button>
-                        <Button as="a" :href="extensionDownloadUrl" variant="secondary">
-                            Download Zip
-                        </Button>
-                        <span class="text-xs text-twilight-indigo-300">v{{ extensionVersion }}</span>
-                    </div>
-                </div>
-
                 <div class="border border-danger-500/30 rounded-lg p-6 bg-prussian-blue-700/50">
                     <h5 class="text-lg font-semibold text-danger-400 mb-2">Danger Zone</h5>
                     <p class="text-twilight-indigo-200 mb-4">
@@ -419,52 +372,5 @@ onMounted(() => {
             </DialogContent>
         </Dialog>
 
-        <Dialog v-model="extensionDialogOpen">
-            <DialogContent class="sm:max-w-[520px] bg-prussian-blue-600 border-smart-blue-500/30">
-                <DialogHeader>
-                    <DialogTitle class="text-smart-blue-300">Install the Atlas Extension</DialogTitle>
-                    <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
-                        Load the extension from this repo and connect it to your Atlas instance.
-                    </DialogDescription>
-                </DialogHeader>
-                <div class="space-y-4 text-sm text-twilight-indigo-100">
-                    <ol class="list-decimal pl-5 space-y-2">
-                        <li>
-                            Open <span class="font-semibold">chrome://extensions</span> (Chrome) or
-                            <span class="font-semibold">brave://extensions</span> (Brave).
-                        </li>
-                        <li>Enable Developer Mode.</li>
-                        <li>Click “Load unpacked” and select <span class="font-semibold">extension/atlas-downloader</span>.</li>
-                        <li>Generate a token with <span class="font-semibold">php artisan atlas:extension-token --set</span>.</li>
-                        <li>Open the extension options and set your Atlas base URL and <span class="font-semibold">ATLAS_EXTENSION_TOKEN</span>.</li>
-                    </ol>
-                    <div class="flex flex-wrap gap-2">
-                        <Button as="a" :href="extensionDownloadUrl" variant="secondary" size="sm">
-                            Download Zip (v{{ extensionVersion }})
-                        </Button>
-                        <Button variant="outline" size="sm" @click="copyToClipboard('chrome://extensions', 'Chrome extensions URL')">
-                            Copy chrome://extensions
-                        </Button>
-                        <Button variant="outline" size="sm" @click="copyToClipboard('brave://extensions', 'Brave extensions URL')">
-                            Copy brave://extensions
-                        </Button>
-                    </div>
-                    <p v-if="extensionCopyStatus" class="text-xs text-smart-blue-200">
-                        {{ extensionCopyStatus }}
-                    </p>
-                    <p class="text-xs text-twilight-indigo-300">
-                        Browser pages like <span class="font-semibold">chrome://extensions</span> and
-                        <span class="font-semibold">brave://extensions</span> must be opened manually in the address bar.
-                    </p>
-                </div>
-                <DialogFooter>
-                    <DialogClose as-child>
-                        <Button variant="outline" @click="extensionDialogOpen = false">
-                            Close
-                        </Button>
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
     </PageLayout>
 </template>

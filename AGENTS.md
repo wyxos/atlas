@@ -47,16 +47,6 @@ npm run check               # TypeScript + ESLint check
 npm run test                # Run Vitest tests
 ```
 
-Extension gotcha:
-- `npm run build:extension` starts with `build:extension:clean`, which deletes `extension/atlas-downloader/dist` before rebuilding. If the build fails early, restore tracked dist files with `git restore extension/atlas-downloader/dist` before continuing.
-- Use `npm run build:extension:release` for extension releases; it auto-bumps `extension/atlas-downloader/manifest.json` patch version, rebuilds extension assets, regenerates the zip, and mirrors the built extension into `ATLAS_EXTENSION_SYNC_DIR` when that env var points to an existing directory.
-- Marker rule for outlines: mark standalone `img`/`video` nodes by media URL only (skip media inside anchors), and use `a[href]` lookups only when the anchor contains `img`/`video`; apply marker attributes/outlines to the child media element, not the anchor element itself.
-- Overlay hover status lookups on thumbnail media inside anchors must include the anchor URL (resolved absolute, including relative hrefs) and avoid defaulting referrer lookups to the current page URL, otherwise widget state can bleed from the main page media.
-- If marker rendering injects DOM nodes into page content (for example border spans/badges), update `mutationGuard` so those nodes/hosts are treated as atlas-owned mutations; otherwise the content `MutationObserver` can loop and freeze the tab.
-- In overlay pending-state cleanup, clear local busy state before dispatching `atlas-shortcut-reaction-state` updates, and ignore detached (`!isConnected`) media in overlay sync handlers; otherwise detached nodes can trigger recursive `showFor` loops and `Maximum call stack size exceeded`.
-- If content-script UI is migrated to Vue components, keep `@vitejs/plugin-vue` enabled in `extension/atlas-downloader/vite.content.config.ts`; otherwise `dist/content.js` builds will fail on `.vue` imports.
-- For extension bundles that include Vue runtime code (`content`/`options`), define `process.env.NODE_ENV` in the Vite config (`define`) so browser extension scripts do not crash on `process is not defined`.
-
 Database gotcha:
 - For long URL fields on MySQL/MariaDB, do not rely on unique indexes directly on `text`/large `varchar` columns. Use a deterministic hash column (e.g. SHA-256) as the unique/upsert key.
 - Do not call `Schema::hasColumn()`/`Schema::hasColumns()` in hot request/model paths. Those checks hit `information_schema` and can create recurring slow-query issues in production; rely on completed migrations instead.
@@ -70,7 +60,6 @@ Database gotcha:
 
 Downloads gotcha:
 - In queued download jobs, catching `Throwable` and writing `FAILED` prevents Laravel queue retries/backoff from running. For transient network errors (timeouts/5xx/connection issues), update transfer state to retry-visible metadata and call `$this->release($delay)` instead.
-- For auth-gated yt-dlp sources (X/Facebook), the extension now sends per-request `auth_context` (cookies + user agent) with react/download payloads; consume it only for that transfer and clear `listing_metadata.auth_context` after the yt-dlp attempt.
 - Extension react/download ingests should default to random stored filenames when `filename` is not explicitly provided; do not derive stored filenames from URL/path slugs (can mirror page titles and produce unstable naming).
 
 Services gotcha:
