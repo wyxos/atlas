@@ -132,7 +132,6 @@ const AtlasReactionBadge = defineComponent({
 
         const controlsDisabled = computed(() =>
             isChecking.value || submittingReactionType.value !== null || isDownloadLocked.value);
-        const showProgress = computed(() => isDownloadLocked.value);
         const timestampText = computed(() => {
             const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
             if (blacklistedAt) {
@@ -433,7 +432,24 @@ const AtlasReactionBadge = defineComponent({
                     }),
                 );
 
-            const progressValue = progressPercent.value ?? 0;
+            const progressDisplayValue = (() => {
+                if (progressPercent.value !== null) {
+                    return Math.max(0, Math.min(100, Math.round(progressPercent.value)));
+                }
+
+                if (transferStatus.value === 'completed') {
+                    return 100;
+                }
+
+                if (matchResult.value.downloadedAt !== null) {
+                    return 100;
+                }
+
+                return 0;
+            })();
+            const progressColor = transferStatus.value === 'completed' || matchResult.value.downloadedAt !== null
+                ? '#22c55e'
+                : '#14b8a6';
 
             return h(
                 'div',
@@ -502,47 +518,55 @@ const AtlasReactionBadge = defineComponent({
                         ],
                     ),
                     iconRow,
-                    showProgress.value
-                        ? h(
-                            'div',
-                            {
-                                style: {
-                                    width: '100%',
-                                    marginTop: '2px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '3px',
-                                },
+                    h(
+                        'div',
+                        {
+                            style: {
+                                width: '100%',
+                                marginTop: '2px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '3px',
                             },
-                            [
+                        },
+                        [
+                            h('div', {
+                                style: {
+                                    height: '4px',
+                                    width: '100%',
+                                    borderRadius: '999px',
+                                    background: 'rgba(255,255,255,0.2)',
+                                    overflow: 'hidden',
+                                },
+                            }, [
                                 h('div', {
                                     style: {
-                                        height: '4px',
-                                        width: '100%',
-                                        borderRadius: '999px',
-                                        background: 'rgba(255,255,255,0.2)',
-                                        overflow: 'hidden',
+                                        height: '100%',
+                                        width: `${progressDisplayValue}%`,
+                                        background: progressColor,
+                                        transition: 'width 180ms ease',
                                     },
-                                }, [
-                                    h('div', {
-                                        style: {
-                                            height: '100%',
-                                            width: `${progressValue}%`,
-                                            background: '#14b8a6',
-                                            transition: 'width 180ms ease',
-                                        },
-                                    }),
-                                ]),
-                                h('div', {
+                                }),
+                            ]),
+                            h(
+                                'div',
+                                {
                                     style: {
                                         fontSize: '10px',
-                                        opacity: 0.85,
+                                        opacity: 0.9,
                                         textAlign: 'right',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
                                     },
-                                }, transferStatus.value ?? 'downloading'),
-                            ],
-                        )
-                        : null,
+                                },
+                                [
+                                    h('span', transferStatus.value ?? 'idle'),
+                                    h('span', `${progressDisplayValue}%`),
+                                ],
+                            ),
+                        ],
+                    ),
                 ],
             );
         };
