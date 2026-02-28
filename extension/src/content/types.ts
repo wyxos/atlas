@@ -2,7 +2,7 @@ export type MediaCandidatePayload = {
     id: string;
     media_url: string | null;
     anchor_url: string | null;
-    page_url: string;
+    page_url: string | null;
 };
 
 export type MediaCandidate = {

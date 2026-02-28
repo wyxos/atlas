@@ -8,6 +8,7 @@ import {
     getStoredOptions,
     normalizeDomain,
     saveStoredOptions,
+    type UrlMatchRule,
     validateDomain,
 } from './atlas-options';
 
@@ -15,6 +16,7 @@ const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSI
 const atlasDomain = ref(DEFAULT_ATLAS_DOMAIN);
 const apiToken = ref('');
 const showApiToken = ref(false);
+const matchRulesText = ref('');
 const errorMessage = ref('');
 const isSaved = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
@@ -38,9 +40,15 @@ async function saveOptions(): Promise<void> {
         return;
     }
 
+    const parsedRules = parseMatchRulesText(matchRulesText.value);
+    if (parsedRules.error) {
+        errorMessage.value = parsedRules.error;
+        return;
+    }
+
     atlasDomain.value = normalizedDomain;
     try {
-        await saveStoredOptions(normalizedDomain, apiToken.value);
+        await saveStoredOptions(normalizedDomain, apiToken.value, parsedRules.rules);
         isSaved.value = true;
         await refreshApiConnectionStatus();
         setTimeout(() => {
@@ -56,12 +64,63 @@ onMounted(() => {
         .then((stored) => {
             atlasDomain.value = stored.atlasDomain;
             apiToken.value = stored.apiToken;
+            matchRulesText.value = formatMatchRules(stored.matchRules);
             void refreshApiConnectionStatus();
         })
         .catch((error) => {
             errorMessage.value = error instanceof Error ? error.message : 'Failed to load extension options.';
         });
 });
+
+function formatMatchRules(rules: UrlMatchRule[]): string {
+    return rules
+        .flatMap((rule) => rule.regexes.map((regex) => `${rule.domain}|${regex}`))
+        .join('\n');
+}
+
+function parseMatchRulesText(input: string): { rules: UrlMatchRule[]; error: string | null } {
+    const grouped = new Map<string, string[]>();
+    const lines = input
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line !== '');
+
+    for (const line of lines) {
+        const separatorIndex = line.indexOf('|');
+        if (separatorIndex <= 0 || separatorIndex === line.length - 1) {
+            return { rules: [], error: `Invalid rule format: "${line}". Use domain|regex.` };
+        }
+
+        const domain = line.slice(0, separatorIndex).trim().toLowerCase();
+        const regexPattern = line.slice(separatorIndex + 1).trim();
+
+        if (domain === '' || regexPattern === '') {
+            return { rules: [], error: `Invalid rule format: "${line}". Use domain|regex.` };
+        }
+
+        try {
+            // Validate regex at save time so content script never throws on invalid patterns.
+             
+            new RegExp(regexPattern, 'i');
+        } catch {
+            return { rules: [], error: `Invalid regex in rule: "${line}".` };
+        }
+
+        if (!grouped.has(domain)) {
+            grouped.set(domain, []);
+        }
+
+        grouped.get(domain)!.push(regexPattern);
+    }
+
+    return {
+        rules: Array.from(grouped.entries()).map(([domain, regexes]) => ({
+            domain,
+            regexes: Array.from(new Set(regexes)),
+        })),
+        error: null,
+    };
+}
 </script>
 
 <template>
@@ -108,6 +167,21 @@ onMounted(() => {
                             {{ showApiToken ? 'Hide' : 'Show' }}
                         </button>
                     </div>
+                </label>
+
+                <label class="block space-y-1">
+                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">
+                        URL Match Rules
+                    </span>
+                    <textarea
+                        v-model="matchRulesText"
+                        rows="8"
+                        placeholder="deviantart.com|^https://(www\\.)?deviantart\\.com/.+\nimages-wixmp.com|^https://images-wixmp\\.com/.+"
+                        class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                    />
+                    <p class="text-xs text-twilight-indigo-300">
+                        One rule per line: <code>domain|regex</code>. Subdomains are included.
+                    </p>
                 </label>
 
                 <div class="flex items-center gap-3">

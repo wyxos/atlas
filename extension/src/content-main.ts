@@ -1,4 +1,4 @@
-import { fetchExtensionMatches } from './content/atlas-client';
+import { fetchExtensionMatches, loadContentConnectionSettings } from './content/atlas-client';
 import { renderMatches } from './content/render-overlays';
 import { scanMediaCandidates } from './content/scan-media';
 
@@ -21,9 +21,14 @@ async function runScanAndRender(): Promise<void> {
         do {
             rerunRequested = false;
 
-            const candidates = scanMediaCandidates(SCAN_LIMIT);
+            const settings = await loadContentConnectionSettings();
+            if (settings.apiToken === '') {
+                continue;
+            }
+
+            const candidates = scanMediaCandidates(SCAN_LIMIT, settings.matchRules);
             const payload = candidates.map((candidate) => candidate.payload);
-            const matches = await fetchExtensionMatches(payload);
+            const matches = await fetchExtensionMatches(settings.atlasDomain, settings.apiToken, payload);
             renderMatches(candidates, matches);
         } while (rerunRequested);
     } catch {

@@ -1,12 +1,16 @@
 import { getContentStoredOptions } from './storage';
+import type { ContentMatchRule } from './storage';
 import type { ExtensionMatchResult, MediaCandidatePayload } from './types';
 
-export async function fetchExtensionMatches(items: MediaCandidatePayload[]): Promise<Map<string, ExtensionMatchResult>> {
+export async function fetchExtensionMatches(
+    atlasDomain: string,
+    apiToken: string,
+    items: MediaCandidatePayload[],
+): Promise<Map<string, ExtensionMatchResult>> {
     if (items.length === 0) {
         return new Map();
     }
 
-    const { atlasDomain, apiToken } = await getContentStoredOptions();
     if (apiToken === '') {
         return new Map();
     }
@@ -28,4 +32,12 @@ export async function fetchExtensionMatches(items: MediaCandidatePayload[]): Pro
     const matches = Array.isArray(data.matches) ? data.matches : [];
 
     return new Map(matches.map((match) => [match.id, match]));
+}
+
+export async function loadContentConnectionSettings(): Promise<{
+    atlasDomain: string;
+    apiToken: string;
+    matchRules: ContentMatchRule[];
+}> {
+    return getContentStoredOptions();
 }
