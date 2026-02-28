@@ -49,20 +49,6 @@ class SettingsServicesController extends Controller
         ]);
     }
 
-    public function extensionPing(Request $request, ExtensionApiKeyService $extensionApiKey): JsonResponse
-    {
-        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
-        if ($apiKey === '' || ! $extensionApiKey->matches($apiKey)) {
-            return response()->json([
-                'message' => 'Invalid extension API key.',
-            ], 401);
-        }
-
-        return response()->json([
-            'ok' => true,
-        ]);
-    }
-
     public function spotifyRedirect(Request $request, SpotifyOAuthService $spotify): RedirectResponse
     {
         try {
