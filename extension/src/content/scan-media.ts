@@ -1,5 +1,5 @@
 import type { MediaCandidate } from './types';
-import { urlMatchesAnyRule, type UrlMatchRule } from '../match-rules';
+import { urlMatchesAnyRule, type UrlMatchRule } from './match-rules';
 
 function isMediaElement(element: Element): element is HTMLImageElement | HTMLVideoElement {
     return element instanceof HTMLImageElement || element instanceof HTMLVideoElement;
