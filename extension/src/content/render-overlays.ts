@@ -35,6 +35,16 @@ const REACTION_WIDGET_ITEMS: ReactionWidgetItem[] = [
     },
 ];
 
+const BADGE_ICON_BY_REACTION_KEY: Record<string, string> = {
+    love: REACTION_WIDGET_ITEMS[0].svg,
+    like: REACTION_WIDGET_ITEMS[1].svg,
+    dislike: REACTION_WIDGET_ITEMS[2].svg,
+    funny: REACTION_WIDGET_ITEMS[3].svg,
+    blacklisted: '<circle cx="12" cy="12" r="10"></circle><line x1="4.93" x2="19.07" y1="4.93" y2="19.07"></line>',
+    downloaded: '<path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path>',
+    default: '<circle cx="12" cy="12" r="4"></circle>',
+};
+
 function reactionColor(match: ExtensionMatchResult): string {
     if (match.reaction === 'love') {
         return '#ef4444';
@@ -58,27 +68,27 @@ function reactionColor(match: ExtensionMatchResult): string {
     return '#64748b';
 }
 
-function reactionIcon(match: ExtensionMatchResult): string {
+function reactionIconSvg(match: ExtensionMatchResult): string {
     if (match.reaction === 'love') {
-        return '♥';
+        return BADGE_ICON_BY_REACTION_KEY.love;
     }
     if (match.reaction === 'like') {
-        return '👍';
+        return BADGE_ICON_BY_REACTION_KEY.like;
     }
     if (match.reaction === 'dislike') {
-        return '👎';
+        return BADGE_ICON_BY_REACTION_KEY.dislike;
     }
     if (match.reaction === 'funny') {
-        return '😄';
+        return BADGE_ICON_BY_REACTION_KEY.funny;
     }
     if (match.blacklisted_at) {
-        return '⛔';
+        return BADGE_ICON_BY_REACTION_KEY.blacklisted;
     }
     if (match.downloaded_at) {
-        return '⬇';
+        return BADGE_ICON_BY_REACTION_KEY.downloaded;
     }
 
-    return '●';
+    return BADGE_ICON_BY_REACTION_KEY.default;
 }
 
 function buildTitle(match: ExtensionMatchResult): string {
@@ -258,7 +268,7 @@ function applyOverlay(candidate: MediaCandidate, match: ExtensionMatchResult): v
     wrapper.style.boxShadow = `inset 0 0 0 4px ${color}`;
 
     const badge = ensureBadge(wrapper);
-    badge.textContent = reactionIcon(match);
+    badge.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${reactionIconSvg(match)}</svg>`;
     badge.title = buildTitle(match);
 
     candidate.element.style.opacity = '0.3';
