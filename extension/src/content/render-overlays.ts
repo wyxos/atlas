@@ -221,6 +221,18 @@ function ensureStandaloneReactionBar(wrapper: HTMLDivElement): HTMLDivElement {
     return bar;
 }
 
+function clearStandaloneReactionBar(candidate: MediaCandidate): void {
+    const wrapper = candidate.element.parentElement;
+    if (!(wrapper instanceof HTMLDivElement) || wrapper.getAttribute(WRAPPER_ATTR) !== '1') {
+        return;
+    }
+
+    const reactionBar = wrapper.querySelector<HTMLElement>(`[${REACTION_BAR_ATTR}="1"]`);
+    if (reactionBar) {
+        reactionBar.remove();
+    }
+}
+
 function clearOverlay(candidate: MediaCandidate): void {
     if (candidate.element.getAttribute(APPLIED_ATTR) !== '1') {
         return;
@@ -236,11 +248,6 @@ function clearOverlay(candidate: MediaCandidate): void {
         if (badge) {
             badge.remove();
         }
-
-        const reactionBar = wrapper.querySelector<HTMLElement>(`[${REACTION_BAR_ATTR}="1"]`);
-        if (reactionBar) {
-            reactionBar.remove();
-        }
     }
 }
 
@@ -254,17 +261,19 @@ function applyOverlay(candidate: MediaCandidate, match: ExtensionMatchResult): v
     badge.textContent = reactionIcon(match);
     badge.title = buildTitle(match);
 
-    const isStandalone = candidate.anchorUrl === null;
-    if (isStandalone) {
-        ensureStandaloneReactionBar(wrapper);
-    }
-
     candidate.element.style.opacity = '0.3';
     candidate.element.setAttribute(APPLIED_ATTR, '1');
 }
 
 export function renderMatches(candidates: MediaCandidate[], matchesById: Map<string, ExtensionMatchResult>): void {
     for (const candidate of candidates) {
+        const isStandalone = candidate.anchorUrl === null;
+        if (isStandalone) {
+            ensureStandaloneReactionBar(ensureWrapper(candidate.element));
+        } else {
+            clearStandaloneReactionBar(candidate);
+        }
+
         const match = matchesById.get(candidate.id);
         if (!match || !match.exists) {
             clearOverlay(candidate);

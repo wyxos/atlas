@@ -42,6 +42,9 @@ async function runScanAndRender(): Promise<void> {
                 continue;
             }
 
+            // Render standalone hover widgets immediately, independent of match API success.
+            renderMatches(unsentCandidates, new Map());
+
             const payload = unsentCandidates.flatMap((candidate) => {
                 const entries = [];
 
