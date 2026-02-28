@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\Local\LocalFetchParams;
 use Illuminate\Support\Facades\Cache;
 
 class LocalService extends BaseService
@@ -24,126 +25,35 @@ class LocalService extends BaseService
      */
     public function fetch(array $params = []): array
     {
-        $this->params = $params;
-
-        $page = (int) ($params['page'] ?? 1);
-        $limit = (int) ($params['limit'] ?? 20);
-        $source = $params['source'] ?? null; // Filter by source if provided
-        $downloaded = $params['downloaded'] ?? 'any';
-        $blacklisted = $params['blacklisted'] ?? 'any';
-        $blacklistType = is_string($params['blacklist_type'] ?? null) ? (string) $params['blacklist_type'] : 'any';
-        $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'downloaded_at';
-        $fileTypeRaw = $params['file_type'] ?? ['all'];
-        $fileTypes = [];
-        if (is_array($fileTypeRaw)) {
-            $fileTypes = array_values(array_filter(array_map(fn ($v) => is_string($v) ? $v : (is_numeric($v) ? (string) $v : ''), $fileTypeRaw)));
-        } elseif (is_string($fileTypeRaw) && $fileTypeRaw !== '') {
-            $fileTypes = [$fileTypeRaw];
-        }
-        $fileTypes = array_values(array_unique(array_filter($fileTypes)));
-        $allowedFileTypes = ['all', 'image', 'video', 'audio', 'other'];
-        $fileTypes = array_values(array_filter($fileTypes, fn ($t) => in_array($t, $allowedFileTypes, true)));
-        if ($fileTypes === []) {
-            $fileTypes = ['all'];
-        }
-        // "All" is exclusive.
-        if (in_array('all', $fileTypes, true)) {
-            $fileTypes = ['all'];
-        }
-        $seedRaw = $params['seed'] ?? null;
-        $seed = is_numeric($seedRaw) ? (int) $seedRaw : null;
-        $hasMaxPreviewedParam = array_key_exists('max_previewed_count', $params);
-        $maxPreviewedRaw = $params['max_previewed_count'] ?? null;
-        $maxPreviewed = is_numeric($maxPreviewedRaw) ? (int) $maxPreviewedRaw : null;
-        // Allow 0 (fresh queue); negative values disable the filter.
-        if (is_int($maxPreviewed) && $maxPreviewed < 0) {
-            $maxPreviewed = null;
-        }
-        $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
-        $autoDisliked = is_string($params['auto_disliked'] ?? null) ? (string) $params['auto_disliked'] : 'any';
-        $moderationUnion = is_string($params['moderation_union'] ?? null) ? (string) $params['moderation_union'] : 'none';
-        $localPreset = is_string($params['local_preset'] ?? null) ? (string) $params['local_preset'] : '';
-        $reaction = $params['reaction'] ?? null;
-        $includeTotal = filter_var($params['include_total'] ?? null, FILTER_VALIDATE_BOOLEAN);
-
-        // Filter by current user's reaction types (optional)
-        $allTypes = ['love', 'like', 'dislike', 'funny'];
-        $reactionTypes = null;
-        if (is_array($reaction)) {
-            $reactionTypes = array_values(array_unique(array_filter(array_map(fn ($v) => is_string($v) ? $v : (is_numeric($v) ? (string) $v : ''), $reaction))));
-        } elseif (is_string($reaction) && $reaction !== '') {
-            $reactionTypes = [$reaction];
+        $context = LocalFetchParams::normalize($params);
+        $this->params = $context['params'];
+        if ($context['shouldReturnEmpty']) {
+            return LocalFetchParams::emptyResponse();
         }
 
-        if ($reactionTypes !== null) {
-            $reactionTypes = array_values(array_filter($reactionTypes, fn ($t) => in_array($t, $allTypes, true)));
-
-            if (count($reactionTypes) === 0) {
-                return [
-                    'files' => [],
-                    'metadata' => [
-                        'nextCursor' => null,
-                        'total' => 0,
-                    ],
-                ];
-            }
-
-            // When all reaction types are selected (default), treat this as "no filter".
-            if (count($reactionTypes) === count($allTypes)) {
-                $reactionTypes = $allTypes;
-            }
-        }
-
-        if ($reactionMode === 'types' && ($reactionTypes === null || count($reactionTypes) === 0)) {
-            return [
-                'files' => [],
-                'metadata' => [
-                    'nextCursor' => null,
-                    'total' => 0,
-                ],
-            ];
-        }
-
-        $isLegacyDislikedBlacklistedAutoIntersection = $reactionMode === 'types'
-            && is_array($reactionTypes)
-            && in_array('dislike', $reactionTypes, true)
-            && $blacklisted === 'yes'
-            && $blacklistType === 'auto';
-
-        if (
-            $moderationUnion === 'none'
-            && ($localPreset === 'disliked_blacklisted_auto' || $isLegacyDislikedBlacklistedAutoIntersection)
-        ) {
-            // Back-compat: old tabs/URLs stored this view as an intersection.
-            // Normalize to OR semantics so users don't need to reset filters manually.
-            $moderationUnion = self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO;
-            $this->params['moderation_union'] = $moderationUnion;
-        }
-
-        // "Reacted" is defined as positive reactions only (love/like/funny), excluding dislikes.
-        // Keep it as a distinct mode so we can use a single Typesense filter field for pagination stability.
-
-        // Default preview cap:
-        // Most presets do not cap previewed_count (null). Disliked/Blacklisted use a bounded cap.
-        if (! $hasMaxPreviewedParam) {
-            $isDislikedView = $reactionMode === 'types'
-                && is_array($reactionTypes)
-                && in_array('dislike', $reactionTypes, true);
-
-            $isBlacklistedView = $blacklisted === 'yes'
-                || in_array($blacklistType, ['manual', 'auto'], true);
-
-            $isUnionModeratedView = $moderationUnion === self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO;
-            $maxPreviewed = ($isDislikedView || $isBlacklistedView || $isUnionModeratedView) ? 2 : null;
-            $this->params['max_previewed_count'] = $maxPreviewed;
-        }
+        $page = $context['page'];
+        $limit = $context['limit'];
+        $source = $context['source'];
+        $downloaded = $context['downloaded'];
+        $blacklisted = $context['blacklisted'];
+        $blacklistType = $context['blacklistType'];
+        $sort = $context['sort'];
+        $fileTypes = $context['fileTypes'];
+        $seed = $context['seed'];
+        $maxPreviewed = $context['maxPreviewed'];
+        $reactionMode = $context['reactionMode'];
+        $autoDisliked = $context['autoDisliked'];
+        $moderationUnion = $context['moderationUnion'];
+        $reactionTypes = $context['reactionTypes'];
+        $includeTotal = $context['includeTotal'];
+        $allTypes = $context['allTypes'];
 
         if ($moderationUnion === self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO) {
             return $this->fetchAutoDislikedOrAutoBlacklisted(
                 page: $page,
                 limit: $limit,
-                source: is_string($source) ? $source : null,
-                downloaded: is_string($downloaded) ? $downloaded : 'any',
+                source: $source,
+                downloaded: $downloaded,
                 sort: $sort,
                 seed: $seed,
                 maxPreviewed: $maxPreviewed,
@@ -163,9 +73,9 @@ class LocalService extends BaseService
             return $this->fetchByReactionTimestamp(
                 page: $page,
                 limit: $limit,
-                source: is_string($source) ? $source : null,
-                downloaded: is_string($downloaded) ? $downloaded : 'any',
-                blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
+                source: $source,
+                downloaded: $downloaded,
+                blacklisted: $blacklisted,
                 blacklistType: $blacklistType,
                 maxPreviewed: $maxPreviewed,
                 autoDisliked: $autoDisliked,
@@ -181,9 +91,9 @@ class LocalService extends BaseService
             return $this->fetchByReactionTimestamp(
                 page: $page,
                 limit: $limit,
-                source: is_string($source) ? $source : null,
-                downloaded: is_string($downloaded) ? $downloaded : 'any',
-                blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
+                source: $source,
+                downloaded: $downloaded,
+                blacklisted: $blacklisted,
                 blacklistType: $blacklistType,
                 maxPreviewed: $maxPreviewed,
                 autoDisliked: $autoDisliked,
@@ -201,9 +111,9 @@ class LocalService extends BaseService
             return $this->fetchUsingDatabase(
                 page: $page,
                 limit: $limit,
-                source: is_string($source) ? $source : null,
-                downloaded: is_string($downloaded) ? $downloaded : 'any',
-                blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
+                source: $source,
+                downloaded: $downloaded,
+                blacklisted: $blacklisted,
                 blacklistType: $blacklistType,
                 autoDisliked: $autoDisliked,
                 sort: $sort,
