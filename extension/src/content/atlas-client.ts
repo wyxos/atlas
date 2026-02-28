@@ -1,5 +1,5 @@
 import { getContentStoredOptions } from './storage';
-import type { ContentMatchRule } from './storage';
+import type { UrlMatchRule } from '../match-rules';
 import type { ExtensionMatchResult, MediaCandidatePayload } from './types';
 
 export async function fetchExtensionMatches(
@@ -37,7 +37,7 @@ export async function fetchExtensionMatches(
 export async function loadContentConnectionSettings(): Promise<{
     atlasDomain: string;
     apiToken: string;
-    matchRules: ContentMatchRule[];
+    matchRules: UrlMatchRule[];
 }> {
     return getContentStoredOptions();
 }

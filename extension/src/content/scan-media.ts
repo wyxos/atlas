@@ -1,5 +1,5 @@
 import type { MediaCandidate } from './types';
-import type { ContentMatchRule } from './storage';
+import { urlMatchesAnyRule, type UrlMatchRule } from '../match-rules';
 
 function isMediaElement(element: Element): element is HTMLImageElement | HTMLVideoElement {
     return element instanceof HTMLImageElement || element instanceof HTMLVideoElement;
@@ -26,54 +26,26 @@ function normalizeUrl(value: string | null | undefined): string | null {
     return trimmed.replace(/#.*$/, '');
 }
 
-function isHttpUrl(url: string | null): url is string {
-    return typeof url === 'string' && /^https?:\/\//i.test(url);
-}
-
-function hostMatchesDomain(hostname: string, domain: string): boolean {
-    const normalizedHost = hostname.toLowerCase();
-    const normalizedDomain = domain.toLowerCase();
-
-    return normalizedHost === normalizedDomain || normalizedHost.endsWith(`.${normalizedDomain}`);
-}
-
-function urlMatchesRules(url: string | null, rules: ContentMatchRule[]): boolean {
-    if (!isHttpUrl(url)) {
+function isElementVisibleInViewport(element: Element): boolean {
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
         return false;
     }
 
-    if (rules.length === 0) {
-        return true;
-    }
-
-    let parsed: URL;
-    try {
-        parsed = new URL(url);
-    } catch {
+    if (rect.bottom < 0 || rect.right < 0 || rect.top > window.innerHeight || rect.left > window.innerWidth) {
         return false;
     }
 
-    const matchedDomainRules = rules.filter((rule) => hostMatchesDomain(parsed.hostname, rule.domain));
-    if (matchedDomainRules.length === 0) {
-        return false;
-    }
+    const style = window.getComputedStyle(element);
 
-    return matchedDomainRules.some((rule) =>
-        rule.regexes.some((pattern) => {
-            try {
-                return new RegExp(pattern, 'i').test(url);
-            } catch {
-                return false;
-            }
-        }),
-    );
+    return style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0';
 }
 
 function collectAnchoredMedia(
     seen: Set<Element>,
     candidates: MediaCandidate[],
     pageUrl: string,
-    matchRules: ContentMatchRule[],
+    matchRules: UrlMatchRule[],
 ): void {
     const anchors = document.querySelectorAll('a[href]');
     for (const anchor of anchors) {
@@ -84,12 +56,15 @@ function collectAnchoredMedia(
             if (!isMediaElement(mediaElement) || seen.has(mediaElement)) {
                 continue;
             }
+            if (!isElementVisibleInViewport(mediaElement)) {
+                continue;
+            }
 
             seen.add(mediaElement);
             const mediaUrl = normalizeUrl(resolveMediaUrl(mediaElement));
-            const validMediaUrl = urlMatchesRules(mediaUrl, matchRules) ? mediaUrl : null;
-            const validAnchorUrl = urlMatchesRules(anchorUrl, matchRules) ? anchorUrl : null;
-            const validPageUrl = urlMatchesRules(pageUrl, matchRules) ? pageUrl : null;
+            const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules) ? mediaUrl : null;
+            const validAnchorUrl = urlMatchesAnyRule(anchorUrl, matchRules) ? anchorUrl : null;
+            const validPageUrl = urlMatchesAnyRule(pageUrl, matchRules) ? pageUrl : null;
 
             candidates.push({
                 element: mediaElement,
@@ -108,7 +83,7 @@ function collectStandaloneMedia(
     seen: Set<Element>,
     candidates: MediaCandidate[],
     pageUrl: string,
-    matchRules: ContentMatchRule[],
+    matchRules: UrlMatchRule[],
 ): void {
     const mediaElements = document.querySelectorAll('img,video');
     for (const mediaElement of mediaElements) {
@@ -119,11 +94,14 @@ function collectStandaloneMedia(
         if (mediaElement.closest('a[href]') !== null) {
             continue;
         }
+        if (!isElementVisibleInViewport(mediaElement)) {
+            continue;
+        }
 
         seen.add(mediaElement);
         const mediaUrl = normalizeUrl(resolveMediaUrl(mediaElement));
-        const validMediaUrl = urlMatchesRules(mediaUrl, matchRules) ? mediaUrl : null;
-        const validPageUrl = urlMatchesRules(pageUrl, matchRules) ? pageUrl : null;
+        const validMediaUrl = urlMatchesAnyRule(mediaUrl, matchRules) ? mediaUrl : null;
+        const validPageUrl = urlMatchesAnyRule(pageUrl, matchRules) ? pageUrl : null;
 
         candidates.push({
             element: mediaElement,
@@ -137,7 +115,7 @@ function collectStandaloneMedia(
     }
 }
 
-export function scanMediaCandidates(limit = 300, matchRules: ContentMatchRule[] = []): MediaCandidate[] {
+export function scanMediaCandidates(limit = 300, matchRules: UrlMatchRule[] = []): MediaCandidate[] {
     const pageUrl = normalizeUrl(window.location.href) ?? window.location.href;
     const seen = new Set<Element>();
     const candidates: MediaCandidate[] = [];

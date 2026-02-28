@@ -1,16 +1,13 @@
 /* global chrome */
-const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
+import { DEFAULT_MATCH_RULES, parseStoredMatchRules, type UrlMatchRule } from '../match-rules';
 
-export type ContentMatchRule = {
-    domain: string;
-    regexes: string[];
-};
+const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
 
 function normalizeDomain(input: string): string {
     return input.trim().replace(/\/+$/, '');
 }
 
-export function getContentStoredOptions(): Promise<{ atlasDomain: string; apiToken: string; matchRules: ContentMatchRule[] }> {
+export function getContentStoredOptions(): Promise<{ atlasDomain: string; apiToken: string; matchRules: UrlMatchRule[] }> {
     return new Promise((resolve, reject) => {
         chrome.storage.local.get(['atlasDomain', 'apiToken', 'matchRules'], (stored: Record<string, unknown>) => {
             if (chrome.runtime.lastError) {
@@ -21,40 +18,13 @@ export function getContentStoredOptions(): Promise<{ atlasDomain: string; apiTok
             const storedDomain = typeof stored.atlasDomain === 'string' ? normalizeDomain(stored.atlasDomain) : '';
             const atlasDomain = storedDomain !== '' ? storedDomain : DEFAULT_ATLAS_DOMAIN;
             const apiToken = typeof stored.apiToken === 'string' ? stored.apiToken.trim() : '';
-            const matchRules = parseMatchRules(stored.matchRules);
+            const matchRules = parseStoredMatchRules(stored.matchRules);
 
-            resolve({ atlasDomain, apiToken, matchRules });
+            resolve({
+                atlasDomain,
+                apiToken,
+                matchRules: matchRules.length > 0 ? matchRules : DEFAULT_MATCH_RULES,
+            });
         });
     });
-}
-
-function parseMatchRules(value: unknown): ContentMatchRule[] {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-
-    return value
-        .map((entry): ContentMatchRule | null => {
-            if (typeof entry !== 'object' || entry === null) {
-                return null;
-            }
-
-            const domain = typeof (entry as { domain?: unknown }).domain === 'string'
-                ? ((entry as { domain: string }).domain).trim().toLowerCase()
-                : '';
-
-            const regexes = Array.isArray((entry as { regexes?: unknown }).regexes)
-                ? ((entry as { regexes: unknown[] }).regexes)
-                    .filter((regex): regex is string => typeof regex === 'string')
-                    .map((regex) => regex.trim())
-                    .filter((regex) => regex !== '')
-                : [];
-
-            if (domain === '' || regexes.length === 0) {
-                return null;
-            }
-
-            return { domain, regexes };
-        })
-        .filter((entry): entry is ContentMatchRule => entry !== null);
 }
