@@ -8,7 +8,6 @@ declare(strict_types=1);
  * Usage:
  *   php scripts/php-max-lines.php --max=500 app routes config
  */
-
 $defaultMaxLines = 500;
 $defaultRoots = ['app', 'bootstrap', 'config', 'database', 'routes', 'tests'];
 
@@ -28,6 +27,7 @@ foreach ($args as $arg) {
         }
 
         $maxLines = $value;
+
         continue;
     }
 
