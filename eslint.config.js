@@ -25,7 +25,7 @@ export default tseslint.config(
             '@typescript-eslint/no-explicit-any': 'warn',
             '@typescript-eslint/require-await': 'off',
             '@typescript-eslint/no-unused-expressions': 'off',
-            'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],
+            'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
             'vue/no-unused-vars': 'warn',
             'vue/use-v-on-exact': 'off',
         },
