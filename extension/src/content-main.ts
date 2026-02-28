@@ -3,10 +3,8 @@ import { renderMatches } from './content/render-overlays';
 import { scanMediaCandidates } from './content/scan-media';
 
 const SCAN_LIMIT = 300;
-const RESCAN_DELAY_MS = 500;
-const FOLLOW_UP_SCAN_DELAYS_MS = [120, 700] as const;
 
-let rescanTimeoutId: number | null = null;
+let rescanQueued = false;
 let isRunning = false;
 let rerunRequested = false;
 const processedSignatures = new WeakMap<Element, string>();
@@ -81,22 +79,16 @@ async function runScanAndRender(): Promise<void> {
 }
 
 function scheduleScan(): void {
-    if (rescanTimeoutId !== null) {
-        window.clearTimeout(rescanTimeoutId);
+    if (rescanQueued) {
+        return;
     }
 
-    rescanTimeoutId = window.setTimeout(() => {
-        rescanTimeoutId = null;
+    rescanQueued = true;
+    window.requestAnimationFrame(() => {
+        rescanQueued = false;
         void runScanAndRender();
-    }, RESCAN_DELAY_MS);
-}
-
-function scheduleFollowUpScans(): void {
-    for (const delay of FOLLOW_UP_SCAN_DELAYS_MS) {
-        window.setTimeout(() => {
-            void runScanAndRender();
-        }, delay);
     }
+    );
 }
 
 function installMutationObserver(): void {
@@ -119,18 +111,7 @@ function installViewportListeners(): void {
 }
 
 function installInteractionListeners(): void {
-    document.addEventListener('pointerup', (event) => {
-        const target = event.target;
-        if (!(target instanceof Element)) {
-            return;
-        }
-
-        if (target.closest('img,video,a[href]') !== null) {
-            scheduleFollowUpScans();
-        }
-    }, { passive: true });
-
-    document.addEventListener('mouseover', (event) => {
+    document.addEventListener('pointerover', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) {
             return;
