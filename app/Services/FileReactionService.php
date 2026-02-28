@@ -90,8 +90,7 @@ class FileReactionService
         ?Reaction $existingReaction,
         string $type,
         bool $deferHeavySideEffects = false,
-    ): Reaction
-    {
+    ): Reaction {
         $metrics = app(MetricsService::class);
         $oldType = $existingReaction?->type;
         $wasBlacklisted = $file->blacklisted_at !== null;

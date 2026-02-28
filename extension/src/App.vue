@@ -8,6 +8,8 @@ const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSI
 
 const statusLabel = ref('Checking');
 const statusDetail = ref('Validating extension API access.');
+const reverbStatusLabel = ref('Checking');
+const reverbStatusDetail = ref('Checking Reverb connection.');
 
 function openOptionsPage(): void {
     chrome.runtime.openOptionsPage(() => {
@@ -21,6 +23,8 @@ onMounted(() => {
     void resolveApiConnectionStatus().then((status) => {
         statusLabel.value = status.label;
         statusDetail.value = status.detail;
+        reverbStatusLabel.value = status.reverbLabel;
+        reverbStatusDetail.value = status.reverbDetail;
     });
 });
 </script>
@@ -39,6 +43,11 @@ onMounted(() => {
             </p>
             <p class="text-sm text-twilight-indigo-200">
                 {{ statusDetail }}
+            </p>
+            <p class="text-sm text-twilight-indigo-200">
+                Reverb:
+                <span class="font-medium text-smart-blue-200">{{ reverbStatusLabel }}</span>
+                · {{ reverbStatusDetail }}
             </p>
 
             <button
