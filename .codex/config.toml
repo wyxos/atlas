@@ -21,3 +21,43 @@ config_file = "agents/monitor.toml"
 [agents.browser_debugger]
 description = "Manual UI verifier for browser workflows and end-to-end behavior checks."
 config_file = "agents/browser-debugger.toml"
+
+[agents.supervisor]
+description = "Coordinator that plans execution, routes work, and synthesizes final outcome and risks."
+config_file = "agents/supervisor.toml"
+
+[agents.implementer]
+description = "Primary code-change agent for focused implementation tasks."
+config_file = "agents/implementer.toml"
+
+[agents.validator]
+description = "Validation agent for lint/typecheck/tests and actionable failure reporting."
+config_file = "agents/validator.toml"
+
+[agents.risk_reviewer]
+description = "Reviewer focused on regressions, security, data integrity, and deploy risk."
+config_file = "agents/risk-reviewer.toml"
+
+[agents.test_planner]
+description = "Maps changed files to the smallest relevant unit/integration/e2e test set."
+config_file = "agents/test-planner.toml"
+
+[agents.release_manager]
+description = "Release/deploy checklist owner for artifacts, preflight checks, and rollback notes."
+config_file = "agents/release-manager.toml"
+
+[agents.migration_guard]
+description = "Database migration safety reviewer, especially for large tables and online DDL constraints."
+config_file = "agents/migration-guard.toml"
+
+[agents.performance_checker]
+description = "Performance-focused reviewer for query count, hot paths, and bundle/runtime impact."
+config_file = "agents/performance-checker.toml"
+
+[agents.contract_checker]
+description = "Checks backend/frontend response contract alignment and API shape consistency."
+config_file = "agents/contract-checker.toml"
+
+[agents.docs_maintainer]
+description = "Updates AGENTS/runbook guidance with durable workflow learnings and gotchas."
+config_file = "agents/docs-maintainer.toml"

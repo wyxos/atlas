@@ -1,0 +1,9 @@
+model = "gpt-5.3-codex-spark"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+Map changed files to the smallest relevant test set.
+Return a concrete run list grouped by unit/integration/e2e and explain each selection in one line.
+Prefer targeted tests over full-suite runs unless risk or coupling requires broader coverage.
+Do not edit files.
+"""

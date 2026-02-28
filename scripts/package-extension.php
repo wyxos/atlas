@@ -32,6 +32,39 @@ function incrementSemver(string $currentVersion, string $bumpType): ?string
     };
 }
 
+function clearDirectory(string $directory, ?callable $keepPredicate = null): bool
+{
+    $entries = scandir($directory);
+    if ($entries === false) {
+        return false;
+    }
+
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+
+        $absolutePath = $directory.DIRECTORY_SEPARATOR.$entry;
+        if ($keepPredicate !== null && $keepPredicate($absolutePath, $entry) === true) {
+            continue;
+        }
+
+        if (is_dir($absolutePath)) {
+            if (! clearDirectory($absolutePath) || ! rmdir($absolutePath)) {
+                return false;
+            }
+
+            continue;
+        }
+
+        if (! unlink($absolutePath)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 $projectRoot = dirname(__DIR__);
 $extensionRoot = $projectRoot.'/extension';
 $distDirectory = $extensionRoot.'/dist';
@@ -60,10 +93,11 @@ if ($currentVersion === '') {
     exit(1);
 }
 
-$options = getopt('', ['version::', 'bump::', 'output-dir::']);
+$options = getopt('', ['version::', 'bump::', 'output-dir::', 'extract-dir::']);
 $requestedVersion = isset($options['version']) ? trim((string) $options['version']) : null;
 $requestedBump = isset($options['bump']) ? trim((string) $options['bump']) : null;
 $requestedOutputDirectory = isset($options['output-dir']) ? trim((string) $options['output-dir']) : null;
+$requestedExtractDirectory = isset($options['extract-dir']) ? trim((string) $options['extract-dir']) : null;
 
 if ($requestedVersion !== null && $requestedVersion !== '' && parseSemver($requestedVersion) === null) {
     fwrite(STDERR, "Invalid --version value '{$requestedVersion}'. Expected SemVer format like 1.2.3.\n");
@@ -77,6 +111,11 @@ if ($requestedBump !== null && $requestedBump !== '' && ! in_array($requestedBum
 
 if ($requestedOutputDirectory !== null && $requestedOutputDirectory === '') {
     fwrite(STDERR, "Invalid --output-dir value ''. Provide a valid directory path.\n");
+    exit(1);
+}
+
+if ($requestedExtractDirectory !== null && $requestedExtractDirectory === '') {
+    fwrite(STDERR, "Invalid --extract-dir value ''. Provide a valid directory path.\n");
     exit(1);
 }
 
@@ -154,3 +193,35 @@ if (! copy($versionedArchive, $latestArchive)) {
 
 fwrite(STDOUT, "Created extension package: {$versionedArchive}\n");
 fwrite(STDOUT, "Updated latest package: {$latestArchive}\n");
+
+if ($requestedExtractDirectory !== null && $requestedExtractDirectory !== '') {
+    if (! is_dir($requestedExtractDirectory) && ! mkdir($requestedExtractDirectory, 0775, true) && ! is_dir($requestedExtractDirectory)) {
+        fwrite(STDERR, "Failed to create extract directory: {$requestedExtractDirectory}\n");
+        exit(1);
+    }
+
+    $keepPredicate = null;
+    if (realpath($requestedExtractDirectory) === realpath($downloadsDirectory)) {
+        $keepPredicate = static fn (string $absolutePath, string $entry): bool => is_file($absolutePath) && preg_match('/^atlas-extension(?:-\d+\.\d+\.\d+)?\.zip$/', $entry) === 1;
+    }
+
+    if (! clearDirectory($requestedExtractDirectory, $keepPredicate)) {
+        fwrite(STDERR, "Failed to clear extract directory: {$requestedExtractDirectory}\n");
+        exit(1);
+    }
+
+    $extractZip = new ZipArchive;
+    if ($extractZip->open($latestArchive) !== true) {
+        fwrite(STDERR, "Unable to open archive for extraction: {$latestArchive}\n");
+        exit(1);
+    }
+
+    if (! $extractZip->extractTo($requestedExtractDirectory)) {
+        $extractZip->close();
+        fwrite(STDERR, "Failed to extract archive to: {$requestedExtractDirectory}\n");
+        exit(1);
+    }
+
+    $extractZip->close();
+    fwrite(STDOUT, "Extracted latest package to: {$requestedExtractDirectory}\n");
+}

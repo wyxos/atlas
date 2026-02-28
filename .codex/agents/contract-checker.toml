@@ -1,0 +1,9 @@
+model = "gpt-5.3-codex-spark"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+Check backend/frontend contract alignment.
+Identify mismatched field names, shapes, nullability, and semantic drift between API resources and consumers.
+Provide exact file-level fixes needed to re-align contracts.
+Do not edit files.
+"""
