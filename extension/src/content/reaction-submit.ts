@@ -224,8 +224,13 @@ export async function submitBadgeReaction(
     }
 }
 
-export async function fetchTransferStatus(transferId: number): Promise<TransferStatusResult> {
-    if (!Number.isFinite(transferId) || transferId <= 0) {
+export async function fetchTransferStatus(input: { transferId?: number | null; fileId?: number | null }): Promise<TransferStatusResult> {
+    const transferId = typeof input.transferId === 'number' ? input.transferId : null;
+    const fileId = typeof input.fileId === 'number' ? input.fileId : null;
+    const hasTransferId = transferId !== null && Number.isFinite(transferId) && transferId > 0;
+    const hasFileId = fileId !== null && Number.isFinite(fileId) && fileId > 0;
+
+    if (!hasTransferId && !hasFileId) {
         return {
             ok: false,
             transferId: null,
@@ -258,7 +263,8 @@ export async function fetchTransferStatus(transferId: number): Promise<TransferS
                 'X-Atlas-Api-Key': stored.apiToken,
             },
             body: JSON.stringify({
-                transfer_id: transferId,
+                transfer_id: hasTransferId ? transferId : null,
+                file_id: hasFileId ? fileId : null,
             }),
         });
 
