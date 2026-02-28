@@ -123,6 +123,7 @@ const AtlasReactionBadge = defineComponent({
         const transferStatus = ref<string | null>(null);
         const trackedFileId = ref<number | null>(null);
         const trackedTransferId = ref<number | null>(null);
+        const hasSeenActiveTransfer = ref(false);
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
@@ -188,6 +189,9 @@ const AtlasReactionBadge = defineComponent({
                 }
                 if (event.status !== null) {
                     transferStatus.value = event.status;
+                    if (!isTerminalStatus(event.status)) {
+                        hasSeenActiveTransfer.value = true;
+                    }
                 }
 
                 if (event.status !== null && isTerminalStatus(event.status)) {
@@ -207,6 +211,7 @@ const AtlasReactionBadge = defineComponent({
         function handleTerminalUnlock(): void {
             isDownloadLocked.value = false;
             submittingReactionType.value = null;
+            hasSeenActiveTransfer.value = false;
             stopFallbackPolling();
         }
 
@@ -247,9 +252,12 @@ const AtlasReactionBadge = defineComponent({
                     }
                     if (statusResult.status !== null) {
                         transferStatus.value = statusResult.status;
+                        if (!isTerminalStatus(statusResult.status)) {
+                            hasSeenActiveTransfer.value = true;
+                        }
                     }
 
-                    if (statusResult.downloadedAt !== null || statusResult.blacklistedAt !== null) {
+                    if ((statusResult.downloadedAt !== null || statusResult.blacklistedAt !== null) && hasSeenActiveTransfer.value) {
                         matchResult.value = {
                             ...matchResult.value,
                             downloadedAt: statusResult.downloadedAt ?? matchResult.value.downloadedAt,
@@ -317,6 +325,7 @@ const AtlasReactionBadge = defineComponent({
             }
 
             submittingReactionType.value = type;
+            hasSeenActiveTransfer.value = false;
 
             try {
                 const result = await submitBadgeReaction(props.media, type);
@@ -333,6 +342,7 @@ const AtlasReactionBadge = defineComponent({
                 trackedTransferId.value = result.downloadTransferId;
                 transferStatus.value = result.downloadStatus;
                 progressPercent.value = result.downloadProgressPercent;
+                hasSeenActiveTransfer.value = result.downloadStatus !== null && !isTerminalStatus(result.downloadStatus);
 
                 if (result.downloadRequested) {
                     isDownloadLocked.value = true;

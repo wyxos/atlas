@@ -27,7 +27,7 @@ class FileReactionService
             // No-op: keep the existing reaction.
             if ($type !== 'dislike') {
                 if ($deferHeavySideEffects) {
-                    DownloadFile::dispatchAfterResponse($file->id);
+                    DownloadFile::dispatchAfterResponse($file->id, true);
                 } else {
                     DownloadFile::dispatch($file->id);
                 }
@@ -125,7 +125,7 @@ class FileReactionService
 
         if ($type !== 'dislike') {
             if ($deferHeavySideEffects) {
-                DownloadFile::dispatchAfterResponse($file->id);
+                DownloadFile::dispatchAfterResponse($file->id, true);
             } else {
                 DownloadFile::dispatch($file->id);
             }
