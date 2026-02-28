@@ -74,6 +74,47 @@ function runGitCommand(string $projectRoot, string $command, ?array &$output = n
     return $exitCode;
 }
 
+function hasExtensionChanges(string $projectRoot): bool
+{
+    $gitOutput = [];
+    if (runGitCommand($projectRoot, 'rev-parse --is-inside-work-tree', $gitOutput) !== 0) {
+        return true;
+    }
+
+    $commands = [
+        'diff-tree --no-commit-id --name-only -r HEAD',
+        'diff --name-only',
+        'diff --cached --name-only',
+    ];
+
+    $files = [];
+    foreach ($commands as $command) {
+        $commandOutput = [];
+        if (runGitCommand($projectRoot, $command, $commandOutput) !== 0) {
+            continue;
+        }
+
+        foreach ($commandOutput as $path) {
+            $path = trim((string) $path);
+            if ($path !== '') {
+                $files[$path] = true;
+            }
+        }
+    }
+
+    if ($files === []) {
+        return false;
+    }
+
+    foreach (array_keys($files) as $path) {
+        if (str_starts_with($path, 'extension/')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 $projectRoot = dirname(__DIR__);
 $extensionRoot = $projectRoot.'/extension';
 $distDirectory = $extensionRoot.'/dist';
@@ -102,9 +143,10 @@ if ($currentVersion === '') {
     exit(1);
 }
 
-$options = getopt('', ['version::', 'bump::', 'output-dir::', 'extract-dir::']);
+$options = getopt('', ['version::', 'bump::', 'bump-if-extension-changed', 'output-dir::', 'extract-dir::']);
 $requestedVersion = isset($options['version']) ? trim((string) $options['version']) : null;
 $requestedBump = isset($options['bump']) ? trim((string) $options['bump']) : null;
+$bumpIfExtensionChanged = array_key_exists('bump-if-extension-changed', $options);
 $requestedOutputDirectory = isset($options['output-dir']) ? trim((string) $options['output-dir']) : null;
 $requestedExtractDirectory = isset($options['extract-dir']) ? trim((string) $options['extract-dir']) : null;
 
@@ -133,13 +175,17 @@ $version = $currentVersion;
 if ($requestedVersion !== null && $requestedVersion !== '') {
     $version = $requestedVersion;
 } elseif ($requestedBump !== null && $requestedBump !== '') {
-    $nextVersion = incrementSemver($currentVersion, $requestedBump);
-    if ($nextVersion === null) {
-        fwrite(STDERR, "Unable to bump version '{$currentVersion}'. Expected SemVer format like 1.2.3.\n");
-        exit(1);
-    }
+    if ($bumpIfExtensionChanged && ! hasExtensionChanges($projectRoot)) {
+        fwrite(STDOUT, "Skipped extension version bump ({$requestedBump}); no extension changes detected.\n");
+    } else {
+        $nextVersion = incrementSemver($currentVersion, $requestedBump);
+        if ($nextVersion === null) {
+            fwrite(STDERR, "Unable to bump version '{$currentVersion}'. Expected SemVer format like 1.2.3.\n");
+            exit(1);
+        }
 
-    $version = $nextVersion;
+        $version = $nextVersion;
+    }
 }
 
 if ($version !== $currentVersion) {
