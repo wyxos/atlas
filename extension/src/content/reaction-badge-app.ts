@@ -228,50 +228,38 @@ const AtlasReactionBadge = defineComponent({
                 }
 
                 const transferId = trackedTransferId.value;
-                if (transferId !== null) {
-                    void fetchTransferStatus(transferId).then((statusResult) => {
-                        if (!isActive || !statusResult.ok) {
-                            return;
-                        }
-
-                        if (statusResult.fileId !== null) {
-                            trackedFileId.value = statusResult.fileId;
-                        }
-                        if (statusResult.transferId !== null) {
-                            trackedTransferId.value = statusResult.transferId;
-                        }
-                        if (statusResult.progressPercent !== null) {
-                            progressPercent.value = Math.max(0, Math.min(100, Math.round(statusResult.progressPercent)));
-                        }
-                        if (statusResult.status !== null) {
-                            transferStatus.value = statusResult.status;
-                        }
-
-                        if (statusResult.downloadedAt !== null || statusResult.blacklistedAt !== null) {
-                            matchResult.value = {
-                                ...matchResult.value,
-                                downloadedAt: statusResult.downloadedAt ?? matchResult.value.downloadedAt,
-                                blacklistedAt: statusResult.blacklistedAt ?? matchResult.value.blacklistedAt,
-                            };
-                            handleTerminalUnlock();
-                            return;
-                        }
-
-                        if (statusResult.status !== null && isTerminalStatus(statusResult.status)) {
-                            handleTerminalUnlock();
-                        }
-                    });
-
-                    return;
-                }
-
-                void enqueueReactionCheck(resolveMediaUrl(props.media)).then((result) => {
-                    if (!isActive) {
+                void fetchTransferStatus({
+                    transferId,
+                    fileId: trackedFileId.value,
+                }).then((statusResult) => {
+                    if (!isActive || !statusResult.ok) {
                         return;
                     }
 
-                    matchResult.value = result;
-                    if (result.downloadedAt !== null || result.blacklistedAt !== null) {
+                    if (statusResult.fileId !== null) {
+                        trackedFileId.value = statusResult.fileId;
+                    }
+                    if (statusResult.transferId !== null) {
+                        trackedTransferId.value = statusResult.transferId;
+                    }
+                    if (statusResult.progressPercent !== null) {
+                        progressPercent.value = Math.max(0, Math.min(100, Math.round(statusResult.progressPercent)));
+                    }
+                    if (statusResult.status !== null) {
+                        transferStatus.value = statusResult.status;
+                    }
+
+                    if (statusResult.downloadedAt !== null || statusResult.blacklistedAt !== null) {
+                        matchResult.value = {
+                            ...matchResult.value,
+                            downloadedAt: statusResult.downloadedAt ?? matchResult.value.downloadedAt,
+                            blacklistedAt: statusResult.blacklistedAt ?? matchResult.value.blacklistedAt,
+                        };
+                        handleTerminalUnlock();
+                        return;
+                    }
+
+                    if (statusResult.status !== null && isTerminalStatus(statusResult.status)) {
                         handleTerminalUnlock();
                     }
                 });

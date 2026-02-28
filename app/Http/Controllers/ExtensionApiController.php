@@ -157,13 +157,21 @@ class ExtensionApiController extends Controller
         }
 
         $validated = $request->validate([
-            'transfer_id' => ['required', 'integer', 'min:1'],
+            'transfer_id' => ['nullable', 'integer', 'min:1', 'required_without:file_id'],
+            'file_id' => ['nullable', 'integer', 'min:1', 'required_without:transfer_id'],
         ]);
 
-        $transfer = DownloadTransfer::query()
+        $query = DownloadTransfer::query()
             ->with('file:id,downloaded_at,blacklisted_at')
-            ->select(['id', 'file_id', 'status', 'last_broadcast_percent'])
-            ->find($validated['transfer_id']);
+            ->select(['id', 'file_id', 'status', 'last_broadcast_percent']);
+
+        if (isset($validated['transfer_id'])) {
+            $query->whereKey($validated['transfer_id']);
+        } else {
+            $query->where('file_id', $validated['file_id'])->latest('id');
+        }
+
+        $transfer = $query->first();
 
         if (! $transfer) {
             return response()->json([
