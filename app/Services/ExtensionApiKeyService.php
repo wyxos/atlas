@@ -63,7 +63,7 @@ class ExtensionApiKeyService
         if ($storedHash !== null && $storedHash !== '') {
             return hash_equals($storedHash, hash('sha256', $rawApiKey));
         }
-        
+
         return false;
     }
 

@@ -16,7 +16,7 @@ class FileReactionService
      *
      * @return array{reaction: array{type: string}|null, changed: bool}
      */
-    public function set(File $file, User $user, string $type): array
+    public function set(File $file, User $user, string $type, bool $deferHeavySideEffects = false): array
     {
         $existingReaction = Reaction::query()
             ->where('user_id', $user->id)
@@ -26,7 +26,11 @@ class FileReactionService
         if ($existingReaction && $existingReaction->type === $type) {
             // No-op: keep the existing reaction.
             if ($type !== 'dislike') {
-                DownloadFile::dispatch($file->id);
+                if ($deferHeavySideEffects) {
+                    DownloadFile::dispatchAfterResponse($file->id);
+                } else {
+                    DownloadFile::dispatch($file->id);
+                }
             }
 
             return [
@@ -35,7 +39,7 @@ class FileReactionService
             ];
         }
 
-        $reaction = $this->applyReactionChange($file, $user, $existingReaction, $type);
+        $reaction = $this->applyReactionChange($file, $user, $existingReaction, $type, $deferHeavySideEffects);
 
         return [
             'reaction' => $reaction ? ['type' => $reaction->type] : null,
@@ -80,7 +84,13 @@ class FileReactionService
         ];
     }
 
-    private function applyReactionChange(File $file, User $user, ?Reaction $existingReaction, string $type): Reaction
+    private function applyReactionChange(
+        File $file,
+        User $user,
+        ?Reaction $existingReaction,
+        string $type,
+        bool $deferHeavySideEffects = false,
+    ): Reaction
     {
         $metrics = app(MetricsService::class);
         $oldType = $existingReaction?->type;
@@ -115,13 +125,23 @@ class FileReactionService
         );
 
         if ($type !== 'dislike') {
-            DownloadFile::dispatch($file->id);
+            if ($deferHeavySideEffects) {
+                DownloadFile::dispatchAfterResponse($file->id);
+            } else {
+                DownloadFile::dispatch($file->id);
+            }
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
 
         // Ensure the search index reflects the new reaction arrays.
-        $file->searchable();
+        if ($deferHeavySideEffects) {
+            app()->terminating(static function () use ($file): void {
+                $file->searchable();
+            });
+        } else {
+            $file->searchable();
+        }
 
         return $reaction;
     }

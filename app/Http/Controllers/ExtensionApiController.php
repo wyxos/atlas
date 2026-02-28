@@ -109,7 +109,7 @@ class ExtensionApiController extends Controller
         $previewUrl = $url;
 
         $file = $this->findOrCreateFile($url, $referrerUrl, $previewUrl);
-        $result = $fileReactionService->set($file, $user, $validated['type']);
+        $result = $fileReactionService->set($file, $user, $validated['type'], deferHeavySideEffects: true);
 
         $reaction = Reaction::query()
             ->select(['type', 'created_at'])
