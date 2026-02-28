@@ -4,7 +4,7 @@ import { Ban, Download, Heart, Loader2, Smile, ThumbsDown, ThumbsUp } from 'luci
 import { formatMatchTimestamp } from './match-timestamp';
 import { resolveMediaResolution, resolveMediaUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
-import { submitBadgeReaction } from './reaction-submit';
+import { fetchTransferStatus, submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress } from './download-progress-bus';
 
 type MountedBadge = {
@@ -126,6 +126,8 @@ const AtlasReactionBadge = defineComponent({
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
+        let fallbackPollTimer: ReturnType<typeof setInterval> | null = null;
+        let fallbackPollStopsAt = 0;
 
         const controlsDisabled = computed(() =>
             isChecking.value || submittingReactionType.value !== null || isDownloadLocked.value);
@@ -189,10 +191,91 @@ const AtlasReactionBadge = defineComponent({
                 }
 
                 if (event.status !== null && isTerminalStatus(event.status)) {
-                    isDownloadLocked.value = false;
-                    submittingReactionType.value = null;
+                    handleTerminalUnlock();
                 }
             });
+        }
+
+        function stopFallbackPolling(): void {
+            if (fallbackPollTimer !== null) {
+                clearInterval(fallbackPollTimer);
+                fallbackPollTimer = null;
+            }
+            fallbackPollStopsAt = 0;
+        }
+
+        function handleTerminalUnlock(): void {
+            isDownloadLocked.value = false;
+            submittingReactionType.value = null;
+            stopFallbackPolling();
+        }
+
+        function startFallbackPolling(): void {
+            if (fallbackPollTimer !== null) {
+                return;
+            }
+
+            fallbackPollStopsAt = Date.now() + (3 * 60 * 1000);
+            fallbackPollTimer = setInterval(() => {
+                if (!isActive || !isDownloadLocked.value) {
+                    stopFallbackPolling();
+                    return;
+                }
+
+                if (Date.now() >= fallbackPollStopsAt) {
+                    handleTerminalUnlock();
+                    return;
+                }
+
+                const transferId = trackedTransferId.value;
+                if (transferId !== null) {
+                    void fetchTransferStatus(transferId).then((statusResult) => {
+                        if (!isActive || !statusResult.ok) {
+                            return;
+                        }
+
+                        if (statusResult.fileId !== null) {
+                            trackedFileId.value = statusResult.fileId;
+                        }
+                        if (statusResult.transferId !== null) {
+                            trackedTransferId.value = statusResult.transferId;
+                        }
+                        if (statusResult.progressPercent !== null) {
+                            progressPercent.value = Math.max(0, Math.min(100, Math.round(statusResult.progressPercent)));
+                        }
+                        if (statusResult.status !== null) {
+                            transferStatus.value = statusResult.status;
+                        }
+
+                        if (statusResult.downloadedAt !== null || statusResult.blacklistedAt !== null) {
+                            matchResult.value = {
+                                ...matchResult.value,
+                                downloadedAt: statusResult.downloadedAt ?? matchResult.value.downloadedAt,
+                                blacklistedAt: statusResult.blacklistedAt ?? matchResult.value.blacklistedAt,
+                            };
+                            handleTerminalUnlock();
+                            return;
+                        }
+
+                        if (statusResult.status !== null && isTerminalStatus(statusResult.status)) {
+                            handleTerminalUnlock();
+                        }
+                    });
+
+                    return;
+                }
+
+                void enqueueReactionCheck(resolveMediaUrl(props.media)).then((result) => {
+                    if (!isActive) {
+                        return;
+                    }
+
+                    matchResult.value = result;
+                    if (result.downloadedAt !== null || result.blacklistedAt !== null) {
+                        handleTerminalUnlock();
+                    }
+                });
+            }, 1200);
         }
 
         const onMediaUpdate = (): void => {
@@ -225,6 +308,7 @@ const AtlasReactionBadge = defineComponent({
                 unsubscribeProgress();
                 unsubscribeProgress = null;
             }
+            stopFallbackPolling();
         });
 
         function iconColor(type: BadgeReactionType, activeReaction: BadgeReactionType | null): string {
@@ -265,13 +349,12 @@ const AtlasReactionBadge = defineComponent({
                 if (result.downloadRequested) {
                     isDownloadLocked.value = true;
                     ensureProgressSubscription();
+                    startFallbackPolling();
                     if (isTerminalStatus(result.downloadStatus)) {
-                        isDownloadLocked.value = false;
-                        submittingReactionType.value = null;
+                        handleTerminalUnlock();
                     }
                 } else {
-                    isDownloadLocked.value = false;
-                    submittingReactionType.value = null;
+                    handleTerminalUnlock();
                 }
             } finally {
                 if (isActive && !isDownloadLocked.value) {

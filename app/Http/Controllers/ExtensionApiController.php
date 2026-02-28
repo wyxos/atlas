@@ -146,6 +146,41 @@ class ExtensionApiController extends Controller
         ]);
     }
 
+    public function downloadStatus(
+        Request $request,
+        ExtensionApiKeyService $extensionApiKey,
+    ): JsonResponse {
+        if (! $this->resolveExtensionUser($request, $extensionApiKey)) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'transfer_id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $transfer = DownloadTransfer::query()
+            ->with('file:id,downloaded_at,blacklisted_at')
+            ->select(['id', 'file_id', 'status', 'last_broadcast_percent'])
+            ->find($validated['transfer_id']);
+
+        if (! $transfer) {
+            return response()->json([
+                'message' => 'Transfer not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'transfer_id' => $transfer->id,
+            'file_id' => $transfer->file_id,
+            'status' => $transfer->status,
+            'progress_percent' => (int) ($transfer->last_broadcast_percent ?? 0),
+            'downloaded_at' => $transfer->file?->downloaded_at?->toIso8601String(),
+            'blacklisted_at' => $transfer->file?->blacklisted_at?->toIso8601String(),
+        ]);
+    }
+
     private function resolveExtensionUser(Request $request, ExtensionApiKeyService $extensionApiKey): ?\App\Models\User
     {
         $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));

@@ -15,6 +15,16 @@ type SubmitReactionResult = {
     reverbConfig: ReverbConfig | null;
 };
 
+export type TransferStatusResult = {
+    ok: boolean;
+    transferId: number | null;
+    fileId: number | null;
+    status: string | null;
+    progressPercent: number | null;
+    downloadedAt: string | null;
+    blacklistedAt: string | null;
+};
+
 function parseReactionType(value: unknown): BadgeReactionType | null {
     if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
         return value;
@@ -210,6 +220,80 @@ export async function submitBadgeReaction(
             downloadStatus: null,
             downloadProgressPercent: null,
             reverbConfig: null,
+        };
+    }
+}
+
+export async function fetchTransferStatus(transferId: number): Promise<TransferStatusResult> {
+    if (!Number.isFinite(transferId) || transferId <= 0) {
+        return {
+            ok: false,
+            transferId: null,
+            fileId: null,
+            status: null,
+            progressPercent: null,
+            downloadedAt: null,
+            blacklistedAt: null,
+        };
+    }
+
+    try {
+        const stored = await getStoredOptions();
+        if (stored.apiToken === '') {
+            return {
+                ok: false,
+                transferId: null,
+                fileId: null,
+                status: null,
+                progressPercent: null,
+                downloadedAt: null,
+                blacklistedAt: null,
+            };
+        }
+
+        const response = await fetch(`${stored.atlasDomain}/api/extension/download-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Atlas-Api-Key': stored.apiToken,
+            },
+            body: JSON.stringify({
+                transfer_id: transferId,
+            }),
+        });
+
+        if (!response.ok) {
+            return {
+                ok: false,
+                transferId: null,
+                fileId: null,
+                status: null,
+                progressPercent: null,
+                downloadedAt: null,
+                blacklistedAt: null,
+            };
+        }
+
+        const payload = await response.json() as Record<string, unknown>;
+
+        return {
+            ok: true,
+            transferId: numberOrNull(payload.transfer_id),
+            fileId: numberOrNull(payload.file_id),
+            status: stringOrNull(payload.status),
+            progressPercent: numberOrNull(payload.progress_percent),
+            downloadedAt: stringOrNull(payload.downloaded_at),
+            blacklistedAt: stringOrNull(payload.blacklisted_at),
+        };
+    } catch {
+        return {
+            ok: false,
+            transferId: null,
+            fileId: null,
+            status: null,
+            progressPercent: null,
+            downloadedAt: null,
+            blacklistedAt: null,
         };
     }
 }
