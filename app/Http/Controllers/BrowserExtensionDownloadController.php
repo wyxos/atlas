@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BrowserExtensionDownloadController extends Controller
 {
-    public function download(): Response
+    public function download(): BinaryFileResponse
     {
         $downloadsDirectory = public_path('downloads');
         if (! is_dir($downloadsDirectory)) {
