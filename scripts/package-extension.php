@@ -65,6 +65,15 @@ function clearDirectory(string $directory, ?callable $keepPredicate = null): boo
     return true;
 }
 
+function runGitCommand(string $projectRoot, string $command, ?array &$output = null): int
+{
+    $fullCommand = 'git -C '.escapeshellarg($projectRoot).' '.$command.' 2>&1';
+
+    exec($fullCommand, $output, $exitCode);
+
+    return $exitCode;
+}
+
 $projectRoot = dirname(__DIR__);
 $extensionRoot = $projectRoot.'/extension';
 $distDirectory = $extensionRoot.'/dist';
@@ -142,6 +151,31 @@ if ($version !== $currentVersion) {
     }
 
     fwrite(STDOUT, "Updated extension manifest version: {$currentVersion} -> {$version}\n");
+
+    $gitOutput = [];
+    if (runGitCommand($projectRoot, 'rev-parse --is-inside-work-tree', $gitOutput) === 0) {
+        $manifestPathspec = escapeshellarg('extension/manifest.json');
+
+        $gitOutput = [];
+        if (runGitCommand($projectRoot, 'add '.$manifestPathspec, $gitOutput) !== 0) {
+            fwrite(STDERR, "Failed to stage extension manifest for commit.\n");
+            exit(1);
+        }
+
+        $gitOutput = [];
+        if (runGitCommand($projectRoot, 'diff --cached --quiet -- '.$manifestPathspec, $gitOutput) === 1) {
+            $commitMessage = escapeshellarg("Bump extension manifest version to {$version}");
+            $commitCommand = 'commit -m '.$commitMessage.' -- '.$manifestPathspec;
+            $gitOutput = [];
+            if (runGitCommand($projectRoot, $commitCommand, $gitOutput) !== 0) {
+                fwrite(STDERR, "Failed to commit extension manifest version bump.\n");
+                fwrite(STDERR, implode(PHP_EOL, $gitOutput).PHP_EOL);
+                exit(1);
+            }
+
+            fwrite(STDOUT, "Committed extension manifest version bump.\n");
+        }
+    }
 }
 
 if (! copy($manifestPath, $distDirectory.'/manifest.json')) {
