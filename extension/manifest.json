@@ -3,8 +3,17 @@
     "name": "Atlas Extension",
     "description": "Atlas browser extension popup.",
     "version": "0.1.1",
+    "permissions": [
+        "storage",
+        "contextMenus"
+    ],
     "action": {
         "default_title": "Atlas",
         "default_popup": "popup.html"
-    }
+    },
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    },
+    "options_page": "options.html"
 }
