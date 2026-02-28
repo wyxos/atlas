@@ -4,7 +4,7 @@ import { onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
 
-const extensionVersion = __ATLAS_EXTENSION_VERSION__;
+const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 
 const statusLabel = ref('Checking');
 const statusDetail = ref('Validating extension API access.');

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+/* global chrome */
 import { onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
@@ -10,7 +11,7 @@ import {
     validateDomain,
 } from './atlas-options';
 
-const extensionVersion = __ATLAS_EXTENSION_VERSION__;
+const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 const atlasDomain = ref(DEFAULT_ATLAS_DOMAIN);
 const apiToken = ref('');
 const showApiToken = ref(false);

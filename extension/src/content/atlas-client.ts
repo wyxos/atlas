@@ -1,4 +1,4 @@
-import { getStoredOptions } from '../atlas-options';
+import { getContentStoredOptions } from './storage';
 import type { ExtensionMatchResult, MediaCandidatePayload } from './types';
 
 export async function fetchExtensionMatches(items: MediaCandidatePayload[]): Promise<Map<string, ExtensionMatchResult>> {
@@ -6,7 +6,7 @@ export async function fetchExtensionMatches(items: MediaCandidatePayload[]): Pro
         return new Map();
     }
 
-    const { atlasDomain, apiToken } = await getStoredOptions();
+    const { atlasDomain, apiToken } = await getContentStoredOptions();
     if (apiToken === '') {
         return new Map();
     }
