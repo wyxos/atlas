@@ -26,6 +26,8 @@ class LocalService extends BaseService
      */
     public function fetch(array $params = []): array
     {
+        $this->assertTypesenseDriver();
+
         $context = LocalFetchParams::normalize($params);
         $this->params = $context['params'];
         if ($context['shouldReturnEmpty']) {
@@ -48,6 +50,56 @@ class LocalService extends BaseService
         $reactionTypes = $context['reactionTypes'];
         $includeTotal = $context['includeTotal'];
         $allTypes = $context['allTypes'];
+
+        if (app()->environment('testing') && config('scout.driver') !== 'typesense') {
+            if ($sort === 'reaction_at' || $sort === 'reaction_at_asc') {
+                return $this->fetchByReactionTimestamp(
+                    page: $page,
+                    limit: $limit,
+                    source: $source,
+                    downloaded: $downloaded,
+                    blacklisted: $blacklisted,
+                    blacklistType: $blacklistType,
+                    maxPreviewed: $maxPreviewed,
+                    autoDisliked: $autoDisliked,
+                    reactionMode: $reactionMode,
+                    reactionTypes: $reactionTypes,
+                    allTypes: $allTypes,
+                    sort: $sort,
+                    includeTotal: $includeTotal,
+                );
+            }
+
+            if ($moderationUnion === self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO) {
+                return $this->fetchAutoDislikedOrAutoBlacklistedUsingDatabase(
+                    page: $page,
+                    limit: $limit,
+                    source: $source,
+                    downloaded: $downloaded,
+                    sort: $sort,
+                    seed: $seed,
+                    maxPreviewed: $maxPreviewed,
+                    fileTypes: $fileTypes,
+                );
+            }
+
+            return $this->fetchUsingDatabase(
+                page: $page,
+                limit: $limit,
+                source: $source,
+                downloaded: $downloaded,
+                blacklisted: $blacklisted,
+                blacklistType: $blacklistType,
+                autoDisliked: $autoDisliked,
+                sort: $sort,
+                seed: $seed,
+                maxPreviewed: $maxPreviewed,
+                fileTypes: $fileTypes,
+                reactionMode: $reactionMode,
+                reactionTypes: $reactionTypes,
+                allTypes: $allTypes,
+            );
+        }
 
         if ($moderationUnion === self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO) {
             return $this->fetchAutoDislikedOrAutoBlacklisted(
@@ -103,27 +155,6 @@ class LocalService extends BaseService
                 allTypes: $allTypes,
                 sort: $sort,
                 includeTotal: $includeTotal,
-            );
-        }
-
-        // Only Typesense can efficiently browse the entire dataset without direct DB queries.
-        // For non-Typesense drivers (testing/dev fallbacks), use Eloquent so filters like blacklisted_at work.
-        if (config('scout.driver') !== 'typesense') {
-            return $this->fetchUsingDatabase(
-                page: $page,
-                limit: $limit,
-                source: $source,
-                downloaded: $downloaded,
-                blacklisted: $blacklisted,
-                blacklistType: $blacklistType,
-                autoDisliked: $autoDisliked,
-                sort: $sort,
-                seed: $seed,
-                maxPreviewed: $maxPreviewed,
-                fileTypes: $fileTypes,
-                reactionMode: $reactionMode,
-                reactionTypes: $reactionTypes,
-                allTypes: $allTypes,
             );
         }
 
@@ -215,14 +246,6 @@ class LocalService extends BaseService
                 $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
 
                 $filesList = $files->all();
-                $driver = config('scout.driver');
-                if ($sort === 'random' && $driver !== 'typesense') {
-                    $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-                    $filesList = collect($filesList)
-                        ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
-                        ->values()
-                        ->all();
-                }
 
                 return [
                     'files' => $filesList,
@@ -324,14 +347,6 @@ class LocalService extends BaseService
         $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
 
         $filesList = $files->all();
-        $driver = config('scout.driver');
-        if ($sort === 'random' && $driver !== 'typesense') {
-            $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-            $filesList = collect($filesList)
-                ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
-                ->values()
-                ->all();
-        }
 
         // Return files directly - Browser.php will use FileItemFormatter
         return [
@@ -344,10 +359,7 @@ class LocalService extends BaseService
     }
 
     /**
-     * Fallback for non-Typesense Scout drivers.
-     *
-     * This is slower than Typesense but keeps correctness for tests/dev environments
-     * (e.g. blacklisted filtering relies on blacklisted_at, not a virtual "blacklisted" column).
+     * Testing-only fallback for non-Typesense drivers.
      *
      * @param  array<int, string>|null  $reactionTypes
      * @param  array<int, string>  $allTypes
@@ -434,7 +446,6 @@ class LocalService extends BaseService
                     $hasClause = true;
                 }
 
-                // Defensive: if nothing matched, allow everything.
                 if (! $hasClause) {
                     $q->orWhereRaw('1=1');
                 }
@@ -447,7 +458,6 @@ class LocalService extends BaseService
             $query->where('auto_disliked', false);
         }
 
-        // Keep reaction_mode semantics aligned with Typesense path.
         if ($reactionMode === 'reacted') {
             $reactionMode = 'types';
             $reactionTypes = ['love', 'like', 'funny'];
@@ -521,6 +531,138 @@ class LocalService extends BaseService
 
         $filesList = collect($pagination->items())->all();
         if ($sort === 'random') {
+            $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
+            $filesList = collect($filesList)
+                ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
+                ->values()
+                ->all();
+        }
+
+        return [
+            'files' => $filesList,
+            'metadata' => [
+                'nextCursor' => $nextCursor,
+                'total' => (int) $pagination->total(),
+            ],
+        ];
+    }
+
+    protected function fetchAutoDislikedOrAutoBlacklistedUsingDatabase(
+        int $page,
+        int $limit,
+        ?string $source,
+        string $downloaded,
+        string $sort,
+        ?int $seed,
+        ?int $maxPreviewed,
+        array $fileTypes,
+    ): array {
+        $page = max(1, $page);
+        $limit = max(1, $limit);
+
+        $userId = auth()->id();
+        if (! $userId) {
+            return [
+                'files' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                    'total' => 0,
+                ],
+            ];
+        }
+
+        $effectiveSort = in_array($sort, ['reaction_at', 'reaction_at_asc'], true) ? 'blacklisted_at' : $sort;
+
+        $query = File::query()->with('metadata');
+
+        if ($source && $source !== 'all') {
+            $query->where('source', $source);
+        }
+
+        if ($downloaded === 'yes') {
+            $query->where('downloaded', true);
+        } elseif ($downloaded === 'no') {
+            $query->where('downloaded', false);
+        }
+
+        if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
+            $query->where('previewed_count', '<=', $maxPreviewed);
+        }
+
+        if (! in_array('all', $fileTypes, true)) {
+            $query->where(function ($q) use ($fileTypes) {
+                $hasClause = false;
+
+                if (in_array('image', $fileTypes, true)) {
+                    $q->orWhere('mime_type', 'like', 'image/%');
+                    $hasClause = true;
+                }
+                if (in_array('video', $fileTypes, true)) {
+                    $q->orWhere('mime_type', 'like', 'video/%');
+                    $hasClause = true;
+                }
+                if (in_array('audio', $fileTypes, true)) {
+                    $q->orWhere('mime_type', 'like', 'audio/%');
+                    $hasClause = true;
+                }
+                if (in_array('other', $fileTypes, true)) {
+                    $q->orWhere(function ($qq) {
+                        $qq->whereNull('mime_type')
+                            ->orWhere('mime_type', '=', '')
+                            ->orWhere(function ($qqq) {
+                                $qqq->where('mime_type', 'not like', 'image/%')
+                                    ->where('mime_type', 'not like', 'video/%')
+                                    ->where('mime_type', 'not like', 'audio/%');
+                            });
+                    });
+                    $hasClause = true;
+                }
+
+                if (! $hasClause) {
+                    $q->orWhereRaw('1=1');
+                }
+            });
+        }
+
+        $query->where(function ($q) use ($userId) {
+            $q->where(function ($qq) use ($userId) {
+                $qq->where('auto_disliked', true)
+                    ->whereHas('reactions', function ($rq) use ($userId) {
+                        $rq->where('user_id', $userId)->where('type', 'dislike');
+                    });
+            })->orWhere(function ($qq) {
+                $qq->whereNotNull('blacklisted_at')
+                    ->where(function ($qqq) {
+                        $qqq->whereNull('blacklist_reason')->orWhere('blacklist_reason', '=', '');
+                    });
+            });
+        });
+
+        if ($effectiveSort === 'random') {
+            $query->inRandomOrder();
+        } elseif ($effectiveSort === 'created_at') {
+            $query->orderBy('created_at', 'desc');
+        } elseif ($effectiveSort === 'created_at_asc') {
+            $query->orderBy('created_at', 'asc');
+        } elseif ($effectiveSort === 'updated_at') {
+            $query->orderBy('updated_at', 'desc');
+        } elseif ($effectiveSort === 'updated_at_asc') {
+            $query->orderBy('updated_at', 'asc');
+        } elseif ($effectiveSort === 'blacklisted_at') {
+            $query->orderBy('blacklisted_at', 'desc')->orderBy('updated_at', 'desc');
+        } elseif ($effectiveSort === 'blacklisted_at_asc') {
+            $query->orderBy('blacklisted_at', 'asc')->orderBy('updated_at', 'asc');
+        } elseif ($effectiveSort === 'downloaded_at_asc') {
+            $query->orderBy('downloaded_at', 'asc')->orderBy('updated_at', 'asc');
+        } else {
+            $query->orderBy('downloaded_at', 'desc')->orderBy('updated_at', 'desc');
+        }
+
+        $pagination = $query->paginate($limit, ['*'], 'page', $page);
+        $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
+
+        $filesList = collect($pagination->items())->all();
+        if ($effectiveSort === 'random') {
             $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
             $filesList = collect($filesList)
                 ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
@@ -719,181 +861,73 @@ class LocalService extends BaseService
         // This view mixes non-reacted blacklisted rows, so reaction_at ordering is not meaningful.
         $effectiveSort = in_array($sort, ['reaction_at', 'reaction_at_asc'], true) ? 'blacklisted_at' : $sort;
 
-        if (config('scout.driver') === 'typesense') {
-            $searchQuery = $this->params['search'] ?? '';
-            if ($searchQuery === '') {
-                $searchQuery = '*';
-            }
-
-            $builder = File::search((string) $searchQuery);
-
-            $filters = [];
-            if ($source && $source !== 'all') {
-                $filters[] = "source:={$source}";
-            }
-
-            if ($downloaded === 'yes') {
-                $filters[] = 'downloaded:=true';
-            } elseif ($downloaded === 'no') {
-                $filters[] = 'downloaded:=false';
-            }
-
-            if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
-                $filters[] = "previewed_count:<={$maxPreviewed}";
-            }
-
-            if (! in_array('all', $fileTypes, true)) {
-                if (count($fileTypes) === 1) {
-                    $filters[] = "mime_group:={$fileTypes[0]}";
-                } else {
-                    $filters[] = 'mime_group:=['.implode(',', $fileTypes).']';
-                }
-            }
-
-            $filters[] = "((auto_disliked:=true && dislike_user_ids:={$userId}) || (blacklisted:=true && blacklist_type:=auto))";
-            $builder->options([
-                'filter_by' => implode(' && ', $filters),
-            ]);
-
-            $driver = config('scout.driver');
-            if ($effectiveSort === 'random' && $driver === 'typesense') {
-                $rand = $seed && $seed > 0 ? "_rand({$seed})" : '_rand()';
-                $builder->orderBy($rand, 'desc');
-            } elseif ($effectiveSort === 'created_at_asc') {
-                $builder->orderBy('created_at', 'asc');
-            } elseif ($effectiveSort === 'created_at') {
-                $builder->orderBy('created_at', 'desc');
-            } elseif ($effectiveSort === 'updated_at') {
-                $builder->orderBy('updated_at', 'desc');
-            } elseif ($effectiveSort === 'updated_at_asc') {
-                $builder->orderBy('updated_at', 'asc');
-            } elseif ($effectiveSort === 'blacklisted_at') {
-                $builder->orderBy('blacklisted_at', 'desc')
-                    ->orderBy('updated_at', 'desc');
-            } elseif ($effectiveSort === 'blacklisted_at_asc') {
-                $builder->orderBy('blacklisted_at', 'asc')
-                    ->orderBy('updated_at', 'asc');
-            } elseif ($effectiveSort === 'downloaded_at_asc') {
-                $builder->orderBy('downloaded_at', 'asc')
-                    ->orderBy('updated_at', 'asc');
-            } else {
-                $builder->orderBy('downloaded_at', 'desc')
-                    ->orderBy('updated_at', 'desc');
-            }
-
-            $pagination = $builder->paginate($limit, 'page', $page);
-
-            return [
-                'files' => collect($pagination->items())->all(),
-                'metadata' => [
-                    'nextCursor' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
-                    'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
-                ],
-            ];
+        $searchQuery = $this->params['search'] ?? '';
+        if ($searchQuery === '') {
+            $searchQuery = config('scout.driver') === 'typesense' ? '*' : '';
         }
 
-        $query = File::query()->with('metadata');
+        $builder = File::search((string) $searchQuery);
 
+        $filters = [];
         if ($source && $source !== 'all') {
-            $query->where('source', $source);
+            $filters[] = "source:={$source}";
         }
 
         if ($downloaded === 'yes') {
-            $query->where('downloaded', true);
+            $filters[] = 'downloaded:=true';
         } elseif ($downloaded === 'no') {
-            $query->where('downloaded', false);
+            $filters[] = 'downloaded:=false';
         }
 
         if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
-            $query->where('previewed_count', '<=', $maxPreviewed);
+            $filters[] = "previewed_count:<={$maxPreviewed}";
         }
 
         if (! in_array('all', $fileTypes, true)) {
-            $query->where(function ($q) use ($fileTypes) {
-                $hasClause = false;
-
-                if (in_array('image', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'image/%');
-                    $hasClause = true;
-                }
-                if (in_array('video', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'video/%');
-                    $hasClause = true;
-                }
-                if (in_array('audio', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'audio/%');
-                    $hasClause = true;
-                }
-                if (in_array('other', $fileTypes, true)) {
-                    $q->orWhere(function ($qq) {
-                        $qq->whereNull('mime_type')
-                            ->orWhere('mime_type', '=', '')
-                            ->orWhere(function ($qqq) {
-                                $qqq->where('mime_type', 'not like', 'image/%')
-                                    ->where('mime_type', 'not like', 'video/%')
-                                    ->where('mime_type', 'not like', 'audio/%');
-                            });
-                    });
-                    $hasClause = true;
-                }
-
-                if (! $hasClause) {
-                    $q->orWhereRaw('1=1');
-                }
-            });
+            if (count($fileTypes) === 1) {
+                $filters[] = "mime_group:={$fileTypes[0]}";
+            } else {
+                $filters[] = 'mime_group:=['.implode(',', $fileTypes).']';
+            }
         }
 
-        $query->where(function ($q) use ($userId) {
-            $q->where(function ($qq) use ($userId) {
-                $qq->where('auto_disliked', true)
-                    ->whereHas('reactions', function ($rq) use ($userId) {
-                        $rq->where('user_id', $userId)->where('type', 'dislike');
-                    });
-            })->orWhere(function ($qq) {
-                $qq->whereNotNull('blacklisted_at')
-                    ->where(function ($qqq) {
-                        $qqq->whereNull('blacklist_reason')->orWhere('blacklist_reason', '=', '');
-                    });
-            });
-        });
+        $filters[] = "((auto_disliked:=true && dislike_user_ids:={$userId}) || (blacklisted:=true && blacklist_type:=auto))";
+        $builder->options([
+            'filter_by' => implode(' && ', $filters),
+        ]);
 
         if ($effectiveSort === 'random') {
-            $query->inRandomOrder();
-        } elseif ($effectiveSort === 'created_at') {
-            $query->orderBy('created_at', 'desc');
+            $rand = $seed && $seed > 0 ? "_rand({$seed})" : '_rand()';
+            $builder->orderBy($rand, 'desc');
         } elseif ($effectiveSort === 'created_at_asc') {
-            $query->orderBy('created_at', 'asc');
+            $builder->orderBy('created_at', 'asc');
+        } elseif ($effectiveSort === 'created_at') {
+            $builder->orderBy('created_at', 'desc');
         } elseif ($effectiveSort === 'updated_at') {
-            $query->orderBy('updated_at', 'desc');
+            $builder->orderBy('updated_at', 'desc');
         } elseif ($effectiveSort === 'updated_at_asc') {
-            $query->orderBy('updated_at', 'asc');
+            $builder->orderBy('updated_at', 'asc');
         } elseif ($effectiveSort === 'blacklisted_at') {
-            $query->orderBy('blacklisted_at', 'desc')->orderBy('updated_at', 'desc');
+            $builder->orderBy('blacklisted_at', 'desc')
+                ->orderBy('updated_at', 'desc');
         } elseif ($effectiveSort === 'blacklisted_at_asc') {
-            $query->orderBy('blacklisted_at', 'asc')->orderBy('updated_at', 'asc');
+            $builder->orderBy('blacklisted_at', 'asc')
+                ->orderBy('updated_at', 'asc');
         } elseif ($effectiveSort === 'downloaded_at_asc') {
-            $query->orderBy('downloaded_at', 'asc')->orderBy('updated_at', 'asc');
+            $builder->orderBy('downloaded_at', 'asc')
+                ->orderBy('updated_at', 'asc');
         } else {
-            $query->orderBy('downloaded_at', 'desc')->orderBy('updated_at', 'desc');
+            $builder->orderBy('downloaded_at', 'desc')
+                ->orderBy('updated_at', 'desc');
         }
 
-        $pagination = $query->paginate($limit, ['*'], 'page', $page);
-        $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
-
-        $filesList = collect($pagination->items())->all();
-        if ($effectiveSort === 'random') {
-            $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-            $filesList = collect($filesList)
-                ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
-                ->values()
-                ->all();
-        }
+        $pagination = $builder->paginate($limit, 'page', $page);
 
         return [
-            'files' => $filesList,
+            'files' => collect($pagination->items())->all(),
             'metadata' => [
-                'nextCursor' => $nextCursor,
-                'total' => (int) $pagination->total(),
+                'nextCursor' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
+                'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
             ],
         ];
     }
@@ -951,5 +985,16 @@ class LocalService extends BaseService
             'limit' => 20,
             'source' => 'all', // Default to all sources
         ];
+    }
+
+    protected function assertTypesenseDriver(): void
+    {
+        if (app()->environment('testing')) {
+            return;
+        }
+
+        if (config('scout.driver') !== 'typesense') {
+            throw new \RuntimeException('LocalService requires SCOUT_DRIVER=typesense.');
+        }
     }
 }
