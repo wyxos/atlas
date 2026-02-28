@@ -133,6 +133,12 @@ function applyIndicator(media: MediaElement): void {
 }
 
 function processMedia(media: MediaElement): void {
+    if (media.closest('a[href]') !== null) {
+        const anchoredTarget = resolveOverlayTarget(media);
+        unwrapTarget(anchoredTarget, media);
+        return;
+    }
+
     if (mediaMatchesRules(media)) {
         applyIndicator(media);
         return;
