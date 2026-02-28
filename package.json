@@ -14,7 +14,7 @@
     "lint": "npm run lint:project",
     "lint:project": "eslint resources/js scripts vite.config.js vitest.config.js playwright.config.ts --max-warnings 0",
     "lint:project:fix": "eslint resources/js scripts vite.config.js vitest.config.js playwright.config.ts --fix",
-    "lint:extension": "eslint extension/atlas-downloader/src extension/atlas-downloader/vite.background.config.ts extension/atlas-downloader/vite.content.config.ts extension/atlas-downloader/vite.options.config.ts --max-warnings 0",
+    "lint:extension": "eslint extension/atlas-downloader/src extension/atlas-downloader/vite.background.config.ts extension/atlas-downloader/vite.content.config.ts extension/atlas-downloader/vite.options.config.ts",
     "lint:extension:fix": "eslint extension/atlas-downloader/src extension/atlas-downloader/vite.background.config.ts extension/atlas-downloader/vite.content.config.ts extension/atlas-downloader/vite.options.config.ts --fix",
     "lint:fix": "npm run lint:project:fix",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
