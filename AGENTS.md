@@ -174,6 +174,7 @@ After you've finished editing
   - UI design system: `resources/js/components/ui/` → [see resources/js/components/ui/AGENTS.md](resources/js/components/ui/AGENTS.md)
 - **Browser Extension Source**: `extension/` (Vite + Vue + TypeScript, popup entry: `extension/popup.html`)
   - Build + package command: `npm run package:extension` (creates `public/downloads/atlas-extension.zip` and a versioned archive)
+  - Version bump helpers: `npm run package:extension -- --bump=patch|minor|major` or set explicit version with `npm run package:extension -- --version=1.2.3`
 
 ### Testing
 - **Test Suite**: `tests/` → [see tests/AGENTS.md](tests/AGENTS.md)

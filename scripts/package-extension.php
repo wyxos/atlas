@@ -2,6 +2,36 @@
 
 declare(strict_types=1);
 
+function parseSemver(string $version): ?array
+{
+    if (! preg_match('/^(\d+)\.(\d+)\.(\d+)$/', $version, $matches)) {
+        return null;
+    }
+
+    return [
+        (int) $matches[1],
+        (int) $matches[2],
+        (int) $matches[3],
+    ];
+}
+
+function incrementSemver(string $currentVersion, string $bumpType): ?string
+{
+    $parts = parseSemver($currentVersion);
+    if ($parts === null) {
+        return null;
+    }
+
+    [$major, $minor, $patch] = $parts;
+
+    return match ($bumpType) {
+        'major' => sprintf('%d.0.0', $major + 1),
+        'minor' => sprintf('%d.%d.0', $major, $minor + 1),
+        'patch' => sprintf('%d.%d.%d', $major, $minor, $patch + 1),
+        default => null,
+    };
+}
+
 $projectRoot = dirname(__DIR__);
 $extensionRoot = $projectRoot.'/extension';
 $distDirectory = $extensionRoot.'/dist';
@@ -24,10 +54,49 @@ if (! is_array($manifestData) || ! isset($manifestData['version']) || ! is_strin
     exit(1);
 }
 
-$version = trim($manifestData['version']);
-if ($version === '') {
+$currentVersion = trim($manifestData['version']);
+if ($currentVersion === '') {
     fwrite(STDERR, "Extension version is empty.\n");
     exit(1);
+}
+
+$options = getopt('', ['version::', 'bump::']);
+$requestedVersion = isset($options['version']) ? trim((string) $options['version']) : null;
+$requestedBump = isset($options['bump']) ? trim((string) $options['bump']) : null;
+
+if ($requestedVersion !== null && $requestedVersion !== '' && parseSemver($requestedVersion) === null) {
+    fwrite(STDERR, "Invalid --version value '{$requestedVersion}'. Expected SemVer format like 1.2.3.\n");
+    exit(1);
+}
+
+if ($requestedBump !== null && $requestedBump !== '' && ! in_array($requestedBump, ['major', 'minor', 'patch'], true)) {
+    fwrite(STDERR, "Invalid --bump value '{$requestedBump}'. Use major, minor, or patch.\n");
+    exit(1);
+}
+
+$version = $currentVersion;
+
+if ($requestedVersion !== null && $requestedVersion !== '') {
+    $version = $requestedVersion;
+} elseif ($requestedBump !== null && $requestedBump !== '') {
+    $nextVersion = incrementSemver($currentVersion, $requestedBump);
+    if ($nextVersion === null) {
+        fwrite(STDERR, "Unable to bump version '{$currentVersion}'. Expected SemVer format like 1.2.3.\n");
+        exit(1);
+    }
+
+    $version = $nextVersion;
+}
+
+if ($version !== $currentVersion) {
+    $manifestData['version'] = $version;
+    $encodedManifest = json_encode($manifestData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($encodedManifest === false || file_put_contents($manifestPath, $encodedManifest.PHP_EOL) === false) {
+        fwrite(STDERR, "Failed to update extension manifest version.\n");
+        exit(1);
+    }
+
+    fwrite(STDOUT, "Updated extension manifest version: {$currentVersion} -> {$version}\n");
 }
 
 if (! is_dir($downloadsDirectory) && ! mkdir($downloadsDirectory, 0775, true) && ! is_dir($downloadsDirectory)) {
@@ -38,7 +107,7 @@ if (! is_dir($downloadsDirectory) && ! mkdir($downloadsDirectory, 0775, true) &&
 $versionedArchive = "{$downloadsDirectory}/atlas-extension-{$version}.zip";
 $latestArchive = "{$downloadsDirectory}/atlas-extension.zip";
 
-$zip = new ZipArchive();
+$zip = new ZipArchive;
 if ($zip->open($versionedArchive, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
     fwrite(STDERR, "Unable to create archive: {$versionedArchive}\n");
     exit(1);
