@@ -20,7 +20,7 @@ class DownloadFile implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $fileId)
+    public function __construct(public int $fileId, public bool $forceDownload = false)
     {
         $this->onQueue('downloads');
     }
@@ -36,7 +36,7 @@ class DownloadFile implements ShouldQueue
         if ($file->downloaded && ! empty($file->path)) {
             if ($this->isInvalidDownloadedFile($file)) {
                 $this->repairDownloadedFile($file);
-            } else {
+            } elseif (! $this->forceDownload) {
                 return;
             }
         }
