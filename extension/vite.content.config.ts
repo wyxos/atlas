@@ -5,6 +5,16 @@ const extensionRoot = path.resolve(__dirname);
 
 export default defineConfig({
     root: extensionRoot,
+    resolve: {
+        alias: {
+            vue: 'vue/dist/vue.runtime.esm-browser.prod.js',
+        },
+    },
+    define: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        __VUE_OPTIONS_API__: true,
+        __VUE_PROD_DEVTOOLS__: false,
+    },
     build: {
         outDir: path.resolve(extensionRoot, 'dist'),
         emptyOutDir: false,
