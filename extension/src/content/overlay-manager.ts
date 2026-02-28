@@ -57,8 +57,6 @@ export class OverlayManager {
         badge.style.left = '50%';
         badge.style.bottom = '8px';
         badge.style.transform = 'translateX(-50%)';
-        badge.style.width = '320px';
-        badge.style.height = '40px';
         badge.style.borderRadius = '8px';
         badge.style.pointerEvents = 'none';
         badge.style.zIndex = '10';

@@ -10,6 +10,15 @@ const iconBaseStyle = {
     width: '18px',
     height: '18px',
     strokeWidth: 2,
+    color: '#ffffff',
+} as const;
+
+const reactionButtonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '4px',
+    padding: '8px',
 } as const;
 
 const AtlasReactionBadge = defineComponent({
@@ -19,8 +28,6 @@ const AtlasReactionBadge = defineComponent({
             'div',
             {
                 style: {
-                    width: '100%',
-                    height: '100%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -29,14 +36,15 @@ const AtlasReactionBadge = defineComponent({
                     backdropFilter: 'blur(8px)',
                     color: '#ffffff',
                     pointerEvents: 'none',
-                    gap: '12px',
+                    gap: '8px',
+                    padding: '8px 16px',
                 },
             },
             [
-                h(Heart, { ...iconBaseStyle, color: '#f87171' }),
-                h(ThumbsUp, { ...iconBaseStyle, color: '#60a5fa' }),
-                h(ThumbsDown, { ...iconBaseStyle, color: '#9ca3af' }),
-                h(Smile, { ...iconBaseStyle, color: '#facc15' }),
+                h('div', { style: reactionButtonStyle }, [h(Heart, iconBaseStyle)]),
+                h('div', { style: reactionButtonStyle }, [h(ThumbsUp, iconBaseStyle)]),
+                h('div', { style: reactionButtonStyle }, [h(ThumbsDown, iconBaseStyle)]),
+                h('div', { style: reactionButtonStyle }, [h(Smile, iconBaseStyle)]),
             ],
         );
     },
