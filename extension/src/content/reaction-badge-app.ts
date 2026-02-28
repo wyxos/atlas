@@ -9,6 +9,7 @@ import { subscribeToDownloadProgress } from './download-progress-bus';
 
 type MountedBadge = {
     element: HTMLDivElement;
+    triggerReaction: (type: BadgeReactionType) => void;
     unmount: () => void;
 };
 
@@ -108,6 +109,11 @@ const AtlasReactionBadge = defineComponent({
         media: {
             type: Object as PropType<MediaElement>,
             required: true,
+        },
+        onShortcutReady: {
+            type: Function as PropType<((handler: ((type: BadgeReactionType) => void) | null) => void) | undefined>,
+            required: false,
+            default: undefined,
         },
     },
     setup(props) {
@@ -279,6 +285,9 @@ const AtlasReactionBadge = defineComponent({
 
         onMounted(() => {
             syncResolution();
+            props.onShortcutReady?.((type: BadgeReactionType) => {
+                void handleReactionClick(type);
+            });
 
             props.media.addEventListener('load', onMediaUpdate);
             props.media.addEventListener('loadedmetadata', onMediaUpdate);
@@ -296,6 +305,7 @@ const AtlasReactionBadge = defineComponent({
 
         onBeforeUnmount(() => {
             isActive = false;
+            props.onShortcutReady?.(null);
             props.media.removeEventListener('load', onMediaUpdate);
             props.media.removeEventListener('loadedmetadata', onMediaUpdate);
             props.media.removeEventListener('resize', onMediaUpdate);
@@ -575,12 +585,22 @@ const AtlasReactionBadge = defineComponent({
 
 export function createReactionBadgeHost(media: MediaElement): MountedBadge {
     const element = document.createElement('div');
-    const app = createApp(AtlasReactionBadge, { media });
+    let triggerReactionHandler: ((type: BadgeReactionType) => void) | null = null;
+    const app = createApp(AtlasReactionBadge, {
+        media,
+        onShortcutReady: (handler: ((type: BadgeReactionType) => void) | null) => {
+            triggerReactionHandler = handler;
+        },
+    });
     app.mount(element);
 
     return {
         element,
+        triggerReaction: (type: BadgeReactionType) => {
+            triggerReactionHandler?.(type);
+        },
         unmount: () => {
+            triggerReactionHandler = null;
             app.unmount();
         },
     };
