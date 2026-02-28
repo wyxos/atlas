@@ -46,6 +46,13 @@
         }
     },
     "scripts": {
+        "lint:php:max-lines": [
+            "@php scripts/php-max-lines.php --max=500"
+        ],
+        "lint:php": [
+            "@php vendor/bin/pint --test",
+            "@composer lint:php:max-lines"
+        ],
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
