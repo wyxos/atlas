@@ -1,6 +1,6 @@
 import type { PropType } from 'vue';
 import { computed, createApp, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Heart, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
+import { Ban, Download, Heart, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
 import { resolveMediaResolution, resolveMediaUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
@@ -85,15 +85,21 @@ const AtlasReactionBadge = defineComponent({
         const timestampText = computed(() => {
             const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
             if (blacklistedAt) {
-                return `Blacklisted ${blacklistedAt}`;
+                return {
+                    icon: Ban,
+                    text: `- ${blacklistedAt}`,
+                };
             }
 
             const downloadedAt = formatMatchTimestamp(matchResult.value.downloadedAt);
             if (downloadedAt) {
-                return `Downloaded ${downloadedAt}`;
+                return {
+                    icon: Download,
+                    text: `- ${downloadedAt}`,
+                };
             }
 
-            return '';
+            return null;
         });
 
         function syncResolution(): void {
@@ -112,7 +118,7 @@ const AtlasReactionBadge = defineComponent({
             props.media.addEventListener('loadedmetadata', onMediaUpdate);
             props.media.addEventListener('resize', onMediaUpdate);
 
-            void enqueueReactionCheck(resolveMediaUrl(props.media), window.location.href).then((result) => {
+            void enqueueReactionCheck(resolveMediaUrl(props.media)).then((result) => {
                 if (!isActive) {
                     return;
                 }
@@ -225,9 +231,23 @@ const AtlasReactionBadge = defineComponent({
                         },
                         [
                             h('span', `Res ${mediaResolution.value}`),
-                            timestampText.value === ''
+                            timestampText.value === null
                                 ? null
-                                : h('span', { style: { opacity: 0.9 } }, timestampText.value),
+                                : h(
+                                    'span',
+                                    {
+                                        style: {
+                                            opacity: 0.9,
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                        },
+                                    },
+                                    [
+                                        h(timestampText.value.icon, { size: 12, strokeWidth: 2 }),
+                                        h('span', timestampText.value.text),
+                                    ],
+                                ),
                         ],
                     ),
                     iconRow,
