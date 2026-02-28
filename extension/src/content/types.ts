@@ -1,12 +1,13 @@
 export type MediaCandidatePayload = {
-    id: string;
-    media_url: string | null;
-    anchor_url: string | null;
-    page_url: string | null;
+    candidate_id: string;
+    type: 'media' | 'referrer';
+    url: string;
 };
 
 export type MediaCandidate = {
-    payload: MediaCandidatePayload;
+    id: string;
+    mediaUrl: string | null;
+    anchorUrl: string | null;
     element: HTMLImageElement | HTMLVideoElement;
 };
 

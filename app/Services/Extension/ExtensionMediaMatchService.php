@@ -10,76 +10,78 @@ use Illuminate\Support\Collection;
 class ExtensionMediaMatchService
 {
     /**
-     * @param  array<int, array{id: string, media_url?: string|null, anchor_url?: string|null, page_url?: string|null}>  $items
+     * @param  array<int, array{candidate_id: string, type: string, url: string}>  $items
      * @return array<int, array{id: string, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
     public function match(array $items): array
     {
         $normalizedItems = collect($items)->map(function (array $item): array {
+            $type = trim((string) ($item['type'] ?? ''));
+
             return [
-                'id' => (string) ($item['id'] ?? ''),
-                'media_url' => $this->normalizeUrl($item['media_url'] ?? null),
-                'anchor_url' => $this->normalizeUrl($item['anchor_url'] ?? null),
-                'page_url' => $this->normalizeUrl($item['page_url'] ?? null),
+                'candidate_id' => (string) ($item['candidate_id'] ?? ''),
+                'type' => in_array($type, ['media', 'referrer'], true) ? $type : '',
+                'url' => $this->normalizeUrl($item['url'] ?? null),
             ];
-        })->filter(fn (array $item): bool => $item['id'] !== '');
+        })->filter(fn (array $item): bool => $item['candidate_id'] !== '' && $item['type'] !== '' && $item['url'] !== null);
 
         if ($normalizedItems->isEmpty()) {
             return [];
         }
 
-        $urls = $normalizedItems
-            ->flatMap(fn (array $item): array => array_values(array_filter([
-                $item['media_url'],
-                $item['anchor_url'],
-                $item['page_url'],
-            ])))
-            ->unique()
-            ->values();
+        $candidateIds = $normalizedItems->pluck('candidate_id')->unique()->values();
+        $mediaUrls = $normalizedItems->where('type', 'media')->pluck('url')->unique()->values();
+        $referrerUrls = $normalizedItems->where('type', 'referrer')->pluck('url')->unique()->values();
 
-        if ($urls->isEmpty()) {
-            return $normalizedItems->map(fn (array $item): array => $this->emptyMatch($item['id']))->values()->all();
+        $mediaFileByUrl = $this->filesByUrl($mediaUrls);
+        $referrerFileByUrl = $this->filesByReferrerUrl($referrerUrls);
+
+        // Priority requested:
+        // 1) media object checks files.url
+        // 2) referrer object checks files.referrer_url
+        $matchedByCandidateId = [];
+        foreach ($candidateIds as $candidateId) {
+            $candidateRows = $normalizedItems->where('candidate_id', $candidateId);
+
+            $matchedFile = null;
+            foreach ($candidateRows->where('type', 'media') as $row) {
+                $match = $mediaFileByUrl->get($row['url']);
+                if ($match !== null) {
+                    $matchedFile = $match;
+                    break;
+                }
+            }
+
+            if ($matchedFile === null) {
+                foreach ($candidateRows->where('type', 'referrer') as $row) {
+                    $match = $referrerFileByUrl->get($row['url']);
+                    if ($match !== null) {
+                        $matchedFile = $match;
+                        break;
+                    }
+                }
+            }
+
+            $matchedByCandidateId[(string) $candidateId] = $matchedFile;
         }
 
-        $urlHashes = $urls->map(fn (string $url): string => hash('sha256', $url))->all();
-
-        /** @var Collection<int, File> $candidateFiles */
-        $candidateFiles = File::query()
-            ->select(['id', 'url', 'referrer_url', 'preview_url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
-            ->where(function ($query) use ($urlHashes, $urls): void {
-                $query
-                    ->whereIn('url_hash', $urlHashes)
-                    ->orWhereIn('referrer_url_hash', $urlHashes)
-                    ->orWhereIn('preview_url', $urls->all());
-            })
-            ->limit(5000)
-            ->get();
-
-        if ($candidateFiles->isEmpty()) {
-            return $normalizedItems->map(fn (array $item): array => $this->emptyMatch($item['id']))->values()->all();
-        }
-
-        $matchedByItemId = $normalizedItems->mapWithKeys(function (array $item) use ($candidateFiles): array {
-            return [$item['id'] => $this->pickBestMatch($item, $candidateFiles)];
-        });
-
-        $matchedFilesById = $matchedByItemId
+        $matchedFilesById = collect($matchedByCandidateId)
             ->filter()
             ->mapWithKeys(fn (File $file): array => [$file->id => $file]);
 
         $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values());
 
-        return $normalizedItems->map(function (array $item) use ($matchedByItemId, $reactionsByFileId): array {
+        return $candidateIds->map(function (string $candidateId) use ($matchedByCandidateId, $reactionsByFileId): array {
             /** @var File|null $file */
-            $file = $matchedByItemId->get($item['id']);
+            $file = $matchedByCandidateId[$candidateId] ?? null;
             if (! $file) {
-                return $this->emptyMatch($item['id']);
+                return $this->emptyMatch($candidateId);
             }
 
             $reaction = $reactionsByFileId->get($file->id);
 
             return [
-                'id' => $item['id'],
+                'id' => $candidateId,
                 'exists' => true,
                 'reaction' => $reaction['type'] ?? null,
                 'reacted_at' => $reaction['reacted_at'] ?? null,
@@ -108,77 +110,48 @@ class ExtensionMediaMatchService
         return trim($withoutFragment);
     }
 
-    private function scoreMatch(array $item, File $file): int
+    /**
+     * @param  Collection<int, string>  $urls
+     * @return Collection<string, File>
+     */
+    private function filesByUrl(Collection $urls): Collection
     {
-        $score = 0;
-
-        if ($item['media_url']) {
-            // Highest-confidence signal: discovered media URL maps to canonical file URL.
-            if ($file->url === $item['media_url']) {
-                $score += 1000;
-            }
-            // Lower-confidence fallbacks.
-            if ($file->preview_url === $item['media_url']) {
-                $score += 500;
-            }
-            if ($file->referrer_url === $item['media_url']) {
-                $score += 120;
-            }
+        if ($urls->isEmpty()) {
+            return collect();
         }
 
-        if ($item['anchor_url']) {
-            // Second-highest confidence: anchor URL maps to stored referrer URL.
-            if ($file->referrer_url === $item['anchor_url']) {
-                $score += 900;
-            }
-            // Lower-confidence fallbacks.
-            if ($file->url === $item['anchor_url']) {
-                $score += 220;
-            }
-            if ($file->preview_url === $item['anchor_url']) {
-                $score += 140;
-            }
-        }
+        $hashes = $urls->map(fn (string $url): string => hash('sha256', $url))->all();
 
-        if ($item['page_url']) {
-            if ($file->referrer_url === $item['page_url']) {
-                $score += 70;
-            }
-            if ($file->url === $item['page_url']) {
-                $score += 45;
-            }
-            if ($file->preview_url === $item['page_url']) {
-                $score += 30;
-            }
-        }
-
-        return $score;
+        return File::query()
+            ->select(['id', 'url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
+            ->whereIn('url_hash', $hashes)
+            ->orderByDesc('updated_at')
+            ->get()
+            ->filter(fn (File $file): bool => is_string($file->url) && $file->url !== '')
+            ->unique('url')
+            ->keyBy('url');
     }
 
-    private function pickBestMatch(array $item, Collection $candidateFiles): ?File
+    /**
+     * @param  Collection<int, string>  $urls
+     * @return Collection<string, File>
+     */
+    private function filesByReferrerUrl(Collection $urls): Collection
     {
-        $bestFile = null;
-        $bestScore = 0;
-
-        foreach ($candidateFiles as $file) {
-            $score = $this->scoreMatch($item, $file);
-            if ($score === 0) {
-                continue;
-            }
-
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $bestFile = $file;
-
-                continue;
-            }
-
-            if ($bestFile && $score === $bestScore && $file->updated_at?->gt($bestFile->updated_at)) {
-                $bestFile = $file;
-            }
+        if ($urls->isEmpty()) {
+            return collect();
         }
 
-        return $bestFile;
+        $hashes = $urls->map(fn (string $url): string => hash('sha256', $url))->all();
+
+        return File::query()
+            ->select(['id', 'referrer_url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
+            ->whereIn('referrer_url_hash', $hashes)
+            ->orderByDesc('updated_at')
+            ->get()
+            ->filter(fn (File $file): bool => is_string($file->referrer_url) && $file->referrer_url !== '')
+            ->unique('referrer_url')
+            ->keyBy('referrer_url');
     }
 
     /**

@@ -151,7 +151,7 @@ function applyOverlay(candidate: MediaCandidate, match: ExtensionMatchResult): v
 
 export function renderMatches(candidates: MediaCandidate[], matchesById: Map<string, ExtensionMatchResult>): void {
     for (const candidate of candidates) {
-        const match = matchesById.get(candidate.payload.id);
+        const match = matchesById.get(candidate.id);
         if (!match || !match.exists) {
             clearOverlay(candidate);
             continue;

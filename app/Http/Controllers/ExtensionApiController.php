@@ -37,10 +37,9 @@ class ExtensionApiController extends Controller
 
         $validated = $request->validate([
             'items' => ['required', 'array', 'max:300'],
-            'items.*.id' => ['required', 'string', 'max:128'],
-            'items.*.media_url' => ['nullable', 'string', 'max:4096'],
-            'items.*.anchor_url' => ['nullable', 'string', 'max:4096'],
-            'items.*.page_url' => ['nullable', 'string', 'max:4096'],
+            'items.*.candidate_id' => ['required', 'string', 'max:128'],
+            'items.*.type' => ['required', 'string', 'in:media,referrer'],
+            'items.*.url' => ['required', 'string', 'max:4096'],
         ]);
 
         $matches = $mediaMatchService->match($validated['items']);

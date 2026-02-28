@@ -24,7 +24,7 @@ test('extension matches endpoint requires a valid api key', function () {
 
     $response = $this->postJson('/api/extension/matches', [
         'items' => [
-            ['id' => 'atlas-1', 'media_url' => 'https://example.test/a.jpg'],
+            ['candidate_id' => 'atlas-1', 'type' => 'media', 'url' => 'https://example.test/a.jpg'],
         ],
     ]);
 
@@ -56,16 +56,24 @@ test('extension matches endpoint returns status for matched and unmatched media'
     ])->postJson('/api/extension/matches', [
         'items' => [
             [
-                'id' => 'atlas-1',
-                'media_url' => 'https://cdn.example.test/media/preview.jpg',
-                'anchor_url' => 'https://www.deviantart.com/artist/art/work-123',
-                'page_url' => 'https://www.deviantart.com/',
+                'candidate_id' => 'atlas-1',
+                'type' => 'media',
+                'url' => 'https://cdn.example.test/media/full.jpg',
             ],
             [
-                'id' => 'atlas-2',
-                'media_url' => 'https://cdn.example.test/other.jpg',
-                'anchor_url' => 'https://www.deviantart.com/artist/art/other',
-                'page_url' => 'https://www.deviantart.com/',
+                'candidate_id' => 'atlas-1',
+                'type' => 'referrer',
+                'url' => 'https://www.deviantart.com/artist/art/work-123',
+            ],
+            [
+                'candidate_id' => 'atlas-2',
+                'type' => 'media',
+                'url' => 'https://cdn.example.test/other.jpg',
+            ],
+            [
+                'candidate_id' => 'atlas-2',
+                'type' => 'referrer',
+                'url' => 'https://www.deviantart.com/artist/art/other',
             ],
         ],
     ]);
