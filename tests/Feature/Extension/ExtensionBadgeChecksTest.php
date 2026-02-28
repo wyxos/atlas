@@ -24,7 +24,7 @@ test('extension badge checks endpoint requires a valid api key', function () {
 
     $response = $this->postJson('/api/extension/badges/checks', [
         'items' => [
-            ['request_id' => 'req-1', 'url' => 'https://example.test/media/a.jpg'],
+            ['request_id' => 'req-1', 'url_hash' => hash('sha256', 'https://example.test/media/a.jpg')],
         ],
     ]);
 
@@ -52,9 +52,9 @@ test('extension badge checks endpoint returns deterministic per-item status', fu
         'X-Atlas-Api-Key' => 'valid-api-key',
     ])->postJson('/api/extension/badges/checks', [
         'items' => [
-            ['request_id' => 'req-1', 'url' => 'https://cdn.example.test/media/full.jpg#fragment'],
-            ['request_id' => 'req-2', 'url' => 'https://cdn.example.test/other.jpg'],
-            ['request_id' => 'req-3', 'url' => 'https://cdn.example.test/media/full.jpg'],
+            ['request_id' => 'req-1', 'url_hash' => hash('sha256', 'https://cdn.example.test/media/full.jpg')],
+            ['request_id' => 'req-2', 'url_hash' => hash('sha256', 'https://cdn.example.test/other.jpg')],
+            ['request_id' => 'req-3', 'url_hash' => hash('sha256', 'https://cdn.example.test/media/full.jpg')],
         ],
     ]);
 
@@ -63,7 +63,6 @@ test('extension badge checks endpoint returns deterministic per-item status', fu
 
     $response->assertJsonPath('matches.0.request_id', 'req-1');
     $response->assertJsonPath('matches.0.request_index', 0);
-    $response->assertJsonPath('matches.0.url', 'https://cdn.example.test/media/full.jpg');
     $response->assertJsonPath('matches.0.exists', true);
     $response->assertJsonPath('matches.0.reaction', 'like');
     $response->assertJsonPath('matches.0.downloaded_at', $matchedFile->downloaded_at?->toIso8601String());
@@ -78,7 +77,6 @@ test('extension badge checks endpoint returns deterministic per-item status', fu
 
     $response->assertJsonPath('matches.2.request_id', 'req-3');
     $response->assertJsonPath('matches.2.request_index', 2);
-    $response->assertJsonPath('matches.2.url', 'https://cdn.example.test/media/full.jpg');
     $response->assertJsonPath('matches.2.exists', true);
     $response->assertJsonPath('matches.2.reaction', 'like');
 });
@@ -109,9 +107,9 @@ test('extension badge checks performs batched queries for large request sets', f
     for ($index = 0; $index < 60; $index++) {
         $items[] = [
             'request_id' => 'req-'.$index,
-            'url' => $index < 30
+            'url_hash' => hash('sha256', $index < 30
                 ? $matchedUrls[$index]
-                : 'https://cdn.example.test/media/missing-'.$index.'.jpg',
+                : 'https://cdn.example.test/media/missing-'.$index.'.jpg'),
         ];
     }
 

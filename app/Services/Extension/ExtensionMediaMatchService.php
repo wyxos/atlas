@@ -10,39 +10,40 @@ use Illuminate\Support\Collection;
 class ExtensionMediaMatchService
 {
     /**
-     * @param  array<int, array{request_id: string, url: string}>  $items
-     * @return array<int, array{request_id: string, request_index: int, url: string, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
+     * @param  array<int, array{request_id: string, url_hash: string}>  $items
+     * @return array<int, array{request_id: string, request_index: int, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
     public function badgeChecks(array $items): array
     {
         $normalizedItems = collect($items)->values()->map(function (array $item, int $index): array {
+            $urlHash = strtolower(trim((string) ($item['url_hash'] ?? '')));
+
             return [
                 'request_id' => (string) ($item['request_id'] ?? ''),
                 'request_index' => $index,
-                'url' => $this->normalizeUrl($item['url'] ?? null),
+                'url_hash' => preg_match('/^[a-f0-9]{64}$/', $urlHash) === 1 ? $urlHash : null,
             ];
-        })->filter(fn (array $item): bool => $item['request_id'] !== '' && $item['url'] !== null)->values();
+        })->filter(fn (array $item): bool => $item['request_id'] !== '' && $item['url_hash'] !== null)->values();
 
         if ($normalizedItems->isEmpty()) {
             return [];
         }
 
-        $urls = $normalizedItems->pluck('url')->filter()->unique()->values();
-        $filesByUrl = $this->filesByUrl($urls);
+        $hashes = $normalizedItems->pluck('url_hash')->filter()->unique()->values();
+        $filesByHash = $this->filesByUrlHash($hashes);
 
-        $matchedFilesById = $filesByUrl
+        $matchedFilesById = $filesByHash
             ->mapWithKeys(fn (File $file): array => [$file->id => $file]);
 
         $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values());
 
-        return $normalizedItems->map(function (array $item) use ($filesByUrl, $reactionsByFileId): array {
+        return $normalizedItems->map(function (array $item) use ($filesByHash, $reactionsByFileId): array {
             /** @var File|null $file */
-            $file = $filesByUrl->get((string) $item['url']);
+            $file = $filesByHash->get((string) $item['url_hash']);
             if (! $file) {
                 return [
                     'request_id' => (string) $item['request_id'],
                     'request_index' => (int) $item['request_index'],
-                    'url' => (string) $item['url'],
                     'exists' => false,
                     'reaction' => null,
                     'reacted_at' => null,
@@ -56,7 +57,6 @@ class ExtensionMediaMatchService
             return [
                 'request_id' => (string) $item['request_id'],
                 'request_index' => (int) $item['request_index'],
-                'url' => (string) $item['url'],
                 'exists' => true,
                 'reaction' => $reaction['type'] ?? null,
                 'reacted_at' => $reaction['reacted_at'] ?? null,
@@ -64,6 +64,26 @@ class ExtensionMediaMatchService
                 'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
             ];
         })->values()->all();
+    }
+
+    /**
+     * @param  Collection<int, string>  $hashes
+     * @return Collection<string, File>
+     */
+    private function filesByUrlHash(Collection $hashes): Collection
+    {
+        if ($hashes->isEmpty()) {
+            return collect();
+        }
+
+        return File::query()
+            ->select(['id', 'url_hash', 'downloaded_at', 'blacklisted_at', 'updated_at'])
+            ->whereIn('url_hash', $hashes->all())
+            ->orderByDesc('updated_at')
+            ->get()
+            ->filter(fn (File $file): bool => is_string($file->url_hash) && $file->url_hash !== '')
+            ->unique('url_hash')
+            ->keyBy('url_hash');
     }
 
     /**

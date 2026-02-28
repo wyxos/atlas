@@ -61,7 +61,7 @@ class ExtensionApiController extends Controller
         $validated = $request->validate([
             'items' => ['required', 'array', 'max:300'],
             'items.*.request_id' => ['required', 'string', 'max:128'],
-            'items.*.url' => ['required', 'string', 'max:4096'],
+            'items.*.url_hash' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
         ]);
 
         $matches = $mediaMatchService->badgeChecks($validated['items']);
