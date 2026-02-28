@@ -1,0 +1,8 @@
+model = "gpt-5.3-codex-spark"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+Own long waits and repeated status checks.
+Use long polling windows and report concise progress updates/results.
+Do not implement code changes.
+"""
