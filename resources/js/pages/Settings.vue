@@ -53,9 +53,19 @@ type SpotifyServiceStatus = {
 
 type SettingsServicesResponse = {
     spotify: SpotifyServiceStatus;
+    extension: {
+        api_key_configured: boolean;
+        default_domain: string;
+    };
 };
 
 const spotifyService = ref<SpotifyServiceStatus | null>(null);
+const extensionApiKey = ref('');
+const extensionApiKeyConfigured = ref(false);
+const extensionDefaultDomain = ref('https://atlas.test');
+const extensionNotice = ref('');
+const extensionNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
+const isExtensionApiKeySaving = ref(false);
 const spotifyIsConnected = computed(() => spotifyService.value?.connected === true);
 const spotifyNeedsReconnect = computed(() => spotifyService.value?.needs_reconnect === true);
 const spotifyIsConfigured = computed(() => spotifyService.value?.configured === true);
@@ -90,6 +100,11 @@ const spotifyExpirySummary = computed(() => {
 function setServicesNotice(message: string, tone: 'success' | 'error' | 'neutral' = 'neutral'): void {
     servicesNotice.value = message;
     servicesNoticeTone.value = tone;
+}
+
+function setExtensionNotice(message: string, tone: 'success' | 'error' | 'neutral' = 'neutral'): void {
+    extensionNotice.value = message;
+    extensionNoticeTone.value = tone;
 }
 
 function consumeSpotifyNoticeFromUrl(): void {
@@ -127,11 +142,38 @@ async function fetchServices(): Promise<void> {
     try {
         const { data } = await window.axios.get<SettingsServicesResponse>('/api/settings/services');
         spotifyService.value = data.spotify;
+        extensionApiKeyConfigured.value = data.extension.api_key_configured === true;
+        extensionDefaultDomain.value = data.extension.default_domain || 'https://atlas.test';
     } catch (error) {
         console.error('Failed to fetch settings services:', error);
         setServicesNotice('Failed to load services status.', 'error');
     } finally {
         isServicesLoading.value = false;
+    }
+}
+
+async function handleSaveExtensionApiKey(): Promise<void> {
+    extensionNotice.value = '';
+    const normalizedApiKey = extensionApiKey.value.trim();
+
+    if (normalizedApiKey === '') {
+        setExtensionNotice('API key is required.', 'error');
+        return;
+    }
+
+    isExtensionApiKeySaving.value = true;
+    try {
+        await window.axios.post('/api/settings/extension', {
+            api_key: normalizedApiKey,
+        });
+        extensionApiKeyConfigured.value = true;
+        extensionApiKey.value = '';
+        setExtensionNotice('Extension API key saved.', 'success');
+    } catch (error: unknown) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setExtensionNotice(responseMessage || 'Failed to save extension API key.', 'error');
+    } finally {
+        isExtensionApiKeySaving.value = false;
     }
 }
 
@@ -341,7 +383,7 @@ onMounted(() => {
                         <div>
                             <h5 class="text-lg font-semibold text-smart-blue-300 mb-2">Browser Extension</h5>
                             <p class="text-twilight-indigo-200">
-                                Download the latest Atlas browser extension package.
+                                Configure extension API access and download the latest package.
                             </p>
                         </div>
                         <Button as-child variant="secondary">
@@ -351,8 +393,52 @@ onMounted(() => {
                         </Button>
                     </div>
 
+                    <form class="space-y-4 mb-4" @submit.prevent="handleSaveExtensionApiKey">
+                        <div class="grid gap-2">
+                            <label class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">
+                                Extension API Key
+                            </label>
+                            <input
+                                v-model="extensionApiKey"
+                                type="password"
+                                autocomplete="off"
+                                placeholder="Enter or rotate extension API key"
+                                class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                            />
+                            <p class="text-xs text-twilight-indigo-300">
+                                Use this same key in the extension options page.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <Button type="submit" size="sm" :loading="isExtensionApiKeySaving">
+                                Save API Key
+                            </Button>
+                            <span
+                                class="text-xs px-2 py-1 rounded-full border"
+                                :class="extensionApiKeyConfigured
+                                    ? 'border-smart-blue-400 text-smart-blue-200 bg-smart-blue-500/10'
+                                    : 'border-twilight-indigo-500 text-twilight-indigo-200 bg-prussian-blue-700/60'"
+                            >
+                                {{ extensionApiKeyConfigured ? 'Configured' : 'Not configured' }}
+                            </span>
+                        </div>
+                    </form>
+
+                    <p
+                        v-if="extensionNotice"
+                        class="text-sm mb-3"
+                        :class="extensionNoticeTone === 'success'
+                            ? 'text-smart-blue-200'
+                            : extensionNoticeTone === 'error'
+                                ? 'text-danger-200'
+                                : 'text-twilight-indigo-200'"
+                    >
+                        {{ extensionNotice }}
+                    </p>
+
                     <p class="text-xs text-twilight-indigo-300">
-                        The download endpoint always serves the latest backend-published version.
+                        Default extension domain: {{ extensionDefaultDomain }}.
                     </p>
                 </div>
 

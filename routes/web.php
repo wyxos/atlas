@@ -27,6 +27,9 @@ Route::get('/api/csrf', function () {
     return response()->noContent();
 })->name('api.csrf');
 
+Route::get('/api/extension/ping', [\App\Http\Controllers\SettingsServicesController::class, 'extensionPing'])
+    ->name('api.extension.ping');
+
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
@@ -38,6 +41,8 @@ Route::middleware('auth')->group(function () {
     // API routes (must come before SPA catch-all)
     Route::get('/api/settings/services', [\App\Http\Controllers\SettingsServicesController::class, 'index'])
         ->name('api.settings.services.index');
+    Route::post('/api/settings/extension', [\App\Http\Controllers\SettingsServicesController::class, 'extensionApiKeyStore'])
+        ->name('api.settings.extension.store');
     Route::post('/api/settings/services/spotify/refresh', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyRefresh'])
         ->name('api.settings.services.spotify.refresh');
     Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])

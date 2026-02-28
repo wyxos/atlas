@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ExtensionApiKeyService;
 use App\Services\Spotify\SpotifyOAuthException;
 use App\Services\Spotify\SpotifyOAuthService;
 use Illuminate\Http\JsonResponse;
@@ -12,10 +13,42 @@ use Throwable;
 
 class SettingsServicesController extends Controller
 {
-    public function index(Request $request, SpotifyOAuthService $spotify): JsonResponse
+    public function index(Request $request, SpotifyOAuthService $spotify, ExtensionApiKeyService $extensionApiKey): JsonResponse
     {
         return response()->json([
             'spotify' => $spotify->statusForUser($request->user()),
+            'extension' => [
+                'api_key_configured' => $extensionApiKey->isConfigured(),
+                'default_domain' => rtrim((string) config('app.url', 'https://atlas.test'), '/'),
+            ],
+        ]);
+    }
+
+    public function extensionApiKeyStore(Request $request, ExtensionApiKeyService $extensionApiKey): JsonResponse
+    {
+        $validated = $request->validate([
+            'api_key' => ['required', 'string', 'min:8', 'max:255'],
+        ]);
+
+        $extensionApiKey->save(trim((string) $validated['api_key']));
+
+        return response()->json([
+            'api_key_configured' => true,
+            'message' => 'Extension API key saved.',
+        ]);
+    }
+
+    public function extensionPing(Request $request, ExtensionApiKeyService $extensionApiKey): JsonResponse
+    {
+        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
+        if ($apiKey === '' || ! $extensionApiKey->matches($apiKey)) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        return response()->json([
+            'ok' => true,
         ]);
     }
 
