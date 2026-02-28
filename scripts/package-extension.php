@@ -36,7 +36,7 @@ $projectRoot = dirname(__DIR__);
 $extensionRoot = $projectRoot.'/extension';
 $distDirectory = $extensionRoot.'/dist';
 $manifestPath = $extensionRoot.'/manifest.json';
-$downloadsDirectory = $projectRoot.'/public/downloads';
+$defaultDownloadsDirectory = $projectRoot.'/public/downloads';
 
 if (! is_dir($distDirectory)) {
     fwrite(STDERR, "Extension dist directory not found: {$distDirectory}\n");
@@ -60,9 +60,10 @@ if ($currentVersion === '') {
     exit(1);
 }
 
-$options = getopt('', ['version::', 'bump::']);
+$options = getopt('', ['version::', 'bump::', 'output-dir::']);
 $requestedVersion = isset($options['version']) ? trim((string) $options['version']) : null;
 $requestedBump = isset($options['bump']) ? trim((string) $options['bump']) : null;
+$requestedOutputDirectory = isset($options['output-dir']) ? trim((string) $options['output-dir']) : null;
 
 if ($requestedVersion !== null && $requestedVersion !== '' && parseSemver($requestedVersion) === null) {
     fwrite(STDERR, "Invalid --version value '{$requestedVersion}'. Expected SemVer format like 1.2.3.\n");
@@ -71,6 +72,11 @@ if ($requestedVersion !== null && $requestedVersion !== '' && parseSemver($reque
 
 if ($requestedBump !== null && $requestedBump !== '' && ! in_array($requestedBump, ['major', 'minor', 'patch'], true)) {
     fwrite(STDERR, "Invalid --bump value '{$requestedBump}'. Use major, minor, or patch.\n");
+    exit(1);
+}
+
+if ($requestedOutputDirectory !== null && $requestedOutputDirectory === '') {
+    fwrite(STDERR, "Invalid --output-dir value ''. Provide a valid directory path.\n");
     exit(1);
 }
 
@@ -97,6 +103,17 @@ if ($version !== $currentVersion) {
     }
 
     fwrite(STDOUT, "Updated extension manifest version: {$currentVersion} -> {$version}\n");
+}
+
+if (! copy($manifestPath, $distDirectory.'/manifest.json')) {
+    fwrite(STDERR, "Failed to sync extension manifest into dist output.\n");
+    exit(1);
+}
+
+if ($requestedOutputDirectory === null || $requestedOutputDirectory === '') {
+    $downloadsDirectory = $defaultDownloadsDirectory;
+} else {
+    $downloadsDirectory = $requestedOutputDirectory;
 }
 
 if (! is_dir($downloadsDirectory) && ! mkdir($downloadsDirectory, 0775, true) && ! is_dir($downloadsDirectory)) {
