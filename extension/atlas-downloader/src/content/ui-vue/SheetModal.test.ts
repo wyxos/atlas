@@ -39,9 +39,23 @@ function buildProps() {
         id: 1,
         messageType: 'atlas-react',
         path: '/api/extension/files/react',
-        state: 'executing',
+        state: 'completed',
         startedAt: 1_700_000_000_000,
-        finishedAt: null,
+        finishedAt: 1_700_000_000_123,
+        durationMs: 123,
+        payload: {
+          type: 'atlas-react',
+          payload: {
+            url: 'https://example.com/a.jpg',
+          },
+        },
+        response: {
+          ok: true,
+          data: {
+            file_id: 999,
+          },
+        },
+        errorMessage: null,
       },
     ],
     debugTargetUrl: null,
@@ -81,10 +95,15 @@ describe('SheetModal', () => {
     expect(wrapper.emitted('react')).toEqual([[0, 'like']]);
   });
 
-  it('renders request trace path and state', () => {
+  it('renders request payload, response, and duration in requests tab', async () => {
     const wrapper = mount(SheetModal, { props: buildProps() });
 
-    expect(wrapper.find('.atlas-downloader-request-trace-path').text()).toContain('/api/extension/files/react');
-    expect(wrapper.find('.atlas-downloader-request-trace-state').text()).toContain('executing');
+    await wrapper.findAll('.atlas-downloader-tab')[1].trigger('click');
+
+    expect(wrapper.find('.atlas-downloader-request-path').text()).toContain('/api/extension/files/react');
+    expect(wrapper.find('.atlas-downloader-request-duration').text()).toContain('123 ms');
+    expect(wrapper.text()).toContain('Payload');
+    expect(wrapper.text()).toContain('Response');
+    expect(wrapper.find('.atlas-downloader-json-key').exists()).toBe(true);
   });
 });

@@ -45,6 +45,11 @@ type ChromeStorageSync = {
   set: (items: Partial<AtlasSettings>) => Promise<void>;
 };
 
+type ChromeStorageLocal = {
+  get: (keys: string[] | string | Record<string, unknown>) => Promise<Record<string, unknown>>;
+  set: (items: Record<string, unknown>) => Promise<void>;
+};
+
 type ChromeStorageChangedValue = {
   oldValue?: unknown;
   newValue?: unknown;
@@ -151,6 +156,7 @@ type ChromeApi = {
   runtime: ChromeRuntime;
   storage: {
     sync: ChromeStorageSync;
+    local: ChromeStorageLocal;
     onChanged: ChromeStorageArea['onChanged'];
   };
   tabs: ChromeTabs;
@@ -180,6 +186,11 @@ const MESSAGE_DUPLICATE_TAB_BLOCKED = 'atlas-duplicate-tab-blocked';
 const MESSAGE_OPEN_TABS_REQUEST = 'atlas-open-tabs-request';
 const MESSAGE_OPEN_TABS_UPDATED = 'atlas-open-tabs-updated';
 const MESSAGE_REACTION_UPDATED = 'atlas-reaction-updated';
+const MESSAGE_SHEET_STATE_GET = 'atlas-sheet-state-get';
+const MESSAGE_SHEET_STATE_SET = 'atlas-sheet-state-set';
+const MESSAGE_SHEET_STATE_TOGGLE = 'atlas-sheet-state-toggle';
+const MESSAGE_SHEET_STATE_CHANGED = 'atlas-sheet-state-changed';
+const SHEET_OPEN_STORAGE_KEY = 'atlasSheetOpen';
 const SOCKET_EVENT_NAMES = [
   'DownloadTransferCreated',
   'DownloadTransferQueued',
@@ -238,6 +249,7 @@ let realtimeReconnectAttempts = 0;
 const recentlyCreatedTabIds = new Set<number>();
 const recentlyCreatedTabOpeners = new Map<number, number | null>();
 let openTabsBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+let globalSheetOpen = false;
 let realtimeStatus: RealtimeConnectionStatus = {
   state: 'not-configured',
   message: 'Set Atlas base URL and extension token to enable realtime updates.',
@@ -313,6 +325,57 @@ function setActionTitle(details: { tabId?: number; title: string }): void {
   }
 }
 
+async function broadcastSheetState(): Promise<void> {
+  let tabs: ChromeTab[] = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return;
+  }
+
+  for (const tab of tabs) {
+    if (!tab?.id) {
+      continue;
+    }
+
+    sendTabMessage(tab.id, {
+      type: MESSAGE_SHEET_STATE_CHANGED,
+      open: globalSheetOpen,
+    });
+  }
+}
+
+async function setGlobalSheetOpen(open: boolean): Promise<void> {
+  const nextOpen = open === true;
+  if (globalSheetOpen === nextOpen) {
+    return;
+  }
+
+  globalSheetOpen = nextOpen;
+  try {
+    await chrome.storage.local.set({
+      [SHEET_OPEN_STORAGE_KEY]: globalSheetOpen,
+    });
+  } catch {
+    // Ignore storage failures and keep in-memory state.
+  }
+
+  await broadcastSheetState();
+}
+
+async function toggleGlobalSheetOpen(): Promise<void> {
+  await setGlobalSheetOpen(!globalSheetOpen);
+}
+
+async function hydrateGlobalSheetState(): Promise<void> {
+  try {
+    const stored = await chrome.storage.local.get([SHEET_OPEN_STORAGE_KEY]);
+    globalSheetOpen = stored[SHEET_OPEN_STORAGE_KEY] === true;
+  } catch {
+    globalSheetOpen = false;
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   // Right click on the extension toolbar icon shows this menu (in addition to Chrome's built-ins).
   try {
@@ -367,8 +430,8 @@ chrome.action.onClicked.addListener((tab) => {
     return;
   }
 
-  // Left click on the toolbar icon asks the content script to open the sheet.
-  sendTabMessage(tabId, { type: 'atlas-open-sheet' });
+  // Left click on the toolbar icon toggles the sheet globally across tabs.
+  void toggleGlobalSheetOpen();
 });
 
 chrome.commands.onCommand.addListener((command) => {
@@ -384,7 +447,7 @@ chrome.commands.onCommand.addListener((command) => {
         return;
       }
 
-      sendTabMessage(tabId, { type: 'atlas-open-sheet' });
+      void toggleGlobalSheetOpen();
     })
     .catch(() => {
       // Ignore tab query/send errors on restricted pages.
@@ -447,6 +510,48 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const messageType = resolveMessageType(message);
+  if (messageType === MESSAGE_SHEET_STATE_GET) {
+    sendResponse({
+      ok: true,
+      open: globalSheetOpen,
+    });
+    return;
+  }
+  if (messageType === MESSAGE_SHEET_STATE_SET) {
+    const request = message as { open?: unknown };
+    const open = request.open === true;
+    void setGlobalSheetOpen(open)
+      .then(() => {
+        sendResponse({
+          ok: true,
+          open: globalSheetOpen,
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          ok: false,
+          open: globalSheetOpen,
+        });
+      });
+    return true;
+  }
+  if (messageType === MESSAGE_SHEET_STATE_TOGGLE) {
+    void toggleGlobalSheetOpen()
+      .then(() => {
+        sendResponse({
+          ok: true,
+          open: globalSheetOpen,
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          ok: false,
+          open: globalSheetOpen,
+        });
+      });
+    return true;
+  }
+
   if (messageType === MESSAGE_REALTIME_STATUS_REQUEST) {
     sendResponse({
       ok: true,
@@ -527,6 +632,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 void refreshActionForActiveTab();
 void ensureRealtimeConnection();
+void hydrateGlobalSheetState();
 scheduleOpenTabsBroadcast(100);
 
 function reloadExtension() {
