@@ -183,6 +183,41 @@ if (! copy($manifestPath, $distDirectory.'/manifest.json')) {
     exit(1);
 }
 
+$distManifestPath = $distDirectory.'/manifest.json';
+$distManifestData = json_decode((string) file_get_contents($distManifestPath), true);
+if (! is_array($distManifestData)) {
+    fwrite(STDERR, "Dist manifest is not valid JSON: {$distManifestPath}\n");
+    exit(1);
+}
+
+$contentScripts = $distManifestData['content_scripts'] ?? null;
+if (! is_array($contentScripts) || $contentScripts === []) {
+    fwrite(STDERR, "Dist manifest is missing content_scripts.\n");
+    exit(1);
+}
+
+$hasContentEntry = false;
+foreach ($contentScripts as $contentScript) {
+    if (! is_array($contentScript) || ! isset($contentScript['js']) || ! is_array($contentScript['js'])) {
+        continue;
+    }
+
+    if (in_array('content.js', $contentScript['js'], true)) {
+        $hasContentEntry = true;
+        break;
+    }
+}
+
+if (! $hasContentEntry) {
+    fwrite(STDERR, "Dist manifest content_scripts do not include content.js.\n");
+    exit(1);
+}
+
+if (! file_exists($distDirectory.'/content.js')) {
+    fwrite(STDERR, "Dist content script bundle missing: {$distDirectory}/content.js\n");
+    exit(1);
+}
+
 if ($requestedOutputDirectory === null || $requestedOutputDirectory === '') {
     $downloadsDirectory = $defaultDownloadsDirectory;
 } else {

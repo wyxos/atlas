@@ -35,12 +35,7 @@ async function runScanAndRender(): Promise<void> {
             const unsentCandidates = candidates.filter((candidate) => {
                 const signature = candidateSignature(candidate);
                 const previousSignature = processedSignatures.get(candidate.element);
-                if (previousSignature === signature) {
-                    return false;
-                }
-
-                processedSignatures.set(candidate.element, signature);
-                return true;
+                return previousSignature !== signature;
             });
 
             if (unsentCandidates.length === 0) {
@@ -70,6 +65,9 @@ async function runScanAndRender(): Promise<void> {
             });
             const matches = await fetchExtensionMatches(settings.atlasDomain, settings.apiToken, payload);
             renderMatches(unsentCandidates, matches);
+            for (const candidate of unsentCandidates) {
+                processedSignatures.set(candidate.element, candidateSignature(candidate));
+            }
         } while (rerunRequested);
     } catch {
         // Ignore content-side network/runtime failures; next mutation tick will retry.
@@ -104,6 +102,7 @@ function installMutationObserver(): void {
 
 function installViewportListeners(): void {
     window.addEventListener('scroll', scheduleScan, { passive: true });
+    document.addEventListener('scroll', scheduleScan, { capture: true, passive: true });
     window.addEventListener('resize', scheduleScan, { passive: true });
 }
 

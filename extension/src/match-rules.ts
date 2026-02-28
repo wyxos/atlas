@@ -87,7 +87,34 @@ export function hostMatchesRuleDomain(hostname: string, domain: string): boolean
     return normalizedHost === normalizedDomain || normalizedHost.endsWith(`.${normalizedDomain}`);
 }
 
-export function urlMatchesAnyRule(url: string | null, rules: UrlMatchRule[]): boolean {
+function compileRulePattern(pattern: string): RegExp | null {
+    const trimmed = pattern.trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    // Support slash-wrapped shorthand like /art/ from options defaults.
+    const normalized = trimmed.startsWith('/') && trimmed.endsWith('/') && trimmed.length > 2
+        ? trimmed.slice(1, -1)
+        : trimmed;
+
+    try {
+        return new RegExp(normalized, 'i');
+    } catch {
+        return null;
+    }
+}
+
+function activeRulesForPage(rules: UrlMatchRule[], pageHostname?: string): UrlMatchRule[] {
+    if (!pageHostname || pageHostname.trim() === '') {
+        return rules;
+    }
+
+    const matched = rules.filter((rule) => hostMatchesRuleDomain(pageHostname, rule.domain));
+    return matched.length > 0 ? matched : [];
+}
+
+export function urlMatchesAnyRule(url: string | null, rules: UrlMatchRule[], pageHostname?: string): boolean {
     if (!url || !/^https?:\/\//i.test(url)) {
         return false;
     }
@@ -96,26 +123,16 @@ export function urlMatchesAnyRule(url: string | null, rules: UrlMatchRule[]): bo
         return true;
     }
 
-    let parsed: URL;
-    try {
-        parsed = new URL(url);
-    } catch {
+    const activeRules = activeRulesForPage(rules, pageHostname);
+    if (activeRules.length === 0) {
         return false;
     }
 
-    const domainRules = rules.filter((rule) => hostMatchesRuleDomain(parsed.hostname, rule.domain));
-    if (domainRules.length === 0) {
-        return false;
-    }
-
-    for (const rule of domainRules) {
+    for (const rule of activeRules) {
         for (const pattern of rule.regexes) {
-            try {
-                if (new RegExp(pattern, 'i').test(url)) {
-                    return true;
-                }
-            } catch {
-                // Ignore invalid stored patterns.
+            const regex = compileRulePattern(pattern);
+            if (regex && regex.test(url)) {
+                return true;
             }
         }
     }

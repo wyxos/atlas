@@ -14,6 +14,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: [
       'resources/js/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'extension/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
     ],
     coverage: {
       provider: 'v8',
