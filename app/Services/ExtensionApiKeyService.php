@@ -9,13 +9,14 @@ use Illuminate\Support\Str;
 class ExtensionApiKeyService
 {
     private const SETTINGS_KEY = 'extension.api_key_hash';
+
     private const SETTINGS_USER_ID_KEY = 'extension.api_key_user_id';
 
     private const SETTINGS_MACHINE = '';
 
     public function isConfigured(): bool
     {
-        return $this->storedHash() !== null || $this->legacyToken() !== '';
+        return $this->storedHash() !== null;
     }
 
     public function save(string $rawApiKey, int $userId): void
@@ -62,13 +63,8 @@ class ExtensionApiKeyService
         if ($storedHash !== null && $storedHash !== '') {
             return hash_equals($storedHash, hash('sha256', $rawApiKey));
         }
-
-        $legacyToken = $this->legacyToken();
-        if ($legacyToken === '') {
-            return false;
-        }
-
-        return hash_equals($legacyToken, $rawApiKey);
+        
+        return false;
     }
 
     public function resolveUserForApiKey(string $rawApiKey): ?User
@@ -79,7 +75,28 @@ class ExtensionApiKeyService
 
         $userId = $this->storedUserId();
         if ($userId === null) {
-            return null;
+            $fallbackUser = User::query()
+                ->select('id')
+                ->orderBy('id')
+                ->first();
+
+            if (! $fallbackUser) {
+                return null;
+            }
+
+            DB::table('settings')->updateOrInsert(
+                [
+                    'key' => self::SETTINGS_USER_ID_KEY,
+                    'machine' => self::SETTINGS_MACHINE,
+                ],
+                [
+                    'value' => (string) $fallbackUser->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+
+            return $fallbackUser;
         }
 
         return User::query()->select('id')->find($userId);
@@ -99,11 +116,6 @@ class ExtensionApiKeyService
         $trimmed = trim($value);
 
         return $trimmed === '' ? null : $trimmed;
-    }
-
-    private function legacyToken(): string
-    {
-        return trim((string) config('downloads.extension_token', ''));
     }
 
     private function storedUserId(): ?int

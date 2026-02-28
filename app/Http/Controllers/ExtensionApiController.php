@@ -16,7 +16,7 @@ class ExtensionApiController extends Controller
 {
     public function ping(Request $request, ExtensionApiKeyService $extensionApiKey): JsonResponse
     {
-        if (! $this->hasValidApiKey($request, $extensionApiKey)) {
+        if (! $this->resolveExtensionUser($request, $extensionApiKey)) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
             ], 401);
@@ -132,13 +132,6 @@ class ExtensionApiController extends Controller
             ],
             'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
         ]);
-    }
-
-    private function hasValidApiKey(Request $request, ExtensionApiKeyService $extensionApiKey): bool
-    {
-        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
-
-        return $apiKey !== '' && $extensionApiKey->matches($apiKey);
     }
 
     private function resolveExtensionUser(Request $request, ExtensionApiKeyService $extensionApiKey): ?\App\Models\User
