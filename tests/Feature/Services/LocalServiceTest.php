@@ -119,3 +119,38 @@ test('defaultParams returns correct defaults', function () {
     expect($defaults['limit'])->toBe(20);
     expect($defaults['source'])->toBe('all');
 });
+
+test('fetch applies auto_disliked no filter in default local browse mode', function () {
+    $included = File::factory()->create([
+        'auto_disliked' => false,
+    ]);
+
+    File::factory()->create([
+        'auto_disliked' => true,
+    ]);
+
+    File::makeAllSearchable();
+
+    $result = $this->service->fetch([
+        'page' => 1,
+        'limit' => 20,
+        'auto_disliked' => 'no',
+    ]);
+
+    expect($result['files'])->toHaveCount(1)
+        ->and($result['files'][0]->id)->toBe($included->id);
+});
+
+test('fetch returns empty response when reaction mode types has no valid reactions', function () {
+    File::factory()->create();
+    File::makeAllSearchable();
+
+    $result = $this->service->fetch([
+        'reaction_mode' => 'types',
+        'reaction' => ['invalid'],
+    ]);
+
+    expect($result['files'])->toBe([])
+        ->and($result['metadata']['nextCursor'])->toBeNull()
+        ->and($result['metadata']['total'])->toBe(0);
+});

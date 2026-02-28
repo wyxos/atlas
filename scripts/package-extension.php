@@ -81,33 +81,13 @@ function hasExtensionChanges(string $projectRoot): bool
         return true;
     }
 
-    $commands = [
-        'diff-tree --no-commit-id --name-only -r HEAD',
-        'diff --name-only',
-        'diff --cached --name-only',
-    ];
-
-    $files = [];
-    foreach ($commands as $command) {
-        $commandOutput = [];
-        if (runGitCommand($projectRoot, $command, $commandOutput) !== 0) {
-            continue;
-        }
-
-        foreach ($commandOutput as $path) {
-            $path = trim((string) $path);
-            if ($path !== '') {
-                $files[$path] = true;
-            }
-        }
+    $statusOutput = [];
+    if (runGitCommand($projectRoot, 'status --porcelain=1 --untracked-files=all -- extension', $statusOutput) !== 0) {
+        return true;
     }
 
-    if ($files === []) {
-        return false;
-    }
-
-    foreach (array_keys($files) as $path) {
-        if (str_starts_with($path, 'extension/')) {
+    foreach ($statusOutput as $line) {
+        if (trim((string) $line) !== '') {
             return true;
         }
     }
