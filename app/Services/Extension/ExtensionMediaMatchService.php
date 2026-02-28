@@ -113,26 +113,30 @@ class ExtensionMediaMatchService
         $score = 0;
 
         if ($item['media_url']) {
+            // Highest-confidence signal: discovered media URL maps to canonical file URL.
             if ($file->url === $item['media_url']) {
-                $score += 120;
+                $score += 1000;
             }
+            // Lower-confidence fallbacks.
             if ($file->preview_url === $item['media_url']) {
-                $score += 110;
+                $score += 500;
             }
             if ($file->referrer_url === $item['media_url']) {
-                $score += 40;
+                $score += 120;
             }
         }
 
         if ($item['anchor_url']) {
+            // Second-highest confidence: anchor URL maps to stored referrer URL.
             if ($file->referrer_url === $item['anchor_url']) {
-                $score += 100;
+                $score += 900;
             }
+            // Lower-confidence fallbacks.
             if ($file->url === $item['anchor_url']) {
-                $score += 80;
+                $score += 220;
             }
             if ($file->preview_url === $item['anchor_url']) {
-                $score += 60;
+                $score += 140;
             }
         }
 
