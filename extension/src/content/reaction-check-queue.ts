@@ -14,6 +14,7 @@ export type BadgeMatchResult = {
 type MatchQueueItem = {
     key: string;
     mediaUrl: string;
+    mediaUrlHash: string;
     resolve: (result: BadgeMatchResult) => void;
     promise: Promise<BadgeMatchResult>;
 };
@@ -33,6 +34,7 @@ const RESULT_CACHE_TTL_MS = 5 * 60 * 1000;
 const pendingByKey = new Map<string, MatchQueueItem>();
 const inFlightByKey = new Map<string, Promise<BadgeMatchResult>>();
 const resultCacheByKey = new Map<string, { result: BadgeMatchResult; cachedAt: number }>();
+const urlHashByUrl = new Map<string, string>();
 let flushTimer: number | null = null;
 
 function emptyResult(): BadgeMatchResult {
@@ -66,14 +68,14 @@ async function requestBatch(batch: MatchQueueItem[]): Promise<Map<string, BadgeM
             return new Map();
         }
 
-        const items: Array<{ request_id: string; url: string }> = [];
+        const items: Array<{ request_id: string; url_hash: string }> = [];
 
         batch.forEach((entry, index) => {
             const requestId = `req-${index}`;
             keyByRequestId.set(requestId, entry.key);
             items.push({
                 request_id: requestId,
-                url: entry.mediaUrl,
+                url_hash: entry.mediaUrlHash,
             });
         });
 
@@ -122,6 +124,22 @@ async function requestBatch(batch: MatchQueueItem[]): Promise<Map<string, BadgeM
     }
 }
 
+async function sha256Hex(input: string): Promise<string> {
+    const cached = urlHashByUrl.get(input);
+    if (cached) {
+        return cached;
+    }
+
+    const bytes = new TextEncoder().encode(input);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    const hash = Array.from(new Uint8Array(digest))
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+
+    urlHashByUrl.set(input, hash);
+    return hash;
+}
+
 async function flushQueue(): Promise<void> {
     const batch = Array.from(pendingByKey.values());
     pendingByKey.clear();
@@ -167,7 +185,7 @@ function scheduleFlush(): void {
     }, BATCH_DELAY_MS);
 }
 
-export function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatchResult> {
+export async function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatchResult> {
     const normalizedMediaUrl = normalizeUrl(mediaUrl);
     if (normalizedMediaUrl === null) {
         return Promise.resolve(emptyResult());
@@ -189,6 +207,8 @@ export function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatc
         return inFlight;
     }
 
+    const mediaUrlHash = await sha256Hex(normalizedMediaUrl);
+
     let resolver: (result: BadgeMatchResult) => void = () => {};
     const promise = new Promise<BadgeMatchResult>((resolve) => {
         resolver = resolve;
@@ -197,6 +217,7 @@ export function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatc
     pendingByKey.set(key, {
         key,
         mediaUrl: normalizedMediaUrl,
+        mediaUrlHash,
         resolve: resolver,
         promise,
     });
