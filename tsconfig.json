@@ -30,6 +30,7 @@
   },
   "include": [
     "resources/js/**/*",
+    "extension/**/*",
     "scripts/**/*",
     "packages/**/*",
     "vite.config.js",
