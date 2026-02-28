@@ -8,15 +8,27 @@ use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
-function setExtensionApiKey(string $value): void
+function setExtensionApiKey(string $value, ?int $userId = null): void
 {
-    DB::table('settings')->insert([
+    DB::table('settings')->updateOrInsert([
         'key' => 'extension.api_key_hash',
         'machine' => '',
+    ], [
         'value' => hash('sha256', $value),
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+
+    if ($userId !== null) {
+        DB::table('settings')->updateOrInsert([
+            'key' => 'extension.api_key_user_id',
+            'machine' => '',
+        ], [
+            'value' => (string) $userId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
 }
 
 test('extension matches endpoint requires a valid api key', function () {
@@ -33,8 +45,7 @@ test('extension matches endpoint requires a valid api key', function () {
 
 test('extension matches endpoint returns status for matched and unmatched media', function () {
     $user = User::factory()->create();
-    config(['downloads.extension_user_id' => $user->id]);
-    setExtensionApiKey('valid-api-key');
+    setExtensionApiKey('valid-api-key', $user->id);
 
     $file = File::factory()->create([
         'url' => 'https://cdn.example.test/media/full.jpg',
@@ -88,8 +99,7 @@ test('extension matches endpoint returns status for matched and unmatched media'
 
 test('extension matches prefers media url match over referrer fallback for same candidate', function () {
     $user = User::factory()->create();
-    config(['downloads.extension_user_id' => $user->id]);
-    setExtensionApiKey('valid-api-key');
+    setExtensionApiKey('valid-api-key', $user->id);
 
     $mediaMatch = File::factory()->create([
         'url' => 'https://images-wixmp.com/f/media-priority.jpg',
@@ -137,7 +147,8 @@ test('extension matches prefers media url match over referrer fallback for same 
 });
 
 test('extension matches resolves legacy rows without hash columns via exact url fallback', function () {
-    setExtensionApiKey('valid-api-key');
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
 
     $file = File::factory()->create([
         'url' => 'https://images-wixmp.com/f/legacy-null-hash.jpg',

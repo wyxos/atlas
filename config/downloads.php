@@ -40,8 +40,4 @@ return [
     'yt_dlp_cookies_from_browser' => env('DOWNLOADS_YT_DLP_COOKIES_FROM_BROWSER'),
 
     'extension_token' => env('ATLAS_EXTENSION_TOKEN'),
-
-    // User used for extension-triggered reactions/downloads.
-    // If unset and there is exactly 1 user in the DB, Atlas will use that user.
-    'extension_user_id' => env('ATLAS_EXTENSION_USER_ID'),
 ];

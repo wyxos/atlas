@@ -8,15 +8,27 @@ use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
-function setBadgeChecksExtensionApiKey(string $value): void
+function setBadgeChecksExtensionApiKey(string $value, ?int $userId = null): void
 {
-    DB::table('settings')->insert([
+    DB::table('settings')->updateOrInsert([
         'key' => 'extension.api_key_hash',
         'machine' => '',
+    ], [
         'value' => hash('sha256', $value),
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+
+    if ($userId !== null) {
+        DB::table('settings')->updateOrInsert([
+            'key' => 'extension.api_key_user_id',
+            'machine' => '',
+        ], [
+            'value' => (string) $userId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
 }
 
 test('extension badge checks endpoint requires a valid api key', function () {
@@ -33,8 +45,7 @@ test('extension badge checks endpoint requires a valid api key', function () {
 
 test('extension badge checks endpoint returns deterministic per-item status', function () {
     $user = User::factory()->create();
-    config(['downloads.extension_user_id' => $user->id]);
-    setBadgeChecksExtensionApiKey('valid-api-key');
+    setBadgeChecksExtensionApiKey('valid-api-key', $user->id);
 
     $matchedFile = File::factory()->create([
         'url' => 'https://cdn.example.test/media/full.jpg',
@@ -83,8 +94,7 @@ test('extension badge checks endpoint returns deterministic per-item status', fu
 
 test('extension badge checks performs batched queries for large request sets', function () {
     $user = User::factory()->create();
-    config(['downloads.extension_user_id' => $user->id]);
-    setBadgeChecksExtensionApiKey('valid-api-key');
+    setBadgeChecksExtensionApiKey('valid-api-key', $user->id);
 
     $matchedUrls = [];
     for ($index = 0; $index < 30; $index++) {

@@ -4,29 +4,15 @@ namespace App\Services\Extension;
 
 use App\Models\File;
 use App\Models\Reaction;
-use App\Models\User;
 use Illuminate\Support\Collection;
 
 class ExtensionMediaMatchService
 {
-    public function resolveReactionUser(): ?User
-    {
-        $configuredUserId = (int) config('downloads.extension_user_id', 0);
-        if ($configuredUserId > 0) {
-            return User::query()->select('id')->find($configuredUserId);
-        }
-
-        return User::query()
-            ->select('id')
-            ->orderBy('id')
-            ->first();
-    }
-
     /**
      * @param  array<int, array{request_id: string, url_hash: string}>  $items
      * @return array<int, array{request_id: string, request_index: int, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
-    public function badgeChecks(array $items): array
+    public function badgeChecks(array $items, int $reactionUserId): array
     {
         $normalizedItems = collect($items)->values()->map(function (array $item, int $index): array {
             $urlHash = strtolower(trim((string) ($item['url_hash'] ?? '')));
@@ -48,7 +34,7 @@ class ExtensionMediaMatchService
         $matchedFilesById = $filesByHash
             ->mapWithKeys(fn (File $file): array => [$file->id => $file]);
 
-        $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values());
+        $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values(), $reactionUserId);
 
         return $normalizedItems->map(function (array $item) use ($filesByHash, $reactionsByFileId): array {
             /** @var File|null $file */
@@ -103,7 +89,7 @@ class ExtensionMediaMatchService
      * @param  array<int, array{candidate_id: string, type: string, url: string}>  $items
      * @return array<int, array{id: string, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
-    public function match(array $items): array
+    public function match(array $items, int $reactionUserId): array
     {
         $normalizedItems = collect($items)->map(function (array $item): array {
             $type = trim((string) ($item['type'] ?? ''));
@@ -159,7 +145,7 @@ class ExtensionMediaMatchService
             ->filter()
             ->mapWithKeys(fn (File $file): array => [$file->id => $file]);
 
-        $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values());
+        $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values(), $reactionUserId);
 
         return $candidateIds->map(function (string $candidateId) use ($matchedByCandidateId, $reactionsByFileId): array {
             /** @var File|null $file */
@@ -288,22 +274,17 @@ class ExtensionMediaMatchService
      * @param  Collection<int, int>  $fileIds
      * @return Collection<int, array{type: string, reacted_at: string|null}>
      */
-    private function loadReactions(Collection $fileIds): Collection
+    private function loadReactions(Collection $fileIds, int $reactionUserId): Collection
     {
         if ($fileIds->isEmpty()) {
             return collect();
         }
 
-        $reactionUserId = $this->resolveReactionUser()?->id;
-
         $query = Reaction::query()
             ->select(['file_id', 'type', 'created_at'])
             ->whereIn('file_id', $fileIds->all())
+            ->where('user_id', $reactionUserId)
             ->orderByDesc('created_at');
-
-        if ($reactionUserId !== null) {
-            $query->where('user_id', $reactionUserId);
-        }
 
         return $query
             ->get()

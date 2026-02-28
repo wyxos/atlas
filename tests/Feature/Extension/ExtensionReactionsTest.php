@@ -10,15 +10,27 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
-function setExtensionReactionApiKey(string $value): void
+function setExtensionReactionApiKey(string $value, ?int $userId = null): void
 {
-    DB::table('settings')->insert([
+    DB::table('settings')->updateOrInsert([
         'key' => 'extension.api_key_hash',
         'machine' => '',
+    ], [
         'value' => hash('sha256', $value),
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+
+    if ($userId !== null) {
+        DB::table('settings')->updateOrInsert([
+            'key' => 'extension.api_key_user_id',
+            'machine' => '',
+        ], [
+            'value' => (string) $userId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
 }
 
 test('extension reactions endpoint requires a valid api key', function () {
@@ -36,8 +48,7 @@ test('extension reactions endpoint creates file applies reaction and queues down
     Queue::fake();
 
     $user = User::factory()->create();
-    config(['downloads.extension_user_id' => $user->id]);
-    setExtensionReactionApiKey('valid-api-key');
+    setExtensionReactionApiKey('valid-api-key', $user->id);
 
     $response = $this->withHeaders([
         'X-Atlas-Api-Key' => 'valid-api-key',

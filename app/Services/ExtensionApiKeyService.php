@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ExtensionApiKeyService
 {
     private const SETTINGS_KEY = 'extension.api_key_hash';
+    private const SETTINGS_USER_ID_KEY = 'extension.api_key_user_id';
 
     private const SETTINGS_MACHINE = '';
 
@@ -16,7 +18,7 @@ class ExtensionApiKeyService
         return $this->storedHash() !== null || $this->legacyToken() !== '';
     }
 
-    public function save(string $rawApiKey): void
+    public function save(string $rawApiKey, int $userId): void
     {
         $hash = hash('sha256', $rawApiKey);
         $now = now();
@@ -32,12 +34,24 @@ class ExtensionApiKeyService
                 'updated_at' => $now,
             ]
         );
+
+        DB::table('settings')->updateOrInsert(
+            [
+                'key' => self::SETTINGS_USER_ID_KEY,
+                'machine' => self::SETTINGS_MACHINE,
+            ],
+            [
+                'value' => (string) $userId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]
+        );
     }
 
-    public function generateAndSave(): string
+    public function generateAndSave(int $userId): string
     {
         $generatedKey = 'atlas_'.Str::random(48);
-        $this->save($generatedKey);
+        $this->save($generatedKey, $userId);
 
         return $generatedKey;
     }
@@ -55,6 +69,20 @@ class ExtensionApiKeyService
         }
 
         return hash_equals($legacyToken, $rawApiKey);
+    }
+
+    public function resolveUserForApiKey(string $rawApiKey): ?User
+    {
+        if (! $this->matches($rawApiKey)) {
+            return null;
+        }
+
+        $userId = $this->storedUserId();
+        if ($userId === null) {
+            return null;
+        }
+
+        return User::query()->select('id')->find($userId);
     }
 
     private function storedHash(): ?string
@@ -76,5 +104,26 @@ class ExtensionApiKeyService
     private function legacyToken(): string
     {
         return trim((string) config('downloads.extension_token', ''));
+    }
+
+    private function storedUserId(): ?int
+    {
+        $value = DB::table('settings')
+            ->where('key', self::SETTINGS_USER_ID_KEY)
+            ->where('machine', self::SETTINGS_MACHINE)
+            ->value('value');
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '' || ! ctype_digit($trimmed)) {
+            return null;
+        }
+
+        $userId = (int) $trimmed;
+
+        return $userId > 0 ? $userId : null;
     }
 }
