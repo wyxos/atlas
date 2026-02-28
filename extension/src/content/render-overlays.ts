@@ -5,7 +5,6 @@ const BADGE_ATTR = 'data-atlas-overlay-badge';
 const APPLIED_ATTR = 'data-atlas-overlay-applied';
 const REACTION_BAR_ATTR = 'data-atlas-overlay-reaction-bar';
 const HOVER_BOUND_ATTR = 'data-atlas-overlay-hover-bound';
-const MEDIA_HOVER_BOUND_ATTR = 'data-atlas-overlay-media-hover-bound';
 
 type ReactionWidgetItem = {
     ariaLabel: string;
@@ -232,25 +231,8 @@ function ensureStandaloneReactionBar(wrapper: HTMLDivElement): HTMLDivElement {
         wrapper.addEventListener('mouseleave', hideBar);
     }
 
-    const media = wrapper.querySelector<HTMLImageElement | HTMLVideoElement>('img,video');
-    if (media && media.getAttribute(MEDIA_HOVER_BOUND_ATTR) !== '1') {
-        media.setAttribute(MEDIA_HOVER_BOUND_ATTR, '1');
-        media.addEventListener('pointerenter', () => {
-            bar.style.opacity = '1';
-            bar.style.pointerEvents = 'auto';
-        });
-        media.addEventListener('pointerleave', () => {
-            bar.style.opacity = '0';
-            bar.style.pointerEvents = 'none';
-        });
-        media.addEventListener('mouseover', () => {
-            bar.style.opacity = '1';
-            bar.style.pointerEvents = 'auto';
-        });
-    }
-
     wrapper.appendChild(bar);
-    if (wrapper.matches(':hover') || media?.matches(':hover')) {
+    if (wrapper.matches(':hover') || wrapper.querySelector('img:hover,video:hover') !== null) {
         bar.style.opacity = '1';
         bar.style.pointerEvents = 'auto';
     }
