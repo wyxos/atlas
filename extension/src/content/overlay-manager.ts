@@ -1,10 +1,16 @@
 import type { MediaElement } from './media-utils';
+import { createReactionBadgeHost } from './reaction-badge-app';
 
 const BADGE_ATTR = 'data-atlas-media-red-badge';
 const APPLIED_ATTR = 'data-atlas-media-red-applied';
 
+type BadgeHost = {
+    element: HTMLDivElement;
+    unmount: () => void;
+};
+
 export class OverlayManager {
-    private readonly badgesByMedia = new WeakMap<MediaElement, HTMLDivElement>();
+    private readonly badgesByMedia = new WeakMap<MediaElement, BadgeHost>();
     private readonly activeMedia = new Set<MediaElement>();
 
     apply(media: MediaElement): void {
@@ -16,9 +22,10 @@ export class OverlayManager {
 
     remove(media: MediaElement): void {
         this.activeMedia.delete(media);
-        const badge = this.badgesByMedia.get(media);
-        if (badge) {
-            badge.remove();
+        const badgeHost = this.badgesByMedia.get(media);
+        if (badgeHost) {
+            badgeHost.unmount();
+            badgeHost.element.remove();
             this.badgesByMedia.delete(media);
         }
         media.removeAttribute(APPLIED_ATTR);
@@ -37,13 +44,14 @@ export class OverlayManager {
     }
 
     private ensureBadge(media: MediaElement): HTMLDivElement {
-        const existing = this.badgesByMedia.get(media);
-        if (existing) {
-            this.syncBadgePlacement(media, existing);
-            return existing;
+        const existingHost = this.badgesByMedia.get(media);
+        if (existingHost) {
+            this.syncBadgePlacement(media, existingHost.element);
+            return existingHost.element;
         }
 
-        const badge = document.createElement('div');
+        const badgeHost = createReactionBadgeHost();
+        const badge = badgeHost.element;
         badge.setAttribute(BADGE_ATTR, '1');
         badge.style.position = 'absolute';
         badge.style.left = '50%';
@@ -51,14 +59,11 @@ export class OverlayManager {
         badge.style.transform = 'translateX(-50%)';
         badge.style.width = '320px';
         badge.style.height = '40px';
-        badge.style.background = '#dc2626';
-        badge.style.border = '2px solid #ef4444';
         badge.style.borderRadius = '8px';
-        badge.style.boxSizing = 'border-box';
         badge.style.pointerEvents = 'none';
         badge.style.zIndex = '10';
         this.syncBadgePlacement(media, badge);
-        this.badgesByMedia.set(media, badge);
+        this.badgesByMedia.set(media, badgeHost);
         return badge;
     }
 
