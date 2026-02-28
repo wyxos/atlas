@@ -82,10 +82,19 @@ test('settings services includes extension api key status', function () {
 });
 
 test('extension ping validates api key', function () {
+    $user = User::factory()->create();
+
     DB::table('settings')->insert([
         'key' => 'extension.api_key_hash',
         'machine' => '',
         'value' => hash('sha256', 'secret-key-123'),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('settings')->insert([
+        'key' => 'extension.api_key_user_id',
+        'machine' => '',
+        'value' => (string) $user->id,
         'created_at' => now(),
         'updated_at' => now(),
     ]);

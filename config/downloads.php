@@ -38,6 +38,4 @@ return [
     // Optional browser cookie source for yt-dlp (e.g. "firefox", "chrome", "edge").
     // Used only when DOWNLOADS_YT_DLP_COOKIES_PATH is not set.
     'yt_dlp_cookies_from_browser' => env('DOWNLOADS_YT_DLP_COOKIES_FROM_BROWSER'),
-
-    'extension_token' => env('ATLAS_EXTENSION_TOKEN'),
 ];
