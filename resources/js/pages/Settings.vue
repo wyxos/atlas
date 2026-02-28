@@ -62,6 +62,8 @@ type SettingsServicesResponse = {
 const spotifyService = ref<SpotifyServiceStatus | null>(null);
 const extensionApiKeyConfigured = ref(false);
 const extensionDefaultDomain = ref('https://atlas.test');
+const generatedExtensionApiKey = ref('');
+const showGeneratedExtensionApiKey = ref(false);
 const extensionNotice = ref('');
 const extensionNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
 const isExtensionApiKeyGenerating = ref(false);
@@ -161,6 +163,8 @@ async function handleGenerateExtensionApiKey(): Promise<void> {
         );
 
         extensionApiKeyConfigured.value = data.api_key_configured === true;
+        generatedExtensionApiKey.value = data.api_key;
+        showGeneratedExtensionApiKey.value = false;
 
         try {
             await navigator.clipboard.writeText(data.api_key);
@@ -409,6 +413,28 @@ onMounted(() => {
                         >
                             {{ extensionApiKeyConfigured ? 'Configured' : 'Not configured' }}
                         </span>
+                    </div>
+
+                    <div v-if="generatedExtensionApiKey" class="space-y-2 mb-4">
+                        <label class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">
+                            Generated API Key
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <input
+                                :type="showGeneratedExtensionApiKey ? 'text' : 'password'"
+                                :value="generatedExtensionApiKey"
+                                readonly
+                                class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none"
+                            />
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                @click="showGeneratedExtensionApiKey = !showGeneratedExtensionApiKey"
+                            >
+                                {{ showGeneratedExtensionApiKey ? 'Hide' : 'Show' }}
+                            </Button>
+                        </div>
                     </div>
 
                     <p

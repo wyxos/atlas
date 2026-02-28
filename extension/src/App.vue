@@ -2,45 +2,12 @@
 /* global chrome */
 import { onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
-import { getStoredOptions } from './atlas-options';
+import { resolveApiConnectionStatus } from './atlas-api';
 
 const extensionVersion = __ATLAS_EXTENSION_VERSION__;
 
 const statusLabel = ref('Checking');
 const statusDetail = ref('Validating extension API access.');
-
-async function checkApiConnection(): Promise<void> {
-    try {
-        const stored = await getStoredOptions();
-        const domain = stored.atlasDomain;
-        const apiToken = stored.apiToken;
-
-        if (apiToken === '') {
-            statusLabel.value = 'Setup required';
-            statusDetail.value = 'Set the API key in extension options before using Atlas API actions.';
-            return;
-        }
-
-        const response = await fetch(`${domain}/api/extension/ping`, {
-            method: 'GET',
-            headers: {
-                'X-Atlas-Api-Key': apiToken,
-            },
-        });
-
-        if (response.ok) {
-            statusLabel.value = 'Ready';
-            statusDetail.value = `Connected to ${domain}`;
-            return;
-        }
-
-        statusLabel.value = 'Auth failed';
-        statusDetail.value = 'API key or domain is invalid. Update extension options.';
-    } catch {
-        statusLabel.value = 'Offline';
-        statusDetail.value = 'Unable to verify API access. Check extension options.';
-    }
-}
 
 function openOptionsPage(): void {
     chrome.runtime.openOptionsPage(() => {
@@ -51,7 +18,10 @@ function openOptionsPage(): void {
 }
 
 onMounted(() => {
-    void checkApiConnection();
+    void resolveApiConnectionStatus().then((status) => {
+        statusLabel.value = status.label;
+        statusDetail.value = status.detail;
+    });
 });
 </script>
 
