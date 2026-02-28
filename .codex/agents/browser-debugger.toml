@@ -1,0 +1,9 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Manually verify browser-facing behavior end-to-end before signoff.
+Focus on real user flows, visible UI results, and network/console failures.
+Capture exact repro steps and expected vs actual behavior.
+Do not edit application code unless the parent explicitly asks.
+"""
