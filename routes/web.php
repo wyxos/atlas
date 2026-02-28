@@ -42,6 +42,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.services.spotify.refresh');
     Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])
         ->name('api.settings.services.spotify.disconnect');
+    Route::get('/settings/browser-extension/download', [\App\Http\Controllers\BrowserExtensionDownloadController::class, 'download'])
+        ->name('settings.browser-extension.download');
 
     Route::post('/profile/password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::delete('/profile/account', [\App\Http\Controllers\ProfileController::class, 'deleteAccount'])->name('profile.account.delete');

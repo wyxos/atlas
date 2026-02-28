@@ -173,6 +173,7 @@ After you've finished editing
   - Types: `resources/js/types/`
   - UI design system: `resources/js/components/ui/` → [see resources/js/components/ui/AGENTS.md](resources/js/components/ui/AGENTS.md)
 - **Browser Extension Source**: `extension/` (Vite + Vue + TypeScript, popup entry: `extension/popup.html`)
+  - Build + package command: `npm run package:extension` (creates `public/downloads/atlas-extension.zip` and a versioned archive)
 
 ### Testing
 - **Test Suite**: `tests/` → [see tests/AGENTS.md](tests/AGENTS.md)
