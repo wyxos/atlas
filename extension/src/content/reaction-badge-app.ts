@@ -18,7 +18,7 @@ const reactionButtonStyle = {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '4px',
-    padding: '8px',
+    padding: '4px',
 } as const;
 
 const AtlasReactionBadge = defineComponent({
@@ -33,11 +33,11 @@ const AtlasReactionBadge = defineComponent({
                     justifyContent: 'center',
                     borderRadius: '8px',
                     background: 'rgba(0, 0, 0, 0.6)',
-                    backdropFilter: 'blur(8px)',
+                    backdropFilter: 'blur(4px)',
                     color: '#ffffff',
                     pointerEvents: 'none',
                     gap: '8px',
-                    padding: '8px 16px',
+                    padding: '4px 8px',
                 },
             },
             [
