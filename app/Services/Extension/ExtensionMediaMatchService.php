@@ -16,13 +16,10 @@ class ExtensionMediaMatchService
             return User::query()->select('id')->find($configuredUserId);
         }
 
-        $singleUser = User::query()->select('id')->limit(2)->pluck('id');
-
-        if ($singleUser->count() !== 1) {
-            return null;
-        }
-
-        return User::query()->select('id')->find((int) $singleUser->first());
+        return User::query()
+            ->select('id')
+            ->orderBy('id')
+            ->first();
     }
 
     /**

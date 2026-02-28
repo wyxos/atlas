@@ -93,7 +93,6 @@ class ExtensionApiController extends Controller
             'url' => ['required', 'string', 'max:4096'],
             'referrer_url' => ['nullable', 'string', 'max:4096'],
             'referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
-            'preview_url' => ['nullable', 'string', 'max:4096'],
         ]);
 
         $user = $mediaMatchService->resolveReactionUser();
@@ -112,7 +111,7 @@ class ExtensionApiController extends Controller
 
         $referrerUrl = $this->normalizeOptionalUrl($validated['referrer_url_hash_aware'] ?? null)
             ?? $this->normalizeOptionalUrl($validated['referrer_url'] ?? null);
-        $previewUrl = $this->normalizeOptionalUrl($validated['preview_url'] ?? null);
+        $previewUrl = $url;
 
         $file = $this->findOrCreateFile($url, $referrerUrl, $previewUrl);
         $result = $fileReactionService->set($file, $user, $validated['type']);
