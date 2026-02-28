@@ -1,3 +1,4 @@
+ 
 import { describe, it, expect, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { nextTick } from 'vue';
@@ -8,8 +9,6 @@ import type { FeedItem } from '@/composables/useTabs';
 const {
     mount,
     mockAxios,
-    mockHandlePillClick,
-    mockHandlePillAuxClick,
     mockRemoveMany,
 } = setup;
 
@@ -369,3 +368,4 @@ describe('TabContent - Container Badges', () => {
         });
     });
 });
+
