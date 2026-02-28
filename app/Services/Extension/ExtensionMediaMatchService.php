@@ -9,6 +9,22 @@ use Illuminate\Support\Collection;
 
 class ExtensionMediaMatchService
 {
+    public function resolveReactionUser(): ?User
+    {
+        $configuredUserId = (int) config('downloads.extension_user_id', 0);
+        if ($configuredUserId > 0) {
+            return User::query()->select('id')->find($configuredUserId);
+        }
+
+        $singleUser = User::query()->select('id')->limit(2)->pluck('id');
+
+        if ($singleUser->count() !== 1) {
+            return null;
+        }
+
+        return User::query()->select('id')->find((int) $singleUser->first());
+    }
+
     /**
      * @param  array<int, array{request_id: string, url_hash: string}>  $items
      * @return array<int, array{request_id: string, request_index: int, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
@@ -281,7 +297,7 @@ class ExtensionMediaMatchService
             return collect();
         }
 
-        $reactionUserId = $this->resolveReactionUserId();
+        $reactionUserId = $this->resolveReactionUser()?->id;
 
         $query = Reaction::query()
             ->select(['file_id', 'type', 'created_at'])
@@ -300,18 +316,6 @@ class ExtensionMediaMatchService
                 'type' => $reaction->type,
                 'reacted_at' => $reaction->created_at?->toIso8601String(),
             ]);
-    }
-
-    private function resolveReactionUserId(): ?int
-    {
-        $configuredUserId = (int) config('downloads.extension_user_id', 0);
-        if ($configuredUserId > 0 && User::query()->whereKey($configuredUserId)->exists()) {
-            return $configuredUserId;
-        }
-
-        $singleUser = User::query()->select('id')->limit(2)->pluck('id');
-
-        return $singleUser->count() === 1 ? (int) $singleUser->first() : null;
     }
 
     private function emptyMatch(string $id): array

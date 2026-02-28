@@ -34,6 +34,8 @@ Route::post('/api/extension/matches', [\App\Http\Controllers\ExtensionApiControl
     ->name('api.extension.matches');
 Route::post('/api/extension/badges/checks', [\App\Http\Controllers\ExtensionApiController::class, 'badgeChecks'])
     ->name('api.extension.badges.checks');
+Route::post('/api/extension/reactions', [\App\Http\Controllers\ExtensionApiController::class, 'react'])
+    ->name('api.extension.reactions');
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
