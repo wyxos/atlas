@@ -27,11 +27,15 @@ const errorMessage = ref('');
 const isSaved = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
 const statusDetail = ref('Validating extension API access.');
+const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
+const reverbStatusDetail = ref('Checking Reverb connection.');
 
 async function refreshApiConnectionStatus(): Promise<void> {
     const status = await resolveApiConnectionStatus();
     statusLabel.value = status.label;
     statusDetail.value = status.detail;
+    reverbStatusLabel.value = status.reverbLabel;
+    reverbStatusDetail.value = status.reverbDetail;
 }
 
 async function saveOptions(): Promise<void> {
@@ -146,6 +150,11 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                     <span class="font-medium text-smart-blue-200">{{ extensionVersion }}</span>
                 </p>
                 <p class="text-sm text-twilight-indigo-200">{{ statusDetail }}</p>
+                <p class="text-sm text-twilight-indigo-200">
+                    Reverb:
+                    <span class="font-medium text-smart-blue-200">{{ reverbStatusLabel }}</span>
+                    · {{ reverbStatusDetail }}
+                </p>
             </header>
 
             <form class="space-y-4" @submit.prevent="saveOptions">

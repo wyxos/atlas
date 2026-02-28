@@ -12,6 +12,8 @@ export default defineConfig({
     },
     define: {
         'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env': JSON.stringify({}),
+        process: JSON.stringify({ env: {} }),
         __VUE_OPTIONS_API__: true,
         __VUE_PROD_DEVTOOLS__: false,
     },

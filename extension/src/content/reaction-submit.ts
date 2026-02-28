@@ -1,11 +1,18 @@
 import { getStoredOptions } from '../atlas-options';
 import { resolveReactionMediaUrl, type MediaElement } from './media-utils';
 import type { BadgeReactionType } from './reaction-check-queue';
+import type { ReverbConfig } from '../reverb-client';
 
 type SubmitReactionResult = {
     ok: boolean;
     reaction: BadgeReactionType | null;
     exists: boolean;
+    fileId: number | null;
+    downloadRequested: boolean;
+    downloadTransferId: number | null;
+    downloadStatus: string | null;
+    downloadProgressPercent: number | null;
+    reverbConfig: ReverbConfig | null;
 };
 
 function parseReactionType(value: unknown): BadgeReactionType | null {
@@ -51,19 +58,70 @@ function getExistsFromPayload(payload: unknown): boolean | null {
     return typeof exists === 'boolean' ? exists : null;
 }
 
+function numberOrNull(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function stringOrNull(value: unknown): string | null {
+    return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+function parseReverbConfig(value: unknown): ReverbConfig | null {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const row = value as Record<string, unknown>;
+    const enabled = row.enabled === true;
+    const key = stringOrNull(row.key) ?? '';
+    const host = stringOrNull(row.host) ?? '';
+    const channel = stringOrNull(row.channel) ?? '';
+    const scheme = row.scheme === 'http' ? 'http' : 'https';
+    const port = numberOrNull(row.port) ?? 443;
+
+    return {
+        enabled,
+        key,
+        host,
+        port,
+        scheme,
+        channel,
+    };
+}
+
 export async function submitBadgeReaction(
     media: MediaElement,
     reactionType: BadgeReactionType,
 ): Promise<SubmitReactionResult> {
     const mediaUrl = resolveReactionMediaUrl(media);
     if (mediaUrl === null) {
-        return { ok: false, reaction: null, exists: false };
+        return {
+            ok: false,
+            reaction: null,
+            exists: false,
+            fileId: null,
+            downloadRequested: false,
+            downloadTransferId: null,
+            downloadStatus: null,
+            downloadProgressPercent: null,
+            reverbConfig: null,
+        };
     }
 
     try {
         const stored = await getStoredOptions();
         if (stored.apiToken === '') {
-            return { ok: false, reaction: null, exists: false };
+            return {
+                ok: false,
+                reaction: null,
+                exists: false,
+                fileId: null,
+                downloadRequested: false,
+                downloadTransferId: null,
+                downloadStatus: null,
+                downloadProgressPercent: null,
+                reverbConfig: null,
+            };
         }
 
         const response = await fetch(`${stored.atlasDomain}/api/extension/reactions`, {
@@ -80,7 +138,17 @@ export async function submitBadgeReaction(
         });
 
         if (!response.ok) {
-            return { ok: false, reaction: null, exists: false };
+            return {
+                ok: false,
+                reaction: null,
+                exists: false,
+                fileId: null,
+                downloadRequested: false,
+                downloadTransferId: null,
+                downloadStatus: null,
+                downloadProgressPercent: null,
+                reverbConfig: null,
+            };
         }
 
         let payload: unknown = null;
@@ -92,12 +160,31 @@ export async function submitBadgeReaction(
 
         const extractedReaction = getReactionFromPayload(payload);
         const extractedExists = getExistsFromPayload(payload);
+        const rootPayload = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+        const downloadPayload = rootPayload.download && typeof rootPayload.download === 'object'
+            ? rootPayload.download as Record<string, unknown>
+            : {};
+        const filePayload = rootPayload.file && typeof rootPayload.file === 'object'
+            ? rootPayload.file as Record<string, unknown>
+            : {};
+        const fileId = numberOrNull(filePayload.id);
+        const downloadRequested = downloadPayload.requested === true;
+        const downloadTransferId = numberOrNull(downloadPayload.transfer_id);
+        const downloadStatus = stringOrNull(downloadPayload.status);
+        const downloadProgressPercent = numberOrNull(downloadPayload.progress_percent);
+        const reverbConfig = parseReverbConfig(rootPayload.reverb);
 
         if (extractedReaction.found) {
             return {
                 ok: true,
                 reaction: extractedReaction.reaction,
                 exists: extractedExists ?? true,
+                fileId,
+                downloadRequested,
+                downloadTransferId,
+                downloadStatus,
+                downloadProgressPercent,
+                reverbConfig,
             };
         }
 
@@ -105,8 +192,24 @@ export async function submitBadgeReaction(
             ok: true,
             reaction: reactionType,
             exists: extractedExists ?? true,
+            fileId,
+            downloadRequested,
+            downloadTransferId,
+            downloadStatus,
+            downloadProgressPercent,
+            reverbConfig,
         };
     } catch {
-        return { ok: false, reaction: null, exists: false };
+        return {
+            ok: false,
+            reaction: null,
+            exists: false,
+            fileId: null,
+            downloadRequested: false,
+            downloadTransferId: null,
+            downloadStatus: null,
+            downloadProgressPercent: null,
+            reverbConfig: null,
+        };
     }
 }

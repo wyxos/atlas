@@ -1,9 +1,112 @@
 import { getStoredOptions } from './atlas-options';
+import { connectReverb, type ReverbConfig } from './reverb-client';
 
 export type AtlasApiConnectionStatus = {
     label: 'Ready' | 'Setup required' | 'Auth failed' | 'Offline';
     detail: string;
+    reverbLabel: 'Connected' | 'Disconnected' | 'Unavailable';
+    reverbDetail: string;
 };
+
+type PingResponse = {
+    reverb?: unknown;
+};
+
+function asString(value: unknown): string | null {
+    return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+function asNumber(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function parseReverbConfig(value: unknown): ReverbConfig | null {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const row = value as Record<string, unknown>;
+    const enabled = row.enabled === true;
+    const key = asString(row.key) ?? '';
+    const host = asString(row.host) ?? '';
+    const channel = asString(row.channel) ?? '';
+    const scheme = row.scheme === 'http' ? 'http' : 'https';
+    const port = asNumber(row.port) ?? 443;
+
+    return {
+        enabled,
+        key,
+        host,
+        port,
+        scheme,
+        channel,
+    };
+}
+
+async function probeReverb(config: ReverbConfig | null): Promise<{
+    label: 'Connected' | 'Disconnected' | 'Unavailable';
+    detail: string;
+}> {
+    if (!config || !config.enabled) {
+        return {
+            label: 'Unavailable',
+            detail: 'Reverb is not configured on Atlas.',
+        };
+    }
+
+    try {
+        const client = await connectReverb(config);
+        if (!client) {
+            return {
+                label: 'Disconnected',
+                detail: 'Unable to initialize Reverb client.',
+            };
+        }
+
+        const state = await new Promise<string>((resolve) => {
+            let done = false;
+            const timeout = window.setTimeout(() => {
+                if (done) {
+                    return;
+                }
+                done = true;
+                resolve('timeout');
+            }, 4500);
+
+            const subscription = client.onConnectionState((next) => {
+                if (done) {
+                    return;
+                }
+
+                if (next === 'connected' || next === 'unavailable' || next === 'failed') {
+                    done = true;
+                    window.clearTimeout(timeout);
+                    subscription.unsubscribe();
+                    resolve(next);
+                }
+            });
+        });
+
+        client.disconnect();
+
+        if (state === 'connected') {
+            return {
+                label: 'Connected',
+                detail: 'Reverb websocket connected.',
+            };
+        }
+
+        return {
+            label: 'Disconnected',
+            detail: 'Reverb websocket is not reachable.',
+        };
+    } catch {
+        return {
+            label: 'Disconnected',
+            detail: 'Reverb probe failed.',
+        };
+    }
+}
 
 export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionStatus> {
     try {
@@ -15,6 +118,8 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
             return {
                 label: 'Setup required',
                 detail: 'Set the API key in extension options before using Atlas API actions.',
+                reverbLabel: 'Unavailable',
+                reverbDetail: 'Requires API key first.',
             };
         }
 
@@ -25,21 +130,31 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
             },
         });
 
-        if (response.ok) {
+        if (!response.ok) {
             return {
-                label: 'Ready',
-                detail: `Connected to ${domain}`,
+                label: 'Auth failed',
+                detail: 'API key or domain is invalid. Update extension options.',
+                reverbLabel: 'Unavailable',
+                reverbDetail: 'Cannot test Reverb until API auth succeeds.',
             };
         }
 
+        const payload = await response.json() as PingResponse;
+        const reverbConfig = parseReverbConfig(payload.reverb);
+        const reverb = await probeReverb(reverbConfig);
+
         return {
-            label: 'Auth failed',
-            detail: 'API key or domain is invalid. Update extension options.',
+            label: 'Ready',
+            detail: `Connected to ${domain}`,
+            reverbLabel: reverb.label,
+            reverbDetail: reverb.detail,
         };
     } catch {
         return {
             label: 'Offline',
             detail: 'Unable to verify API access. Check extension options.',
+            reverbLabel: 'Disconnected',
+            reverbDetail: 'Unable to reach Atlas.',
         };
     }
 }

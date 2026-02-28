@@ -55,11 +55,11 @@ export class OverlayManager {
         badge.setAttribute(BADGE_ATTR, '1');
         badge.style.position = 'absolute';
         badge.style.left = '50%';
-        badge.style.bottom = '8px';
+        badge.style.bottom = '58px';
         badge.style.transform = 'translateX(-50%)';
         badge.style.borderRadius = '8px';
         badge.style.pointerEvents = 'auto';
-        badge.style.zIndex = '10';
+        badge.style.zIndex = '5';
         this.syncBadgePlacement(media, badge);
         this.badgesByMedia.set(media, badgeHost);
         return badge;

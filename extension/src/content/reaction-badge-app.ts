@@ -1,10 +1,11 @@
 import type { PropType } from 'vue';
 import { computed, createApp, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Ban, Download, Heart, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
+import { Ban, Download, Heart, Loader2, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
 import { resolveMediaResolution, resolveMediaUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { submitBadgeReaction } from './reaction-submit';
+import { subscribeToDownloadProgress } from './download-progress-bus';
 
 type MountedBadge = {
     element: HTMLDivElement;
@@ -93,6 +94,14 @@ function emptyMatchResult(): BadgeMatchResult {
     };
 }
 
+function isTerminalStatus(status: string | null): boolean {
+    if (status === null) {
+        return false;
+    }
+
+    return status === 'completed' || status === 'failed' || status === 'canceled';
+}
+
 const AtlasReactionBadge = defineComponent({
     name: 'AtlasReactionBadge',
     props: {
@@ -108,8 +117,19 @@ const AtlasReactionBadge = defineComponent({
         const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
         const mediaResolution = ref<string | null>(null);
         const hoveredReaction = ref<BadgeReactionType | null>(null);
-        const isSubmittingReaction = ref(false);
+        const submittingReactionType = ref<BadgeReactionType | null>(null);
+        const isDownloadLocked = ref(false);
+        const progressPercent = ref<number | null>(null);
+        const transferStatus = ref<string | null>(null);
+        const trackedFileId = ref<number | null>(null);
+        const trackedTransferId = ref<number | null>(null);
+
         let isActive = true;
+        let unsubscribeProgress: (() => void) | null = null;
+
+        const controlsDisabled = computed(() =>
+            isChecking.value || submittingReactionType.value !== null || isDownloadLocked.value);
+        const showProgress = computed(() => isDownloadLocked.value);
         const timestampText = computed(() => {
             const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
             if (blacklistedAt) {
@@ -133,6 +153,46 @@ const AtlasReactionBadge = defineComponent({
         function syncResolution(): void {
             const resolved = resolveMediaResolution(props.media);
             mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
+        }
+
+        function ensureProgressSubscription(): void {
+            if (unsubscribeProgress) {
+                return;
+            }
+
+            unsubscribeProgress = subscribeToDownloadProgress((event) => {
+                if (!isActive) {
+                    return;
+                }
+
+                if (trackedTransferId.value !== null) {
+                    if (event.transferId !== trackedTransferId.value) {
+                        return;
+                    }
+                } else if (trackedFileId.value !== null) {
+                    if (event.fileId !== trackedFileId.value) {
+                        return;
+                    }
+
+                    if (event.transferId !== null) {
+                        trackedTransferId.value = event.transferId;
+                    }
+                } else {
+                    return;
+                }
+
+                if (event.percent !== null) {
+                    progressPercent.value = Math.max(0, Math.min(100, Math.round(event.percent)));
+                }
+                if (event.status !== null) {
+                    transferStatus.value = event.status;
+                }
+
+                if (event.status !== null && isTerminalStatus(event.status)) {
+                    isDownloadLocked.value = false;
+                    submittingReactionType.value = null;
+                }
+            });
         }
 
         const onMediaUpdate = (): void => {
@@ -161,6 +221,10 @@ const AtlasReactionBadge = defineComponent({
             props.media.removeEventListener('load', onMediaUpdate);
             props.media.removeEventListener('loadedmetadata', onMediaUpdate);
             props.media.removeEventListener('resize', onMediaUpdate);
+            if (unsubscribeProgress) {
+                unsubscribeProgress();
+                unsubscribeProgress = null;
+            }
         });
 
         function iconColor(type: BadgeReactionType, activeReaction: BadgeReactionType | null): string {
@@ -168,7 +232,7 @@ const AtlasReactionBadge = defineComponent({
                 return '#ffffff';
             }
 
-            if (hoveredReaction.value === type) {
+            if (hoveredReaction.value === type && !controlsDisabled.value) {
                 return reactionPalette[type].hoverColor;
             }
 
@@ -176,11 +240,11 @@ const AtlasReactionBadge = defineComponent({
         }
 
         async function handleReactionClick(type: BadgeReactionType): Promise<void> {
-            if (isSubmittingReaction.value || isChecking.value) {
+            if (controlsDisabled.value) {
                 return;
             }
 
-            isSubmittingReaction.value = true;
+            submittingReactionType.value = type;
 
             try {
                 const result = await submitBadgeReaction(props.media, type);
@@ -193,9 +257,25 @@ const AtlasReactionBadge = defineComponent({
                     exists: result.exists || matchResult.value.exists,
                     reaction: result.reaction,
                 };
+                trackedFileId.value = result.fileId;
+                trackedTransferId.value = result.downloadTransferId;
+                transferStatus.value = result.downloadStatus;
+                progressPercent.value = result.downloadProgressPercent;
+
+                if (result.downloadRequested) {
+                    isDownloadLocked.value = true;
+                    ensureProgressSubscription();
+                    if (isTerminalStatus(result.downloadStatus)) {
+                        isDownloadLocked.value = false;
+                        submittingReactionType.value = null;
+                    }
+                } else {
+                    isDownloadLocked.value = false;
+                    submittingReactionType.value = null;
+                }
             } finally {
-                if (isActive) {
-                    isSubmittingReaction.value = false;
+                if (isActive && !isDownloadLocked.value) {
+                    submittingReactionType.value = null;
                 }
             }
         }
@@ -228,11 +308,13 @@ const AtlasReactionBadge = defineComponent({
                     },
                     reactionOrder.map((reactionType) => {
                         const IconComponent = reactionIconByType[reactionType];
+                        const isSubmittingThisReaction = submittingReactionType.value === reactionType;
 
                         return h(
                             'button',
                             {
                                 type: 'button',
+                                disabled: controlsDisabled.value,
                                 onClick: () => {
                                     void handleReactionClick(reactionType);
                                 },
@@ -249,19 +331,28 @@ const AtlasReactionBadge = defineComponent({
                                     background: activeReaction === reactionType
                                         ? reactionPalette[reactionType].activeBackground
                                         : 'transparent',
-                                    opacity: isSubmittingReaction.value ? 0.75 : 1,
-                                    cursor: isSubmittingReaction.value ? 'wait' : 'pointer',
+                                    opacity: controlsDisabled.value ? 0.75 : 1,
+                                    cursor: controlsDisabled.value ? 'not-allowed' : 'pointer',
                                 },
                             },
                             [
-                                h(IconComponent, {
-                                    ...iconBaseStyle,
-                                    color: iconColor(reactionType, activeReaction),
-                                }),
+                                isSubmittingThisReaction
+                                    ? h(Loader2, {
+                                        ...iconBaseStyle,
+                                        style: {
+                                            animation: 'atlas-badge-spin 0.9s linear infinite',
+                                        },
+                                    })
+                                    : h(IconComponent, {
+                                        ...iconBaseStyle,
+                                        color: iconColor(reactionType, activeReaction),
+                                    }),
                             ],
                         );
                     }),
                 );
+
+            const progressValue = progressPercent.value ?? 0;
 
             return h(
                 'div',
@@ -278,7 +369,9 @@ const AtlasReactionBadge = defineComponent({
                         pointerEvents: 'auto',
                         gap: '4px',
                         padding: '6px 8px',
-                        minWidth: '172px',
+                        width: '320px',
+                        minWidth: '320px',
+                        maxWidth: '320px',
                     },
                 },
                 [
@@ -328,6 +421,47 @@ const AtlasReactionBadge = defineComponent({
                         ],
                     ),
                     iconRow,
+                    showProgress.value
+                        ? h(
+                            'div',
+                            {
+                                style: {
+                                    width: '100%',
+                                    marginTop: '2px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '3px',
+                                },
+                            },
+                            [
+                                h('div', {
+                                    style: {
+                                        height: '4px',
+                                        width: '100%',
+                                        borderRadius: '999px',
+                                        background: 'rgba(255,255,255,0.2)',
+                                        overflow: 'hidden',
+                                    },
+                                }, [
+                                    h('div', {
+                                        style: {
+                                            height: '100%',
+                                            width: `${progressValue}%`,
+                                            background: '#14b8a6',
+                                            transition: 'width 180ms ease',
+                                        },
+                                    }),
+                                ]),
+                                h('div', {
+                                    style: {
+                                        fontSize: '10px',
+                                        opacity: 0.85,
+                                        textAlign: 'right',
+                                    },
+                                }, transferStatus.value ?? 'downloading'),
+                            ],
+                        )
+                        : null,
                 ],
             );
         };

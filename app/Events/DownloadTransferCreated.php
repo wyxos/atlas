@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -20,11 +21,17 @@ class DownloadTransferCreated implements ShouldBroadcastNow
     /**
      * Get the channels the event should broadcast on.
      *
-     * @return array<int, PrivateChannel>
+     * @return array<int, Channel|PrivateChannel>
      */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('downloads')];
+        $channels = [new PrivateChannel('downloads')];
+        $extensionChannel = data_get($this->payload, 'extension_channel');
+        if (is_string($extensionChannel) && $extensionChannel !== '') {
+            $channels[] = new Channel('extension-downloads.'.$extensionChannel);
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string

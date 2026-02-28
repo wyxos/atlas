@@ -9,12 +9,19 @@ use Illuminate\Support\Facades\Storage;
 final class DownloadTransferPayload
 {
     /**
+     * @var array<int, string|null>
+     */
+    private static array $extensionChannelCacheByTransferId = [];
+
+    /**
      * @return array<string, mixed>
      */
     public static function forList(DownloadTransfer $transfer): array
     {
         return [
             'id' => $transfer->id,
+            'fileId' => $transfer->file_id,
+            'file_id' => $transfer->file_id,
             'status' => $transfer->status,
             'created_at' => $transfer->created_at?->toISOString(),
             'queued_at' => $transfer->queued_at?->toISOString(),
@@ -23,6 +30,7 @@ final class DownloadTransferPayload
             'failed_at' => $transfer->failed_at?->toISOString(),
             'percent' => (int) ($transfer->last_broadcast_percent ?? 0),
             'error' => $transfer->error,
+            'extension_channel' => self::extensionChannelForTransfer($transfer),
         ];
     }
 
@@ -55,6 +63,8 @@ final class DownloadTransferPayload
     {
         $payload = [
             'downloadTransferId' => $transfer->id,
+            'fileId' => $transfer->file_id,
+            'file_id' => $transfer->file_id,
             'status' => $transfer->status,
             'percent' => $percent,
             'original' => $transfer->url,
@@ -64,6 +74,7 @@ final class DownloadTransferPayload
             'finished_at' => $transfer->finished_at?->toISOString(),
             'failed_at' => $transfer->failed_at?->toISOString(),
             'error' => $transfer->error,
+            'extension_channel' => self::extensionChannelForTransfer($transfer),
         ];
 
         if ($transfer->isTerminal()) {
@@ -163,5 +174,38 @@ final class DownloadTransferPayload
         $extension = pathinfo($path, PATHINFO_EXTENSION);
 
         return $extension !== '' ? strtolower($extension) : null;
+    }
+
+    private static function extensionChannelForTransfer(DownloadTransfer $transfer): ?string
+    {
+        if (array_key_exists($transfer->id, self::$extensionChannelCacheByTransferId)) {
+            return self::$extensionChannelCacheByTransferId[$transfer->id];
+        }
+
+        $file = $transfer->relationLoaded('file')
+            ? $transfer->file
+            : $transfer->file()->select(['id', 'listing_metadata'])->first();
+
+        $channel = self::extensionChannelForFile($file);
+        self::$extensionChannelCacheByTransferId[$transfer->id] = $channel;
+
+        return $channel;
+    }
+
+    private static function extensionChannelForFile(?File $file): ?string
+    {
+        if (! $file) {
+            return null;
+        }
+
+        $listing = is_array($file->listing_metadata) ? $file->listing_metadata : [];
+        $value = $listing['extension_channel'] ?? null;
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+
+        return preg_match('/^[a-f0-9]{64}$/', $normalized) === 1 ? $normalized : null;
     }
 }
