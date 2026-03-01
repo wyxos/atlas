@@ -110,8 +110,7 @@ function activeRulesForPage(rules: UrlMatchRule[], pageHostname?: string): UrlMa
         return rules;
     }
 
-    const matched = rules.filter((rule) => hostMatchesRuleDomain(pageHostname, rule.domain));
-    return matched.length > 0 ? matched : [];
+    return rules.filter((rule) => hostMatchesRuleDomain(pageHostname, rule.domain));
 }
 
 export function urlMatchesAnyRule(url: string | null, rules: UrlMatchRule[], pageHostname?: string): boolean {
@@ -125,7 +124,7 @@ export function urlMatchesAnyRule(url: string | null, rules: UrlMatchRule[], pag
 
     const activeRules = activeRulesForPage(rules, pageHostname);
     if (activeRules.length === 0) {
-        return false;
+        return true;
     }
 
     for (const rule of activeRules) {

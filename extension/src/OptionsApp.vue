@@ -258,7 +258,8 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                     </div>
 
                     <p class="text-xs text-twilight-indigo-300">
-                        Subdomains are included. URLs are sent only when one of the domain regex rules matches.
+                        Subdomains are included. If this page host has rules, at least one regex must match. If this page host has
+                        no rule, all eligible media URLs are sent.
                     </p>
                 </div>
 
