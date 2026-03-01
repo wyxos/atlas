@@ -1,7 +1,7 @@
 import { getStoredOptions } from '../atlas-options';
 import { connectReverb, type ReverbConfig, type ReverbSubscription } from '../reverb-client';
 
-type ProgressEvent = {
+export type ProgressEvent = {
     event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated';
     fileId: number | null;
     transferId: number | null;
