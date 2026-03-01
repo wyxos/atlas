@@ -21,6 +21,8 @@ class ExtensionApiKeyService
 
     private const CACHE_RESOLVED_USER_ID_KEY = 'extension:api-key:resolved-user-id';
 
+    private const CACHE_VERSION_KEY = 'extension:api-key:cache-version';
+
     private const CACHE_TTL_SECONDS = 15;
 
     public function isConfigured(): bool
@@ -95,7 +97,7 @@ class ExtensionApiKeyService
     private function storedHash(): ?string
     {
         $cached = Cache::remember(
-            self::CACHE_STORED_HASH_KEY,
+            $this->cacheScopedKey(self::CACHE_STORED_HASH_KEY),
             now()->addSeconds(self::CACHE_TTL_SECONDS),
             fn (): array => ['value' => $this->readStoredHash()],
         );
@@ -108,7 +110,7 @@ class ExtensionApiKeyService
     private function storedUserId(): ?int
     {
         $cached = Cache::remember(
-            self::CACHE_STORED_USER_ID_KEY,
+            $this->cacheScopedKey(self::CACHE_STORED_USER_ID_KEY),
             now()->addSeconds(self::CACHE_TTL_SECONDS),
             fn (): array => ['value' => $this->readStoredUserId()],
         );
@@ -121,7 +123,7 @@ class ExtensionApiKeyService
     private function resolvedUserId(): ?int
     {
         $cached = Cache::remember(
-            self::CACHE_RESOLVED_USER_ID_KEY,
+            $this->cacheScopedKey(self::CACHE_RESOLVED_USER_ID_KEY),
             now()->addSeconds(self::CACHE_TTL_SECONDS),
             fn (): array => ['value' => $this->readResolvedUserId()],
         );
@@ -196,15 +198,39 @@ class ExtensionApiKeyService
             ]
         );
 
-        Cache::forget(self::CACHE_STORED_USER_ID_KEY);
+        Cache::forget($this->cacheScopedKey(self::CACHE_STORED_USER_ID_KEY));
 
         return $fallbackUser->id;
     }
 
     private function invalidateCache(): void
     {
-        Cache::forget(self::CACHE_STORED_HASH_KEY);
-        Cache::forget(self::CACHE_STORED_USER_ID_KEY);
-        Cache::forget(self::CACHE_RESOLVED_USER_ID_KEY);
+        $version = $this->cacheVersion();
+
+        Cache::forget($this->cacheScopedKey(self::CACHE_STORED_HASH_KEY, $version));
+        Cache::forget($this->cacheScopedKey(self::CACHE_STORED_USER_ID_KEY, $version));
+        Cache::forget($this->cacheScopedKey(self::CACHE_RESOLVED_USER_ID_KEY, $version));
+
+        Cache::forever(self::CACHE_VERSION_KEY, (string) Str::uuid());
+    }
+
+    private function cacheScopedKey(string $baseKey, ?string $version = null): string
+    {
+        $effectiveVersion = $version ?? $this->cacheVersion();
+
+        return $baseKey.':'.$effectiveVersion;
+    }
+
+    private function cacheVersion(): string
+    {
+        $value = Cache::get(self::CACHE_VERSION_KEY);
+        if (is_string($value) && trim($value) !== '') {
+            return $value;
+        }
+
+        $version = (string) Str::uuid();
+        Cache::forever(self::CACHE_VERSION_KEY, $version);
+
+        return $version;
     }
 }
