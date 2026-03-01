@@ -131,10 +131,12 @@ async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
 async function waitForReverbState(
     client: ReverbClient,
     timeoutMs = 4500,
-): Promise<ReverbConnectionState | 'timeout'> {
+): Promise<{ state: ReverbConnectionState | 'timeout'; error: string | null }> {
     return new Promise((resolve) => {
         let finished = false;
         let subscription: { unsubscribe: () => void } | null = null;
+        let errorSubscription: { unsubscribe: () => void } | null = null;
+        let lastError: string | null = null;
 
         const timeout = window.setTimeout(() => {
             if (finished) {
@@ -143,8 +145,13 @@ async function waitForReverbState(
 
             finished = true;
             subscription?.unsubscribe();
-            resolve('timeout');
+            errorSubscription?.unsubscribe();
+            resolve({ state: 'timeout', error: lastError ?? client.getLastConnectionError() });
         }, timeoutMs);
+
+        errorSubscription = client.onConnectionError((message) => {
+            lastError = message;
+        });
 
         subscription = client.onConnectionState((state) => {
             if (finished) {
@@ -155,7 +162,8 @@ async function waitForReverbState(
                 finished = true;
                 window.clearTimeout(timeout);
                 subscription?.unsubscribe();
-                resolve(state);
+                errorSubscription?.unsubscribe();
+                resolve({ state, error: lastError ?? client.getLastConnectionError() });
             }
         });
     });

@@ -52,10 +52,10 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
                 reverbEndpoint: runtime.endpoint,
             };
         case 'connected': {
-            const state = await waitForReverbState(runtime.client);
+            const stateResult = await waitForReverbState(runtime.client);
             runtime.client.disconnect();
 
-            if (state === 'connected') {
+            if (stateResult.state === 'connected') {
                 return {
                     label: 'Ready',
                     detail: `Connected to ${runtime.domain}`,
@@ -69,9 +69,11 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
                 label: 'Ready',
                 detail: `Connected to ${runtime.domain}`,
                 reverbLabel: 'Disconnected',
-                reverbDetail: state === 'timeout'
+                reverbDetail: stateResult.state === 'timeout'
                     ? 'Reverb websocket timed out.'
-                    : `Reverb websocket state: ${state}.`,
+                    : stateResult.error
+                        ? `Reverb websocket state: ${stateResult.state}. ${stateResult.error}`
+                        : `Reverb websocket state: ${stateResult.state}.`,
                 reverbEndpoint: runtime.endpoint,
             };
         }
