@@ -2,9 +2,10 @@ import { getStoredOptions } from './atlas-options';
 import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './match-rules';
 import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, type MediaElement } from './content/media-utils';
 import { OverlayManager } from './content/overlay-manager';
-import { enqueueReferrerCheck } from './content/referrer-check-queue';
+import { clearReferrerCheckCache, enqueueReferrerCheck } from './content/referrer-check-queue';
 import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
 import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
+import { subscribeToDownloadProgress } from './content/download-progress-bus';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
@@ -15,6 +16,7 @@ let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
 const observedAnchorMedia = new WeakSet<MediaElement>();
 const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
+let downloadRefreshTimer: number | null = null;
 const anchorMediaObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
         if (!entry.isIntersecting) {
@@ -330,7 +332,26 @@ function installRuntimeMessageListener(): void {
         }
 
         clearOpenTabCheckCache();
+        clearReferrerCheckCache();
         refreshVisibleAnchorMedia();
+    });
+}
+
+function scheduleRefreshFromDownloadEvent(): void {
+    if (downloadRefreshTimer !== null) {
+        return;
+    }
+
+    downloadRefreshTimer = window.setTimeout(() => {
+        downloadRefreshTimer = null;
+        clearReferrerCheckCache();
+        refreshVisibleAnchorMedia();
+    }, 120);
+}
+
+function installDownloadProgressListener(): void {
+    subscribeToDownloadProgress(() => {
+        scheduleRefreshFromDownloadEvent();
     });
 }
 
@@ -356,6 +377,7 @@ function bootstrap(): void {
     installMutationObserver();
     installStorageListener();
     installRuntimeMessageListener();
+    installDownloadProgressListener();
     installViewportListeners();
     void loadRulesAndProcess();
 }
