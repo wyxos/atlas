@@ -10,6 +10,7 @@ const statusLabel = ref('Checking');
 const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
+const reverbEndpoint = ref<string | null>(null);
 
 function openOptionsPage(): void {
     chrome.runtime.openOptionsPage(() => {
@@ -25,6 +26,7 @@ onMounted(() => {
         statusDetail.value = status.detail;
         reverbStatusLabel.value = status.reverbLabel;
         reverbStatusDetail.value = status.reverbDetail;
+        reverbEndpoint.value = status.reverbEndpoint;
     });
 });
 </script>
@@ -48,6 +50,9 @@ onMounted(() => {
                 Reverb:
                 <span class="font-medium text-smart-blue-200">{{ reverbStatusLabel }}</span>
                 · {{ reverbStatusDetail }}
+            </p>
+            <p v-if="reverbEndpoint" class="text-xs text-twilight-indigo-300">
+                Reverb Endpoint: <span class="font-mono">{{ reverbEndpoint }}</span>
             </p>
 
             <button

@@ -6,6 +6,7 @@ export type AtlasApiConnectionStatus = {
     detail: string;
     reverbLabel: 'Connected' | 'Disconnected' | 'Unavailable';
     reverbDetail: string;
+    reverbEndpoint: string | null;
 };
 
 type PingResponse = {
@@ -41,6 +42,14 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
         scheme,
         channel,
     };
+}
+
+function formatReverbEndpoint(config: ReverbConfig | null): string | null {
+    if (!config || config.host === '' || !Number.isFinite(config.port) || config.port <= 0) {
+        return null;
+    }
+
+    return `${config.scheme}://${config.host}:${config.port}`;
 }
 
 async function probeReverb(config: ReverbConfig | null): Promise<{
@@ -126,6 +135,7 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
                 detail: 'Set the API key in extension options before using Atlas API actions.',
                 reverbLabel: 'Unavailable',
                 reverbDetail: 'Requires API key first.',
+                reverbEndpoint: null,
             };
         }
 
@@ -142,18 +152,21 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
                 detail: 'API key or domain is invalid. Update extension options.',
                 reverbLabel: 'Unavailable',
                 reverbDetail: 'Cannot test Reverb until API auth succeeds.',
+                reverbEndpoint: null,
             };
         }
 
         const payload = await response.json() as PingResponse;
         const reverbConfig = parseReverbConfig(payload.reverb);
         const reverb = await probeReverb(reverbConfig);
+        const reverbEndpoint = formatReverbEndpoint(reverbConfig);
 
         return {
             label: 'Ready',
             detail: `Connected to ${domain}`,
             reverbLabel: reverb.label,
             reverbDetail: reverb.detail,
+            reverbEndpoint,
         };
     } catch {
         return {
@@ -161,6 +174,7 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
             detail: 'Unable to verify API access. Check extension options.',
             reverbLabel: 'Disconnected',
             reverbDetail: 'Unable to reach Atlas.',
+            reverbEndpoint: null,
         };
     }
 }
