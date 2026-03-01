@@ -6,6 +6,7 @@ import { clearReferrerCheckCache, enqueueReferrerCheck } from './content/referre
 import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
 import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
+import { fetchTransferStatus } from './content/reaction-submit';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
@@ -17,6 +18,7 @@ const overlayManager = new OverlayManager();
 const observedAnchorMedia = new WeakSet<MediaElement>();
 const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
 let downloadRefreshTimer: number | null = null;
+const transferRefreshTimers = new Map<number, number>();
 const anchorMediaObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
         if (!entry.isIntersecting) {
@@ -349,8 +351,74 @@ function scheduleRefreshFromDownloadEvent(): void {
     }, 120);
 }
 
+function applyReactionForReferrerUrl(referrerUrl: string, reaction: 'love' | 'like' | 'dislike' | 'funny' | null): void {
+    for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
+        if (!isMediaElement(mediaElement)) {
+            continue;
+        }
+
+        const anchor = mediaElement.closest('a[href]');
+        if (!(anchor instanceof HTMLAnchorElement)) {
+            continue;
+        }
+
+        const anchorHref = normalizeUrl(anchor.href);
+        if (anchorHref !== referrerUrl) {
+            continue;
+        }
+
+        if (!isVisibleInViewport(mediaElement)) {
+            continue;
+        }
+
+        applyAnchorMatchDecoration(mediaElement, reaction);
+        mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+        mediaElement.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
+        mediaElement.removeAttribute('data-atlas-anchor-opened-elsewhere');
+
+        if (reaction) {
+            mediaElement.setAttribute('data-atlas-anchor-reaction', reaction);
+        } else {
+            mediaElement.removeAttribute('data-atlas-anchor-reaction');
+        }
+    }
+}
+
+function scheduleTransferReactionSync(transferId: number | null): void {
+    if (transferId === null || !Number.isFinite(transferId) || transferId <= 0) {
+        return;
+    }
+
+    const existingTimer = transferRefreshTimers.get(transferId);
+    if (existingTimer !== undefined) {
+        window.clearTimeout(existingTimer);
+    }
+
+    const timer = window.setTimeout(() => {
+        transferRefreshTimers.delete(transferId);
+
+        void fetchTransferStatus({ transferId }).then((statusResult) => {
+            if (!statusResult.ok || statusResult.referrerUrl === null) {
+                return;
+            }
+
+            const reaction = statusResult.reaction === 'love'
+                || statusResult.reaction === 'like'
+                || statusResult.reaction === 'dislike'
+                || statusResult.reaction === 'funny'
+                ? statusResult.reaction
+                : null;
+
+            applyReactionForReferrerUrl(statusResult.referrerUrl, reaction);
+        });
+    }, 90);
+
+    transferRefreshTimers.set(transferId, timer);
+}
+
 function installDownloadProgressListener(): void {
-    subscribeToDownloadProgress(() => {
+    subscribeToDownloadProgress((event) => {
+        scheduleTransferReactionSync(event.transferId);
         scheduleRefreshFromDownloadEvent();
     });
 }
