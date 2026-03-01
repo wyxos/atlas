@@ -43,6 +43,19 @@ test('extension matches endpoint requires a valid api key', function () {
     $response->assertUnauthorized();
 });
 
+test('extension referrer checks endpoint requires a valid api key', function () {
+    setExtensionApiKey('valid-api-key');
+
+    $hash = hash('sha256', 'https://www.deviantart.com/artist/art/sample-1');
+    $response = $this->postJson('/api/extension/referrer-checks', [
+        'items' => [
+            ['request_id' => 'ref-1', 'referrer_hash' => $hash],
+        ],
+    ]);
+
+    $response->assertUnauthorized();
+});
+
 test('extension matches endpoint returns status for matched and unmatched media', function () {
     $user = User::factory()->create();
     setExtensionApiKey('valid-api-key', $user->id);
@@ -94,6 +107,48 @@ test('extension matches endpoint returns status for matched and unmatched media'
     $response->assertJsonPath('matches.0.exists', true);
     $response->assertJsonPath('matches.0.reaction', 'like');
     $response->assertJsonPath('matches.1.id', 'atlas-2');
+    $response->assertJsonPath('matches.1.exists', false);
+});
+
+test('extension referrer checks endpoint returns status for matched and unmatched referrer hashes', function () {
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $referrerUrl = 'https://www.deviantart.com/artist/art/work-123';
+    $file = File::factory()->create([
+        'url' => 'https://cdn.example.test/media/full.jpg',
+        'referrer_url' => $referrerUrl,
+        'downloaded' => true,
+        'downloaded_at' => now()->subHour(),
+        'blacklisted_at' => now()->subDay(),
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/referrer-checks', [
+        'items' => [
+            [
+                'request_id' => 'ref-hit',
+                'referrer_hash' => hash('sha256', $referrerUrl),
+            ],
+            [
+                'request_id' => 'ref-miss',
+                'referrer_hash' => hash('sha256', 'https://www.deviantart.com/artist/art/missing'),
+            ],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('matches.0.request_id', 'ref-hit');
+    $response->assertJsonPath('matches.0.exists', true);
+    $response->assertJsonPath('matches.0.reaction', 'love');
+    $response->assertJsonPath('matches.1.request_id', 'ref-miss');
     $response->assertJsonPath('matches.1.exists', false);
 });
 
