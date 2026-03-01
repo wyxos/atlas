@@ -81,6 +81,12 @@ describe('download-progress-bus', () => {
             referrerUrl: null,
             status: 'queued',
             percent: 10,
+            payload: {
+                file_id: 12,
+                downloadTransferId: 25,
+                status: 'queued',
+                percent: 10,
+            },
         });
         expect(listenerTwo).toHaveBeenCalledWith({
             event: 'DownloadTransferQueued',
@@ -89,6 +95,12 @@ describe('download-progress-bus', () => {
             referrerUrl: null,
             status: 'queued',
             percent: 10,
+            payload: {
+                file_id: 12,
+                downloadTransferId: 25,
+                status: 'queued',
+                percent: 10,
+            },
         });
 
         offOne();

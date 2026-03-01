@@ -8,6 +8,7 @@ export type ProgressEvent = {
     referrerUrl: string | null;
     status: string | null;
     percent: number | null;
+    payload: Record<string, unknown>;
 };
 
 type BusListener = (event: ProgressEvent) => void;
@@ -115,6 +116,7 @@ async function ensureConnected(): Promise<void> {
                 referrerUrl: asString(payload.referrer_url),
                 status: asString(payload.status),
                 percent: asNumber(payload.percent),
+                payload,
             };
 
             listeners.forEach((listener) => {

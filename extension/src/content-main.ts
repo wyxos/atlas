@@ -7,6 +7,7 @@ import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMat
 import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { fetchTransferStatus } from './content/reaction-submit';
+import { createDownloadEventSheet } from './content/download-event-sheet';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
@@ -15,6 +16,7 @@ const ANCHOR_MEDIA_MATCH_ATTR = 'data-atlas-anchor-media-match';
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
+const downloadEventSheet = createDownloadEventSheet();
 const observedAnchorMedia = new WeakSet<MediaElement>();
 const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
 const transferRefreshTimers = new Map<string, number>();
@@ -435,6 +437,8 @@ function scheduleTransferReactionSync(input: { transferId: number | null; fileId
 
 function installDownloadProgressListener(): void {
     subscribeToDownloadProgress((event) => {
+        downloadEventSheet.push(event);
+
         const isLifecycleEvent = event.event === 'DownloadTransferCreated'
             || event.event === 'DownloadTransferQueued'
             || isTerminalTransferStatus(event.status);
