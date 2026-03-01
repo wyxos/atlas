@@ -76,6 +76,9 @@ async function ensureConnected(): Promise<void> {
     if (connectionPromise) {
         return connectionPromise;
     }
+    if (activeClient && activeSubscription) {
+        return;
+    }
 
     connectionPromise = (async () => {
         const config = await fetchReverbConfig();
