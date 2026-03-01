@@ -85,3 +85,43 @@ test('extension reactions endpoint creates file applies reaction and queues down
         return $job->fileId === $file?->id;
     });
 });
+
+test('extension reactions endpoint rejects non-http urls', function () {
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'blob:https://x.com/00c34be5-77d2-49d2-b520-30369de3b587',
+    ]);
+
+    $response->assertStatus(422);
+    $response->assertJsonPath('message', 'A valid media URL is required.');
+});
+
+test('extension video reactions on x mark files for yt-dlp', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'love',
+        'url' => 'https://x.com/Ronycoder/status/2027740182682996825',
+        'referrer_url_hash_aware' => 'https://x.com/Ronycoder/status/2027740182682996825',
+        'page_url' => 'https://x.com/Ronycoder/status/2027740182682996825',
+        'tag_name' => 'video',
+    ]);
+
+    $response->assertSuccessful();
+
+    $file = File::query()->where('url', 'https://x.com/Ronycoder/status/2027740182682996825')->first();
+    expect($file)->not->toBeNull();
+    expect(data_get($file?->listing_metadata, 'tag_name'))->toBe('video');
+    expect(data_get($file?->listing_metadata, 'page_url'))->toBe('https://x.com/Ronycoder/status/2027740182682996825');
+    expect(data_get($file?->listing_metadata, 'download_via'))->toBe('yt-dlp');
+});

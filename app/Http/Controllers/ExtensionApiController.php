@@ -101,6 +101,8 @@ class ExtensionApiController extends Controller
             'url' => ['required', 'string', 'max:4096'],
             'referrer_url' => ['nullable', 'string', 'max:4096'],
             'referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
+            'page_url' => ['nullable', 'string', 'max:4096'],
+            'tag_name' => ['nullable', 'string', 'in:img,video,iframe'],
         ]);
 
         $url = $this->normalizeUrl($validated['url']);
@@ -114,8 +116,10 @@ class ExtensionApiController extends Controller
             ?? $this->normalizeOptionalUrl($validated['referrer_url'] ?? null);
         $previewUrl = $url;
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
+        $pageUrl = $this->normalizeOptionalUrl($validated['page_url'] ?? null);
+        $tagName = isset($validated['tag_name']) && is_string($validated['tag_name']) ? $validated['tag_name'] : null;
 
-        $file = $this->findOrCreateFile($url, $referrerUrl, $previewUrl, $extensionChannel);
+        $file = $this->findOrCreateFile($url, $referrerUrl, $previewUrl, $extensionChannel, $pageUrl, $tagName);
         $result = $fileReactionService->set($file, $user, $validated['type'], deferHeavySideEffects: true);
         $activeTransfer = $this->findActiveTransfer($file->id);
 
@@ -211,8 +215,17 @@ class ExtensionApiController extends Controller
         }
 
         $withoutFragment = preg_replace('/#.*$/', '', $trimmed);
+        $candidate = is_string($withoutFragment) ? trim($withoutFragment) : $trimmed;
+        if ($candidate === '') {
+            return null;
+        }
 
-        return is_string($withoutFragment) ? trim($withoutFragment) : $trimmed;
+        $scheme = parse_url($candidate, PHP_URL_SCHEME);
+        if (! is_string($scheme) || ! in_array(strtolower($scheme), ['http', 'https'], true)) {
+            return null;
+        }
+
+        return $candidate;
     }
 
     private function normalizeOptionalUrl(?string $url): ?string
@@ -226,9 +239,22 @@ class ExtensionApiController extends Controller
         return $trimmed !== '' ? $trimmed : null;
     }
 
-    private function findOrCreateFile(string $url, ?string $referrerUrl, ?string $previewUrl, string $extensionChannel): File
-    {
+    private function findOrCreateFile(
+        string $url,
+        ?string $referrerUrl,
+        ?string $previewUrl,
+        string $extensionChannel,
+        ?string $pageUrl,
+        ?string $tagName,
+    ): File {
         $urlHash = hash('sha256', $url);
+        $downloadVia = $this->shouldUseYtDlp($url, $pageUrl, $tagName) ? 'yt-dlp' : null;
+        $listingMetadata = array_filter([
+            'extension_channel' => $extensionChannel,
+            'page_url' => $pageUrl,
+            'tag_name' => $tagName,
+            'download_via' => $downloadVia,
+        ], static fn ($value) => $value !== null && $value !== '');
 
         $file = File::query()
             ->where('url_hash', $urlHash)
@@ -241,9 +267,7 @@ class ExtensionApiController extends Controller
                 'url' => $url,
                 'referrer_url' => $referrerUrl,
                 'preview_url' => $previewUrl,
-                'listing_metadata' => [
-                    'extension_channel' => $extensionChannel,
-                ],
+                'listing_metadata' => $listingMetadata,
                 'filename' => Str::random(40),
                 'ext' => FileTypeDetector::extensionFromUrl($url),
             ]);
@@ -257,8 +281,24 @@ class ExtensionApiController extends Controller
             $updates['preview_url'] = $previewUrl;
         }
         $listingMetadata = is_array($file->listing_metadata) ? $file->listing_metadata : [];
+        $listingChanged = false;
         if (($listingMetadata['extension_channel'] ?? null) !== $extensionChannel) {
             $listingMetadata['extension_channel'] = $extensionChannel;
+            $listingChanged = true;
+        }
+        if ($pageUrl !== null && ($listingMetadata['page_url'] ?? null) !== $pageUrl) {
+            $listingMetadata['page_url'] = $pageUrl;
+            $listingChanged = true;
+        }
+        if ($tagName !== null && ($listingMetadata['tag_name'] ?? null) !== $tagName) {
+            $listingMetadata['tag_name'] = $tagName;
+            $listingChanged = true;
+        }
+        if ($downloadVia !== null && ($listingMetadata['download_via'] ?? null) !== $downloadVia) {
+            $listingMetadata['download_via'] = $downloadVia;
+            $listingChanged = true;
+        }
+        if ($listingChanged) {
             $updates['listing_metadata'] = $listingMetadata;
         }
 
@@ -292,6 +332,41 @@ class ExtensionApiController extends Controller
         return hash('sha256', $apiKey);
     }
 
+    private function shouldUseYtDlp(string $url, ?string $pageUrl, ?string $tagName): bool
+    {
+        if ($tagName !== 'video' && $tagName !== 'iframe') {
+            return false;
+        }
+
+        $videoPlatformHosts = [
+            'x.com',
+            'twitter.com',
+            'facebook.com',
+            'fb.watch',
+            'youtube.com',
+            'youtu.be',
+            'instagram.com',
+            'tiktok.com',
+            'vimeo.com',
+        ];
+
+        $hosts = array_values(array_filter([
+            parse_url($url, PHP_URL_HOST),
+            parse_url((string) $pageUrl, PHP_URL_HOST),
+        ], static fn ($host) => is_string($host) && $host !== ''));
+
+        foreach ($hosts as $host) {
+            $normalizedHost = strtolower($host);
+            foreach ($videoPlatformHosts as $platformHost) {
+                if ($normalizedHost === $platformHost || str_ends_with($normalizedHost, '.'.$platformHost)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @return array{enabled: bool, key: string, host: string, port: int, scheme: string, channel: string}
      */
@@ -300,6 +375,13 @@ class ExtensionApiController extends Controller
         $reverb = config('broadcasting.connections.reverb');
         $key = trim((string) data_get($reverb, 'key', ''));
         $host = trim((string) data_get($reverb, 'options.host', ''));
+        if (str_contains($host, '://')) {
+            $parsedHost = parse_url($host, PHP_URL_HOST);
+            $host = is_string($parsedHost) ? $parsedHost : '';
+        }
+        if (str_contains($host, '/')) {
+            $host = trim((string) parse_url('https://'.$host, PHP_URL_HOST));
+        }
         if ($host === '') {
             $appHost = parse_url((string) config('app.url', ''), PHP_URL_HOST);
             $host = is_string($appHost) ? $appHost : '';
