@@ -21,6 +21,8 @@ export type TransferStatusResult = {
     fileId: number | null;
     status: string | null;
     progressPercent: number | null;
+    reaction: BadgeReactionType | null;
+    referrerUrl: string | null;
     downloadedAt: string | null;
     blacklistedAt: string | null;
 };
@@ -243,6 +245,8 @@ export async function fetchTransferStatus(input: { transferId?: number | null; f
             fileId: null,
             status: null,
             progressPercent: null,
+            reaction: null,
+            referrerUrl: null,
             downloadedAt: null,
             blacklistedAt: null,
         };
@@ -257,6 +261,8 @@ export async function fetchTransferStatus(input: { transferId?: number | null; f
                 fileId: null,
                 status: null,
                 progressPercent: null,
+                reaction: null,
+                referrerUrl: null,
                 downloadedAt: null,
                 blacklistedAt: null,
             };
@@ -281,6 +287,8 @@ export async function fetchTransferStatus(input: { transferId?: number | null; f
                 fileId: null,
                 status: null,
                 progressPercent: null,
+                reaction: null,
+                referrerUrl: null,
                 downloadedAt: null,
                 blacklistedAt: null,
             };
@@ -294,6 +302,8 @@ export async function fetchTransferStatus(input: { transferId?: number | null; f
             fileId: numberOrNull(payload.file_id),
             status: stringOrNull(payload.status),
             progressPercent: numberOrNull(payload.progress_percent),
+            reaction: parseReactionType(payload.reaction),
+            referrerUrl: stringOrNull(payload.referrer_url),
             downloadedAt: stringOrNull(payload.downloaded_at),
             blacklistedAt: stringOrNull(payload.blacklisted_at),
         };
@@ -304,6 +314,8 @@ export async function fetchTransferStatus(input: { transferId?: number | null; f
             fileId: null,
             status: null,
             progressPercent: null,
+            reaction: null,
+            referrerUrl: null,
             downloadedAt: null,
             blacklistedAt: null,
         };

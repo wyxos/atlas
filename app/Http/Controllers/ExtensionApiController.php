@@ -179,7 +179,8 @@ class ExtensionApiController extends Controller
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
     ): JsonResponse {
-        if (! $this->resolveExtensionUser($request, $extensionApiKey)) {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
             ], 401);
@@ -191,7 +192,7 @@ class ExtensionApiController extends Controller
         ]);
 
         $query = DownloadTransfer::query()
-            ->with('file:id,downloaded_at,blacklisted_at')
+            ->with('file:id,referrer_url,downloaded_at,blacklisted_at')
             ->select(['id', 'file_id', 'status', 'last_broadcast_percent']);
 
         if (isset($validated['transfer_id'])) {
@@ -208,11 +209,21 @@ class ExtensionApiController extends Controller
             ], 404);
         }
 
+        $reactionType = null;
+        if ($transfer->file_id !== null) {
+            $reactionType = Reaction::query()
+                ->where('user_id', $user->id)
+                ->where('file_id', $transfer->file_id)
+                ->value('type');
+        }
+
         return response()->json([
             'transfer_id' => $transfer->id,
             'file_id' => $transfer->file_id,
             'status' => $transfer->status,
             'progress_percent' => (int) ($transfer->last_broadcast_percent ?? 0),
+            'reaction' => is_string($reactionType) ? $reactionType : null,
+            'referrer_url' => $transfer->file?->referrer_url,
             'downloaded_at' => $transfer->file?->downloaded_at?->toIso8601String(),
             'blacklisted_at' => $transfer->file?->blacklisted_at?->toIso8601String(),
         ]);

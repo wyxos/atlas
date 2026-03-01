@@ -17,6 +17,7 @@ type ReverbSubscription = {
 
 type PusherLike = {
     connection: {
+        state?: string;
         bind: (eventName: string, callback: (state: unknown) => void) => void;
     };
     subscribe: (channelName: string) => {
@@ -98,6 +99,12 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
         },
         onConnectionState: (callback) => {
             connectionCallbacks.add(callback);
+            const currentState = typeof pusher.connection.state === 'string'
+                ? pusher.connection.state
+                : null;
+            if (currentState) {
+                callback(currentState);
+            }
             return {
                 unsubscribe: () => {
                     connectionCallbacks.delete(callback);
