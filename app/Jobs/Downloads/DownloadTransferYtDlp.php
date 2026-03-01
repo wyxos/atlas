@@ -61,10 +61,15 @@ class DownloadTransferYtDlp implements ShouldQueue
             [$runtimeOptions, $runtimeCookieJarPath] = $this->buildRuntimeOptions($file, $absoluteTmpDir);
 
             $timeoutSeconds = (int) config('downloads.yt_dlp_timeout_seconds', 1800);
+            $lastBroadcastPercent = (int) ($transfer->last_broadcast_percent ?? 0);
+            $progressBuffer = '';
 
             $process = new Process($commandBuilder->build((string) $transfer->url, $outputTemplate, $runtimeOptions));
             $process->setTimeout(max(60, $timeoutSeconds));
-            $process->run();
+            $process->run(function (string $type, string $buffer) use ($transfer, &$lastBroadcastPercent, &$progressBuffer): void {
+                $this->broadcastProgressFromChunk($transfer, $type, $buffer, $lastBroadcastPercent, $progressBuffer);
+            });
+            $this->broadcastProgressFromChunk($transfer, Process::OUT, '', $lastBroadcastPercent, $progressBuffer, true);
 
             if (! $process->isSuccessful()) {
                 $error = trim($process->getErrorOutput() ?: $process->getOutput());
@@ -181,6 +186,86 @@ class DownloadTransferYtDlp implements ShouldQueue
         }
 
         return $trimmed;
+    }
+
+    private function broadcastProgressFromChunk(
+        DownloadTransfer $transfer,
+        string $type,
+        string $buffer,
+        int &$lastBroadcastPercent,
+        string &$progressBuffer,
+        bool $flush = false
+    ): void {
+        if (! in_array($type, [Process::OUT, Process::ERR], true)) {
+            return;
+        }
+
+        if ($buffer !== '') {
+            $clean = preg_replace('/\x1B\[[0-9;?]*[ -\/]*[@-~]/', '', $buffer);
+            if (! is_string($clean) || $clean === '') {
+                return;
+            }
+
+            $progressBuffer .= str_replace("\r", "\n", $clean);
+        }
+
+        if ($progressBuffer === '') {
+            return;
+        }
+
+        $lines = explode("\n", $progressBuffer);
+        $progressBuffer = $flush ? '' : (string) array_pop($lines);
+        if ($lines === []) {
+            return;
+        }
+
+        foreach ($lines as $line) {
+            if (! preg_match_all('/(\d{1,3}(?:\.\d+)?)\s*%/', $line, $matches)) {
+                continue;
+            }
+
+            foreach ($matches[1] as $rawPercent) {
+                $percent = (int) floor((float) $rawPercent);
+                $percent = max(0, min(99, $percent));
+
+                if ($percent <= $lastBroadcastPercent) {
+                    continue;
+                }
+
+                $this->broadcastProgress($transfer, $percent, $lastBroadcastPercent);
+            }
+        }
+    }
+
+    private function broadcastProgress(DownloadTransfer $transfer, int $percent, int &$lastBroadcastPercent): void
+    {
+        $updated = DownloadTransfer::query()
+            ->whereKey($transfer->id)
+            ->where('last_broadcast_percent', '<', $percent)
+            ->update([
+                'last_broadcast_percent' => $percent,
+                'updated_at' => now(),
+            ]);
+
+        if ($updated === 0) {
+            return;
+        }
+
+        File::query()->whereKey($transfer->file_id)->update([
+            'download_progress' => $percent,
+            'updated_at' => now(),
+        ]);
+
+        $lastBroadcastPercent = $percent;
+        $transfer->last_broadcast_percent = $percent;
+
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($transfer, $percent)
+            ));
+        } catch (Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
     }
 
     /**
