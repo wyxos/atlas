@@ -187,7 +187,7 @@ function scheduleFlush(): void {
 
 export async function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatchResult> {
     const normalizedMediaUrl = normalizeUrl(mediaUrl);
-    if (normalizedMediaUrl === null || shouldExcludeMediaOrAnchorUrl(normalizedMediaUrl)) {
+    if (normalizedMediaUrl === null || shouldExcludeMediaOrAnchorUrl(mediaUrl)) {
         return Promise.resolve(emptyResult());
     }
 

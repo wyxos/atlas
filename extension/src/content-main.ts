@@ -46,8 +46,9 @@ const anchorMediaObserver = new IntersectionObserver((entries) => {
 });
 
 function mediaMatchesRules(element: MediaElement): boolean {
-    const mediaUrl = normalizeUrl(resolveMediaUrl(element));
-    if (mediaUrl === null || shouldExcludeMediaOrAnchorUrl(mediaUrl)) {
+    const rawMediaUrl = resolveMediaUrl(element);
+    const mediaUrl = normalizeUrl(rawMediaUrl);
+    if (mediaUrl === null || shouldExcludeMediaOrAnchorUrl(rawMediaUrl)) {
         return false;
     }
 
@@ -131,9 +132,10 @@ function applyAnchorMediaBorder(media: MediaElement): void {
     }
 
     const rawHref = anchor.getAttribute('href');
-    const anchorHref = normalizeUrl(anchor.href);
+    const absoluteHref = anchor.href;
+    const anchorHref = normalizeUrl(absoluteHref);
     const isValid = anchorHref !== null
-        && !shouldExcludeAnchorHref(rawHref, anchorHref)
+        && !shouldExcludeAnchorHref(rawHref, absoluteHref)
         && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
     if (!isValid) {
         anchorReferrerKeyByMedia.delete(media);

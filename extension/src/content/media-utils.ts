@@ -89,16 +89,20 @@ export function normalizeUrl(value: string | null | undefined): string | null {
 }
 
 export function isLikelyDomainRootUrl(url: string | null | undefined): boolean {
-    const normalized = normalizeUrl(url);
-    if (normalized === null) {
+    if (typeof url !== 'string') {
+        return false;
+    }
+
+    const trimmed = url.trim();
+    if (!/^https?:\/\//i.test(trimmed)) {
         return false;
     }
 
     try {
-        const parsed = new URL(normalized);
+        const parsed = new URL(trimmed);
         const segments = parsed.pathname.split('/').filter((segment) => segment !== '');
 
-        return segments.length === 0;
+        return segments.length === 0 && parsed.search === '' && parsed.hash === '';
     } catch {
         return false;
     }

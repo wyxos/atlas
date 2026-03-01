@@ -27,6 +27,11 @@ describe('shouldExcludeMediaOrAnchorUrl', () => {
     it('does not exclude non-root media urls', () => {
         expect(shouldExcludeMediaOrAnchorUrl('https://images.example.com/path/file.jpg')).toBe(false);
     });
+
+    it('allows root urls when query or hash is present', () => {
+        expect(shouldExcludeMediaOrAnchorUrl('https://youtube.com/?v=abc123')).toBe(false);
+        expect(shouldExcludeMediaOrAnchorUrl('https://youtube.com/#watch')).toBe(false);
+    });
 });
 
 describe('shouldExcludeAnchorHref', () => {
