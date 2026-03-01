@@ -1,5 +1,11 @@
-import { computed, createApp, defineComponent, h, ref } from 'vue';
+import { computed, createApp, defineComponent, h, onUnmounted, ref } from 'vue';
 import type { ProgressEvent } from './download-progress-bus';
+import {
+    clearAtlasRequestLog,
+    getAtlasRequestLogSnapshot,
+    subscribeToAtlasRequestLog,
+    type AtlasRequestLogEntry,
+} from './atlas-request-log';
 
 type EventLogRow = {
     id: number;
@@ -10,6 +16,10 @@ type EventLogRow = {
     status: string | null;
     percent: number | null;
     payload: Record<string, unknown>;
+    expanded: boolean;
+};
+
+type RequestLogRow = AtlasRequestLogEntry & {
     expanded: boolean;
 };
 
@@ -56,12 +66,18 @@ const DownloadEventSheet = defineComponent({
     name: 'DownloadEventSheet',
     setup() {
         const isOpen = ref(false);
-        const rows = ref<EventLogRow[]>([]);
+        const eventRows = ref<EventLogRow[]>([]);
+        const requestRows = ref<RequestLogRow[]>(
+            getAtlasRequestLogSnapshot().map((row) => ({
+                ...row,
+                expanded: false,
+            })),
+        );
         let nextId = 1;
 
         function push(event: ProgressEvent): void {
             const createdAt = new Date().toLocaleTimeString();
-            rows.value = [
+            eventRows.value = [
                 {
                     id: nextId++,
                     createdAt,
@@ -73,19 +89,36 @@ const DownloadEventSheet = defineComponent({
                     payload: event.payload,
                     expanded: false,
                 },
-                ...rows.value,
+                ...eventRows.value,
             ].slice(0, MAX_ROWS);
         }
 
-        function toggleRow(id: number): void {
-            rows.value = rows.value.map((row) => row.id === id ? { ...row, expanded: !row.expanded } : row);
+        function toggleEventRow(id: number): void {
+            eventRows.value = eventRows.value.map((row) => row.id === id ? { ...row, expanded: !row.expanded } : row);
         }
 
-        function clearRows(): void {
-            rows.value = [];
+        function toggleRequestRow(id: number): void {
+            requestRows.value = requestRows.value.map((row) => row.id === id ? { ...row, expanded: !row.expanded } : row);
         }
 
-        const count = computed(() => rows.value.length);
+        function clearEventRows(): void {
+            eventRows.value = [];
+        }
+
+        function clearRequestRows(): void {
+            clearAtlasRequestLog();
+        }
+
+        function mergeRequestRows(entries: AtlasRequestLogEntry[]): void {
+            const expandedById = new Map(requestRows.value.map((row) => [row.id, row.expanded]));
+            requestRows.value = entries.map((row) => ({
+                ...row,
+                expanded: expandedById.get(row.id) ?? false,
+            }));
+        }
+
+        const eventCount = computed(() => eventRows.value.length);
+        const requestCount = computed(() => requestRows.value.length);
 
         window.addEventListener('keydown', (event) => {
             if (!event.altKey || event.key.toLowerCase() !== 'a') {
@@ -101,13 +134,25 @@ const DownloadEventSheet = defineComponent({
             isOpen.value = !isOpen.value;
         }, true);
 
+        const unsubscribe = subscribeToAtlasRequestLog((entries) => {
+            mergeRequestRows(entries);
+        });
+
+        onUnmounted(() => {
+            unsubscribe();
+        });
+
         return {
             isOpen,
-            rows,
-            count,
+            eventRows,
+            requestRows,
+            eventCount,
+            requestCount,
             push,
-            toggleRow,
-            clearRows,
+            toggleEventRow,
+            toggleRequestRow,
+            clearEventRows,
+            clearRequestRows,
         };
     },
     render() {
@@ -142,15 +187,16 @@ const DownloadEventSheet = defineComponent({
                     {
                         style: {
                             position: 'absolute',
-                            top: '0',
-                            right: '0',
-                            width: '560px',
-                            maxWidth: '92vw',
-                            height: '100vh',
+                            top: '4vh',
+                            right: '2vw',
+                            width: '1200px',
+                            maxWidth: '96vw',
+                            height: '92vh',
                             background: '#020617',
                             color: '#e2e8f0',
-                            borderLeft: '1px solid rgba(148,163,184,0.25)',
-                            boxShadow: '-20px 0 40px rgba(0,0,0,0.45)',
+                            border: '1px solid rgba(148,163,184,0.25)',
+                            borderRadius: '14px',
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
                             display: 'flex',
                             flexDirection: 'column',
                             pointerEvents: 'auto',
@@ -170,10 +216,10 @@ const DownloadEventSheet = defineComponent({
                             h('div', [
                                 h('div', {
                                     style: { fontSize: '15px', fontWeight: '700', color: '#f8fafc' },
-                                }, 'Download Events'),
+                                }, 'Download Debug Sheet'),
                                 h('div', {
                                     style: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
-                                }, `Alt + A · ${this.count} event(s)`),
+                                }, `Alt + A · Reverb ${this.eventCount} · Atlas ${this.requestCount}`),
                             ]),
                             h('div', {
                                 style: { display: 'flex', gap: '8px' },
@@ -189,8 +235,21 @@ const DownloadEventSheet = defineComponent({
                                         cursor: 'pointer',
                                         fontSize: '12px',
                                     },
-                                    onClick: this.clearRows,
-                                }, 'Clear'),
+                                    onClick: this.clearEventRows,
+                                }, 'Clear Events'),
+                                h('button', {
+                                    type: 'button',
+                                    style: {
+                                        border: '1px solid rgba(148,163,184,0.35)',
+                                        color: '#e2e8f0',
+                                        background: 'transparent',
+                                        padding: '6px 10px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                    },
+                                    onClick: this.clearRequestRows,
+                                }, 'Clear Requests'),
                                 h('button', {
                                     type: 'button',
                                     style: {
@@ -213,70 +272,211 @@ const DownloadEventSheet = defineComponent({
                                 padding: '10px',
                                 overflow: 'auto',
                                 flex: '1',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px',
-                            },
-                        }, this.rows.map((row) => h('article', {
-                            key: row.id,
-                            style: {
-                                border: '1px solid rgba(148,163,184,0.25)',
-                                borderRadius: '10px',
-                                overflow: 'hidden',
-                                background: 'rgba(15,23,42,0.85)',
                             },
                         }, [
-                            h('button', {
-                                type: 'button',
+                            h('div', {
                                 style: {
-                                    all: 'unset',
-                                    cursor: 'pointer',
-                                    display: 'block',
-                                    width: '100%',
-                                    padding: '10px 12px',
-                                },
-                                onClick: () => {
-                                    this.toggleRow(row.id);
+                                    display: 'grid',
+                                    gap: '12px',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
                                 },
                             }, [
-                                h('div', {
+                                h('section', {
                                     style: {
-                                        display: 'grid',
-                                        gap: '2px',
-                                        fontSize: '12px',
-                                        color: '#cbd5e1',
+                                        minHeight: '0',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '8px',
                                     },
                                 }, [
-                                    h('div', {
+                                    h('h3', {
                                         style: {
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            gap: '8px',
+                                            margin: '0 0 4px',
+                                            fontSize: '13px',
+                                            color: '#94a3b8',
+                                            letterSpacing: '0.02em',
+                                        },
+                                    }, 'Reverb Events'),
+                                    ...this.eventRows.map((row) => h('article', {
+                                        key: `event-${row.id}`,
+                                        style: {
+                                            border: '1px solid rgba(148,163,184,0.25)',
+                                            borderRadius: '10px',
+                                            overflow: 'hidden',
+                                            background: 'rgba(15,23,42,0.85)',
                                         },
                                     }, [
-                                        h('strong', { style: { color: '#f8fafc' } }, row.event),
-                                        h('span', { style: { color: '#94a3b8' } }, row.createdAt),
-                                    ]),
-                                    h('div', `transfer=${row.transferId ?? '-'} file=${row.fileId ?? '-'} status=${row.status ?? '-'} percent=${row.percent ?? '-'}`),
+                                        h('button', {
+                                            type: 'button',
+                                            style: {
+                                                all: 'unset',
+                                                cursor: 'pointer',
+                                                display: 'block',
+                                                width: '100%',
+                                                padding: '10px 12px',
+                                            },
+                                            onClick: () => {
+                                                this.toggleEventRow(row.id);
+                                            },
+                                        }, [
+                                            h('div', {
+                                                style: {
+                                                    display: 'grid',
+                                                    gap: '2px',
+                                                    fontSize: '12px',
+                                                    color: '#cbd5e1',
+                                                },
+                                            }, [
+                                                h('div', {
+                                                    style: {
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                    },
+                                                }, [
+                                                    h('strong', { style: { color: '#f8fafc' } }, row.event),
+                                                    h('span', { style: { color: '#94a3b8' } }, row.createdAt),
+                                                ]),
+                                                h('div', `transfer=${row.transferId ?? '-'} file=${row.fileId ?? '-'} status=${row.status ?? '-'} percent=${row.percent ?? '-'}`),
+                                            ]),
+                                        ]),
+                                        row.expanded
+                                            ? h('div', {
+                                                style: {
+                                                    borderTop: '1px solid rgba(148,163,184,0.2)',
+                                                    display: 'grid',
+                                                    gap: '8px',
+                                                    padding: '10px 12px 12px',
+                                                },
+                                            }, [
+                                                h('div', { style: { fontSize: '11px', color: '#94a3b8', fontWeight: '700' } }, 'Payload'),
+                                                h('pre', {
+                                                    style: {
+                                                        margin: '0',
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.45',
+                                                        overflowX: 'auto',
+                                                        whiteSpace: 'pre',
+                                                        color: '#e2e8f0',
+                                                    },
+                                                    innerHTML: toHighlightedJson(row.payload),
+                                                }),
+                                                h('div', { style: { fontSize: '11px', color: '#94a3b8', fontWeight: '700' } }, 'Response'),
+                                                h('pre', {
+                                                    style: {
+                                                        margin: '0',
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.45',
+                                                        overflowX: 'auto',
+                                                        whiteSpace: 'pre',
+                                                        color: '#e2e8f0',
+                                                    },
+                                                    innerHTML: toHighlightedJson(null),
+                                                }),
+                                            ])
+                                            : null,
+                                    ])),
+                                ]),
+                                h('section', {
+                                    style: {
+                                        minHeight: '0',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '8px',
+                                    },
+                                }, [
+                                    h('h3', {
+                                        style: {
+                                            margin: '0 0 4px',
+                                            fontSize: '13px',
+                                            color: '#94a3b8',
+                                            letterSpacing: '0.02em',
+                                        },
+                                    }, 'Atlas Requests'),
+                                    ...this.requestRows.map((row) => h('article', {
+                                        key: `request-${row.id}`,
+                                        style: {
+                                            border: '1px solid rgba(148,163,184,0.25)',
+                                            borderRadius: '10px',
+                                            overflow: 'hidden',
+                                            background: 'rgba(15,23,42,0.85)',
+                                        },
+                                    }, [
+                                        h('button', {
+                                            type: 'button',
+                                            style: {
+                                                all: 'unset',
+                                                cursor: 'pointer',
+                                                display: 'block',
+                                                width: '100%',
+                                                padding: '10px 12px',
+                                            },
+                                            onClick: () => {
+                                                this.toggleRequestRow(row.id);
+                                            },
+                                        }, [
+                                            h('div', {
+                                                style: {
+                                                    display: 'grid',
+                                                    gap: '2px',
+                                                    fontSize: '12px',
+                                                    color: '#cbd5e1',
+                                                },
+                                            }, [
+                                                h('div', {
+                                                    style: {
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                    },
+                                                }, [
+                                                    h('strong', { style: { color: '#f8fafc' } }, `${row.method} ${row.endpoint}`),
+                                                    h('span', { style: { color: '#94a3b8' } }, row.timestamp),
+                                                ]),
+                                                h('div', `status=${String(row.status)} duration=${row.durationMs}ms`),
+                                            ]),
+                                        ]),
+                                        row.expanded
+                                            ? h('div', {
+                                                style: {
+                                                    borderTop: '1px solid rgba(148,163,184,0.2)',
+                                                    display: 'grid',
+                                                    gap: '8px',
+                                                    padding: '10px 12px 12px',
+                                                },
+                                            }, [
+                                                h('div', { style: { fontSize: '11px', color: '#94a3b8', fontWeight: '700' } }, 'Payload'),
+                                                h('pre', {
+                                                    style: {
+                                                        margin: '0',
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.45',
+                                                        overflowX: 'auto',
+                                                        whiteSpace: 'pre',
+                                                        color: '#e2e8f0',
+                                                    },
+                                                    innerHTML: toHighlightedJson(row.requestPayload),
+                                                }),
+                                                h('div', { style: { fontSize: '11px', color: '#94a3b8', fontWeight: '700' } }, 'Response'),
+                                                h('pre', {
+                                                    style: {
+                                                        margin: '0',
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.45',
+                                                        overflowX: 'auto',
+                                                        whiteSpace: 'pre',
+                                                        color: '#e2e8f0',
+                                                    },
+                                                    innerHTML: toHighlightedJson(row.responsePayload),
+                                                }),
+                                            ])
+                                            : null,
+                                    ])),
                                 ]),
                             ]),
-                            row.expanded
-                                ? h('pre', {
-                                    style: {
-                                        margin: '0',
-                                        padding: '10px 12px 12px',
-                                        borderTop: '1px solid rgba(148,163,184,0.2)',
-                                        fontSize: '12px',
-                                        lineHeight: '1.45',
-                                        overflowX: 'auto',
-                                        whiteSpace: 'pre',
-                                        color: '#e2e8f0',
-                                    },
-                                    innerHTML: toHighlightedJson(row.payload),
-                                })
-                                : null,
-                        ]))),
+                        ]),
                     ],
                 ),
             ],

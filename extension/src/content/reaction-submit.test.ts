@@ -71,6 +71,8 @@ describe('submitBadgeReaction', () => {
         });
 
         const { submitBadgeReaction } = await import('./reaction-submit');
+        const { clearAtlasRequestLog, getAtlasRequestLogSnapshot } = await import('./atlas-request-log');
+        clearAtlasRequestLog();
         const video = document.createElement('video');
         video.poster = 'https://cdn.example.com/poster.jpg';
 
@@ -100,6 +102,25 @@ describe('submitBadgeReaction', () => {
             },
         ]);
         expect(body.user_agent).toBe(navigator.userAgent);
+
+        const [requestLog] = getAtlasRequestLogSnapshot();
+        expect(requestLog.endpoint).toBe('https://atlas.test/api/extension/reactions');
+        expect(requestLog.method).toBe('POST');
+        expect(requestLog.status).toBe(200);
+        expect(requestLog.requestPayload).toMatchObject({
+            type: 'like',
+            url: window.location.href,
+        });
+        expect(requestLog.responsePayload).toEqual({
+            reaction: 'like',
+            exists: true,
+            download: {
+                requested: false,
+                transfer_id: null,
+                status: null,
+                progress_percent: null,
+            },
+        });
     });
 
     it('falls back to page fetch with keepalive when runtime submit is unavailable', async () => {
@@ -109,9 +130,8 @@ describe('submitBadgeReaction', () => {
             matchRules: [],
         });
 
-        const fetchMock = vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({
                 reaction: 'like',
                 exists: true,
                 download: {
@@ -120,8 +140,8 @@ describe('submitBadgeReaction', () => {
                     status: null,
                     progress_percent: null,
                 },
-            }),
-        });
+            }), { status: 200 }),
+        );
         vi.stubGlobal('fetch', fetchMock);
         const runtimeSendMessage = vi.fn((payload: unknown, callback: (response: unknown) => void) => {
             const typed = payload as { type?: string };
@@ -153,6 +173,8 @@ describe('submitBadgeReaction', () => {
         });
 
         const { submitBadgeReaction } = await import('./reaction-submit');
+        const { clearAtlasRequestLog, getAtlasRequestLogSnapshot } = await import('./atlas-request-log');
+        clearAtlasRequestLog();
         const video = document.createElement('video');
         video.poster = 'https://cdn.example.com/poster.jpg';
 
@@ -182,5 +204,11 @@ describe('submitBadgeReaction', () => {
             },
         ]);
         expect(body.user_agent).toBe(navigator.userAgent);
+
+        const logs = getAtlasRequestLogSnapshot();
+        expect(logs).toHaveLength(2);
+        expect(logs[0].status).toBe(200);
+        expect(logs[0].endpoint).toBe('https://atlas.test/api/extension/reactions');
+        expect(logs[1].status).toBe('runtime_unavailable');
     });
 });

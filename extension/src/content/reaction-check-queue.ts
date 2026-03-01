@@ -1,4 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
+import { atlasLoggedFetch } from './atlas-request-log';
 import { normalizeUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 export type BadgeReactionType = 'love' | 'like' | 'dislike' | 'funny';
@@ -79,13 +80,15 @@ async function requestBatch(batch: MatchQueueItem[]): Promise<Map<string, BadgeM
             });
         });
 
-        const response = await fetch(`${stored.atlasDomain}/api/extension/badges/checks`, {
+        const endpoint = `${stored.atlasDomain}/api/extension/badges/checks`;
+        const requestPayload = { items };
+        const response = await atlasLoggedFetch(endpoint, 'POST', requestPayload, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Atlas-Api-Key': stored.apiToken,
             },
-            body: JSON.stringify({ items }),
+            body: JSON.stringify(requestPayload),
         });
 
         if (!response.ok) {
