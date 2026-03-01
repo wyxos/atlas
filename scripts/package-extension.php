@@ -95,11 +95,57 @@ function hasExtensionChanges(string $projectRoot): bool
     return false;
 }
 
+function normalizeEnvValue(string $value): string
+{
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $quote = $trimmed[0];
+    if (($quote === '"' || $quote === "'") && str_ends_with($trimmed, $quote)) {
+        return substr($trimmed, 1, -1);
+    }
+
+    return $trimmed;
+}
+
+function readDotEnvValue(string $dotenvPath, string $key): ?string
+{
+    if (! file_exists($dotenvPath)) {
+        return null;
+    }
+
+    $lines = file($dotenvPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (! is_array($lines)) {
+        return null;
+    }
+
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '' || str_starts_with($trimmed, '#') || ! str_contains($trimmed, '=')) {
+            continue;
+        }
+
+        [$candidateKey, $candidateValue] = explode('=', $trimmed, 2);
+        if (trim($candidateKey) !== $key) {
+            continue;
+        }
+
+        $normalized = normalizeEnvValue($candidateValue);
+
+        return $normalized === '' ? null : $normalized;
+    }
+
+    return null;
+}
+
 $projectRoot = dirname(__DIR__);
 $extensionRoot = $projectRoot.'/extension';
 $distDirectory = $extensionRoot.'/dist';
 $manifestPath = $extensionRoot.'/manifest.json';
 $defaultDownloadsDirectory = $projectRoot.'/public/downloads';
+$dotenvPath = $projectRoot.'/.env';
 
 if (! is_dir($distDirectory)) {
     fwrite(STDERR, "Extension dist directory not found: {$distDirectory}\n");
@@ -129,6 +175,14 @@ $requestedBump = isset($options['bump']) ? trim((string) $options['bump']) : nul
 $bumpIfExtensionChanged = array_key_exists('bump-if-extension-changed', $options);
 $requestedOutputDirectory = isset($options['output-dir']) ? trim((string) $options['output-dir']) : null;
 $requestedExtractDirectory = isset($options['extract-dir']) ? trim((string) $options['extract-dir']) : null;
+$envPackageDirectory = getenv('EXTENSION_LOCAL_PACKAGE_DIR');
+if ($envPackageDirectory === false || trim((string) $envPackageDirectory) === '') {
+    $envPackageDirectory = readDotEnvValue($dotenvPath, 'EXTENSION_LOCAL_PACKAGE_DIR');
+}
+$envExtractDirectory = getenv('EXTENSION_LOCAL_EXTRACT_DIR');
+if ($envExtractDirectory === false || trim((string) $envExtractDirectory) === '') {
+    $envExtractDirectory = readDotEnvValue($dotenvPath, 'EXTENSION_LOCAL_EXTRACT_DIR');
+}
 
 if ($requestedVersion !== null && $requestedVersion !== '' && parseSemver($requestedVersion) === null) {
     fwrite(STDERR, "Invalid --version value '{$requestedVersion}'. Expected SemVer format like 1.2.3.\n");
@@ -244,6 +298,10 @@ if (! file_exists($distDirectory.'/content.js')) {
     exit(1);
 }
 
+if (($requestedOutputDirectory === null || $requestedOutputDirectory === '') && is_string($envPackageDirectory) && trim($envPackageDirectory) !== '') {
+    $requestedOutputDirectory = trim($envPackageDirectory);
+}
+
 if ($requestedOutputDirectory === null || $requestedOutputDirectory === '') {
     $downloadsDirectory = $defaultDownloadsDirectory;
 } else {
@@ -288,6 +346,14 @@ if (! copy($versionedArchive, $latestArchive)) {
 
 fwrite(STDOUT, "Created extension package: {$versionedArchive}\n");
 fwrite(STDOUT, "Updated latest package: {$latestArchive}\n");
+
+if (($requestedExtractDirectory === null || $requestedExtractDirectory === '') && is_string($envExtractDirectory) && trim($envExtractDirectory) !== '') {
+    $requestedExtractDirectory = trim($envExtractDirectory);
+}
+
+if (($requestedExtractDirectory === null || $requestedExtractDirectory === '') && is_string($envPackageDirectory) && trim($envPackageDirectory) !== '') {
+    $requestedExtractDirectory = trim($envPackageDirectory);
+}
 
 if ($requestedExtractDirectory !== null && $requestedExtractDirectory !== '') {
     if (! is_dir($requestedExtractDirectory) && ! mkdir($requestedExtractDirectory, 0775, true) && ! is_dir($requestedExtractDirectory)) {
