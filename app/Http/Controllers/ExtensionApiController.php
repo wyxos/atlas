@@ -299,8 +299,9 @@ class ExtensionApiController extends Controller
         ?string $pageUrl,
         ?string $tagName,
     ): File {
-        $urlHash = hash('sha256', $url);
         $downloadVia = $this->shouldUseYtDlp($url, $pageUrl, $tagName) ? 'yt-dlp' : null;
+        $canonicalUrl = $downloadVia === 'yt-dlp' && $pageUrl !== null ? $pageUrl : $url;
+        $urlHash = hash('sha256', $canonicalUrl);
         $listingMetadata = array_filter([
             'extension_channel' => $extensionChannel,
             'page_url' => $pageUrl,
@@ -316,12 +317,12 @@ class ExtensionApiController extends Controller
         if (! $file) {
             return File::query()->create([
                 'source' => 'extension',
-                'url' => $url,
+                'url' => $canonicalUrl,
                 'referrer_url' => $referrerUrl,
                 'preview_url' => $previewUrl,
                 'listing_metadata' => $listingMetadata,
                 'filename' => Str::random(40),
-                'ext' => FileTypeDetector::extensionFromUrl($url),
+                'ext' => FileTypeDetector::extensionFromUrl($canonicalUrl),
             ]);
         }
 

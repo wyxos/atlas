@@ -42,8 +42,48 @@ function mediaMatchesRules(element: MediaElement): boolean {
     return mediaUrl !== null && urlMatchesAnyRule(mediaUrl, currentRules, currentPageHostname);
 }
 
+function isSmallImage(element: HTMLImageElement): boolean {
+    const width = element.naturalWidth || element.width || element.clientWidth;
+    const height = element.naturalHeight || element.height || element.clientHeight;
+
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+
+    return width < 96 || height < 96;
+}
+
+function imageHasNearbyVideo(element: HTMLImageElement): boolean {
+    let current: HTMLElement | null = element.parentElement;
+    let depth = 0;
+
+    while (current && depth < 4) {
+        if (current.querySelector('video') !== null) {
+            return true;
+        }
+
+        current = current.parentElement;
+        depth += 1;
+    }
+
+    return false;
+}
+
+function shouldIgnoreMedia(element: MediaElement): boolean {
+    if (!(element instanceof HTMLImageElement)) {
+        return false;
+    }
+
+    return isSmallImage(element) || imageHasNearbyVideo(element);
+}
+
 function processMedia(media: MediaElement): void {
     if (media.closest('a[href]') !== null) {
+        overlayManager.remove(media);
+        return;
+    }
+
+    if (shouldIgnoreMedia(media)) {
         overlayManager.remove(media);
         return;
     }

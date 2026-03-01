@@ -126,6 +126,31 @@ test('extension video reactions on x mark files for yt-dlp', function () {
     expect(data_get($file?->listing_metadata, 'download_via'))->toBe('yt-dlp');
 });
 
+test('extension video reactions prefer page url when yt-dlp is selected', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://video.xx.fbcdn.net/v/t42.1790-2/10000000_n.jpg',
+        'referrer_url_hash_aware' => 'https://www.facebook.com/reel/735842842730500',
+        'page_url' => 'https://www.facebook.com/reel/735842842730500',
+        'tag_name' => 'video',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.url', 'https://www.facebook.com/reel/735842842730500');
+
+    $file = File::query()->where('url', 'https://www.facebook.com/reel/735842842730500')->first();
+    expect($file)->not->toBeNull();
+    expect(data_get($file?->listing_metadata, 'download_via'))->toBe('yt-dlp');
+    expect(data_get($file?->listing_metadata, 'tag_name'))->toBe('video');
+});
+
 test('extension reactions payload forwards cookies and user agent to queued download job', function () {
     Queue::fake();
 
