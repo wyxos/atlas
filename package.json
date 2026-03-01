@@ -7,7 +7,7 @@
     "build": "vite build",
     "build:extension": "vite build --config extension/vite.config.ts && vite build --config extension/vite.content.config.ts",
     "package:extension": "npm run build:extension && php scripts/package-extension.php",
-    "package:extension:local": "npm run build:extension && php scripts/package-extension.php --bump=patch --output-dir=\"EXTENSION_LOCAL_PACKAGE_DIR\" --extract-dir=\"EXTENSION_LOCAL_PACKAGE_DIR\"",
+    "package:extension:local": "npm run build:extension && php scripts/package-extension.php --bump=patch",
     "dev": "vite",
     "dev:extension": "vite --config extension/vite.config.ts",
     "check": "npm run check:project && npm run backend:lint && npm run backend:test",
