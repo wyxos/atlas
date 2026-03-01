@@ -1,25 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetStoredOptions = vi.fn();
-const mockConnectReverb = vi.fn();
+const mockConnectRuntimeReverb = vi.fn();
 
-vi.mock('../atlas-options', () => ({
-    getStoredOptions: mockGetStoredOptions,
-}));
-
-vi.mock('../reverb-client', () => ({
-    connectReverb: mockConnectReverb,
+vi.mock('../reverb-runtime', () => ({
+    connectRuntimeReverb: mockConnectRuntimeReverb,
 }));
 
 describe('download-progress-bus', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
-        vi.stubGlobal('fetch', vi.fn());
-    });
-
-    afterEach(() => {
-        vi.unstubAllGlobals();
     });
 
     it('reuses a single reverb connection for multiple subscribers and tears down once', async () => {
@@ -27,31 +17,17 @@ describe('download-progress-bus', () => {
         const disconnect = vi.fn();
         let eventHandler: ((event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated', payload: Record<string, unknown>) => void) | null = null;
 
-        mockGetStoredOptions.mockResolvedValue({
-            atlasDomain: 'https://atlas-v2.test',
-            apiToken: 'atlas-token',
-        });
-
-        (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                reverb: {
-                    enabled: true,
-                    key: 'k',
-                    host: 'h',
-                    port: 443,
-                    scheme: 'https',
-                    channel: 'extension-downloads.test',
+        mockConnectRuntimeReverb.mockResolvedValue({
+            kind: 'connected',
+            domain: 'https://atlas-v2.test',
+            endpoint: 'https://atlas-v2.test:443',
+            client: {
+                onEvent: (handler: typeof eventHandler) => {
+                    eventHandler = handler;
+                    return { unsubscribe };
                 },
-            }),
-        });
-
-        mockConnectReverb.mockResolvedValue({
-            onEvent: (handler: typeof eventHandler) => {
-                eventHandler = handler;
-                return { unsubscribe };
+                disconnect,
             },
-            disconnect,
         });
 
         const bus = await import('./download-progress-bus');
@@ -63,7 +39,7 @@ describe('download-progress-bus', () => {
         const offTwo = bus.subscribeToDownloadProgress(listenerTwo);
 
         await vi.waitFor(() => {
-            expect(mockConnectReverb).toHaveBeenCalledTimes(1);
+            expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(1);
         });
         expect(eventHandler).not.toBeNull();
 
