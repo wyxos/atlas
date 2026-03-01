@@ -103,6 +103,24 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
     };
 }
 
+function getSafeCookieHeaderValue(): string | null {
+    try {
+        const cookies = document.cookie.trim();
+        return cookies === '' ? null : cookies;
+    } catch {
+        return null;
+    }
+}
+
+function getSafeUserAgent(): string | null {
+    try {
+        const userAgent = navigator.userAgent.trim();
+        return userAgent === '' ? null : userAgent;
+    } catch {
+        return null;
+    }
+}
+
 export async function submitBadgeReaction(
     media: MediaElement,
     reactionType: BadgeReactionType,
@@ -142,6 +160,8 @@ export async function submitBadgeReaction(
             };
         }
 
+        const cookies = getSafeCookieHeaderValue();
+        const userAgent = getSafeUserAgent();
         const response = await fetch(`${stored.atlasDomain}/api/extension/reactions`, {
             method: 'POST',
             headers: {
@@ -154,6 +174,8 @@ export async function submitBadgeReaction(
                 referrer_url_hash_aware: window.location.href,
                 page_url: window.location.href,
                 tag_name: isVideo ? 'video' : 'img',
+                cookies,
+                user_agent: userAgent,
             }),
         });
 
