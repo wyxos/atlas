@@ -112,7 +112,11 @@ export function persistBadgeCheckResult(mediaUrl: string | null, result: BadgeMa
     const shouldKeepLocalReaction = existing !== null
         && existing.reaction !== null
         && result.reaction === null
-        && (existing.isDownloadLocked || isActiveTransferStatus(existing.status));
+        && (
+            existing.isDownloadLocked
+            || isActiveTransferStatus(existing.status)
+            || existing.exists
+        );
 
     const nextReaction = shouldKeepLocalReaction ? existing?.reaction ?? null : result.reaction;
     const nextExists = shouldKeepLocalReaction ? true : result.exists;
