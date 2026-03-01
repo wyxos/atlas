@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveReactionMediaUrl, shouldExcludeAnchorHref, shouldExcludeMediaOrAnchorUrl } from './media-utils';
+import { resolveReactionMediaUrl, resolveReactionTargetUrl, shouldExcludeAnchorHref, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 describe('resolveReactionMediaUrl', () => {
     it('does not use video poster as reaction media url fallback', () => {
@@ -14,6 +14,15 @@ describe('resolveReactionMediaUrl', () => {
         video.src = 'https://cdn.example.com/video.mp4#fragment';
 
         expect(resolveReactionMediaUrl(video)).toBe('https://cdn.example.com/video.mp4');
+    });
+});
+
+describe('resolveReactionTargetUrl', () => {
+    it('falls back to page url for poster-only videos', () => {
+        const video = document.createElement('video');
+        video.poster = 'https://cdn.example.com/poster.jpg';
+
+        expect(resolveReactionTargetUrl(video, 'https://www.facebook.com/reel/123')).toBe('https://www.facebook.com/reel/123');
     });
 });
 

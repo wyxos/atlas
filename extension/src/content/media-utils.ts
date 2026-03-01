@@ -57,6 +57,19 @@ export function resolveReactionMediaUrl(element: MediaElement): string | null {
     return normalizeUrl(element.currentSrc || element.src || element.getAttribute('src') || null);
 }
 
+export function resolveReactionTargetUrl(element: MediaElement, pageUrl: string | null): string | null {
+    const mediaUrl = resolveReactionMediaUrl(element);
+    if (mediaUrl !== null) {
+        return mediaUrl;
+    }
+
+    if (element instanceof HTMLVideoElement) {
+        return normalizeUrl(pageUrl);
+    }
+
+    return null;
+}
+
 export function resolveMediaResolution(element: MediaElement): MediaResolution | null {
     if (element instanceof HTMLImageElement) {
         const width = element.naturalWidth || element.width;

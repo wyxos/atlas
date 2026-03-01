@@ -1,5 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
-import { normalizeUrl, resolveReactionMediaUrl, type MediaElement } from './media-utils';
+import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
 
@@ -262,11 +262,9 @@ export async function submitBadgeReaction(
     media: MediaElement,
     reactionType: BadgeReactionType,
 ): Promise<SubmitReactionResult> {
-    const mediaUrl = resolveReactionMediaUrl(media);
     const pageUrl = normalizeUrl(window.location.href);
+    const reactionUrl = resolveReactionTargetUrl(media, pageUrl);
     const isVideo = media instanceof HTMLVideoElement;
-    // Some platforms expose media as blob: URLs in DOM. Use page URL fallback for video reactions.
-    const reactionUrl = mediaUrl ?? (isVideo ? pageUrl : null);
     if (reactionUrl === null) {
         return {
             ok: false,
