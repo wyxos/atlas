@@ -4,7 +4,7 @@ import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, ty
 import { OverlayManager } from './content/overlay-manager';
 import { enqueueReferrerCheck } from './content/referrer-check-queue';
 import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
-import { isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
+import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
@@ -255,6 +255,20 @@ function registerAnchorMediaFromDocument(): void {
     }
 }
 
+function refreshVisibleAnchorMedia(): void {
+    for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
+        if (!isMediaElement(mediaElement)) {
+            continue;
+        }
+
+        if (!isVisibleInViewport(mediaElement)) {
+            continue;
+        }
+
+        applyAnchorMediaBorder(mediaElement);
+    }
+}
+
 function installMutationObserver(): void {
     const observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
@@ -300,6 +314,26 @@ function installStorageListener(): void {
     });
 }
 
+function installRuntimeMessageListener(): void {
+    if (!chrome.runtime?.onMessage) {
+        return;
+    }
+
+    chrome.runtime.onMessage.addListener((message: unknown) => {
+        if (typeof message !== 'object' || message === null) {
+            return;
+        }
+
+        const type = (message as { type?: unknown }).type;
+        if (type !== 'ATLAS_TAB_PRESENCE_CHANGED') {
+            return;
+        }
+
+        clearOpenTabCheckCache();
+        refreshVisibleAnchorMedia();
+    });
+}
+
 function installViewportListeners(): void {
     window.addEventListener('scroll', scheduleReposition, { passive: true });
     window.addEventListener('resize', scheduleReposition, { passive: true });
@@ -321,6 +355,7 @@ async function loadRulesAndProcess(): Promise<void> {
 function bootstrap(): void {
     installMutationObserver();
     installStorageListener();
+    installRuntimeMessageListener();
     installViewportListeners();
     void loadRulesAndProcess();
 }
