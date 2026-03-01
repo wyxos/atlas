@@ -78,6 +78,14 @@ class DownloadTransferYtDlp implements ShouldQueue
                 return;
             }
 
+            $currentStatus = DownloadTransfer::query()
+                ->whereKey($transfer->id)
+                ->value('status');
+            if ($currentStatus !== DownloadTransferStatus::DOWNLOADING) {
+                // Transfer was canceled/paused/changed while yt-dlp was running; stop here.
+                return;
+            }
+
             $candidates = glob($absoluteTmpDir.DIRECTORY_SEPARATOR.'download.*') ?: [];
             $candidates = array_values(array_filter($candidates, fn ($path) => is_string($path) && is_file($path)));
 
@@ -109,6 +117,10 @@ class DownloadTransferYtDlp implements ShouldQueue
 
             DownloadTransfer::query()->whereKey($transfer->id)->update([
                 'last_broadcast_percent' => 100,
+                'updated_at' => now(),
+            ]);
+            File::query()->whereKey($transfer->file_id)->update([
+                'download_progress' => 100,
                 'updated_at' => now(),
             ]);
 
@@ -241,6 +253,7 @@ class DownloadTransferYtDlp implements ShouldQueue
     {
         $updated = DownloadTransfer::query()
             ->whereKey($transfer->id)
+            ->where('status', DownloadTransferStatus::DOWNLOADING)
             ->where('last_broadcast_percent', '<', $percent)
             ->update([
                 'last_broadcast_percent' => $percent,
