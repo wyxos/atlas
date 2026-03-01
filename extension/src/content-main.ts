@@ -194,7 +194,7 @@ function applyAnchorMediaBorder(media: MediaElement): void {
             return;
         }
 
-        void isUrlOpenInAnotherTab(anchorHref).then((isOpenedElsewhere) => {
+        void isUrlOpenInAnotherTab(absoluteHref).then((isOpenedElsewhere) => {
             if (!media.isConnected) {
                 return;
             }

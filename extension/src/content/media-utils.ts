@@ -143,7 +143,7 @@ export function shouldExcludeMediaOrAnchorUrl(url: string | null | undefined): b
         return true;
     }
 
-    return isLikelyDomainRootUrl(url) || containsEmailOrPhoneHint(url);
+    return containsEmailOrPhoneHint(url);
 }
 
 export function shouldExcludeAnchorHref(rawHref: string | null | undefined, absoluteHref: string | null): boolean {

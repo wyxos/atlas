@@ -1,4 +1,4 @@
-import { normalizeUrl } from './media-utils';
+import { isLikelyDomainRootUrl, normalizeUrl } from './media-utils';
 
 const CACHE_TTL_MS = 20 * 1000;
 
@@ -6,6 +6,10 @@ const resultCache = new Map<string, { value: boolean; cachedAt: number }>();
 const inFlight = new Map<string, Promise<boolean>>();
 
 function normalizeComparableUrl(value: string | null): string | null {
+    if (isLikelyDomainRootUrl(value)) {
+        return null;
+    }
+
     const normalized = normalizeUrl(value);
     if (normalized === null) {
         return null;
