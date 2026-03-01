@@ -15,6 +15,19 @@ type ReverbSubscription = {
     unsubscribe: () => void;
 };
 
+type PusherLike = {
+    connection: {
+        state?: string;
+        bind: (eventName: string, callback: (state: unknown) => void) => void;
+        unbind: (eventName: string, callback: (state: unknown) => void) => void;
+    };
+    subscribe: (channelName: string) => {
+        bind: (eventName: string, callback: (payload: unknown) => void) => void;
+        unbind_all?: () => void;
+    };
+    disconnect: () => void;
+};
+
 type ReverbConnectionState = 'connected' | 'disconnected' | 'connecting' | 'reconnecting' | 'failed';
 
 type ReverbClient = {
@@ -28,27 +41,20 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
         return null;
     }
 
-    const [{ default: Echo }, { default: Pusher }] = await Promise.all([
-        import('laravel-echo'),
-        import('pusher-js'),
-    ]);
-
-    const echo = new Echo<'reverb'>({
-        broadcaster: 'reverb',
-        key: config.key,
+    const module = await import('pusher-js');
+    const PusherCtor = (module as { default?: unknown }).default ?? module;
+    const pusher = new (PusherCtor as new (key: string, options: Record<string, unknown>) => PusherLike)(config.key, {
+        cluster: 'mt1',
         wsHost: config.host,
         wsPort: config.port,
         wssPort: config.port,
+        wsPath: '/app',
         forceTLS: config.scheme === 'https',
         enabledTransports: config.scheme === 'https' ? ['wss'] : ['ws'],
         disableStats: true,
-        cluster: '',
-        namespace: false,
-        withoutInterceptors: true,
-        Pusher,
     });
 
-    const channel = echo.channel(config.channel);
+    const channel = pusher.subscribe(config.channel);
     const eventCallbacks = new Set<(event: ReverbEventName, payload: ReverbEventPayload) => void>();
     const connectionCallbacks = new Set<(state: ReverbConnectionState) => void>();
 
@@ -63,21 +69,33 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
         });
     };
 
-    channel.listen('.DownloadTransferCreated', (payload: unknown) => {
+    channel.bind('DownloadTransferCreated', (payload: unknown) => {
         emitEvent('DownloadTransferCreated', payload);
     });
-    channel.listen('.DownloadTransferQueued', (payload: unknown) => {
+    channel.bind('DownloadTransferQueued', (payload: unknown) => {
         emitEvent('DownloadTransferQueued', payload);
     });
-    channel.listen('.DownloadTransferProgressUpdated', (payload: unknown) => {
+    channel.bind('DownloadTransferProgressUpdated', (payload: unknown) => {
         emitEvent('DownloadTransferProgressUpdated', payload);
     });
 
-    const stopConnectionChangeListener = echo.connector.onConnectionChange((state) => {
+    const onStateChange = (state: unknown) => {
+        const current = (state as { current?: unknown })?.current;
+        const raw = typeof current === 'string' ? current : (typeof pusher.connection.state === 'string' ? pusher.connection.state : 'disconnected');
+        const normalized = raw === 'connected'
+            ? 'connected'
+            : raw === 'connecting'
+                ? 'connecting'
+                : raw === 'unavailable' || raw === 'failed'
+                    ? 'failed'
+                    : raw === 'disconnected'
+                        ? 'disconnected'
+                        : 'reconnecting';
         connectionCallbacks.forEach((callback) => {
-            callback(state);
+            callback(normalized);
         });
-    });
+    };
+    pusher.connection.bind('state_change', onStateChange);
 
     return {
         onEvent: (callback) => {
@@ -90,8 +108,19 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
         },
         onConnectionState: (callback) => {
             connectionCallbacks.add(callback);
-            const currentState = echo.connectionStatus();
-            if (currentState) {
+            const raw = typeof pusher.connection.state === 'string' ? pusher.connection.state : null;
+            const currentState: ReverbConnectionState | null = raw === 'connected'
+                ? 'connected'
+                : raw === 'connecting'
+                    ? 'connecting'
+                    : raw === 'unavailable' || raw === 'failed'
+                        ? 'failed'
+                        : raw === 'disconnected'
+                            ? 'disconnected'
+                            : raw === null
+                                ? null
+                                : 'reconnecting';
+            if (currentState !== null) {
                 callback(currentState);
             }
             return {
@@ -103,12 +132,11 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
         disconnect: () => {
             eventCallbacks.clear();
             connectionCallbacks.clear();
-            stopConnectionChangeListener();
-            channel.stopListening('.DownloadTransferCreated');
-            channel.stopListening('.DownloadTransferQueued');
-            channel.stopListening('.DownloadTransferProgressUpdated');
-            echo.leaveChannel(config.channel);
-            echo.disconnect();
+            pusher.connection.unbind('state_change', onStateChange);
+            if (typeof channel.unbind_all === 'function') {
+                channel.unbind_all();
+            }
+            pusher.disconnect();
         },
     };
 }
