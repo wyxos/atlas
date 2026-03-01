@@ -81,8 +81,11 @@ describe('badge-state-cache', () => {
             event: 'DownloadTransferProgressUpdated',
             fileId: 10,
             transferId: 25,
+            sourceUrl: null,
+            referrerUrl: null,
             status: null,
             percent: 42,
+            payload: {},
         };
         cache.persistDownloadProgressEvent(progressOnlyEvent);
 
@@ -90,8 +93,11 @@ describe('badge-state-cache', () => {
             event: 'DownloadTransferQueued',
             fileId: 10,
             transferId: 25,
+            sourceUrl: null,
+            referrerUrl: null,
             status: 'downloading',
             percent: null,
+            payload: {},
         };
         cache.persistDownloadProgressEvent(statusOnlyEvent);
 
@@ -125,8 +131,11 @@ describe('badge-state-cache', () => {
             event: 'DownloadTransferProgressUpdated',
             fileId: null,
             transferId: 88,
+            sourceUrl: null,
+            referrerUrl: null,
             status: 'completed',
             percent: 100,
+            payload: {},
         };
         cache.persistDownloadProgressEvent(completedEvent);
 
@@ -139,6 +148,28 @@ describe('badge-state-cache', () => {
             percent: 100,
             downloadedAt: '2026-01-01T12:00:00Z',
             isDownloadLocked: false,
+        });
+    });
+
+    it('maps progress updates by source url when ids are not yet known', async () => {
+        const cache = await loadModule();
+
+        const event: ProgressEvent = {
+            event: 'DownloadTransferQueued',
+            fileId: null,
+            transferId: null,
+            sourceUrl: `${TEST_URL}#fragment`,
+            referrerUrl: null,
+            status: 'queued',
+            percent: 12,
+            payload: {},
+        };
+        cache.persistDownloadProgressEvent(event);
+
+        expect(cache.getPersistedBadgeState(TEST_URL)).toMatchObject({
+            status: 'queued',
+            percent: 12,
+            isDownloadLocked: true,
         });
     });
 });

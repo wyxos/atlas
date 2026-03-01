@@ -5,6 +5,7 @@ export type ProgressEvent = {
     event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated';
     fileId: number | null;
     transferId: number | null;
+    sourceUrl: string | null;
     referrerUrl: string | null;
     status: string | null;
     percent: number | null;
@@ -60,7 +61,8 @@ async function ensureConnected(): Promise<void> {
                 event,
                 fileId: asNumber(payload.fileId ?? payload.file_id),
                 transferId: asNumber(payload.downloadTransferId ?? payload.id),
-                referrerUrl: asString(payload.referrer_url),
+                sourceUrl: asString(payload.original ?? payload.url ?? payload.file_url),
+                referrerUrl: asString(payload.referrer_url ?? payload.referrerUrl ?? payload.page_url),
                 status: asString(payload.status),
                 percent: asNumber(payload.percent),
                 payload,

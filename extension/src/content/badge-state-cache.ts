@@ -139,26 +139,34 @@ export function persistBadgeCheckResult(mediaUrl: string | null, result: BadgeMa
 export function persistDownloadProgressEvent(event: ProgressEvent): void {
     const byTransfer = event.transferId !== null ? urlByTransferId.get(event.transferId) : null;
     const byFile = event.fileId !== null ? urlByFileId.get(event.fileId) : null;
-    const url = byTransfer ?? byFile;
-    if (!url) {
+    const bySourceUrl = normalizeMediaUrl(event.sourceUrl);
+    const byReferrerUrl = normalizeMediaUrl(event.referrerUrl);
+
+    const urls = Array.from(
+        new Set([byTransfer, byFile, bySourceUrl, byReferrerUrl].filter((url): url is string => typeof url === 'string' && url !== '')),
+    );
+
+    if (urls.length === 0) {
         return;
     }
 
-    const state = ensureState(url);
-    const nextStatus = event.status ?? state.status;
-    const nextPercent = event.percent ?? state.percent;
-    const locked = nextStatus !== null ? !isTerminalStatus(nextStatus) : state.isDownloadLocked;
+    for (const url of urls) {
+        const state = ensureState(url);
+        const nextStatus = event.status ?? state.status;
+        const nextPercent = event.percent ?? state.percent;
+        const locked = nextStatus !== null ? !isTerminalStatus(nextStatus) : state.isDownloadLocked;
 
-    const next: PersistedBadgeState = {
-        ...state,
-        fileId: event.fileId ?? state.fileId,
-        transferId: event.transferId ?? state.transferId,
-        status: nextStatus,
-        percent: nextPercent,
-        isDownloadLocked: locked,
-        updatedAt: now(),
-    };
+        const next: PersistedBadgeState = {
+            ...state,
+            fileId: event.fileId ?? state.fileId,
+            transferId: event.transferId ?? state.transferId,
+            status: nextStatus,
+            percent: nextPercent,
+            isDownloadLocked: locked,
+            updatedAt: now(),
+        };
 
-    stateByUrl.set(url, next);
-    rememberIdentity(url, next.fileId, next.transferId);
+        stateByUrl.set(url, next);
+        rememberIdentity(url, next.fileId, next.transferId);
+    }
 }

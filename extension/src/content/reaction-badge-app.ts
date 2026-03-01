@@ -2,10 +2,10 @@ import type { PropType } from 'vue';
 import { computed, createApp, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Ban, Download } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
-import { normalizeUrl, resolveMediaResolution, resolveMediaUrl, resolveReactionMediaUrl, type MediaElement } from './media-utils';
+import { normalizeUrl, resolveMediaResolution, resolveMediaUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { submitBadgeReaction } from './reaction-submit';
-import { subscribeToDownloadProgress } from './download-progress-bus';
+import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
 import { renderReactionBadge, type BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
 import {
@@ -69,6 +69,7 @@ const AtlasReactionBadge = defineComponent({
         const hasSeenActiveTransfer = ref(false);
         const lastCheckedMediaUrl = ref<string | null>(null);
         const lastReactionMediaUrl = ref<string | null>(null);
+        const trackedMediaUrls = ref<string[]>([]);
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
@@ -97,6 +98,64 @@ const AtlasReactionBadge = defineComponent({
             return null;
         });
 
+        function resolveTrackedUrlsForCurrentMedia(): string[] {
+            const pageUrl = normalizeUrl(window.location.href);
+            const reactionTargetUrl = resolveReactionTargetUrl(props.media, pageUrl);
+            const mediaUrl = normalizeUrl(resolveMediaUrl(props.media));
+            const urls = [
+                reactionTargetUrl,
+                mediaUrl,
+                props.media instanceof HTMLVideoElement ? pageUrl : null,
+            ].filter((url): url is string => url !== null);
+
+            return Array.from(new Set(urls));
+        }
+
+        function syncTrackedUrlsForCurrentMedia(): void {
+            trackedMediaUrls.value = resolveTrackedUrlsForCurrentMedia();
+            lastReactionMediaUrl.value = trackedMediaUrls.value[0] ?? null;
+        }
+
+        function resolvePersistenceUrl(): string | null {
+            return lastReactionMediaUrl.value ?? trackedMediaUrls.value[0] ?? null;
+        }
+
+        function getLatestPersistedStateForTrackedUrls(): PersistedBadgeState | null {
+            let latest: PersistedBadgeState | null = null;
+
+            for (const url of trackedMediaUrls.value) {
+                const snapshot = getPersistedBadgeState(url);
+                if (snapshot === null) {
+                    continue;
+                }
+
+                if (latest === null || snapshot.updatedAt > latest.updatedAt) {
+                    latest = snapshot;
+                }
+            }
+
+            return latest;
+        }
+
+        function matchingUrlFromProgressEvent(event: ProgressEvent): string | null {
+            if (trackedMediaUrls.value.length === 0) {
+                return null;
+            }
+
+            const candidates = [
+                normalizeUrl(event.sourceUrl),
+                normalizeUrl(event.referrerUrl),
+            ];
+
+            for (const candidate of candidates) {
+                if (candidate !== null && trackedMediaUrls.value.includes(candidate)) {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
         function syncResolution(): void {
             const resolved = resolveMediaResolution(props.media);
             mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
@@ -113,20 +172,37 @@ const AtlasReactionBadge = defineComponent({
                     return;
                 }
 
-                if (trackedTransferId.value !== null) {
-                    if (event.transferId !== trackedTransferId.value) {
-                        return;
-                    }
-                } else if (trackedFileId.value !== null) {
-                    if (event.fileId !== trackedFileId.value) {
-                        return;
-                    }
+                const transferMatches = trackedTransferId.value !== null && event.transferId === trackedTransferId.value;
+                const fileMatches = trackedFileId.value !== null && event.fileId === trackedFileId.value;
+                const matchedUrl = matchingUrlFromProgressEvent(event);
 
-                    if (event.transferId !== null) {
-                        trackedTransferId.value = event.transferId;
-                    }
-                } else {
+                if (!transferMatches && !fileMatches && matchedUrl === null) {
                     return;
+                }
+
+                if (matchedUrl !== null) {
+                    lastReactionMediaUrl.value = matchedUrl;
+                }
+
+                if (event.fileId !== null) {
+                    trackedFileId.value = event.fileId;
+                }
+                if (event.transferId !== null) {
+                    trackedTransferId.value = event.transferId;
+                }
+
+                const priorReaction = matchResult.value.reaction;
+                const priorExists = matchResult.value.exists;
+                const persisted = getLatestPersistedStateForTrackedUrls();
+                if (persisted !== null) {
+                    applyPersistedState(persisted);
+                    if (persisted.reaction === null && priorReaction !== null) {
+                        matchResult.value = {
+                            ...matchResult.value,
+                            exists: persisted.exists || priorExists,
+                            reaction: priorReaction,
+                        };
+                    }
                 }
 
                 if (event.percent !== null) {
@@ -143,7 +219,7 @@ const AtlasReactionBadge = defineComponent({
                     handleTerminalUnlock();
                 }
 
-                persistBadgeState(lastReactionMediaUrl.value, {
+                persistBadgeState(resolvePersistenceUrl(), {
                     fileId: trackedFileId.value,
                     transferId: trackedTransferId.value,
                     status: transferStatus.value,
@@ -159,7 +235,7 @@ const AtlasReactionBadge = defineComponent({
             isDownloadLocked.value = false;
             submittingReactionType.value = null;
             hasSeenActiveTransfer.value = false;
-            persistBadgeState(lastReactionMediaUrl.value, {
+            persistBadgeState(resolvePersistenceUrl(), {
                 fileId: trackedFileId.value,
                 transferId: trackedTransferId.value,
                 status: transferStatus.value,
@@ -204,28 +280,27 @@ const AtlasReactionBadge = defineComponent({
         }
 
         async function refreshMatchForCurrentMedia(force = false): Promise<void> {
-            const mediaUrl = resolveMediaUrl(props.media);
-            if (!force && mediaUrl === lastCheckedMediaUrl.value) {
+            syncTrackedUrlsForCurrentMedia();
+            const checkUrl = trackedMediaUrls.value[0] ?? null;
+            if (!force && checkUrl === lastCheckedMediaUrl.value) {
                 return;
             }
 
-            lastCheckedMediaUrl.value = mediaUrl;
-            const reactionMediaUrl = normalizeUrl(resolveReactionMediaUrl(props.media));
-            lastReactionMediaUrl.value = reactionMediaUrl;
+            lastCheckedMediaUrl.value = checkUrl;
             const currentSequence = ++checkSequence;
             resetStateForMediaContextChange();
-            applyPersistedState(getPersistedBadgeState(reactionMediaUrl));
-            if (isDownloadLocked.value) {
-                ensureProgressSubscription();
+            const persistedBeforeCheck = getLatestPersistedStateForTrackedUrls();
+            if (persistedBeforeCheck !== null) {
+                applyPersistedState(persistedBeforeCheck);
             }
 
-            const result = await enqueueReactionCheck(mediaUrl);
+            const result = await enqueueReactionCheck(checkUrl);
             if (!isActive || currentSequence !== checkSequence) {
                 return;
             }
 
-            persistBadgeCheckResult(reactionMediaUrl, result);
-            const persistedAfterCheck = getPersistedBadgeState(reactionMediaUrl);
+            persistBadgeCheckResult(resolvePersistenceUrl(), result);
+            const persistedAfterCheck = getLatestPersistedStateForTrackedUrls();
             if (persistedAfterCheck !== null) {
                 applyPersistedState(persistedAfterCheck);
             } else {
@@ -261,13 +336,14 @@ const AtlasReactionBadge = defineComponent({
                 subtree: true,
             });
 
+            ensureProgressSubscription();
             void refreshMatchForCurrentMedia(true);
         });
 
         onBeforeUnmount(() => {
             isActive = false;
             checkSequence += 1;
-            persistBadgeState(lastReactionMediaUrl.value, {
+            persistBadgeState(resolvePersistenceUrl(), {
                 exists: matchResult.value.exists,
                 reaction: matchResult.value.reaction,
                 fileId: trackedFileId.value,
@@ -311,13 +387,13 @@ const AtlasReactionBadge = defineComponent({
                     exists: result.exists || matchResult.value.exists,
                     reaction: result.reaction,
                 };
-                lastReactionMediaUrl.value = normalizeUrl(resolveReactionMediaUrl(props.media));
+                syncTrackedUrlsForCurrentMedia();
                 trackedFileId.value = result.fileId;
                 trackedTransferId.value = result.downloadTransferId;
                 transferStatus.value = result.downloadStatus;
                 progressPercent.value = result.downloadProgressPercent;
                 hasSeenActiveTransfer.value = result.downloadStatus !== null && !isTerminalStatus(result.downloadStatus);
-                persistBadgeState(lastReactionMediaUrl.value, {
+                persistBadgeState(resolvePersistenceUrl(), {
                     exists: matchResult.value.exists,
                     reaction: matchResult.value.reaction,
                     fileId: trackedFileId.value,
