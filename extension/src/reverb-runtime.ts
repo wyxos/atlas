@@ -146,7 +146,13 @@ async function waitForReverbState(
             finished = true;
             subscription?.unsubscribe();
             errorSubscription?.unsubscribe();
-            resolve({ state: 'timeout', error: lastError ?? client.getLastConnectionError() });
+            const currentState = client.getConnectionState();
+            resolve({
+                state: currentState === 'connected' || currentState === 'failed' || currentState === 'disconnected'
+                    ? currentState
+                    : 'timeout',
+                error: lastError ?? client.getLastConnectionError(),
+            });
         }, timeoutMs);
 
         errorSubscription = client.onConnectionError((message) => {
