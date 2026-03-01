@@ -128,6 +128,8 @@ class ExtensionApiController extends Controller
             'referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
             'page_url' => ['nullable', 'string', 'max:4096'],
             'tag_name' => ['nullable', 'string', 'in:img,video,iframe'],
+            'cookies' => ['nullable', 'string', 'max:20000'],
+            'user_agent' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $url = $this->normalizeUrl($validated['url']);
@@ -145,7 +147,13 @@ class ExtensionApiController extends Controller
         $tagName = isset($validated['tag_name']) && is_string($validated['tag_name']) ? $validated['tag_name'] : null;
 
         $file = $this->findOrCreateFile($url, $referrerUrl, $previewUrl, $extensionChannel, $pageUrl, $tagName);
-        $result = $fileReactionService->set($file, $user, $validated['type'], deferHeavySideEffects: true);
+        $result = $fileReactionService->set(
+            $file,
+            $user,
+            $validated['type'],
+            deferHeavySideEffects: true,
+            downloadRuntimeContext: $this->downloadRuntimeContext($validated, $request)
+        );
         $activeTransfer = $this->findActiveTransfer($file->id);
 
         $reaction = Reaction::query()
@@ -401,6 +409,30 @@ class ExtensionApiController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{cookies?: string, user_agent?: string}
+     */
+    private function downloadRuntimeContext(array $validated, Request $request): array
+    {
+        $context = [];
+
+        $cookies = trim((string) ($validated['cookies'] ?? ''));
+        if ($cookies !== '') {
+            $context['cookies'] = $cookies;
+        }
+
+        $userAgent = trim((string) ($validated['user_agent'] ?? ''));
+        if ($userAgent === '') {
+            $userAgent = trim((string) $request->userAgent());
+        }
+        if ($userAgent !== '') {
+            $context['user_agent'] = $userAgent;
+        }
+
+        return $context;
     }
 
     /**

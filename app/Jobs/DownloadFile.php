@@ -8,6 +8,7 @@ use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
+use App\Services\Downloads\DownloadTransferRuntimeStore;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -20,13 +21,18 @@ class DownloadFile implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $fileId, public bool $forceDownload = false)
+    /**
+     * @param  array{cookies?: string, user_agent?: string}  $runtimeContext
+     */
+    public function __construct(public int $fileId, public bool $forceDownload = false, public array $runtimeContext = [])
     {
         $this->onQueue('downloads');
     }
 
-    public function handle(): void
+    public function handle(?DownloadTransferRuntimeStore $runtimeStore = null): void
     {
+        $runtimeStore ??= app(DownloadTransferRuntimeStore::class);
+
         $file = File::find($this->fileId);
 
         if (! $file || ! $file->url) {
@@ -75,9 +81,22 @@ class DownloadFile implements ShouldQueue
             } catch (\Throwable) {
                 // Broadcast errors shouldn't fail downloads.
             }
+
+            $this->storeRuntimeContext($runtimeStore, $transfer->id);
+        } else {
+            $this->storeRuntimeContext($runtimeStore, $existing->id);
         }
 
         PumpDomainDownloads::dispatch($domain);
+    }
+
+    private function storeRuntimeContext(DownloadTransferRuntimeStore $runtimeStore, int $transferId): void
+    {
+        if ($this->runtimeContext === []) {
+            return;
+        }
+
+        $runtimeStore->putForTransfer($transferId, $this->runtimeContext);
     }
 
     private function isInvalidDownloadedFile(File $file): bool

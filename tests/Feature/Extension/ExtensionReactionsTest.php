@@ -125,3 +125,28 @@ test('extension video reactions on x mark files for yt-dlp', function () {
     expect(data_get($file?->listing_metadata, 'page_url'))->toBe('https://x.com/Ronycoder/status/2027740182682996825');
     expect(data_get($file?->listing_metadata, 'download_via'))->toBe('yt-dlp');
 });
+
+test('extension reactions payload forwards cookies and user agent to queued download job', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+        'User-Agent' => 'AtlasExtensionHeaderUA/9.0',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://cdn.example.test/media/runtime-options.jpg',
+        'referrer_url_hash_aware' => 'https://www.example.test/post/999',
+        'cookies' => 'auth_token=secret123; session_id=abc123',
+        'user_agent' => 'AtlasExtensionBodyUA/1.2.3',
+    ])->assertSuccessful();
+
+    Queue::assertPushed(DownloadFile::class, function (DownloadFile $job): bool {
+        return $job->runtimeContext === [
+            'cookies' => 'auth_token=secret123; session_id=abc123',
+            'user_agent' => 'AtlasExtensionBodyUA/1.2.3',
+        ];
+    });
+});

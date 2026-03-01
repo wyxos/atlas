@@ -16,8 +16,13 @@ class FileReactionService
      *
      * @return array{reaction: array{type: string}|null, changed: bool}
      */
-    public function set(File $file, User $user, string $type, bool $deferHeavySideEffects = false): array
-    {
+    public function set(
+        File $file,
+        User $user,
+        string $type,
+        bool $deferHeavySideEffects = false,
+        array $downloadRuntimeContext = [],
+    ): array {
         $existingReaction = Reaction::query()
             ->where('user_id', $user->id)
             ->where('file_id', $file->id)
@@ -27,9 +32,9 @@ class FileReactionService
             // No-op: keep the existing reaction.
             if ($type !== 'dislike') {
                 if ($deferHeavySideEffects) {
-                    DownloadFile::dispatchAfterResponse($file->id, true);
+                    DownloadFile::dispatchAfterResponse($file->id, true, $downloadRuntimeContext);
                 } else {
-                    DownloadFile::dispatch($file->id);
+                    DownloadFile::dispatch($file->id, false, $downloadRuntimeContext);
                 }
             }
 
@@ -39,7 +44,7 @@ class FileReactionService
             ];
         }
 
-        $reaction = $this->applyReactionChange($file, $user, $existingReaction, $type, $deferHeavySideEffects);
+        $reaction = $this->applyReactionChange($file, $user, $existingReaction, $type, $deferHeavySideEffects, $downloadRuntimeContext);
 
         return [
             'reaction' => $reaction ? ['type' => $reaction->type] : null,
@@ -90,6 +95,7 @@ class FileReactionService
         ?Reaction $existingReaction,
         string $type,
         bool $deferHeavySideEffects = false,
+        array $downloadRuntimeContext = [],
     ): Reaction {
         $metrics = app(MetricsService::class);
         $oldType = $existingReaction?->type;
@@ -125,9 +131,9 @@ class FileReactionService
 
         if ($type !== 'dislike') {
             if ($deferHeavySideEffects) {
-                DownloadFile::dispatchAfterResponse($file->id, true);
+                DownloadFile::dispatchAfterResponse($file->id, true, $downloadRuntimeContext);
             } else {
-                DownloadFile::dispatch($file->id);
+                DownloadFile::dispatch($file->id, false, $downloadRuntimeContext);
             }
         }
 
