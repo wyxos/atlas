@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\DownloadFile;
+use App\Jobs\SyncFileSearchIndex;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -27,7 +28,7 @@ class FileReactionService
      *     }>,
      *     user_agent?: string
      * }  $downloadRuntimeContext
-     * @return array{reaction: array{type: string}|null, changed: bool}
+     * @return array{reaction: array{type: string}|null, reacted_at: string|null, changed: bool}
      */
     public function set(
         File $file,
@@ -44,15 +45,12 @@ class FileReactionService
         if ($existingReaction && $existingReaction->type === $type) {
             // No-op: keep the existing reaction.
             if ($type !== 'dislike') {
-                if ($deferHeavySideEffects) {
-                    DownloadFile::dispatchAfterResponse($file->id, true, $downloadRuntimeContext);
-                } else {
-                    DownloadFile::dispatch($file->id, false, $downloadRuntimeContext);
-                }
+                $this->dispatchDownloadFile($file->id, $deferHeavySideEffects, $downloadRuntimeContext);
             }
 
             return [
                 'reaction' => ['type' => $existingReaction->type],
+                'reacted_at' => $existingReaction->created_at?->toIso8601String(),
                 'changed' => false,
             ];
         }
@@ -61,6 +59,7 @@ class FileReactionService
 
         return [
             'reaction' => $reaction ? ['type' => $reaction->type] : null,
+            'reacted_at' => $reaction?->created_at?->toIso8601String(),
             'changed' => true,
         ];
     }
@@ -143,24 +142,54 @@ class FileReactionService
         );
 
         if ($type !== 'dislike') {
-            if ($deferHeavySideEffects) {
-                DownloadFile::dispatchAfterResponse($file->id, true, $downloadRuntimeContext);
-            } else {
-                DownloadFile::dispatch($file->id, false, $downloadRuntimeContext);
-            }
+            $this->dispatchDownloadFile($file->id, $deferHeavySideEffects, $downloadRuntimeContext);
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
 
         // Ensure the search index reflects the new reaction arrays.
         if ($deferHeavySideEffects) {
-            app()->terminating(static function () use ($file): void {
-                $file->searchable();
-            });
+            SyncFileSearchIndex::dispatch($file->id)
+                ->onConnection($this->asyncQueueConnection())
+                ->onQueue('processing');
         } else {
             $file->searchable();
         }
 
         return $reaction;
+    }
+
+    /**
+     * @param  array{
+     *     cookies?: list<array{
+     *         name: string,
+     *         value: string,
+     *         domain: string,
+     *         path: string,
+     *         secure: bool,
+     *         http_only: bool,
+     *         host_only: bool,
+     *         expires_at: int|null
+     *     }>,
+     *     user_agent?: string
+     * }  $downloadRuntimeContext
+     */
+    private function dispatchDownloadFile(int $fileId, bool $forceDownload, array $downloadRuntimeContext): void
+    {
+        DownloadFile::dispatch($fileId, $forceDownload, $downloadRuntimeContext)
+            ->onConnection($this->asyncQueueConnection())
+            ->onQueue('downloads');
+    }
+
+    private function asyncQueueConnection(): string
+    {
+        $connection = (string) config('downloads.queue_connection', config('queue.default', 'database'));
+        $normalized = strtolower(trim($connection));
+
+        if ($normalized === '' || $normalized === 'sync') {
+            return 'database';
+        }
+
+        return $connection;
     }
 }
