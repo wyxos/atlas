@@ -4,7 +4,8 @@
     "description": "Atlas browser extension popup.",
     "version": "0.1.67",
     "permissions": [
-        "storage"
+        "storage",
+        "tabs"
     ],
     "host_permissions": [
         "http://*/*",
