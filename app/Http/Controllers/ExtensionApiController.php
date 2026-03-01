@@ -164,12 +164,6 @@ class ExtensionApiController extends Controller
         );
         $activeTransfer = $this->findActiveTransfer($file->id);
 
-        $reaction = Reaction::query()
-            ->select(['type', 'created_at'])
-            ->where('user_id', $user->id)
-            ->where('file_id', $file->id)
-            ->first();
-
         return response()->json([
             'file' => [
                 'id' => $file->id,
@@ -178,7 +172,7 @@ class ExtensionApiController extends Controller
                 'preview_url' => $file->preview_url,
             ],
             'reaction' => $result['reaction'],
-            'reacted_at' => $reaction?->created_at?->toIso8601String(),
+            'reacted_at' => $result['reacted_at'] ?? null,
             'download' => [
                 'requested' => $validated['type'] !== 'dislike',
                 'transfer_id' => $activeTransfer?->id,
