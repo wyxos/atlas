@@ -33,6 +33,8 @@ type ReverbConnectionState = 'connected' | 'disconnected' | 'connecting' | 'reco
 type ReverbClient = {
     onEvent: (callback: (event: ReverbEventName, payload: ReverbEventPayload) => void) => ReverbSubscription;
     onConnectionState: (callback: (state: ReverbConnectionState) => void) => ReverbSubscription;
+    onConnectionError: (callback: (message: string) => void) => ReverbSubscription;
+    getLastConnectionError: () => string | null;
     disconnect: () => void;
 };
 
@@ -50,13 +52,15 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
         wssPort: config.port,
         wsPath: '/app',
         forceTLS: config.scheme === 'https',
-        enabledTransports: config.scheme === 'https' ? ['wss'] : ['ws'],
+        enabledTransports: ['ws', 'wss'],
         disableStats: true,
     });
 
     const channel = pusher.subscribe(config.channel);
     const eventCallbacks = new Set<(event: ReverbEventName, payload: ReverbEventPayload) => void>();
     const connectionCallbacks = new Set<(state: ReverbConnectionState) => void>();
+    const connectionErrorCallbacks = new Set<(message: string) => void>();
+    let lastConnectionError: string | null = null;
 
     const emitEvent = (event: ReverbEventName, payload: unknown): void => {
         if (!payload || typeof payload !== 'object') {
@@ -96,6 +100,21 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
         });
     };
     pusher.connection.bind('state_change', onStateChange);
+    const onConnectionError = (error: unknown): void => {
+        const candidate = error as { error?: { message?: unknown }; data?: { message?: unknown }; message?: unknown } | null;
+        const message = typeof candidate?.error?.message === 'string'
+            ? candidate.error.message
+            : typeof candidate?.data?.message === 'string'
+                ? candidate.data.message
+                : typeof candidate?.message === 'string'
+                    ? candidate.message
+                    : 'Unknown websocket error';
+        lastConnectionError = message;
+        connectionErrorCallbacks.forEach((callback) => {
+            callback(message);
+        });
+    };
+    pusher.connection.bind('error', onConnectionError);
 
     return {
         onEvent: (callback) => {
@@ -129,10 +148,24 @@ export async function connectReverb(config: ReverbConfig): Promise<ReverbClient 
                 },
             };
         },
+        onConnectionError: (callback) => {
+            connectionErrorCallbacks.add(callback);
+            if (lastConnectionError !== null) {
+                callback(lastConnectionError);
+            }
+            return {
+                unsubscribe: () => {
+                    connectionErrorCallbacks.delete(callback);
+                },
+            };
+        },
+        getLastConnectionError: () => lastConnectionError,
         disconnect: () => {
             eventCallbacks.clear();
             connectionCallbacks.clear();
+            connectionErrorCallbacks.clear();
             pusher.connection.unbind('state_change', onStateChange);
+            pusher.connection.unbind('error', onConnectionError);
             if (typeof channel.unbind_all === 'function') {
                 channel.unbind_all();
             }
