@@ -17,7 +17,7 @@ let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
 const observedAnchorMedia = new WeakSet<MediaElement>();
 const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
-const transferRefreshTimers = new Map<number, number>();
+const transferRefreshTimers = new Map<string, number>();
 const anchorMediaObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
         if (!entry.isIntersecting) {
@@ -341,6 +341,11 @@ function applyReactionForReferrerUrl(
     downloadedAt: string | null,
     blacklistedAt: string | null,
 ): void {
+    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
+    if (normalizedReferrerUrl === null) {
+        return;
+    }
+
     for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
         if (!isMediaElement(mediaElement)) {
             continue;
@@ -352,7 +357,7 @@ function applyReactionForReferrerUrl(
         }
 
         const anchorHref = normalizeUrl(anchor.href);
-        if (anchorHref !== referrerUrl) {
+        if (anchorHref !== normalizedReferrerUrl) {
             continue;
         }
 
@@ -385,20 +390,26 @@ function applyReactionForReferrerUrl(
     }
 }
 
-function scheduleTransferReactionSync(transferId: number | null, delayMs = 90): void {
-    if (transferId === null || !Number.isFinite(transferId) || transferId <= 0) {
+function scheduleTransferReactionSync(input: { transferId: number | null; fileId: number | null }, delayMs = 90): void {
+    const hasTransferId = input.transferId !== null && Number.isFinite(input.transferId) && input.transferId > 0;
+    const hasFileId = input.fileId !== null && Number.isFinite(input.fileId) && input.fileId > 0;
+    if (!hasTransferId && !hasFileId) {
         return;
     }
 
-    const existingTimer = transferRefreshTimers.get(transferId);
+    const key = hasTransferId ? `transfer:${input.transferId}` : `file:${input.fileId}`;
+    const existingTimer = transferRefreshTimers.get(key);
     if (existingTimer !== undefined) {
         window.clearTimeout(existingTimer);
     }
 
     const timer = window.setTimeout(() => {
-        transferRefreshTimers.delete(transferId);
+        transferRefreshTimers.delete(key);
 
-        void fetchTransferStatus({ transferId }).then((statusResult) => {
+        void fetchTransferStatus({
+            transferId: hasTransferId ? input.transferId : null,
+            fileId: hasTransferId ? null : input.fileId,
+        }).then((statusResult) => {
             if (!statusResult.ok || statusResult.referrerUrl === null) {
                 return;
             }
@@ -419,7 +430,7 @@ function scheduleTransferReactionSync(transferId: number | null, delayMs = 90): 
         });
     }, delayMs);
 
-    transferRefreshTimers.set(transferId, timer);
+    transferRefreshTimers.set(key, timer);
 }
 
 function installDownloadProgressListener(): void {
@@ -429,7 +440,10 @@ function installDownloadProgressListener(): void {
             || isTerminalTransferStatus(event.status);
 
         if (isLifecycleEvent) {
-            scheduleTransferReactionSync(event.transferId, 0);
+            scheduleTransferReactionSync({
+                transferId: event.transferId,
+                fileId: event.fileId,
+            }, 0);
         }
     });
 }

@@ -21,7 +21,21 @@ let activeSubscription: ReverbSubscription | null = null;
 let activeClient: { disconnect: () => void } | null = null;
 
 function asNumber(value: unknown): number | null {
-    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '') {
+            return null;
+        }
+
+        const parsed = Number(trimmed);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    return null;
 }
 
 function asString(value: unknown): string | null {
