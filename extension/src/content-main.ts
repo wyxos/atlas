@@ -17,7 +17,6 @@ let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
 const observedAnchorMedia = new WeakSet<MediaElement>();
 const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
-let downloadRefreshTimer: number | null = null;
 const transferRefreshTimers = new Map<number, number>();
 const anchorMediaObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
@@ -135,13 +134,6 @@ function applyAnchorMediaBorder(media: MediaElement): void {
 
     const referrerKey = anchorHref;
     anchorReferrerKeyByMedia.set(media, referrerKey);
-    clearAnchorMatchDecoration(media);
-    media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
-    media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
-    media.removeAttribute('data-atlas-anchor-opened-elsewhere');
-    media.removeAttribute('data-atlas-anchor-reaction');
-    media.removeAttribute('data-atlas-anchor-downloaded-at');
-    media.removeAttribute('data-atlas-anchor-blacklisted-at');
 
     void enqueueReferrerCheck(anchorHref).then((result) => {
         if (!media.isConnected) {
@@ -339,19 +331,16 @@ function installRuntimeMessageListener(): void {
     });
 }
 
-function scheduleRefreshFromDownloadEvent(): void {
-    if (downloadRefreshTimer !== null) {
-        return;
-    }
-
-    downloadRefreshTimer = window.setTimeout(() => {
-        downloadRefreshTimer = null;
-        clearReferrerCheckCache();
-        refreshVisibleAnchorMedia();
-    }, 120);
+function isTerminalTransferStatus(status: string | null): boolean {
+    return status === 'completed' || status === 'failed' || status === 'canceled';
 }
 
-function applyReactionForReferrerUrl(referrerUrl: string, reaction: 'love' | 'like' | 'dislike' | 'funny' | null): void {
+function applyReactionForReferrerUrl(
+    referrerUrl: string,
+    reaction: 'love' | 'like' | 'dislike' | 'funny' | null,
+    downloadedAt: string | null,
+    blacklistedAt: string | null,
+): void {
     for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
         if (!isMediaElement(mediaElement)) {
             continue;
@@ -381,10 +370,22 @@ function applyReactionForReferrerUrl(referrerUrl: string, reaction: 'love' | 'li
         } else {
             mediaElement.removeAttribute('data-atlas-anchor-reaction');
         }
+
+        if (downloadedAt) {
+            mediaElement.setAttribute('data-atlas-anchor-downloaded-at', downloadedAt);
+        } else {
+            mediaElement.removeAttribute('data-atlas-anchor-downloaded-at');
+        }
+
+        if (blacklistedAt) {
+            mediaElement.setAttribute('data-atlas-anchor-blacklisted-at', blacklistedAt);
+        } else {
+            mediaElement.removeAttribute('data-atlas-anchor-blacklisted-at');
+        }
     }
 }
 
-function scheduleTransferReactionSync(transferId: number | null): void {
+function scheduleTransferReactionSync(transferId: number | null, delayMs = 90): void {
     if (transferId === null || !Number.isFinite(transferId) || transferId <= 0) {
         return;
     }
@@ -409,17 +410,27 @@ function scheduleTransferReactionSync(transferId: number | null): void {
                 ? statusResult.reaction
                 : null;
 
-            applyReactionForReferrerUrl(statusResult.referrerUrl, reaction);
+            applyReactionForReferrerUrl(
+                statusResult.referrerUrl,
+                reaction,
+                statusResult.downloadedAt,
+                statusResult.blacklistedAt,
+            );
         });
-    }, 90);
+    }, delayMs);
 
     transferRefreshTimers.set(transferId, timer);
 }
 
 function installDownloadProgressListener(): void {
     subscribeToDownloadProgress((event) => {
-        scheduleTransferReactionSync(event.transferId);
-        scheduleRefreshFromDownloadEvent();
+        const isLifecycleEvent = event.event === 'DownloadTransferCreated'
+            || event.event === 'DownloadTransferQueued'
+            || isTerminalTransferStatus(event.status);
+
+        if (isLifecycleEvent) {
+            scheduleTransferReactionSync(event.transferId, 0);
+        }
     });
 }
 
