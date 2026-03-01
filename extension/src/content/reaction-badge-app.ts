@@ -307,8 +307,13 @@ const AtlasReactionBadge = defineComponent({
                 return;
             }
 
-            matchResult.value = result;
             persistBadgeCheckResult(reactionMediaUrl, result);
+            const persistedAfterCheck = getPersistedBadgeState(reactionMediaUrl);
+            if (persistedAfterCheck !== null) {
+                applyPersistedState(persistedAfterCheck);
+            } else {
+                matchResult.value = result;
+            }
             isChecking.value = false;
         }
 
