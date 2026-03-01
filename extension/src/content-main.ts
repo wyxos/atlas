@@ -10,10 +10,6 @@ let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
 
 function mediaMatchesRules(element: MediaElement): boolean {
-    if (currentRules.length === 0) {
-        return false;
-    }
-
     const mediaUrl = normalizeUrl(resolveMediaUrl(element));
     return mediaUrl !== null && urlMatchesAnyRule(mediaUrl, currentRules, currentPageHostname);
 }
