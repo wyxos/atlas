@@ -78,6 +78,7 @@ describe('download-progress-bus', () => {
             event: 'DownloadTransferQueued',
             fileId: 12,
             transferId: 25,
+            referrerUrl: null,
             status: 'queued',
             percent: 10,
         });
@@ -85,6 +86,7 @@ describe('download-progress-bus', () => {
             event: 'DownloadTransferQueued',
             fileId: 12,
             transferId: 25,
+            referrerUrl: null,
             status: 'queued',
             percent: 10,
         });

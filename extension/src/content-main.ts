@@ -439,6 +439,32 @@ function installDownloadProgressListener(): void {
             || event.event === 'DownloadTransferQueued'
             || isTerminalTransferStatus(event.status);
 
+        if (isLifecycleEvent && event.referrerUrl) {
+            const normalizedReferrer = normalizeUrl(event.referrerUrl);
+            if (normalizedReferrer) {
+                clearReferrerCheckCache();
+                void enqueueReferrerCheck(normalizedReferrer).then((result) => {
+                    if (!result.exists) {
+                        return;
+                    }
+
+                    const reaction = result.reaction === 'love'
+                        || result.reaction === 'like'
+                        || result.reaction === 'dislike'
+                        || result.reaction === 'funny'
+                        ? result.reaction
+                        : null;
+
+                    applyReactionForReferrerUrl(
+                        normalizedReferrer,
+                        reaction,
+                        result.downloadedAt,
+                        result.blacklistedAt,
+                    );
+                });
+            }
+        }
+
         if (isLifecycleEvent) {
             scheduleTransferReactionSync({
                 transferId: event.transferId,
