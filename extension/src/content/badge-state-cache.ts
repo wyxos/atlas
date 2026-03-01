@@ -29,6 +29,10 @@ function isTerminalStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
 }
 
+function isActiveTransferStatus(status: string | null): boolean {
+    return status === 'queued' || status === 'downloading' || status === 'pending';
+}
+
 function ensureState(url: string): PersistedBadgeState {
     const existing = stateByUrl.get(url);
     if (existing) {
@@ -99,12 +103,33 @@ export function persistBadgeState(mediaUrl: string | null, input: PersistInput):
 }
 
 export function persistBadgeCheckResult(mediaUrl: string | null, result: BadgeMatchResult): void {
-    persistBadgeState(mediaUrl, {
-        exists: result.exists,
-        reaction: result.reaction,
-        downloadedAt: result.downloadedAt,
-        blacklistedAt: result.blacklistedAt,
-    });
+    const normalized = normalizeMediaUrl(mediaUrl);
+    if (normalized === null) {
+        return;
+    }
+
+    const existing = stateByUrl.get(normalized) ?? null;
+    const shouldKeepLocalReaction = existing !== null
+        && existing.reaction !== null
+        && result.reaction === null
+        && (existing.isDownloadLocked || isActiveTransferStatus(existing.status));
+
+    const nextReaction = shouldKeepLocalReaction ? existing?.reaction ?? null : result.reaction;
+    const nextExists = shouldKeepLocalReaction ? true : result.exists;
+
+    const input: PersistInput = {
+        exists: nextExists,
+        reaction: nextReaction,
+    };
+
+    if (result.downloadedAt !== null) {
+        input.downloadedAt = result.downloadedAt;
+    }
+    if (result.blacklistedAt !== null) {
+        input.blacklistedAt = result.blacklistedAt;
+    }
+
+    persistBadgeState(normalized, input);
 }
 
 export function persistDownloadProgressEvent(event: ProgressEvent): void {
