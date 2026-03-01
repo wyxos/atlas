@@ -98,7 +98,9 @@ async function probeReverb(config: ReverbConfig | null): Promise<{
 
         return {
             label: 'Disconnected',
-            detail: 'Reverb websocket is not reachable.',
+            detail: state === 'timeout'
+                ? 'Reverb websocket timed out.'
+                : `Reverb websocket state: ${state}.`,
         };
     } catch (error) {
         const detail = error instanceof Error && error.message.trim() !== ''

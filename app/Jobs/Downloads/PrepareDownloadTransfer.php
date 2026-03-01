@@ -91,6 +91,11 @@ class PrepareDownloadTransfer implements ShouldQueue
             }
 
             $url = $transfer->url;
+            if (! is_string($url) || ! preg_match('/^https?:\/\//i', $url)) {
+                $this->failTransfer($transfer, 'Invalid transfer URL. Only HTTP(S) URLs are supported.');
+
+                return;
+            }
             $headers = [];
             if ($transfer->file?->referrer_url) {
                 $headers['Referer'] = $transfer->file->referrer_url;

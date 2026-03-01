@@ -32,7 +32,7 @@ function isLikelyMp4Source(source: HTMLSourceElement, sourceUrl: string): boolea
 
 export function resolveReactionMediaUrl(element: MediaElement): string | null {
     if (element instanceof HTMLImageElement) {
-        return resolveMediaUrl(element);
+        return normalizeUrl(resolveMediaUrl(element));
     }
 
     const sources = Array.from(element.querySelectorAll('source'))
@@ -44,14 +44,14 @@ export function resolveReactionMediaUrl(element: MediaElement): string | null {
 
     const mp4Source = sources.find(({ source, sourceUrl }) => isLikelyMp4Source(source, sourceUrl));
     if (mp4Source) {
-        return mp4Source.sourceUrl;
+        return normalizeUrl(mp4Source.sourceUrl);
     }
 
     if (sources.length > 0) {
-        return sources[0].sourceUrl;
+        return normalizeUrl(sources[0].sourceUrl);
     }
 
-    return element.currentSrc || element.src || element.getAttribute('src') || element.poster || null;
+    return normalizeUrl(element.currentSrc || element.src || element.getAttribute('src') || element.poster || null);
 }
 
 export function resolveMediaResolution(element: MediaElement): MediaResolution | null {
