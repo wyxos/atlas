@@ -130,11 +130,14 @@ const AtlasReactionBadge = defineComponent({
         const trackedFileId = ref<number | null>(null);
         const trackedTransferId = ref<number | null>(null);
         const hasSeenActiveTransfer = ref(false);
+        const lastCheckedMediaUrl = ref<string | null>(null);
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
         let fallbackPollTimer: ReturnType<typeof setInterval> | null = null;
         let fallbackPollStopsAt = 0;
+        let mediaMutationObserver: MutationObserver | null = null;
+        let checkSequence = 0;
 
         const controlsDisabled = computed(() =>
             isChecking.value || submittingReactionType.value !== null || isDownloadLocked.value);
@@ -220,6 +223,39 @@ const AtlasReactionBadge = defineComponent({
             stopFallbackPolling();
         }
 
+        function resetStateForMediaContextChange(): void {
+            isChecking.value = true;
+            hoveredReaction.value = null;
+            matchResult.value = emptyMatchResult();
+            submittingReactionType.value = null;
+            isDownloadLocked.value = false;
+            progressPercent.value = null;
+            transferStatus.value = null;
+            trackedFileId.value = null;
+            trackedTransferId.value = null;
+            hasSeenActiveTransfer.value = false;
+            stopFallbackPolling();
+        }
+
+        async function refreshMatchForCurrentMedia(force = false): Promise<void> {
+            const mediaUrl = resolveMediaUrl(props.media);
+            if (!force && mediaUrl === lastCheckedMediaUrl.value) {
+                return;
+            }
+
+            lastCheckedMediaUrl.value = mediaUrl;
+            const currentSequence = ++checkSequence;
+            resetStateForMediaContextChange();
+
+            const result = await enqueueReactionCheck(mediaUrl);
+            if (!isActive || currentSequence !== checkSequence) {
+                return;
+            }
+
+            matchResult.value = result;
+            isChecking.value = false;
+        }
+
         function startFallbackPolling(): void {
             if (fallbackPollTimer !== null) {
                 return;
@@ -281,6 +317,7 @@ const AtlasReactionBadge = defineComponent({
 
         const onMediaUpdate = (): void => {
             syncResolution();
+            void refreshMatchForCurrentMedia();
         };
 
         onMounted(() => {
@@ -293,22 +330,32 @@ const AtlasReactionBadge = defineComponent({
             props.media.addEventListener('loadedmetadata', onMediaUpdate);
             props.media.addEventListener('resize', onMediaUpdate);
 
-            void enqueueReactionCheck(resolveMediaUrl(props.media)).then((result) => {
-                if (!isActive) {
-                    return;
-                }
-
-                matchResult.value = result;
-                isChecking.value = false;
+            mediaMutationObserver = new MutationObserver(() => {
+                syncResolution();
+                void refreshMatchForCurrentMedia();
             });
+
+            mediaMutationObserver.observe(props.media, {
+                attributes: true,
+                attributeFilter: ['src', 'srcset', 'poster'],
+                childList: true,
+                subtree: true,
+            });
+
+            void refreshMatchForCurrentMedia(true);
         });
 
         onBeforeUnmount(() => {
             isActive = false;
+            checkSequence += 1;
             props.onShortcutReady?.(null);
             props.media.removeEventListener('load', onMediaUpdate);
             props.media.removeEventListener('loadedmetadata', onMediaUpdate);
             props.media.removeEventListener('resize', onMediaUpdate);
+            if (mediaMutationObserver) {
+                mediaMutationObserver.disconnect();
+                mediaMutationObserver = null;
+            }
             if (unsubscribeProgress) {
                 unsubscribeProgress();
                 unsubscribeProgress = null;
