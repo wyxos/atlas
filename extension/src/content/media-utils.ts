@@ -51,7 +51,7 @@ export function resolveReactionMediaUrl(element: MediaElement): string | null {
         return normalizeUrl(sources[0].sourceUrl);
     }
 
-    return normalizeUrl(element.currentSrc || element.src || element.getAttribute('src') || element.poster || null);
+    return normalizeUrl(element.currentSrc || element.src || element.getAttribute('src') || null);
 }
 
 export function resolveMediaResolution(element: MediaElement): MediaResolution | null {
