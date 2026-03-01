@@ -357,15 +357,11 @@ class ExtensionMediaMatchService
             return collect();
         }
 
-        $query = Reaction::query()
+        return Reaction::query()
             ->select(['file_id', 'type', 'created_at'])
             ->whereIn('file_id', $fileIds->all())
             ->where('user_id', $reactionUserId)
-            ->orderByDesc('created_at');
-
-        return $query
             ->get()
-            ->unique('file_id')
             ->keyBy('file_id')
             ->map(fn (Reaction $reaction): array => [
                 'type' => $reaction->type,
