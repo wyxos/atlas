@@ -97,7 +97,20 @@ function isVisibleInViewport(element: Element): boolean {
 }
 
 function applyAnchorMediaBorder(media: MediaElement): void {
-    if (media.closest('a[href]') === null) {
+    const anchor = media.closest('a[href]');
+    if (!(anchor instanceof HTMLAnchorElement)) {
+        media.style.outline = '';
+        media.style.outlineOffset = '';
+        media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
+        return;
+    }
+
+    const anchorHref = normalizeUrl(anchor.href);
+    const isValid = anchorHref !== null && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
+    if (!isValid) {
+        media.style.outline = '';
+        media.style.outlineOffset = '';
+        media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
         return;
     }
 
