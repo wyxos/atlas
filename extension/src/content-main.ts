@@ -9,6 +9,25 @@ const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
+const observedAnchorMedia = new WeakSet<MediaElement>();
+const anchorMediaObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+        if (!entry.isIntersecting) {
+            continue;
+        }
+
+        const target = entry.target;
+        if (!isMediaElement(target)) {
+            continue;
+        }
+
+        applyAnchorMediaBorder(target);
+    }
+}, {
+    root: null,
+    rootMargin: '160px 0px',
+    threshold: 0.01,
+});
 
 function mediaMatchesRules(element: MediaElement): boolean {
     const mediaUrl = normalizeUrl(resolveMediaUrl(element));
@@ -77,35 +96,56 @@ function isVisibleInViewport(element: Element): boolean {
         && rect.height > 0;
 }
 
-function applyVisibleAnchorBordersOnLoad(): void {
-    const anchors = document.querySelectorAll('a[href]');
-    for (const anchor of anchors) {
-        if (!(anchor instanceof HTMLAnchorElement)) {
+function applyAnchorMediaBorder(media: MediaElement): void {
+    if (media.closest('a[href]') === null) {
+        return;
+    }
+
+    media.style.outline = '4px solid red';
+    media.style.outlineOffset = '-4px';
+    media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+}
+
+function registerAnchorMediaCandidate(media: MediaElement): void {
+    if (media.closest('a[href]') === null) {
+        return;
+    }
+
+    if (!observedAnchorMedia.has(media)) {
+        observedAnchorMedia.add(media);
+        anchorMediaObserver.observe(media);
+    }
+
+    if (isVisibleInViewport(media)) {
+        applyAnchorMediaBorder(media);
+    }
+}
+
+function registerAnchorMediaFromNode(node: Node): void {
+    if (!(node instanceof Element)) {
+        return;
+    }
+
+    if (isMediaElement(node)) {
+        registerAnchorMediaCandidate(node);
+    }
+
+    for (const mediaElement of node.querySelectorAll('a[href] img, a[href] video')) {
+        if (!isMediaElement(mediaElement)) {
             continue;
         }
 
-        const mediaElements = anchor.querySelectorAll('img,video');
-        if (mediaElements.length === 0) {
+        registerAnchorMediaCandidate(mediaElement);
+    }
+}
+
+function registerAnchorMediaFromDocument(): void {
+    for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
+        if (!isMediaElement(mediaElement)) {
             continue;
         }
 
-        if (!isVisibleInViewport(anchor)) {
-            continue;
-        }
-
-        for (const mediaElement of mediaElements) {
-            if (!isMediaElement(mediaElement)) {
-                continue;
-            }
-
-            if (!isVisibleInViewport(mediaElement)) {
-                continue;
-            }
-
-            mediaElement.style.outline = '4px solid red';
-            mediaElement.style.outlineOffset = '-4px';
-            mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-        }
+        registerAnchorMediaCandidate(mediaElement);
     }
 }
 
@@ -115,12 +155,14 @@ function installMutationObserver(): void {
             if (mutation.type === 'childList') {
                 for (const addedNode of mutation.addedNodes) {
                     processNodeAndDescendants(addedNode);
+                    registerAnchorMediaFromNode(addedNode);
                 }
                 scheduleReposition();
             }
 
             if (mutation.type === 'attributes' && mutation.target instanceof Element && isMediaElement(mutation.target)) {
                 processMedia(mutation.target);
+                registerAnchorMediaCandidate(mutation.target);
                 scheduleReposition();
             }
 
@@ -163,7 +205,7 @@ async function loadRulesAndProcess(): Promise<void> {
 
     currentPageHostname = window.location.hostname;
     processAllCurrentMedia();
-    applyVisibleAnchorBordersOnLoad();
+    registerAnchorMediaFromDocument();
 }
 
 function bootstrap(): void {
