@@ -3,7 +3,8 @@ import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './mat
 import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, type MediaElement } from './content/media-utils';
 import { OverlayManager } from './content/overlay-manager';
 import { enqueueReferrerCheck } from './content/referrer-check-queue';
-import { applyAnchorMatchDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
+import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
+import { isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
@@ -107,6 +108,7 @@ function applyAnchorMediaBorder(media: MediaElement): void {
         clearAnchorMatchDecoration(media);
         media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
         media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+        media.removeAttribute('data-atlas-anchor-opened-elsewhere');
         media.removeAttribute('data-atlas-anchor-reaction');
         media.removeAttribute('data-atlas-anchor-downloaded-at');
         media.removeAttribute('data-atlas-anchor-blacklisted-at');
@@ -120,6 +122,7 @@ function applyAnchorMediaBorder(media: MediaElement): void {
         clearAnchorMatchDecoration(media);
         media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
         media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+        media.removeAttribute('data-atlas-anchor-opened-elsewhere');
         media.removeAttribute('data-atlas-anchor-reaction');
         media.removeAttribute('data-atlas-anchor-downloaded-at');
         media.removeAttribute('data-atlas-anchor-blacklisted-at');
@@ -131,6 +134,7 @@ function applyAnchorMediaBorder(media: MediaElement): void {
     clearAnchorMatchDecoration(media);
     media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
     media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+    media.removeAttribute('data-atlas-anchor-opened-elsewhere');
     media.removeAttribute('data-atlas-anchor-reaction');
     media.removeAttribute('data-atlas-anchor-downloaded-at');
     media.removeAttribute('data-atlas-anchor-blacklisted-at');
@@ -145,43 +149,66 @@ function applyAnchorMediaBorder(media: MediaElement): void {
         }
 
         const isMatch = result.exists === true;
-        if (!isMatch) {
-            clearAnchorMatchDecoration(media);
-            media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
-            media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
-            media.removeAttribute('data-atlas-anchor-reaction');
-            media.removeAttribute('data-atlas-anchor-downloaded-at');
-            media.removeAttribute('data-atlas-anchor-blacklisted-at');
+        if (isMatch) {
+            const reaction = result.reaction === 'love'
+                || result.reaction === 'like'
+                || result.reaction === 'dislike'
+                || result.reaction === 'funny'
+                ? result.reaction
+                : null;
+            applyAnchorMatchDecoration(media, reaction);
+            media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+            media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
+            media.removeAttribute('data-atlas-anchor-opened-elsewhere');
+
+            if (result.reaction) {
+                media.setAttribute('data-atlas-anchor-reaction', result.reaction);
+            } else {
+                media.removeAttribute('data-atlas-anchor-reaction');
+            }
+
+            if (result.downloadedAt) {
+                media.setAttribute('data-atlas-anchor-downloaded-at', result.downloadedAt);
+            } else {
+                media.removeAttribute('data-atlas-anchor-downloaded-at');
+            }
+
+            if (result.blacklistedAt) {
+                media.setAttribute('data-atlas-anchor-blacklisted-at', result.blacklistedAt);
+            } else {
+                media.removeAttribute('data-atlas-anchor-blacklisted-at');
+            }
             return;
         }
 
-        const reaction = result.reaction === 'love'
-            || result.reaction === 'like'
-            || result.reaction === 'dislike'
-            || result.reaction === 'funny'
-            ? result.reaction
-            : null;
-        applyAnchorMatchDecoration(media, reaction);
-        media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-        media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
+        void isUrlOpenInAnotherTab(anchorHref).then((isOpenedElsewhere) => {
+            if (!media.isConnected) {
+                return;
+            }
 
-        if (result.reaction) {
-            media.setAttribute('data-atlas-anchor-reaction', result.reaction);
-        } else {
+            if (anchorReferrerKeyByMedia.get(media) !== referrerKey) {
+                return;
+            }
+
+            if (isOpenedElsewhere) {
+                applyAnchorOpenedDecoration(media);
+                media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+                media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
+                media.setAttribute('data-atlas-anchor-opened-elsewhere', '1');
+                media.removeAttribute('data-atlas-anchor-reaction');
+                media.removeAttribute('data-atlas-anchor-downloaded-at');
+                media.removeAttribute('data-atlas-anchor-blacklisted-at');
+                return;
+            }
+
+            clearAnchorMatchDecoration(media);
+            media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
+            media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+            media.removeAttribute('data-atlas-anchor-opened-elsewhere');
             media.removeAttribute('data-atlas-anchor-reaction');
-        }
-
-        if (result.downloadedAt) {
-            media.setAttribute('data-atlas-anchor-downloaded-at', result.downloadedAt);
-        } else {
             media.removeAttribute('data-atlas-anchor-downloaded-at');
-        }
-
-        if (result.blacklistedAt) {
-            media.setAttribute('data-atlas-anchor-blacklisted-at', result.blacklistedAt);
-        } else {
             media.removeAttribute('data-atlas-anchor-blacklisted-at');
-        }
+        });
     });
 }
 

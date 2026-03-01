@@ -1,6 +1,7 @@
 import type { MediaElement } from './media-utils';
 
 type ReactionType = 'love' | 'like' | 'dislike' | 'funny' | null;
+type AnchorDecorationKind = 'reaction' | 'opened';
 
 const BADGE_ATTR = 'data-atlas-anchor-reaction-badge';
 const badgeByMedia = new WeakMap<MediaElement, HTMLDivElement>();
@@ -20,7 +21,11 @@ function reactionColor(reaction: ReactionType): string {
     return paletteByReaction[reaction].color;
 }
 
-function iconMarkup(reaction: ReactionType): string {
+function iconMarkup(reaction: ReactionType, kind: AnchorDecorationKind): string {
+    if (kind === 'opened') {
+        return '<path d="M14 3h7v7"></path><path d="M10 14 21 3"></path><path d="M21 14v7h-7"></path><path d="M3 10 14 21"></path>';
+    }
+
     if (reaction === 'love') {
         return '<path d="M19 14c1.49-1.46 2-3.24 2-5a5 5 0 0 0-5-5c-1.54 0-3.04.99-4 2.36C11.04 4.99 9.54 4 8 4a5 5 0 0 0-5 5c0 1.76.5 3.54 2 5l7 7Z"></path>';
     }
@@ -40,7 +45,7 @@ function iconMarkup(reaction: ReactionType): string {
     return '<path d="M20 6 9 17l-5-5"></path>';
 }
 
-function ensureBadge(media: MediaElement, reaction: ReactionType, color: string): void {
+function ensureBadge(media: MediaElement, reaction: ReactionType, color: string, kind: AnchorDecorationKind): void {
     const parent = media.parentElement;
     if (!parent) {
         return;
@@ -62,16 +67,16 @@ function ensureBadge(media: MediaElement, reaction: ReactionType, color: string)
     badge.style.bottom = '8px';
     badge.style.width = '50px';
     badge.style.height = '50px';
-    badge.style.borderRadius = '999px';
-    badge.style.background = color;
-    badge.style.border = '2px solid rgba(255,255,255,0.85)';
+    badge.style.borderRadius = '12px';
+    badge.style.background = 'rgba(255, 255, 255, 0.92)';
+    badge.style.border = `2px solid ${color}`;
     badge.style.display = 'flex';
     badge.style.alignItems = 'center';
     badge.style.justifyContent = 'center';
     badge.style.pointerEvents = 'none';
     badge.style.zIndex = '6';
     badge.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.35)';
-    badge.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconMarkup(reaction)}</svg>`;
+    badge.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconMarkup(reaction, kind)}</svg>`;
 
     if (badge.parentElement !== parent || badge.previousElementSibling !== media) {
         media.insertAdjacentElement('afterend', badge);
@@ -97,5 +102,14 @@ export function applyAnchorMatchDecoration(media: MediaElement, reaction: Reacti
     media.style.outlineOffset = '-4px';
     media.style.opacity = '0.25';
 
-    ensureBadge(media, reaction, color);
+    ensureBadge(media, reaction, color, 'reaction');
+}
+
+export function applyAnchorOpenedDecoration(media: MediaElement): void {
+    const color = '#22c55e';
+    media.style.outline = `4px solid ${color}`;
+    media.style.outlineOffset = '-4px';
+    media.style.opacity = '0.25';
+
+    ensureBadge(media, null, color, 'opened');
 }
