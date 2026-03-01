@@ -9,6 +9,63 @@ use Illuminate\Support\Collection;
 class ExtensionMediaMatchService
 {
     /**
+     * @param  array<int, array{request_id: string, referrer_hash: string}>  $items
+     * @return array<int, array{request_id: string, request_index: int, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
+     */
+    public function referrerChecks(array $items, int $reactionUserId): array
+    {
+        $normalizedItems = collect($items)->values()->map(function (array $item, int $index): array {
+            $referrerHash = strtolower(trim((string) ($item['referrer_hash'] ?? '')));
+
+            return [
+                'request_id' => (string) ($item['request_id'] ?? ''),
+                'request_index' => $index,
+                'referrer_hash' => preg_match('/^[a-f0-9]{64}$/', $referrerHash) === 1 ? $referrerHash : null,
+            ];
+        })->filter(fn (array $item): bool => $item['request_id'] !== '' && $item['referrer_hash'] !== null)->values();
+
+        if ($normalizedItems->isEmpty()) {
+            return [];
+        }
+
+        $hashes = $normalizedItems->pluck('referrer_hash')->filter()->unique()->values();
+        $filesByReferrerHash = $this->filesByReferrerHash($hashes);
+
+        $matchedFilesById = $filesByReferrerHash
+            ->mapWithKeys(fn (File $file): array => [$file->id => $file]);
+
+        $reactionsByFileId = $this->loadReactions($matchedFilesById->keys()->values(), $reactionUserId);
+
+        return $normalizedItems->map(function (array $item) use ($filesByReferrerHash, $reactionsByFileId): array {
+            /** @var File|null $file */
+            $file = $filesByReferrerHash->get((string) $item['referrer_hash']);
+            if (! $file) {
+                return [
+                    'request_id' => (string) $item['request_id'],
+                    'request_index' => (int) $item['request_index'],
+                    'exists' => false,
+                    'reaction' => null,
+                    'reacted_at' => null,
+                    'downloaded_at' => null,
+                    'blacklisted_at' => null,
+                ];
+            }
+
+            $reaction = $reactionsByFileId->get($file->id);
+
+            return [
+                'request_id' => (string) $item['request_id'],
+                'request_index' => (int) $item['request_index'],
+                'exists' => true,
+                'reaction' => $reaction['type'] ?? null,
+                'reacted_at' => $reaction['reacted_at'] ?? null,
+                'downloaded_at' => $file->downloaded_at?->toIso8601String(),
+                'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
+            ];
+        })->values()->all();
+    }
+
+    /**
      * @param  array<int, array{request_id: string, url_hash: string}>  $items
      * @return array<int, array{request_id: string, request_index: int, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
@@ -268,6 +325,26 @@ class ExtensionMediaMatchService
         }
 
         return $byReferrerUrl;
+    }
+
+    /**
+     * @param  Collection<int, string>  $hashes
+     * @return Collection<string, File>
+     */
+    private function filesByReferrerHash(Collection $hashes): Collection
+    {
+        if ($hashes->isEmpty()) {
+            return collect();
+        }
+
+        return File::query()
+            ->select(['id', 'referrer_url_hash', 'downloaded_at', 'blacklisted_at', 'updated_at'])
+            ->whereIn('referrer_url_hash', $hashes->all())
+            ->orderByDesc('updated_at')
+            ->get()
+            ->filter(fn (File $file): bool => is_string($file->referrer_url_hash) && $file->referrer_url_hash !== '')
+            ->unique('referrer_url_hash')
+            ->keyBy('referrer_url_hash');
     }
 
     /**

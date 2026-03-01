@@ -84,6 +84,31 @@ class ExtensionApiController extends Controller
         ]);
     }
 
+    public function referrerChecks(
+        Request $request,
+        ExtensionApiKeyService $extensionApiKey,
+        ExtensionMediaMatchService $mediaMatchService,
+    ): JsonResponse {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'max:300'],
+            'items.*.request_id' => ['required', 'string', 'max:128'],
+            'items.*.referrer_hash' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'],
+        ]);
+
+        $matches = $mediaMatchService->referrerChecks($validated['items'], (int) $user->id);
+
+        return response()->json([
+            'matches' => $matches,
+        ]);
+    }
+
     public function react(
         Request $request,
         ExtensionApiKeyService $extensionApiKey,

@@ -2,14 +2,19 @@ import { getStoredOptions } from './atlas-options';
 import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './match-rules';
 import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, type MediaElement } from './content/media-utils';
 import { OverlayManager } from './content/overlay-manager';
+import { enqueueReferrerCheck } from './content/referrer-check-queue';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
+const ANCHOR_MEDIA_MATCH_ATTR = 'data-atlas-anchor-media-match';
+const BORDER_COLOR_MISS = '#ef4444';
+const BORDER_COLOR_MATCH = '#22c55e';
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
 const observedAnchorMedia = new WeakSet<MediaElement>();
+const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
 const anchorMediaObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
         if (!entry.isIntersecting) {
@@ -99,24 +104,71 @@ function isVisibleInViewport(element: Element): boolean {
 function applyAnchorMediaBorder(media: MediaElement): void {
     const anchor = media.closest('a[href]');
     if (!(anchor instanceof HTMLAnchorElement)) {
+        anchorReferrerKeyByMedia.delete(media);
         media.style.outline = '';
         media.style.outlineOffset = '';
         media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
+        media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+        media.removeAttribute('data-atlas-anchor-reaction');
+        media.removeAttribute('data-atlas-anchor-downloaded-at');
+        media.removeAttribute('data-atlas-anchor-blacklisted-at');
         return;
     }
 
     const anchorHref = normalizeUrl(anchor.href);
     const isValid = anchorHref !== null && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
     if (!isValid) {
+        anchorReferrerKeyByMedia.delete(media);
         media.style.outline = '';
         media.style.outlineOffset = '';
         media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
+        media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+        media.removeAttribute('data-atlas-anchor-reaction');
+        media.removeAttribute('data-atlas-anchor-downloaded-at');
+        media.removeAttribute('data-atlas-anchor-blacklisted-at');
         return;
     }
 
-    media.style.outline = '4px solid red';
+    const referrerKey = anchorHref;
+    anchorReferrerKeyByMedia.set(media, referrerKey);
+    media.style.outline = `4px solid ${BORDER_COLOR_MISS}`;
     media.style.outlineOffset = '-4px';
     media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+    media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
+
+    void enqueueReferrerCheck(anchorHref).then((result) => {
+        if (!media.isConnected) {
+            return;
+        }
+
+        if (anchorReferrerKeyByMedia.get(media) !== referrerKey) {
+            return;
+        }
+
+        const isMatch = result.exists === true;
+        media.style.outline = `4px solid ${isMatch ? BORDER_COLOR_MATCH : BORDER_COLOR_MISS}`;
+        media.style.outlineOffset = '-4px';
+        media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+        media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, isMatch ? '1' : '0');
+
+        if (result.reaction) {
+            media.setAttribute('data-atlas-anchor-reaction', result.reaction);
+        } else {
+            media.removeAttribute('data-atlas-anchor-reaction');
+        }
+
+        if (result.downloadedAt) {
+            media.setAttribute('data-atlas-anchor-downloaded-at', result.downloadedAt);
+        } else {
+            media.removeAttribute('data-atlas-anchor-downloaded-at');
+        }
+
+        if (result.blacklistedAt) {
+            media.setAttribute('data-atlas-anchor-blacklisted-at', result.blacklistedAt);
+        } else {
+            media.removeAttribute('data-atlas-anchor-blacklisted-at');
+        }
+    });
 }
 
 function registerAnchorMediaCandidate(media: MediaElement): void {
@@ -179,6 +231,10 @@ function installMutationObserver(): void {
                 scheduleReposition();
             }
 
+            if (mutation.type === 'attributes' && mutation.target instanceof HTMLAnchorElement) {
+                registerAnchorMediaFromNode(mutation.target);
+            }
+
             if (mutation.type === 'attributes' && mutation.target instanceof HTMLSourceElement) {
                 processSourceMutation(mutation.target);
             }
@@ -189,7 +245,7 @@ function installMutationObserver(): void {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: [...OBSERVED_ATTRS],
+        attributeFilter: [...OBSERVED_ATTRS, 'href'],
     });
 }
 
