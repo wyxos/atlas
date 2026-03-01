@@ -182,14 +182,26 @@ final class DownloadTransferPayload
             return self::$extensionChannelCacheByTransferId[$transfer->id];
         }
 
-        $file = $transfer->relationLoaded('file')
-            ? $transfer->file
-            : $transfer->file()->select(['id', 'listing_metadata'])->first();
+        $file = $transfer->relationLoaded('file') ? $transfer->file : null;
+        if ($file instanceof File && ! self::hasListingMetadataAttribute($file)) {
+            $file = null;
+        }
+
+        if (! $file) {
+            $file = $transfer->file()->select(['id', 'listing_metadata'])->first();
+        }
 
         $channel = self::extensionChannelForFile($file);
-        self::$extensionChannelCacheByTransferId[$transfer->id] = $channel;
+        if ($channel !== null) {
+            self::$extensionChannelCacheByTransferId[$transfer->id] = $channel;
+        }
 
         return $channel;
+    }
+
+    private static function hasListingMetadataAttribute(File $file): bool
+    {
+        return array_key_exists('listing_metadata', $file->getAttributes());
     }
 
     private static function extensionChannelForFile(?File $file): ?string
