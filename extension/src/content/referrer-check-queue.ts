@@ -211,3 +211,8 @@ export async function enqueueReferrerCheck(referrerUrl: string | null): Promise<
     return promise;
 }
 
+export function clearReferrerCheckCache(): void {
+    resultCacheByKey.clear();
+    pendingByKey.clear();
+    inFlightByKey.clear();
+}
