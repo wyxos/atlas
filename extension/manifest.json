@@ -5,7 +5,8 @@
     "version": "0.1.83",
     "permissions": [
         "storage",
-        "tabs"
+        "tabs",
+        "cookies"
     ],
     "host_permissions": [
         "http://*/*",

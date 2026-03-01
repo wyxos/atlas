@@ -9,6 +9,7 @@ use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\DownloadTransferRequestOptions;
+use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -175,6 +176,7 @@ class DownloadTransferSingleStream implements ShouldQueue
                 'status' => DownloadTransferStatus::PREVIEWING,
                 'finished_at' => null,
             ]);
+            app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 
             File::query()->whereKey($transfer->file_id)->update([
                 'download_progress' => 100,
@@ -258,6 +260,7 @@ class DownloadTransferSingleStream implements ShouldQueue
             'failed_at' => now(),
             'error' => $message,
         ]);
+        app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 
         $updated = DownloadTransfer::query()->find($transfer->id);
         if ($updated) {

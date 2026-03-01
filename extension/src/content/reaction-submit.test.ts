@@ -14,7 +14,7 @@ describe('submitBadgeReaction', () => {
         history.replaceState({}, '', '/extension-test/reaction-submit');
     });
 
-    it('falls back to page url for poster-only videos and includes cookies/user-agent payload fields', async () => {
+    it('falls back to page url for poster-only videos and includes runtime cookies/user-agent payload fields', async () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
@@ -35,8 +35,28 @@ describe('submitBadgeReaction', () => {
             }),
         });
         vi.stubGlobal('fetch', fetchMock);
-
-        document.cookie = 'atlas_session=abc123';
+        const runtimeSendMessage = vi.fn((payload: unknown, callback: (response: unknown) => void) => {
+            callback({
+                cookies: [
+                    {
+                        name: 'atlas_session',
+                        value: 'abc123',
+                        domain: '.atlas.test',
+                        path: '/',
+                        secure: true,
+                        http_only: true,
+                        host_only: false,
+                        expires_at: null,
+                    },
+                ],
+            });
+        });
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: runtimeSendMessage,
+            },
+        });
 
         const { submitBadgeReaction } = await import('./reaction-submit');
         const video = document.createElement('video');
@@ -54,7 +74,19 @@ describe('submitBadgeReaction', () => {
         expect(body.url).toBe(window.location.href);
         expect(body.page_url).toBe(window.location.href);
         expect(body.tag_name).toBe('video');
-        expect(body.cookies).toContain('atlas_session=abc123');
+        expect(runtimeSendMessage).toHaveBeenCalledTimes(1);
+        expect(body.cookies).toEqual([
+            {
+                name: 'atlas_session',
+                value: 'abc123',
+                domain: '.atlas.test',
+                path: '/',
+                secure: true,
+                http_only: true,
+                host_only: false,
+                expires_at: null,
+            },
+        ]);
         expect(body.user_agent).toBe(navigator.userAgent);
     });
 });

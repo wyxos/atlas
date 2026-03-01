@@ -61,6 +61,7 @@ Database gotcha:
 Downloads gotcha:
 - In queued download jobs, catching `Throwable` and writing `FAILED` prevents Laravel queue retries/backoff from running. For transient network errors (timeouts/5xx/connection issues), update transfer state to retry-visible metadata and call `$this->release($delay)` instead.
 - Extension react/download ingests should default to random stored filenames when `filename` is not explicitly provided; do not derive stored filenames from URL/path slugs (can mirror page titles and produce unstable naming).
+- Extension download auth cookies must be captured via extension cookie APIs (`chrome.cookies`), not `document.cookie`; send structured cookie metadata and host/path-filter on the server before applying `Cookie` headers or building yt-dlp cookie jars.
 
 Services gotcha:
 - Spotify tokens are encrypted at rest; if `APP_KEY` changes or legacy plaintext rows exist, token decryption can fail. Treat unreadable token rows as reconnect-required and clear them instead of returning a 500 from settings APIs.

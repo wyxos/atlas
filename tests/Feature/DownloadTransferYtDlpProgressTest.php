@@ -71,8 +71,16 @@ PHP;
                 return [PHP_BINARY, '-r', $script, $outputTemplate];
             });
     });
+
     (new DownloadTransferYtDlp($transfer->id))
         ->handle(app(FileDownloadFinalizer::class), app(YtDlpCommandBuilder::class), app(DownloadTransferRequestOptions::class));
+
+    $transfer->refresh();
+    $file->refresh();
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::PREVIEWING)
+        ->and($transfer->last_broadcast_percent)->toBe(100)
+        ->and($file->path)->not->toBeNull();
 
     $events = Event::dispatched(DownloadTransferProgressUpdated::class)
         ->map(fn (array $item) => $item[0])
@@ -84,9 +92,8 @@ PHP;
         ->values()
         ->all();
 
-    expect($percents)->not->toBeEmpty()
+    expect($percents)->toContain(2, 11, 47, 100)
         ->and($percents)->toBe(array_values(array_unique($percents)))
         ->and($percents)->toBe(collect($percents)->sort()->values()->all())
-        ->and(max($percents))->toBeGreaterThanOrEqual(2);
-
+        ->and($events->firstWhere('percent', 100)?->status)->toBe(DownloadTransferStatus::PREVIEWING);
 });

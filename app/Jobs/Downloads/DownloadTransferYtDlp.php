@@ -5,8 +5,10 @@ namespace App\Jobs\Downloads;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
+use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRequestOptions;
+use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\Downloads\YtDlpCommandBuilder;
 use Illuminate\Bus\Queueable;
@@ -119,6 +121,7 @@ class DownloadTransferYtDlp implements ShouldQueue
                 'status' => DownloadTransferStatus::PREVIEWING,
                 'finished_at' => null,
             ]);
+            app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 
             DownloadTransfer::query()->whereKey($transfer->id)->update([
                 'last_broadcast_percent' => 100,
@@ -172,6 +175,7 @@ class DownloadTransferYtDlp implements ShouldQueue
             'failed_at' => now(),
             'error' => $normalizedMessage !== '' ? $normalizedMessage : 'yt-dlp failed.',
         ]);
+        app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 
         $updated = DownloadTransfer::query()->find($transfer->id);
         if ($updated) {

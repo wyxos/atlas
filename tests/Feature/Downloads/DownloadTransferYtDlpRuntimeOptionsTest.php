@@ -35,7 +35,38 @@ it('passes runtime cookies and user agent to yt-dlp command builder', function (
     ]);
 
     app(DownloadTransferRuntimeStore::class)->putForTransfer($transfer->id, [
-        'cookies' => 'auth_token=abc123; ct0=def456',
+        'cookies' => [
+            [
+                'name' => 'auth_token',
+                'value' => 'abc123',
+                'domain' => 'x.com',
+                'path' => '/',
+                'secure' => true,
+                'http_only' => true,
+                'host_only' => false,
+                'expires_at' => time() + 3600,
+            ],
+            [
+                'name' => 'ct0',
+                'value' => 'def456',
+                'domain' => 'x.com',
+                'path' => '/',
+                'secure' => true,
+                'http_only' => false,
+                'host_only' => false,
+                'expires_at' => time() + 3600,
+            ],
+            [
+                'name' => 'other',
+                'value' => 'zzz',
+                'domain' => 'example.com',
+                'path' => '/',
+                'secure' => true,
+                'http_only' => false,
+                'host_only' => false,
+                'expires_at' => time() + 3600,
+            ],
+        ],
         'user_agent' => 'AtlasExtensionRuntime/2.0',
     ]);
 
@@ -75,5 +106,6 @@ PHP;
     expect($capturedRuntimeOptions['user_agent'] ?? null)->toBe('AtlasExtensionRuntime/2.0')
         ->and($capturedRuntimeOptions['cookies_path'] ?? null)->not->toBeNull()
         ->and($capturedCookieJarContents)->toContain('auth_token')
-        ->and($capturedCookieJarContents)->toContain('ct0');
+        ->and($capturedCookieJarContents)->toContain('ct0')
+        ->and($capturedCookieJarContents)->not->toContain('other');
 });

@@ -43,7 +43,28 @@ it('includes runtime cookies and user agent in chunk download headers', function
     ]);
 
     app(DownloadTransferRuntimeStore::class)->putForTransfer($transfer->id, [
-        'cookies' => 'auth=abc; session=xyz',
+        'cookies' => [
+            [
+                'name' => 'auth',
+                'value' => 'abc',
+                'domain' => 'cdn.example.test',
+                'path' => '/',
+                'secure' => true,
+                'http_only' => true,
+                'host_only' => false,
+                'expires_at' => time() + 3600,
+            ],
+            [
+                'name' => 'other',
+                'value' => 'zzz',
+                'domain' => 'other.example.test',
+                'path' => '/',
+                'secure' => true,
+                'http_only' => false,
+                'host_only' => false,
+                'expires_at' => time() + 3600,
+            ],
+        ],
         'user_agent' => 'AtlasExtensionRuntime/1.0',
     ]);
 
@@ -61,7 +82,7 @@ it('includes runtime cookies and user agent in chunk download headers', function
     Http::assertSent(function (Request $request): bool {
         return $request->header('Referer')[0] === 'https://www.example.test/post/456'
             && $request->header('User-Agent')[0] === 'AtlasExtensionRuntime/1.0'
-            && $request->header('Cookie')[0] === 'auth=abc; session=xyz'
+            && $request->header('Cookie')[0] === 'auth=abc'
             && $request->header('Range')[0] === 'bytes=0-2';
     });
 

@@ -10,6 +10,7 @@ use App\Models\DownloadTransfer;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\DownloadTransferRequestOptions;
+use App\Services\Downloads\DownloadTransferRuntimeStore;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -246,6 +247,7 @@ class DownloadTransferChunk implements ShouldQueue
             'failed_at' => now(),
             'error' => $message,
         ]);
+        app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 
         $updated = DownloadTransfer::query()->find($transfer->id);
         if ($updated) {

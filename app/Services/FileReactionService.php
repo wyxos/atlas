@@ -14,6 +14,19 @@ class FileReactionService
      *
      * Unlike the UI controller, this does NOT toggle off if the same reaction is set again.
      *
+     * @param  array{
+     *     cookies?: list<array{
+     *         name: string,
+     *         value: string,
+     *         domain: string,
+     *         path: string,
+     *         secure: bool,
+     *         http_only: bool,
+     *         host_only: bool,
+     *         expires_at: int|null
+     *     }>,
+     *     user_agent?: string
+     * }  $downloadRuntimeContext
      * @return array{reaction: array{type: string}|null, changed: bool}
      */
     public function set(
