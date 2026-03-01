@@ -85,6 +85,7 @@ describe('badge-state-cache', () => {
             referrerUrl: null,
             status: null,
             percent: 42,
+            reaction: null,
             payload: {},
         };
         cache.persistDownloadProgressEvent(progressOnlyEvent);
@@ -97,6 +98,7 @@ describe('badge-state-cache', () => {
             referrerUrl: null,
             status: 'downloading',
             percent: null,
+            reaction: null,
             payload: {},
         };
         cache.persistDownloadProgressEvent(statusOnlyEvent);
@@ -135,6 +137,7 @@ describe('badge-state-cache', () => {
             referrerUrl: null,
             status: 'completed',
             percent: 100,
+            reaction: null,
             payload: {},
         };
         cache.persistDownloadProgressEvent(completedEvent);
@@ -162,6 +165,7 @@ describe('badge-state-cache', () => {
             referrerUrl: null,
             status: 'queued',
             percent: 12,
+            reaction: null,
             payload: {},
         };
         cache.persistDownloadProgressEvent(event);
@@ -170,6 +174,66 @@ describe('badge-state-cache', () => {
             status: 'queued',
             percent: 12,
             isDownloadLocked: true,
+        });
+    });
+
+    it('persists reaction from progress event and marks state as existing for restore', async () => {
+        const cache = await loadModule();
+
+        const event: ProgressEvent = {
+            event: 'DownloadTransferQueued',
+            fileId: 22,
+            transferId: 33,
+            sourceUrl: TEST_URL,
+            referrerUrl: null,
+            status: 'queued',
+            percent: 7,
+            reaction: 'love',
+            payload: {},
+        };
+        cache.persistDownloadProgressEvent(event);
+
+        expect(cache.getPersistedBadgeState(TEST_URL)).toMatchObject({
+            exists: true,
+            reaction: 'love',
+            fileId: 22,
+            transferId: 33,
+            status: 'queued',
+            percent: 7,
+        });
+    });
+
+    it('does not clobber a known reaction when later progress events have null reaction', async () => {
+        const cache = await loadModule();
+
+        cache.persistBadgeState(TEST_URL, {
+            exists: true,
+            reaction: 'like',
+            fileId: 10,
+            transferId: 25,
+            status: 'downloading',
+            percent: 30,
+            isDownloadLocked: true,
+        });
+
+        const event: ProgressEvent = {
+            event: 'DownloadTransferProgressUpdated',
+            fileId: 10,
+            transferId: 25,
+            sourceUrl: null,
+            referrerUrl: null,
+            status: 'downloading',
+            percent: 55,
+            reaction: null,
+            payload: {},
+        };
+        cache.persistDownloadProgressEvent(event);
+
+        expect(cache.getPersistedBadgeState(TEST_URL)).toMatchObject({
+            exists: true,
+            reaction: 'like',
+            status: 'downloading',
+            percent: 55,
         });
     });
 });

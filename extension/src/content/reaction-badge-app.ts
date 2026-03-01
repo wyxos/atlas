@@ -264,9 +264,10 @@ const AtlasReactionBadge = defineComponent({
                 return;
             }
 
+            const hasReaction = snapshot.reaction !== null;
             matchResult.value = {
                 ...matchResult.value,
-                exists: snapshot.exists,
+                exists: snapshot.exists || hasReaction,
                 reaction: snapshot.reaction,
                 downloadedAt: snapshot.downloadedAt,
                 blacklistedAt: snapshot.blacklistedAt,
