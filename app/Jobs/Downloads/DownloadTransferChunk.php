@@ -9,6 +9,7 @@ use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
+use App\Services\Downloads\DownloadTransferRequestOptions;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -40,8 +41,12 @@ class DownloadTransferChunk implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(DownloadTransferProgressBroadcaster $broadcaster): void
-    {
+    public function handle(
+        DownloadTransferProgressBroadcaster $broadcaster,
+        ?DownloadTransferRequestOptions $requestOptions = null
+    ): void {
+        $requestOptions ??= app(DownloadTransferRequestOptions::class);
+
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || $transfer->status !== DownloadTransferStatus::DOWNLOADING) {
             return;
@@ -68,10 +73,7 @@ class DownloadTransferChunk implements ShouldQueue
                 'started_at' => $chunk->started_at ?? now(),
             ]);
 
-            $headers = [];
-            if ($transfer->file?->referrer_url) {
-                $headers['Referer'] = $transfer->file->referrer_url;
-            }
+            $headers = $requestOptions->httpHeaders($transfer);
 
             $timeout = (int) config('downloads.http_timeout_seconds');
             $rangeHeader = "bytes={$chunk->range_start}-{$chunk->range_end}";

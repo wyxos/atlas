@@ -5,8 +5,8 @@ namespace App\Jobs\Downloads;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
-use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
+use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\Downloads\YtDlpCommandBuilder;
 use Illuminate\Bus\Queueable;
@@ -34,8 +34,13 @@ class DownloadTransferYtDlp implements ShouldQueue
         $this->onQueue('downloads');
     }
 
-    public function handle(FileDownloadFinalizer $finalizer, YtDlpCommandBuilder $commandBuilder): void
-    {
+    public function handle(
+        FileDownloadFinalizer $finalizer,
+        YtDlpCommandBuilder $commandBuilder,
+        ?DownloadTransferRequestOptions $requestOptions = null
+    ): void {
+        $requestOptions ??= app(DownloadTransferRequestOptions::class);
+
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
             return;
@@ -58,7 +63,7 @@ class DownloadTransferYtDlp implements ShouldQueue
 
             $absoluteTmpDir = $disk->path($tmpDir);
             $outputTemplate = $absoluteTmpDir.DIRECTORY_SEPARATOR.'download.%(ext)s';
-            [$runtimeOptions, $runtimeCookieJarPath] = $this->buildRuntimeOptions($file, $absoluteTmpDir);
+            [$runtimeOptions, $runtimeCookieJarPath] = $this->buildRuntimeOptions($transfer, $absoluteTmpDir, $requestOptions);
 
             $timeoutSeconds = (int) config('downloads.yt_dlp_timeout_seconds', 1800);
             $lastBroadcastPercent = (int) ($transfer->last_broadcast_percent ?? 0);
@@ -284,8 +289,11 @@ class DownloadTransferYtDlp implements ShouldQueue
     /**
      * @return array{0: array{cookies_path?: string, user_agent?: string}, 1: string|null}
      */
-    private function buildRuntimeOptions(File $file, string $absoluteTmpDir): array
-    {
-        return [[], null];
+    private function buildRuntimeOptions(
+        DownloadTransfer $transfer,
+        string $absoluteTmpDir,
+        DownloadTransferRequestOptions $requestOptions
+    ): array {
+        return $requestOptions->ytDlpRuntimeOptions($transfer, $absoluteTmpDir);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
+use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,8 +39,13 @@ class DownloadTransferSingleStream implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(FileDownloadFinalizer $finalizer, DownloadTransferProgressBroadcaster $broadcaster): void
-    {
+    public function handle(
+        FileDownloadFinalizer $finalizer,
+        DownloadTransferProgressBroadcaster $broadcaster,
+        ?DownloadTransferRequestOptions $requestOptions = null
+    ): void {
+        $requestOptions ??= app(DownloadTransferRequestOptions::class);
+
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
             return;
@@ -52,10 +58,7 @@ class DownloadTransferSingleStream implements ShouldQueue
                 return;
             }
 
-            $headers = [];
-            if ($transfer->file?->referrer_url) {
-                $headers['Referer'] = $transfer->file->referrer_url;
-            }
+            $headers = $requestOptions->httpHeaders($transfer);
 
             $timeout = (int) config('downloads.http_timeout_seconds');
 
