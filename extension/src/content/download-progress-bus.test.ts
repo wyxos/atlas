@@ -50,6 +50,7 @@ describe('download-progress-bus', () => {
             referrer_url: 'https://example.com/page#top',
             status: 'queued',
             percent: 10,
+            reaction_type: 'funny',
         });
 
         expect(listenerOne).toHaveBeenCalledWith({
@@ -60,6 +61,7 @@ describe('download-progress-bus', () => {
             referrerUrl: 'https://example.com/page#top',
             status: 'queued',
             percent: 10,
+            reaction: 'funny',
             payload: {
                 file_id: 12,
                 downloadTransferId: 25,
@@ -67,6 +69,7 @@ describe('download-progress-bus', () => {
                 referrer_url: 'https://example.com/page#top',
                 status: 'queued',
                 percent: 10,
+                reaction_type: 'funny',
             },
         });
         expect(listenerTwo).toHaveBeenCalledWith({
@@ -77,6 +80,7 @@ describe('download-progress-bus', () => {
             referrerUrl: 'https://example.com/page#top',
             status: 'queued',
             percent: 10,
+            reaction: 'funny',
             payload: {
                 file_id: 12,
                 downloadTransferId: 25,
@@ -84,6 +88,7 @@ describe('download-progress-bus', () => {
                 referrer_url: 'https://example.com/page#top',
                 status: 'queued',
                 percent: 10,
+                reaction_type: 'funny',
             },
         });
 

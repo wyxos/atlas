@@ -1,5 +1,6 @@
 import { type ReverbSubscription } from '../reverb-client';
 import { connectRuntimeReverb } from '../reverb-runtime';
+import type { BadgeReactionType } from './reaction-check-queue';
 
 export type ProgressEvent = {
     event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated';
@@ -9,6 +10,7 @@ export type ProgressEvent = {
     referrerUrl: string | null;
     status: string | null;
     percent: number | null;
+    reaction: BadgeReactionType | null;
     payload: Record<string, unknown>;
 };
 
@@ -41,6 +43,33 @@ function asString(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+function asReaction(value: unknown): BadgeReactionType | null {
+    if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
+        return value;
+    }
+
+    return null;
+}
+
+function parseReaction(payload: Record<string, unknown>): BadgeReactionType | null {
+    const direct = asReaction(payload.reaction);
+    if (direct !== null) {
+        return direct;
+    }
+
+    const reactionType = asReaction(payload.reactionType ?? payload.reaction_type);
+    if (reactionType !== null) {
+        return reactionType;
+    }
+
+    if (payload.reaction && typeof payload.reaction === 'object') {
+        const nested = payload.reaction as Record<string, unknown>;
+        return asReaction(nested.type);
+    }
+
+    return null;
+}
+
 async function ensureConnected(): Promise<void> {
     if (connectionPromise) {
         return connectionPromise;
@@ -65,6 +94,7 @@ async function ensureConnected(): Promise<void> {
                 referrerUrl: asString(payload.referrer_url ?? payload.referrerUrl ?? payload.page_url),
                 status: asString(payload.status),
                 percent: asNumber(payload.percent),
+                reaction: parseReaction(payload),
                 payload,
             };
 

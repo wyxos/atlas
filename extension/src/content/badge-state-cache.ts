@@ -154,10 +154,14 @@ export function persistDownloadProgressEvent(event: ProgressEvent): void {
         const state = ensureState(url);
         const nextStatus = event.status ?? state.status;
         const nextPercent = event.percent ?? state.percent;
+        const nextReaction = event.reaction ?? state.reaction;
+        const nextExists = event.reaction !== null ? true : state.exists;
         const locked = nextStatus !== null ? !isTerminalStatus(nextStatus) : state.isDownloadLocked;
 
         const next: PersistedBadgeState = {
             ...state,
+            exists: nextExists,
+            reaction: nextReaction,
             fileId: event.fileId ?? state.fileId,
             transferId: event.transferId ?? state.transferId,
             status: nextStatus,
