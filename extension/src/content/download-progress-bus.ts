@@ -1,5 +1,5 @@
-import { getStoredOptions } from '../atlas-options';
-import { connectReverb, type ReverbConfig, type ReverbSubscription } from '../reverb-client';
+import { type ReverbSubscription } from '../reverb-client';
+import { connectRuntimeReverb } from '../reverb-runtime';
 
 export type ProgressEvent = {
     event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated';
@@ -12,10 +12,6 @@ export type ProgressEvent = {
 };
 
 type BusListener = (event: ProgressEvent) => void;
-
-type ReverbPingResponse = {
-    reverb?: unknown;
-};
 
 const listeners = new Set<BusListener>();
 let connectionPromise: Promise<void> | null = null;
@@ -44,50 +40,6 @@ function asString(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
-function parseReverbConfig(value: unknown): ReverbConfig | null {
-    if (!value || typeof value !== 'object') {
-        return null;
-    }
-
-    const row = value as Record<string, unknown>;
-    const enabled = row.enabled === true;
-    const key = asString(row.key) ?? '';
-    const host = asString(row.host) ?? '';
-    const channel = asString(row.channel) ?? '';
-    const scheme = row.scheme === 'http' ? 'http' : 'https';
-    const port = asNumber(row.port) ?? 443;
-
-    return {
-        enabled,
-        key,
-        host,
-        port,
-        scheme,
-        channel,
-    };
-}
-
-async function fetchReverbConfig(): Promise<ReverbConfig | null> {
-    const stored = await getStoredOptions();
-    if (stored.apiToken === '') {
-        return null;
-    }
-
-    const response = await fetch(`${stored.atlasDomain}/api/extension/ping`, {
-        method: 'GET',
-        headers: {
-            'X-Atlas-Api-Key': stored.apiToken,
-        },
-    });
-
-    if (!response.ok) {
-        return null;
-    }
-
-    const payload = await response.json() as ReverbPingResponse;
-    return parseReverbConfig(payload.reverb);
-}
-
 async function ensureConnected(): Promise<void> {
     if (connectionPromise) {
         return connectionPromise;
@@ -97,18 +49,13 @@ async function ensureConnected(): Promise<void> {
     }
 
     connectionPromise = (async () => {
-        const config = await fetchReverbConfig();
-        if (!config) {
+        const runtime = await connectRuntimeReverb();
+        if (runtime.kind !== 'connected') {
             return;
         }
 
-        const client = await connectReverb(config);
-        if (!client) {
-            return;
-        }
-
-        activeClient = client;
-        activeSubscription = client.onEvent((event, payload) => {
+        activeClient = runtime.client;
+        activeSubscription = runtime.client.onEvent((event, payload) => {
             const progressEvent: ProgressEvent = {
                 event,
                 fileId: asNumber(payload.fileId ?? payload.file_id),
@@ -123,6 +70,10 @@ async function ensureConnected(): Promise<void> {
                 listener(progressEvent);
             });
         });
+
+        if (listeners.size === 0) {
+            teardownIfUnused();
+        }
     })().finally(() => {
         connectionPromise = null;
     });
