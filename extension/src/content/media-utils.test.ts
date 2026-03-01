@@ -18,10 +18,10 @@ describe('resolveReactionMediaUrl', () => {
 });
 
 describe('shouldExcludeMediaOrAnchorUrl', () => {
-    it('excludes domain-root urls', () => {
-        expect(shouldExcludeMediaOrAnchorUrl('https://deviantart.com')).toBe(true);
-        expect(shouldExcludeMediaOrAnchorUrl('https://youtube.com/')).toBe(true);
-        expect(shouldExcludeMediaOrAnchorUrl('https://www.youtube.com')).toBe(true);
+    it('allows domain-root urls', () => {
+        expect(shouldExcludeMediaOrAnchorUrl('https://deviantart.com')).toBe(false);
+        expect(shouldExcludeMediaOrAnchorUrl('https://youtube.com/')).toBe(false);
+        expect(shouldExcludeMediaOrAnchorUrl('https://www.youtube.com')).toBe(false);
     });
 
     it('does not exclude non-root media urls', () => {
