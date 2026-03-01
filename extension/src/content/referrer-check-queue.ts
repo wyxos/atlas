@@ -1,5 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
-import { normalizeUrl } from './media-utils';
+import { normalizeUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 export type ReferrerMatchResult = {
     exists: boolean;
@@ -174,7 +174,7 @@ function scheduleFlush(): void {
 
 export async function enqueueReferrerCheck(referrerUrl: string | null): Promise<ReferrerMatchResult> {
     const normalizedReferrerUrl = normalizeUrl(referrerUrl);
-    if (normalizedReferrerUrl === null) {
+    if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(normalizedReferrerUrl)) {
         return Promise.resolve(emptyResult());
     }
 

@@ -1,5 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
-import { normalizeUrl } from './media-utils';
+import { normalizeUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 export type BadgeReactionType = 'love' | 'like' | 'dislike' | 'funny';
 
@@ -187,7 +187,7 @@ function scheduleFlush(): void {
 
 export async function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatchResult> {
     const normalizedMediaUrl = normalizeUrl(mediaUrl);
-    if (normalizedMediaUrl === null) {
+    if (normalizedMediaUrl === null || shouldExcludeMediaOrAnchorUrl(normalizedMediaUrl)) {
         return Promise.resolve(emptyResult());
     }
 
