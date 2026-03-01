@@ -2,10 +2,17 @@ import type { PropType } from 'vue';
 import { computed, createApp, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Ban, Download, Heart, Loader2, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
-import { resolveMediaResolution, resolveMediaUrl, type MediaElement } from './media-utils';
+import { normalizeUrl, resolveMediaResolution, resolveMediaUrl, resolveReactionMediaUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { fetchTransferStatus, submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress } from './download-progress-bus';
+import {
+    getPersistedBadgeState,
+    persistBadgeCheckResult,
+    persistBadgeState,
+    persistDownloadProgressEvent,
+    type PersistedBadgeState,
+} from './badge-state-cache';
 
 type MountedBadge = {
     element: HTMLDivElement;
@@ -131,6 +138,7 @@ const AtlasReactionBadge = defineComponent({
         const trackedTransferId = ref<number | null>(null);
         const hasSeenActiveTransfer = ref(false);
         const lastCheckedMediaUrl = ref<string | null>(null);
+        const lastReactionMediaUrl = ref<string | null>(null);
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
@@ -172,6 +180,7 @@ const AtlasReactionBadge = defineComponent({
             }
 
             unsubscribeProgress = subscribeToDownloadProgress((event) => {
+                persistDownloadProgressEvent(event);
                 if (!isActive) {
                     return;
                 }
@@ -205,6 +214,16 @@ const AtlasReactionBadge = defineComponent({
                 if (event.status !== null && isTerminalStatus(event.status)) {
                     handleTerminalUnlock();
                 }
+
+                persistBadgeState(lastReactionMediaUrl.value, {
+                    fileId: trackedFileId.value,
+                    transferId: trackedTransferId.value,
+                    status: transferStatus.value,
+                    percent: progressPercent.value,
+                    isDownloadLocked: isDownloadLocked.value,
+                    downloadedAt: matchResult.value.downloadedAt,
+                    blacklistedAt: matchResult.value.blacklistedAt,
+                });
             });
         }
 
@@ -221,6 +240,15 @@ const AtlasReactionBadge = defineComponent({
             submittingReactionType.value = null;
             hasSeenActiveTransfer.value = false;
             stopFallbackPolling();
+            persistBadgeState(lastReactionMediaUrl.value, {
+                fileId: trackedFileId.value,
+                transferId: trackedTransferId.value,
+                status: transferStatus.value,
+                percent: progressPercent.value,
+                isDownloadLocked: false,
+                downloadedAt: matchResult.value.downloadedAt,
+                blacklistedAt: matchResult.value.blacklistedAt,
+            });
         }
 
         function resetStateForMediaContextChange(): void {
@@ -237,6 +265,26 @@ const AtlasReactionBadge = defineComponent({
             stopFallbackPolling();
         }
 
+        function applyPersistedState(snapshot: PersistedBadgeState | null): void {
+            if (snapshot === null) {
+                return;
+            }
+
+            matchResult.value = {
+                ...matchResult.value,
+                exists: snapshot.exists,
+                reaction: snapshot.reaction,
+                downloadedAt: snapshot.downloadedAt,
+                blacklistedAt: snapshot.blacklistedAt,
+            };
+            trackedFileId.value = snapshot.fileId;
+            trackedTransferId.value = snapshot.transferId;
+            transferStatus.value = snapshot.status;
+            progressPercent.value = snapshot.percent;
+            isDownloadLocked.value = snapshot.isDownloadLocked;
+            hasSeenActiveTransfer.value = snapshot.status !== null && !isTerminalStatus(snapshot.status);
+        }
+
         async function refreshMatchForCurrentMedia(force = false): Promise<void> {
             const mediaUrl = resolveMediaUrl(props.media);
             if (!force && mediaUrl === lastCheckedMediaUrl.value) {
@@ -244,8 +292,15 @@ const AtlasReactionBadge = defineComponent({
             }
 
             lastCheckedMediaUrl.value = mediaUrl;
+            const reactionMediaUrl = normalizeUrl(resolveReactionMediaUrl(props.media));
+            lastReactionMediaUrl.value = reactionMediaUrl;
             const currentSequence = ++checkSequence;
             resetStateForMediaContextChange();
+            applyPersistedState(getPersistedBadgeState(reactionMediaUrl));
+            if (isDownloadLocked.value) {
+                ensureProgressSubscription();
+                startFallbackPolling();
+            }
 
             const result = await enqueueReactionCheck(mediaUrl);
             if (!isActive || currentSequence !== checkSequence) {
@@ -253,6 +308,7 @@ const AtlasReactionBadge = defineComponent({
             }
 
             matchResult.value = result;
+            persistBadgeCheckResult(reactionMediaUrl, result);
             isChecking.value = false;
         }
 
@@ -297,6 +353,13 @@ const AtlasReactionBadge = defineComponent({
                             hasSeenActiveTransfer.value = true;
                         }
                     }
+                    persistBadgeState(lastReactionMediaUrl.value, {
+                        fileId: trackedFileId.value,
+                        transferId: trackedTransferId.value,
+                        status: transferStatus.value,
+                        percent: progressPercent.value,
+                        isDownloadLocked: isDownloadLocked.value,
+                    });
 
                     if ((statusResult.downloadedAt !== null || statusResult.blacklistedAt !== null) && hasSeenActiveTransfer.value) {
                         matchResult.value = {
@@ -348,6 +411,17 @@ const AtlasReactionBadge = defineComponent({
         onBeforeUnmount(() => {
             isActive = false;
             checkSequence += 1;
+            persistBadgeState(lastReactionMediaUrl.value, {
+                exists: matchResult.value.exists,
+                reaction: matchResult.value.reaction,
+                fileId: trackedFileId.value,
+                transferId: trackedTransferId.value,
+                status: transferStatus.value,
+                percent: progressPercent.value,
+                isDownloadLocked: isDownloadLocked.value,
+                downloadedAt: matchResult.value.downloadedAt,
+                blacklistedAt: matchResult.value.blacklistedAt,
+            });
             props.onShortcutReady?.(null);
             props.media.removeEventListener('load', onMediaUpdate);
             props.media.removeEventListener('loadedmetadata', onMediaUpdate);
@@ -394,11 +468,23 @@ const AtlasReactionBadge = defineComponent({
                     exists: result.exists || matchResult.value.exists,
                     reaction: result.reaction,
                 };
+                lastReactionMediaUrl.value = normalizeUrl(resolveReactionMediaUrl(props.media));
                 trackedFileId.value = result.fileId;
                 trackedTransferId.value = result.downloadTransferId;
                 transferStatus.value = result.downloadStatus;
                 progressPercent.value = result.downloadProgressPercent;
                 hasSeenActiveTransfer.value = result.downloadStatus !== null && !isTerminalStatus(result.downloadStatus);
+                persistBadgeState(lastReactionMediaUrl.value, {
+                    exists: matchResult.value.exists,
+                    reaction: matchResult.value.reaction,
+                    fileId: trackedFileId.value,
+                    transferId: trackedTransferId.value,
+                    status: transferStatus.value,
+                    percent: progressPercent.value,
+                    isDownloadLocked: result.downloadRequested,
+                    downloadedAt: matchResult.value.downloadedAt,
+                    blacklistedAt: matchResult.value.blacklistedAt,
+                });
 
                 if (result.downloadRequested) {
                     isDownloadLocked.value = true;
