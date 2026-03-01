@@ -26,6 +26,12 @@ type RuntimeCookie = {
     expires_at: number | null;
 };
 
+type RuntimeReactionSubmitResponse = {
+    ok: boolean;
+    status: number;
+    payload: unknown;
+};
+
 function parseReactionType(value: unknown): BadgeReactionType | null {
     if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
         return value;
@@ -198,6 +204,51 @@ async function getRuntimeCookies(urls: string[]): Promise<RuntimeCookie[]> {
     });
 }
 
+async function submitReactionViaRuntime(
+    atlasDomain: string,
+    apiToken: string,
+    body: Record<string, unknown>,
+): Promise<RuntimeReactionSubmitResponse | null> {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+        return null;
+    }
+
+    return new Promise((resolve) => {
+        try {
+            chrome.runtime.sendMessage(
+                {
+                    type: 'ATLAS_SUBMIT_REACTION',
+                    atlasDomain,
+                    apiToken,
+                    body,
+                },
+                (response: unknown) => {
+                    if (chrome.runtime.lastError) {
+                        resolve(null);
+                        return;
+                    }
+
+                    if (!response || typeof response !== 'object') {
+                        resolve(null);
+                        return;
+                    }
+
+                    const row = response as Record<string, unknown>;
+                    const ok = row.ok === true;
+                    const statusRaw = numberOrNull(row.status);
+                    resolve({
+                        ok,
+                        status: statusRaw !== null ? statusRaw : 0,
+                        payload: row.payload ?? null,
+                    });
+                },
+            );
+        } catch {
+            resolve(null);
+        }
+    });
+}
+
 function getSafeUserAgent(): string | null {
     try {
         const userAgent = navigator.userAgent.trim();
@@ -248,42 +299,64 @@ export async function submitBadgeReaction(
 
         const cookies = await getRuntimeCookies(normalizeCookieUrls([reactionUrl, pageUrl]));
         const userAgent = getSafeUserAgent();
-        const response = await fetch(`${stored.atlasDomain}/api/extension/reactions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Atlas-Api-Key': stored.apiToken,
-            },
-            body: JSON.stringify({
-                type: reactionType,
-                url: reactionUrl,
-                referrer_url_hash_aware: window.location.href,
-                page_url: window.location.href,
-                tag_name: isVideo ? 'video' : 'img',
-                cookies: cookies.length > 0 ? cookies : null,
-                user_agent: userAgent,
-            }),
-        });
-
-        if (!response.ok) {
-            return {
-                ok: false,
-                reaction: null,
-                exists: false,
-                fileId: null,
-                downloadRequested: false,
-                downloadTransferId: null,
-                downloadStatus: null,
-                downloadProgressPercent: null,
-                reverbConfig: null,
-            };
-        }
+        const requestBody = {
+            type: reactionType,
+            url: reactionUrl,
+            referrer_url_hash_aware: window.location.href,
+            page_url: window.location.href,
+            tag_name: isVideo ? 'video' : 'img',
+            cookies: cookies.length > 0 ? cookies : null,
+            user_agent: userAgent,
+        };
 
         let payload: unknown = null;
-        try {
-            payload = await response.json();
-        } catch {
-            payload = null;
+        const runtimeResponse = await submitReactionViaRuntime(stored.atlasDomain, stored.apiToken, requestBody);
+        if (runtimeResponse !== null) {
+            if (!runtimeResponse.ok) {
+                return {
+                    ok: false,
+                    reaction: null,
+                    exists: false,
+                    fileId: null,
+                    downloadRequested: false,
+                    downloadTransferId: null,
+                    downloadStatus: null,
+                    downloadProgressPercent: null,
+                    reverbConfig: null,
+                };
+            }
+
+            payload = runtimeResponse.payload;
+        } else {
+            const response = await fetch(`${stored.atlasDomain}/api/extension/reactions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Atlas-Api-Key': stored.apiToken,
+                },
+                body: JSON.stringify(requestBody),
+                keepalive: true,
+            });
+
+            if (!response.ok) {
+                return {
+                    ok: false,
+                    reaction: null,
+                    exists: false,
+                    fileId: null,
+                    downloadRequested: false,
+                    downloadTransferId: null,
+                    downloadStatus: null,
+                    downloadProgressPercent: null,
+                    reverbConfig: null,
+                };
+            }
+
+            try {
+                payload = await response.json();
+            } catch {
+                payload = null;
+            }
         }
 
         const extractedReaction = getReactionFromPayload(payload);

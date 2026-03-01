@@ -28,6 +28,13 @@ type RuntimeMessageSender = {
     };
 };
 
+type SubmitReactionPayload = {
+    type: 'ATLAS_SUBMIT_REACTION';
+    atlasDomain: string;
+    apiToken: string;
+    body: Record<string, unknown>;
+};
+
 type BrowserTab = {
     id?: number;
     url?: string;
@@ -178,6 +185,46 @@ chrome.runtime.onMessage.addListener((
             })
             .catch(() => {
                 sendResponse({ cookies: [] });
+            });
+
+        return true;
+    }
+
+    if (payload.type === 'ATLAS_SUBMIT_REACTION') {
+        const submitPayload = message as SubmitReactionPayload;
+        const atlasDomain = typeof submitPayload.atlasDomain === 'string' ? submitPayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+        const apiToken = typeof submitPayload.apiToken === 'string' ? submitPayload.apiToken.trim() : '';
+        const body = submitPayload.body;
+        if (atlasDomain === '' || apiToken === '' || typeof body !== 'object' || body === null) {
+            sendResponse({ ok: false, status: 0, payload: null });
+            return false;
+        }
+
+        void fetch(`${atlasDomain}/api/extension/reactions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Atlas-Api-Key': apiToken,
+            },
+            body: JSON.stringify(body),
+            keepalive: true,
+        })
+            .then(async (response) => {
+                let responsePayload: unknown = null;
+                try {
+                    responsePayload = await response.json();
+                } catch {
+                    responsePayload = null;
+                }
+
+                sendResponse({
+                    ok: response.ok,
+                    status: response.status,
+                    payload: responsePayload,
+                });
+            })
+            .catch(() => {
+                sendResponse({ ok: false, status: 0, payload: null });
             });
 
         return true;
