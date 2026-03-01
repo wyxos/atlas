@@ -6,7 +6,6 @@ import { clearReferrerCheckCache, enqueueReferrerCheck } from './content/referre
 import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
 import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
-import { fetchTransferStatus } from './content/reaction-submit';
 import { createDownloadEventSheet } from './content/download-event-sheet';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
@@ -19,7 +18,6 @@ const overlayManager = new OverlayManager();
 const downloadEventSheet = createDownloadEventSheet();
 const observedAnchorMedia = new WeakSet<MediaElement>();
 const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
-const transferRefreshTimers = new Map<string, number>();
 const anchorMediaObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
         if (!entry.isIntersecting) {
@@ -392,49 +390,6 @@ function applyReactionForReferrerUrl(
     }
 }
 
-function scheduleTransferReactionSync(input: { transferId: number | null; fileId: number | null }, delayMs = 90): void {
-    const hasTransferId = input.transferId !== null && Number.isFinite(input.transferId) && input.transferId > 0;
-    const hasFileId = input.fileId !== null && Number.isFinite(input.fileId) && input.fileId > 0;
-    if (!hasTransferId && !hasFileId) {
-        return;
-    }
-
-    const key = hasTransferId ? `transfer:${input.transferId}` : `file:${input.fileId}`;
-    const existingTimer = transferRefreshTimers.get(key);
-    if (existingTimer !== undefined) {
-        window.clearTimeout(existingTimer);
-    }
-
-    const timer = window.setTimeout(() => {
-        transferRefreshTimers.delete(key);
-
-        void fetchTransferStatus({
-            transferId: hasTransferId ? input.transferId : null,
-            fileId: hasTransferId ? null : input.fileId,
-        }).then((statusResult) => {
-            if (!statusResult.ok || statusResult.referrerUrl === null) {
-                return;
-            }
-
-            const reaction = statusResult.reaction === 'love'
-                || statusResult.reaction === 'like'
-                || statusResult.reaction === 'dislike'
-                || statusResult.reaction === 'funny'
-                ? statusResult.reaction
-                : null;
-
-            applyReactionForReferrerUrl(
-                statusResult.referrerUrl,
-                reaction,
-                statusResult.downloadedAt,
-                statusResult.blacklistedAt,
-            );
-        });
-    }, delayMs);
-
-    transferRefreshTimers.set(key, timer);
-}
-
 function installDownloadProgressListener(): void {
     subscribeToDownloadProgress((event) => {
         downloadEventSheet.push(event);
@@ -469,12 +424,6 @@ function installDownloadProgressListener(): void {
             }
         }
 
-        if (isLifecycleEvent) {
-            scheduleTransferReactionSync({
-                transferId: event.transferId,
-                fileId: event.fileId,
-            }, 0);
-        }
     });
 }
 

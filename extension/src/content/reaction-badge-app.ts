@@ -4,7 +4,7 @@ import { Ban, Download } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
 import { normalizeUrl, resolveMediaResolution, resolveMediaUrl, resolveReactionMediaUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
-import { fetchTransferStatus, submitBadgeReaction } from './reaction-submit';
+import { submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress } from './download-progress-bus';
 import { renderReactionBadge, type BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
@@ -72,8 +72,6 @@ const AtlasReactionBadge = defineComponent({
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
-        let fallbackPollTimer: ReturnType<typeof setInterval> | null = null;
-        let fallbackPollStopsAt = 0;
         let mediaMutationObserver: MutationObserver | null = null;
         let checkSequence = 0;
 
@@ -157,19 +155,10 @@ const AtlasReactionBadge = defineComponent({
             });
         }
 
-        function stopFallbackPolling(): void {
-            if (fallbackPollTimer !== null) {
-                clearInterval(fallbackPollTimer);
-                fallbackPollTimer = null;
-            }
-            fallbackPollStopsAt = 0;
-        }
-
         function handleTerminalUnlock(): void {
             isDownloadLocked.value = false;
             submittingReactionType.value = null;
             hasSeenActiveTransfer.value = false;
-            stopFallbackPolling();
             persistBadgeState(lastReactionMediaUrl.value, {
                 fileId: trackedFileId.value,
                 transferId: trackedTransferId.value,
@@ -192,7 +181,6 @@ const AtlasReactionBadge = defineComponent({
             trackedFileId.value = null;
             trackedTransferId.value = null;
             hasSeenActiveTransfer.value = false;
-            stopFallbackPolling();
         }
 
         function applyPersistedState(snapshot: PersistedBadgeState | null): void {
@@ -229,7 +217,6 @@ const AtlasReactionBadge = defineComponent({
             applyPersistedState(getPersistedBadgeState(reactionMediaUrl));
             if (isDownloadLocked.value) {
                 ensureProgressSubscription();
-                startFallbackPolling();
             }
 
             const result = await enqueueReactionCheck(mediaUrl);
@@ -245,72 +232,6 @@ const AtlasReactionBadge = defineComponent({
                 matchResult.value = result;
             }
             isChecking.value = false;
-        }
-
-        function startFallbackPolling(): void {
-            if (fallbackPollTimer !== null) {
-                return;
-            }
-
-            fallbackPollStopsAt = Date.now() + (3 * 60 * 1000);
-            fallbackPollTimer = setInterval(() => {
-                if (!isActive || !isDownloadLocked.value) {
-                    stopFallbackPolling();
-                    return;
-                }
-
-                if (Date.now() >= fallbackPollStopsAt) {
-                    handleTerminalUnlock();
-                    return;
-                }
-
-                const transferId = trackedTransferId.value;
-                void fetchTransferStatus({
-                    transferId,
-                    fileId: trackedFileId.value,
-                }).then((statusResult) => {
-                    if (!isActive || !statusResult.ok) {
-                        return;
-                    }
-
-                    if (statusResult.fileId !== null) {
-                        trackedFileId.value = statusResult.fileId;
-                    }
-                    if (statusResult.transferId !== null) {
-                        trackedTransferId.value = statusResult.transferId;
-                    }
-                    if (statusResult.progressPercent !== null) {
-                        progressPercent.value = Math.max(0, Math.min(100, Math.round(statusResult.progressPercent)));
-                    }
-                    if (statusResult.status !== null) {
-                        transferStatus.value = statusResult.status;
-                        if (!isTerminalStatus(statusResult.status)) {
-                            hasSeenActiveTransfer.value = true;
-                        }
-                    }
-                    persistBadgeState(lastReactionMediaUrl.value, {
-                        fileId: trackedFileId.value,
-                        transferId: trackedTransferId.value,
-                        status: transferStatus.value,
-                        percent: progressPercent.value,
-                        isDownloadLocked: isDownloadLocked.value,
-                    });
-
-                    if ((statusResult.downloadedAt !== null || statusResult.blacklistedAt !== null) && hasSeenActiveTransfer.value) {
-                        matchResult.value = {
-                            ...matchResult.value,
-                            downloadedAt: statusResult.downloadedAt ?? matchResult.value.downloadedAt,
-                            blacklistedAt: statusResult.blacklistedAt ?? matchResult.value.blacklistedAt,
-                        };
-                        handleTerminalUnlock();
-                        return;
-                    }
-
-                    if (statusResult.status !== null && isTerminalStatus(statusResult.status)) {
-                        handleTerminalUnlock();
-                    }
-                });
-            }, 1200);
         }
 
         const onMediaUpdate = (): void => {
@@ -369,7 +290,6 @@ const AtlasReactionBadge = defineComponent({
                 unsubscribeProgress();
                 unsubscribeProgress = null;
             }
-            stopFallbackPolling();
         });
 
         async function handleReactionClick(type: BadgeReactionType): Promise<void> {
@@ -412,7 +332,6 @@ const AtlasReactionBadge = defineComponent({
                 if (result.downloadRequested) {
                     isDownloadLocked.value = true;
                     ensureProgressSubscription();
-                    startFallbackPolling();
                     if (isTerminalStatus(result.downloadStatus)) {
                         handleTerminalUnlock();
                     }

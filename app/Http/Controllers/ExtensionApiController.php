@@ -410,19 +410,22 @@ class ExtensionApiController extends Controller
     {
         $reverb = config('broadcasting.connections.reverb');
         $key = trim((string) data_get($reverb, 'key', ''));
-        $host = trim((string) data_get($reverb, 'options.host', ''));
-        if (str_contains($host, '://')) {
-            $parsedHost = parse_url($host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        }
-        if (str_contains($host, '/')) {
-            $host = trim((string) parse_url('https://'.$host, PHP_URL_HOST));
+        $rawHost = trim((string) data_get($reverb, 'options.host', ''));
+        $host = '';
+        $hostPort = null;
+        if ($rawHost !== '') {
+            $hostCandidate = str_contains($rawHost, '://') ? $rawHost : 'https://'.$rawHost;
+            $parsedHost = parse_url($hostCandidate, PHP_URL_HOST);
+            $parsedPort = parse_url($hostCandidate, PHP_URL_PORT);
+            $host = is_string($parsedHost) ? trim($parsedHost) : '';
+            $hostPort = is_int($parsedPort) ? $parsedPort : null;
         }
         if ($host === '') {
             $appHost = parse_url((string) config('app.url', ''), PHP_URL_HOST);
             $host = is_string($appHost) ? $appHost : '';
         }
-        $port = (int) data_get($reverb, 'options.port', 443);
+        $configuredPort = (int) data_get($reverb, 'options.port', 443);
+        $port = $hostPort ?? $configuredPort;
         $scheme = strtolower((string) data_get($reverb, 'options.scheme', 'https'));
         if ($scheme !== 'http' && $scheme !== 'https') {
             $scheme = 'https';
