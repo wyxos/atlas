@@ -5,6 +5,9 @@ export type MediaResolution = {
     height: number;
 };
 
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const PHONE_PATTERN = /\+\d[\d\s().-]{6,}\d/;
+
 export function isMediaElement(element: Element): element is MediaElement {
     return element instanceof HTMLImageElement || element instanceof HTMLVideoElement;
 }
@@ -83,6 +86,73 @@ export function normalizeUrl(value: string | null | undefined): string | null {
     }
 
     return trimmed.replace(/#.*$/, '');
+}
+
+export function isLikelyDomainRootUrl(url: string | null | undefined): boolean {
+    const normalized = normalizeUrl(url);
+    if (normalized === null) {
+        return false;
+    }
+
+    try {
+        const parsed = new URL(normalized);
+        const segments = parsed.pathname.split('/').filter((segment) => segment !== '');
+
+        return segments.length === 0;
+    } catch {
+        return false;
+    }
+}
+
+export function containsEmailOrPhoneHint(value: string | null | undefined): boolean {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed === '') {
+        return false;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    if (normalized.startsWith('mailto:') || normalized.startsWith('tel:') || normalized.startsWith('sms:') || normalized.startsWith('callto:')) {
+        return true;
+    }
+
+    if (normalized.includes('%40') || normalized.includes('email=') || normalized.includes('phone=') || normalized.includes('tel=')) {
+        return true;
+    }
+
+    if (EMAIL_PATTERN.test(trimmed)) {
+        return true;
+    }
+
+    if (PHONE_PATTERN.test(trimmed)) {
+        return true;
+    }
+
+    return false;
+}
+
+export function shouldExcludeMediaOrAnchorUrl(url: string | null | undefined): boolean {
+    if (url === null || url === undefined) {
+        return true;
+    }
+
+    return isLikelyDomainRootUrl(url) || containsEmailOrPhoneHint(url);
+}
+
+export function shouldExcludeAnchorHref(rawHref: string | null | undefined, absoluteHref: string | null): boolean {
+    const trimmedRaw = typeof rawHref === 'string' ? rawHref.trim() : '';
+    if (trimmedRaw === '' || trimmedRaw === '#') {
+        return true;
+    }
+
+    if (containsEmailOrPhoneHint(trimmedRaw)) {
+        return true;
+    }
+
+    return shouldExcludeMediaOrAnchorUrl(absoluteHref);
 }
 
 export function collectMediaFromNode(node: Node): MediaElement[] {

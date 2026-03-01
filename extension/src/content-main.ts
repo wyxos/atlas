@@ -1,6 +1,14 @@
 import { getStoredOptions } from './atlas-options';
 import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './match-rules';
-import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, type MediaElement } from './content/media-utils';
+import {
+    collectMediaFromNode,
+    isMediaElement,
+    normalizeUrl,
+    resolveMediaUrl,
+    shouldExcludeAnchorHref,
+    shouldExcludeMediaOrAnchorUrl,
+    type MediaElement,
+} from './content/media-utils';
 import { OverlayManager } from './content/overlay-manager';
 import { clearReferrerCheckCache, enqueueReferrerCheck } from './content/referrer-check-queue';
 import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
@@ -39,7 +47,11 @@ const anchorMediaObserver = new IntersectionObserver((entries) => {
 
 function mediaMatchesRules(element: MediaElement): boolean {
     const mediaUrl = normalizeUrl(resolveMediaUrl(element));
-    return mediaUrl !== null && urlMatchesAnyRule(mediaUrl, currentRules, currentPageHostname);
+    if (mediaUrl === null || shouldExcludeMediaOrAnchorUrl(mediaUrl)) {
+        return false;
+    }
+
+    return urlMatchesAnyRule(mediaUrl, currentRules, currentPageHostname);
 }
 
 function processMedia(media: MediaElement): void {
@@ -118,8 +130,11 @@ function applyAnchorMediaBorder(media: MediaElement): void {
         return;
     }
 
+    const rawHref = anchor.getAttribute('href');
     const anchorHref = normalizeUrl(anchor.href);
-    const isValid = anchorHref !== null && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
+    const isValid = anchorHref !== null
+        && !shouldExcludeAnchorHref(rawHref, anchorHref)
+        && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
     if (!isValid) {
         anchorReferrerKeyByMedia.delete(media);
         clearAnchorMatchDecoration(media);
