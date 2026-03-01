@@ -22,7 +22,19 @@ class DownloadFile implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * @param  array{cookies?: string, user_agent?: string}  $runtimeContext
+     * @param  array{
+     *     cookies?: list<array{
+     *         name: string,
+     *         value: string,
+     *         domain: string,
+     *         path: string,
+     *         secure: bool,
+     *         http_only: bool,
+     *         host_only: bool,
+     *         expires_at: int|null
+     *     }>,
+     *     user_agent?: string
+     * }  $runtimeContext
      */
     public function __construct(public int $fileId, public bool $forceDownload = false, public array $runtimeContext = [])
     {

@@ -21,14 +21,14 @@ final class DownloadTransferRequestOptions
 
         $runtimeContext = $this->runtimeStore->getForTransfer($transfer->id);
         $runtimeUserAgent = trim((string) ($runtimeContext['user_agent'] ?? ''));
-        $runtimeCookies = trim((string) ($runtimeContext['cookies'] ?? ''));
-
         if ($runtimeUserAgent !== '') {
             $headers['User-Agent'] = $runtimeUserAgent;
         }
 
-        if ($runtimeCookies !== '') {
-            $headers['Cookie'] = $runtimeCookies;
+        $cookies = $this->cookiesForUrl($runtimeContext['cookies'] ?? [], (string) $transfer->url);
+        $cookieHeader = $this->buildCookieHeader($cookies);
+        if ($cookieHeader !== null) {
+            $headers['Cookie'] = $cookieHeader;
         }
 
         return $headers;
@@ -48,14 +48,9 @@ final class DownloadTransferRequestOptions
             $runtimeOptions['user_agent'] = $runtimeUserAgent;
         }
 
-        $runtimeCookies = trim((string) ($runtimeContext['cookies'] ?? ''));
-        if ($runtimeCookies !== '') {
-            $cookieJarPath = $this->writeCookieJar(
-                $runtimeCookies,
-                $this->cookieDomainForTransfer($transfer),
-                $absoluteTmpDir
-            );
-
+        $cookies = $this->cookiesForUrl($runtimeContext['cookies'] ?? [], (string) $transfer->url);
+        if ($cookies !== []) {
+            $cookieJarPath = $this->writeCookieJar($cookies, $absoluteTmpDir);
             if ($cookieJarPath !== null) {
                 $runtimeOptions['cookies_path'] = $cookieJarPath;
             }
@@ -64,52 +59,173 @@ final class DownloadTransferRequestOptions
         return [$runtimeOptions, $cookieJarPath];
     }
 
-    private function cookieDomainForTransfer(DownloadTransfer $transfer): ?string
+    /**
+     * @return list<array{
+     *     name: string,
+     *     value: string,
+     *     domain: string,
+     *     path: string,
+     *     secure: bool,
+     *     http_only: bool,
+     *     host_only: bool,
+     *     expires_at: int|null
+     * }>
+     */
+    private function cookiesForUrl(mixed $cookies, string $url): array
     {
-        $candidates = [
-            $transfer->url,
-            $transfer->file?->referrer_url,
-            data_get($transfer->file?->listing_metadata, 'page_url'),
-        ];
+        if (! is_array($cookies) || $cookies === []) {
+            return [];
+        }
 
-        foreach ($candidates as $candidate) {
-            if (! is_string($candidate) || $candidate === '') {
+        $host = parse_url($url, PHP_URL_HOST);
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($host) || $host === '') {
+            return [];
+        }
+
+        $host = strtolower($host);
+        $isHttps = is_string($scheme) && strtolower($scheme) === 'https';
+        $requestPath = is_string($path) && $path !== '' ? $path : '/';
+        $now = time();
+
+        $matched = [];
+
+        foreach ($cookies as $cookie) {
+            if (! is_array($cookie)) {
                 continue;
             }
 
-            $host = parse_url($candidate, PHP_URL_HOST);
-            if (is_string($host) && $host !== '') {
-                return strtolower($host);
+            $cookieDomain = ltrim(strtolower((string) ($cookie['domain'] ?? '')), '.');
+            $cookiePath = (string) ($cookie['path'] ?? '/');
+            if ($cookiePath === '') {
+                $cookiePath = '/';
             }
+
+            $expiresAt = isset($cookie['expires_at']) && is_numeric($cookie['expires_at'])
+                ? (int) $cookie['expires_at']
+                : null;
+            if ($expiresAt !== null && $expiresAt > 0 && $expiresAt <= $now) {
+                continue;
+            }
+
+            $hostOnly = ($cookie['host_only'] ?? false) === true;
+            if ($hostOnly) {
+                if ($cookieDomain !== $host) {
+                    continue;
+                }
+            } elseif ($cookieDomain === '' || ($cookieDomain !== $host && ! str_ends_with($host, '.'.$cookieDomain))) {
+                continue;
+            }
+
+            $secure = ($cookie['secure'] ?? false) === true;
+            if ($secure && ! $isHttps) {
+                continue;
+            }
+
+            if (! str_starts_with($requestPath, $cookiePath)) {
+                continue;
+            }
+
+            if ($cookiePath !== '/' && ! str_ends_with($cookiePath, '/')) {
+                $next = substr($requestPath, strlen($cookiePath), 1);
+                if ($next !== '' && $next !== '/') {
+                    continue;
+                }
+            }
+
+            $matched[] = [
+                'name' => (string) ($cookie['name'] ?? ''),
+                'value' => (string) ($cookie['value'] ?? ''),
+                'domain' => $cookieDomain,
+                'path' => $cookiePath,
+                'secure' => $secure,
+                'http_only' => ($cookie['http_only'] ?? false) === true,
+                'host_only' => $hostOnly,
+                'expires_at' => $expiresAt,
+            ];
         }
 
-        return null;
+        usort($matched, static fn (array $left, array $right): int => strlen($right['path']) <=> strlen($left['path']));
+
+        return $matched;
     }
 
-    private function writeCookieJar(string $cookieHeader, ?string $domain, string $absoluteTmpDir): ?string
+    /**
+     * @param  list<array{name: string, value: string}>  $cookies
+     */
+    private function buildCookieHeader(array $cookies): ?string
     {
-        if ($domain === null || $domain === '') {
+        if ($cookies === []) {
             return null;
         }
 
-        $cookiePairs = array_map('trim', explode(';', $cookieHeader));
-        $lines = ['# Netscape HTTP Cookie File', '# Generated by Atlas runtime options'];
-
-        foreach ($cookiePairs as $pair) {
-            if ($pair === '' || ! str_contains($pair, '=')) {
+        $pairs = [];
+        foreach ($cookies as $cookie) {
+            $name = trim($cookie['name']);
+            if ($name === '') {
                 continue;
             }
 
-            [$name, $value] = array_pad(explode('=', $pair, 2), 2, '');
-            $name = trim($name);
-            $value = trim($value);
+            $value = str_replace(["\r", "\n", ';'], '', $cookie['value']);
+            $pairs[] = $name.'='.$value;
+        }
 
+        if ($pairs === []) {
+            return null;
+        }
+
+        return implode('; ', $pairs);
+    }
+
+    /**
+     * @param  list<array{
+     *     name: string,
+     *     value: string,
+     *     domain: string,
+     *     path: string,
+     *     secure: bool,
+     *     http_only: bool,
+     *     host_only: bool,
+     *     expires_at: int|null
+     * }>  $cookies
+     */
+    private function writeCookieJar(array $cookies, string $absoluteTmpDir): ?string
+    {
+        $lines = ['# Netscape HTTP Cookie File', '# Generated by Atlas runtime options'];
+
+        foreach ($cookies as $cookie) {
+            $name = trim($cookie['name']);
             if ($name === '' || preg_match('/^[!#$%&\'*+\-.^_`|~0-9A-Za-z]+$/', $name) !== 1) {
                 continue;
             }
 
-            $value = str_replace(["\t", "\r", "\n"], '', $value);
-            $lines[] = "{$domain}\tFALSE\t/\tFALSE\t0\t{$name}\t{$value}";
+            $domain = $cookie['domain'];
+            if ($domain === '') {
+                continue;
+            }
+
+            $includeSubdomains = $cookie['host_only'] ? 'FALSE' : 'TRUE';
+            if (! $cookie['host_only'] && ! str_starts_with($domain, '.')) {
+                $domain = '.'.$domain;
+            }
+
+            $domainField = $cookie['http_only'] ? '#HttpOnly_'.$domain : $domain;
+            $path = $cookie['path'] !== '' ? $cookie['path'] : '/';
+            $secure = $cookie['secure'] ? 'TRUE' : 'FALSE';
+            $expires = $cookie['expires_at'] !== null ? max(0, (int) $cookie['expires_at']) : 0;
+            $value = str_replace(["\t", "\r", "\n"], '', $cookie['value']);
+
+            $lines[] = implode("\t", [
+                $domainField,
+                $includeSubdomains,
+                $path,
+                $secure,
+                (string) $expires,
+                $name,
+                $value,
+            ]);
         }
 
         if (count($lines) <= 2) {

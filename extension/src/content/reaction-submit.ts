@@ -15,6 +15,17 @@ type SubmitReactionResult = {
     reverbConfig: ReverbConfig | null;
 };
 
+type RuntimeCookie = {
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    secure: boolean;
+    http_only: boolean;
+    host_only: boolean;
+    expires_at: number | null;
+};
+
 function parseReactionType(value: unknown): BadgeReactionType | null {
     if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
         return value;
@@ -103,13 +114,88 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
     };
 }
 
-function getSafeCookieHeaderValue(): string | null {
-    try {
-        const cookies = document.cookie.trim();
-        return cookies === '' ? null : cookies;
-    } catch {
-        return null;
+function normalizeCookieUrls(urls: Array<string | null>): string[] {
+    const normalized = urls
+        .map((url) => normalizeUrl(url))
+        .filter((url): url is string => url !== null);
+
+    return Array.from(new Set(normalized));
+}
+
+function parseRuntimeCookies(value: unknown): RuntimeCookie[] {
+    if (!Array.isArray(value)) {
+        return [];
     }
+
+    const cookies: RuntimeCookie[] = [];
+
+    for (const entry of value) {
+        if (!entry || typeof entry !== 'object') {
+            continue;
+        }
+
+        const row = entry as Record<string, unknown>;
+        const name = stringOrNull(row.name);
+        const domain = stringOrNull(row.domain);
+        const pathRaw = stringOrNull(row.path) ?? '/';
+        if (name === null || domain === null) {
+            continue;
+        }
+
+        const path = pathRaw.startsWith('/') ? pathRaw : `/${pathRaw}`;
+        const valueField = typeof row.value === 'string' ? row.value : '';
+        const expiresAtRaw = numberOrNull(row.expires_at);
+
+        cookies.push({
+            name,
+            value: valueField,
+            domain: domain.toLowerCase(),
+            path,
+            secure: row.secure === true,
+            http_only: row.http_only === true,
+            host_only: row.host_only === true,
+            expires_at: expiresAtRaw !== null ? Math.floor(expiresAtRaw) : null,
+        });
+    }
+
+    return cookies;
+}
+
+async function getRuntimeCookies(urls: string[]): Promise<RuntimeCookie[]> {
+    if (urls.length === 0) {
+        return [];
+    }
+
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+        return [];
+    }
+
+    return new Promise((resolve) => {
+        try {
+            chrome.runtime.sendMessage(
+                {
+                    type: 'ATLAS_GET_URL_COOKIES',
+                    urls,
+                },
+                (response: unknown) => {
+                    if (chrome.runtime.lastError) {
+                        resolve([]);
+                        return;
+                    }
+
+                    if (!response || typeof response !== 'object') {
+                        resolve([]);
+                        return;
+                    }
+
+                    const cookies = parseRuntimeCookies((response as { cookies?: unknown }).cookies);
+                    resolve(cookies);
+                },
+            );
+        } catch {
+            resolve([]);
+        }
+    });
 }
 
 function getSafeUserAgent(): string | null {
@@ -160,7 +246,7 @@ export async function submitBadgeReaction(
             };
         }
 
-        const cookies = getSafeCookieHeaderValue();
+        const cookies = await getRuntimeCookies(normalizeCookieUrls([reactionUrl, pageUrl]));
         const userAgent = getSafeUserAgent();
         const response = await fetch(`${stored.atlasDomain}/api/extension/reactions`, {
             method: 'POST',
@@ -174,7 +260,7 @@ export async function submitBadgeReaction(
                 referrer_url_hash_aware: window.location.href,
                 page_url: window.location.href,
                 tag_name: isVideo ? 'video' : 'img',
-                cookies,
+                cookies: cookies.length > 0 ? cookies : null,
                 user_agent: userAgent,
             }),
         });

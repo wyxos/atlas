@@ -128,7 +128,15 @@ class ExtensionApiController extends Controller
             'referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
             'page_url' => ['nullable', 'string', 'max:4096'],
             'tag_name' => ['nullable', 'string', 'in:img,video,iframe'],
-            'cookies' => ['nullable', 'string', 'max:20000'],
+            'cookies' => ['nullable', 'array', 'max:300'],
+            'cookies.*.name' => ['required', 'string', 'max:255'],
+            'cookies.*.value' => ['required', 'string', 'max:4096'],
+            'cookies.*.domain' => ['required', 'string', 'max:255'],
+            'cookies.*.path' => ['required', 'string', 'max:2048'],
+            'cookies.*.secure' => ['nullable', 'boolean'],
+            'cookies.*.http_only' => ['nullable', 'boolean'],
+            'cookies.*.host_only' => ['nullable', 'boolean'],
+            'cookies.*.expires_at' => ['nullable', 'integer', 'min:0'],
             'user_agent' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -413,14 +421,26 @@ class ExtensionApiController extends Controller
 
     /**
      * @param  array<string, mixed>  $validated
-     * @return array{cookies?: string, user_agent?: string}
+     * @return array{
+     *     cookies?: list<array{
+     *         name: string,
+     *         value: string,
+     *         domain: string,
+     *         path: string,
+     *         secure: bool,
+     *         http_only: bool,
+     *         host_only: bool,
+     *         expires_at: int|null
+     *     }>,
+     *     user_agent?: string
+     * }
      */
     private function downloadRuntimeContext(array $validated, Request $request): array
     {
         $context = [];
 
-        $cookies = trim((string) ($validated['cookies'] ?? ''));
-        if ($cookies !== '') {
+        $cookies = $this->normalizeRuntimeCookies($validated['cookies'] ?? null);
+        if ($cookies !== []) {
             $context['cookies'] = $cookies;
         }
 
@@ -433,6 +453,65 @@ class ExtensionApiController extends Controller
         }
 
         return $context;
+    }
+
+    /**
+     * @return list<array{
+     *     name: string,
+     *     value: string,
+     *     domain: string,
+     *     path: string,
+     *     secure: bool,
+     *     http_only: bool,
+     *     host_only: bool,
+     *     expires_at: int|null
+     * }>
+     */
+    private function normalizeRuntimeCookies(mixed $cookies): array
+    {
+        if (! is_array($cookies)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($cookies as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $name = trim((string) ($row['name'] ?? ''));
+            $value = trim((string) ($row['value'] ?? ''));
+            $domain = ltrim(strtolower(trim((string) ($row['domain'] ?? ''))), '.');
+            $path = trim((string) ($row['path'] ?? '/'));
+            if ($path === '') {
+                $path = '/';
+            } elseif (! str_starts_with($path, '/')) {
+                $path = '/'.$path;
+            }
+
+            if ($name === '' || $domain === '' || preg_match('/^[!#$%&\'*+\-.^_`|~0-9A-Za-z]+$/', $name) !== 1) {
+                continue;
+            }
+
+            $expiresAt = null;
+            if (isset($row['expires_at']) && is_numeric($row['expires_at'])) {
+                $expiresAt = max(0, (int) $row['expires_at']);
+            }
+
+            $normalized[] = [
+                'name' => $name,
+                'value' => preg_replace('/[\x00-\x1F\x7F]/', '', $value) ?? '',
+                'domain' => $domain,
+                'path' => $path,
+                'secure' => ($row['secure'] ?? false) === true,
+                'http_only' => ($row['http_only'] ?? false) === true,
+                'host_only' => ($row['host_only'] ?? false) === true,
+                'expires_at' => $expiresAt,
+            ];
+        }
+
+        return $normalized;
     }
 
     /**

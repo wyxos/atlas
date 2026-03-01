@@ -139,13 +139,31 @@ test('extension reactions payload forwards cookies and user agent to queued down
         'type' => 'like',
         'url' => 'https://cdn.example.test/media/runtime-options.jpg',
         'referrer_url_hash_aware' => 'https://www.example.test/post/999',
-        'cookies' => 'auth_token=secret123; session_id=abc123',
+        'cookies' => [[
+            'name' => 'auth_token',
+            'value' => 'secret123',
+            'domain' => '.cdn.example.test',
+            'path' => '/',
+            'secure' => true,
+            'http_only' => true,
+            'host_only' => false,
+            'expires_at' => null,
+        ]],
         'user_agent' => 'AtlasExtensionBodyUA/1.2.3',
     ])->assertSuccessful();
 
     Queue::assertPushed(DownloadFile::class, function (DownloadFile $job): bool {
         return $job->runtimeContext === [
-            'cookies' => 'auth_token=secret123; session_id=abc123',
+            'cookies' => [[
+                'name' => 'auth_token',
+                'value' => 'secret123',
+                'domain' => 'cdn.example.test',
+                'path' => '/',
+                'secure' => true,
+                'http_only' => true,
+                'host_only' => false,
+                'expires_at' => null,
+            ]],
             'user_agent' => 'AtlasExtensionBodyUA/1.2.3',
         ];
     });

@@ -11,7 +11,19 @@ final class DownloadTransferRuntimeStore
     private const int TTL_SECONDS = 21600;
 
     /**
-     * @param  array{cookies?: string, user_agent?: string}  $context
+     * @param  array{
+     *     cookies?: list<array{
+     *         name: string,
+     *         value: string,
+     *         domain: string,
+     *         path: string,
+     *         secure: bool,
+     *         http_only: bool,
+     *         host_only: bool,
+     *         expires_at: int|null
+     *     }>,
+     *     user_agent?: string
+     * }  $context
      */
     public function putForTransfer(int $transferId, array $context): void
     {
@@ -24,7 +36,19 @@ final class DownloadTransferRuntimeStore
     }
 
     /**
-     * @return array{cookies?: string, user_agent?: string}
+     * @return array{
+     *     cookies?: list<array{
+     *         name: string,
+     *         value: string,
+     *         domain: string,
+     *         path: string,
+     *         secure: bool,
+     *         http_only: bool,
+     *         host_only: bool,
+     *         expires_at: int|null
+     *     }>,
+     *     user_agent?: string
+     * }
      */
     public function getForTransfer(int $transferId): array
     {
@@ -33,24 +57,103 @@ final class DownloadTransferRuntimeStore
         return is_array($value) ? $this->normalizeContext($value) : [];
     }
 
+    public function forgetForTransfer(int $transferId): void
+    {
+        Cache::forget($this->transferKey($transferId));
+    }
+
     /**
      * @param  array<string, mixed>  $context
-     * @return array{cookies?: string, user_agent?: string}
+     * @return array{
+     *     cookies?: list<array{
+     *         name: string,
+     *         value: string,
+     *         domain: string,
+     *         path: string,
+     *         secure: bool,
+     *         http_only: bool,
+     *         host_only: bool,
+     *         expires_at: int|null
+     *     }>,
+     *     user_agent?: string
+     * }
      */
     private function normalizeContext(array $context): array
     {
         $normalized = [];
 
-        $cookies = trim((string) ($context['cookies'] ?? ''));
-        $cookies = $this->stripControlCharacters($cookies);
-        if ($cookies !== '') {
-            $normalized['cookies'] = mb_substr($cookies, 0, 20000);
+        $cookies = $this->normalizeCookies($context['cookies'] ?? null);
+        if ($cookies !== []) {
+            $normalized['cookies'] = $cookies;
         }
 
         $userAgent = trim((string) ($context['user_agent'] ?? ''));
         $userAgent = $this->stripControlCharacters($userAgent);
         if ($userAgent !== '') {
             $normalized['user_agent'] = mb_substr($userAgent, 0, 1000);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return list<array{
+     *     name: string,
+     *     value: string,
+     *     domain: string,
+     *     path: string,
+     *     secure: bool,
+     *     http_only: bool,
+     *     host_only: bool,
+     *     expires_at: int|null
+     * }>
+     */
+    private function normalizeCookies(mixed $cookies): array
+    {
+        if (! is_array($cookies)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($cookies as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $name = trim((string) ($entry['name'] ?? ''));
+            $domain = ltrim(strtolower(trim((string) ($entry['domain'] ?? ''))), '.');
+            if ($name === '' || $domain === '' || preg_match('/^[!#$%&\'*+\-.^_`|~0-9A-Za-z]+$/', $name) !== 1) {
+                continue;
+            }
+
+            $path = trim((string) ($entry['path'] ?? '/'));
+            if ($path === '') {
+                $path = '/';
+            } elseif (! str_starts_with($path, '/')) {
+                $path = '/'.$path;
+            }
+
+            $value = $this->stripControlCharacters((string) ($entry['value'] ?? ''));
+            $expiresAt = null;
+            if (isset($entry['expires_at']) && is_numeric($entry['expires_at'])) {
+                $expiresAt = max(0, (int) $entry['expires_at']);
+            }
+
+            $normalized[] = [
+                'name' => mb_substr($name, 0, 255),
+                'value' => mb_substr($value, 0, 4096),
+                'domain' => mb_substr($domain, 0, 255),
+                'path' => mb_substr($path, 0, 2048),
+                'secure' => ($entry['secure'] ?? false) === true,
+                'http_only' => ($entry['http_only'] ?? false) === true,
+                'host_only' => ($entry['host_only'] ?? false) === true,
+                'expires_at' => $expiresAt,
+            ];
+
+            if (count($normalized) >= 300) {
+                break;
+            }
         }
 
         return $normalized;
