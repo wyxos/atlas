@@ -4,6 +4,7 @@ import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, ty
 import { OverlayManager } from './content/overlay-manager';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
+const ANCHOR_BORDER_ATTR = 'data-atlas-anchor-red-border';
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
@@ -63,6 +64,39 @@ function processAllCurrentMedia(): void {
     }
 }
 
+function isVisibleInViewport(element: Element): boolean {
+    const rect = element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+    return rect.bottom > 0
+        && rect.right > 0
+        && rect.top < viewportHeight
+        && rect.left < viewportWidth
+        && rect.width > 0
+        && rect.height > 0;
+}
+
+function applyVisibleAnchorBordersOnLoad(): void {
+    const anchors = document.querySelectorAll('a[href]');
+    for (const anchor of anchors) {
+        if (!(anchor instanceof HTMLAnchorElement)) {
+            continue;
+        }
+
+        if (anchor.querySelector('img,video') === null) {
+            continue;
+        }
+
+        if (!isVisibleInViewport(anchor)) {
+            continue;
+        }
+
+        anchor.style.boxShadow = 'inset 0 0 0 4px red';
+        anchor.setAttribute(ANCHOR_BORDER_ATTR, '1');
+    }
+}
+
 function installMutationObserver(): void {
     const observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
@@ -117,6 +151,7 @@ async function loadRulesAndProcess(): Promise<void> {
 
     currentPageHostname = window.location.hostname;
     processAllCurrentMedia();
+    applyVisibleAnchorBordersOnLoad();
 }
 
 function bootstrap(): void {
