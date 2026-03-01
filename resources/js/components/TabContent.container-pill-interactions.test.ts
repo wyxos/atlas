@@ -50,6 +50,7 @@ describe('TabContent - Container Badges', () => {
             const wrapper = mount(TabContent, {
                 props: {
                     tab,
+                    tabId: tab.id,
                     availableServices: [{ key: 'test-service', label: 'Test Service' }],
                     onReaction: vi.fn(),
                     updateActiveTab: vi.fn(),
@@ -77,6 +78,7 @@ describe('TabContent - Container Badges', () => {
             const wrapper = mount(TabContent, {
                 props: {
                     tab,
+                    tabId: tab.id,
                     availableServices: [{ key: 'test-service', label: 'Test Service' }],
                     onReaction: vi.fn(),
                     updateActiveTab: vi.fn(),
@@ -117,6 +119,7 @@ describe('TabContent - Container Badges', () => {
             const wrapper = mount(TabContent, {
                 props: {
                     tab,
+                    tabId: tab.id,
                     availableServices: [{ key: 'test-service', label: 'Test Service' }],
                     onReaction: vi.fn(),
                     updateActiveTab: vi.fn(),
@@ -157,6 +160,7 @@ describe('TabContent - Container Badges', () => {
             const wrapper = mount(TabContent, {
                 props: {
                     tab,
+                    tabId: tab.id,
                     availableServices: [{ key: 'test-service', label: 'Test Service' }],
                     onReaction: vi.fn(),
                     updateActiveTab: vi.fn(),
@@ -350,6 +354,7 @@ describe('TabContent - Container Badges', () => {
             const wrapper = mount(TabContent, {
                 props: {
                     tab,
+                    tabId: tab.id,
                     availableServices: [{ key: 'test-service', label: 'Test Service' }],
                     onReaction: vi.fn(),
                     updateActiveTab: vi.fn(),
