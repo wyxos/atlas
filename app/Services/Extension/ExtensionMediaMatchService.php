@@ -5,6 +5,7 @@ namespace App\Services\Extension;
 use App\Models\File;
 use App\Models\Reaction;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ExtensionMediaMatchService
 {
@@ -337,13 +338,37 @@ class ExtensionMediaMatchService
             return collect();
         }
 
+        $latestUpdatedAtByHash = File::query()
+            ->selectRaw('referrer_url_hash, MAX(updated_at) as max_updated_at')
+            ->whereIn('referrer_url_hash', $hashes->all())
+            ->whereNotNull('referrer_url_hash')
+            ->groupBy('referrer_url_hash');
+
+        $latestIdsByHash = DB::table('files as f')
+            ->joinSub($latestUpdatedAtByHash, 'latest_referrer_hash_rows', function ($join): void {
+                $join->on('f.referrer_url_hash', '=', 'latest_referrer_hash_rows.referrer_url_hash')
+                    ->on('f.updated_at', '=', 'latest_referrer_hash_rows.max_updated_at');
+            })
+            ->selectRaw('f.referrer_url_hash, MAX(f.id) as latest_id')
+            ->groupBy('f.referrer_url_hash');
+
+        $latestIds = DB::query()
+            ->fromSub($latestIdsByHash, 'latest_referrer_hash_ids')
+            ->pluck('latest_id')
+            ->filter(fn ($id): bool => is_numeric($id))
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        if ($latestIds === []) {
+            return collect();
+        }
+
         return File::query()
             ->select(['id', 'referrer_url_hash', 'downloaded_at', 'blacklisted_at', 'updated_at'])
-            ->whereIn('referrer_url_hash', $hashes->all())
-            ->orderByDesc('updated_at')
+            ->whereIn('id', $latestIds)
             ->get()
             ->filter(fn (File $file): bool => is_string($file->referrer_url_hash) && $file->referrer_url_hash !== '')
-            ->unique('referrer_url_hash')
             ->keyBy('referrer_url_hash');
     }
 

@@ -152,6 +152,54 @@ test('extension referrer checks endpoint returns status for matched and unmatche
     $response->assertJsonPath('matches.1.exists', false);
 });
 
+test('extension referrer checks prefer the latest updated row for duplicate referrer hashes', function () {
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $referrerUrl = 'https://www.deviantart.com/artist/art/duplicate-referrer';
+
+    $olderRow = File::factory()->create([
+        'url' => 'https://cdn.example.test/media/duplicate-referrer-older.jpg',
+        'referrer_url' => $referrerUrl,
+    ]);
+
+    $newerRow = File::factory()->create([
+        'url' => 'https://cdn.example.test/media/duplicate-referrer-newer.jpg',
+        'referrer_url' => $referrerUrl,
+    ]);
+
+    $olderRow->updated_at = now()->addMinute();
+    $olderRow->saveQuietly();
+
+    Reaction::query()->create([
+        'file_id' => $olderRow->id,
+        'user_id' => $user->id,
+        'type' => 'funny',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $newerRow->id,
+        'user_id' => $user->id,
+        'type' => 'dislike',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/referrer-checks', [
+        'items' => [
+            [
+                'request_id' => 'ref-duplicate',
+                'referrer_hash' => hash('sha256', $referrerUrl),
+            ],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('matches.0.request_id', 'ref-duplicate');
+    $response->assertJsonPath('matches.0.exists', true);
+    $response->assertJsonPath('matches.0.reaction', 'funny');
+});
+
 test('extension matches prefers media url match over referrer fallback for same candidate', function () {
     $user = User::factory()->create();
     setExtensionApiKey('valid-api-key', $user->id);
