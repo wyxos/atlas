@@ -12,9 +12,8 @@ type BadgeHost = {
 };
 
 type ShortcutListeners = {
-    click: (event: MouseEvent) => void;
-    contextmenu: (event: MouseEvent) => void;
-    mousedown: (event: MouseEvent) => void;
+    mouseenter: (event: Event) => void;
+    focus: (event: Event) => void;
 };
 
 export class OverlayManager {
@@ -23,6 +22,8 @@ export class OverlayManager {
     private readonly activeMedia = new Set<MediaElement>();
     private focusedMedia: MediaElement | null = null;
     private isGlobalShortcutBound = false;
+    private lastPointerX: number | null = null;
+    private lastPointerY: number | null = null;
 
     apply(media: MediaElement): void {
         this.activeMedia.add(media);
@@ -48,6 +49,10 @@ export class OverlayManager {
         }
         if (this.activeMedia.size === 0 && this.isGlobalShortcutBound) {
             window.removeEventListener('keydown', this.handleGlobalKeyDown, true);
+            window.removeEventListener('mousemove', this.handleGlobalMouseMove, true);
+            window.removeEventListener('click', this.handleGlobalClick, true);
+            window.removeEventListener('contextmenu', this.handleGlobalContextmenu, true);
+            window.removeEventListener('mousedown', this.handleGlobalMousedown, true);
             this.isGlobalShortcutBound = false;
         }
     }
@@ -91,55 +96,22 @@ export class OverlayManager {
             return;
         }
 
-        const click = (event: MouseEvent): void => {
-            if (!event.altKey || event.button !== 0) {
-                return;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            this.focusedMedia = media;
-            this.triggerReaction(media, 'like');
-        };
+        const mouseenter = this.handleMediaEnter;
+        const focus = this.handleMediaEnter as EventListener;
 
-        const contextmenu = (event: MouseEvent): void => {
-            if (!event.altKey) {
-                return;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            this.focusedMedia = media;
-            this.triggerReaction(media, 'dislike');
-        };
+        media.addEventListener('mouseenter', mouseenter);
+        media.addEventListener('focus', focus);
 
-        const mousedown = (event: MouseEvent): void => {
-            if (!event.altKey || event.button !== 1) {
-                return;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            this.focusedMedia = media;
-            this.triggerReaction(media, 'love');
-        };
-
-        media.addEventListener('mouseenter', this.handleMediaEnter);
-        media.addEventListener('focus', this.handleMediaEnter as EventListener);
-        media.addEventListener('click', click as EventListener, true);
-        media.addEventListener('contextmenu', contextmenu as EventListener, true);
-        media.addEventListener('mousedown', mousedown as EventListener, true);
-
-        this.shortcutListenersByMedia.set(media, { click, contextmenu, mousedown });
+        this.shortcutListenersByMedia.set(media, { mouseenter, focus });
     }
 
     private unbindShortcutListeners(media: MediaElement): void {
-        media.removeEventListener('mouseenter', this.handleMediaEnter);
-        media.removeEventListener('focus', this.handleMediaEnter as EventListener);
         const listeners = this.shortcutListenersByMedia.get(media);
         if (!listeners) {
             return;
         }
-        media.removeEventListener('click', listeners.click as EventListener, true);
-        media.removeEventListener('contextmenu', listeners.contextmenu as EventListener, true);
-        media.removeEventListener('mousedown', listeners.mousedown as EventListener, true);
+        media.removeEventListener('mouseenter', listeners.mouseenter);
+        media.removeEventListener('focus', listeners.focus);
         this.shortcutListenersByMedia.delete(media);
     }
 
@@ -155,7 +127,55 @@ export class OverlayManager {
             return;
         }
         window.addEventListener('keydown', this.handleGlobalKeyDown, true);
+        window.addEventListener('mousemove', this.handleGlobalMouseMove, true);
+        window.addEventListener('click', this.handleGlobalClick, true);
+        window.addEventListener('contextmenu', this.handleGlobalContextmenu, true);
+        window.addEventListener('mousedown', this.handleGlobalMousedown, true);
         this.isGlobalShortcutBound = true;
+    }
+
+    private readonly handleGlobalMouseMove = (event: MouseEvent): void => {
+        this.lastPointerX = event.clientX;
+        this.lastPointerY = event.clientY;
+    };
+
+    private readonly handleGlobalClick = (event: MouseEvent): void => {
+        this.handleGlobalMouseShortcut(event, 'like', 0);
+    };
+
+    private readonly handleGlobalContextmenu = (event: MouseEvent): void => {
+        this.handleGlobalMouseShortcut(event, 'dislike');
+    };
+
+    private readonly handleGlobalMousedown = (event: MouseEvent): void => {
+        this.handleGlobalMouseShortcut(event, 'love', 1);
+    };
+
+    private handleGlobalMouseShortcut(event: MouseEvent, type: BadgeReactionType, button?: number): void {
+        if (!event.altKey) {
+            return;
+        }
+
+        if (button !== undefined && event.button !== button) {
+            return;
+        }
+
+        if (button === undefined && event.type !== 'contextmenu') {
+            return;
+        }
+
+        this.lastPointerX = event.clientX;
+        this.lastPointerY = event.clientY;
+
+        const media = this.findActiveMediaAtPoint(event.clientX, event.clientY);
+        if (!media) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        this.focusedMedia = media;
+        this.triggerReaction(media, type);
     }
 
     private readonly handleGlobalKeyDown = (event: KeyboardEvent): void => {
@@ -168,24 +188,25 @@ export class OverlayManager {
             return;
         }
 
-        if (!this.focusedMedia || !this.activeMedia.has(this.focusedMedia)) {
+        const shortcutMedia = this.resolveShortcutMedia();
+        if (!shortcutMedia) {
             return;
         }
 
         const key = event.key.toLowerCase();
         if (key === 'l') {
             event.preventDefault();
-            this.triggerReaction(this.focusedMedia, 'like');
+            this.triggerReaction(shortcutMedia, 'like');
             return;
         }
         if (key === 'd') {
             event.preventDefault();
-            this.triggerReaction(this.focusedMedia, 'dislike');
+            this.triggerReaction(shortcutMedia, 'dislike');
             return;
         }
         if (key === 'f') {
             event.preventDefault();
-            this.triggerReaction(this.focusedMedia, 'love');
+            this.triggerReaction(shortcutMedia, 'love');
         }
     };
 
@@ -211,5 +232,99 @@ export class OverlayManager {
             media.insertAdjacentElement('afterend', badge);
         }
         badge.style.display = 'block';
+    }
+
+    private resolveShortcutMedia(): MediaElement | null {
+        if (this.focusedMedia && this.isActiveConnectedMedia(this.focusedMedia)) {
+            return this.focusedMedia;
+        }
+
+        const pointerMedia = this.findActiveMediaAtPoint(this.lastPointerX, this.lastPointerY);
+        if (pointerMedia) {
+            this.focusedMedia = pointerMedia;
+            return pointerMedia;
+        }
+
+        const visibleMedia = this.findPrimaryVisibleMedia();
+        if (visibleMedia) {
+            this.focusedMedia = visibleMedia;
+        }
+
+        return visibleMedia;
+    }
+
+    private findActiveMediaAtPoint(x: number | null, y: number | null): MediaElement | null {
+        if (x === null || y === null) {
+            return null;
+        }
+
+        const directMedia = document.elementsFromPoint(x, y)
+            .find((element) => this.isActiveConnectedMedia(element));
+        if (directMedia && (directMedia instanceof HTMLImageElement || directMedia instanceof HTMLVideoElement)) {
+            return directMedia;
+        }
+
+        let candidate: MediaElement | null = null;
+        let candidateArea = 0;
+
+        for (const media of this.activeMedia) {
+            if (!this.isActiveConnectedMedia(media)) {
+                continue;
+            }
+
+            const rect = media.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) {
+                continue;
+            }
+
+            const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+            if (!inside) {
+                continue;
+            }
+
+            const area = rect.width * rect.height;
+            if (area > candidateArea) {
+                candidate = media;
+                candidateArea = area;
+            }
+        }
+
+        return candidate;
+    }
+
+    private findPrimaryVisibleMedia(): MediaElement | null {
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+        let candidate: MediaElement | null = null;
+        let candidateVisibleArea = 0;
+
+        for (const media of this.activeMedia) {
+            if (!this.isActiveConnectedMedia(media)) {
+                continue;
+            }
+
+            const rect = media.getBoundingClientRect();
+            const width = Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0);
+            const height = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+            if (width <= 0 || height <= 0) {
+                continue;
+            }
+
+            const visibleArea = width * height;
+            if (visibleArea > candidateVisibleArea) {
+                candidate = media;
+                candidateVisibleArea = visibleArea;
+            }
+        }
+
+        return candidate;
+    }
+
+    private isActiveConnectedMedia(media: unknown): media is MediaElement {
+        if (!(media instanceof HTMLImageElement || media instanceof HTMLVideoElement)) {
+            return false;
+        }
+
+        return media.isConnected && this.activeMedia.has(media);
     }
 }
