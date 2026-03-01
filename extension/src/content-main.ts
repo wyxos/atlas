@@ -3,12 +3,11 @@ import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './mat
 import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, type MediaElement } from './content/media-utils';
 import { OverlayManager } from './content/overlay-manager';
 import { enqueueReferrerCheck } from './content/referrer-check-queue';
+import { applyAnchorMatchDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
 const ANCHOR_MEDIA_MATCH_ATTR = 'data-atlas-anchor-media-match';
-const BORDER_COLOR_MISS = '#ef4444';
-const BORDER_COLOR_MATCH = '#22c55e';
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
@@ -105,8 +104,7 @@ function applyAnchorMediaBorder(media: MediaElement): void {
     const anchor = media.closest('a[href]');
     if (!(anchor instanceof HTMLAnchorElement)) {
         anchorReferrerKeyByMedia.delete(media);
-        media.style.outline = '';
-        media.style.outlineOffset = '';
+        clearAnchorMatchDecoration(media);
         media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
         media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
         media.removeAttribute('data-atlas-anchor-reaction');
@@ -119,8 +117,7 @@ function applyAnchorMediaBorder(media: MediaElement): void {
     const isValid = anchorHref !== null && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
     if (!isValid) {
         anchorReferrerKeyByMedia.delete(media);
-        media.style.outline = '';
-        media.style.outlineOffset = '';
+        clearAnchorMatchDecoration(media);
         media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
         media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
         media.removeAttribute('data-atlas-anchor-reaction');
@@ -131,10 +128,12 @@ function applyAnchorMediaBorder(media: MediaElement): void {
 
     const referrerKey = anchorHref;
     anchorReferrerKeyByMedia.set(media, referrerKey);
-    media.style.outline = `4px solid ${BORDER_COLOR_MISS}`;
-    media.style.outlineOffset = '-4px';
-    media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-    media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
+    clearAnchorMatchDecoration(media);
+    media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
+    media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+    media.removeAttribute('data-atlas-anchor-reaction');
+    media.removeAttribute('data-atlas-anchor-downloaded-at');
+    media.removeAttribute('data-atlas-anchor-blacklisted-at');
 
     void enqueueReferrerCheck(anchorHref).then((result) => {
         if (!media.isConnected) {
@@ -146,10 +145,25 @@ function applyAnchorMediaBorder(media: MediaElement): void {
         }
 
         const isMatch = result.exists === true;
-        media.style.outline = `4px solid ${isMatch ? BORDER_COLOR_MATCH : BORDER_COLOR_MISS}`;
-        media.style.outlineOffset = '-4px';
+        if (!isMatch) {
+            clearAnchorMatchDecoration(media);
+            media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
+            media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+            media.removeAttribute('data-atlas-anchor-reaction');
+            media.removeAttribute('data-atlas-anchor-downloaded-at');
+            media.removeAttribute('data-atlas-anchor-blacklisted-at');
+            return;
+        }
+
+        const reaction = result.reaction === 'love'
+            || result.reaction === 'like'
+            || result.reaction === 'dislike'
+            || result.reaction === 'funny'
+            ? result.reaction
+            : null;
+        applyAnchorMatchDecoration(media, reaction);
         media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-        media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, isMatch ? '1' : '0');
+        media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
 
         if (result.reaction) {
             media.setAttribute('data-atlas-anchor-reaction', result.reaction);
