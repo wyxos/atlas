@@ -242,15 +242,10 @@ export class OverlayManager {
         const pointerMedia = this.findActiveMediaAtPoint(this.lastPointerX, this.lastPointerY);
         if (pointerMedia) {
             this.focusedMedia = pointerMedia;
-            return pointerMedia;
+            return this.focusedMedia;
         }
 
-        const visibleMedia = this.findPrimaryVisibleMedia();
-        if (visibleMedia) {
-            this.focusedMedia = visibleMedia;
-        }
-
-        return visibleMedia;
+        return null;
     }
 
     private findActiveMediaAtPoint(x: number | null, y: number | null): MediaElement | null {
@@ -264,60 +259,7 @@ export class OverlayManager {
             return directMedia;
         }
 
-        let candidate: MediaElement | null = null;
-        let candidateArea = 0;
-
-        for (const media of this.activeMedia) {
-            if (!this.isActiveConnectedMedia(media)) {
-                continue;
-            }
-
-            const rect = media.getBoundingClientRect();
-            if (rect.width <= 0 || rect.height <= 0) {
-                continue;
-            }
-
-            const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-            if (!inside) {
-                continue;
-            }
-
-            const area = rect.width * rect.height;
-            if (area > candidateArea) {
-                candidate = media;
-                candidateArea = area;
-            }
-        }
-
-        return candidate;
-    }
-
-    private findPrimaryVisibleMedia(): MediaElement | null {
-        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-        let candidate: MediaElement | null = null;
-        let candidateVisibleArea = 0;
-
-        for (const media of this.activeMedia) {
-            if (!this.isActiveConnectedMedia(media)) {
-                continue;
-            }
-
-            const rect = media.getBoundingClientRect();
-            const width = Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0);
-            const height = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
-            if (width <= 0 || height <= 0) {
-                continue;
-            }
-
-            const visibleArea = width * height;
-            if (visibleArea > candidateVisibleArea) {
-                candidate = media;
-                candidateVisibleArea = visibleArea;
-            }
-        }
-
-        return candidate;
+        return null;
     }
 
     private isActiveConnectedMedia(media: unknown): media is MediaElement {
