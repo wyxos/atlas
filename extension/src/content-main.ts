@@ -4,7 +4,7 @@ import { collectMediaFromNode, isMediaElement, normalizeUrl, resolveMediaUrl, ty
 import { OverlayManager } from './content/overlay-manager';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
-const ANCHOR_BORDER_ATTR = 'data-atlas-anchor-red-border';
+const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
@@ -84,7 +84,8 @@ function applyVisibleAnchorBordersOnLoad(): void {
             continue;
         }
 
-        if (anchor.querySelector('img,video') === null) {
+        const mediaElements = anchor.querySelectorAll('img,video');
+        if (mediaElements.length === 0) {
             continue;
         }
 
@@ -92,8 +93,19 @@ function applyVisibleAnchorBordersOnLoad(): void {
             continue;
         }
 
-        anchor.style.boxShadow = 'inset 0 0 0 4px red';
-        anchor.setAttribute(ANCHOR_BORDER_ATTR, '1');
+        for (const mediaElement of mediaElements) {
+            if (!isMediaElement(mediaElement)) {
+                continue;
+            }
+
+            if (!isVisibleInViewport(mediaElement)) {
+                continue;
+            }
+
+            mediaElement.style.outline = '4px solid red';
+            mediaElement.style.outlineOffset = '-4px';
+            mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+        }
     }
 }
 
