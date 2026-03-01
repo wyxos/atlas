@@ -61,3 +61,7 @@ export async function isUrlOpenInAnotherTab(url: string | null): Promise<boolean
     return request;
 }
 
+export function clearOpenTabCheckCache(): void {
+    resultCache.clear();
+    inFlight.clear();
+}

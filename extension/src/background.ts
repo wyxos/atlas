@@ -2,6 +2,9 @@ type IsUrlOpenMessage = {
     type: 'ATLAS_IS_URL_OPEN';
     url: string;
 };
+type TabPresenceChangedMessage = {
+    type: 'ATLAS_TAB_PRESENCE_CHANGED';
+};
 
 type RuntimeMessageSender = {
     tab?: {
@@ -30,6 +33,21 @@ function normalizeComparableUrl(value: string): string | null {
     } catch {
         return null;
     }
+}
+
+function broadcastTabPresenceChanged(): void {
+    chrome.tabs.query({}, (tabs: BrowserTab[]) => {
+        tabs.forEach((tab) => {
+            if (typeof tab.id !== 'number') {
+                return;
+            }
+
+            const message: TabPresenceChangedMessage = { type: 'ATLAS_TAB_PRESENCE_CHANGED' };
+            chrome.tabs.sendMessage(tab.id, message, () => {
+                void chrome.runtime.lastError;
+            });
+        });
+    });
 }
 
 chrome.runtime.onMessage.addListener((
@@ -68,4 +86,18 @@ chrome.runtime.onMessage.addListener((
     });
 
     return true;
+});
+
+chrome.tabs.onCreated.addListener(() => {
+    broadcastTabPresenceChanged();
+});
+
+chrome.tabs.onRemoved.addListener(() => {
+    broadcastTabPresenceChanged();
+});
+
+chrome.tabs.onUpdated.addListener((_tabId: number, changeInfo: { url?: string; status?: string }) => {
+    if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
+        broadcastTabPresenceChanged();
+    }
 });
