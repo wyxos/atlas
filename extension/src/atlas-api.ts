@@ -74,6 +74,7 @@ async function probeReverb(config: ReverbConfig | null): Promise<{
 
         const state = await new Promise<string>((resolve) => {
             let done = false;
+            let subscription: { unsubscribe: () => void } | null = null;
             const timeout = window.setTimeout(() => {
                 if (done) {
                     return;
@@ -82,7 +83,7 @@ async function probeReverb(config: ReverbConfig | null): Promise<{
                 resolve('timeout');
             }, 4500);
 
-            const subscription = client.onConnectionState((next) => {
+            subscription = client.onConnectionState((next) => {
                 if (done) {
                     return;
                 }
@@ -90,10 +91,14 @@ async function probeReverb(config: ReverbConfig | null): Promise<{
                 if (next === 'connected' || next === 'unavailable' || next === 'failed') {
                     done = true;
                     window.clearTimeout(timeout);
-                    subscription.unsubscribe();
                     resolve(next);
+                    subscription?.unsubscribe();
                 }
             });
+
+            if (done) {
+                subscription.unsubscribe();
+            }
         });
 
         client.disconnect();
