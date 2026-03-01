@@ -154,7 +154,15 @@ class ExtensionApiController extends Controller
         $pageUrl = $this->normalizeOptionalUrl($validated['page_url'] ?? null);
         $tagName = isset($validated['tag_name']) && is_string($validated['tag_name']) ? $validated['tag_name'] : null;
 
-        $file = $this->findOrCreateFile($url, $referrerUrl, $previewUrl, $extensionChannel, $pageUrl, $tagName);
+        $file = $this->findOrCreateFile(
+            $url,
+            $referrerUrl,
+            $previewUrl,
+            $extensionChannel,
+            (int) $user->id,
+            $pageUrl,
+            $tagName
+        );
         $result = $fileReactionService->set(
             $file,
             $user,
@@ -290,6 +298,7 @@ class ExtensionApiController extends Controller
         ?string $referrerUrl,
         ?string $previewUrl,
         string $extensionChannel,
+        int $extensionUserId,
         ?string $pageUrl,
         ?string $tagName,
     ): File {
@@ -298,6 +307,7 @@ class ExtensionApiController extends Controller
         $urlHash = hash('sha256', $canonicalUrl);
         $listingMetadata = array_filter([
             'extension_channel' => $extensionChannel,
+            'extension_user_id' => $extensionUserId,
             'page_url' => $pageUrl,
             'tag_name' => $tagName,
             'download_via' => $downloadVia,
@@ -331,6 +341,10 @@ class ExtensionApiController extends Controller
         $listingChanged = false;
         if (($listingMetadata['extension_channel'] ?? null) !== $extensionChannel) {
             $listingMetadata['extension_channel'] = $extensionChannel;
+            $listingChanged = true;
+        }
+        if (($listingMetadata['extension_user_id'] ?? null) !== $extensionUserId) {
+            $listingMetadata['extension_user_id'] = $extensionUserId;
             $listingChanged = true;
         }
         if ($pageUrl !== null && ($listingMetadata['page_url'] ?? null) !== $pageUrl) {

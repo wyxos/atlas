@@ -4,21 +4,32 @@ namespace App\Services\Downloads;
 
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Models\Reaction;
 use Illuminate\Support\Facades\Storage;
 
 final class DownloadTransferPayload
 {
     /**
-     * @var array<int, string|null>
+     * @var array<string, string|null>
      */
     private static array $extensionChannelCacheByTransferId = [];
+
+    /**
+     * @var array<string, array<string, mixed>>
+     */
+    private static array $listingMetadataCacheByTransferId = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private static array $extensionReactionCacheByTransferId = [];
 
     /**
      * @return array<string, mixed>
      */
     public static function forList(DownloadTransfer $transfer): array
     {
-        return [
+        $payload = [
             'id' => $transfer->id,
             'fileId' => $transfer->file_id,
             'file_id' => $transfer->file_id,
@@ -32,6 +43,12 @@ final class DownloadTransferPayload
             'error' => $transfer->error,
             'extension_channel' => self::extensionChannelForTransfer($transfer),
         ];
+
+        if ($payload['extension_channel'] !== null) {
+            $payload['reaction'] = self::extensionReactionForTransfer($transfer);
+        }
+
+        return $payload;
     }
 
     /**
@@ -76,6 +93,10 @@ final class DownloadTransferPayload
             'error' => $transfer->error,
             'extension_channel' => self::extensionChannelForTransfer($transfer),
         ];
+
+        if ($payload['extension_channel'] !== null) {
+            $payload['reaction'] = self::extensionReactionForTransfer($transfer);
+        }
 
         if ($transfer->isTerminal()) {
             $file = $transfer->file()->first();
@@ -178,8 +199,60 @@ final class DownloadTransferPayload
 
     private static function extensionChannelForTransfer(DownloadTransfer $transfer): ?string
     {
-        if (array_key_exists($transfer->id, self::$extensionChannelCacheByTransferId)) {
-            return self::$extensionChannelCacheByTransferId[$transfer->id];
+        $cacheKey = self::cacheKeyForTransfer($transfer);
+        if (array_key_exists($cacheKey, self::$extensionChannelCacheByTransferId)) {
+            return self::$extensionChannelCacheByTransferId[$cacheKey];
+        }
+
+        $channel = self::extensionChannelFromListingMetadata(
+            self::listingMetadataForTransfer($transfer)
+        );
+        self::$extensionChannelCacheByTransferId[$cacheKey] = $channel;
+
+        return $channel;
+    }
+
+    private static function extensionReactionForTransfer(DownloadTransfer $transfer): ?string
+    {
+        $cacheKey = self::cacheKeyForTransfer($transfer);
+        if (array_key_exists($cacheKey, self::$extensionReactionCacheByTransferId)) {
+            return self::$extensionReactionCacheByTransferId[$cacheKey];
+        }
+
+        if ($transfer->file_id === null) {
+            self::$extensionReactionCacheByTransferId[$cacheKey] = null;
+
+            return null;
+        }
+
+        $extensionUserId = self::extensionUserIdFromListingMetadata(
+            self::listingMetadataForTransfer($transfer)
+        );
+        if ($extensionUserId === null) {
+            self::$extensionReactionCacheByTransferId[$cacheKey] = null;
+
+            return null;
+        }
+
+        $reaction = Reaction::query()
+            ->where('file_id', $transfer->file_id)
+            ->where('user_id', $extensionUserId)
+            ->value('type');
+
+        $resolved = is_string($reaction) ? $reaction : null;
+        self::$extensionReactionCacheByTransferId[$cacheKey] = $resolved;
+
+        return $resolved;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function listingMetadataForTransfer(DownloadTransfer $transfer): array
+    {
+        $cacheKey = self::cacheKeyForTransfer($transfer);
+        if (array_key_exists($cacheKey, self::$listingMetadataCacheByTransferId)) {
+            return self::$listingMetadataCacheByTransferId[$cacheKey];
         }
 
         $file = $transfer->relationLoaded('file') ? $transfer->file : null;
@@ -191,12 +264,18 @@ final class DownloadTransferPayload
             $file = $transfer->file()->select(['id', 'listing_metadata'])->first();
         }
 
-        $channel = self::extensionChannelForFile($file);
-        if ($channel !== null) {
-            self::$extensionChannelCacheByTransferId[$transfer->id] = $channel;
-        }
+        $metadata = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
+        self::$listingMetadataCacheByTransferId[$cacheKey] = $metadata;
 
-        return $channel;
+        return $metadata;
+    }
+
+    private static function cacheKeyForTransfer(DownloadTransfer $transfer): string
+    {
+        $createdAt = $transfer->created_at?->format('Y-m-d H:i:s.u') ?? 'na';
+        $urlHash = hash('sha256', (string) ($transfer->url ?? ''));
+
+        return "{$transfer->id}:{$transfer->file_id}:{$createdAt}:{$urlHash}";
     }
 
     private static function hasListingMetadataAttribute(File $file): bool
@@ -204,13 +283,11 @@ final class DownloadTransferPayload
         return array_key_exists('listing_metadata', $file->getAttributes());
     }
 
-    private static function extensionChannelForFile(?File $file): ?string
+    /**
+     * @param  array<string, mixed>  $listing
+     */
+    private static function extensionChannelFromListingMetadata(array $listing): ?string
     {
-        if (! $file) {
-            return null;
-        }
-
-        $listing = is_array($file->listing_metadata) ? $file->listing_metadata : [];
         $value = $listing['extension_channel'] ?? null;
         if (! is_string($value)) {
             return null;
@@ -219,5 +296,20 @@ final class DownloadTransferPayload
         $normalized = strtolower(trim($value));
 
         return preg_match('/^[a-f0-9]{64}$/', $normalized) === 1 ? $normalized : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $listing
+     */
+    private static function extensionUserIdFromListingMetadata(array $listing): ?int
+    {
+        $value = $listing['extension_user_id'] ?? null;
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $normalized = (int) $value;
+
+        return $normalized > 0 ? $normalized : null;
     }
 }

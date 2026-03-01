@@ -2,6 +2,7 @@ import { getStoredOptions } from '../atlas-options';
 import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
+import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
 
 type SubmitReactionResult = {
     ok: boolean;
@@ -306,9 +307,15 @@ export async function submitBadgeReaction(
             cookies: cookies.length > 0 ? cookies : null,
             user_agent: userAgent,
         };
+        const endpoint = `${stored.atlasDomain}/api/extension/reactions`;
 
         let payload: unknown = null;
-        const runtimeResponse = await submitReactionViaRuntime(stored.atlasDomain, stored.apiToken, requestBody);
+        const runtimeResponse = await atlasLoggedRuntimeRequest(
+            endpoint,
+            'POST',
+            requestBody,
+            () => submitReactionViaRuntime(stored.atlasDomain, stored.apiToken, requestBody),
+        );
         if (runtimeResponse !== null) {
             if (!runtimeResponse.ok) {
                 return {
@@ -326,7 +333,7 @@ export async function submitBadgeReaction(
 
             payload = runtimeResponse.payload;
         } else {
-            const response = await fetch(`${stored.atlasDomain}/api/extension/reactions`, {
+            const response = await atlasLoggedFetch(endpoint, 'POST', requestBody, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

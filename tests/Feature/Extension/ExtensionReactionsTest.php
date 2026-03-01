@@ -72,6 +72,7 @@ test('extension reactions endpoint creates file applies reaction and queues down
     expect($file?->source)->toBe('extension');
     expect($file?->referrer_url)->toBe('https://www.example.test/post/123#media-id-42');
     expect($file?->preview_url)->toBe('https://cdn.example.test/media/new-file.jpg');
+    expect(data_get($file?->listing_metadata, 'extension_user_id'))->toBe($user->id);
 
     $reaction = Reaction::query()
         ->where('user_id', $user->id)

@@ -3,6 +3,8 @@
 use App\Enums\DownloadTransferStatus;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Models\Reaction;
+use App\Models\User;
 use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -31,4 +33,68 @@ it('includes original URL in non-terminal progress payloads', function () {
         ->and($payload['percent'])->toBe(25)
         ->and($payload['original'])->toBe('https://images.example.com/media/progress.jpg')
         ->and(array_key_exists('referrer_url', $payload))->toBeFalse();
+});
+
+it('includes extension user reaction in extension payloads', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://images.example.com/media/reaction.jpg',
+        'listing_metadata' => [
+            'extension_channel' => str_repeat('a', 64),
+            'extension_user_id' => $user->id,
+        ],
+    ]);
+
+    Reaction::query()->create([
+        'user_id' => $user->id,
+        'file_id' => $file->id,
+        'type' => 'funny',
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://images.example.com/media/reaction.jpg',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 30,
+        'last_broadcast_percent' => 30,
+    ]);
+
+    $file->refresh();
+    expect(data_get($file->listing_metadata, 'extension_channel'))->toBe(str_repeat('a', 64));
+
+    $listPayload = DownloadTransferPayload::forList($transfer);
+    $queuedPayload = DownloadTransferPayload::forQueued($transfer);
+    $progressPayload = DownloadTransferPayload::forProgress($transfer, 30);
+
+    expect($listPayload['reaction'])->toBe('funny')
+        ->and($queuedPayload['reaction'])->toBe('funny')
+        ->and($progressPayload['reaction'])->toBe('funny');
+});
+
+it('includes null reaction for extension payloads when no reaction exists', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://images.example.com/media/no-reaction.jpg',
+        'listing_metadata' => [
+            'extension_channel' => str_repeat('b', 64),
+            'extension_user_id' => $user->id,
+        ],
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://images.example.com/media/no-reaction.jpg',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::QUEUED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 0,
+    ]);
+
+    $payload = DownloadTransferPayload::forProgress($transfer, 0);
+
+    expect(array_key_exists('reaction', $payload))->toBeTrue()
+        ->and($payload['reaction'])->toBeNull();
 });
