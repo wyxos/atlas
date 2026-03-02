@@ -259,8 +259,16 @@ export function upsertReferrerCheckCache(referrerUrl: string | null, update: Ref
     }
 }
 
-export function clearReferrerCheckCache(): void {
-    resultCacheByKey.clear();
-    pendingByKey.clear();
-    inFlightByKey.clear();
+export function getCachedReferrerCheck(referrerUrl: string | null): ReferrerMatchResult | null {
+    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
+    if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
+        return null;
+    }
+
+    const cached = resultCacheByKey.get(normalizedReferrerUrl);
+    if (!cached || (Date.now() - cached.cachedAt) >= CACHE_TTL_MS) {
+        return null;
+    }
+
+    return cached.result;
 }

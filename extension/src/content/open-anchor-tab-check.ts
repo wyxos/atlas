@@ -24,6 +24,10 @@ function normalizeComparableUrl(value: string | null): string | null {
     }
 }
 
+export function toComparableOpenTabUrl(url: string | null): string | null {
+    return normalizeComparableUrl(url);
+}
+
 export async function isUrlOpenInAnotherTab(url: string | null): Promise<boolean> {
     const comparableUrl = normalizeComparableUrl(url);
     if (comparableUrl === null) {
@@ -65,7 +69,14 @@ export async function isUrlOpenInAnotherTab(url: string | null): Promise<boolean
     return request;
 }
 
-export function clearOpenTabCheckCache(): void {
-    resultCache.clear();
-    inFlight.clear();
+export function invalidateOpenTabCheckCache(urls: string[]): void {
+    for (const url of urls) {
+        const comparableUrl = normalizeComparableUrl(url);
+        if (comparableUrl === null) {
+            continue;
+        }
+
+        resultCache.delete(comparableUrl);
+        inFlight.delete(comparableUrl);
+    }
 }

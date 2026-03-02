@@ -10,9 +10,9 @@ import {
     type MediaElement,
 } from './content/media-utils';
 import { OverlayManager } from './content/overlay-manager';
-import { clearReferrerCheckCache, enqueueReferrerCheck, upsertReferrerCheckCache } from './content/referrer-check-queue';
+import { enqueueReferrerCheck, getCachedReferrerCheck, upsertReferrerCheckCache } from './content/referrer-check-queue';
 import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
-import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
+import { invalidateOpenTabCheckCache, isUrlOpenInAnotherTab, toComparableOpenTabUrl } from './content/open-anchor-tab-check';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { createDownloadEventSheet } from './content/download-event-sheet';
 import { mountReloadRequiredToastHost } from './content/reload-required-toast-host';
@@ -118,17 +118,69 @@ function isVisibleInViewport(element: Element): boolean {
         && rect.height > 0;
 }
 
-function applyAnchorMediaBorder(media: MediaElement): void {
+function clearAnchorMediaAttributes(media: MediaElement): void {
+    media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
+    media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+    media.removeAttribute('data-atlas-anchor-opened-elsewhere');
+    media.removeAttribute('data-atlas-anchor-reaction');
+    media.removeAttribute('data-atlas-anchor-downloaded-at');
+    media.removeAttribute('data-atlas-anchor-blacklisted-at');
+}
+
+function applyAnchorMediaMatch(media: MediaElement, result: {
+    reaction: string | null;
+    downloadedAt: string | null;
+    blacklistedAt: string | null;
+}): void {
+    const reaction = result.reaction === 'love'
+        || result.reaction === 'like'
+        || result.reaction === 'dislike'
+        || result.reaction === 'funny'
+        ? result.reaction
+        : null;
+    applyAnchorMatchDecoration(media, reaction);
+    media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+    media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
+    media.removeAttribute('data-atlas-anchor-opened-elsewhere');
+
+    if (result.reaction) {
+        media.setAttribute('data-atlas-anchor-reaction', result.reaction);
+    } else {
+        media.removeAttribute('data-atlas-anchor-reaction');
+    }
+
+    if (result.downloadedAt) {
+        media.setAttribute('data-atlas-anchor-downloaded-at', result.downloadedAt);
+    } else {
+        media.removeAttribute('data-atlas-anchor-downloaded-at');
+    }
+
+    if (result.blacklistedAt) {
+        media.setAttribute('data-atlas-anchor-blacklisted-at', result.blacklistedAt);
+    } else {
+        media.removeAttribute('data-atlas-anchor-blacklisted-at');
+    }
+}
+
+function applyAnchorMediaOpenedElsewhere(media: MediaElement): void {
+    applyAnchorOpenedDecoration(media);
+    media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+    media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
+    media.setAttribute('data-atlas-anchor-opened-elsewhere', '1');
+    media.removeAttribute('data-atlas-anchor-reaction');
+    media.removeAttribute('data-atlas-anchor-downloaded-at');
+    media.removeAttribute('data-atlas-anchor-blacklisted-at');
+}
+
+function applyAnchorMediaBorder(
+    media: MediaElement,
+    options?: { referrerMatchFromCacheOnly?: boolean },
+): void {
     const anchor = media.closest('a[href]');
     if (!(anchor instanceof HTMLAnchorElement)) {
         anchorReferrerKeyByMedia.delete(media);
         clearAnchorMatchDecoration(media);
-        media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
-        media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
-        media.removeAttribute('data-atlas-anchor-opened-elsewhere');
-        media.removeAttribute('data-atlas-anchor-reaction');
-        media.removeAttribute('data-atlas-anchor-downloaded-at');
-        media.removeAttribute('data-atlas-anchor-blacklisted-at');
+        clearAnchorMediaAttributes(media);
         return;
     }
 
@@ -141,19 +193,17 @@ function applyAnchorMediaBorder(media: MediaElement): void {
     if (!isValid) {
         anchorReferrerKeyByMedia.delete(media);
         clearAnchorMatchDecoration(media);
-        media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
-        media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
-        media.removeAttribute('data-atlas-anchor-opened-elsewhere');
-        media.removeAttribute('data-atlas-anchor-reaction');
-        media.removeAttribute('data-atlas-anchor-downloaded-at');
-        media.removeAttribute('data-atlas-anchor-blacklisted-at');
+        clearAnchorMediaAttributes(media);
         return;
     }
 
     const referrerKey = anchorHref;
     anchorReferrerKeyByMedia.set(media, referrerKey);
-
-    void enqueueReferrerCheck(anchorHref).then((result) => {
+    const isCacheOnly = options?.referrerMatchFromCacheOnly === true;
+    const referrerResultPromise = isCacheOnly
+        ? Promise.resolve(getCachedReferrerCheck(anchorHref))
+        : enqueueReferrerCheck(anchorHref).then((result) => result);
+    void referrerResultPromise.then((result) => {
         if (!media.isConnected) {
             return;
         }
@@ -162,36 +212,13 @@ function applyAnchorMediaBorder(media: MediaElement): void {
             return;
         }
 
-        const isMatch = result.exists === true;
+        const isMatch = result?.exists === true;
         if (isMatch) {
-            const reaction = result.reaction === 'love'
-                || result.reaction === 'like'
-                || result.reaction === 'dislike'
-                || result.reaction === 'funny'
-                ? result.reaction
-                : null;
-            applyAnchorMatchDecoration(media, reaction);
-            media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-            media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
-            media.removeAttribute('data-atlas-anchor-opened-elsewhere');
-
-            if (result.reaction) {
-                media.setAttribute('data-atlas-anchor-reaction', result.reaction);
-            } else {
-                media.removeAttribute('data-atlas-anchor-reaction');
-            }
-
-            if (result.downloadedAt) {
-                media.setAttribute('data-atlas-anchor-downloaded-at', result.downloadedAt);
-            } else {
-                media.removeAttribute('data-atlas-anchor-downloaded-at');
-            }
-
-            if (result.blacklistedAt) {
-                media.setAttribute('data-atlas-anchor-blacklisted-at', result.blacklistedAt);
-            } else {
-                media.removeAttribute('data-atlas-anchor-blacklisted-at');
-            }
+            applyAnchorMediaMatch(media, {
+                reaction: result.reaction,
+                downloadedAt: result.downloadedAt,
+                blacklistedAt: result.blacklistedAt,
+            });
             return;
         }
 
@@ -205,23 +232,12 @@ function applyAnchorMediaBorder(media: MediaElement): void {
             }
 
             if (isOpenedElsewhere) {
-                applyAnchorOpenedDecoration(media);
-                media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-                media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
-                media.setAttribute('data-atlas-anchor-opened-elsewhere', '1');
-                media.removeAttribute('data-atlas-anchor-reaction');
-                media.removeAttribute('data-atlas-anchor-downloaded-at');
-                media.removeAttribute('data-atlas-anchor-blacklisted-at');
+                applyAnchorMediaOpenedElsewhere(media);
                 return;
             }
 
             clearAnchorMatchDecoration(media);
-            media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
-            media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
-            media.removeAttribute('data-atlas-anchor-opened-elsewhere');
-            media.removeAttribute('data-atlas-anchor-reaction');
-            media.removeAttribute('data-atlas-anchor-downloaded-at');
-            media.removeAttribute('data-atlas-anchor-blacklisted-at');
+            clearAnchorMediaAttributes(media);
         });
     });
 }
@@ -269,7 +285,12 @@ function registerAnchorMediaFromDocument(): void {
     }
 }
 
-function refreshVisibleAnchorMedia(): void {
+function refreshVisibleAnchorMediaForUrls(changedUrls: string[]): void {
+    const changedUrlSet = new Set(changedUrls);
+    if (changedUrlSet.size === 0) {
+        return;
+    }
+
     for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
         if (!isMediaElement(mediaElement)) {
             continue;
@@ -279,7 +300,17 @@ function refreshVisibleAnchorMedia(): void {
             continue;
         }
 
-        applyAnchorMediaBorder(mediaElement);
+        const anchor = mediaElement.closest('a[href]');
+        if (!(anchor instanceof HTMLAnchorElement)) {
+            continue;
+        }
+
+        const comparableAnchorUrl = toComparableOpenTabUrl(anchor.href);
+        if (comparableAnchorUrl === null || !changedUrlSet.has(comparableAnchorUrl)) {
+            continue;
+        }
+
+        applyAnchorMediaBorder(mediaElement, { referrerMatchFromCacheOnly: true });
     }
 }
 
@@ -343,9 +374,18 @@ function installRuntimeMessageListener(): void {
             return;
         }
 
-        clearOpenTabCheckCache();
-        clearReferrerCheckCache();
-        refreshVisibleAnchorMedia();
+        const urls = (message as { urls?: unknown }).urls;
+        const changedUrls = Array.isArray(urls)
+            ? urls
+                .map((url: unknown) => (typeof url === 'string' ? toComparableOpenTabUrl(url) : null))
+                .filter((url): url is string => url !== null)
+            : [];
+        if (changedUrls.length === 0) {
+            return;
+        }
+
+        invalidateOpenTabCheckCache(changedUrls);
+        refreshVisibleAnchorMediaForUrls(changedUrls);
     });
 }
 
