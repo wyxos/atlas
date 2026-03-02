@@ -4,7 +4,7 @@ import {
     collectMediaFromNode,
     isMediaElement,
     normalizeUrl,
-    resolveMediaUrl,
+    resolveReactionTargetUrl,
     shouldExcludeAnchorHref,
     shouldExcludeMediaOrAnchorUrl,
     type MediaElement,
@@ -18,9 +18,7 @@ import { createDownloadEventSheet } from './content/download-event-sheet';
 import { mountReloadRequiredToastHost } from './content/reload-required-toast-host';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
-const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
-const ANCHOR_MEDIA_MATCH_ATTR = 'data-atlas-anchor-media-match';
-const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
+const [ANCHOR_MEDIA_BORDER_ATTR, ANCHOR_MEDIA_MATCH_ATTR, MEDIA_WIDGET_APPLIED_ATTR] = ['data-atlas-anchor-media-red-border', 'data-atlas-anchor-media-match', 'data-atlas-media-red-applied'] as const;
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
@@ -48,9 +46,9 @@ const anchorMediaObserver = new IntersectionObserver((entries) => {
 });
 
 function mediaMatchesRules(element: MediaElement): boolean {
-    const rawMediaUrl = resolveMediaUrl(element);
-    const mediaUrl = normalizeUrl(rawMediaUrl);
-    if (mediaUrl === null || shouldExcludeMediaOrAnchorUrl(rawMediaUrl)) {
+    const pageUrl = normalizeUrl(window.location.href);
+    const mediaUrl = resolveReactionTargetUrl(element, pageUrl);
+    if (mediaUrl === null || shouldExcludeMediaOrAnchorUrl(mediaUrl)) {
         return false;
     }
 
@@ -106,16 +104,28 @@ function processAllCurrentMedia(): void {
     }
 }
 
-function tryApplyMediaWidgetFromInteractionTarget(target: EventTarget | null): void {
-    if (!(target instanceof Element)) {
-        return;
+function resolveMediaCandidateFromInteraction(event: MouseEvent): MediaElement | null {
+    const target = event.target;
+    if (target instanceof Element) {
+        const fromTarget = target.closest('img,video');
+        if (fromTarget && isMediaElement(fromTarget)) {
+            return fromTarget;
+        }
+    }
+    for (const element of document.elementsFromPoint(event.clientX, event.clientY)) {
+        if (isMediaElement(element)) {
+            return element;
+        }
     }
 
-    const mediaCandidate = target.closest('img,video');
-    if (!mediaCandidate || !isMediaElement(mediaCandidate)) {
+    return null;
+}
+
+function tryApplyMediaWidgetFromInteraction(event: MouseEvent): void {
+    const mediaCandidate = resolveMediaCandidateFromInteraction(event);
+    if (!mediaCandidate) {
         return;
     }
-
     if (mediaCandidate.closest('a[href]') !== null) {
         return;
     }
@@ -533,7 +543,6 @@ function installDownloadProgressListener(): void {
                 applyReactionForReferrerUrl(normalizedReferrer, reaction, downloadedAt, blacklistedAt);
             }
         }
-
     });
 }
 
@@ -544,9 +553,8 @@ function installViewportListeners(): void {
 
 function installInteractionFallbackListeners(): void {
     const handleInteraction = (event: MouseEvent): void => {
-        tryApplyMediaWidgetFromInteractionTarget(event.target);
+        tryApplyMediaWidgetFromInteraction(event);
     };
-
     document.addEventListener('mouseover', handleInteraction, { passive: true });
     document.addEventListener('mouseup', handleInteraction, { passive: true });
 }
