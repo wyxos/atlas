@@ -7,6 +7,7 @@ import {
 
 type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
+    urls: string[];
 };
 type RuntimeCookie = {
     name: string;
@@ -48,6 +49,7 @@ type BrowserTab = {
 };
 
 const EXTENSION_RELOAD_REQUIRED_STORAGE_KEY = 'atlasExtensionReloadRequired';
+const openComparableUrlByTabId = new Map<number, string>();
 
 function normalizeComparableUrl(value: string): string | null {
     const trimmed = value.trim();
@@ -210,18 +212,60 @@ function broadcastExtensionReloadRequired(): void {
     });
 }
 
-function broadcastTabPresenceChanged(): void {
+function updateTrackedComparableTabUrl(tabId: number, nextComparableUrl: string | null): string[] {
+    const previousComparableUrl = openComparableUrlByTabId.get(tabId) ?? null;
+    if (nextComparableUrl === null) {
+        openComparableUrlByTabId.delete(tabId);
+    } else {
+        openComparableUrlByTabId.set(tabId, nextComparableUrl);
+    }
+
+    if (previousComparableUrl === nextComparableUrl) {
+        return [];
+    }
+
+    return Array.from(new Set([previousComparableUrl, nextComparableUrl].filter((url): url is string => url !== null)));
+}
+
+function broadcastTabPresenceChanged(urls: string[]): void {
+    if (urls.length === 0) {
+        return;
+    }
+
+    const dedupedUrls = Array.from(new Set(urls));
+
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
         tabs.forEach((tab) => {
             if (typeof tab.id !== 'number') {
                 return;
             }
 
-            const message: TabPresenceChangedMessage = { type: 'ATLAS_TAB_PRESENCE_CHANGED' };
+            const message: TabPresenceChangedMessage = {
+                type: 'ATLAS_TAB_PRESENCE_CHANGED',
+                urls: dedupedUrls,
+            };
             chrome.tabs.sendMessage(tab.id, message, () => {
                 void chrome.runtime.lastError;
             });
         });
+    });
+}
+
+function initializeTrackedTabUrls(): void {
+    chrome.tabs.query({}, (tabs: BrowserTab[]) => {
+        for (const tab of tabs) {
+            if (typeof tab.id !== 'number') {
+                continue;
+            }
+
+            const comparableUrl = typeof tab.url === 'string' ? normalizeComparableUrl(tab.url) : null;
+            if (comparableUrl === null) {
+                openComparableUrlByTabId.delete(tab.id);
+                continue;
+            }
+
+            openComparableUrlByTabId.set(tab.id, comparableUrl);
+        }
     });
 }
 
@@ -345,16 +389,28 @@ chrome.runtime.onUpdateAvailable.addListener(() => {
     });
 });
 
-chrome.tabs.onCreated.addListener(() => {
-    broadcastTabPresenceChanged();
+chrome.tabs.onCreated.addListener((tab: BrowserTab) => {
+    if (typeof tab.id !== 'number') {
+        return;
+    }
+
+    const comparableUrl = typeof tab.url === 'string' ? normalizeComparableUrl(tab.url) : null;
+    const changedUrls = updateTrackedComparableTabUrl(tab.id, comparableUrl);
+    broadcastTabPresenceChanged(changedUrls);
 });
 
-chrome.tabs.onRemoved.addListener(() => {
-    broadcastTabPresenceChanged();
+chrome.tabs.onRemoved.addListener((tabId: number) => {
+    const changedUrls = updateTrackedComparableTabUrl(tabId, null);
+    broadcastTabPresenceChanged(changedUrls);
 });
 
-chrome.tabs.onUpdated.addListener((_tabId: number, changeInfo: { url?: string; status?: string }) => {
+chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string; status?: string }, tab: BrowserTab) => {
     if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
-        broadcastTabPresenceChanged();
+        const sourceUrl = typeof changeInfo.url === 'string' ? changeInfo.url : tab.url ?? null;
+        const comparableUrl = sourceUrl === null ? null : normalizeComparableUrl(sourceUrl);
+        const changedUrls = updateTrackedComparableTabUrl(tabId, comparableUrl);
+        broadcastTabPresenceChanged(changedUrls);
     }
 });
+
+initializeTrackedTabUrls();
