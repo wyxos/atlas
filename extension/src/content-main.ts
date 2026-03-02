@@ -15,6 +15,7 @@ import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMat
 import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { createDownloadEventSheet } from './content/download-event-sheet';
+import { mountReloadRequiredToastHost } from './content/reload-required-toast-host';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
@@ -489,6 +490,7 @@ async function loadRulesAndProcess(): Promise<void> {
 }
 
 function bootstrap(): void {
+    mountReloadRequiredToastHost();
     installMutationObserver();
     installStorageListener();
     installRuntimeMessageListener();
