@@ -46,10 +46,13 @@ type SubmitReactionPayload = {
 type BrowserTab = {
     id?: number;
     url?: string;
+    active?: boolean;
+    discarded?: boolean;
 };
 
 const EXTENSION_RELOAD_REQUIRED_STORAGE_KEY = 'atlasExtensionReloadRequired';
 const openComparableUrlByTabId = new Map<number, string>();
+let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
 
 function normalizeComparableUrl(value: string): string | null {
     const trimmed = value.trim();
@@ -269,6 +272,64 @@ function initializeTrackedTabUrls(): void {
     });
 }
 
+function discardTab(tabId: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        chrome.tabs.discard(tabId, (discardedTab: BrowserTab | undefined) => {
+            resolve(!chrome.runtime.lastError && discardedTab !== undefined);
+        });
+    });
+}
+
+async function discardInactiveTabs(): Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> {
+    const tabs = await new Promise<BrowserTab[]>((resolve) => {
+        chrome.tabs.query({}, (items: BrowserTab[]) => {
+            if (chrome.runtime.lastError || !Array.isArray(items)) {
+                resolve([]);
+                return;
+            }
+
+            resolve(items);
+        });
+    });
+
+    const candidateTabs = tabs.filter((tab): tab is BrowserTab & { id: number } => {
+        return typeof tab.id === 'number' && tab.active !== true;
+    });
+
+    let discardedCount = 0;
+    let failedCount = 0;
+    let skippedCount = 0;
+
+    await Promise.all(candidateTabs.map(async (tab) => {
+        if (tab.discarded === true) {
+            skippedCount += 1;
+            return;
+        }
+
+        const didDiscard = await discardTab(tab.id);
+        if (didDiscard) {
+            discardedCount += 1;
+            return;
+        }
+
+        failedCount += 1;
+    }));
+
+    return { discardedCount, failedCount, skippedCount };
+}
+
+function discardInactiveTabsOnce(): Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> {
+    if (discardInactiveTabsInFlight !== null) {
+        return discardInactiveTabsInFlight;
+    }
+
+    discardInactiveTabsInFlight = discardInactiveTabs()
+        .finally(() => {
+            discardInactiveTabsInFlight = null;
+        });
+    return discardInactiveTabsInFlight;
+}
+
 chrome.runtime.onMessage.addListener((
     message: unknown,
     sender: RuntimeMessageSender,
@@ -346,6 +407,28 @@ chrome.runtime.onMessage.addListener((
             })
             .catch(() => {
                 sendResponse({ ok: false, status: 0, payload: null });
+            });
+
+        return true;
+    }
+
+    if (payload.type === 'ATLAS_DISCARD_INACTIVE_TABS') {
+        void discardInactiveTabsOnce()
+            .then(({ discardedCount, failedCount, skippedCount }) => {
+                sendResponse({
+                    ok: true,
+                    discardedCount,
+                    failedCount,
+                    skippedCount,
+                });
+            })
+            .catch(() => {
+                sendResponse({
+                    ok: false,
+                    discardedCount: 0,
+                    failedCount: 0,
+                    skippedCount: 0,
+                });
             });
 
         return true;
