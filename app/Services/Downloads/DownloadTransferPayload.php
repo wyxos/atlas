@@ -25,6 +25,21 @@ final class DownloadTransferPayload
     private static array $extensionReactionCacheByTransferId = [];
 
     /**
+     * @var array<string, string|null>
+     */
+    private static array $referrerUrlCacheByTransferId = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private static array $downloadedAtCacheByTransferId = [];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private static array $blacklistedAtCacheByTransferId = [];
+
+    /**
      * @return array<string, mixed>
      */
     public static function forList(DownloadTransfer $transfer): array
@@ -42,11 +57,11 @@ final class DownloadTransferPayload
             'percent' => (int) ($transfer->last_broadcast_percent ?? 0),
             'error' => $transfer->error,
             'extension_channel' => self::extensionChannelForTransfer($transfer),
+            'reaction' => self::extensionReactionForTransfer($transfer),
+            'referrer_url' => self::referrerUrlForTransfer($transfer),
+            'downloaded_at' => self::downloadedAtForTransfer($transfer),
+            'blacklisted_at' => self::blacklistedAtForTransfer($transfer),
         ];
-
-        if ($payload['extension_channel'] !== null) {
-            $payload['reaction'] = self::extensionReactionForTransfer($transfer);
-        }
 
         return $payload;
     }
@@ -92,11 +107,11 @@ final class DownloadTransferPayload
             'failed_at' => $transfer->failed_at?->toISOString(),
             'error' => $transfer->error,
             'extension_channel' => self::extensionChannelForTransfer($transfer),
+            'reaction' => self::extensionReactionForTransfer($transfer),
+            'referrer_url' => self::referrerUrlForTransfer($transfer),
+            'downloaded_at' => self::downloadedAtForTransfer($transfer),
+            'blacklisted_at' => self::blacklistedAtForTransfer($transfer),
         ];
-
-        if ($payload['extension_channel'] !== null) {
-            $payload['reaction'] = self::extensionReactionForTransfer($transfer);
-        }
 
         if ($transfer->isTerminal()) {
             $file = $transfer->file()->first();
@@ -142,6 +157,8 @@ final class DownloadTransferPayload
             'absolute_path' => $absolutePath,
             'original' => $original,
             'referrer_url' => $file?->referrer_url,
+            'downloaded_at' => $file?->downloaded_at?->toIso8601String(),
+            'blacklisted_at' => $file?->blacklisted_at?->toIso8601String(),
             'preview' => $preview,
             'size' => $file?->size,
             'filename' => $file?->filename,
@@ -267,13 +284,46 @@ final class DownloadTransferPayload
         }
 
         if (! $file) {
-            $file = $transfer->file()->select(['id', 'listing_metadata'])->first();
+            $file = $transfer->file()->select(['id', 'listing_metadata', 'referrer_url', 'downloaded_at', 'blacklisted_at'])->first();
         }
 
         $metadata = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
         self::$listingMetadataCacheByTransferId[$cacheKey] = $metadata;
+        self::$referrerUrlCacheByTransferId[$cacheKey] = self::trimmedStringOrNull($file?->referrer_url);
+        self::$downloadedAtCacheByTransferId[$cacheKey] = self::datetimeToIsoStringOrNull($file?->downloaded_at);
+        self::$blacklistedAtCacheByTransferId[$cacheKey] = self::datetimeToIsoStringOrNull($file?->blacklisted_at);
 
         return $metadata;
+    }
+
+    private static function referrerUrlForTransfer(DownloadTransfer $transfer): ?string
+    {
+        $cacheKey = self::cacheKeyForTransfer($transfer);
+        if (! array_key_exists($cacheKey, self::$referrerUrlCacheByTransferId)) {
+            self::listingMetadataForTransfer($transfer);
+        }
+
+        return self::$referrerUrlCacheByTransferId[$cacheKey] ?? null;
+    }
+
+    private static function downloadedAtForTransfer(DownloadTransfer $transfer): ?string
+    {
+        $cacheKey = self::cacheKeyForTransfer($transfer);
+        if (! array_key_exists($cacheKey, self::$downloadedAtCacheByTransferId)) {
+            self::listingMetadataForTransfer($transfer);
+        }
+
+        return self::$downloadedAtCacheByTransferId[$cacheKey] ?? null;
+    }
+
+    private static function blacklistedAtForTransfer(DownloadTransfer $transfer): ?string
+    {
+        $cacheKey = self::cacheKeyForTransfer($transfer);
+        if (! array_key_exists($cacheKey, self::$blacklistedAtCacheByTransferId)) {
+            self::listingMetadataForTransfer($transfer);
+        }
+
+        return self::$blacklistedAtCacheByTransferId[$cacheKey] ?? null;
     }
 
     private static function cacheKeyForTransfer(DownloadTransfer $transfer): string
@@ -287,6 +337,26 @@ final class DownloadTransferPayload
     private static function hasListingMetadataAttribute(File $file): bool
     {
         return array_key_exists('listing_metadata', $file->getAttributes());
+    }
+
+    private static function trimmedStringOrNull(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed !== '' ? $trimmed : null;
+    }
+
+    private static function datetimeToIsoStringOrNull(mixed $value): ?string
+    {
+        if (! $value instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        return $value->format(DATE_ATOM);
     }
 
     /**

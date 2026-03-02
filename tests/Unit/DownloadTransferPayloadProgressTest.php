@@ -14,6 +14,8 @@ it('includes original URL in non-terminal progress payloads', function () {
     $file = File::factory()->create([
         'url' => 'https://images.example.com/media/progress.jpg',
         'referrer_url' => 'https://example.com/art/progress',
+        'downloaded_at' => null,
+        'blacklisted_at' => null,
     ]);
 
     $transfer = DownloadTransfer::query()->create([
@@ -32,7 +34,13 @@ it('includes original URL in non-terminal progress payloads', function () {
         ->and($payload['status'])->toBe(DownloadTransferStatus::DOWNLOADING)
         ->and($payload['percent'])->toBe(25)
         ->and($payload['original'])->toBe('https://images.example.com/media/progress.jpg')
-        ->and(array_key_exists('referrer_url', $payload))->toBeFalse();
+        ->and(array_key_exists('reaction', $payload))->toBeTrue()
+        ->and($payload['reaction'])->toBeNull()
+        ->and($payload['referrer_url'])->toBe('https://example.com/art/progress')
+        ->and(array_key_exists('downloaded_at', $payload))->toBeTrue()
+        ->and($payload['downloaded_at'])->toBeNull()
+        ->and(array_key_exists('blacklisted_at', $payload))->toBeTrue()
+        ->and($payload['blacklisted_at'])->toBeNull();
 });
 
 it('includes extension user reaction in extension payloads', function () {
@@ -96,7 +104,10 @@ it('includes null reaction for extension payloads when no reaction exists', func
     $payload = DownloadTransferPayload::forProgress($transfer, 0);
 
     expect(array_key_exists('reaction', $payload))->toBeTrue()
-        ->and($payload['reaction'])->toBeNull();
+        ->and($payload['reaction'])->toBeNull()
+        ->and(array_key_exists('referrer_url', $payload))->toBeTrue()
+        ->and(array_key_exists('downloaded_at', $payload))->toBeTrue()
+        ->and(array_key_exists('blacklisted_at', $payload))->toBeTrue();
 });
 
 it('prefers downloaded file URLs for terminal yt-dlp payloads', function () {

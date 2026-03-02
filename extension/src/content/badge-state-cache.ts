@@ -5,6 +5,7 @@ import type { ProgressEvent } from './download-progress-bus';
 export type PersistedBadgeState = {
     exists: boolean;
     reaction: BadgeReactionType | null;
+    reactedAt: string | null;
     fileId: number | null;
     transferId: number | null;
     status: string | null;
@@ -42,6 +43,7 @@ function ensureState(url: string): PersistedBadgeState {
     const created: PersistedBadgeState = {
         exists: false,
         reaction: null,
+        reactedAt: null,
         fileId: null,
         transferId: null,
         status: null,
@@ -120,10 +122,14 @@ export function persistBadgeCheckResult(mediaUrl: string | null, result: BadgeMa
 
     const nextReaction = shouldKeepLocalReaction ? existing?.reaction ?? null : result.reaction;
     const nextExists = shouldKeepLocalReaction ? true : result.exists;
+    const nextReactedAt = shouldKeepLocalReaction
+        ? existing?.reactedAt ?? result.reactedAt
+        : result.reactedAt;
 
     const input: PersistInput = {
         exists: nextExists,
         reaction: nextReaction,
+        reactedAt: nextReactedAt,
     };
 
     if (result.downloadedAt !== null) {
@@ -155,18 +161,30 @@ export function persistDownloadProgressEvent(event: ProgressEvent): void {
         const nextStatus = event.status ?? state.status;
         const nextPercent = event.percent ?? state.percent;
         const nextReaction = event.reaction ?? state.reaction;
-        const nextExists = event.reaction !== null ? true : state.exists;
-        const locked = nextStatus !== null ? !isTerminalStatus(nextStatus) : state.isDownloadLocked;
+        const nextReactedAt = event.reactedAt !== undefined ? event.reactedAt : state.reactedAt;
+        const nextDownloadedAt = event.downloadedAt !== undefined ? event.downloadedAt : state.downloadedAt;
+        const nextBlacklistedAt = event.blacklistedAt !== undefined ? event.blacklistedAt : state.blacklistedAt;
+        const nextExists = event.reaction !== null
+            || nextDownloadedAt !== null
+            || nextBlacklistedAt !== null
+            ? true
+            : state.exists;
+        const locked = nextDownloadedAt !== null || nextBlacklistedAt !== null
+            ? false
+            : (nextStatus !== null ? !isTerminalStatus(nextStatus) : state.isDownloadLocked);
 
         const next: PersistedBadgeState = {
             ...state,
             exists: nextExists,
             reaction: nextReaction,
+            reactedAt: nextReactedAt,
             fileId: event.fileId ?? state.fileId,
             transferId: event.transferId ?? state.transferId,
             status: nextStatus,
             percent: nextPercent,
             isDownloadLocked: locked,
+            downloadedAt: nextDownloadedAt,
+            blacklistedAt: nextBlacklistedAt,
             updatedAt: now(),
         };
 

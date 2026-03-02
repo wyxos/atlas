@@ -435,22 +435,6 @@ function parseKnownReaction(value: string | null): 'love' | 'like' | 'dislike' |
         : null;
 }
 
-function payloadString(
-    payload: Record<string, unknown>,
-    ...keys: string[]
-): string | null | undefined {
-    for (const key of keys) {
-        if (!(key in payload)) {
-            continue;
-        }
-
-        const value = payload[key];
-        return typeof value === 'string' && value.trim() !== '' ? value : null;
-    }
-
-    return undefined;
-}
-
 function applyReactionForReferrerUrl(
     referrerUrl: string,
     reaction: 'love' | 'like' | 'dislike' | 'funny' | null | undefined,
@@ -472,12 +456,12 @@ function applyReactionForReferrerUrl(
             continue;
         }
 
+        const rawHref = anchor.getAttribute('href');
         const anchorHref = normalizeUrl(anchor.href);
-        if (anchorHref !== normalizedReferrerUrl) {
-            continue;
-        }
-
-        if (!isVisibleInViewport(mediaElement)) {
+        const isEligibleAnchor = anchorHref !== null
+            && !shouldExcludeAnchorHref(rawHref, anchor.href)
+            && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
+        if (!isEligibleAnchor || anchorHref !== normalizedReferrerUrl) {
             continue;
         }
 
@@ -528,9 +512,9 @@ function installDownloadProgressListener(): void {
             const normalizedReferrer = normalizeUrl(event.referrerUrl);
             if (normalizedReferrer) {
                 const reaction = event.reaction ?? undefined;
-                const reactedAt = payloadString(event.payload, 'reacted_at', 'reactedAt');
-                const downloadedAt = payloadString(event.payload, 'downloaded_at', 'downloadedAt');
-                const blacklistedAt = payloadString(event.payload, 'blacklisted_at', 'blacklistedAt');
+                const reactedAt = event.reactedAt;
+                const downloadedAt = event.downloadedAt;
+                const blacklistedAt = event.blacklistedAt;
 
                 upsertReferrerCheckCache(normalizedReferrer, {
                     exists: true,
