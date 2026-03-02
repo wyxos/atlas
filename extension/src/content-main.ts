@@ -212,6 +212,10 @@ function applyAnchorMediaBorder(
             return;
         }
 
+        if (isCacheOnly && result === null) {
+            return;
+        }
+
         const isMatch = result?.exists === true;
         if (isMatch) {
             applyAnchorMediaMatch(media, {
