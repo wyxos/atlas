@@ -10,7 +10,7 @@ import {
     type MediaElement,
 } from './content/media-utils';
 import { OverlayManager } from './content/overlay-manager';
-import { clearReferrerCheckCache, enqueueReferrerCheck } from './content/referrer-check-queue';
+import { clearReferrerCheckCache, enqueueReferrerCheck, upsertReferrerCheckCache } from './content/referrer-check-queue';
 import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './content/anchor-match-decoration';
 import { clearOpenTabCheckCache, isUrlOpenInAnotherTab } from './content/open-anchor-tab-check';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
@@ -352,11 +352,33 @@ function isTerminalTransferStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
 }
 
+function parseKnownReaction(value: string | null): 'love' | 'like' | 'dislike' | 'funny' | null {
+    return value === 'love' || value === 'like' || value === 'dislike' || value === 'funny'
+        ? value
+        : null;
+}
+
+function payloadString(
+    payload: Record<string, unknown>,
+    ...keys: string[]
+): string | null | undefined {
+    for (const key of keys) {
+        if (!(key in payload)) {
+            continue;
+        }
+
+        const value = payload[key];
+        return typeof value === 'string' && value.trim() !== '' ? value : null;
+    }
+
+    return undefined;
+}
+
 function applyReactionForReferrerUrl(
     referrerUrl: string,
-    reaction: 'love' | 'like' | 'dislike' | 'funny' | null,
-    downloadedAt: string | null,
-    blacklistedAt: string | null,
+    reaction: 'love' | 'like' | 'dislike' | 'funny' | null | undefined,
+    downloadedAt: string | null | undefined,
+    blacklistedAt: string | null | undefined,
 ): void {
     const normalizedReferrerUrl = normalizeUrl(referrerUrl);
     if (normalizedReferrerUrl === null) {
@@ -382,27 +404,37 @@ function applyReactionForReferrerUrl(
             continue;
         }
 
-        applyAnchorMatchDecoration(mediaElement, reaction);
+        const reactionForDecoration = reaction === undefined
+            ? parseKnownReaction(mediaElement.getAttribute('data-atlas-anchor-reaction'))
+            : reaction;
+
+        applyAnchorMatchDecoration(mediaElement, reactionForDecoration);
         mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
         mediaElement.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
         mediaElement.removeAttribute('data-atlas-anchor-opened-elsewhere');
 
-        if (reaction) {
-            mediaElement.setAttribute('data-atlas-anchor-reaction', reaction);
-        } else {
-            mediaElement.removeAttribute('data-atlas-anchor-reaction');
+        if (reaction !== undefined) {
+            if (reaction) {
+                mediaElement.setAttribute('data-atlas-anchor-reaction', reaction);
+            } else {
+                mediaElement.removeAttribute('data-atlas-anchor-reaction');
+            }
         }
 
-        if (downloadedAt) {
-            mediaElement.setAttribute('data-atlas-anchor-downloaded-at', downloadedAt);
-        } else {
-            mediaElement.removeAttribute('data-atlas-anchor-downloaded-at');
+        if (downloadedAt !== undefined) {
+            if (downloadedAt) {
+                mediaElement.setAttribute('data-atlas-anchor-downloaded-at', downloadedAt);
+            } else {
+                mediaElement.removeAttribute('data-atlas-anchor-downloaded-at');
+            }
         }
 
-        if (blacklistedAt) {
-            mediaElement.setAttribute('data-atlas-anchor-blacklisted-at', blacklistedAt);
-        } else {
-            mediaElement.removeAttribute('data-atlas-anchor-blacklisted-at');
+        if (blacklistedAt !== undefined) {
+            if (blacklistedAt) {
+                mediaElement.setAttribute('data-atlas-anchor-blacklisted-at', blacklistedAt);
+            } else {
+                mediaElement.removeAttribute('data-atlas-anchor-blacklisted-at');
+            }
         }
     }
 }
@@ -418,26 +450,20 @@ function installDownloadProgressListener(): void {
         if (isLifecycleEvent && event.referrerUrl) {
             const normalizedReferrer = normalizeUrl(event.referrerUrl);
             if (normalizedReferrer) {
-                clearReferrerCheckCache();
-                void enqueueReferrerCheck(normalizedReferrer).then((result) => {
-                    if (!result.exists) {
-                        return;
-                    }
+                const reaction = event.reaction ?? undefined;
+                const reactedAt = payloadString(event.payload, 'reacted_at', 'reactedAt');
+                const downloadedAt = payloadString(event.payload, 'downloaded_at', 'downloadedAt');
+                const blacklistedAt = payloadString(event.payload, 'blacklisted_at', 'blacklistedAt');
 
-                    const reaction = result.reaction === 'love'
-                        || result.reaction === 'like'
-                        || result.reaction === 'dislike'
-                        || result.reaction === 'funny'
-                        ? result.reaction
-                        : null;
-
-                    applyReactionForReferrerUrl(
-                        normalizedReferrer,
-                        reaction,
-                        result.downloadedAt,
-                        result.blacklistedAt,
-                    );
+                upsertReferrerCheckCache(normalizedReferrer, {
+                    exists: true,
+                    reaction,
+                    reactedAt,
+                    downloadedAt,
+                    blacklistedAt,
                 });
+
+                applyReactionForReferrerUrl(normalizedReferrer, reaction, downloadedAt, blacklistedAt);
             }
         }
 
