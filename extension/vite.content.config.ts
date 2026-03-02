@@ -1,10 +1,12 @@
 import path from 'node:path';
 import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 
 const extensionRoot = path.resolve(__dirname);
 
 export default defineConfig({
     root: extensionRoot,
+    plugins: [vue()],
     resolve: {
         alias: {
             vue: 'vue/dist/vue.runtime.esm-browser.prod.js',
@@ -25,6 +27,7 @@ export default defineConfig({
             formats: ['iife'],
             name: 'AtlasContentScript',
             fileName: () => 'content.js',
+            cssFileName: 'content',
         },
         rollupOptions: {
             output: {
