@@ -64,4 +64,24 @@ describe('atlas-request-log', () => {
         expect(latest.status).toBe(200);
         expect(latest.responsePayload).toEqual({ reaction: 'like' });
     });
+
+    it('retains only the latest 20 request entries', async () => {
+        for (let index = 0; index < 25; index += 1) {
+            await atlasLoggedRuntimeRequest(
+                `https://atlas.test/api/extension/reactions/${index}`,
+                'POST',
+                { index },
+                async () => ({
+                    ok: true,
+                    status: 200,
+                    payload: { index },
+                }),
+            );
+        }
+
+        const snapshot = getAtlasRequestLogSnapshot();
+        expect(snapshot).toHaveLength(20);
+        expect(snapshot[0]?.requestPayload).toEqual({ index: 24 });
+        expect(snapshot[19]?.requestPayload).toEqual({ index: 5 });
+    });
 });
