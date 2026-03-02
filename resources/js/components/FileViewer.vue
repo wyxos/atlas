@@ -154,7 +154,7 @@ const {
     videoProgressPercent,
     videoVolumePercent,
     overlayVideoPoster,
-    handleVideoLoadedMetadata,
+    handleVideoLoadedMetadata: syncVideoPlaybackMetadata,
     handleVideoTimeUpdate,
     handleVideoPlay,
     handleVideoPause,
@@ -326,6 +326,52 @@ function handleOverlayImageMouseDown(e: MouseEvent): void {
         return;
     }
 
+}
+
+function recomputeOverlayMediaFit(width: number, height: number): void {
+    if (width <= 0 || height <= 0 || !overlayState.rect) {
+        return;
+    }
+
+    const borderWidth = 4;
+    const tabContent = props.containerRef;
+    if (!tabContent) {
+        return;
+    }
+
+    overlayState.originalDimensions = { width, height };
+
+    const tabContentBox = tabContent.getBoundingClientRect();
+    const frameWidth = overlayState.isFilled ? tabContentBox.width : overlayState.rect.width;
+    const frameHeight = overlayState.isFilled ? tabContentBox.height : overlayState.rect.height;
+    const availableWidth = overlayState.isFilled
+        ? getAvailableWidth(frameWidth, borderWidth)
+        : Math.max(frameWidth - (borderWidth * 2), 0);
+    const availableHeight = Math.max(frameHeight - (borderWidth * 2), 0);
+
+    if (availableWidth <= 0 || availableHeight <= 0) {
+        return;
+    }
+
+    const bestFitSize = calculateBestFitSize(width, height, availableWidth, availableHeight);
+    overlayState.imageSize = bestFitSize;
+    overlayState.centerPosition = getCenteredPosition(
+        availableWidth,
+        availableHeight,
+        bestFitSize.width,
+        bestFitSize.height
+    );
+}
+
+function handleOverlayVideoLoadedMetadata(): void {
+    syncVideoPlaybackMetadata();
+
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+
+    recomputeOverlayMediaFit(video.videoWidth, video.videoHeight);
 }
 
 function handleOverlayMediaClick(e: MouseEvent): void {
@@ -528,7 +574,7 @@ defineExpose({
                     ]" :style="overlayMediaStyle" playsinline disablepictureinpicture preload="metadata"
                        @click="handleOverlayMediaClick"
                        @contextmenu="handleOverlayMediaContextMenu"
-                       @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
+                       @loadedmetadata="handleOverlayVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
                        @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
                        @volumechange="handleVideoVolumeChange" @mousedown="handleOverlayImageMouseDown"
                        @auxclick="handleOverlayImageAuxClick">
