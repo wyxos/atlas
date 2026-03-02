@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* global chrome */
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
 
@@ -11,6 +11,7 @@ const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
+const tabCount = ref<number | null>(null);
 const isDiscardingTabs = ref(false);
 const discardTabsResult = ref<string | null>(null);
 
@@ -35,6 +36,26 @@ function toSafeCount(value: unknown): number {
 
 function pluralize(value: number, singular: string, plural: string): string {
     return value === 1 ? singular : plural;
+}
+
+function refreshTabCount(): void {
+    if (!chrome.tabs?.query) {
+        tabCount.value = null;
+        return;
+    }
+
+    chrome.tabs.query({}, (tabs: unknown) => {
+        if (chrome.runtime.lastError || !Array.isArray(tabs)) {
+            tabCount.value = null;
+            return;
+        }
+
+        tabCount.value = tabs.length;
+    });
+}
+
+function handleTabPresenceChanged(): void {
+    refreshTabCount();
 }
 
 async function discardInactiveTabs(): Promise<void> {
@@ -103,6 +124,17 @@ onMounted(() => {
         reverbStatusDetail.value = status.reverbDetail;
         reverbEndpoint.value = status.reverbEndpoint;
     });
+
+    refreshTabCount();
+    chrome.tabs?.onCreated?.addListener(handleTabPresenceChanged);
+    chrome.tabs?.onRemoved?.addListener(handleTabPresenceChanged);
+    chrome.tabs?.onUpdated?.addListener(handleTabPresenceChanged);
+});
+
+onUnmounted(() => {
+    chrome.tabs?.onCreated?.removeListener(handleTabPresenceChanged);
+    chrome.tabs?.onRemoved?.removeListener(handleTabPresenceChanged);
+    chrome.tabs?.onUpdated?.removeListener(handleTabPresenceChanged);
 });
 </script>
 
@@ -117,6 +149,10 @@ onMounted(() => {
             <p class="text-sm text-twilight-indigo-200">
                 Version
                 <span class="font-medium text-smart-blue-200">{{ extensionVersion }}</span>
+            </p>
+            <p class="text-sm text-twilight-indigo-200">
+                Tabs
+                <span class="font-medium text-smart-blue-200">{{ tabCount ?? '—' }}</span>
             </p>
             <p class="text-sm text-twilight-indigo-200">
                 {{ statusDetail }}
