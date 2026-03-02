@@ -331,7 +331,7 @@ class ExtensionApiController extends Controller
         }
 
         $updates = [];
-        if ($file->referrer_url === null && $referrerUrl !== null) {
+        if ($referrerUrl !== null && $file->referrer_url !== $referrerUrl) {
             $updates['referrer_url'] = $referrerUrl;
         }
         if ($file->preview_url === null && $previewUrl !== null) {
