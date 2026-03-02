@@ -35,3 +35,21 @@ it('includes width and height when available in metadata payload', function () {
     expect($data['width'])->toBe(123);
     expect($data['height'])->toBe(456);
 });
+
+it('prefers downloaded and preview file routes for downloaded files', function () {
+    $file = File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/example.mp4',
+        'preview_path' => 'downloads/aa/bb/example.preview.mp4',
+        'url' => 'https://www.youtube.com/watch?v=example',
+        'preview_url' => 'https://www.youtube.com/watch?v=example',
+        'mime_type' => 'video/mp4',
+    ]);
+
+    $data = FileResource::make($file)->toArray(request());
+
+    expect($data['disk_url'])->toBe("/api/files/{$file->id}/downloaded")
+        ->and($data['preview_file_url'])->toBe("/api/files/{$file->id}/preview")
+        ->and($data['file_url'])->toBe("/api/files/{$file->id}/downloaded")
+        ->and($data['preview_url'])->toBe("/api/files/{$file->id}/preview");
+});

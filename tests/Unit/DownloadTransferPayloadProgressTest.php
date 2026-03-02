@@ -98,3 +98,32 @@ it('includes null reaction for extension payloads when no reaction exists', func
     expect(array_key_exists('reaction', $payload))->toBeTrue()
         ->and($payload['reaction'])->toBeNull();
 });
+
+it('prefers downloaded file URLs for terminal yt-dlp payloads', function () {
+    $file = File::factory()->create([
+        'url' => 'https://www.youtube.com/watch?v=example',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/example.mp4',
+        'preview_path' => 'downloads/aa/bb/example.preview.mp4',
+        'preview_url' => 'https://www.youtube.com/watch?v=example',
+        'mime_type' => 'video/mp4',
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://www.youtube.com/watch?v=example',
+        'domain' => 'www.youtube.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 100,
+    ]);
+
+    $payload = DownloadTransferPayload::forProgress($transfer, 100);
+
+    $originalPath = parse_url((string) $payload['original'], PHP_URL_PATH);
+    $previewPath = parse_url((string) $payload['preview'], PHP_URL_PATH);
+
+    expect($originalPath)->toBe("/api/files/{$file->id}/downloaded")
+        ->and($previewPath)->toBe("/api/files/{$file->id}/preview");
+});

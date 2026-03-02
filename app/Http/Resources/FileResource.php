@@ -94,14 +94,6 @@ class FileResource extends JsonResource
             ?? data_get($listingMetadata, 'height')
         );
 
-        $fileUrl = null;
-        if ($this->url) {
-            $fileUrl = $this->url;
-        } elseif ($this->path) {
-            // Generate URL for local files
-            $fileUrl = route('api.files.serve', ['file' => $this->id], false);
-        }
-
         $diskUrl = null;
         if ($this->downloaded && $this->path) {
             $diskUrl = route('api.files.downloaded', ['file' => $this->id], false);
@@ -109,8 +101,23 @@ class FileResource extends JsonResource
         $previewFileUrl = $this->preview_path ? route('api.files.preview', ['file' => $this->id], false) : null;
         $posterUrl = $this->poster_path ? route('api.files.poster', ['file' => $this->id], false) : null;
 
+        // For downloaded files, always prefer the local downloaded stream URL.
+        $fileUrl = $diskUrl;
+        if (! $fileUrl) {
+            if ($this->url) {
+                $fileUrl = $this->url;
+            } elseif ($this->path) {
+                // Generate URL for local files
+                $fileUrl = route('api.files.serve', ['file' => $this->id], false);
+            }
+        }
+
+        // For downloaded files with generated previews, prefer the internal preview route.
+        $previewUrl = $previewFileUrl ?: $this->preview_url;
+
         $fileUrl = self::toRelativeInternalApiUrl($fileUrl);
         $diskUrl = self::toRelativeInternalApiUrl($diskUrl);
+        $previewUrl = self::toRelativeInternalApiUrl($previewUrl);
         $previewFileUrl = self::toRelativeInternalApiUrl($previewFileUrl);
         $posterUrl = self::toRelativeInternalApiUrl($posterUrl);
 
@@ -175,7 +182,7 @@ class FileResource extends JsonResource
             'path' => $this->path,
             'absolute_path' => $absolutePath,
             'absolute_preview_path' => $absolutePreviewPath,
-            'preview_url' => $this->preview_url,
+            'preview_url' => $previewUrl,
             'disk_url' => $diskUrl,
             'preview_file_url' => $previewFileUrl,
             'poster_url' => $posterUrl,

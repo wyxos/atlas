@@ -116,7 +116,11 @@ final class DownloadTransferPayload
      */
     private static function filePayload(?File $file, ?string $sourceUrl): array
     {
-        $original = $sourceUrl;
+        $isDownloadedFile = (bool) ($file?->downloaded && $file?->path);
+
+        $original = $isDownloadedFile
+            ? route('api.files.downloaded', ['file' => $file->id])
+            : $sourceUrl;
         if (! $original && $file?->url) {
             $original = $file->url;
         }
@@ -124,7 +128,9 @@ final class DownloadTransferPayload
             $original = route('api.files.serve', ['file' => $file->id]);
         }
 
-        $preview = $file?->preview_url ?? $original;
+        $preview = $isDownloadedFile && $file?->preview_path
+            ? route('api.files.preview', ['file' => $file->id])
+            : ($file?->preview_url ?? $original);
         $plannedPath = self::plannedPath($file, $sourceUrl);
         $path = $file?->path ?? $plannedPath;
         $absolutePath = $path
