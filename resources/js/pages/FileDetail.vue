@@ -35,8 +35,12 @@ const fileUrl = computed(() => {
     if (!file.value) {
         return null;
     }
-    // Use file_url if available (generated from path), otherwise use url
-    return file.value.file_url || file.value.url;
+    // Downloaded files should always play from local disk route, not source/preview URLs.
+    if (file.value.downloaded && file.value.disk_url) {
+        return file.value.disk_url;
+    }
+
+    return file.value.file_url || file.value.url || file.value.preview_file_url || file.value.preview_url || null;
 });
 
 const fileType = computed(() => {

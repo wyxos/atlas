@@ -85,6 +85,41 @@ export function useFileViewerPaging(params: {
         return item.type === 'video' ? 'video' : 'image';
     };
 
+    const normalizeVideoUrl = (url: string, mediaType: OverlayMediaType): string => {
+        if (mediaType !== 'video') {
+            return url;
+        }
+
+        // Guard against malformed payloads that pass preview endpoint as the playback URL.
+        const match = url.match(/^(.*\/api\/files\/\d+)\/preview(\?.*)?$/);
+        if (!match) {
+            return url;
+        }
+
+        const base = match[1];
+        const query = match[2] ?? '';
+        return `${base}/downloaded${query}`;
+    };
+
+    const resolveFullSizeUrl = (item: FeedItem, fallback: string, mediaType: OverlayMediaType): string => {
+        const candidates = [item.original, item.originalUrl, fallback];
+
+        for (const candidate of candidates) {
+            if (typeof candidate !== 'string') {
+                continue;
+            }
+
+            const value = candidate.trim();
+            if (value === '') {
+                continue;
+            }
+
+            return normalizeVideoUrl(value, mediaType);
+        }
+
+        return normalizeVideoUrl(fallback, mediaType);
+    };
+
     async function navigateToNext(): Promise<void> {
         if (!rect.value || !fillComplete.value || currentItemIndex.value === null) return;
         if (currentItemIndex.value >= params.items.value.length - 1) {
@@ -143,7 +178,7 @@ export function useFileViewerPaging(params: {
         const nextIsAudio = nextMediaType === 'audio';
         const nextIsFile = nextMediaType === 'file';
         const nextImageSrc = (nextItem.preview || nextItem.original) as string;
-        const nextFullSizeUrl = nextItem.original || nextImageSrc;
+        const nextFullSizeUrl = resolveFullSizeUrl(nextItem, nextImageSrc, nextMediaType);
 
         image.value = {
             src: nextImageSrc,

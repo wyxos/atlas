@@ -89,6 +89,41 @@ export function useFileViewerOpen(params: {
         return Number.isFinite(id) ? id : null;
     }
 
+    function normalizeVideoUrl(url: string, mediaType: OverlayMediaType): string {
+        if (mediaType !== 'video') {
+            return url;
+        }
+
+        // Guard against malformed payloads that pass preview endpoint as the playback URL.
+        const match = url.match(/^(.*\/api\/files\/\d+)\/preview(\?.*)?$/);
+        if (!match) {
+            return url;
+        }
+
+        const base = match[1];
+        const query = match[2] ?? '';
+        return `${base}/downloaded${query}`;
+    }
+
+    function resolveFullSizeUrl(item: FeedItem, fallback: string, mediaType: OverlayMediaType): string {
+        const candidates = [item.original, item.originalUrl, fallback];
+
+        for (const candidate of candidates) {
+            if (typeof candidate !== 'string') {
+                continue;
+            }
+
+            const value = candidate.trim();
+            if (value === '') {
+                continue;
+            }
+
+            return normalizeVideoUrl(value, mediaType);
+        }
+
+        return normalizeVideoUrl(fallback, mediaType);
+    }
+
     async function openFromClick(e: MouseEvent): Promise<void> {
         const container = params.masonryContainerRef.value;
         const tabContent = params.containerRef.value;
@@ -165,7 +200,7 @@ export function useFileViewerOpen(params: {
         const computedStyle = window.getComputedStyle(itemEl);
         const radius = computedStyle.borderRadius || '';
 
-        const fullSizeUrl = masonryItem.original || src;
+        const fullSizeUrl = resolveFullSizeUrl(masonryItem, src, nextMediaType);
         currentItemIndex.value = params.items.value.findIndex((it) => it.id === masonryItem.id);
 
         key.value++;
