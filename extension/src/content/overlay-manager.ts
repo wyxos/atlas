@@ -224,6 +224,31 @@ export class OverlayManager {
             return;
         }
 
+        const parentRect = parent.getBoundingClientRect();
+        const mediaRect = media.getBoundingClientRect();
+        const parentIsCollapsed = parentRect.width < 2 || parentRect.height < 2;
+        if (parentIsCollapsed) {
+            if (badge.parentElement !== document.body) {
+                document.body.appendChild(badge);
+            }
+
+            const centerX = mediaRect.left + (mediaRect.width / 2);
+            const bottomOffset = Math.max(0, window.innerHeight - mediaRect.bottom + 58);
+
+            badge.style.position = 'fixed';
+            badge.style.left = `${centerX}px`;
+            badge.style.bottom = `${bottomOffset}px`;
+            badge.style.transform = 'translateX(-50%)';
+            badge.style.display = 'block';
+
+            return;
+        }
+
+        badge.style.position = 'absolute';
+        badge.style.left = '50%';
+        badge.style.bottom = '58px';
+        badge.style.transform = 'translateX(-50%)';
+
         if (window.getComputedStyle(parent).position === 'static') {
             parent.style.position = 'relative';
         }
