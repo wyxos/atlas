@@ -20,6 +20,7 @@ import { mountReloadRequiredToastHost } from './content/reload-required-toast-ho
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
 const ANCHOR_MEDIA_MATCH_ATTR = 'data-atlas-anchor-media-match';
+const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
@@ -103,6 +104,31 @@ function processAllCurrentMedia(): void {
             processMedia(mediaElement);
         }
     }
+}
+
+function tryApplyMediaWidgetFromInteractionTarget(target: EventTarget | null): void {
+    if (!(target instanceof Element)) {
+        return;
+    }
+
+    const mediaCandidate = target.closest('img,video');
+    if (!mediaCandidate || !isMediaElement(mediaCandidate)) {
+        return;
+    }
+
+    if (mediaCandidate.closest('a[href]') !== null) {
+        return;
+    }
+
+    if (mediaCandidate.getAttribute(MEDIA_WIDGET_APPLIED_ATTR) === '1') {
+        return;
+    }
+
+    if (!mediaMatchesRules(mediaCandidate)) {
+        return;
+    }
+
+    overlayManager.apply(mediaCandidate);
 }
 
 function isVisibleInViewport(element: Element): boolean {
@@ -516,6 +542,15 @@ function installViewportListeners(): void {
     window.addEventListener('resize', scheduleReposition, { passive: true });
 }
 
+function installInteractionFallbackListeners(): void {
+    const handleInteraction = (event: MouseEvent): void => {
+        tryApplyMediaWidgetFromInteractionTarget(event.target);
+    };
+
+    document.addEventListener('mouseover', handleInteraction, { passive: true });
+    document.addEventListener('mouseup', handleInteraction, { passive: true });
+}
+
 async function loadRulesAndProcess(): Promise<void> {
     try {
         const stored = await getStoredOptions();
@@ -536,6 +571,7 @@ function bootstrap(): void {
     installRuntimeMessageListener();
     installDownloadProgressListener();
     installViewportListeners();
+    installInteractionFallbackListeners();
     void loadRulesAndProcess();
 }
 
