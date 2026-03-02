@@ -49,6 +49,14 @@ function stringOrNull(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+type ReferrerCheckCacheUpdate = {
+    exists?: boolean;
+    reaction?: string | null;
+    reactedAt?: string | null;
+    downloadedAt?: string | null;
+    blacklistedAt?: string | null;
+};
+
 async function sha256Hex(input: string): Promise<string> {
     const cached = hashByUrl.get(input);
     if (cached) {
@@ -212,6 +220,43 @@ export async function enqueueReferrerCheck(referrerUrl: string | null): Promise<
 
     scheduleFlush();
     return promise;
+}
+
+export function upsertReferrerCheckCache(referrerUrl: string | null, update: ReferrerCheckCacheUpdate): void {
+    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
+    if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
+        return;
+    }
+
+    const key = normalizedReferrerUrl;
+    const cached = resultCacheByKey.get(key)?.result ?? emptyResult();
+    const nextReaction = update.reaction !== undefined ? stringOrNull(update.reaction) : cached.reaction;
+    const nextReactedAt = update.reactedAt !== undefined ? stringOrNull(update.reactedAt) : cached.reactedAt;
+    const nextDownloadedAt = update.downloadedAt !== undefined ? stringOrNull(update.downloadedAt) : cached.downloadedAt;
+    const nextBlacklistedAt = update.blacklistedAt !== undefined ? stringOrNull(update.blacklistedAt) : cached.blacklistedAt;
+    const hasState = nextReaction !== null
+        || nextDownloadedAt !== null
+        || nextBlacklistedAt !== null;
+    const nextExists = update.exists ?? (cached.exists || hasState);
+
+    const next: ReferrerMatchResult = {
+        exists: nextExists,
+        reaction: nextReaction,
+        reactedAt: nextReactedAt,
+        downloadedAt: nextDownloadedAt,
+        blacklistedAt: nextBlacklistedAt,
+    };
+
+    resultCacheByKey.set(key, {
+        result: next,
+        cachedAt: Date.now(),
+    });
+
+    const pending = pendingByKey.get(key);
+    if (pending) {
+        pendingByKey.delete(key);
+        pending.resolve(next);
+    }
 }
 
 export function clearReferrerCheckCache(): void {
