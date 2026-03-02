@@ -2,7 +2,9 @@
 /* global chrome */
 import { onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
+import ExtensionReloadRequiredToast from './ExtensionReloadRequiredToast.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
+import { useExtensionReloadRequirement } from './useExtensionReloadRequirement';
 
 const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 
@@ -11,6 +13,7 @@ const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
+const { requiresReload, reloadExtension } = useExtensionReloadRequirement();
 
 function openOptionsPage(): void {
     chrome.runtime.openOptionsPage(() => {
@@ -63,5 +66,7 @@ onMounted(() => {
                 Open Options
             </button>
         </section>
+
+        <ExtensionReloadRequiredToast :open="requiresReload" @reload="reloadExtension" />
     </main>
 </template>

@@ -2,6 +2,7 @@
 /* global chrome */
 import { onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
+import ExtensionReloadRequiredToast from './ExtensionReloadRequiredToast.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
 import {
     DEFAULT_ATLAS_DOMAIN,
@@ -10,6 +11,7 @@ import {
     saveStoredOptions,
     validateDomain,
 } from './atlas-options';
+import { useExtensionReloadRequirement } from './useExtensionReloadRequirement';
 import {
     normalizeMatchRules,
     type UrlMatchRule,
@@ -30,6 +32,7 @@ const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
+const { requiresReload, reloadExtension } = useExtensionReloadRequirement();
 
 async function refreshApiConnectionStatus(): Promise<void> {
     const status = await resolveApiConnectionStatus();
@@ -282,5 +285,7 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
 
             <p v-if="errorMessage" class="text-sm text-red-300">{{ errorMessage }}</p>
         </section>
+
+        <ExtensionReloadRequiredToast :open="requiresReload" @reload="reloadExtension" />
     </main>
 </template>
