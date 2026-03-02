@@ -196,6 +196,18 @@ function broadcastExtensionReloadRequired(): void {
     chrome.runtime.sendMessage(message, () => {
         void chrome.runtime.lastError;
     });
+
+    chrome.tabs.query({}, (tabs: BrowserTab[]) => {
+        tabs.forEach((tab) => {
+            if (typeof tab.id !== 'number') {
+                return;
+            }
+
+            chrome.tabs.sendMessage(tab.id, message, () => {
+                void chrome.runtime.lastError;
+            });
+        });
+    });
 }
 
 function broadcastTabPresenceChanged(): void {
