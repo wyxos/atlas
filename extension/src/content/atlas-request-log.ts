@@ -19,7 +19,7 @@ type AtlasRuntimeResponse = {
     payload: unknown;
 };
 
-const MAX_ENTRIES = 200;
+const MAX_ENTRIES = 20;
 
 const listeners = new Set<AtlasRequestListener>();
 let entries: AtlasRequestLogEntry[] = [];

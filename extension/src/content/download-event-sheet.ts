@@ -27,7 +27,8 @@ type DownloadEventSheetApi = {
     push: (event: ProgressEvent) => void;
 };
 
-const MAX_ROWS = 200;
+const MAX_EVENT_ROWS = 20;
+const MAX_REQUEST_ROWS = 20;
 
 function escapeHtml(input: string): string {
     return input
@@ -68,7 +69,7 @@ const DownloadEventSheet = defineComponent({
         const isOpen = ref(false);
         const eventRows = ref<EventLogRow[]>([]);
         const requestRows = ref<RequestLogRow[]>(
-            getAtlasRequestLogSnapshot().map((row) => ({
+            getAtlasRequestLogSnapshot().slice(0, MAX_REQUEST_ROWS).map((row) => ({
                 ...row,
                 expanded: false,
             })),
@@ -90,7 +91,7 @@ const DownloadEventSheet = defineComponent({
                     expanded: false,
                 },
                 ...eventRows.value,
-            ].slice(0, MAX_ROWS);
+            ].slice(0, MAX_EVENT_ROWS);
         }
 
         function toggleEventRow(id: number): void {
@@ -111,7 +112,7 @@ const DownloadEventSheet = defineComponent({
 
         function mergeRequestRows(entries: AtlasRequestLogEntry[]): void {
             const expandedById = new Map(requestRows.value.map((row) => [row.id, row.expanded]));
-            requestRows.value = entries.map((row) => ({
+            requestRows.value = entries.slice(0, MAX_REQUEST_ROWS).map((row) => ({
                 ...row,
                 expanded: expandedById.get(row.id) ?? false,
             }));
