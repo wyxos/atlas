@@ -3,61 +3,73 @@ max_threads = 6
 max_depth = 1
 
 [agents.explorer]
-description = "Read-only codebase explorer for locating Laravel + Vue execution paths and gathering evidence."
+description = "Principal Laravel+Vue code explorer (20+ years) for tracing execution paths with hard evidence."
 config_file = "agents/explorer.toml"
 
 [agents.worker]
-description = "Implementation-focused agent for scoped code changes in assigned files only."
+description = "Senior implementation agent (20+ years) for scoped, production-grade code changes in assigned files."
 config_file = "agents/worker.toml"
 
 [agents.reviewer]
-description = "Read-only reviewer focused on correctness, regressions, security, and missing tests."
+description = "Principal reviewer (20+ years) focused on correctness, regressions, security, and missing tests."
 config_file = "agents/reviewer.toml"
 
 [agents.monitor]
-description = "Long-running task monitor for polling/waiting and reporting status without drift."
+description = "Senior reliability monitor (20+ years) for polling/waiting and drift-free status reporting."
 config_file = "agents/monitor.toml"
 
 [agents.browser_debugger]
-description = "Manual UI verifier for browser workflows and end-to-end behavior checks."
+description = "Principal browser debugger (20+ years) for end-to-end UI behavior and runtime diagnostics."
 config_file = "agents/browser-debugger.toml"
 
 [agents.supervisor]
-description = "Coordinator that plans execution, routes work, and synthesizes final outcome and risks."
+description = "Senior supervisor (20+ years) that plans execution, routes work, and synthesizes outcomes and risks."
 config_file = "agents/supervisor.toml"
 
 [agents.implementer]
-description = "Primary code-change agent for focused implementation tasks."
+description = "Principal implementer (20+ years) for focused, high-quality code changes."
 config_file = "agents/implementer.toml"
 
 [agents.validator]
-description = "Validation agent for lint/typecheck/tests and actionable failure reporting."
+description = "Senior validator (20+ years) for lint/typecheck/tests and actionable failure reporting."
 config_file = "agents/validator.toml"
 
 [agents.risk_reviewer]
-description = "Reviewer focused on regressions, security, data integrity, and deploy risk."
+description = "Principal risk reviewer (20+ years) focused on regressions, security, data integrity, and deploy risk."
 config_file = "agents/risk-reviewer.toml"
 
 [agents.test_planner]
-description = "Maps changed files to the smallest relevant unit/integration/e2e test set."
+description = "Principal test strategist (20+ years) mapping changes to the smallest relevant unit/integration/e2e test set."
 config_file = "agents/test-planner.toml"
 
 [agents.release_manager]
-description = "Release/deploy checklist owner for artifacts, preflight checks, and rollback notes."
+description = "Senior release manager (20+ years) for artifacts, preflight checks, and rollback plans."
 config_file = "agents/release-manager.toml"
 
 [agents.migration_guard]
-description = "Database migration safety reviewer, especially for large tables and online DDL constraints."
+description = "Principal migration guard (20+ years) for safe schema evolution on large tables and online DDL constraints."
 config_file = "agents/migration-guard.toml"
 
 [agents.performance_checker]
-description = "Performance-focused reviewer for query count, hot paths, and bundle/runtime impact."
+description = "Principal performance reviewer (20+ years) for query count, hot paths, and bundle/runtime impact."
 config_file = "agents/performance-checker.toml"
 
 [agents.contract_checker]
-description = "Checks backend/frontend response contract alignment and API shape consistency."
+description = "Principal contract checker (20+ years) for Laravel API and Vue consumer contract alignment."
 config_file = "agents/contract-checker.toml"
 
 [agents.docs_maintainer]
-description = "Updates AGENTS/runbook guidance with durable workflow learnings and gotchas."
+description = "Senior docs maintainer (20+ years) for durable, objective AGENTS/runbook guidance."
 config_file = "agents/docs-maintainer.toml"
+
+[agents.laravel_architect]
+description = "Principal Laravel architect (20+ years) for backend design, safety, and maintainability reviews."
+config_file = "agents/laravel-architect.toml"
+
+[agents.vue_architect]
+description = "Principal Vue architect (20+ years) for frontend architecture, reactivity correctness, and UX robustness."
+config_file = "agents/vue-architect.toml"
+
+[agents.web_implementer]
+description = "Senior full-stack Laravel+Vue implementer (20+ years) for end-to-end feature delivery."
+config_file = "agents/web-implementer.toml"
