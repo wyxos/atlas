@@ -176,6 +176,7 @@ After you've finished editing
 - **Browser Extension Source**: `extension/` (Vite + Vue + TypeScript, popup entry: `extension/popup.html`)
   - Build + package command: `npm run package:extension` (creates `public/downloads/atlas-extension.zip` and a versioned archive)
   - Version bump helpers: `npm run package:extension -- --bump=patch|minor|major` or set explicit version with `npm run package:extension -- --version=1.2.3`
+  - Content script build gotcha: if `extension/vite.content.config.ts` builds a `.vue` import, keep `@vitejs/plugin-vue` enabled there, set `build.lib.cssFileName`, and include the emitted CSS file in `manifest.json` `content_scripts[].css`.
 
 ### Testing
 - **Test Suite**: `tests/` → [see tests/AGENTS.md](tests/AGENTS.md)
