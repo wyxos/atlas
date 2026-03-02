@@ -1,10 +1,3 @@
-import {
-    EXTENSION_RELOAD_REQUIRED_EVENT,
-    GET_EXTENSION_RELOAD_STATE_EVENT,
-    type ExtensionReloadRequiredMessage,
-    type ExtensionReloadStateResponse,
-} from './reload-required-message';
-
 type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
     urls: string[];
@@ -50,7 +43,6 @@ type BrowserTab = {
     discarded?: boolean;
 };
 
-const EXTENSION_RELOAD_REQUIRED_STORAGE_KEY = 'atlasExtensionReloadRequired';
 const openComparableUrlByTabId = new Map<number, string>();
 let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
 
@@ -159,60 +151,6 @@ async function collectCookiesForUrls(urls: string[]): Promise<RuntimeCookie[]> {
     }
 
     return Array.from(byKey.values());
-}
-
-function readExtensionReloadRequired(): Promise<boolean> {
-    return new Promise((resolve) => {
-        if (!chrome.storage?.local) {
-            resolve(false);
-            return;
-        }
-
-        chrome.storage.local.get(EXTENSION_RELOAD_REQUIRED_STORAGE_KEY, (row: unknown) => {
-            if (chrome.runtime.lastError || !row || typeof row !== 'object') {
-                resolve(false);
-                return;
-            }
-
-            const value = (row as Record<string, unknown>)[EXTENSION_RELOAD_REQUIRED_STORAGE_KEY];
-            resolve(value === true);
-        });
-    });
-}
-
-function writeExtensionReloadRequired(value: boolean): Promise<void> {
-    return new Promise((resolve) => {
-        if (!chrome.storage?.local) {
-            resolve();
-            return;
-        }
-
-        chrome.storage.local.set({ [EXTENSION_RELOAD_REQUIRED_STORAGE_KEY]: value }, () => {
-            resolve();
-        });
-    });
-}
-
-function broadcastExtensionReloadRequired(): void {
-    const message: ExtensionReloadRequiredMessage = {
-        type: EXTENSION_RELOAD_REQUIRED_EVENT,
-    };
-
-    chrome.runtime.sendMessage(message, () => {
-        void chrome.runtime.lastError;
-    });
-
-    chrome.tabs.query({}, (tabs: BrowserTab[]) => {
-        tabs.forEach((tab) => {
-            if (typeof tab.id !== 'number') {
-                return;
-            }
-
-            chrome.tabs.sendMessage(tab.id, message, () => {
-                void chrome.runtime.lastError;
-            });
-        });
-    });
 }
 
 function updateTrackedComparableTabUrl(tabId: number, nextComparableUrl: string | null): string[] {
@@ -340,20 +278,6 @@ chrome.runtime.onMessage.addListener((
     }
 
     const payload = message as { type?: unknown; url?: unknown; urls?: unknown };
-    if (payload.type === GET_EXTENSION_RELOAD_STATE_EVENT) {
-        void readExtensionReloadRequired()
-            .then((requiresReload) => {
-                const response: ExtensionReloadStateResponse = { requiresReload };
-                sendResponse(response);
-            })
-            .catch(() => {
-                const response: ExtensionReloadStateResponse = { requiresReload: false };
-                sendResponse(response);
-            });
-
-        return true;
-    }
-
     if (payload.type === 'ATLAS_GET_URL_COOKIES') {
         const urls = normalizeComparableUrls(payload.urls);
         if (urls.length === 0) {
@@ -460,16 +384,6 @@ chrome.runtime.onMessage.addListener((
     });
 
     return true;
-});
-
-chrome.runtime.onInstalled.addListener(() => {
-    void writeExtensionReloadRequired(false);
-});
-
-chrome.runtime.onUpdateAvailable.addListener(() => {
-    void writeExtensionReloadRequired(true).finally(() => {
-        broadcastExtensionReloadRequired();
-    });
 });
 
 chrome.tabs.onCreated.addListener((tab: BrowserTab) => {
