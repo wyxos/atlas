@@ -300,10 +300,6 @@ function refreshVisibleAnchorMediaForUrls(changedUrls: string[]): void {
             continue;
         }
 
-        if (!isVisibleInViewport(mediaElement)) {
-            continue;
-        }
-
         const anchor = mediaElement.closest('a[href]');
         if (!(anchor instanceof HTMLAnchorElement)) {
             continue;
