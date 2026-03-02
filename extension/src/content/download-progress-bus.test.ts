@@ -62,6 +62,9 @@ describe('download-progress-bus', () => {
             status: 'queued',
             percent: 10,
             reaction: 'funny',
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {
                 file_id: 12,
                 downloadTransferId: 25,
@@ -81,6 +84,9 @@ describe('download-progress-bus', () => {
             status: 'queued',
             percent: 10,
             reaction: 'funny',
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {
                 file_id: 12,
                 downloadTransferId: 25,

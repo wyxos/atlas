@@ -86,6 +86,9 @@ describe('badge-state-cache', () => {
             status: null,
             percent: 42,
             reaction: null,
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {},
         };
         cache.persistDownloadProgressEvent(progressOnlyEvent);
@@ -99,6 +102,9 @@ describe('badge-state-cache', () => {
             status: 'downloading',
             percent: null,
             reaction: null,
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {},
         };
         cache.persistDownloadProgressEvent(statusOnlyEvent);
@@ -138,6 +144,9 @@ describe('badge-state-cache', () => {
             status: 'completed',
             percent: 100,
             reaction: null,
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {},
         };
         cache.persistDownloadProgressEvent(completedEvent);
@@ -154,6 +163,45 @@ describe('badge-state-cache', () => {
         });
     });
 
+    it('merges reacted/downloaded/blacklisted timestamps from progress events', async () => {
+        const cache = await loadModule();
+
+        cache.persistBadgeState(TEST_URL, {
+            fileId: 51,
+            transferId: 61,
+            status: 'downloading',
+            percent: 40,
+            isDownloadLocked: true,
+        });
+
+        const event: ProgressEvent = {
+            event: 'DownloadTransferProgressUpdated',
+            fileId: 51,
+            transferId: 61,
+            sourceUrl: TEST_URL,
+            referrerUrl: null,
+            status: 'completed',
+            percent: 100,
+            reaction: 'funny',
+            reactedAt: '2026-03-01T08:15:00Z',
+            downloadedAt: '2026-03-01T08:20:00Z',
+            blacklistedAt: null,
+            payload: {},
+        };
+        cache.persistDownloadProgressEvent(event);
+
+        expect(cache.getPersistedBadgeState(TEST_URL)).toMatchObject({
+            exists: true,
+            reaction: 'funny',
+            reactedAt: '2026-03-01T08:15:00Z',
+            downloadedAt: '2026-03-01T08:20:00Z',
+            blacklistedAt: null,
+            status: 'completed',
+            percent: 100,
+            isDownloadLocked: false,
+        });
+    });
+
     it('maps progress updates by source url when ids are not yet known', async () => {
         const cache = await loadModule();
 
@@ -166,6 +214,9 @@ describe('badge-state-cache', () => {
             status: 'queued',
             percent: 12,
             reaction: null,
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {},
         };
         cache.persistDownloadProgressEvent(event);
@@ -189,6 +240,9 @@ describe('badge-state-cache', () => {
             status: 'queued',
             percent: 7,
             reaction: 'love',
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {},
         };
         cache.persistDownloadProgressEvent(event);
@@ -225,6 +279,9 @@ describe('badge-state-cache', () => {
             status: 'downloading',
             percent: 55,
             reaction: null,
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
             payload: {},
         };
         cache.persistDownloadProgressEvent(event);

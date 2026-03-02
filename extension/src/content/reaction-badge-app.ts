@@ -225,6 +225,7 @@ const AtlasReactionBadge = defineComponent({
                     status: transferStatus.value,
                     percent: progressPercent.value,
                     isDownloadLocked: isDownloadLocked.value,
+                    reactedAt: matchResult.value.reactedAt,
                     downloadedAt: matchResult.value.downloadedAt,
                     blacklistedAt: matchResult.value.blacklistedAt,
                 });
@@ -241,6 +242,7 @@ const AtlasReactionBadge = defineComponent({
                 status: transferStatus.value,
                 percent: progressPercent.value,
                 isDownloadLocked: false,
+                reactedAt: matchResult.value.reactedAt,
                 downloadedAt: matchResult.value.downloadedAt,
                 blacklistedAt: matchResult.value.blacklistedAt,
             });
@@ -269,6 +271,7 @@ const AtlasReactionBadge = defineComponent({
                 ...matchResult.value,
                 exists: snapshot.exists || hasReaction,
                 reaction: snapshot.reaction,
+                reactedAt: snapshot.reactedAt,
                 downloadedAt: snapshot.downloadedAt,
                 blacklistedAt: snapshot.blacklistedAt,
             };
@@ -352,6 +355,7 @@ const AtlasReactionBadge = defineComponent({
                 status: transferStatus.value,
                 percent: progressPercent.value,
                 isDownloadLocked: isDownloadLocked.value,
+                reactedAt: matchResult.value.reactedAt,
                 downloadedAt: matchResult.value.downloadedAt,
                 blacklistedAt: matchResult.value.blacklistedAt,
             });
@@ -402,6 +406,7 @@ const AtlasReactionBadge = defineComponent({
                     status: transferStatus.value,
                     percent: progressPercent.value,
                     isDownloadLocked: result.downloadRequested,
+                    reactedAt: matchResult.value.reactedAt,
                     downloadedAt: matchResult.value.downloadedAt,
                     blacklistedAt: matchResult.value.blacklistedAt,
                 });

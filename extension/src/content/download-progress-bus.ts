@@ -11,6 +11,9 @@ export type ProgressEvent = {
     status: string | null;
     percent: number | null;
     reaction: BadgeReactionType | null;
+    reactedAt: string | null | undefined;
+    downloadedAt: string | null | undefined;
+    blacklistedAt: string | null | undefined;
     payload: Record<string, unknown>;
 };
 
@@ -70,6 +73,21 @@ function parseReaction(payload: Record<string, unknown>): BadgeReactionType | nu
     return null;
 }
 
+function parseOptionalString(
+    payload: Record<string, unknown>,
+    ...keys: string[]
+): string | null | undefined {
+    for (const key of keys) {
+        if (!(key in payload)) {
+            continue;
+        }
+
+        return asString(payload[key]);
+    }
+
+    return undefined;
+}
+
 async function ensureConnected(): Promise<void> {
     if (connectionPromise) {
         return connectionPromise;
@@ -95,6 +113,9 @@ async function ensureConnected(): Promise<void> {
                 status: asString(payload.status),
                 percent: asNumber(payload.percent),
                 reaction: parseReaction(payload),
+                reactedAt: parseOptionalString(payload, 'reacted_at', 'reactedAt'),
+                downloadedAt: parseOptionalString(payload, 'downloaded_at', 'downloadedAt'),
+                blacklistedAt: parseOptionalString(payload, 'blacklisted_at', 'blacklistedAt'),
                 payload,
             };
 
