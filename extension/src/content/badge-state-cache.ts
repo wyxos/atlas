@@ -146,10 +146,9 @@ export function persistDownloadProgressEvent(event: ProgressEvent): void {
     const byTransfer = event.transferId !== null ? urlByTransferId.get(event.transferId) : null;
     const byFile = event.fileId !== null ? urlByFileId.get(event.fileId) : null;
     const bySourceUrl = normalizeMediaUrl(event.sourceUrl);
-    const byReferrerUrl = normalizeMediaUrl(event.referrerUrl);
 
     const urls = Array.from(
-        new Set([byTransfer, byFile, bySourceUrl, byReferrerUrl].filter((url): url is string => typeof url === 'string' && url !== '')),
+        new Set([byTransfer, byFile, bySourceUrl].filter((url): url is string => typeof url === 'string' && url !== '')),
     );
 
     if (urls.length === 0) {

@@ -142,15 +142,9 @@ const AtlasReactionBadge = defineComponent({
                 return null;
             }
 
-            const candidates = [
-                normalizeUrl(event.sourceUrl),
-                normalizeUrl(event.referrerUrl),
-            ];
-
-            for (const candidate of candidates) {
-                if (candidate !== null && trackedMediaUrls.value.includes(candidate)) {
-                    return candidate;
-                }
+            const candidate = normalizeUrl(event.sourceUrl);
+            if (candidate !== null && trackedMediaUrls.value.includes(candidate)) {
+                return candidate;
             }
 
             return null;
