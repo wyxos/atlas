@@ -228,6 +228,28 @@ describe('badge-state-cache', () => {
         });
     });
 
+    it('ignores referrer-only progress events when file and transfer ids are unknown', async () => {
+        const cache = await loadModule();
+
+        const event: ProgressEvent = {
+            event: 'DownloadTransferQueued',
+            fileId: null,
+            transferId: null,
+            sourceUrl: null,
+            referrerUrl: 'https://example.com/gallery',
+            status: 'queued',
+            percent: 12,
+            reaction: null,
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
+            payload: {},
+        };
+        cache.persistDownloadProgressEvent(event);
+
+        expect(cache.getPersistedBadgeState('https://example.com/gallery')).toBeNull();
+    });
+
     it('persists reaction from progress event and marks state as existing for restore', async () => {
         const cache = await loadModule();
 
