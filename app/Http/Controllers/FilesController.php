@@ -11,6 +11,7 @@ use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class FilesController extends Controller
@@ -520,17 +521,26 @@ SVG;
         // 2. Preview count >= 3 (flagged after previewing)
         // We don't require preview count here since moderation-flagged files
         // may not have been previewed 3 times yet
-        $validFileIds = [];
-        foreach ($files as $file) {
-            $hasReactions = Reaction::where('file_id', $file->id)->exists();
-            $isNotLocal = $file->source !== 'local';
-            $hasNoPath = empty($file->path);
-            $isNotBlacklisted = $file->blacklisted_at === null;
-            $isNotAlreadyAutoDisliked = ! $file->auto_disliked;
+        $candidates = $files->filter(static function (File $file): bool {
+            return $file->source !== 'local'
+                && empty($file->path)
+                && $file->blacklisted_at === null
+                && ! $file->auto_disliked;
+        });
+        $candidateFileIds = $candidates->pluck('id')->all();
 
-            if (! $hasReactions && $isNotLocal && $hasNoPath && $isNotBlacklisted && $isNotAlreadyAutoDisliked) {
-                $validFileIds[] = $file->id;
-            }
+        $validFileIds = [];
+        if ($candidateFileIds !== []) {
+            $filesWithReactions = Reaction::query()
+                ->whereIn('file_id', $candidateFileIds)
+                ->pluck('file_id')
+                ->all();
+            $filesWithReactionsLookup = array_fill_keys($filesWithReactions, true);
+
+            $validFileIds = array_values(array_filter(
+                $candidateFileIds,
+                static fn (int $fileId): bool => ! isset($filesWithReactionsLookup[$fileId]),
+            ));
         }
 
         if (empty($validFileIds)) {
@@ -541,40 +551,46 @@ SVG;
             ]);
         }
 
-        // Batch update files with auto_disliked = true
-        File::whereIn('id', $validFileIds)->update(['auto_disliked' => true]);
+        DB::transaction(function () use ($user, $validFileIds): void {
+            // Batch update files with auto_disliked = true
+            File::query()->whereIn('id', $validFileIds)->update(['auto_disliked' => true]);
 
-        // Batch insert dislike reactions
-        $reactionsToInsert = array_map(function ($fileId) use ($user) {
-            return [
-                'file_id' => $fileId,
-                'user_id' => $user->id,
-                'type' => 'dislike',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        }, $validFileIds);
+            // Batch insert dislike reactions
+            $timestamp = now();
+            $reactionsToInsert = array_map(static function (int $fileId) use ($user, $timestamp): array {
+                return [
+                    'file_id' => $fileId,
+                    'user_id' => $user->id,
+                    'type' => 'dislike',
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
+                ];
+            }, $validFileIds);
 
-        // Check for existing reactions to avoid duplicates
-        $existingReactions = Reaction::whereIn('file_id', $validFileIds)
-            ->where('user_id', $user->id)
-            ->pluck('file_id')
-            ->toArray();
+            // Check for existing reactions to avoid duplicates
+            $existingReactionFileIds = Reaction::query()
+                ->whereIn('file_id', $validFileIds)
+                ->where('user_id', $user->id)
+                ->pluck('file_id')
+                ->all();
+            $existingReactionLookup = array_fill_keys($existingReactionFileIds, true);
 
-        $newReactionsToInsert = array_filter($reactionsToInsert, function ($reaction) use ($existingReactions) {
-            return ! in_array($reaction['file_id'], $existingReactions);
-        });
-
-        if (! empty($newReactionsToInsert)) {
-            app(MetricsService::class)->applyDislikeInsert(array_map(
-                fn ($reaction) => (int) $reaction['file_id'],
-                $newReactionsToInsert
+            $newReactionsToInsert = array_values(array_filter(
+                $reactionsToInsert,
+                static fn (array $reaction): bool => ! isset($existingReactionLookup[$reaction['file_id']]),
             ));
-            Reaction::insert($newReactionsToInsert);
-        }
 
-        // Detach files from all tabs belonging to this user
-        app(TabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
+            if ($newReactionsToInsert !== []) {
+                app(MetricsService::class)->applyDislikeInsert(array_map(
+                    static fn (array $reaction): int => (int) $reaction['file_id'],
+                    $newReactionsToInsert
+                ));
+                Reaction::query()->insert($newReactionsToInsert);
+            }
+
+            // Detach files from all tabs belonging to this user
+            app(TabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
+        });
 
         // Keep Typesense in sync (auto_disliked + dislike reaction arrays).
         File::query()

@@ -4,6 +4,7 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Models\Tab;
 use App\Models\User;
+use App\Services\TabFileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
@@ -169,6 +170,68 @@ test('batch auto-dislike skips files that do not meet conditions', function () {
         ->and($fileWithPath->fresh()->auto_disliked)->toBeFalse()
         ->and($blacklistedFile->fresh()->auto_disliked)->toBeFalse()
         ->and($alreadyAutoDislikedFile->fresh()->auto_disliked)->toBeTrue(); // Still true (wasn't changed)
+});
+
+test('batch auto-dislike skips files with reactions from a different user', function () {
+    Bus::fake();
+
+    $otherUser = User::factory()->create();
+    $fileWithOtherUserReaction = File::factory()->create([
+        'source' => 'civit-ai',
+        'path' => null,
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'previewed_count' => 5,
+    ]);
+
+    Reaction::create([
+        'file_id' => $fileWithOtherUserReaction->id,
+        'user_id' => $otherUser->id,
+        'type' => 'like',
+    ]);
+
+    $response = $this->postJson('/api/files/auto-dislike/batch', [
+        'file_ids' => [$fileWithOtherUserReaction->id],
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'auto_disliked_count' => 0,
+            'file_ids' => [],
+        ]);
+
+    expect($fileWithOtherUserReaction->fresh()->auto_disliked)->toBeFalse();
+});
+
+test('batch auto-dislike is transactional when tab detach fails', function () {
+    Bus::fake();
+
+    $file = File::factory()->create([
+        'source' => 'civit-ai',
+        'path' => null,
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'previewed_count' => 5,
+    ]);
+    $tab = Tab::factory()->for($this->user)->create();
+    $tab->files()->attach($file->id, ['position' => 0]);
+
+    $mock = \Mockery::mock(TabFileService::class);
+    $mock->shouldReceive('detachFilesFromUserTabs')
+        ->once()
+        ->with($this->user->id, [$file->id])
+        ->andThrow(new \RuntimeException('Detach failed'));
+    app()->instance(TabFileService::class, $mock);
+
+    $response = $this->postJson('/api/files/auto-dislike/batch', [
+        'file_ids' => [$file->id],
+    ]);
+
+    $response->assertStatus(500);
+
+    expect($file->fresh()->auto_disliked)->toBeFalse()
+        ->and(Reaction::query()->where('file_id', $file->id)->where('user_id', $this->user->id)->exists())->toBeFalse()
+        ->and($tab->files()->where('file_id', $file->id)->exists())->toBeTrue();
 });
 
 test('batch auto-dislike requires authentication', function () {
