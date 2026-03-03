@@ -38,23 +38,26 @@ return new class extends Migration
                         ELSE SHA2(TRIM(referrer_url), 256)
                     END
             ");
+        } elseif ($driver === 'pgsql') {
+            $digestFunction = DB::selectOne("SELECT to_regproc('digest(bytea,text)') AS proc");
+            if (($digestFunction?->proc ?? null) !== null) {
+                DB::statement("
+                    UPDATE files
+                    SET
+                        url_hash = CASE
+                            WHEN url IS NULL OR BTRIM(url) = '' THEN NULL
+                            ELSE ENCODE(DIGEST(BTRIM(url), 'sha256'), 'hex')
+                        END,
+                        referrer_url_hash = CASE
+                            WHEN referrer_url IS NULL OR BTRIM(referrer_url) = '' THEN NULL
+                            ELSE ENCODE(DIGEST(BTRIM(referrer_url), 'sha256'), 'hex')
+                        END
+                ");
+            } else {
+                $this->backfillHashesWithBulkUpsert();
+            }
         } else {
-            DB::table('files')
-                ->select(['id', 'url', 'referrer_url'])
-                ->orderBy('id')
-                ->chunkById(1000, function ($rows): void {
-                    foreach ($rows as $row) {
-                        $url = trim((string) ($row->url ?? ''));
-                        $referrerUrl = trim((string) ($row->referrer_url ?? ''));
-
-                        DB::table('files')
-                            ->where('id', $row->id)
-                            ->update([
-                                'url_hash' => $url !== '' ? hash('sha256', $url) : null,
-                                'referrer_url_hash' => $referrerUrl !== '' ? hash('sha256', $referrerUrl) : null,
-                            ]);
-                    }
-                });
+            $this->backfillHashesWithBulkUpsert();
         }
 
         try {
@@ -105,5 +108,32 @@ return new class extends Migration
                 }
             });
         }
+    }
+
+    private function backfillHashesWithBulkUpsert(): void
+    {
+        DB::table('files')
+            ->select(['id', 'url', 'referrer_url'])
+            ->orderBy('id')
+            ->chunkById(1000, function ($rows): void {
+                $updates = [];
+
+                foreach ($rows as $row) {
+                    $url = trim((string) ($row->url ?? ''));
+                    $referrerUrl = trim((string) ($row->referrer_url ?? ''));
+
+                    $updates[] = [
+                        'id' => (int) $row->id,
+                        'url_hash' => $url !== '' ? hash('sha256', $url) : null,
+                        'referrer_url_hash' => $referrerUrl !== '' ? hash('sha256', $referrerUrl) : null,
+                    ];
+                }
+
+                if ($updates === []) {
+                    return;
+                }
+
+                DB::table('files')->upsert($updates, ['id'], ['url_hash', 'referrer_url_hash']);
+            });
     }
 };

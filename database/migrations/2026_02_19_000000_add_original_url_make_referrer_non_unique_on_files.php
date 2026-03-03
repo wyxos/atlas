@@ -42,12 +42,12 @@ return new class extends Migration
         }
 
         $driver = DB::connection()->getDriverName();
-        if (in_array($driver, ['mysql', 'mariadb'], true)) {
-            DB::statement("
-                UPDATE files
-                SET url = NULLIF(TRIM(url), '')
-            ");
+        DB::statement("
+            UPDATE files
+            SET url = NULLIF(TRIM(url), '')
+        ");
 
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
             // Keep one row per canonical URL before adding unique(url).
             DB::statement('
                 DELETE f
@@ -61,18 +61,6 @@ return new class extends Migration
                 WHERE f.url IS NOT NULL
                   AND f.id <> k.keep_id
             ');
-        } else {
-            DB::table('files')
-                ->select(['id', 'url'])
-                ->orderBy('id')
-                ->chunkById(500, function ($rows): void {
-                    foreach ($rows as $row) {
-                        $url = is_string($row->url ?? null) ? trim((string) $row->url) : '';
-                        DB::table('files')
-                            ->where('id', $row->id)
-                            ->update(['url' => $url !== '' ? $url : null]);
-                    }
-                });
         }
 
         // Referrer must be non-unique.
