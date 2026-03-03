@@ -478,6 +478,33 @@ chrome.runtime.onMessage.addListener((
         return true;
     }
 
+    if (payload.type === 'ATLAS_GET_URL_OPEN_COUNT' && typeof payload.url === 'string') {
+        const target = normalizeComparableUrl(payload.url);
+        if (target === null) {
+            sendResponse({ count: 0 });
+            return false;
+        }
+
+        chrome.tabs.query({}, (tabs: BrowserTab[]) => {
+            let count = 0;
+
+            for (const tab of tabs) {
+                if (typeof tab.url !== 'string') {
+                    continue;
+                }
+
+                const tabUrl = normalizeComparableUrl(tab.url);
+                if (tabUrl !== null && tabUrl === target) {
+                    count += 1;
+                }
+            }
+
+            sendResponse({ count });
+        });
+
+        return true;
+    }
+
     if (payload.type !== 'ATLAS_IS_URL_OPEN' || typeof payload.url !== 'string') {
         return false;
     }

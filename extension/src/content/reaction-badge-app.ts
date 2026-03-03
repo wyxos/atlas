@@ -8,6 +8,7 @@ import { submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
 import { renderReactionBadge, type BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
+import { getOpenTabCountForUrl, invalidateOpenTabCheckCache, toComparableOpenTabUrl } from './open-anchor-tab-check';
 import {
     getPersistedBadgeState,
     persistBadgeCheckResult,
@@ -40,6 +41,48 @@ function isTerminalStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
 }
 
+type TabPresenceChangedListener = (changedUrls: string[]) => void;
+
+const tabPresenceChangedListeners = new Set<TabPresenceChangedListener>();
+let tabPresenceRuntimeBound = false;
+
+function subscribeToTabPresenceChanged(listener: TabPresenceChangedListener): () => void {
+    tabPresenceChangedListeners.add(listener);
+
+    if (!tabPresenceRuntimeBound && chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener((message: unknown) => {
+            if (typeof message !== 'object' || message === null) {
+                return;
+            }
+
+            const type = (message as { type?: unknown }).type;
+            if (type !== 'ATLAS_TAB_PRESENCE_CHANGED') {
+                return;
+            }
+
+            const urls = (message as { urls?: unknown }).urls;
+            const changedUrls = Array.isArray(urls)
+                ? urls
+                    .map((url: unknown) => (typeof url === 'string' ? toComparableOpenTabUrl(url) : null))
+                    .filter((url): url is string => url !== null)
+                : [];
+            if (changedUrls.length === 0) {
+                return;
+            }
+
+            invalidateOpenTabCheckCache(changedUrls);
+            tabPresenceChangedListeners.forEach((tabListener) => {
+                tabListener(changedUrls);
+            });
+        });
+        tabPresenceRuntimeBound = true;
+    }
+
+    return () => {
+        tabPresenceChangedListeners.delete(listener);
+    };
+}
+
 const AtlasReactionBadge = defineComponent({
     name: 'AtlasReactionBadge',
     props: {
@@ -59,6 +102,7 @@ const AtlasReactionBadge = defineComponent({
         const isChecking = ref(true);
         const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
         const mediaResolution = ref<string | null>(null);
+        const openTabCount = ref<number | null>(null);
         const hoveredReaction = ref<BadgeReactionType | null>(null);
         const submittingReactionType = ref<BadgeReactionType | null>(null);
         const isDownloadLocked = ref(false);
@@ -73,6 +117,7 @@ const AtlasReactionBadge = defineComponent({
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
+        let unsubscribeTabPresence: (() => void) | null = null;
         let mediaMutationObserver: MutationObserver | null = null;
         let checkSequence = 0;
 
@@ -153,6 +198,14 @@ const AtlasReactionBadge = defineComponent({
         function syncResolution(): void {
             const resolved = resolveMediaResolution(props.media);
             mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
+        }
+
+        function resolveComparablePageUrl(): string | null {
+            return toComparableOpenTabUrl(window.location.href);
+        }
+
+        async function refreshOpenTabCount(): Promise<void> {
+            openTabCount.value = await getOpenTabCountForUrl(resolveComparablePageUrl());
         }
 
         function ensureProgressSubscription(): void {
@@ -335,6 +388,15 @@ const AtlasReactionBadge = defineComponent({
             });
 
             ensureProgressSubscription();
+            unsubscribeTabPresence = subscribeToTabPresenceChanged((changedUrls) => {
+                const currentPageUrl = resolveComparablePageUrl();
+                if (currentPageUrl === null || !changedUrls.includes(currentPageUrl)) {
+                    return;
+                }
+
+                void refreshOpenTabCount();
+            });
+            void refreshOpenTabCount();
             void refreshMatchForCurrentMedia(true);
         });
 
@@ -364,6 +426,10 @@ const AtlasReactionBadge = defineComponent({
             if (unsubscribeProgress) {
                 unsubscribeProgress();
                 unsubscribeProgress = null;
+            }
+            if (unsubscribeTabPresence) {
+                unsubscribeTabPresence();
+                unsubscribeTabPresence = null;
             }
         });
 
@@ -451,6 +517,7 @@ const AtlasReactionBadge = defineComponent({
                     hoveredReaction: hoveredReaction.value,
                     submittingReactionType: submittingReactionType.value,
                     mediaResolution: mediaResolution.value,
+                    openTabCount: openTabCount.value,
                     timestampText: timestampText.value,
                     progressDisplayValue,
                     progressColor,

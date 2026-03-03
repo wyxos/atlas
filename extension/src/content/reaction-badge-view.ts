@@ -14,6 +14,7 @@ type BadgeViewModel = {
     hoveredReaction: BadgeReactionType | null;
     submittingReactionType: BadgeReactionType | null;
     mediaResolution: string | null;
+    openTabCount: number | null;
     timestampText: BadgeTimestampDisplay;
     progressDisplayValue: number;
     progressColor: string;
@@ -215,6 +216,7 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                                 animation: 'atlas-badge-pulse 1.4s ease-in-out infinite',
                             },
                         }),
+                    h('span', model.openTabCount === null ? 'Tabs -' : `Tabs ${model.openTabCount}`),
                     model.timestampText === null
                         ? null
                         : h(
