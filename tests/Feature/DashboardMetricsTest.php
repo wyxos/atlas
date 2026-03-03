@@ -126,3 +126,21 @@ test('dashboard metrics report file and reaction totals', function () {
         ],
     ]);
 });
+
+test('incrementContainersByCounts applies batched deltas and clamps at zero', function () {
+    $first = Container::factory()->create([
+        'files_downloaded' => 2,
+    ]);
+
+    $second = Container::factory()->create([
+        'files_downloaded' => 0,
+    ]);
+
+    app(MetricsService::class)->incrementContainersByCounts('files_downloaded', [
+        $first->id => -5,
+        $second->id => 3,
+    ]);
+
+    expect($first->fresh()->files_downloaded)->toBe(0);
+    expect($second->fresh()->files_downloaded)->toBe(3);
+});

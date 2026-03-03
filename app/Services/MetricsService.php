@@ -131,17 +131,36 @@ class MetricsService
             return;
         }
 
+        $cases = [];
+        $containerIds = [];
+
         foreach ($countsByContainer as $containerId => $count) {
+            $count = (int) $count;
             if ($count === 0) {
                 continue;
             }
-            DB::table('containers')
-                ->where('id', $containerId)
-                ->update([
-                    $column => DB::raw("CASE WHEN {$column} + {$count} < 0 THEN 0 ELSE {$column} + {$count} END"),
-                    'updated_at' => now(),
-                ]);
+
+            $containerId = (int) $containerId;
+            $containerIds[] = $containerId;
+            $cases[] = "WHEN {$containerId} THEN {$count}";
         }
+
+        if ($cases === []) {
+            return;
+        }
+
+        $grammar = DB::query()->getGrammar();
+        $wrappedId = $grammar->wrap('id');
+        $wrappedColumn = $grammar->wrap($column);
+        $deltaCaseExpression = 'CASE '.$wrappedId.' '.implode(' ', $cases).' ELSE 0 END';
+        $updateExpression = "CASE WHEN {$wrappedColumn} + ({$deltaCaseExpression}) < 0 THEN 0 ELSE {$wrappedColumn} + ({$deltaCaseExpression}) END";
+
+        DB::table('containers')
+            ->whereIn('id', $containerIds)
+            ->update([
+                $column => DB::raw($updateExpression),
+                'updated_at' => now(),
+            ]);
     }
 
     /**
@@ -456,14 +475,35 @@ class MetricsService
             ->groupBy('container_file.container_id')
             ->get();
 
+        $timestamp = now();
+        $grammar = DB::query()->getGrammar();
+        $wrappedId = $grammar->wrap('id');
+
+        $totalContainerIds = [];
+        $totalCases = [];
+        $downloadedCases = [];
+        $blacklistedCases = [];
+
         foreach ($totals as $row) {
+            $containerId = (int) $row->container_id;
+            $totalContainerIds[] = $containerId;
+            $totalCases[] = "WHEN {$containerId} THEN ".(int) $row->files_total;
+            $downloadedCases[] = "WHEN {$containerId} THEN ".(int) $row->files_downloaded;
+            $blacklistedCases[] = "WHEN {$containerId} THEN ".(int) $row->files_blacklisted;
+        }
+
+        if ($totalContainerIds !== []) {
+            $wrappedTotal = $grammar->wrap('files_total');
+            $wrappedDownloaded = $grammar->wrap('files_downloaded');
+            $wrappedBlacklisted = $grammar->wrap('files_blacklisted');
+
             DB::table('containers')
-                ->where('id', $row->container_id)
+                ->whereIn('id', $totalContainerIds)
                 ->update([
-                    'files_total' => (int) $row->files_total,
-                    'files_downloaded' => (int) $row->files_downloaded,
-                    'files_blacklisted' => (int) $row->files_blacklisted,
-                    'updated_at' => now(),
+                    'files_total' => DB::raw('CASE '.$wrappedId.' '.implode(' ', $totalCases)." ELSE {$wrappedTotal} END"),
+                    'files_downloaded' => DB::raw('CASE '.$wrappedId.' '.implode(' ', $downloadedCases)." ELSE {$wrappedDownloaded} END"),
+                    'files_blacklisted' => DB::raw('CASE '.$wrappedId.' '.implode(' ', $blacklistedCases)." ELSE {$wrappedBlacklisted} END"),
+                    'updated_at' => $timestamp,
                 ]);
         }
 
@@ -477,12 +517,23 @@ class MetricsService
             ->groupBy('container_file.container_id')
             ->get();
 
+        $favoriteContainerIds = [];
+        $favoriteCases = [];
+
         foreach ($favorites as $row) {
+            $containerId = (int) $row->container_id;
+            $favoriteContainerIds[] = $containerId;
+            $favoriteCases[] = "WHEN {$containerId} THEN ".(int) $row->files_favorited;
+        }
+
+        if ($favoriteContainerIds !== []) {
+            $wrappedFavorited = $grammar->wrap('files_favorited');
+
             DB::table('containers')
-                ->where('id', $row->container_id)
+                ->whereIn('id', $favoriteContainerIds)
                 ->update([
-                    'files_favorited' => (int) $row->files_favorited,
-                    'updated_at' => now(),
+                    'files_favorited' => DB::raw('CASE '.$wrappedId.' '.implode(' ', $favoriteCases)." ELSE {$wrappedFavorited} END"),
+                    'updated_at' => $timestamp,
                 ]);
         }
 
