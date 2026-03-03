@@ -8,7 +8,6 @@ import { submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
 import { renderReactionBadge, type BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
-import { getOpenTabCountForUrl, invalidateOpenTabCheckCache, toComparableOpenTabUrl } from './open-anchor-tab-check';
 import {
     getPersistedBadgeState,
     persistBadgeCheckResult,
@@ -41,46 +40,62 @@ function isTerminalStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
 }
 
-type TabPresenceChangedListener = (changedUrls: string[]) => void;
+type TabCountChangedListener = (count: number) => void;
 
-const tabPresenceChangedListeners = new Set<TabPresenceChangedListener>();
-let tabPresenceRuntimeBound = false;
+const tabCountChangedListeners = new Set<TabCountChangedListener>();
+let tabCountRuntimeBound = false;
 
-function subscribeToTabPresenceChanged(listener: TabPresenceChangedListener): () => void {
-    tabPresenceChangedListeners.add(listener);
+function toSafeCount(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
 
-    if (!tabPresenceRuntimeBound && chrome.runtime?.onMessage) {
+function subscribeToTabCountChanged(listener: TabCountChangedListener): () => void {
+    tabCountChangedListeners.add(listener);
+
+    if (!tabCountRuntimeBound && chrome.runtime?.onMessage) {
         chrome.runtime.onMessage.addListener((message: unknown) => {
             if (typeof message !== 'object' || message === null) {
                 return;
             }
 
-            const type = (message as { type?: unknown }).type;
-            if (type !== 'ATLAS_TAB_PRESENCE_CHANGED') {
+            const payload = message as { type?: unknown; count?: unknown };
+            if (payload.type !== 'ATLAS_TAB_COUNT_CHANGED') {
                 return;
             }
 
-            const urls = (message as { urls?: unknown }).urls;
-            const changedUrls = Array.isArray(urls)
-                ? urls
-                    .map((url: unknown) => (typeof url === 'string' ? toComparableOpenTabUrl(url) : null))
-                    .filter((url): url is string => url !== null)
-                : [];
-            if (changedUrls.length === 0) {
-                return;
-            }
-
-            invalidateOpenTabCheckCache(changedUrls);
-            tabPresenceChangedListeners.forEach((tabListener) => {
-                tabListener(changedUrls);
+            const count = toSafeCount(payload.count);
+            tabCountChangedListeners.forEach((tabListener) => {
+                tabListener(count);
             });
         });
-        tabPresenceRuntimeBound = true;
+        tabCountRuntimeBound = true;
     }
 
     return () => {
-        tabPresenceChangedListeners.delete(listener);
+        tabCountChangedListeners.delete(listener);
     };
+}
+
+async function requestTabCount(): Promise<number | null> {
+    if (!chrome.runtime?.sendMessage) {
+        return null;
+    }
+
+    return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'ATLAS_GET_TAB_COUNT' }, (response: unknown) => {
+            if (chrome.runtime.lastError) {
+                resolve(null);
+                return;
+            }
+
+            if (typeof response !== 'object' || response === null) {
+                resolve(0);
+                return;
+            }
+
+            resolve(toSafeCount((response as { count?: unknown }).count));
+        });
+    });
 }
 
 const AtlasReactionBadge = defineComponent({
@@ -117,7 +132,7 @@ const AtlasReactionBadge = defineComponent({
 
         let isActive = true;
         let unsubscribeProgress: (() => void) | null = null;
-        let unsubscribeTabPresence: (() => void) | null = null;
+        let unsubscribeTabCount: (() => void) | null = null;
         let mediaMutationObserver: MutationObserver | null = null;
         let checkSequence = 0;
 
@@ -200,12 +215,8 @@ const AtlasReactionBadge = defineComponent({
             mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
         }
 
-        function resolveComparablePageUrl(): string | null {
-            return toComparableOpenTabUrl(window.location.href);
-        }
-
         async function refreshOpenTabCount(): Promise<void> {
-            openTabCount.value = await getOpenTabCountForUrl(resolveComparablePageUrl());
+            openTabCount.value = await requestTabCount();
         }
 
         function ensureProgressSubscription(): void {
@@ -388,13 +399,8 @@ const AtlasReactionBadge = defineComponent({
             });
 
             ensureProgressSubscription();
-            unsubscribeTabPresence = subscribeToTabPresenceChanged((changedUrls) => {
-                const currentPageUrl = resolveComparablePageUrl();
-                if (currentPageUrl === null || !changedUrls.includes(currentPageUrl)) {
-                    return;
-                }
-
-                void refreshOpenTabCount();
+            unsubscribeTabCount = subscribeToTabCountChanged((count) => {
+                openTabCount.value = count;
             });
             void refreshOpenTabCount();
             void refreshMatchForCurrentMedia(true);
@@ -427,9 +433,9 @@ const AtlasReactionBadge = defineComponent({
                 unsubscribeProgress();
                 unsubscribeProgress = null;
             }
-            if (unsubscribeTabPresence) {
-                unsubscribeTabPresence();
-                unsubscribeTabPresence = null;
+            if (unsubscribeTabCount) {
+                unsubscribeTabCount();
+                unsubscribeTabCount = null;
             }
         });
 
