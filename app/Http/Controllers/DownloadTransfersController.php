@@ -11,9 +11,11 @@ class DownloadTransfersController extends Controller
 {
     public function index(): JsonResponse
     {
-        $items = DownloadTransfer::query()
+        $transfers = DownloadTransfer::query()
             ->select([
                 'id',
+                'file_id',
+                'url',
                 'status',
                 'created_at',
                 'queued_at',
@@ -23,9 +25,11 @@ class DownloadTransfersController extends Controller
                 'last_broadcast_percent',
                 'error',
             ])
+            ->with(['file:id,listing_metadata,referrer_url,downloaded_at,blacklisted_at'])
             ->orderByDesc('id')
-            ->get()
-            ->map(fn (DownloadTransfer $transfer) => DownloadTransferPayload::forList($transfer));
+            ->get();
+
+        $items = DownloadTransferPayload::forListCollection($transfers);
 
         return response()->json(['items' => $items]);
     }
