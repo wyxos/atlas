@@ -2,6 +2,10 @@ type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
     urls: string[];
 };
+type TabCountChangedMessage = {
+    type: 'ATLAS_TAB_COUNT_CHANGED';
+    count: number;
+};
 type RuntimeCookie = {
     name: string;
     value: string;
@@ -312,6 +316,26 @@ function broadcastTabPresenceChanged(urls: string[]): void {
     });
 }
 
+function broadcastTabCountChanged(): void {
+    chrome.tabs.query({}, (tabs: BrowserTab[]) => {
+        const count = Array.isArray(tabs) ? tabs.length : 0;
+
+        tabs.forEach((tab) => {
+            if (typeof tab.id !== 'number') {
+                return;
+            }
+
+            const message: TabCountChangedMessage = {
+                type: 'ATLAS_TAB_COUNT_CHANGED',
+                count,
+            };
+            chrome.tabs.sendMessage(tab.id, message, () => {
+                void chrome.runtime.lastError;
+            });
+        });
+    });
+}
+
 function initializeTrackedTabUrls(): void {
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
         for (const tab of tabs) {
@@ -478,28 +502,9 @@ chrome.runtime.onMessage.addListener((
         return true;
     }
 
-    if (payload.type === 'ATLAS_GET_URL_OPEN_COUNT' && typeof payload.url === 'string') {
-        const target = normalizeComparableUrl(payload.url);
-        if (target === null) {
-            sendResponse({ count: 0 });
-            return false;
-        }
-
+    if (payload.type === 'ATLAS_GET_TAB_COUNT') {
         chrome.tabs.query({}, (tabs: BrowserTab[]) => {
-            let count = 0;
-
-            for (const tab of tabs) {
-                if (typeof tab.url !== 'string') {
-                    continue;
-                }
-
-                const tabUrl = normalizeComparableUrl(tab.url);
-                if (tabUrl !== null && tabUrl === target) {
-                    count += 1;
-                }
-            }
-
-            sendResponse({ count });
+            sendResponse({ count: Array.isArray(tabs) ? tabs.length : 0 });
         });
 
         return true;
@@ -541,11 +546,13 @@ chrome.tabs.onCreated.addListener((tab: BrowserTab) => {
     const comparableUrl = typeof tab.url === 'string' ? normalizeComparableUrl(tab.url) : null;
     const changedUrls = updateTrackedComparableTabUrl(tab.id, comparableUrl);
     broadcastTabPresenceChanged(changedUrls);
+    broadcastTabCountChanged();
 });
 
 chrome.tabs.onRemoved.addListener((tabId: number) => {
     const changedUrls = updateTrackedComparableTabUrl(tabId, null);
     broadcastTabPresenceChanged(changedUrls);
+    broadcastTabCountChanged();
 });
 
 chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string; status?: string }, tab: BrowserTab) => {
