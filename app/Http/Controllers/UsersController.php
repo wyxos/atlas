@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Listings\UserListing;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 class UsersController extends Controller
 {
@@ -21,6 +22,8 @@ class UsersController extends Controller
      */
     public function destroy(User $user): JsonResponse
     {
+        Gate::authorize('delete', $user);
+
         $user->delete();
 
         return response()->json([
