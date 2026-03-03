@@ -5,6 +5,7 @@ namespace App\Services\Downloads;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\Reaction;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 final class DownloadTransferPayload
@@ -64,6 +65,17 @@ final class DownloadTransferPayload
         ];
 
         return $payload;
+    }
+
+    /**
+     * @param  Collection<int, DownloadTransfer>  $transfers
+     * @return Collection<int, array<string, mixed>>
+     */
+    public static function forListCollection(Collection $transfers): Collection
+    {
+        self::preloadListLookups($transfers);
+
+        return $transfers->map(fn (DownloadTransfer $transfer): array => self::forList($transfer));
     }
 
     /**
@@ -269,6 +281,115 @@ final class DownloadTransferPayload
     }
 
     /**
+     * @param  Collection<int, DownloadTransfer>  $transfers
+     */
+    private static function preloadListLookups(Collection $transfers): void
+    {
+        if ($transfers->isEmpty()) {
+            return;
+        }
+
+        self::preloadListFiles($transfers);
+
+        /** @var array<string, array{file_id:int,user_id:int}> $pairs */
+        $pairs = [];
+        /** @var array<string, string> $pairByTransferCacheKey */
+        $pairByTransferCacheKey = [];
+
+        foreach ($transfers as $transfer) {
+            $cacheKey = self::cacheKeyForTransfer($transfer);
+
+            if ($transfer->file_id === null) {
+                self::$extensionReactionCacheByTransferId[$cacheKey] = null;
+
+                continue;
+            }
+
+            $extensionUserId = self::extensionUserIdFromListingMetadata(
+                self::listingMetadataForTransfer($transfer)
+            );
+
+            if ($extensionUserId === null) {
+                self::$extensionReactionCacheByTransferId[$cacheKey] = null;
+
+                continue;
+            }
+
+            $pairKey = self::reactionPairKey((int) $transfer->file_id, $extensionUserId);
+            $pairs[$pairKey] = [
+                'file_id' => (int) $transfer->file_id,
+                'user_id' => $extensionUserId,
+            ];
+            $pairByTransferCacheKey[$cacheKey] = $pairKey;
+        }
+
+        if ($pairs === []) {
+            return;
+        }
+
+        $fileIds = array_values(array_unique(array_column($pairs, 'file_id')));
+        $userIds = array_values(array_unique(array_column($pairs, 'user_id')));
+
+        $reactionByPair = Reaction::query()
+            ->select(['file_id', 'user_id', 'type'])
+            ->whereIn('file_id', $fileIds)
+            ->whereIn('user_id', $userIds)
+            ->get()
+            ->reduce(
+                /**
+                 * @param  array<string, string>  $carry
+                 */
+                static function (array $carry, Reaction $reaction) use ($pairs): array {
+                    $pairKey = self::reactionPairKey((int) $reaction->file_id, (int) $reaction->user_id);
+                    if (! array_key_exists($pairKey, $pairs) || ! is_string($reaction->type)) {
+                        return $carry;
+                    }
+
+                    $carry[$pairKey] = $reaction->type;
+
+                    return $carry;
+                },
+                [],
+            );
+
+        foreach ($pairByTransferCacheKey as $cacheKey => $pairKey) {
+            self::$extensionReactionCacheByTransferId[$cacheKey] = $reactionByPair[$pairKey] ?? null;
+        }
+    }
+
+    /**
+     * @param  Collection<int, DownloadTransfer>  $transfers
+     */
+    private static function preloadListFiles(Collection $transfers): void
+    {
+        $fileIds = $transfers
+            ->filter(static fn (DownloadTransfer $transfer): bool => $transfer->file_id !== null && ! $transfer->relationLoaded('file'))
+            ->pluck('file_id')
+            ->filter(static fn (mixed $fileId): bool => is_numeric($fileId))
+            ->map(static fn (mixed $fileId): int => (int) $fileId)
+            ->unique()
+            ->values();
+
+        if ($fileIds->isEmpty()) {
+            return;
+        }
+
+        $filesById = File::query()
+            ->select(['id', 'listing_metadata', 'referrer_url', 'downloaded_at', 'blacklisted_at'])
+            ->whereIn('id', $fileIds->all())
+            ->get()
+            ->keyBy('id');
+
+        foreach ($transfers as $transfer) {
+            if ($transfer->file_id === null || $transfer->relationLoaded('file')) {
+                continue;
+            }
+
+            $transfer->setRelation('file', $filesById->get((int) $transfer->file_id));
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private static function listingMetadataForTransfer(DownloadTransfer $transfer): array
@@ -332,6 +453,11 @@ final class DownloadTransferPayload
         $urlHash = hash('sha256', (string) ($transfer->url ?? ''));
 
         return "{$transfer->id}:{$transfer->file_id}:{$createdAt}:{$urlHash}";
+    }
+
+    private static function reactionPairKey(int $fileId, int $userId): string
+    {
+        return "{$fileId}:{$userId}";
     }
 
     private static function hasListingMetadataAttribute(File $file): bool
