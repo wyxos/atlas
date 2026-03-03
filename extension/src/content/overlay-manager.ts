@@ -167,7 +167,7 @@ export class OverlayManager {
         this.lastPointerX = event.clientX;
         this.lastPointerY = event.clientY;
 
-        const media = this.findActiveMediaAtPoint(event.clientX, event.clientY);
+        const media = this.resolveMouseShortcutMedia(event);
         if (!media) {
             return;
         }
@@ -176,6 +176,15 @@ export class OverlayManager {
         event.stopPropagation();
         this.focusedMedia = media;
         this.triggerReaction(media, type);
+    }
+
+    private resolveMouseShortcutMedia(event: MouseEvent): MediaElement | null {
+        const dialogMedia = this.findActiveDialogMediaAtPoint(event.clientX, event.clientY);
+        if (dialogMedia) {
+            return dialogMedia;
+        }
+
+        return this.findActiveMediaAtPoint(event.clientX, event.clientY);
     }
 
     private readonly handleGlobalKeyDown = (event: KeyboardEvent): void => {
@@ -285,6 +294,74 @@ export class OverlayManager {
         }
 
         return null;
+    }
+
+    private findActiveDialogMediaAtPoint(x: number, y: number): MediaElement | null {
+        const dialogCandidates: Element[] = [];
+        for (const element of document.elementsFromPoint(x, y)) {
+            const dialog = element.closest('[role="dialog"]');
+            if (!(dialog instanceof Element)) {
+                continue;
+            }
+            if (!this.isElementVisible(dialog) || dialogCandidates.includes(dialog)) {
+                continue;
+            }
+            dialogCandidates.push(dialog);
+        }
+
+        for (const dialog of dialogCandidates) {
+            const mediaCandidates = Array.from(dialog.querySelectorAll('img[data-atlas-media-red-applied],video[data-atlas-media-red-applied]'))
+                .filter((media): media is MediaElement => this.isActiveConnectedMedia(media))
+                .filter((media) => this.isPointInsideRect(x, y, media.getBoundingClientRect()));
+
+            const selected = this.pickNearestMediaCandidate(mediaCandidates, x, y);
+            if (selected) {
+                return selected;
+            }
+        }
+
+        return null;
+    }
+
+    private pickNearestMediaCandidate(candidates: MediaElement[], x: number, y: number): MediaElement | null {
+        if (candidates.length === 0) {
+            return null;
+        }
+
+        if (candidates.length === 1) {
+            return candidates[0];
+        }
+
+        let selected = candidates[0];
+        let selectedDistance = Number.POSITIVE_INFINITY;
+
+        for (const candidate of candidates) {
+            const rect = candidate.getBoundingClientRect();
+            const centerX = rect.left + (rect.width / 2);
+            const centerY = rect.top + (rect.height / 2);
+            const distance = ((centerX - x) ** 2) + ((centerY - y) ** 2);
+
+            if (distance < selectedDistance) {
+                selected = candidate;
+                selectedDistance = distance;
+            }
+        }
+
+        return selected;
+    }
+
+    private isPointInsideRect(x: number, y: number, rect: DOMRect): boolean {
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    }
+
+    private isElementVisible(element: Element): boolean {
+        const rect = element.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) {
+            return false;
+        }
+
+        const style = window.getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden';
     }
 
     private isActiveConnectedMedia(media: unknown): media is MediaElement {
