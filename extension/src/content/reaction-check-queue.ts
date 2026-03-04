@@ -210,7 +210,24 @@ export async function enqueueReactionCheck(mediaUrl: string | null): Promise<Bad
         return inFlight;
     }
 
-    const mediaUrlHash = await sha256Hex(normalizedMediaUrl);
+    let mediaUrlHash: string;
+    try {
+        mediaUrlHash = await sha256Hex(normalizedMediaUrl);
+    } catch {
+        return Promise.resolve(emptyResult());
+    }
+
+    // Re-check after the async hash step to avoid orphaning earlier promises
+    // when concurrent calls enqueue the same key.
+    const queuedAfterHash = pendingByKey.get(key);
+    if (queuedAfterHash) {
+        return queuedAfterHash.promise;
+    }
+
+    const inFlightAfterHash = inFlightByKey.get(key);
+    if (inFlightAfterHash) {
+        return inFlightAfterHash;
+    }
 
     let resolver: (result: BadgeMatchResult) => void = () => {};
     const promise = new Promise<BadgeMatchResult>((resolve) => {
