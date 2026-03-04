@@ -248,6 +248,26 @@ function applyAnchorMediaBorder(
         }
 
         if (isCacheOnly && result === null) {
+            void isUrlOpenInAnotherTab(absoluteHref).then((isOpenedElsewhere) => {
+                if (!media.isConnected) {
+                    return;
+                }
+
+                if (anchorReferrerKeyByMedia.get(media) !== referrerKey) {
+                    return;
+                }
+
+                if (isOpenedElsewhere) {
+                    applyAnchorMediaOpenedElsewhere(media);
+                    return;
+                }
+
+                const wasOpenedElsewhere = media.getAttribute('data-atlas-anchor-opened-elsewhere') === '1';
+                if (wasOpenedElsewhere) {
+                    clearAnchorMatchDecoration(media);
+                    clearAnchorMediaAttributes(media);
+                }
+            });
             return;
         }
 
