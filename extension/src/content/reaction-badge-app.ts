@@ -356,19 +356,30 @@ const AtlasReactionBadge = defineComponent({
                 applyPersistedState(persistedBeforeCheck);
             }
 
-            const result = await enqueueReactionCheck(checkUrl);
-            if (!isActive || currentSequence !== checkSequence) {
-                return;
-            }
+            try {
+                const result = await enqueueReactionCheck(checkUrl);
+                if (!isActive || currentSequence !== checkSequence) {
+                    return;
+                }
 
-            persistBadgeCheckResult(resolvePersistenceUrl(), result);
-            const persistedAfterCheck = getLatestPersistedStateForTrackedUrls();
-            if (persistedAfterCheck !== null) {
-                applyPersistedState(persistedAfterCheck);
-            } else {
-                matchResult.value = result;
+                persistBadgeCheckResult(resolvePersistenceUrl(), result);
+                const persistedAfterCheck = getLatestPersistedStateForTrackedUrls();
+                if (persistedAfterCheck !== null) {
+                    applyPersistedState(persistedAfterCheck);
+                } else {
+                    matchResult.value = result;
+                }
+            } catch {
+                if (!isActive || currentSequence !== checkSequence) {
+                    return;
+                }
+
+                matchResult.value = emptyMatchResult();
+            } finally {
+                if (isActive && currentSequence === checkSequence) {
+                    isChecking.value = false;
+                }
             }
-            isChecking.value = false;
         }
 
         const onMediaUpdate = (): void => {
