@@ -12,6 +12,7 @@ class YtDlpCommandBuilder
     {
         $ytDlp = (string) config('downloads.yt_dlp_path', 'yt-dlp');
         $ffmpeg = (string) config('downloads.ffmpeg_path', 'ffmpeg');
+        $jsRuntimes = trim((string) config('downloads.yt_dlp_js_runtimes', 'node'));
         $runtimeCookiesPath = trim((string) ($runtimeOptions['cookies_path'] ?? ''));
         $runtimeUserAgent = trim((string) ($runtimeOptions['user_agent'] ?? ''));
         $cookiesPath = trim((string) config('downloads.yt_dlp_cookies_path', ''));
@@ -26,6 +27,11 @@ class YtDlpCommandBuilder
         if ($ffmpeg !== '') {
             $args[] = '--ffmpeg-location';
             $args[] = $ffmpeg;
+        }
+
+        if ($jsRuntimes !== '') {
+            $args[] = '--js-runtimes';
+            $args[] = $jsRuntimes;
         }
 
         if ($runtimeCookiesPath !== '') {

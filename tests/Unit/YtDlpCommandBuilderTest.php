@@ -5,6 +5,7 @@ use App\Services\Downloads\YtDlpCommandBuilder;
 it('builds a yt-dlp command including ffmpeg location and an audio-capable format', function () {
     config()->set('downloads.yt_dlp_path', 'yt-dlp');
     config()->set('downloads.ffmpeg_path', 'D:\\ffmpeg\\bin\\ffmpeg.exe');
+    config()->set('downloads.yt_dlp_js_runtimes', 'node');
 
     $builder = new YtDlpCommandBuilder;
 
@@ -13,6 +14,8 @@ it('builds a yt-dlp command including ffmpeg location and an audio-capable forma
     expect($args[0])->toBe('yt-dlp');
     expect($args)->toContain('--ffmpeg-location');
     expect($args)->toContain('D:\\ffmpeg\\bin\\ffmpeg.exe');
+    expect($args)->toContain('--js-runtimes');
+    expect($args)->toContain('node');
     expect($args)->toContain('--format');
     expect($args)->toContain('bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo*+bestaudio/best');
 });
@@ -70,4 +73,16 @@ it('prefers runtime cookies and user agent over global cookie config', function 
     expect($args)->not->toContain('--cookies-from-browser');
     expect($args)->toContain('--user-agent');
     expect($args)->toContain('AtlasTestAgent/1.0');
+});
+
+it('does not add js-runtimes when disabled', function () {
+    config()->set('downloads.yt_dlp_path', 'yt-dlp');
+    config()->set('downloads.ffmpeg_path', 'ffmpeg');
+    config()->set('downloads.yt_dlp_js_runtimes', '   ');
+
+    $builder = new YtDlpCommandBuilder;
+
+    $args = $builder->build('https://example.com/watch?v=123', '/tmp/download.%(ext)s');
+
+    expect($args)->not->toContain('--js-runtimes');
 });
