@@ -31,6 +31,10 @@ return [
 
     'yt_dlp_timeout_seconds' => (int) env('DOWNLOADS_YT_DLP_TIMEOUT_SECONDS', 1800),
 
+    // Explicit JS challenge runtimes for yt-dlp extractor flows (notably YouTube).
+    // Set empty to let yt-dlp defaults apply.
+    'yt_dlp_js_runtimes' => env('DOWNLOADS_YT_DLP_JS_RUNTIMES', 'node'),
+
     // Optional Netscape cookie file path for authenticated yt-dlp runs
     // (useful for age-restricted/auth-required media on X/Twitter/Facebook).
     'yt_dlp_cookies_path' => env('DOWNLOADS_YT_DLP_COOKIES_PATH'),
