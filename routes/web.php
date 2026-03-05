@@ -38,6 +38,8 @@ Route::post('/api/extension/referrer-checks', [\App\Http\Controllers\ExtensionAp
     ->name('api.extension.referrer-checks');
 Route::post('/api/extension/reactions', [\App\Http\Controllers\ExtensionApiController::class, 'react'])
     ->name('api.extension.reactions');
+Route::post('/api/extension/reactions/batch', [\App\Http\Controllers\ExtensionApiController::class, 'reactBatch'])
+    ->name('api.extension.reactions.batch');
 Route::post('/api/extension/download-status', [\App\Http\Controllers\ExtensionApiController::class, 'downloadStatus'])
     ->name('api.extension.download-status');
 

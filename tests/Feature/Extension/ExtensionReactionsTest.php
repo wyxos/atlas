@@ -194,3 +194,58 @@ test('extension reactions payload forwards cookies and user agent to queued down
         ];
     });
 });
+
+test('extension batch reactions queue all submitted gallery items and return the selected primary item', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions/batch', [
+        'type' => 'like',
+        'primary_candidate_id' => 'image-2',
+        'items' => [
+            [
+                'candidate_id' => 'image-1',
+                'url' => 'https://images.example.test/direct-image-1.jpg',
+                'referrer_url_hash_aware' => 'https://www.deviantart.com/artist/art/post-1',
+                'page_url' => 'https://www.deviantart.com/artist/art/post-1',
+                'tag_name' => 'img',
+            ],
+            [
+                'candidate_id' => 'image-2',
+                'url' => 'https://images.example.test/direct-image-2.jpg',
+                'referrer_url_hash_aware' => 'https://www.deviantart.com/artist/art/post-1#image-2',
+                'page_url' => 'https://www.deviantart.com/artist/art/post-1',
+                'tag_name' => 'img',
+            ],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.url', 'https://images.example.test/direct-image-2.jpg');
+    $response->assertJsonPath('file.referrer_url', 'https://www.deviantart.com/artist/art/post-1#image-2');
+    $response->assertJsonPath('batch.count', 2);
+    $response->assertJsonPath('batch.primary_candidate_id', 'image-2');
+
+    $firstFile = File::query()->where('url', 'https://images.example.test/direct-image-1.jpg')->first();
+    $secondFile = File::query()->where('url', 'https://images.example.test/direct-image-2.jpg')->first();
+
+    expect($firstFile)->not->toBeNull();
+    expect($secondFile)->not->toBeNull();
+    expect($firstFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/post-1');
+    expect($secondFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/post-1#image-2');
+
+    expect(Reaction::query()
+        ->where('user_id', $user->id)
+        ->where('file_id', $firstFile?->id)
+        ->value('type'))->toBe('like');
+    expect(Reaction::query()
+        ->where('user_id', $user->id)
+        ->where('file_id', $secondFile?->id)
+        ->value('type'))->toBe('like');
+
+    Queue::assertPushed(DownloadFile::class, 2);
+});

@@ -10,6 +10,7 @@ import {
     resolveReactionTargetUrl,
     type MediaElement,
 } from './media-utils';
+import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
@@ -163,6 +164,7 @@ const AtlasReactionBadge = defineComponent({
         let unsubscribeTabCount: (() => void) | null = null;
         let mediaMutationObserver: MutationObserver | null = null;
         let checkSequence = 0;
+        let suppressMediaContextUpdates = false;
         const pageHostname = window.location.hostname.trim().toLowerCase();
 
         const controlsDisabled = computed(() =>
@@ -451,6 +453,10 @@ const AtlasReactionBadge = defineComponent({
         }
 
         const onMediaUpdate = (): void => {
+            if (suppressMediaContextUpdates) {
+                return;
+            }
+
             syncResolution();
             syncRelatedPostThumbnailContext();
             void refreshMatchForCurrentMedia();
@@ -467,6 +473,10 @@ const AtlasReactionBadge = defineComponent({
             props.media.addEventListener('resize', onMediaUpdate);
 
             mediaMutationObserver = new MutationObserver(() => {
+                if (suppressMediaContextUpdates) {
+                    return;
+                }
+
                 syncResolution();
                 syncRelatedPostThumbnailContext();
                 void refreshMatchForCurrentMedia();
@@ -531,7 +541,25 @@ const AtlasReactionBadge = defineComponent({
             hasSeenActiveTransfer.value = false;
 
             try {
-                const result = await submitBadgeReaction(props.media, type);
+                let batchItems = null;
+                if (reactAllItemsInPost.value) {
+                    suppressMediaContextUpdates = true;
+                    try {
+                        batchItems = await collectDeviantArtBatchReactionItems(props.media, {
+                            hostname: pageHostname,
+                        });
+                    } catch {
+                        batchItems = null;
+                    } finally {
+                        suppressMediaContextUpdates = false;
+                        syncResolution();
+                        syncRelatedPostThumbnailContext();
+                    }
+                }
+
+                const result = await submitBadgeReaction(props.media, type, {
+                    batchItems,
+                });
                 if (!isActive || !result.ok) {
                     return;
                 }

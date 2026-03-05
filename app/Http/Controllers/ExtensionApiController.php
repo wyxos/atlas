@@ -6,6 +6,7 @@ use App\Enums\DownloadTransferStatus;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Models\User;
 use App\Services\Extension\ExtensionMediaMatchService;
 use App\Services\ExtensionApiKeyService;
 use App\Services\FileReactionService;
@@ -13,6 +14,7 @@ use App\Support\FileTypeDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ExtensionApiController extends Controller
 {
@@ -140,56 +142,97 @@ class ExtensionApiController extends Controller
             'user_agent' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $url = $this->normalizeUrl($validated['url']);
-        if ($url === null) {
-            return response()->json([
-                'message' => 'A valid media URL is required.',
-            ], 422);
-        }
-
-        $referrerUrl = $this->normalizeOptionalUrl($validated['referrer_url_hash_aware'] ?? null)
-            ?? $this->normalizeOptionalUrl($validated['referrer_url'] ?? null);
-        $previewUrl = $url;
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
-        $pageUrl = $this->normalizeOptionalUrl($validated['page_url'] ?? null);
-        $tagName = isset($validated['tag_name']) && is_string($validated['tag_name']) ? $validated['tag_name'] : null;
-
-        $file = $this->findOrCreateFile(
-            $url,
-            $referrerUrl,
-            $previewUrl,
-            $extensionChannel,
-            (int) $user->id,
-            $pageUrl,
-            $tagName
-        );
-        $result = $fileReactionService->set(
-            $file,
-            $user,
+        $payload = $this->processReactionItem(
+            $validated,
             $validated['type'],
-            deferHeavySideEffects: true,
-            downloadRuntimeContext: $this->downloadRuntimeContext($validated, $request)
+            $fileReactionService,
+            $user,
+            $extensionChannel,
+            $this->downloadRuntimeContext($validated, $request)
         );
-        $activeTransfer = $this->findActiveTransfer($file->id);
 
         return response()->json([
-            'file' => [
-                'id' => $file->id,
-                'url' => $file->url,
-                'referrer_url' => $file->referrer_url,
-                'preview_url' => $file->preview_url,
-            ],
-            'reaction' => $result['reaction'],
-            'reacted_at' => $result['reacted_at'] ?? null,
-            'download' => [
-                'requested' => $validated['type'] !== 'dislike',
-                'transfer_id' => $activeTransfer?->id,
-                'status' => $activeTransfer?->status,
-                'progress_percent' => $activeTransfer?->last_broadcast_percent,
-                'downloaded_at' => $file->downloaded_at?->toIso8601String(),
-            ],
-            'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
+            ...$payload,
             'reverb' => $this->reverbPayload($extensionChannel),
+        ]);
+    }
+
+    public function reactBatch(
+        Request $request,
+        ExtensionApiKeyService $extensionApiKey,
+        FileReactionService $fileReactionService,
+    ): JsonResponse {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:love,like,dislike,funny'],
+            'primary_candidate_id' => ['required', 'string', 'max:128'],
+            'items' => ['required', 'array', 'min:2', 'max:300'],
+            'items.*.candidate_id' => ['required', 'string', 'max:128'],
+            'items.*.url' => ['required', 'string', 'max:4096'],
+            'items.*.referrer_url' => ['nullable', 'string', 'max:4096'],
+            'items.*.referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
+            'items.*.page_url' => ['nullable', 'string', 'max:4096'],
+            'items.*.tag_name' => ['nullable', 'string', 'in:img,video,iframe'],
+            'cookies' => ['nullable', 'array', 'max:300'],
+            'cookies.*.name' => ['required', 'string', 'max:255'],
+            'cookies.*.value' => ['required', 'string', 'max:4096'],
+            'cookies.*.domain' => ['required', 'string', 'max:255'],
+            'cookies.*.path' => ['required', 'string', 'max:2048'],
+            'cookies.*.secure' => ['nullable', 'boolean'],
+            'cookies.*.http_only' => ['nullable', 'boolean'],
+            'cookies.*.host_only' => ['nullable', 'boolean'],
+            'cookies.*.expires_at' => ['nullable', 'integer', 'min:0'],
+            'user_agent' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
+        $runtimeContext = $this->downloadRuntimeContext($validated, $request);
+        $batchItems = [];
+        $primaryPayload = null;
+        $primaryCandidateId = $validated['primary_candidate_id'];
+
+        foreach ($validated['items'] as $item) {
+            $payload = $this->processReactionItem(
+                $item,
+                $validated['type'],
+                $fileReactionService,
+                $user,
+                $extensionChannel,
+                $runtimeContext
+            );
+
+            $candidatePayload = [
+                'candidate_id' => $item['candidate_id'],
+                ...$payload,
+            ];
+            $batchItems[] = $candidatePayload;
+
+            if ($item['candidate_id'] === $primaryCandidateId) {
+                $primaryPayload = $payload;
+            }
+        }
+
+        if ($primaryPayload === null) {
+            throw ValidationException::withMessages([
+                'primary_candidate_id' => 'The selected primary candidate was not found in the submitted items.',
+            ]);
+        }
+
+        return response()->json([
+            ...$primaryPayload,
+            'reverb' => $this->reverbPayload($extensionChannel),
+            'batch' => [
+                'count' => count($batchItems),
+                'primary_candidate_id' => $primaryCandidateId,
+                'items' => $batchItems,
+            ],
         ]);
     }
 
@@ -386,6 +429,70 @@ class ExtensionApiController extends Controller
             ])
             ->latest('id')
             ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed>  $runtimeContext
+     * @return array<string, mixed>
+     */
+    private function processReactionItem(
+        array $item,
+        string $reactionType,
+        FileReactionService $fileReactionService,
+        User $user,
+        string $extensionChannel,
+        array $runtimeContext,
+    ): array {
+        $url = $this->normalizeUrl($item['url'] ?? null);
+        if ($url === null) {
+            throw ValidationException::withMessages([
+                'url' => 'A valid media URL is required.',
+            ]);
+        }
+
+        $referrerUrl = $this->normalizeOptionalUrl($item['referrer_url_hash_aware'] ?? null)
+            ?? $this->normalizeOptionalUrl($item['referrer_url'] ?? null);
+        $previewUrl = $url;
+        $pageUrl = $this->normalizeOptionalUrl($item['page_url'] ?? null);
+        $tagName = isset($item['tag_name']) && is_string($item['tag_name']) ? $item['tag_name'] : null;
+
+        $file = $this->findOrCreateFile(
+            $url,
+            $referrerUrl,
+            $previewUrl,
+            $extensionChannel,
+            (int) $user->id,
+            $pageUrl,
+            $tagName
+        );
+        $result = $fileReactionService->set(
+            $file,
+            $user,
+            $reactionType,
+            deferHeavySideEffects: true,
+            downloadRuntimeContext: $runtimeContext
+        );
+        $activeTransfer = $this->findActiveTransfer($file->id);
+
+        return [
+            'file' => [
+                'id' => $file->id,
+                'url' => $file->url,
+                'referrer_url' => $file->referrer_url,
+                'preview_url' => $file->preview_url,
+            ],
+            'reaction' => $result['reaction'],
+            'reacted_at' => $result['reacted_at'] ?? null,
+            'download' => [
+                'requested' => $reactionType !== 'dislike',
+                'transfer_id' => $activeTransfer?->id,
+                'status' => $activeTransfer?->status,
+                'progress_percent' => $activeTransfer?->last_broadcast_percent,
+                'downloaded_at' => $file->downloaded_at?->toIso8601String(),
+            ],
+            'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
+        ];
     }
 
     private function extensionChannelHash(string $apiKey): string
