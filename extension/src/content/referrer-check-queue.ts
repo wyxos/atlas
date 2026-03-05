@@ -94,7 +94,13 @@ async function requestBatch(batch: QueueItem[]): Promise<Map<string, ReferrerMat
 
         const endpoint = `${stored.atlasDomain}/api/extension/referrer-checks`;
         const requestPayload = { items };
-        const response = await atlasLoggedFetch(endpoint, 'POST', requestPayload, {
+        const requestLogPayload = {
+            items: items.map((item) => ({
+                ...item,
+                referrer_url: keyByRequestId.get(item.request_id) ?? null,
+            })),
+        };
+        const response = await atlasLoggedFetch(endpoint, 'POST', requestLogPayload, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
