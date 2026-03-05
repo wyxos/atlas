@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    hasRelatedPostThumbnailsBelowMedia,
     normalizeHashAwareUrl,
     normalizeUrl,
     resolveIdentifiedMediaResolution,
@@ -9,6 +10,29 @@ import {
     shouldExcludeAnchorHref,
     shouldExcludeMediaOrAnchorUrl,
 } from './media-utils';
+
+function setMockRect(
+    element: Element,
+    rect: { left: number; top: number; width: number; height: number },
+): void {
+    const right = rect.left + rect.width;
+    const bottom = rect.top + rect.height;
+
+    Object.defineProperty(element, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+            x: rect.left,
+            y: rect.top,
+            left: rect.left,
+            top: rect.top,
+            right,
+            bottom,
+            width: rect.width,
+            height: rect.height,
+            toJSON: () => ({}),
+        }) as DOMRect,
+    });
+}
 
 describe('resolveReactionMediaUrl', () => {
     it('does not use video poster as reaction media url fallback', () => {
@@ -102,5 +126,60 @@ describe('shouldExcludeAnchorHref', () => {
     it('excludes email/phone href', () => {
         expect(shouldExcludeAnchorHref('mailto:test@example.com', null)).toBe(true);
         expect(shouldExcludeAnchorHref('tel:+1-212-555-0123', null)).toBe(true);
+    });
+});
+
+describe('hasRelatedPostThumbnailsBelowMedia', () => {
+    it('returns true when post thumbnails are shown below the media', () => {
+        document.body.innerHTML = '';
+
+        const main = document.createElement('main');
+        const media = document.createElement('img');
+        main.appendChild(media);
+
+        const thumbA = document.createElement('button');
+        thumbA.setAttribute('aria-label', 'Untitled');
+        const thumbB = document.createElement('button');
+        thumbB.setAttribute('aria-label', 'grok_image_1772597638273.jpg');
+        const helperToggle = document.createElement('button');
+        helperToggle.setAttribute('aria-label', 'Click to view images by scrolling through them');
+        const actionButton = document.createElement('button');
+        actionButton.setAttribute('aria-label', 'Add to Favourites');
+
+        main.appendChild(thumbA);
+        main.appendChild(thumbB);
+        main.appendChild(helperToggle);
+        main.appendChild(actionButton);
+        document.body.appendChild(main);
+
+        setMockRect(media, { left: 120, top: 80, width: 420, height: 360 });
+        setMockRect(thumbA, { left: 280, top: 460, width: 36, height: 36 });
+        setMockRect(thumbB, { left: 328, top: 460, width: 36, height: 36 });
+        setMockRect(helperToggle, { left: 372, top: 464, width: 24, height: 24 });
+        setMockRect(actionButton, { left: 210, top: 548, width: 143, height: 32 });
+
+        expect(hasRelatedPostThumbnailsBelowMedia(media)).toBe(true);
+    });
+
+    it('returns false when only action controls are below the media', () => {
+        document.body.innerHTML = '';
+
+        const main = document.createElement('main');
+        const media = document.createElement('img');
+        main.appendChild(media);
+
+        const fav = document.createElement('button');
+        fav.setAttribute('aria-label', 'Add to Favourites');
+        const comment = document.createElement('button');
+        comment.setAttribute('aria-label', 'Comment');
+        main.appendChild(fav);
+        main.appendChild(comment);
+        document.body.appendChild(main);
+
+        setMockRect(media, { left: 120, top: 80, width: 420, height: 360 });
+        setMockRect(fav, { left: 210, top: 460, width: 143, height: 32 });
+        setMockRect(comment, { left: 360, top: 460, width: 92, height: 32 });
+
+        expect(hasRelatedPostThumbnailsBelowMedia(media)).toBe(false);
     });
 });
