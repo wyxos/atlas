@@ -7,22 +7,7 @@ export type MediaResolution = {
 
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE_PATTERN = /\+\d[\d\s().-]{6,}\d/;
-const THUMBNAIL_LABEL_BLOCKLIST = [
-    'add to',
-    'favourite',
-    'favorite',
-    'comment',
-    'watch',
-    'download',
-    'award',
-    'private collection',
-    'more actions',
-    'navigation menu',
-    'submit',
-    'log in',
-    'join',
-    'folder select',
-];
+const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
 
 export function isMediaElement(element: Element): element is MediaElement {
     return element instanceof HTMLImageElement || element instanceof HTMLVideoElement;
@@ -216,106 +201,62 @@ export function shouldExcludeAnchorHref(rawHref: string | null | undefined, abso
     return shouldExcludeMediaOrAnchorUrl(absoluteHref);
 }
 
-function normalizeControlLabel(value: string | null | undefined): string | null {
-    if (typeof value !== 'string') {
-        return null;
-    }
-
-    const trimmed = value.trim().toLowerCase();
-    return trimmed === '' ? null : trimmed;
-}
-
-function hasBlockedThumbnailLabel(label: string | null): boolean {
-    if (label === null) {
+function isDeviantArtHostname(hostname: string | null | undefined): boolean {
+    if (typeof hostname !== 'string') {
         return false;
     }
 
-    return THUMBNAIL_LABEL_BLOCKLIST.some((blocked) => label.includes(blocked));
+    return DEVIANT_ART_HOST_PATTERN.test(hostname.trim().toLowerCase());
 }
 
-type ThumbnailControlCandidate = {
-    top: number;
-};
-
-function thumbnailControlCandidate(
-    element: Element,
-    mediaRect: DOMRect,
-): ThumbnailControlCandidate | null {
-    if (element.closest('[data-atlas-media-red-badge="1"]')) {
-        return null;
+function hasVisibleThumbnailImage(button: HTMLButtonElement): boolean {
+    const image = button.querySelector('img');
+    if (!(image instanceof HTMLImageElement)) {
+        return false;
     }
 
-    const rect = element.getBoundingClientRect();
-    if (rect.width < 18 || rect.height < 18 || rect.width > 120 || rect.height > 120) {
-        return null;
-    }
+    const alt = image.getAttribute('alt')?.trim() ?? '';
+    const src = image.getAttribute('src')?.trim() ?? '';
 
-    if (rect.top < mediaRect.bottom - 16 || rect.top > mediaRect.bottom + 220) {
-        return null;
-    }
-
-    if (rect.left < mediaRect.left - 140 || rect.right > mediaRect.right + 140) {
-        return null;
-    }
-
-    const ariaLabel = normalizeControlLabel(element.getAttribute('aria-label'));
-    const textLabel = normalizeControlLabel(element.textContent);
-    const label = ariaLabel ?? textLabel;
-    const hasNestedImage = element.querySelector('img') !== null;
-    if (label === null && !hasNestedImage) {
-        return null;
-    }
-
-    if (hasBlockedThumbnailLabel(label)) {
-        return null;
-    }
-
-    return {
-        top: rect.top,
-    };
+    return alt !== '' && src !== '';
 }
 
-export function hasRelatedPostThumbnailsBelowMedia(element: MediaElement): boolean {
+function isDeviantArtAllImagesSection(section: Element): boolean {
+    const heading = Array.from(section.querySelectorAll('h1, h2, h3'))
+        .find((element) => element.textContent?.trim() === 'All Images');
+    if (heading === undefined) {
+        return false;
+    }
+
+    const thumbnailButtons = Array.from(section.querySelectorAll('button'))
+        .filter((button): button is HTMLButtonElement => button instanceof HTMLButtonElement)
+        .filter((button) => hasVisibleThumbnailImage(button));
+
+    return thumbnailButtons.length >= 2;
+}
+
+export function hasRelatedPostThumbnailsBelowMedia(
+    element: MediaElement,
+    hostname: string = window.location.hostname,
+): boolean {
+    if (!isDeviantArtHostname(hostname)) {
+        return false;
+    }
+
     const mediaRect = element.getBoundingClientRect();
     if (mediaRect.width < 1 || mediaRect.height < 1) {
         return false;
     }
 
-    const root = element.closest('article, main, [role="main"], [data-testid*="post"], [data-hook*="post"]') ?? document.body;
-    const controls = Array.from(root.querySelectorAll('button, a[href], [role="button"]'))
-        .filter((control) => control !== element && !control.contains(element));
+    const root = element.closest('main, article, [role="main"]') ?? document.querySelector('main') ?? document.body;
 
-    if (controls.length < 2) {
-        return false;
-    }
+    return Array.from(root.querySelectorAll('section'))
+        .filter((section) => isDeviantArtAllImagesSection(section))
+        .some((section) => {
+            const sectionRect = section.getBoundingClientRect();
 
-    const candidates = controls
-        .map((control) => thumbnailControlCandidate(control, mediaRect))
-        .filter((candidate): candidate is ThumbnailControlCandidate => candidate !== null)
-        .sort((left, right) => left.top - right.top);
-
-    if (candidates.length < 2) {
-        return false;
-    }
-
-    const rowTolerance = 14;
-    const rows: Array<{ top: number; count: number }> = [];
-    for (const candidate of candidates) {
-        const existingRow = rows.find((row) => Math.abs(row.top - candidate.top) <= rowTolerance);
-        if (existingRow) {
-            const nextCount = existingRow.count + 1;
-            existingRow.top = ((existingRow.top * existingRow.count) + candidate.top) / nextCount;
-            existingRow.count = nextCount;
-            continue;
-        }
-
-        rows.push({
-            top: candidate.top,
-            count: 1,
+            return sectionRect.top >= mediaRect.bottom - 24 && sectionRect.top <= mediaRect.bottom + 220;
         });
-    }
-
-    return rows.some((row) => row.count >= 2);
 }
 
 export function collectMediaFromNode(node: Node): MediaElement[] {
