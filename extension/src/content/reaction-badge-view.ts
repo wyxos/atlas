@@ -13,6 +13,8 @@ type BadgeViewModel = {
     activeReaction: BadgeReactionType | null;
     hoveredReaction: BadgeReactionType | null;
     submittingReactionType: BadgeReactionType | null;
+    closeTabAfterQueueEnabled: boolean;
+    closeTabAfterQueueSaving: boolean;
     mediaResolution: string | null;
     openTabCount: number | null;
     timestampText: BadgeTimestampDisplay;
@@ -24,6 +26,7 @@ type BadgeViewModel = {
 type BadgeViewHandlers = {
     onReactionClick: (type: BadgeReactionType) => void;
     onReactionHover: (type: BadgeReactionType | null) => void;
+    onCloseTabAfterQueueToggle: () => void;
 };
 
 const reactionOrder: BadgeReactionType[] = ['love', 'like', 'dislike', 'funny'];
@@ -237,6 +240,48 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                 ],
             ),
             renderIconRow(model, handlers),
+            h(
+                'div',
+                {
+                    style: {
+                        width: '100%',
+                        marginTop: '1px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        fontSize: '10px',
+                        opacity: 0.9,
+                    },
+                },
+                [
+                    h('span', 'Close tab after queue'),
+                    h(
+                        'button',
+                        {
+                            type: 'button',
+                            onClick: handlers.onCloseTabAfterQueueToggle,
+                            disabled: model.closeTabAfterQueueSaving,
+                            style: {
+                                borderRadius: '999px',
+                                border: 'none',
+                                padding: '3px 8px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                cursor: model.closeTabAfterQueueSaving ? 'not-allowed' : 'pointer',
+                                opacity: model.closeTabAfterQueueSaving ? 0.7 : 1,
+                                background: model.closeTabAfterQueueEnabled ? '#14b8a6' : 'rgba(255,255,255,0.22)',
+                                color: model.closeTabAfterQueueEnabled ? '#052e2b' : '#ffffff',
+                            },
+                        },
+                        model.closeTabAfterQueueSaving
+                            ? 'Saving...'
+                            : model.closeTabAfterQueueEnabled
+                                ? 'On'
+                                : 'Off',
+                    ),
+                ],
+            ),
             h(
                 'div',
                 {
