@@ -4,6 +4,7 @@ import {
     collectMediaFromNode,
     isMediaElement,
     normalizeUrl,
+    resolveMediaResolution,
     resolveReactionTargetUrl,
     shouldExcludeAnchorHref,
     shouldExcludeMediaOrAnchorUrl,
@@ -18,6 +19,7 @@ import { createDownloadEventSheet } from './content/download-event-sheet';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const [ANCHOR_MEDIA_BORDER_ATTR, ANCHOR_MEDIA_MATCH_ATTR, MEDIA_WIDGET_APPLIED_ATTR] = ['data-atlas-anchor-media-red-border', 'data-atlas-anchor-media-match', 'data-atlas-media-red-applied'] as const;
+const MIN_WIDGET_MEDIA_WIDTH = 200;
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
 let currentPageHostname = window.location.hostname;
@@ -54,13 +56,23 @@ function mediaMatchesRules(element: MediaElement): boolean {
     return urlMatchesAnyRule(mediaUrl, currentRules, currentPageHostname);
 }
 
+function mediaHasEligibleWidgetWidth(element: MediaElement): boolean {
+    const resolution = resolveMediaResolution(element);
+    if (resolution === null) {
+        // Dimensions are unknown until media metadata is available.
+        return true;
+    }
+
+    return resolution.width > MIN_WIDGET_MEDIA_WIDTH;
+}
+
 function processMedia(media: MediaElement): void {
     if (media.closest('a[href]') !== null) {
         overlayManager.remove(media);
         return;
     }
 
-    if (mediaMatchesRules(media)) {
+    if (mediaMatchesRules(media) && mediaHasEligibleWidgetWidth(media)) {
         overlayManager.apply(media);
         return;
     }
@@ -562,6 +574,21 @@ function installInteractionFallbackListeners(): void {
     document.addEventListener('mouseup', handleInteraction, { passive: true });
 }
 
+function installMediaDimensionListeners(): void {
+    const handleMediaDimensionResolved = (event: Event): void => {
+        const target = event.target;
+        if (!(target instanceof Element) || !isMediaElement(target)) {
+            return;
+        }
+
+        processMedia(target);
+        scheduleReposition();
+    };
+
+    document.addEventListener('load', handleMediaDimensionResolved, true);
+    document.addEventListener('loadedmetadata', handleMediaDimensionResolved, true);
+}
+
 async function loadRulesAndProcess(): Promise<void> {
     try {
         const stored = await getStoredOptions();
@@ -582,6 +609,7 @@ function bootstrap(): void {
     installDownloadProgressListener();
     installViewportListeners();
     installInteractionFallbackListeners();
+    installMediaDimensionListeners();
     void loadRulesAndProcess();
 }
 
