@@ -130,56 +130,78 @@ describe('shouldExcludeAnchorHref', () => {
 });
 
 describe('hasRelatedPostThumbnailsBelowMedia', () => {
-    it('returns true when post thumbnails are shown below the media', () => {
+    function buildDeviantArtAllImagesSection(): {
+        main: HTMLElement;
+        media: HTMLImageElement;
+        section: HTMLElement;
+    } {
         document.body.innerHTML = '';
 
         const main = document.createElement('main');
         const media = document.createElement('img');
         main.appendChild(media);
+
+        const section = document.createElement('section');
+        const headingWrap = document.createElement('span');
+        const heading = document.createElement('h2');
+        heading.textContent = 'All Images';
+        headingWrap.appendChild(heading);
+        section.appendChild(headingWrap);
+
+        const track = document.createElement('div');
+        const thumbStrip = document.createElement('div');
 
         const thumbA = document.createElement('button');
-        thumbA.setAttribute('aria-label', 'Untitled');
+        const thumbAImage = document.createElement('img');
+        thumbAImage.src = 'https://images.example.com/one-150.jpg';
+        thumbAImage.alt = 'Untitled';
+        thumbA.appendChild(thumbAImage);
+
         const thumbB = document.createElement('button');
-        thumbB.setAttribute('aria-label', 'grok_image_1772597638273.jpg');
+        const thumbBImage = document.createElement('img');
+        thumbBImage.src = 'https://images.example.com/two-150.jpg';
+        thumbBImage.alt = 'grok_image_1772597638273.jpg';
+        thumbB.appendChild(thumbBImage);
+
+        thumbStrip.appendChild(thumbA);
+        thumbStrip.appendChild(thumbB);
+        track.appendChild(thumbStrip);
+        section.appendChild(track);
+
         const helperToggle = document.createElement('button');
         helperToggle.setAttribute('aria-label', 'Click to view images by scrolling through them');
-        const actionButton = document.createElement('button');
-        actionButton.setAttribute('aria-label', 'Add to Favourites');
+        section.appendChild(helperToggle);
 
-        main.appendChild(thumbA);
-        main.appendChild(thumbB);
-        main.appendChild(helperToggle);
-        main.appendChild(actionButton);
+        main.appendChild(section);
         document.body.appendChild(main);
 
         setMockRect(media, { left: 120, top: 80, width: 420, height: 360 });
-        setMockRect(thumbA, { left: 280, top: 460, width: 36, height: 36 });
-        setMockRect(thumbB, { left: 328, top: 460, width: 36, height: 36 });
-        setMockRect(helperToggle, { left: 372, top: 464, width: 24, height: 24 });
-        setMockRect(actionButton, { left: 210, top: 548, width: 143, height: 32 });
+        setMockRect(section, { left: 260, top: 452, width: 340, height: 56 });
 
-        expect(hasRelatedPostThumbnailsBelowMedia(media)).toBe(true);
+        return {
+            main,
+            media,
+            section,
+        };
+    }
+
+    it('returns true for DeviantArt when the All Images strip is shown below the media', () => {
+        const { media } = buildDeviantArtAllImagesSection();
+
+        expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.deviantart.com')).toBe(true);
     });
 
-    it('returns false when only action controls are below the media', () => {
-        document.body.innerHTML = '';
+    it('returns false on non-DeviantArt hosts even when similar controls exist', () => {
+        const { media } = buildDeviantArtAllImagesSection();
 
-        const main = document.createElement('main');
-        const media = document.createElement('img');
-        main.appendChild(media);
+        expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.example.com')).toBe(false);
+    });
 
-        const fav = document.createElement('button');
-        fav.setAttribute('aria-label', 'Add to Favourites');
-        const comment = document.createElement('button');
-        comment.setAttribute('aria-label', 'Comment');
-        main.appendChild(fav);
-        main.appendChild(comment);
-        document.body.appendChild(main);
+    it('returns false when the DeviantArt section has fewer than two thumbnail buttons', () => {
+        const { media, section } = buildDeviantArtAllImagesSection();
+        const secondThumb = section.querySelectorAll('button img')[1]?.closest('button');
+        secondThumb?.remove();
 
-        setMockRect(media, { left: 120, top: 80, width: 420, height: 360 });
-        setMockRect(fav, { left: 210, top: 460, width: 143, height: 32 });
-        setMockRect(comment, { left: 360, top: 460, width: 92, height: 32 });
-
-        expect(hasRelatedPostThumbnailsBelowMedia(media)).toBe(false);
+        expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.deviantart.com')).toBe(false);
     });
 });
