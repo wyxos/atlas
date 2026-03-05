@@ -9,6 +9,10 @@ import { subscribeToDownloadProgress, type ProgressEvent } from './download-prog
 import { renderReactionBadge, type BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
 import {
+    getCloseTabAfterQueuePreferenceForHostname,
+    setCloseTabAfterQueuePreferenceForHostname,
+} from '../atlas-options';
+import {
     getPersistedBadgeState,
     persistBadgeCheckResult,
     persistBadgeState,
@@ -98,6 +102,19 @@ async function requestTabCount(): Promise<number | null> {
     });
 }
 
+async function requestCloseCurrentTab(): Promise<void> {
+    if (!chrome.runtime?.sendMessage) {
+        return;
+    }
+
+    await new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage({ type: 'ATLAS_CLOSE_CURRENT_TAB' }, () => {
+            void chrome.runtime.lastError;
+            resolve();
+        });
+    });
+}
+
 const AtlasReactionBadge = defineComponent({
     name: 'AtlasReactionBadge',
     props: {
@@ -121,6 +138,8 @@ const AtlasReactionBadge = defineComponent({
         const hoveredReaction = ref<BadgeReactionType | null>(null);
         const submittingReactionType = ref<BadgeReactionType | null>(null);
         const isDownloadLocked = ref(false);
+        const closeTabAfterQueueEnabled = ref(false);
+        const isSavingCloseTabAfterQueuePreference = ref(false);
         const progressPercent = ref<number | null>(null);
         const transferStatus = ref<string | null>(null);
         const trackedFileId = ref<number | null>(null);
@@ -135,6 +154,7 @@ const AtlasReactionBadge = defineComponent({
         let unsubscribeTabCount: (() => void) | null = null;
         let mediaMutationObserver: MutationObserver | null = null;
         let checkSequence = 0;
+        const pageHostname = window.location.hostname.trim().toLowerCase();
 
         const controlsDisabled = computed(() =>
             isChecking.value || submittingReactionType.value !== null || isDownloadLocked.value);
@@ -213,6 +233,37 @@ const AtlasReactionBadge = defineComponent({
         function syncResolution(): void {
             const resolved = resolveMediaResolution(props.media);
             mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
+        }
+
+        async function loadCloseTabAfterQueuePreference(): Promise<void> {
+            if (pageHostname === '') {
+                closeTabAfterQueueEnabled.value = false;
+                return;
+            }
+
+            try {
+                closeTabAfterQueueEnabled.value = await getCloseTabAfterQueuePreferenceForHostname(pageHostname);
+            } catch {
+                closeTabAfterQueueEnabled.value = false;
+            }
+        }
+
+        async function toggleCloseTabAfterQueuePreference(): Promise<void> {
+            if (isSavingCloseTabAfterQueuePreference.value || pageHostname === '') {
+                return;
+            }
+
+            const nextEnabled = !closeTabAfterQueueEnabled.value;
+            closeTabAfterQueueEnabled.value = nextEnabled;
+            isSavingCloseTabAfterQueuePreference.value = true;
+
+            try {
+                await setCloseTabAfterQueuePreferenceForHostname(pageHostname, nextEnabled);
+            } catch {
+                closeTabAfterQueueEnabled.value = !nextEnabled;
+            } finally {
+                isSavingCloseTabAfterQueuePreference.value = false;
+            }
         }
 
         async function refreshOpenTabCount(): Promise<void> {
@@ -414,6 +465,7 @@ const AtlasReactionBadge = defineComponent({
                 openTabCount.value = count;
             });
             void refreshOpenTabCount();
+            void loadCloseTabAfterQueuePreference();
             void refreshMatchForCurrentMedia(true);
         });
 
@@ -494,6 +546,10 @@ const AtlasReactionBadge = defineComponent({
                     if (isTerminalStatus(result.downloadStatus)) {
                         handleTerminalUnlock();
                     }
+
+                    if (closeTabAfterQueueEnabled.value) {
+                        void requestCloseCurrentTab();
+                    }
                 } else {
                     handleTerminalUnlock();
                 }
@@ -533,6 +589,8 @@ const AtlasReactionBadge = defineComponent({
                     activeReaction,
                     hoveredReaction: hoveredReaction.value,
                     submittingReactionType: submittingReactionType.value,
+                    closeTabAfterQueueEnabled: closeTabAfterQueueEnabled.value,
+                    closeTabAfterQueueSaving: isSavingCloseTabAfterQueuePreference.value,
                     mediaResolution: mediaResolution.value,
                     openTabCount: openTabCount.value,
                     timestampText: timestampText.value,
@@ -546,6 +604,9 @@ const AtlasReactionBadge = defineComponent({
                     },
                     onReactionHover: (reactionType) => {
                         hoveredReaction.value = reactionType;
+                    },
+                    onCloseTabAfterQueueToggle: () => {
+                        void toggleCloseTabAfterQueuePreference();
                     },
                 },
             );

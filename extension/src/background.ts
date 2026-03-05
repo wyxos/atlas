@@ -480,6 +480,20 @@ chrome.runtime.onMessage.addListener((
         return true;
     }
 
+    if (payload.type === 'ATLAS_CLOSE_CURRENT_TAB') {
+        const senderTabId = sender.tab?.id;
+        if (typeof senderTabId !== 'number') {
+            sendResponse({ ok: false });
+            return false;
+        }
+
+        chrome.tabs.remove(senderTabId, () => {
+            sendResponse({ ok: !chrome.runtime.lastError });
+        });
+
+        return true;
+    }
+
     if (payload.type === 'ATLAS_DISCARD_INACTIVE_TABS') {
         void discardInactiveTabsOnce()
             .then(({ discardedCount, failedCount, skippedCount }) => {
