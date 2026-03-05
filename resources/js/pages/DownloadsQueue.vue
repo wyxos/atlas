@@ -552,6 +552,10 @@ function upsertDownload(item: DownloadItem) {
     downloads.value = next;
 }
 
+function incomingNullable<T>(value: T | null | undefined, fallback: T | null | undefined): T | null {
+    return value === undefined ? (fallback ?? null) : (value ?? null);
+}
+
 function applyQueuedPayload(payload: unknown) {
     if (!payload || typeof payload !== 'object') {
         return;
@@ -565,13 +569,13 @@ function applyQueuedPayload(payload: unknown) {
     const item: DownloadItem = {
         id,
         status: value.status,
-        created_at: value.created_at ?? existing?.created_at ?? null,
-        queued_at: value.queued_at ?? null,
-        started_at: value.started_at ?? null,
-        finished_at: value.finished_at ?? null,
-        failed_at: value.failed_at ?? null,
+        created_at: incomingNullable(value.created_at, existing?.created_at),
+        queued_at: incomingNullable(value.queued_at, existing?.queued_at),
+        started_at: incomingNullable(value.started_at, existing?.started_at),
+        finished_at: incomingNullable(value.finished_at, existing?.finished_at),
+        failed_at: incomingNullable(value.failed_at, existing?.failed_at),
         percent: value.percent ?? 0,
-        error: value.error ?? existing?.error ?? null,
+        error: incomingNullable(value.error, existing?.error),
     };
 
     upsertDownload(item);
@@ -605,13 +609,13 @@ function applyProgressPayload(payload: unknown) {
     updateDownload(id, (current) => ({
         ...current,
         status: value.status,
-        percent: normalizeProgress(value.percent),
-        created_at: value.created_at ?? current.created_at ?? null,
-        queued_at: value.queued_at ?? current.queued_at ?? null,
-        started_at: value.started_at ?? current.started_at ?? null,
-        finished_at: value.finished_at ?? current.finished_at ?? null,
-        failed_at: value.failed_at ?? current.failed_at ?? null,
-        error: value.error ?? current.error ?? null,
+        percent: normalizeProgress(value.percent ?? current.percent ?? 0),
+        created_at: incomingNullable(value.created_at, current.created_at),
+        queued_at: incomingNullable(value.queued_at, current.queued_at),
+        started_at: incomingNullable(value.started_at, current.started_at),
+        finished_at: incomingNullable(value.finished_at, current.finished_at),
+        failed_at: incomingNullable(value.failed_at, current.failed_at),
+        error: incomingNullable(value.error, current.error),
     }));
     if (
         value.path !== undefined

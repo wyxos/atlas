@@ -86,3 +86,61 @@ it('shows retry context when a download is queued for retry', async () => {
 
     expect(wrapper.text()).toContain('Retry 1/3 scheduled in 30s');
 });
+
+it('clears stale error when progress payload sends error as null', async () => {
+    const listeners = new Map<string, (payload: unknown) => void>();
+    window.Echo = {
+        private: () => ({
+            listen: (event: string, cb: (payload: unknown) => void) => {
+                listeners.set(event, cb);
+            },
+        }),
+        leave: () => {},
+    } as typeof window.Echo;
+
+    window.axios.get = vi.fn().mockResolvedValue({
+        data: {
+            items: [
+                {
+                    id: 77,
+                    status: 'failed',
+                    created_at: null,
+                    queued_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    failed_at: '2026-03-05T10:00:00.000000Z',
+                    percent: 12,
+                    error: 'Old failure should disappear',
+                },
+            ],
+        },
+    });
+
+    const wrapper = mount(DownloadsQueue);
+    await flushPromises();
+
+    const container = wrapper.find('.flex-1.overflow-auto');
+    Object.defineProperty(container.element, 'clientHeight', { value: 600, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('Old failure should disappear');
+
+    const onProgress = listeners.get('.DownloadTransferProgressUpdated');
+    expect(onProgress).toBeTypeOf('function');
+
+    onProgress?.({
+        downloadTransferId: 77,
+        status: 'completed',
+        percent: 100,
+        created_at: null,
+        queued_at: null,
+        started_at: null,
+        finished_at: '2026-03-05T10:01:00.000000Z',
+        failed_at: null,
+        error: null,
+    });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).not.toContain('Old failure should disappear');
+});
