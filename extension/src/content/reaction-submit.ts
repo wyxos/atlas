@@ -1,5 +1,6 @@
 import { getStoredOptions } from '../atlas-options';
 import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
+import type { BatchReactionItem } from './deviantart-batch-reaction';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
@@ -31,6 +32,10 @@ type RuntimeReactionSubmitResponse = {
     ok: boolean;
     status: number;
     payload: unknown;
+};
+
+type SubmitBadgeReactionOptions = {
+    batchItems?: BatchReactionItem[] | null;
 };
 
 function parseReactionType(value: unknown): BadgeReactionType | null {
@@ -262,11 +267,14 @@ function getSafeUserAgent(): string | null {
 export async function submitBadgeReaction(
     media: MediaElement,
     reactionType: BadgeReactionType,
+    options: SubmitBadgeReactionOptions = {},
 ): Promise<SubmitReactionResult> {
     const pageUrl = normalizeUrl(window.location.href);
     const reactionUrl = resolveReactionTargetUrl(media, pageUrl);
     const isVideo = media instanceof HTMLVideoElement;
-    if (reactionUrl === null) {
+    const batchItems = options.batchItems?.filter((item) => item.url.trim() !== '') ?? [];
+    const usesBatchEndpoint = batchItems.length >= 2;
+    if (reactionUrl === null && !usesBatchEndpoint) {
         return {
             ok: false,
             reaction: null,
@@ -296,18 +304,41 @@ export async function submitBadgeReaction(
             };
         }
 
-        const cookies = await getRuntimeCookies(normalizeCookieUrls([reactionUrl, pageUrl]));
+        const cookieUrls = usesBatchEndpoint
+            ? normalizeCookieUrls([
+                ...batchItems.map((item) => item.url),
+                ...batchItems.map((item) => item.pageUrl),
+                ...batchItems.map((item) => item.referrerUrlHashAware),
+            ])
+            : normalizeCookieUrls([reactionUrl, pageUrl]);
+        const cookies = await getRuntimeCookies(cookieUrls);
         const userAgent = getSafeUserAgent();
-        const requestBody = {
-            type: reactionType,
-            url: reactionUrl,
-            referrer_url_hash_aware: window.location.href,
-            page_url: window.location.href,
-            tag_name: isVideo ? 'video' : 'img',
-            cookies: cookies.length > 0 ? cookies : null,
-            user_agent: userAgent,
-        };
-        const endpoint = `${stored.atlasDomain}/api/extension/reactions`;
+        const requestBody = usesBatchEndpoint
+            ? {
+                type: reactionType,
+                primary_candidate_id: batchItems[0]?.candidateId ?? null,
+                items: batchItems.map((item) => ({
+                    candidate_id: item.candidateId,
+                    url: item.url,
+                    referrer_url_hash_aware: item.referrerUrlHashAware,
+                    page_url: item.pageUrl,
+                    tag_name: item.tagName,
+                })),
+                cookies: cookies.length > 0 ? cookies : null,
+                user_agent: userAgent,
+            }
+            : {
+                type: reactionType,
+                url: reactionUrl,
+                referrer_url_hash_aware: window.location.href,
+                page_url: window.location.href,
+                tag_name: isVideo ? 'video' : 'img',
+                cookies: cookies.length > 0 ? cookies : null,
+                user_agent: userAgent,
+            };
+        const endpoint = usesBatchEndpoint
+            ? `${stored.atlasDomain}/api/extension/reactions/batch`
+            : `${stored.atlasDomain}/api/extension/reactions`;
 
         let payload: unknown = null;
         const runtimeResponse = await atlasLoggedRuntimeRequest(
