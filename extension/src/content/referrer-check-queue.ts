@@ -1,6 +1,6 @@
 import { getStoredOptions } from '../atlas-options';
 import { atlasLoggedFetch } from './atlas-request-log';
-import { normalizeUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
+import { normalizeHashAwareUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 export type ReferrerMatchResult = {
     exists: boolean;
@@ -190,7 +190,7 @@ function scheduleFlush(): void {
 }
 
 export async function enqueueReferrerCheck(referrerUrl: string | null): Promise<ReferrerMatchResult> {
-    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
+    const normalizedReferrerUrl = normalizeHashAwareUrl(referrerUrl);
     if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
         return Promise.resolve(emptyResult());
     }
@@ -229,7 +229,7 @@ export async function enqueueReferrerCheck(referrerUrl: string | null): Promise<
 }
 
 export function upsertReferrerCheckCache(referrerUrl: string | null, update: ReferrerCheckCacheUpdate): void {
-    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
+    const normalizedReferrerUrl = normalizeHashAwareUrl(referrerUrl);
     if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
         return;
     }
@@ -266,7 +266,7 @@ export function upsertReferrerCheckCache(referrerUrl: string | null, update: Ref
 }
 
 export function getCachedReferrerCheck(referrerUrl: string | null): ReferrerMatchResult | null {
-    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
+    const normalizedReferrerUrl = normalizeHashAwareUrl(referrerUrl);
     if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
         return null;
     }
