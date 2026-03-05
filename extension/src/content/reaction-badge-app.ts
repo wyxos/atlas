@@ -55,6 +55,7 @@ function isTerminalStatus(status: string | null): boolean {
 type TabCountChangedListener = (count: number) => void;
 
 const tabCountChangedListeners = new Set<TabCountChangedListener>();
+const reactAllItemsPreferenceByPageUrl = new Map<string, boolean>();
 let tabCountRuntimeBound = false;
 
 function toSafeCount(value: unknown): number {
@@ -207,12 +208,39 @@ const AtlasReactionBadge = defineComponent({
             lastReactionMediaUrl.value = trackedMediaUrls.value[0] ?? null;
         }
 
+        function resolveReactAllItemsPageKey(): string | null {
+            return normalizeUrl(window.location.href);
+        }
+
+        function persistReactAllItemsPreference(enabled: boolean): void {
+            const key = resolveReactAllItemsPageKey();
+            if (key === null) {
+                return;
+            }
+
+            if (enabled) {
+                reactAllItemsPreferenceByPageUrl.set(key, true);
+                return;
+            }
+
+            reactAllItemsPreferenceByPageUrl.delete(key);
+        }
+
         function syncRelatedPostThumbnailContext(): void {
             const nextVisible = hasRelatedPostThumbnailsBelowMedia(props.media);
-            showReactAllItemsInPost.value = nextVisible;
-            if (!nextVisible) {
-                reactAllItemsInPost.value = false;
+            if (!nextVisible && submittingReactionType.value !== null) {
+                return;
             }
+
+            showReactAllItemsInPost.value = nextVisible;
+            if (nextVisible) {
+                const pageKey = resolveReactAllItemsPageKey();
+                reactAllItemsInPost.value = pageKey !== null && reactAllItemsPreferenceByPageUrl.get(pageKey) === true;
+                return;
+            }
+
+            reactAllItemsInPost.value = false;
+            persistReactAllItemsPreference(false);
         }
 
         function resolvePersistenceUrl(): string | null {
@@ -614,6 +642,7 @@ const AtlasReactionBadge = defineComponent({
             }
 
             reactAllItemsInPost.value = !reactAllItemsInPost.value;
+            persistReactAllItemsPreference(reactAllItemsInPost.value);
         }
 
         return () => {

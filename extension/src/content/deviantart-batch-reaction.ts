@@ -15,6 +15,8 @@ type CollectBatchReactionItemsOptions = {
     hostname?: string;
 };
 
+type CurrentImageResolver = () => HTMLImageElement | null;
+
 function isDeviantArtHostname(hostname: string | null | undefined): boolean {
     if (typeof hostname !== 'string') {
         return false;
@@ -39,7 +41,11 @@ function parseImageNumber(url: string): number {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
-function resolveCurrentImageUrl(media: HTMLImageElement): string | null {
+function resolveCurrentImageUrl(media: HTMLImageElement | null): string | null {
+    if (!(media instanceof HTMLImageElement)) {
+        return null;
+    }
+
     return normalizeUrl(media.getAttribute('src') || media.src || null);
 }
 
@@ -97,14 +103,14 @@ function resolveThumbnailButtons(section: HTMLElement): HTMLButtonElement[] {
 }
 
 async function waitForImageSelectionChange(
-    media: HTMLImageElement,
+    resolveCurrentMedia: CurrentImageResolver,
     previousImageUrl: string | null,
     previousHref: string,
 ): Promise<void> {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < 2500) {
-        const nextImageUrl = resolveCurrentImageUrl(media);
+        const nextImageUrl = resolveCurrentImageUrl(resolveCurrentMedia());
         const nextHref = normalizeHashAwareUrl(window.location.href);
         if ((nextImageUrl !== null && nextImageUrl !== previousImageUrl) || (nextHref !== null && nextHref !== previousHref)) {
             await sleep(50);
@@ -115,8 +121,41 @@ async function waitForImageSelectionChange(
     }
 }
 
-function buildBatchReactionItem(
+function createCurrentImageResolver(
     media: HTMLImageElement,
+    section: HTMLElement,
+): CurrentImageResolver {
+    const root = media.closest('main, article, [role="main"]') ?? document.querySelector('main') ?? document.body;
+    const initialRect = media.getBoundingClientRect();
+    const minimumWidth = Math.max(160, Math.round(initialRect.width * 0.4));
+    const minimumHeight = Math.max(160, Math.round(initialRect.height * 0.4));
+
+    return () => {
+        if (media.isConnected) {
+            return media;
+        }
+
+        const candidates = Array.from(root.querySelectorAll('img'))
+            .filter((candidate): candidate is HTMLImageElement => candidate instanceof HTMLImageElement)
+            .filter((candidate) => !section.contains(candidate))
+            .filter((candidate) => {
+                const rect = candidate.getBoundingClientRect();
+
+                return rect.width >= minimumWidth && rect.height >= minimumHeight;
+            })
+            .sort((left, right) => {
+                const leftRect = left.getBoundingClientRect();
+                const rightRect = right.getBoundingClientRect();
+
+                return (rightRect.width * rightRect.height) - (leftRect.width * leftRect.height);
+            });
+
+        return candidates[0] ?? null;
+    };
+}
+
+function buildBatchReactionItem(
+    media: HTMLImageElement | null,
     candidateIndex: number,
 ): BatchReactionItem | null {
     const url = resolveCurrentImageUrl(media);
@@ -135,13 +174,13 @@ function buildBatchReactionItem(
 }
 
 async function restoreInitialSelection(
-    media: HTMLImageElement,
+    resolveCurrentMedia: CurrentImageResolver,
     buttons: HTMLButtonElement[],
     initialImageUrl: string,
     initialHref: string,
     initialImageNumber: number,
 ): Promise<void> {
-    const currentImageUrl = resolveCurrentImageUrl(media);
+    const currentImageUrl = resolveCurrentImageUrl(resolveCurrentMedia());
     const currentHref = normalizeHashAwareUrl(window.location.href);
     if (currentImageUrl === initialImageUrl && currentHref === initialHref) {
         return;
@@ -149,10 +188,10 @@ async function restoreInitialSelection(
 
     const restoreButton = buttons[initialImageNumber - 1] ?? null;
     if (restoreButton !== null) {
-        const beforeImageUrl = resolveCurrentImageUrl(media);
+        const beforeImageUrl = resolveCurrentImageUrl(resolveCurrentMedia());
         const beforeHref = normalizeHashAwareUrl(window.location.href) ?? initialHref;
         restoreButton.click();
-        await waitForImageSelectionChange(media, beforeImageUrl, beforeHref);
+        await waitForImageSelectionChange(resolveCurrentMedia, beforeImageUrl, beforeHref);
     }
 
     if (normalizeHashAwareUrl(window.location.href) !== initialHref) {
@@ -179,7 +218,8 @@ export async function collectDeviantArtBatchReactionItems(
         return null;
     }
 
-    const initialImageUrl = resolveCurrentImageUrl(media);
+    const resolveCurrentMedia = createCurrentImageResolver(media, section);
+    const initialImageUrl = resolveCurrentImageUrl(resolveCurrentMedia());
     const initialLocationState = resolveCurrentLocationState();
     if (initialImageUrl === null || initialLocationState === null) {
         return null;
@@ -189,7 +229,7 @@ export async function collectDeviantArtBatchReactionItems(
     const seenUrls = new Set<string>();
 
     const collectCurrentItem = (candidateIndex: number): void => {
-        const item = buildBatchReactionItem(media, candidateIndex);
+        const item = buildBatchReactionItem(resolveCurrentMedia(), candidateIndex);
         if (item === null || seenUrls.has(item.url)) {
             return;
         }
@@ -202,15 +242,15 @@ export async function collectDeviantArtBatchReactionItems(
 
     try {
         for (const [index, button] of buttons.entries()) {
-            const beforeImageUrl = resolveCurrentImageUrl(media);
+            const beforeImageUrl = resolveCurrentImageUrl(resolveCurrentMedia());
             const beforeHref = normalizeHashAwareUrl(window.location.href) ?? initialLocationState.href;
             button.click();
-            await waitForImageSelectionChange(media, beforeImageUrl, beforeHref);
+            await waitForImageSelectionChange(resolveCurrentMedia, beforeImageUrl, beforeHref);
             collectCurrentItem(index);
         }
     } finally {
         await restoreInitialSelection(
-            media,
+            resolveCurrentMedia,
             buttons,
             initialImageUrl,
             initialLocationState.href,
