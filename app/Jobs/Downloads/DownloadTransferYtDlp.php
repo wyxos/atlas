@@ -120,6 +120,8 @@ class DownloadTransferYtDlp implements ShouldQueue
             $transfer->update([
                 'status' => DownloadTransferStatus::PREVIEWING,
                 'finished_at' => null,
+                'failed_at' => null,
+                'error' => null,
             ]);
             app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 

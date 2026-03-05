@@ -27,6 +27,8 @@ it('completes the transfer after preview generation', function () {
         'bytes_total' => 100,
         'bytes_downloaded' => 100,
         'last_broadcast_percent' => 100,
+        'failed_at' => now()->subMinute(),
+        'error' => 'old transient failure',
     ]);
 
     mock(FileDownloadFinalizer::class)
@@ -42,5 +44,7 @@ it('completes the transfer after preview generation', function () {
 
     expect($transfer->status)->toBe(DownloadTransferStatus::COMPLETED);
     expect($transfer->finished_at)->not->toBeNull();
+    expect($transfer->failed_at)->toBeNull();
+    expect($transfer->error)->toBeNull();
     expect($file->preview_path)->toBe('downloads/aa/bb/test.preview.mp4');
 });

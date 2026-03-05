@@ -60,6 +60,8 @@ class GenerateTransferPreview implements ShouldBeUnique, ShouldQueue
         $transfer->update([
             'status' => DownloadTransferStatus::COMPLETED,
             'finished_at' => now(),
+            'failed_at' => null,
+            'error' => null,
         ]);
 
         DownloadTransfer::query()->whereKey($transfer->id)->update([

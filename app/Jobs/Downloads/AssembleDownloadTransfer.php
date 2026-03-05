@@ -109,6 +109,8 @@ class AssembleDownloadTransfer implements ShouldQueue
             $transfer->update([
                 'status' => DownloadTransferStatus::PREVIEWING,
                 'finished_at' => null,
+                'failed_at' => null,
+                'error' => null,
             ]);
 
             File::query()->whereKey($transfer->file_id)->update([
