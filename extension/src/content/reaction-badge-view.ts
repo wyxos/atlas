@@ -21,12 +21,15 @@ type BadgeViewModel = {
     progressDisplayValue: number;
     progressColor: string;
     transferStatus: string | null;
+    showReactAllItemsInPost: boolean;
+    reactAllItemsInPost: boolean;
 };
 
 type BadgeViewHandlers = {
     onReactionClick: (type: BadgeReactionType) => void;
     onReactionHover: (type: BadgeReactionType | null) => void;
     onCloseTabAfterQueueToggle: () => void;
+    onReactAllItemsInPostToggle: () => void;
 };
 
 const reactionOrder: BadgeReactionType[] = ['love', 'like', 'dislike', 'funny'];
@@ -171,6 +174,46 @@ function renderIconRow(model: BadgeViewModel, handlers: BadgeViewHandlers): VNod
     );
 }
 
+function renderReactAllItemsRow(model: BadgeViewModel, handlers: BadgeViewHandlers): VNode | null {
+    if (!model.showReactAllItemsInPost) {
+        return null;
+    }
+
+    return h(
+        'label',
+        {
+            style: {
+                width: '100%',
+                marginTop: '1px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                fontSize: '10px',
+                opacity: model.controlsDisabled ? 0.75 : 0.92,
+                cursor: model.controlsDisabled ? 'not-allowed' : 'pointer',
+                userSelect: 'none',
+            },
+        },
+        [
+            h('span', 'React all items in post'),
+            h('input', {
+                type: 'checkbox',
+                checked: model.reactAllItemsInPost,
+                disabled: model.controlsDisabled,
+                onChange: handlers.onReactAllItemsInPostToggle,
+                style: {
+                    width: '12px',
+                    height: '12px',
+                    margin: 0,
+                    accentColor: '#14b8a6',
+                    cursor: model.controlsDisabled ? 'not-allowed' : 'pointer',
+                },
+            }),
+        ],
+    );
+}
+
 export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHandlers): VNode {
     return h(
         'div',
@@ -240,6 +283,7 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                 ],
             ),
             renderIconRow(model, handlers),
+            renderReactAllItemsRow(model, handlers),
             h(
                 'div',
                 {

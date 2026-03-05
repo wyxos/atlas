@@ -2,7 +2,14 @@ import type { PropType } from 'vue';
 import { computed, createApp, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Ban, Download } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
-import { normalizeUrl, resolveIdentifiedMediaResolution, resolveMediaUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
+import {
+    hasRelatedPostThumbnailsBelowMedia,
+    normalizeUrl,
+    resolveIdentifiedMediaResolution,
+    resolveMediaUrl,
+    resolveReactionTargetUrl,
+    type MediaElement,
+} from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
@@ -145,6 +152,8 @@ const AtlasReactionBadge = defineComponent({
         const trackedFileId = ref<number | null>(null);
         const trackedTransferId = ref<number | null>(null);
         const hasSeenActiveTransfer = ref(false);
+        const showReactAllItemsInPost = ref(false);
+        const reactAllItemsInPost = ref(false);
         const lastCheckedMediaUrl = ref<string | null>(null);
         const lastReactionMediaUrl = ref<string | null>(null);
         const trackedMediaUrls = ref<string[]>([]);
@@ -194,6 +203,14 @@ const AtlasReactionBadge = defineComponent({
         function syncTrackedUrlsForCurrentMedia(): void {
             trackedMediaUrls.value = resolveTrackedUrlsForCurrentMedia();
             lastReactionMediaUrl.value = trackedMediaUrls.value[0] ?? null;
+        }
+
+        function syncRelatedPostThumbnailContext(): void {
+            const nextVisible = hasRelatedPostThumbnailsBelowMedia(props.media);
+            showReactAllItemsInPost.value = nextVisible;
+            if (!nextVisible) {
+                reactAllItemsInPost.value = false;
+            }
         }
 
         function resolvePersistenceUrl(): string | null {
@@ -435,6 +452,7 @@ const AtlasReactionBadge = defineComponent({
 
         const onMediaUpdate = (): void => {
             syncResolution();
+            syncRelatedPostThumbnailContext();
             void refreshMatchForCurrentMedia();
         };
 
@@ -450,6 +468,7 @@ const AtlasReactionBadge = defineComponent({
 
             mediaMutationObserver = new MutationObserver(() => {
                 syncResolution();
+                syncRelatedPostThumbnailContext();
                 void refreshMatchForCurrentMedia();
             });
 
@@ -466,6 +485,7 @@ const AtlasReactionBadge = defineComponent({
             });
             void refreshOpenTabCount();
             void loadCloseTabAfterQueuePreference();
+            syncRelatedPostThumbnailContext();
             void refreshMatchForCurrentMedia(true);
         });
 
@@ -560,6 +580,14 @@ const AtlasReactionBadge = defineComponent({
             }
         }
 
+        function handleReactAllItemsInPostToggle(): void {
+            if (!showReactAllItemsInPost.value || controlsDisabled.value) {
+                return;
+            }
+
+            reactAllItemsInPost.value = !reactAllItemsInPost.value;
+        }
+
         return () => {
             const activeReaction = matchResult.value.exists ? matchResult.value.reaction : null;
 
@@ -597,6 +625,8 @@ const AtlasReactionBadge = defineComponent({
                     progressDisplayValue,
                     progressColor,
                     transferStatus: transferStatus.value,
+                    showReactAllItemsInPost: showReactAllItemsInPost.value,
+                    reactAllItemsInPost: reactAllItemsInPost.value,
                 },
                 {
                     onReactionClick: (reactionType) => {
@@ -607,6 +637,9 @@ const AtlasReactionBadge = defineComponent({
                     },
                     onCloseTabAfterQueueToggle: () => {
                         void toggleCloseTabAfterQueuePreference();
+                    },
+                    onReactAllItemsInPostToggle: () => {
+                        handleReactAllItemsInPostToggle();
                     },
                 },
             );
