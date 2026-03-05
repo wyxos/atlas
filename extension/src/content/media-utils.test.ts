@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    normalizeHashAwareUrl,
+    normalizeUrl,
     resolveIdentifiedMediaResolution,
     resolveMediaResolution,
     resolveReactionMediaUrl,
@@ -30,6 +32,18 @@ describe('resolveReactionTargetUrl', () => {
         video.poster = 'https://cdn.example.com/poster.jpg';
 
         expect(resolveReactionTargetUrl(video, 'https://www.facebook.com/reel/123')).toBe('https://www.facebook.com/reel/123');
+    });
+});
+
+describe('normalizeHashAwareUrl', () => {
+    it('keeps hash fragments for hash-aware comparisons', () => {
+        expect(normalizeHashAwareUrl('https://example.com/page?tab=1#section')).toBe('https://example.com/page?tab=1#section');
+    });
+});
+
+describe('normalizeUrl', () => {
+    it('removes hash fragments for hash-insensitive checks', () => {
+        expect(normalizeUrl('https://example.com/page?tab=1#section')).toBe('https://example.com/page?tab=1');
     });
 });
 

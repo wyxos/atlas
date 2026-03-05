@@ -3,6 +3,7 @@ import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './mat
 import {
     collectMediaFromNode,
     isMediaElement,
+    normalizeHashAwareUrl,
     normalizeUrl,
     resolveMediaResolution,
     resolveReactionTargetUrl,
@@ -233,7 +234,7 @@ function applyAnchorMediaBorder(
 
     const rawHref = anchor.getAttribute('href');
     const absoluteHref = anchor.href;
-    const anchorHref = normalizeUrl(absoluteHref);
+    const anchorHref = normalizeHashAwareUrl(absoluteHref);
     const isValid = anchorHref !== null
         && !shouldExcludeAnchorHref(rawHref, absoluteHref)
         && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);
@@ -472,7 +473,7 @@ function applyReactionForReferrerUrl(
     downloadedAt: string | null | undefined,
     blacklistedAt: string | null | undefined,
 ): void {
-    const normalizedReferrerUrl = normalizeUrl(referrerUrl);
+    const normalizedReferrerUrl = normalizeHashAwareUrl(referrerUrl);
     if (normalizedReferrerUrl === null) {
         return;
     }
@@ -488,7 +489,7 @@ function applyReactionForReferrerUrl(
         }
 
         const rawHref = anchor.getAttribute('href');
-        const anchorHref = normalizeUrl(anchor.href);
+        const anchorHref = normalizeHashAwareUrl(anchor.href);
         const isEligibleAnchor = anchorHref !== null
             && !shouldExcludeAnchorHref(rawHref, anchor.href)
             && urlMatchesAnyRule(anchorHref, currentRules, currentPageHostname);

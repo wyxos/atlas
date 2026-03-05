@@ -103,7 +103,7 @@ export function resolveMediaResolution(element: MediaElement): MediaResolution |
     return width > 0 && height > 0 ? { width, height } : null;
 }
 
-export function normalizeUrl(value: string | null | undefined): string | null {
+export function normalizeHashAwareUrl(value: string | null | undefined): string | null {
     if (typeof value !== 'string') {
         return null;
     }
@@ -117,7 +117,16 @@ export function normalizeUrl(value: string | null | undefined): string | null {
         return null;
     }
 
-    return trimmed.replace(/#.*$/, '');
+    return trimmed;
+}
+
+export function normalizeUrl(value: string | null | undefined): string | null {
+    const hashAware = normalizeHashAwareUrl(value);
+    if (hashAware === null) {
+        return null;
+    }
+
+    return hashAware.replace(/#.*$/, '');
 }
 
 export function isLikelyDomainRootUrl(url: string | null | undefined): boolean {
