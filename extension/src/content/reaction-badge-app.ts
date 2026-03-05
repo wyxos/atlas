@@ -2,7 +2,7 @@ import type { PropType } from 'vue';
 import { computed, createApp, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Ban, Download } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
-import { normalizeUrl, resolveMediaResolution, resolveMediaUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
+import { normalizeUrl, resolveIdentifiedMediaResolution, resolveMediaUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
@@ -231,7 +231,7 @@ const AtlasReactionBadge = defineComponent({
         }
 
         function syncResolution(): void {
-            const resolved = resolveMediaResolution(props.media);
+            const resolved = resolveIdentifiedMediaResolution(props.media);
             mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
         }
 

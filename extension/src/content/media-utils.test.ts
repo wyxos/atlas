@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { resolveReactionMediaUrl, resolveReactionTargetUrl, shouldExcludeAnchorHref, shouldExcludeMediaOrAnchorUrl } from './media-utils';
+import {
+    resolveIdentifiedMediaResolution,
+    resolveMediaResolution,
+    resolveReactionMediaUrl,
+    resolveReactionTargetUrl,
+    shouldExcludeAnchorHref,
+    shouldExcludeMediaOrAnchorUrl,
+} from './media-utils';
 
 describe('resolveReactionMediaUrl', () => {
     it('does not use video poster as reaction media url fallback', () => {
@@ -23,6 +30,36 @@ describe('resolveReactionTargetUrl', () => {
         video.poster = 'https://cdn.example.com/poster.jpg';
 
         expect(resolveReactionTargetUrl(video, 'https://www.facebook.com/reel/123')).toBe('https://www.facebook.com/reel/123');
+    });
+});
+
+describe('resolveIdentifiedMediaResolution', () => {
+    it('returns null for images until natural dimensions are known', () => {
+        const image = document.createElement('img');
+        image.width = 640;
+        image.height = 360;
+
+        expect(resolveIdentifiedMediaResolution(image)).toBeNull();
+        expect(resolveMediaResolution(image)).toEqual({ width: 640, height: 360 });
+
+        Object.defineProperty(image, 'naturalWidth', { value: 1920, configurable: true });
+        Object.defineProperty(image, 'naturalHeight', { value: 1080, configurable: true });
+
+        expect(resolveIdentifiedMediaResolution(image)).toEqual({ width: 1920, height: 1080 });
+    });
+
+    it('returns null for videos until metadata dimensions are known', () => {
+        const video = document.createElement('video');
+        Object.defineProperty(video, 'clientWidth', { value: 640, configurable: true });
+        Object.defineProperty(video, 'clientHeight', { value: 360, configurable: true });
+
+        expect(resolveIdentifiedMediaResolution(video)).toBeNull();
+        expect(resolveMediaResolution(video)).toEqual({ width: 640, height: 360 });
+
+        Object.defineProperty(video, 'videoWidth', { value: 1920, configurable: true });
+        Object.defineProperty(video, 'videoHeight', { value: 1080, configurable: true });
+
+        expect(resolveIdentifiedMediaResolution(video)).toEqual({ width: 1920, height: 1080 });
     });
 });
 

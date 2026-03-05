@@ -70,7 +70,26 @@ export function resolveReactionTargetUrl(element: MediaElement, pageUrl: string 
     return null;
 }
 
+export function resolveIdentifiedMediaResolution(element: MediaElement): MediaResolution | null {
+    if (element instanceof HTMLImageElement) {
+        const width = element.naturalWidth;
+        const height = element.naturalHeight;
+
+        return width > 0 && height > 0 ? { width, height } : null;
+    }
+
+    const width = element.videoWidth;
+    const height = element.videoHeight;
+
+    return width > 0 && height > 0 ? { width, height } : null;
+}
+
 export function resolveMediaResolution(element: MediaElement): MediaResolution | null {
+    const identifiedResolution = resolveIdentifiedMediaResolution(element);
+    if (identifiedResolution !== null) {
+        return identifiedResolution;
+    }
+
     if (element instanceof HTMLImageElement) {
         const width = element.naturalWidth || element.width;
         const height = element.naturalHeight || element.height;
