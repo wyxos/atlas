@@ -44,6 +44,8 @@ npm run check:js
 - ✅ DO: Extract reusable UI components to `resources/js/components/ui/`
 - ✅ DO: Follow the UI design system guidelines in `resources/js/components/ui/AGENTS.md`
 - ✅ DO: Use TypeScript for all components
+- ✅ DO: Extract repeated or interaction-heavy template blocks into child components once the parent template starts collecting many inline lambdas/casts
+- ❌ DON'T: Group code as generic `state`, `handlers`, and `callbacks` if those pieces actually belong to different feature slices
 - ✅ Example: `resources/js/components/AppHeader.vue` - header component with test
 - ✅ Example: `resources/js/components/ui/button/Button.vue` - reusable button component
 
@@ -51,6 +53,7 @@ npm run check:js
 - ✅ DO: Pages are route components, use Vue Router
 - ✅ DO: Keep pages focused on layout and composition
 - ✅ DO: Delegate logic to composables
+- ✅ DO: Keep parent components as orchestrators; child components should own DOM-level event noise for a focused UI slice
 - ✅ Example: `resources/js/pages/Browse.vue` - main browse page
 - ✅ Example: `resources/js/pages/Dashboard.vue` - dashboard layout
 
@@ -60,6 +63,8 @@ npm run check:js
 - ✅ DO: Colocate tests: `useFeature.ts` + `useFeature.test.ts`
 - ❌ DON'T: Create composables that only wrap a single method call
 - ❌ DON'T: Use composables for pure utility functions (use `utils/` instead)
+- ✅ DO: Group composables by feature capability (`browseState`, `containerActions`, `promptDialog`) instead of returning one flat bag of unrelated handlers
+- ❌ DON'T: Build god composables that mix hover state, dialog state, masonry events, tab routing, and toolbar actions in one API
 - ✅ Example: `resources/js/composables/useBrowseService.ts` - browse logic
 - ✅ Example: `resources/js/composables/useTabs.ts` - tab management
 

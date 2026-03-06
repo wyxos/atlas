@@ -3,22 +3,21 @@ import { computed, provide, ref, shallowRef, toRef, watch } from 'vue';
 import type { TabData, FeedItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem } from '@wyxos/vibe';
 import type { MasonryInstance } from '@wyxos/vibe';
-import { Info, Loader2 } from 'lucide-vue-next';
+import { Loader2 } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
-import FileReactions from './FileReactions.vue';
-import DislikeProgressBar from './DislikeProgressBar.vue';
-import { Button } from '@/components/ui/button';
-import Pill from './ui/Pill.vue';
 import { useBrowseService } from '@/composables/useBrowseService';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/composables/useBrowseService';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
-import { useTabContentInteractions } from '@/composables/useTabContentInteractions';
+import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
+import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
+import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
 import TabContentPromptDialog from './TabContentPromptDialog.vue';
 import TabContentStartForm from './TabContentStartForm.vue';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
+import TabContentMasonryItemOverlay from './TabContentMasonryItemOverlay.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from 'vue-toastification';
@@ -89,6 +88,12 @@ const availableServices = computed(() => {
     return props.availableServices.length > 0 ? props.availableServices : localServices.value;
 });
 
+const promptDialog = useTabContentPromptDialog(items);
+
+function resetItemPreloads(): void {
+    itemInteractions.preload.reset();
+}
+
 const {
     totalAvailable,
     masonryRenderKey,
@@ -116,10 +121,31 @@ const {
     fetchServices,
     fetchSources,
     clearPreviewedItems: itemPreview.clearPreviewedItems,
-    resetPreloadedItems: clearInteractionPreloadedItems,
+    resetPreloadedItems: resetItemPreloads,
     onLoadingStart: handleLoadingStart,
     onLoadingStop: handleLoadingStop,
     onUpdateTabLabel: props.onUpdateTabLabel,
+});
+
+const containerInteractions = useTabContentContainerInteractions({
+    items,
+    tab,
+    form,
+    masonry,
+    availableServices,
+    formatTabLabel,
+    onReaction: props.onReaction,
+    onOpenContainerTab: props.onOpenContainerTab,
+});
+const itemInteractions = useTabContentItemInteractions({
+    items,
+    tab,
+    form,
+    masonry,
+    fileViewer,
+    itemPreview,
+    onReaction: props.onReaction,
+    clearHoveredContainer: containerInteractions.clearHoveredContainer,
 });
 
 // Accumulate moderation data from each page load
@@ -198,66 +224,13 @@ function handleLoadingStop(): void {
     onLoadingStop();
 }
 
-function clearInteractionPreloadedItems(): void {
-    resetPreloadedItems();
+function handleResetFilters(): void {
+    form.reset();
 }
 
-const {
-    hoveredItemId,
-    containerBadges,
-    containerBlacklistManager,
-    containerPillInteractions,
-    promptData,
-    autoDislikeQueue,
-    getItemIndex,
-    isItemPreloaded,
-    hasActiveReaction,
-    resetPreloadedItems,
-    onMasonryClick,
-    onMasonryMouseDown,
-    handleResetFilters,
-    handleModerationRulesChanged,
-    cancelMasonryLoad,
-    loadNextPage,
-    handleMasonryRemoved,
-    handleMasonryItemClick,
-    handleMasonryItemContextMenu,
-    handleMasonryItemMouseDown,
-    handleMasonryItemAuxClick,
-    handleMasonryItemMouseEnter,
-    handleMasonryItemMouseLeave,
-    handleFileViewerOpen,
-    handleFileViewerClose,
-    handleBatchPreloaded,
-    handleBatchFailures,
-    handleItemPreloaded,
-    handleContainerPillMouseEnter,
-    handleContainerPillMouseLeave,
-    handleContainerPillClick,
-    handleContainerPillDblClick,
-    handleContainerPillContextMenu,
-    handleContainerPillAuxClick,
-    handleContainerPillMouseDown,
-    handlePillDismiss,
-    handlePromptDialogClick,
-    handleFileReaction,
-    handleFileViewerReaction,
-    handleCopyPromptClick,
-    handleTestPromptClick,
-    handlePromptDialogUpdate,
-    isContainerBlacklistable,
-} = useTabContentInteractions({
-    items,
-    tab,
-    form,
-    masonry,
-    fileViewer,
-    availableServices,
-    itemPreview,
-    formatTabLabel,
-    onReaction: props.onReaction,
-    onOpenContainerTab: props.onOpenContainerTab,
-});
+function handleModerationRulesChanged(): void {
+    // TODO: Implement moderation rules changed logic.
+}
 
 defineExpose({
     // Expose compatibility fields used by some Browse tests
@@ -266,7 +239,10 @@ defineExpose({
     hasServiceSelected,
     loadAtPage,
     isTabRestored,
-    containerPillInteractions,
+    hoveredItemIndex: itemInteractions.state.hoveredItemIndex,
+    hoveredItemId: itemInteractions.state.hoveredItemId,
+    containerBadges: containerInteractions.badges,
+    containerPillInteractions: containerInteractions.pillInteractions,
     // Expose the per-tab form for tests/debugging
     browseForm: form,
     masonry,
@@ -282,16 +258,18 @@ defineExpose({
             :update-feed="(value) => form.data.feed = value" :update-service="updateService"
             :update-source="(value) => form.data.source = value" :apply-service="applyService"
             :apply-filters="applyFilters" :reset-filters="handleResetFilters"
-            :rules-changed="handleModerationRulesChanged" :cancel-masonry-load="cancelMasonryLoad" :load-next-page="loadNextPage">
-            <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading"
+            :rules-changed="handleModerationRulesChanged" :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
+            :load-next-page="itemInteractions.masonry.loadNextPage">
+            <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"
                 @blacklists-changed="handleModerationRulesChanged" />
         </TabContentServiceHeader>
 
         <!-- Masonry Content -->
         <div class="flex-1 min-h-0 overflow-hidden">
             <!-- Masonry -->
-            <div class="relative flex h-full min-h-0 flex-col overflow-hidden masonry-container" ref="masonryContainer" @click="onMasonryClick"
-                @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
+            <div class="relative flex h-full min-h-0 flex-col overflow-hidden masonry-container" ref="masonryContainer"
+                @click="itemInteractions.masonry.onClick" @contextmenu.prevent="itemInteractions.masonry.onClick"
+                @mousedown="itemInteractions.masonry.onMouseDown">
 
                 <TabContentStartForm v-if="shouldShowForm" :form="form" :available-services="availableServices"
                     :available-sources="availableSources" :is-loading="masonry?.isLoading ?? false"
@@ -305,9 +283,9 @@ defineExpose({
                     :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
-                    @preloaded="handleBatchPreloaded" @failures="handleBatchFailures"
-                    @removed="handleMasonryRemoved" data-test="masonry-component">
-                    <MasonryItem @preloaded="handleItemPreloaded">
+                    @preloaded="itemInteractions.preload.onBatchPreloaded" @failures="itemInteractions.preload.onBatchFailures"
+                    @removed="itemInteractions.masonry.onRemoved" data-test="masonry-component">
+                    <MasonryItem @preloaded="itemInteractions.preload.onItemPreloaded">
                         <template #loader>
                             <div class="flex h-full w-full items-center justify-center text-twilight-indigo-200">
                                 <Loader2 :size="20" class="animate-spin" />
@@ -319,78 +297,9 @@ defineExpose({
                         </template>
 
                         <template #overlay="{ item, remove }">
-                            <div class="relative h-full w-full"
-                                @mouseenter="(e: MouseEvent) => handleMasonryItemMouseEnter(e, item as FeedItem)"
-                                @mouseleave="(e: MouseEvent) => handleMasonryItemMouseLeave(e, item as FeedItem)"
-                                :data-file-id="(item as FeedItem).id"
-                                :class="[
-                                    'overflow-hidden rounded-xl transition-colors transition-opacity duration-200',
-                                    containerBadges.getMasonryItemClasses.value(item as FeedItem),
-                                ]"
-                                @click="(e: MouseEvent) => handleMasonryItemClick(e, item as FeedItem)"
-                                @contextmenu="(e: MouseEvent) => handleMasonryItemContextMenu(e, item as FeedItem)"
-                                @mousedown="(e: MouseEvent) => handleMasonryItemMouseDown(e, item as FeedItem)"
-                                @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item as FeedItem)">
-                                <!-- When hovering a container pill, dim non-siblings to focus context -->
-                                <div
-                                    class="absolute inset-0 bg-black/50 pointer-events-none transition-opacity duration-200"
-                                    :class="(containerBadges.activeHoveredContainerId.value !== null && !containerBadges.isSiblingItem(item as FeedItem, containerBadges.activeHoveredContainerId.value)) ? 'opacity-100' : 'opacity-0'"
-                                />
-                                <!-- Container badges (shows on hover with type and count) -->
-                                <Transition name="fade">
-                                    <div v-if="hoveredItemId === ((item as FeedItem).id as number) && isItemPreloaded((item as FeedItem).id as number) && containerBadges.getContainersForItem(item as FeedItem).length > 0"
-                                        class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
-                                        <div v-for="container in containerBadges.getContainersForItem(item as FeedItem)"
-                                            :key="container.id" class="cursor-pointer"
-                                            @mouseenter="handleContainerPillMouseEnter(container.id)"
-                                            @mouseleave="handleContainerPillMouseLeave"
-                                            @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
-                                            @dblclick.prevent.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
-                                            @contextmenu.prevent.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
-                                            @auxclick.prevent.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
-                                            @mousedown.stop="handleContainerPillMouseDown">
-                                            <Pill :label="container.type"
-                                                :value="containerBadges.getItemCountForContainerId(container.id)"
-                                                :variant="containerBadges.getVariantForContainerType(container.type)"
-                                                :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
-                                                @dismiss="() => handlePillDismiss(container)" />
-                                        </div>
-                                    </div>
-                                </Transition>
-
-                                <!-- Info badge -->
-                                <Transition name="fade">
-                                    <div v-if="hoveredItemId === ((item as FeedItem).id as number) && isItemPreloaded((item as FeedItem).id as number)"
-                                        class="absolute top-2 right-2 z-50 pointer-events-auto">
-                                        <Button variant="ghost" size="sm"
-                                            class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
-                                            @click.stop="handlePromptDialogClick(item as FeedItem)" aria-label="Show prompt">
-                                            <Info :size="14" />
-                                        </Button>
-                                    </div>
-                                </Transition>
-
-                                <!-- Hover reactions overlay -->
-                                <Transition name="fade">
-                                    <div v-if="(hoveredItemId === ((item as FeedItem).id as number) || hasActiveReaction(item as FeedItem)) && isItemPreloaded((item as FeedItem).id as number)"
-                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                        <FileReactions :file-id="(item as FeedItem).id as number" :reaction="(item as FeedItem).reaction as ({ type: string } | null | undefined)"
-                                            :previewed-count="(item as FeedItem).previewed_count"
-                                            :viewed-count="(item as FeedItem).seen_count"
-                                            :current-index="getItemIndex((item as FeedItem).id as number)"
-                                            :total-items="items.length" variant="small" :remove-item="remove"
-                                            @reaction="(type) => handleFileReaction(item as FeedItem, type)" />
-                                    </div>
-                                </Transition>
-
-                                <!-- Progress Bar Overlay (only show if will_auto_dislike is true and countdown is active) -->
-                                <DislikeProgressBar
-                                    v-if="(item as FeedItem).will_auto_dislike && autoDislikeQueue.hasActiveCountdown((item as FeedItem).id as number)"
-                                    :progress="autoDislikeQueue.getCountdownProgress((item as FeedItem).id as number)"
-                                    :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime((item as FeedItem).id as number))"
-                                    :is-frozen="autoDislikeQueue.isFrozen.value"
-                                    :is-hovered="hoveredItemId === ((item as FeedItem).id as number) && autoDislikeQueue.hasActiveCountdown((item as FeedItem).id as number)" />
-                            </div>
+                            <TabContentMasonryItemOverlay :item="item as FeedItem" :items-length="items.length"
+                                :remove-item="remove" :containers="containerInteractions"
+                                :item-interactions="itemInteractions" :prompt-dialog="promptDialog" />
                         </template>
                     </MasonryItem>
                 </Masonry>
@@ -400,19 +309,19 @@ defineExpose({
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :masonry="masonry"
-            @open="handleFileViewerOpen" @close="handleFileViewerClose"
-            @reaction="handleFileViewerReaction" />
+            @open="itemInteractions.viewer.onOpen" @close="itemInteractions.viewer.onClose"
+            @reaction="itemInteractions.viewer.onReaction" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
             :visible="tab !== null && tab !== undefined && !shouldShowForm" :total="totalAvailable"
             @first-page="goToFirstPage" />
 
-        <TabContentPromptDialog :open="promptData.promptDialogOpen.value"
-            :item-id="promptData.promptDialogItemId.value" :loading="promptData.promptDataLoading.value"
-            :prompt="promptData.currentPromptData.value" :update-open="handlePromptDialogUpdate"
-            :copy-prompt="handleCopyPromptClick" :test-prompt="handleTestPromptClick"
-            :close-prompt="promptData.closePromptDialog" />
+        <TabContentPromptDialog :open="promptDialog.data.promptDialogOpen.value"
+            :item-id="promptDialog.data.promptDialogItemId.value" :loading="promptDialog.data.promptDataLoading.value"
+            :prompt="promptDialog.data.currentPromptData.value" :update-open="promptDialog.setOpen"
+            :copy-prompt="promptDialog.copy" :test-prompt="promptDialog.openTestPage"
+            :close-prompt="promptDialog.close" />
 
     </div>
     <div v-else class="flex items-center justify-center h-full" data-test="no-tab-message">
