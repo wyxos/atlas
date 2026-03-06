@@ -7,7 +7,12 @@ import {
     type MediaElement,
 } from './media-utils';
 import { urlMatchesAnyRule } from '../match-rules';
-import { applyAnchorMatchDecoration, applyAnchorOpenedDecoration, clearAnchorMatchDecoration } from './anchor-match-decoration';
+import {
+    applyAnchorCheckingDecoration,
+    applyAnchorMatchDecoration,
+    applyAnchorOpenedDecoration,
+    clearAnchorMatchDecoration,
+} from './anchor-match-decoration';
 import { enqueueReferrerCheck, getCachedReferrerCheck, upsertReferrerCheckCache } from './referrer-check-queue';
 import { invalidateOpenTabCheckCache, isUrlOpenInAnotherTab, toComparableOpenTabUrl } from './open-anchor-tab-check';
 import type { ProgressEvent } from './download-progress-bus';
@@ -74,6 +79,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
     function clearAnchorMediaAttributes(media: MediaElement): void {
         media.removeAttribute(ANCHOR_MEDIA_BORDER_ATTR);
         media.removeAttribute(ANCHOR_MEDIA_MATCH_ATTR);
+        media.removeAttribute('data-atlas-anchor-checking');
         media.removeAttribute('data-atlas-anchor-opened-elsewhere');
         media.removeAttribute('data-atlas-anchor-reaction');
         media.removeAttribute('data-atlas-anchor-downloaded-at');
@@ -91,6 +97,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         applyAnchorMatchDecoration(media, reaction);
         media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
         media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
+        media.removeAttribute('data-atlas-anchor-checking');
         media.removeAttribute('data-atlas-anchor-opened-elsewhere');
 
         if (result.reaction) {
@@ -116,6 +123,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         applyAnchorOpenedDecoration(media);
         media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
         media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
+        media.removeAttribute('data-atlas-anchor-checking');
         media.setAttribute('data-atlas-anchor-opened-elsewhere', '1');
         media.removeAttribute('data-atlas-anchor-reaction');
         media.removeAttribute('data-atlas-anchor-downloaded-at');
@@ -150,8 +158,19 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         const referrerKey = anchorHref;
         anchorReferrerKeyByMedia.set(media, referrerKey);
         const isCacheOnly = optionsOverride?.referrerMatchFromCacheOnly === true;
-        const referrerResultPromise = isCacheOnly
-            ? Promise.resolve(getCachedReferrerCheck(anchorHref))
+        const cachedResult = getCachedReferrerCheck(anchorHref);
+        if (!isCacheOnly && cachedResult === null) {
+            applyAnchorCheckingDecoration(media);
+            media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+            media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
+            media.setAttribute('data-atlas-anchor-checking', '1');
+            media.removeAttribute('data-atlas-anchor-opened-elsewhere');
+            media.removeAttribute('data-atlas-anchor-reaction');
+            media.removeAttribute('data-atlas-anchor-downloaded-at');
+            media.removeAttribute('data-atlas-anchor-blacklisted-at');
+        }
+        const referrerResultPromise = isCacheOnly || cachedResult !== null
+            ? Promise.resolve(cachedResult)
             : enqueueReferrerCheck(anchorHref).then((result) => result);
 
         void referrerResultPromise.then((result) => {
