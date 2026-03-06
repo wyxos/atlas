@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, provide, ref, shallowRef, triggerRef, watch } from 'vue';
+import { computed, nextTick, onUnmounted, provide, ref, shallowRef, toRef, triggerRef, watch } from 'vue';
 import type { TabData, FeedItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem } from '@wyxos/vibe';
-import type { MasonryInstance, MasonryRestoredPages, PageToken } from '@wyxos/vibe';
+import type { MasonryInstance } from '@wyxos/vibe';
 import {
     ChevronDown,
     Copy,
@@ -36,16 +36,15 @@ import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
-import { BrowseFormKey, createBrowseForm, type BrowseFormData } from '@/composables/useBrowseForm';
+import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/composables/useBrowseService';
+import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import TabFilter from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from 'vue-toastification';
-import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
-import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
-import { getLocalPresetLabel } from '@/lib/localPresets';
+import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
@@ -71,7 +70,6 @@ const emit = defineEmits<{
 // Use shallowRef to reduce Vue reactivity overhead with large arrays (3k+ items)
 // This prevents deep reactivity tracking on each item, significantly improving performance
 const items = shallowRef<FeedItem[]>([]);
-const totalAvailable = ref<number | null>(null);
 
 // Diagnostic: Log item size analysis when items change (only in dev mode)
 watch(
@@ -108,10 +106,6 @@ function getItemIndex(itemId: number): number | undefined {
     return itemIndexById.value.get(itemId);
 }
 
-const masonryRenderKey = ref(0);
-const startPageToken = ref<PageToken>(1);
-const restoredPages = ref<MasonryRestoredPages | null>(null);
-
 // Track which items have successfully preloaded so overlays can gate UI like the old implementation did.
 const preloadedItemIds = ref<Set<number>>(new Set());
 
@@ -146,7 +140,7 @@ const tabContentContainer = ref<HTMLElement | null>(null);
 const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Item preview composable (needs to be initialized early)
-const itemPreview = useItemPreview(items, computed(() => tab.value));
+const itemPreview = useItemPreview(items, computed(() => tab.value ?? undefined));
 
 // Browse service composable - fetch services if not provided via prop
 const { availableServices: localServices, availableSources, localService, fetchServices, fetchSources } = useBrowseService();
@@ -156,46 +150,40 @@ const availableServices = computed(() => {
     return props.availableServices.length > 0 ? props.availableServices : localServices.value;
 });
 
-function updateService(nextService: string): void {
-    const defaults = availableServices.value.find((s) => s.key === nextService)?.defaults;
-    form.setService(nextService, defaults);
-}
-
-function normalizeContainerValue(value: unknown): string | null {
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        return trimmed.length > 0 ? trimmed : null;
-    }
-    if (typeof value === 'number') {
-        return Number.isFinite(value) ? String(value) : null;
-    }
-    return null;
-}
-
-function getContainerLabelFromFilters(): string | null {
-    if (form.data.feed !== 'online') {
-        return null;
-    }
-
-    if (form.data.service === 'civit-ai-images') {
-        const username = normalizeContainerValue(form.data.serviceFilters?.username);
-        if (username) {
-            return `User ${username}`;
-        }
-
-        const postId = normalizeContainerValue(form.data.serviceFilters?.postId);
-        if (postId) {
-            return `Post ${postId}`;
-        }
-    }
-
-    return null;
-}
-
-function formatTabLabel(serviceLabel: string, pageToken: PageToken, containerLabel?: string | null): string {
-    const prefix = containerLabel ? `${serviceLabel}: ${containerLabel}` : serviceLabel;
-    return `${prefix} - ${String(pageToken)}`;
-}
+const {
+    totalAvailable,
+    masonryRenderKey,
+    startPageToken,
+    restoredPages,
+    loadAtPage,
+    isTabRestored,
+    shouldShowForm,
+    selectedService,
+    currentTabService,
+    hasServiceSelected,
+    updateService,
+    formatTabLabel,
+    getPage,
+    applyFilters,
+    goToFirstPage,
+    applyService,
+} = useTabContentBrowseState({
+    tabId: toRef(props, 'tabId'),
+    form,
+    items,
+    tab,
+    availableServices,
+    localService,
+    fetchServices,
+    fetchSources,
+    clearPreviewedItems: itemPreview.clearPreviewedItems,
+    resetPreloadedItems: () => {
+        preloadedItemIds.value = new Set();
+    },
+    onLoadingStart: handleLoadingStart,
+    onLoadingStop: handleLoadingStop,
+    onUpdateTabLabel: props.onUpdateTabLabel,
+});
 
 // Accumulate moderation data from each page load
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
@@ -249,172 +237,11 @@ function onLoadingStop(): void {
     }
 }
 
-const selectedService = computed({
-    get: () => form.data.service,
-    set: (value: string) => {
-        form.data.service = value;
-    },
-});
-
-const currentTabService = computed(() => {
-    const fromTab = tab.value?.params?.service;
-    return (typeof fromTab === 'string' && fromTab.length > 0) ? fromTab : (form.data.service || null);
-});
-
-const hasServiceSelected = computed(() => {
-    // In online mode, a service must be selected.
-    if (form.data.feed === 'online') {
-        return Boolean(form.data.service);
-    }
-
-    // In local mode, service selection is not required.
-    return true;
-});
-
-// Tracks the page we intend to load (used by some tests).
-const loadAtPage = ref<number | string | null>(null);
-
-// Back-compat flag referenced by some tests.
-const isTabRestored = ref(false);
-
-// Check if we should show the form (new tab with no items)
-const shouldShowForm = ref(true);
-
 const layout = {
     gutterX: 12,
     gutterY: 12,
     sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
 };
-
-async function getPage(page: PageToken, context?: BrowseFormData) {
-    const formData = context || form.getData();
-    // Canonical query contract:
-    // - Online browsing: `service=<serviceKey>`
-    // - Local browsing: `source=<sourceName>` (filters local files by source column)
-    // Never send `source` in online mode.
-    const params: Record<string, unknown> = {
-        feed: formData.feed,
-        tab_id: formData.tab_id,
-        page,
-        limit: formData.limit,
-    };
-
-    if (formData.feed === 'online') {
-        params.service = formData.service;
-    } else {
-        params.source = formData.source;
-    }
-
-    // Flatten service-specific filters into the query params, but don't let them override
-    // the envelope keys above.
-    const reserved = new Set(['service', 'source', 'feed', 'tab_id', 'page', 'limit', 'serviceFilters']);
-    for (const [k, v] of Object.entries(formData.serviceFilters || {})) {
-        if (reserved.has(k)) {
-            continue;
-        }
-        params[k] = v;
-    }
-
-    if (props.onUpdateTabLabel) {
-        if (formData.feed === 'local' || (formData.feed === 'online' && formData.service)) {
-            const baseServiceLabel = formData.feed === 'local'
-                ? (localService.value?.label ?? 'Local')
-                : (availableServices.value.find((s) => s.key === formData.service)?.label ?? formData.service);
-
-            const localPresetLabel = formData.feed === 'local'
-                ? getLocalPresetLabel(formData.serviceFilters?.local_preset)
-                : null;
-
-            const serviceLabel = localPresetLabel ? `${baseServiceLabel} - ${localPresetLabel}` : baseServiceLabel;
-            const containerLabel = getContainerLabelFromFilters();
-            props.onUpdateTabLabel(formatTabLabel(serviceLabel, page, containerLabel));
-        }
-    }
-
-    handleLoadingStart();
-    try {
-        const { data } = await window.axios.get(browseIndex.url({ query: params }));
-
-        totalAvailable.value = typeof data.total === 'number'
-            ? data.total
-            : (Number.isFinite(Number(data.total)) ? Number(data.total) : null);
-
-        return {
-            items: data.items || [],
-            nextPage: data.nextPage,
-        };
-    } catch (error: unknown) {
-        const err = error as { message?: unknown; response?: { data?: { message?: unknown } } };
-        const message =
-            (typeof err?.response?.data?.message === 'string' ? err.response.data.message : null) ||
-            (typeof err?.message === 'string' ? err.message : null) ||
-            'Browse request failed.';
-        const trimmed = typeof message === 'string' && message.length > 280
-            ? `${message.slice(0, 280)}…`
-            : message;
-
-        // Avoid silent "blank page" when Typesense / network errors occur.
-        toast.error(trimmed);
-        // Keep a console breadcrumb for diagnosing intermittent refresh failures.
-        // Tests suppress console.error by default.
-        console.error('Browse request failed', { params, error });
-
-        totalAvailable.value = null;
-
-        return {
-            items: [],
-            nextPage: null,
-        };
-    } finally {
-        // Best-effort: Masonry no longer emits loading:stop, so we stop here.
-        handleLoadingStop();
-    }
-}
-
-async function applyFilters() {
-    // Best-effort cancel/reset: remount Masonry.
-    shouldShowForm.value = false;
-
-    // Preview increments are de-duped for the lifetime of this TabContent instance.
-    // When filters/presets change, we want a clean slate for the new result set.
-    itemPreview.clearPreviewedItems();
-
-    // Online browsing uses cursor-based pagination; when filters change, always restart at page 1.
-    // Local browsing can optionally jump to a specific numeric page via Advanced Filters.
-    const normalizeLocalPage = (): number => {
-        const raw = form.data.page;
-        const n = typeof raw === 'number' ? raw : Number(raw);
-        if (!Number.isFinite(n) || n < 1) {
-            return 1;
-        }
-        return Math.floor(n);
-    };
-
-    const nextStart: PageToken = form.data.feed === 'local' ? normalizeLocalPage() : 1;
-    form.data.page = nextStart;
-    items.value = [];
-    preloadedItemIds.value = new Set();
-    restoredPages.value = null;
-    startPageToken.value = nextStart;
-    masonryRenderKey.value += 1;
-    // Wait for next tick to ensure form data updates are reactive
-    await nextTick();
-}
-
-async function goToFirstPage(): Promise<void> {
-    form.data.page = 1;
-    await applyFilters();
-}
-
-async function applyService() {
-    shouldShowForm.value = false;
-    itemPreview.clearPreviewedItems();
-    items.value = [];
-    preloadedItemIds.value = new Set();
-    restoredPages.value = null;
-    startPageToken.value = 1;
-    masonryRenderKey.value += 1;
-}
 
 function onMasonryClick(e: MouseEvent): void {
     // Normal click behavior - open overlay (only for left click)
@@ -500,7 +327,7 @@ function handleContainerBan(container: {
 const containerPillInteractions = useContainerPillInteractions(
     items,
     masonry,
-    computed(() => tab.value.id),
+    computed(() => tab.value?.id),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
         props.onReaction(fileId, type);
     },
@@ -561,13 +388,7 @@ const containerPillInteractions = useContainerPillInteractions(
         // When browsing online, keep any existing serviceFilters so a user can keep their current context.
         // In local mode, serviceFilters are local-specific and should not be forwarded to an online service tab.
         if (form.data.feed === 'online') {
-            const reserved = new Set(['service', 'source', 'feed', 'tab_id', 'page', 'limit', 'serviceFilters']);
-            for (const [k, v] of Object.entries(form.data.serviceFilters || {})) {
-                if (reserved.has(k)) {
-                    continue;
-                }
-                params[k] = v;
-            }
+            appendBrowseServiceFilters(params, form.data.serviceFilters);
         }
 
         let hasContainerFilter = false;
@@ -878,73 +699,6 @@ function handleLoadingStop(): void {
     // Also call onLoadingStop for moderation toast handling
     onLoadingStop();
 }
-
-// Initialize tab state on mount - this will run every time the component is created (tab switch)
-onMounted(async () => {
-    if (!props.tabId) {
-        return;
-    }
-
-    const { data } = await window.axios.get(tabsShow.url(props.tabId));
-
-    if (data.tab) {
-        tab.value = data.tab;
-
-        form.syncFromTab(tab.value);
-
-        const params = (tab.value?.params ?? {}) as Record<string, unknown>;
-
-        const itemsToRestore = Array.isArray(data.tab.items) ? data.tab.items : [];
-        const hasRestoredItems = itemsToRestore.length > 0;
-
-        const hasMeaningfulParams = Object.keys(params).length > 0;
-        const shouldRestoreUi = hasRestoredItems || hasMeaningfulParams;
-
-        if (shouldRestoreUi) {
-            // Restore items + pagination state.
-            // Hide form since we're resuming a previous session/search.
-            shouldShowForm.value = false;
-            isTabRestored.value = hasRestoredItems;
-
-            const savedNextToken = params.page as PageToken | null | undefined;
-
-            items.value = itemsToRestore as FeedItem[];
-            preloadedItemIds.value = new Set();
-
-            // Vibe contract: `page` is the next token to load.
-            // `restoredPages` is optional history; Vibe can resume without it when items are preloaded.
-            restoredPages.value = null;
-            startPageToken.value = (savedNextToken ?? 1) as PageToken;
-
-            // Ensure Masonry is remounted after restoring state.
-            masonryRenderKey.value += 1;
-
-            // Let the DOM catch up before any follow-up work.
-            await nextTick();
-        }
-    }
-
-    await fetchServices();
-
-    // Legacy migration: older tabs stored the selected online service in `params.source`.
-    // If we restored an online tab with an empty `service`, upgrade it in-memory so the
-    // UI and requests consistently use `service`.
-    if (form.data.feed === 'online' && !form.data.service) {
-        const legacyCandidate = tab.value?.params?.source;
-        if (typeof legacyCandidate === 'string' && legacyCandidate.length > 0) {
-            const isKnownService = availableServices.value.some((s) => s.key === legacyCandidate);
-            if (isKnownService) {
-                updateService(legacyCandidate);
-                // Reset local-mode source to its default to avoid leaking it into UI.
-                form.data.source = 'all';
-            }
-        }
-    }
-
-    await fetchSources();
-});
-
-
 
 // Cleanup on unmount
 onUnmounted(() => {
