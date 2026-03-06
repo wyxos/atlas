@@ -211,6 +211,7 @@ async function getRuntimeCookies(urls: string[]): Promise<RuntimeCookie[]> {
 }
 
 async function submitReactionViaRuntime(
+    endpoint: string,
     atlasDomain: string,
     apiToken: string,
     body: Record<string, unknown>,
@@ -224,6 +225,7 @@ async function submitReactionViaRuntime(
             chrome.runtime.sendMessage(
                 {
                     type: 'ATLAS_SUBMIT_REACTION',
+                    endpoint,
                     atlasDomain,
                     apiToken,
                     body,
@@ -345,7 +347,7 @@ export async function submitBadgeReaction(
             endpoint,
             'POST',
             requestBody,
-            () => submitReactionViaRuntime(stored.atlasDomain, stored.apiToken, requestBody),
+            () => submitReactionViaRuntime(endpoint, stored.atlasDomain, stored.apiToken, requestBody),
         );
         if (runtimeResponse !== null) {
             if (!runtimeResponse.ok) {
