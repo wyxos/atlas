@@ -179,6 +179,7 @@ After you've finished editing
   - Version bump helpers: `npm run package:extension -- --bump=patch|minor|major` or set explicit version with `npm run package:extension -- --version=1.2.3`
   - Content script build gotcha: if `extension/vite.content.config.ts` builds a `.vue` import, keep `@vitejs/plugin-vue` enabled there, set `build.lib.cssFileName`, and include the emitted CSS file in `manifest.json` `content_scripts[].css`.
   - Extension automation gotcha: Chrome stable no longer reliably honors `--load-extension` for side-loaded unpacked extensions; use Brave/Chromium with an isolated `userDataDir` for automated extension testing so it does not collide with a live profile.
+  - Codex extension automation workflow: use `npm run test:extension:automation` instead of `chrome://extensions` reload. It rebuilds `extension/dist`, copies the unpacked build to `%USERPROFILE%/Downloads/atlas-extension-automation` (override with `ATLAS_EXTENSION_AUTOMATION_DIR`), rewrites local `.playwright-mcp/config.json`, and restarts only the isolated Brave automation profile.
 
 ### Testing
 - **Test Suite**: `tests/` → [see tests/AGENTS.md](tests/AGENTS.md)

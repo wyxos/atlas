@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "build:extension": "vite build --config extension/vite.config.ts && vite build --config extension/vite.content.config.ts",
+    "test:extension:automation": "npm run build:extension && node scripts/restart-extension-automation.mjs",
     "package:extension": "npm run build:extension && php scripts/package-extension.php",
     "package:extension:local": "npm run build:extension && php scripts/package-extension.php --bump=patch",
     "dev": "vite",
