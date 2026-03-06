@@ -38,6 +38,10 @@ function mediaMatchesRules(element: MediaElement): boolean {
 }
 
 function mediaHasEligibleWidgetWidth(element: MediaElement): boolean {
+    if (element instanceof HTMLVideoElement) {
+        return true;
+    }
+
     const resolution = resolveMediaResolution(element);
     if (resolution === null) {
         // Dimensions are unknown until media metadata is available.
