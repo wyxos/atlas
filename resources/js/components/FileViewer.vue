@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import {computed, ref, reactive, nextTick, onUnmounted, watch, toRef} from 'vue';
-import {X, Loader2, PanelRightOpen, Pause, Play, Maximize2, Minimize2} from 'lucide-vue-next';
+import { computed, nextTick, onUnmounted, reactive, ref, toRef } from 'vue';
+import { PanelRightOpen } from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
-import FileReactions from './FileReactions.vue';
-import type {FeedItem} from '@/composables/useTabs';
-import type {ReactionType} from '@/types/reaction';
-import type {Masonry} from '@wyxos/vibe';
-import {useOverlayVideoControls} from '@/composables/useOverlayVideoControls';
-import {useOverlayAudioControls} from '@/composables/useOverlayAudioControls';
-import {useFileViewerNavigation} from '@/composables/useFileViewerNavigation';
-import {useFileViewerSizing} from '@/composables/useFileViewerSizing';
-import {useFileViewerOverlayState} from '@/composables/useFileViewerOverlayState';
-import {useFileViewerOpen} from '@/composables/useFileViewerOpen';
-import {useFileViewerPaging} from '@/composables/useFileViewerPaging';
-import {useFileViewerData} from '@/composables/useFileViewerData';
-import {useFileViewerSheetSizing} from '@/composables/useFileViewerSheetSizing';
-import {useFileViewerOverlayStyles} from '@/composables/useFileViewerOverlayStyles';
-import {useFileViewerPreload} from '@/composables/useFileViewerPreload';
+import FileViewerMediaStage from './FileViewerMediaStage.vue';
+import type { FeedItem } from '@/composables/useTabs';
+import type { ReactionType } from '@/types/reaction';
+import type { Masonry } from '@wyxos/vibe';
+import { useOverlayVideoControls } from '@/composables/useOverlayVideoControls';
+import { useOverlayAudioControls } from '@/composables/useOverlayAudioControls';
+import { useFileViewerNavigation } from '@/composables/useFileViewerNavigation';
+import { useFileViewerSizing } from '@/composables/useFileViewerSizing';
+import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlayState';
+import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
+import { useFileViewerPaging } from '@/composables/useFileViewerPaging';
+import { useFileViewerData } from '@/composables/useFileViewerData';
+import { useFileViewerSheetSizing } from '@/composables/useFileViewerSheetSizing';
+import { useFileViewerOverlayStyles } from '@/composables/useFileViewerOverlayStyles';
+import { useFileViewerPreload } from '@/composables/useFileViewerPreload';
+import { useFileViewerSheetState } from '@/composables/useFileViewerSheetState';
+import { useFileViewerReactionFlow } from '@/composables/useFileViewerReactionFlow';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -36,16 +38,6 @@ const emit = defineEmits<{
 const items = toRef(props, 'items');
 const hasMore = computed(() => !props.masonry?.hasReachedEnd);
 const isLoading = computed(() => props.masonry?.isLoading ?? false);
-const currentItem = computed(() => {
-    const index = navigationState.currentItemIndex;
-    if (index === null || index < 0 || index >= items.value.length) {
-        return null;
-    }
-    return items.value[index] ?? null;
-});
-const currentItemId = ref<number | null>(null);
-
-// Overlay state
 const overlayVideoRef = ref<HTMLVideoElement | null>(null);
 const overlayAudioRef = ref<HTMLAudioElement | null>(null);
 
@@ -78,96 +70,19 @@ const navigationState = reactive({
     currentTarget: null as number | null,
 });
 
-const sheetState = reactive({
-    isOpen: false,
-});
-
-const FILE_VIEWER_SHEET_OPEN_STORAGE_KEY = 'atlas:fileViewerSheetOpen';
-
-function readFileViewerSheetOpenPreference(): boolean | null {
-    if (typeof window === 'undefined' || !('localStorage' in window)) {
-        return null;
-    }
-
-    try {
-        const raw = window.localStorage.getItem(FILE_VIEWER_SHEET_OPEN_STORAGE_KEY);
-        if (raw === null) {
-            return null;
-        }
-
-        if (raw === '1' || raw === 'true') {
-            return true;
-        }
-
-        if (raw === '0' || raw === 'false') {
-            return false;
-        }
-
-        return null;
-    } catch {
-        return null;
-    }
-}
-
-function writeFileViewerSheetOpenPreference(value: boolean): void {
-    if (typeof window === 'undefined' || !('localStorage' in window)) {
-        return;
-    }
-
-    try {
-        window.localStorage.setItem(FILE_VIEWER_SHEET_OPEN_STORAGE_KEY, value ? '1' : '0');
-    } catch {
-        // Ignore storage errors (private mode, quota, etc.)
-    }
-}
-
-const sheetOpenPreference = ref<boolean | null>(readFileViewerSheetOpenPreference());
-if (sheetOpenPreference.value !== null) {
-    sheetState.isOpen = sheetOpenPreference.value;
-}
-
-function setSheetOpen(isOpen: boolean, options?: { persist?: boolean }): void {
-    sheetState.isOpen = isOpen;
-
-    if (options?.persist === false) {
-        return;
-    }
-
-    sheetOpenPreference.value = isOpen;
-    writeFileViewerSheetOpenPreference(isOpen);
-}
-
 const containerState = reactive({
     isLoadingMore: false,
     overflow: null as string | null,
     overscroll: null as string | null,
 });
 
+const sheet = useFileViewerSheetState({
+    overlay: overlayState,
+});
+const sheetState = sheet.sheetState;
 const currentItemIndex = toRef(navigationState, 'currentItemIndex');
 
-const {
-    videoCurrentTime,
-    videoDuration,
-    isVideoPlaying,
-    isVideoFullscreen,
-    videoVolume,
-    videoProgressPercent,
-    videoVolumePercent,
-    overlayVideoPoster,
-    handleVideoLoadedMetadata: syncVideoPlaybackMetadata,
-    handleVideoTimeUpdate,
-    handleVideoPlay,
-    handleVideoPause,
-    handleVideoEnded,
-    handleVideoVolumeChange,
-    toggleVideoPlayback,
-    handleVideoSeek,
-    handleVideoSeekStart,
-    handleVideoSeekEnd,
-    handleVideoVolumeInput,
-    toggleVideoFullscreen,
-    handleFullscreenChange,
-} = useOverlayVideoControls({
+const video = useOverlayVideoControls({
     overlayVideoRef,
     overlayMediaType: toRef(overlayState, 'mediaType'),
     overlayFillComplete: toRef(overlayState, 'fillComplete'),
@@ -176,25 +91,7 @@ const {
     overlayImageSrc: computed(() => overlayState.image?.src ?? null),
 });
 
-const {
-    audioCurrentTime,
-    audioDuration,
-    isAudioPlaying,
-    audioVolume,
-    audioProgressPercent,
-    audioVolumePercent,
-    handleAudioLoadedMetadata,
-    handleAudioTimeUpdate,
-    handleAudioPlay,
-    handleAudioPause,
-    handleAudioEnded,
-    handleAudioVolumeChange,
-    toggleAudioPlayback,
-    handleAudioSeek,
-    handleAudioSeekStart,
-    handleAudioSeekEnd,
-    handleAudioVolumeInput,
-} = useOverlayAudioControls({
+const audio = useOverlayAudioControls({
     overlayAudioRef,
     overlayMediaType: toRef(overlayState, 'mediaType'),
     overlayFillComplete: toRef(overlayState, 'fillComplete'),
@@ -202,12 +99,12 @@ const {
     overlayAudioSrc: toRef(overlayState, 'audioSrc'),
 });
 
-const {getAvailableWidth, calculateBestFitSize, getCenteredPosition} = useFileViewerSizing({
+const sizing = useFileViewerSizing({
     overlay: overlayState,
     sheet: sheetState,
 });
 
-const {closeOverlay} = useFileViewerOverlayState({
+const overlayLifecycle = useFileViewerOverlayState({
     containerRef: computed(() => props.containerRef),
     container: containerState,
     overlay: overlayState,
@@ -219,26 +116,29 @@ async function ensureMoreItems(): Promise<boolean> {
     if (!hasMore.value || containerState.isLoadingMore || isLoading.value) {
         return false;
     }
+
     containerState.isLoadingMore = true;
+
     try {
         await props.masonry?.loadNextPage?.();
         await nextTick();
     } finally {
         containerState.isLoadingMore = false;
     }
+
     return true;
 }
 
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve({width: img.naturalWidth, height: img.naturalHeight});
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
         img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
         img.src = url;
     });
 }
 
-const {fileData, isLoadingFileData, handleItemSeen} = useFileViewerData({
+const viewerData = useFileViewerData({
     items,
     navigation: navigationState,
     overlay: overlayState,
@@ -249,83 +149,131 @@ useFileViewerSheetSizing({
     sheet: sheetState,
     overlay: overlayState,
     containerRef: computed(() => props.containerRef),
-    getAvailableWidth,
-    calculateBestFitSize,
-    getCenteredPosition,
+    getAvailableWidth: sizing.getAvailableWidth,
+    calculateBestFitSize: sizing.calculateBestFitSize,
+    getCenteredPosition: sizing.getCenteredPosition,
 });
 
-const {openFromClick} = useFileViewerOpen({
+const opener = useFileViewerOpen({
     containerRef: computed(() => props.containerRef),
     masonryContainerRef: computed(() => props.masonryContainerRef),
     items,
     container: containerState,
     overlay: overlayState,
     navigation: navigationState,
-    getAvailableWidth,
-    calculateBestFitSize,
-    getCenteredPosition,
+    getAvailableWidth: sizing.getAvailableWidth,
+    calculateBestFitSize: sizing.calculateBestFitSize,
+    getCenteredPosition: sizing.getCenteredPosition,
     preloadImage,
-    handleItemSeen,
-    closeOverlay,
+    handleItemSeen: viewerData.handleItemSeen,
+    closeOverlay: overlayLifecycle.closeOverlay,
     emitOpen: () => emit('open'),
 });
 
-const { navigateToNext, navigateToPrevious, navigateToIndex } = useFileViewerPaging({
+const paging = useFileViewerPaging({
     containerRef: computed(() => props.containerRef),
     items,
     overlay: overlayState,
     navigation: navigationState,
-    getAvailableWidth,
-    calculateBestFitSize,
-    getCenteredPosition,
+    getAvailableWidth: sizing.getAvailableWidth,
+    calculateBestFitSize: sizing.calculateBestFitSize,
+    getCenteredPosition: sizing.getCenteredPosition,
     preloadImage,
-    handleItemSeen,
+    handleItemSeen: viewerData.handleItemSeen,
     ensureMoreItems,
 });
 
-const {handleTouchStart, handleTouchEnd} = useFileViewerNavigation({
+const reactionFlow = useFileViewerReactionFlow({
+    items,
+    navigation: navigationState,
     overlay: overlayState,
-    onClose: closeOverlay,
-    onNext: navigateToNext,
-    onPrevious: navigateToPrevious,
-    onFullscreenChange: handleFullscreenChange,
+    ensureMoreItems,
+    closeOverlay: overlayLifecycle.closeOverlay,
+    navigateToIndex: paging.navigateToIndex,
+    emitReaction: (fileId, type) => emit('reaction', fileId, type),
 });
 
-const {
-    overlayContainerClass,
-    overlayContainerStyle,
-    overlayContentClass,
-    overlayMediaWrapperStyle,
-    overlayMediaTransitionClass,
-    overlayMediaStyle,
-} = useFileViewerOverlayStyles({
+const gestures = useFileViewerNavigation({
+    overlay: overlayState,
+    onClose: overlayLifecycle.closeOverlay,
+    onNext: paging.navigateToNext,
+    onPrevious: paging.navigateToPrevious,
+    onFullscreenChange: video.handleFullscreenChange,
+});
+
+const overlayUi = useFileViewerOverlayStyles({
     overlay: overlayState,
     navigation: navigationState,
 });
 
-const { clearPreloadCache } = useFileViewerPreload({
+const preload = useFileViewerPreload({
     items,
-    currentItemIndex: toRef(navigationState, 'currentItemIndex'),
+    currentItemIndex,
     fillComplete: toRef(overlayState, 'fillComplete'),
     preloadCount: 2,
 });
 
-// Handle ALT + Middle Click (mousedown event needed for middle button)
-function handleOverlayImageMouseDown(e: MouseEvent): void {
-    if (e.altKey && e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-        void handleViewerReaction('love');
-        return;
-    }
-    // Middle click without ALT - open original URL (prevent default to avoid browser scroll)
-    if (!e.altKey && e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-        // Actual opening will be handled in auxclick
-        return;
-    }
+const currentItem = reactionFlow.currentItem;
+const fileData = viewerData.fileData;
+const isLoadingFileData = viewerData.isLoadingFileData;
+const overlayContainerClass = overlayUi.overlayContainerClass;
+const overlayContainerStyle = overlayUi.overlayContainerStyle;
+const overlayContentClass = overlayUi.overlayContentClass;
+const overlayMediaWrapperStyle = overlayUi.overlayMediaWrapperStyle;
+const overlayMediaTransitionClass = overlayUi.overlayMediaTransitionClass;
+const overlayMediaStyle = overlayUi.overlayMediaStyle;
 
+const videoStage = computed(() => ({
+    setRef: setOverlayVideoRef,
+    poster: video.overlayVideoPoster.value,
+    isPlaying: video.isVideoPlaying.value,
+    isFullscreen: video.isVideoFullscreen.value,
+    currentTime: video.videoCurrentTime.value,
+    duration: video.videoDuration.value,
+    volume: video.videoVolume.value,
+    progressPercent: video.videoProgressPercent.value,
+    volumePercent: video.videoVolumePercent.value,
+    onLoadedMetadata: handleOverlayVideoLoadedMetadata,
+    onTimeUpdate: video.handleVideoTimeUpdate,
+    onPlay: video.handleVideoPlay,
+    onPause: video.handleVideoPause,
+    onEnded: video.handleVideoEnded,
+    onVolumeChange: video.handleVideoVolumeChange,
+    onTogglePlayback: video.toggleVideoPlayback,
+    onSeek: video.handleVideoSeek,
+    onSeekStart: video.handleVideoSeekStart,
+    onSeekEnd: video.handleVideoSeekEnd,
+    onVolumeInput: video.handleVideoVolumeInput,
+    onToggleFullscreen: video.toggleVideoFullscreen,
+}));
+
+const audioStage = computed(() => ({
+    setRef: setOverlayAudioRef,
+    isPlaying: audio.isAudioPlaying.value,
+    currentTime: audio.audioCurrentTime.value,
+    duration: audio.audioDuration.value,
+    volume: audio.audioVolume.value,
+    progressPercent: audio.audioProgressPercent.value,
+    volumePercent: audio.audioVolumePercent.value,
+    onLoadedMetadata: audio.handleAudioLoadedMetadata,
+    onTimeUpdate: audio.handleAudioTimeUpdate,
+    onPlay: audio.handleAudioPlay,
+    onPause: audio.handleAudioPause,
+    onEnded: audio.handleAudioEnded,
+    onVolumeChange: audio.handleAudioVolumeChange,
+    onTogglePlayback: audio.toggleAudioPlayback,
+    onSeek: audio.handleAudioSeek,
+    onSeekStart: audio.handleAudioSeekStart,
+    onSeekEnd: audio.handleAudioSeekEnd,
+    onVolumeInput: audio.handleAudioVolumeInput,
+}));
+
+function setOverlayVideoRef(element: HTMLVideoElement | null): void {
+    overlayVideoRef.value = element;
+}
+
+function setOverlayAudioRef(element: HTMLAudioElement | null): void {
+    overlayAudioRef.value = element;
 }
 
 function recomputeOverlayMediaFit(width: number, height: number): void {
@@ -335,6 +283,7 @@ function recomputeOverlayMediaFit(width: number, height: number): void {
 
     const borderWidth = 4;
     const tabContent = props.containerRef;
+
     if (!tabContent) {
         return;
     }
@@ -345,7 +294,7 @@ function recomputeOverlayMediaFit(width: number, height: number): void {
     const frameWidth = overlayState.isFilled ? tabContentBox.width : overlayState.rect.width;
     const frameHeight = overlayState.isFilled ? tabContentBox.height : overlayState.rect.height;
     const availableWidth = overlayState.isFilled
-        ? getAvailableWidth(frameWidth, borderWidth)
+        ? sizing.getAvailableWidth(frameWidth, borderWidth)
         : Math.max(frameWidth - (borderWidth * 2), 0);
     const availableHeight = Math.max(frameHeight - (borderWidth * 2), 0);
 
@@ -353,175 +302,71 @@ function recomputeOverlayMediaFit(width: number, height: number): void {
         return;
     }
 
-    const bestFitSize = calculateBestFitSize(width, height, availableWidth, availableHeight);
+    const bestFitSize = sizing.calculateBestFitSize(width, height, availableWidth, availableHeight);
+
     overlayState.imageSize = bestFitSize;
-    overlayState.centerPosition = getCenteredPosition(
+    overlayState.centerPosition = sizing.getCenteredPosition(
         availableWidth,
         availableHeight,
         bestFitSize.width,
-        bestFitSize.height
+        bestFitSize.height,
     );
 }
 
 function handleOverlayVideoLoadedMetadata(): void {
-    syncVideoPlaybackMetadata();
+    video.handleVideoLoadedMetadata();
 
-    const video = overlayVideoRef.value;
-    if (!video) {
+    const currentVideo = overlayVideoRef.value;
+    if (!currentVideo) {
         return;
     }
 
-    recomputeOverlayMediaFit(video.videoWidth, video.videoHeight);
+    recomputeOverlayMediaFit(currentVideo.videoWidth, currentVideo.videoHeight);
 }
 
-function handleOverlayMediaClick(e: MouseEvent): void {
-    if (!e.altKey) {
-        return;
-    }
-    if (e.button !== 0 && e.type !== 'click') {
-        return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    void handleViewerReaction('like');
-}
-
-function handleOverlayMediaContextMenu(e: MouseEvent): void {
-    if (!e.altKey) {
-        return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    void handleViewerReaction('dislike');
-}
-
-// Handle middle click (auxclick) to open original URL
-function handleOverlayImageAuxClick(e: MouseEvent): void {
-    // Middle click without ALT - open original URL
-    if (!e.altKey && e.button === 1 && navigationState.currentItemIndex !== null) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const currentItem = items.value[navigationState.currentItemIndex];
-        if (currentItem) {
-            const url = currentItem.original || currentItem.preview;
-            if (url) {
-                try {
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                } catch {
-                    // ignore
-                }
-            }
-        }
-    }
-}
-
-async function handleViewerReaction(type: ReactionType): Promise<void> {
+function openCurrentItemOriginal(): void {
     const item = currentItem.value;
     if (!item) {
         return;
     }
-    emit('reaction', item.id, type);
-    await nextTick();
 
-    if (items.value.length === 0) {
-        await ensureMoreItems();
-        if (items.value.length === 0) {
-            closeOverlay();
-            return;
-        }
+    const url = item.original || item.preview;
+    if (!url) {
+        return;
     }
 
-    const previousIndex = navigationState.currentItemIndex;
-    const currentIndexInList = items.value.findIndex((candidate) => candidate.id === item.id);
-    let targetIndex: number | null = null;
-
-    if (currentIndexInList === -1) {
-        if (previousIndex !== null) {
-            targetIndex = Math.min(previousIndex, items.value.length - 1);
-        }
-    } else {
-        const nextIndex = currentIndexInList + 1;
-        if (nextIndex < items.value.length) {
-            targetIndex = nextIndex;
-        }
+    try {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+        // Ignore popup errors.
     }
-
-    if (targetIndex === null) {
-        await ensureMoreItems();
-        if (items.value.length === 0) {
-            closeOverlay();
-            return;
-        }
-        targetIndex = Math.min(previousIndex ?? 0, items.value.length - 1);
-    }
-
-    navigationState.currentItemIndex = targetIndex;
-    currentItemId.value = items.value[targetIndex]?.id ?? null;
-    void navigateToIndex(targetIndex, 'down');
 }
 
-watch(() => [navigationState.currentItemIndex, overlayState.fillComplete], ([newIndex, isFilled]) => {
-    if (newIndex === null || !isFilled) return;
-    if (items.value.length - 1 - newIndex <= 1) {
-        void ensureMoreItems();
-    }
-});
-
-watch(() => navigationState.currentItemIndex, (index) => {
-    if (index === null || index < 0 || index >= items.value.length) {
-        currentItemId.value = null;
-        return;
-    }
-    currentItemId.value = items.value[index]?.id ?? null;
-});
-
-watch(() => items.value.map((item) => item.id), () => {
-    if (currentItemId.value === null) {
-        const index = navigationState.currentItemIndex;
-        if (index !== null && index >= 0 && index < items.value.length) {
-            currentItemId.value = items.value[index]?.id ?? null;
-        }
-        return;
-    }
-    const nextIndex = items.value.findIndex((item) => item.id === currentItemId.value);
-    if (nextIndex !== -1 && nextIndex !== navigationState.currentItemIndex) {
-        navigationState.currentItemIndex = nextIndex;
-    }
-});
-
-watch(() => [overlayState.mediaType, overlayState.fillComplete, overlayState.isClosing], ([mediaType, filled, isClosing]) => {
-    if (mediaType === 'file' && filled && !isClosing) {
-        // Keep existing UX (file view prefers the details panel), but don't override
-        // an explicit user preference to keep it closed.
-        if (sheetOpenPreference.value !== false) {
-            setSheetOpen(true, { persist: false });
-        }
-    }
-});
-
-// Cleanup on unmount
 onUnmounted(() => {
     const tabContent = props.containerRef;
+
     if (tabContent && containerState.overflow !== null) {
         tabContent.style.overflow = containerState.overflow;
+
         if (containerState.overscroll !== null) {
             tabContent.style.overscrollBehavior = containerState.overscroll;
         } else {
             tabContent.style.removeProperty('overscroll-behavior');
         }
+
         containerState.overflow = null;
         containerState.overscroll = null;
     }
-    clearPreloadCache();
+
+    preload.clearPreloadCache();
 });
 
-// Expose methods for parent component
 defineExpose({
-    openFromClick,
-    close: closeOverlay,
-    navigateForward: navigateToNext,
-    navigateBackward: navigateToPrevious,
+    openFromClick: opener.openFromClick,
+    close: overlayLifecycle.closeOverlay,
+    closeOverlay: overlayLifecycle.closeOverlay,
+    navigateForward: paging.navigateToNext,
+    navigateBackward: paging.navigateToPrevious,
     currentItemIndex,
     overlayState,
     navigationState,
@@ -531,207 +376,28 @@ defineExpose({
 </script>
 
 <template>
-    <!-- Click overlay -->
     <div v-if="overlayState.rect && overlayState.image" :class="overlayContainerClass" :style="overlayContainerStyle"
-         @touchstart.passive="handleTouchStart" @touchend.passive="handleTouchEnd">
-        <!-- Main content area -->
+        @touchstart.passive="gestures.handleTouchStart" @touchend.passive="gestures.handleTouchEnd">
         <div :class="overlayContentClass" :style="overlayMediaWrapperStyle">
-            <!-- Image container -->
-            <div class="relative flex-1 min-h-0 overflow-hidden" :style="overlayMediaWrapperStyle">
-                <!-- Preview image (shown immediately, behind spinner) -->
-                <img v-if="overlayState.isLoading" :key="overlayState.key + '-preview'" :src="overlayState.image.src"
-                     :srcset="overlayState.image.srcset" :sizes="overlayState.image.sizes" :alt="overlayState.image.alt" :class="[
-                        'absolute select-none pointer-events-none object-cover',
-                        overlayMediaTransitionClass
-                    ]" :style="overlayMediaStyle" draggable="false"/>
-
-                <!-- Spinner while loading full-size image -->
-                <div v-if="overlayState.isLoading" class="absolute inset-0 flex items-center justify-center z-10">
-                    <Loader2 :size="32" class="animate-spin text-smart-blue-500"/>
-                </div>
-
-                <!-- Full-size media (image/icon or video) -->
-                <img v-if="!overlayState.isLoading && overlayState.mediaType !== 'video'" :key="overlayState.key"
-                     :src="overlayState.fullSizeImage || overlayState.image.src" :alt="overlayState.image.alt"
-                     :class="[
-                        'absolute select-none',
-                        overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
-                        overlayState.isFilled ? '' : 'object-cover',
-                        overlayMediaTransitionClass
-                    ]" :style="overlayMediaStyle" draggable="false"
-                     @click="handleOverlayMediaClick"
-                     @contextmenu="handleOverlayMediaContextMenu"
-                     @mousedown="handleOverlayImageMouseDown"
-                     @auxclick="handleOverlayImageAuxClick"/>
-
-                <video v-else-if="!overlayState.isLoading && overlayState.mediaType === 'video'" :key="overlayState.key"
-                       :poster="overlayVideoPoster" ref="overlayVideoRef"
-                       :class="[
-                        'absolute',
-                        overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing ? 'pointer-events-auto' : 'pointer-events-none',
-                        overlayState.isFilled ? 'object-contain' : 'object-cover',
-                        overlayMediaTransitionClass
-                    ]" :style="overlayMediaStyle" playsinline disablepictureinpicture preload="metadata"
-                       @click="handleOverlayMediaClick"
-                       @contextmenu="handleOverlayMediaContextMenu"
-                       @loadedmetadata="handleOverlayVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
-                       @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
-                       @volumechange="handleVideoVolumeChange" @mousedown="handleOverlayImageMouseDown"
-                       @auxclick="handleOverlayImageAuxClick">
-                    <source v-if="overlayState.videoSrc" :src="overlayState.videoSrc" type="video/mp4"/>
-                </video>
-
-                <div
-                    v-if="!overlayState.isLoading && overlayState.mediaType === 'video' && overlayState.fillComplete && !overlayState.isClosing"
-                    class="absolute bottom-4 left-0 right-0 z-50 pointer-events-auto px-4">
-                    <div
-                        class="flex w-full items-center gap-3 rounded border border-twilight-indigo-500/80 bg-prussian-blue-800/80 px-3 py-2 backdrop-blur">
-                        <button type="button" class="rounded-full p-2 text-smart-blue-100 hover:text-white"
-                                :aria-label="isVideoPlaying ? 'Pause video' : 'Play video'"
-                                @click.stop="toggleVideoPlayback">
-                            <Pause v-if="isVideoPlaying" :size="16"/>
-                            <Play v-else :size="16"/>
-                        </button>
-                        <div class="flex-1 min-w-0">
-                            <input class="file-viewer-video-slider w-full" type="range" min="0"
-                                   :max="videoDuration || 0" step="0.1" :value="videoCurrentTime"
-                                   :style="{
-                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${videoProgressPercent}%, var(--color-twilight-indigo-600) ${videoProgressPercent}%)`
-                                }" @input="handleVideoSeek" @pointerdown="handleVideoSeekStart"
-                                   @pointerup="handleVideoSeekEnd"/>
-                        </div>
-                        <div class="w-24 shrink-0">
-                            <input class="file-viewer-video-slider w-full" type="range" min="0" max="1" step="0.01"
-                                   :value="videoVolume" :style="{
-                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${videoVolumePercent}%, var(--color-twilight-indigo-600) ${videoVolumePercent}%)`
-                                }" @input="handleVideoVolumeInput"/>
-                        </div>
-                        <button type="button" class="rounded-full p-2 text-smart-blue-100 hover:text-white"
-                                :aria-label="isVideoFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-                                @click.stop="toggleVideoFullscreen">
-                            <Minimize2 v-if="isVideoFullscreen" :size="16"/>
-                            <Maximize2 v-else :size="16"/>
-                        </button>
-                    </div>
-                </div>
-
-                <audio
-                    v-if="!overlayState.isLoading && overlayState.mediaType === 'audio'"
-                    ref="overlayAudioRef"
-                    class="hidden"
-                    preload="metadata"
-                    @loadedmetadata="handleAudioLoadedMetadata"
-                    @timeupdate="handleAudioTimeUpdate"
-                    @play="handleAudioPlay"
-                    @pause="handleAudioPause"
-                    @ended="handleAudioEnded"
-                    @volumechange="handleAudioVolumeChange"
-                />
-
-                <div
-                    v-if="!overlayState.isLoading && overlayState.mediaType === 'audio' && overlayState.fillComplete && !overlayState.isClosing"
-                    class="absolute bottom-4 left-0 right-0 z-50 pointer-events-auto px-4"
-                >
-                    <div
-                        class="flex w-full items-center gap-3 rounded border border-twilight-indigo-500/80 bg-prussian-blue-800/80 px-3 py-2 backdrop-blur"
-                    >
-                        <button
-                            type="button"
-                            class="rounded-full p-2 text-smart-blue-100 hover:text-white"
-                            :aria-label="isAudioPlaying ? 'Pause audio' : 'Play audio'"
-                            @click.stop="toggleAudioPlayback"
-                        >
-                            <Pause v-if="isAudioPlaying" :size="16" />
-                            <Play v-else :size="16" />
-                        </button>
-                        <div class="flex-1 min-w-0">
-                            <input
-                                class="file-viewer-video-slider w-full"
-                                type="range"
-                                min="0"
-                                :max="audioDuration || 0"
-                                step="0.1"
-                                :value="audioCurrentTime"
-                                :style="{
-                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${audioProgressPercent}%, var(--color-twilight-indigo-600) ${audioProgressPercent}%)`
-                                }"
-                                @input="handleAudioSeek"
-                                @pointerdown="handleAudioSeekStart"
-                                @pointerup="handleAudioSeekEnd"
-                            />
-                        </div>
-                        <div class="w-24 shrink-0">
-                            <input
-                                class="file-viewer-video-slider w-full"
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                :value="audioVolume"
-                                :style="{
-                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${audioVolumePercent}%, var(--color-twilight-indigo-600) ${audioVolumePercent}%)`
-                                }"
-                                @input="handleAudioVolumeInput"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing && currentItem"
-                    class="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 pointer-events-auto"
-                >
-                    <FileReactions
-                        :file-id="currentItem.id"
-                        :reaction="currentItem.reaction as ({ type: string } | null | undefined)"
-                        :previewed-count="currentItem.previewed_count ?? 0"
-                        :viewed-count="currentItem.seen_count ?? 0"
-                        :current-index="navigationState.currentItemIndex ?? 0"
-                        :total-items="items.length"
-                        variant="default"
-                        @reaction="handleViewerReaction"
-                    />
-                </div>
-
-                <!-- Close button -->
-                <button v-if="overlayState.fillComplete && !overlayState.isClosing" @click="closeOverlay"
-                        class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
-                        aria-label="Close overlay" data-test="close-overlay-button">
-                    <X :size="20"/>
-                </button>
-
-                <div
-                    v-if="overlayState.fillComplete && !overlayState.isClosing && containerState.isLoadingMore"
-                    class="absolute top-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-smart-blue-500/80 bg-prussian-blue-800/90 px-4 py-2 text-xs font-medium text-smart-blue-100 backdrop-blur"
-                >
-                <span class="inline-flex items-center gap-2">
-                    <Loader2 :size="14" class="animate-spin"/>
-                    Loading more items…
-                </span>
-                </div>
-            </div>
+            <FileViewerMediaStage :overlay="overlayState" :current-item="currentItem"
+                :current-index="navigationState.currentItemIndex ?? 0" :items-length="items.length"
+                :is-loading-more="containerState.isLoadingMore" :overlay-media-transition-class="overlayMediaTransitionClass"
+                :overlay-media-style="overlayMediaStyle" :video="videoStage" :audio="audioStage"
+                @close="overlayLifecycle.closeOverlay" @reaction="reactionFlow.reactAndAdvance"
+                @open-original="openCurrentItemOriginal" />
         </div>
 
-        <!-- Vertical Taskbar (only shown when filled) -->
         <div v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing && !sheetState.isOpen"
-             class="flex flex-col items-center justify-center gap-4 p-4 bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out w-16">
-            <!-- CTA Button to open sheet -->
-            <button @click="setSheetOpen(true)"
-                    class="p-3 rounded-lg bg-smart-blue-500 hover:bg-smart-blue-600 text-white transition-colors"
-                    aria-label="Open sheet">
-                <PanelRightOpen :size="20"/>
+            class="flex flex-col items-center justify-center gap-4 p-4 bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out w-16">
+            <button @click="sheet.setSheetOpen(true)"
+                class="p-3 rounded-lg bg-smart-blue-500 hover:bg-smart-blue-600 text-white transition-colors"
+                aria-label="Open sheet">
+                <PanelRightOpen :size="20" />
             </button>
         </div>
 
-        <FileViewerSheet
-            v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing"
-            :is-open="sheetState.isOpen"
-            :file-id="navigationState.currentItemIndex !== null && items[navigationState.currentItemIndex] ? items[navigationState.currentItemIndex].id : null"
-            :file-data="fileData ?? null"
-            :is-loading="isLoadingFileData"
-            @close="setSheetOpen(false)"
-        />
+        <FileViewerSheet v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing"
+            :is-open="sheetState.isOpen" :file-id="currentItem?.id ?? null" :file-data="fileData ?? null"
+            :is-loading="isLoadingFileData" @close="sheet.setSheetOpen(false)" />
     </div>
 </template>
-
-
