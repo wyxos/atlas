@@ -501,4 +501,6 @@ describe('submitBadgeReaction', () => {
         expect(result.downloadRequested).toBe(false);
         expect(result.shouldCloseTabAfterQueue).toBe(true);
     });
+
+
 });

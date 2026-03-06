@@ -40,6 +40,8 @@ npm run dev                 # Vite dev server
 # Backend
 vendor/bin/pint --dirty     # Format PHP code
 php artisan test            # Run Pest tests
+composer lint:php:max-lines # Fail on new/regressed PHP files above 500 lines
+composer lint:php:max-lines:report # Audit the remaining legacy >500-line baseline
 
 # Frontend
 npm run build               # Production build
