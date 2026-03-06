@@ -251,6 +251,7 @@ describe('submitBadgeReaction', () => {
                         batch: {
                             count: 2,
                             primary_candidate_id: 'image-1',
+                            download_requested: true,
                         },
                     },
                 });
@@ -398,6 +399,86 @@ describe('submitBadgeReaction', () => {
         image.src = 'https://images.example.com/direct-image-1.jpg';
 
         const result = await submitBadgeReaction(image, 'love', {
+            batchItems: [
+                {
+                    candidateId: 'image-1',
+                    url: 'https://images.example.com/direct-image-1.jpg',
+                    referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1',
+                    pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                    tagName: 'img',
+                },
+                {
+                    candidateId: 'image-2',
+                    url: 'https://images.example.com/direct-image-2.jpg',
+                    referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1#image-2',
+                    pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                    tagName: 'img',
+                },
+            ],
+        });
+
+        expect(result.ok).toBe(true);
+        expect(result.downloadRequested).toBe(false);
+        expect(result.shouldCloseTabAfterQueue).toBe(true);
+    });
+
+    it('closes on explicit batch download_requested even without item payload details', async () => {
+        mockGetStoredOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'test-api-token',
+            matchRules: [],
+        });
+
+        vi.stubGlobal('fetch', vi.fn());
+        const runtimeSendMessage = vi.fn((payload: unknown, callback: (response: unknown) => void) => {
+            const typed = payload as { type?: string };
+            if (typed.type === 'ATLAS_GET_URL_COOKIES') {
+                callback({ cookies: [] });
+                return;
+            }
+
+            if (typed.type === 'ATLAS_SUBMIT_REACTION') {
+                callback({
+                    ok: true,
+                    status: 200,
+                    payload: {
+                        reaction: 'funny',
+                        file: {
+                            id: 77,
+                            url: 'https://images.example.com/direct-image-1.jpg',
+                            referrer_url: 'https://www.deviantart.com/artist/art/post-1',
+                            preview_url: 'https://images.example.com/direct-image-1.jpg',
+                        },
+                        download: {
+                            requested: false,
+                            transfer_id: null,
+                            status: null,
+                            progress_percent: null,
+                        },
+                        batch: {
+                            count: 2,
+                            primary_candidate_id: 'image-1',
+                            download_requested: true,
+                        },
+                    },
+                });
+                return;
+            }
+
+            callback(null);
+        });
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: runtimeSendMessage,
+            },
+        });
+
+        const { submitBadgeReaction } = await import('./reaction-submit');
+        const image = document.createElement('img');
+        image.src = 'https://images.example.com/direct-image-1.jpg';
+
+        const result = await submitBadgeReaction(image, 'funny', {
             batchItems: [
                 {
                     candidateId: 'image-1',

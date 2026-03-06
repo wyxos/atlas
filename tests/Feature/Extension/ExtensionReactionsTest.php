@@ -229,6 +229,7 @@ test('extension batch reactions queue all submitted gallery items and return the
     $response->assertJsonPath('file.referrer_url', 'https://www.deviantart.com/artist/art/post-1#image-2');
     $response->assertJsonPath('batch.count', 2);
     $response->assertJsonPath('batch.primary_candidate_id', 'image-2');
+    $response->assertJsonPath('batch.download_requested', true);
 
     $firstFile = File::query()->where('url', 'https://images.example.test/direct-image-1.jpg')->first();
     $secondFile = File::query()->where('url', 'https://images.example.test/direct-image-2.jpg')->first();
