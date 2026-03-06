@@ -1,50 +1,27 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, provide, ref, shallowRef, toRef, triggerRef, watch } from 'vue';
+import { computed, provide, ref, shallowRef, toRef, watch } from 'vue';
 import type { TabData, FeedItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem } from '@wyxos/vibe';
 import type { MasonryInstance } from '@wyxos/vibe';
-import {
-    ChevronDown,
-    Copy,
-    Info,
-    Loader2,
-    Play,
-    TestTube,
-    X
-} from 'lucide-vue-next';
+import { Info, Loader2 } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
 import DislikeProgressBar from './DislikeProgressBar.vue';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Switch } from '@/components/ui/switch';
 import Pill from './ui/Pill.vue';
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from './ui/dialog';
 import { useBrowseService } from '@/composables/useBrowseService';
-import { useContainerBadges } from '@/composables/useContainerBadges';
-import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
-import { usePromptData } from '@/composables/usePromptData';
-import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
-import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
-import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/composables/useBrowseService';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
-import TabFilter from './TabFilter.vue';
-import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
+import { useTabContentInteractions } from '@/composables/useTabContentInteractions';
+import TabContentPromptDialog from './TabContentPromptDialog.vue';
+import TabContentStartForm from './TabContentStartForm.vue';
+import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from 'vue-toastification';
-import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
@@ -87,45 +64,7 @@ watch(
 );
 
 const masonry = ref<MasonryInstance | null>(null);
-const hoveredItemIndex = ref<number | null>(null);
-const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
-
-const itemIndexById = computed(() => {
-    const map = new Map<number, number>();
-    for (let i = 0; i < items.value.length; i += 1) {
-        const id = items.value[i]?.id;
-        if (typeof id === 'number') {
-            map.set(id, i);
-        }
-    }
-    return map;
-});
-
-function getItemIndex(itemId: number): number | undefined {
-    return itemIndexById.value.get(itemId);
-}
-
-// Track which items have successfully preloaded so overlays can gate UI like the old implementation did.
-const preloadedItemIds = ref<Set<number>>(new Set());
-
-function markItemsPreloaded(batch: FeedItem[]): void {
-    const next = new Set(preloadedItemIds.value);
-    for (const it of batch) {
-        if (typeof it?.id === 'number') {
-            next.add(it.id);
-        }
-    }
-    preloadedItemIds.value = next;
-}
-
-function isItemPreloaded(itemId: number): boolean {
-    return preloadedItemIds.value.has(itemId);
-}
-
-function hasActiveReaction(item: FeedItem): boolean {
-    return Boolean(item.reaction?.type);
-}
 
 // Internal tab data - loaded from API
 const tab = ref<TabData | null>(null);
@@ -177,9 +116,7 @@ const {
     fetchServices,
     fetchSources,
     clearPreviewedItems: itemPreview.clearPreviewedItems,
-    resetPreloadedItems: () => {
-        preloadedItemIds.value = new Set();
-    },
+    resetPreloadedItems: clearInteractionPreloadedItems,
     onLoadingStart: handleLoadingStart,
     onLoadingStop: handleLoadingStop,
     onUpdateTabLabel: props.onUpdateTabLabel,
@@ -243,445 +180,6 @@ const layout = {
     sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
 };
 
-function onMasonryClick(e: MouseEvent): void {
-    // Normal click behavior - open overlay (only for left click)
-    if (e.button === 0 || (e.type === 'click' && !e.button)) {
-        fileViewer.value?.openFromClick(e);
-    }
-}
-
-function handleMasonryItemClick(e: MouseEvent, item: FeedItem): void {
-    if (e.altKey) {
-        masonryInteractions.handleAltClickReaction(e, item);
-        return;
-    }
-
-    // Keep the click handling local to the item so it continues to work with Vibe 2.x
-    // (which no longer renders the legacy `.masonry-item` wrapper).
-    e.stopPropagation();
-    fileViewer.value?.openFromClick(e);
-}
-
-function handleMasonryItemContextMenu(e: MouseEvent, item: FeedItem): void {
-    if (e.altKey) {
-        masonryInteractions.handleAltClickReaction(e, item);
-    }
-}
-
-function handleMasonryItemMouseDown(e: MouseEvent, item: FeedItem): void {
-    if (e.altKey && e.button === 1) {
-        masonryInteractions.handleAltClickReaction(e, item);
-        return;
-    }
-}
-
-function onMasonryMouseDown(e: MouseEvent): void {
-    // Prevent browser scroll for middle click (without ALT) - actual opening happens on auxclick
-    if (!e.altKey && e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-}
-
-
-// Initialize composables
-// Container badges composable
-const containerBadges = useContainerBadges(items);
-
-// Container blacklist manager ref
-const containerBlacklistManager = ref<InstanceType<typeof ContainerBlacklistManager> | null>(null);
-
-// Check if a container type is blacklistable for the current service
-function isContainerBlacklistable(container: { type: string; source?: string }): boolean {
-    // Hardcoded mapping for now - in the future, this could come from service metadata
-    // CivitAI: 'User' type is blacklistable (case-sensitive match)
-    if (container.source === 'CivitAI') {
-        return container.type === 'User';
-    }
-    // Wallhaven: no containers are blacklistable yet
-    // Add other services as needed
-    return false;
-}
-
-// Handle container ban button click
-function handleContainerBan(container: {
-    id: number;
-    type: string;
-    source?: string;
-    source_id?: string;
-    referrer?: string | null
-}): void {
-    if (containerBlacklistManager.value && container.source && container.source_id) {
-        containerBlacklistManager.value.openBlacklistDialog({
-            id: container.id,
-            type: container.type,
-            source: container.source,
-            source_id: container.source_id,
-            referrer: container.referrer,
-        });
-    }
-}
-
-// Container pill interactions composable
-// tabId will be set when tab loads, using computed to reactively get the current value
-const containerPillInteractions = useContainerPillInteractions(
-    items,
-    masonry,
-    computed(() => tab.value?.id),
-    (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
-        props.onReaction(fileId, type);
-    },
-    (container) => {
-        const openExternal = (url: string | null | undefined): void => {
-            if (!url) {
-                return;
-            }
-            try {
-                const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-                if (newWindow) {
-                    newWindow.blur();
-                    window.focus();
-                }
-            } catch {
-                // ignore
-            }
-        };
-
-        if (!props.onOpenContainerTab) {
-            openExternal(container.referrer ?? null);
-            return;
-        }
-
-        const resolveServiceKey = (): string | null => {
-            // When browsing online, use the current service directly.
-            if (form.data.feed === 'online' && form.data.service) {
-                return form.data.service;
-            }
-
-            // In local mode, infer the online service based on the container.source (stored using BaseService::source()).
-            if (form.data.feed === 'local' && container.source) {
-                const match = availableServices.value.find((service) => (
-                    service.source === container.source || service.key === container.source
-                ));
-                return match?.key ?? null;
-            }
-
-            return null;
-        };
-
-        const serviceKey = resolveServiceKey();
-        if (!serviceKey) {
-            openExternal(container.referrer ?? null);
-            return;
-        }
-
-        const serviceLabel = availableServices.value.find((service) => service.key === serviceKey)?.label ?? serviceKey;
-        const containerValue = container.source_id ?? container.id;
-
-        const params: Record<string, unknown> = {
-            feed: 'online',
-            service: serviceKey,
-            page: 1,
-            limit: form.data.limit,
-        };
-
-        // When browsing online, keep any existing serviceFilters so a user can keep their current context.
-        // In local mode, serviceFilters are local-specific and should not be forwarded to an online service tab.
-        if (form.data.feed === 'online') {
-            appendBrowseServiceFilters(params, form.data.serviceFilters);
-        }
-
-        let hasContainerFilter = false;
-        if (serviceKey === 'civit-ai-images' && container.source === 'CivitAI') {
-            if (container.type === 'User' && container.source_id) {
-                params.username = container.source_id;
-                hasContainerFilter = true;
-            }
-            if (container.type === 'Post' && container.source_id) {
-                params.postId = container.source_id;
-                hasContainerFilter = true;
-            }
-        }
-
-        if (!hasContainerFilter) {
-            openExternal(container.referrer ?? null);
-            return;
-        }
-
-        const containerLabel = `${container.type} ${containerValue}`;
-        props.onOpenContainerTab({
-            label: formatTabLabel(serviceLabel, 1, containerLabel),
-            params,
-        });
-    }
-);
-
-// Prompt data composable
-const promptData = usePromptData(items);
-
-// Masonry reaction handler composable
-const { handleMasonryReaction } = useMasonryReactionHandler(
-    items,
-    masonry,
-    computed(() => tab.value),
-    (fileId: number, type: ReactionType) => {
-        props.onReaction(fileId, type);
-    }
-);
-
-// Masonry interactions composable (needs handleMasonryReaction)
-const masonryInteractions = createMasonryInteractions(
-    items,
-    masonry,
-    handleMasonryReaction
-);
-
-// Handle reset event from TabFilter
-function handleResetFilters(): void {
-    form.reset();
-}
-
-// Handle moderation rules changed
-function handleModerationRulesChanged(): void {
-    // TODO: Implement moderation rules changed logic
-}
-
-// Cancel masonry loading
-function cancelMasonryLoad(): void {
-    masonry.value?.cancel?.();
-}
-
-// Load next page manually (used by both button click and carousel load more)
-async function loadNextPage(): Promise<void> {
-    await masonry.value?.loadNextPage?.();
-}
-
-async function handleMasonryRemoved(payload: { items: FeedItem[]; ids: string[] }): Promise<void> {
-    if (form.data.feed !== 'online') {
-        return;
-    }
-    if (!masonry.value || masonry.value.isLoading || masonry.value.hasReachedEnd) {
-        return;
-    }
-    if (payload.ids.length === 0) {
-        return;
-    }
-
-    await nextTick();
-    if (items.value.length === 0) {
-        await masonry.value.loadNextPage?.();
-    }
-}
-
-
-// Auto-dislike queue composable
-const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
-
-function findNearestVideoElement(from: EventTarget | null): HTMLVideoElement | null {
-    let el = from as HTMLElement | null;
-    for (let i = 0; i < 8 && el; i += 1) {
-        const video = el.querySelector('video');
-        if (video instanceof HTMLVideoElement) {
-            return video;
-        }
-        el = el.parentElement;
-    }
-    return null;
-}
-
-// Event handlers for masonry items
-function handleMasonryItemMouseEnter(e: MouseEvent, item: FeedItem): void {
-    const itemId = item.id;
-    const index = items.value.findIndex((i) => i.id === itemId);
-    hoveredItemIndex.value = index === -1 ? null : index;
-    hoveredItemId.value = itemId;
-
-    if (item.type === 'video') {
-        const video = findNearestVideoElement(e.currentTarget);
-        if (video) {
-            // Avoid autoplay policy issues; Atlas doesn't expose volume controls on hover previews.
-            video.muted = true;
-            void video.play().catch(() => {
-                // Ignore playback failures (browser policy, etc.)
-            });
-        }
-    }
-
-    // Freeze auto-dislike queue only if hovering over an item with an active countdown
-    if (autoDislikeQueue.hasActiveCountdown(itemId)) {
-        autoDislikeQueue.freezeAll();
-    }
-}
-
-function handleMasonryItemMouseLeave(e: MouseEvent, item: FeedItem): void {
-    const itemId = hoveredItemId.value;
-    const wasHoveringItemWithCountdown = itemId !== null && autoDislikeQueue.hasActiveCountdown(itemId);
-
-    hoveredItemIndex.value = null;
-    hoveredItemId.value = null;
-    containerBadges.setHoveredContainerId(null);
-
-    // Unfreeze auto-dislike queue when mouse leaves an item with active countdown
-    // (The queue will be frozen again if mouse enters another item with countdown)
-    if (wasHoveringItemWithCountdown) {
-        autoDislikeQueue.unfreezeAll();
-    }
-
-    if (item.type === 'video') {
-        const video = findNearestVideoElement(e.currentTarget);
-        if (video && !video.paused) {
-            video.pause();
-        }
-    }
-}
-
-function handleFileViewerOpen(): void {
-    // Freeze only auto-dislike countdowns when FileViewer opens
-    // Other countdowns (e.g., reaction queue) continue normally
-    autoDislikeQueue.freezeAutoDislikeOnly();
-}
-
-function handleFileViewerClose(): void {
-    // Resume only auto-dislike countdowns when FileViewer closes (after 2 second delay)
-    autoDislikeQueue.unfreezeAutoDislikeOnly();
-}
-
-/**
- * Handle when item is both fully in view AND media is loaded.
- * This is when we should increment preview count and check for auto-dislike.
- */
-async function handleItemInViewAndLoaded(item: FeedItem): Promise<void> {
-    const itemId = item.id;
-    if (itemId) {
-        // Increment preview count when item is fully in view AND media is loaded
-        const result = await itemPreview.incrementPreviewCount(itemId);
-
-        // Check if item is already flagged for auto-dislike (from moderation rules)
-        // incrementPreviewCount mutates the item in place, so item already has updated values
-        const isModerationFlagged = item.will_auto_dislike === true;
-
-        // If you already reacted to this item, never start an auto-dislike countdown.
-        // (Moderation flags should not override a user's explicit reaction.)
-        const alreadyReacted = Boolean(item.reaction?.type);
-
-        // Start countdown if:
-        // 1. Item was already flagged for auto-dislike (from moderation rules) OR
-        // 2. Preview count increment indicates it should be auto-disliked (from preview count threshold)
-        const shouldAutoDislike = !alreadyReacted && (isModerationFlagged || result?.will_auto_dislike === true);
-
-        if (shouldAutoDislike) {
-            autoDislikeQueue.startAutoDislikeCountdown(itemId, item);
-            // Force items array reference update to trigger Vibe's computed to re-evaluate
-            // This ensures the progress bar component sees the updated will_auto_dislike value immediately
-            triggerRef(items);
-            await nextTick();
-        }
-    }
-}
-
-async function handleItemPreloaded(item: FeedItem): Promise<void> {
-    // Vibe loader success is gated by intersection >= 0.5, so this matches the old intent.
-    await handleItemInViewAndLoaded(item);
-}
-
-function handleBatchPreloaded(batch: FeedItem[]): void {
-    markItemsPreloaded(batch);
-    for (const it of batch) {
-        void handleItemPreloaded(it);
-    }
-}
-
-function handleBatchFailures(_payloads: Array<{ item: FeedItem; error: unknown }>): void {
-    // Intentionally no-op for now; per-item errors can still show via Vibe loader UI.
-    void _payloads;
-}
-
-function handleMasonryItemAuxClick(e: MouseEvent, item: FeedItem): void {
-    masonryInteractions.handleMasonryItemAuxClick(e, item);
-}
-
-// Event handlers for container pills
-function handleContainerPillMouseEnter(containerId: number): void {
-    containerBadges.setHoveredContainerId(containerId);
-}
-
-function handleContainerPillMouseLeave(): void {
-    containerBadges.setHoveredContainerId(null);
-}
-
-function handleContainerPillClick(containerId: number, e: MouseEvent): void {
-    containerPillInteractions.handlePillClick(containerId, e);
-}
-
-function handleContainerPillDblClick(containerId: number, e: MouseEvent): void {
-    containerPillInteractions.handlePillClick(containerId, e, true);
-}
-
-function handleContainerPillContextMenu(containerId: number, e: MouseEvent): void {
-    e.preventDefault();
-    containerPillInteractions.handlePillClick(containerId, e);
-}
-
-function handleContainerPillAuxClick(containerId: number, e: MouseEvent): void {
-    containerPillInteractions.handlePillAuxClick(containerId, e);
-}
-
-function handleContainerPillMouseDown(e: MouseEvent): void {
-    if (e.button === 1) {
-        e.preventDefault();
-    }
-}
-
-function handlePillDismiss(container: {
-    id: number;
-    type: string;
-    source?: string;
-    source_id?: string;
-    referrer?: string | null
-}): void {
-    handleContainerBan(container);
-}
-
-function handlePromptDialogClick(item: FeedItem): void {
-    promptData.openPromptDialog(item);
-}
-
-function handleFileReaction(item: FeedItem, type: ReactionType): void {
-    // Cancel auto-dislike countdown if user reacts manually
-    autoDislikeQueue.cancelAutoDislikeCountdown(item.id);
-    // Pass item directly - FileReactions may have already called removeItem(),
-    // so we can't rely on finding the item in the items array by ID
-    handleMasonryReaction(item, type);
-}
-
-function handleFileViewerReaction(itemId: number, type: ReactionType): void {
-    const item = items.value.find((i) => i.id === itemId);
-    if (item) {
-        handleFileReaction(item, type);
-    }
-}
-
-function handleCopyPromptClick(): void {
-    if (promptData.currentPromptData.value) {
-        promptData.copyPromptToClipboard(promptData.currentPromptData.value);
-    }
-}
-
-function handleTestPromptClick(): void {
-    if (promptData.currentPromptData.value) {
-        const params = new URLSearchParams();
-        params.set('text', promptData.currentPromptData.value);
-        const url = `/moderation/test?${params.toString()}`;
-        window.open(url, '_blank', 'noopener,noreferrer');
-    }
-}
-
-function handlePromptDialogUpdate(val: boolean): void {
-    if (!val) {
-        promptData.closePromptDialog();
-    }
-}
-
 // Handle masonry loading state changes via events
 function handleLoadingStart(): void {
     emit('update:loading', true);
@@ -700,11 +198,65 @@ function handleLoadingStop(): void {
     onLoadingStop();
 }
 
-// Cleanup on unmount
-onUnmounted(() => {
-    // cancel any in-flight masonry requests
-    masonry.value?.cancel?.();
-    autoDislikeQueue.clearAutoDislikeCountdowns();
+function clearInteractionPreloadedItems(): void {
+    resetPreloadedItems();
+}
+
+const {
+    hoveredItemId,
+    containerBadges,
+    containerBlacklistManager,
+    containerPillInteractions,
+    promptData,
+    autoDislikeQueue,
+    getItemIndex,
+    isItemPreloaded,
+    hasActiveReaction,
+    resetPreloadedItems,
+    onMasonryClick,
+    onMasonryMouseDown,
+    handleResetFilters,
+    handleModerationRulesChanged,
+    cancelMasonryLoad,
+    loadNextPage,
+    handleMasonryRemoved,
+    handleMasonryItemClick,
+    handleMasonryItemContextMenu,
+    handleMasonryItemMouseDown,
+    handleMasonryItemAuxClick,
+    handleMasonryItemMouseEnter,
+    handleMasonryItemMouseLeave,
+    handleFileViewerOpen,
+    handleFileViewerClose,
+    handleBatchPreloaded,
+    handleBatchFailures,
+    handleItemPreloaded,
+    handleContainerPillMouseEnter,
+    handleContainerPillMouseLeave,
+    handleContainerPillClick,
+    handleContainerPillDblClick,
+    handleContainerPillContextMenu,
+    handleContainerPillAuxClick,
+    handleContainerPillMouseDown,
+    handlePillDismiss,
+    handlePromptDialogClick,
+    handleFileReaction,
+    handleFileViewerReaction,
+    handleCopyPromptClick,
+    handleTestPromptClick,
+    handlePromptDialogUpdate,
+    isContainerBlacklistable,
+} = useTabContentInteractions({
+    items,
+    tab,
+    form,
+    masonry,
+    fileViewer,
+    availableServices,
+    itemPreview,
+    formatTabLabel,
+    onReaction: props.onReaction,
+    onOpenContainerTab: props.onOpenContainerTab,
 });
 
 defineExpose({
@@ -714,6 +266,7 @@ defineExpose({
     hasServiceSelected,
     loadAtPage,
     isTabRestored,
+    containerPillInteractions,
     // Expose the per-tab form for tests/debugging
     browseForm: form,
     masonry,
@@ -722,85 +275,17 @@ defineExpose({
 
 <template>
     <div v-if="tab" ref="tabContentContainer" class="flex-1 min-h-0 flex flex-col relative">
-        <!-- Service Selection Header (only show when not showing form) -->
-        <div v-if="!shouldShowForm" class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
-            data-test="service-selection-header">
-            <div class="flex items-center gap-3">
-                <!-- Source Type Toggle (Online/Local) -->
-                <div>
-                    <Select :model-value="form.data.feed"
-                        @update:model-value="(val: string) => { form.data.feed = val as 'online' | 'local'; }"
-                        :disabled="masonry?.isLoading">
-                        <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
-                            <SelectValue placeholder="Online" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
-                            <SelectItem value="local" data-test="source-type-local">Local</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <!-- Service Dropdown (only show when feed is 'online') -->
-                <div v-if="form.data.feed === 'online'" class="flex-1">
-                    <Select :model-value="form.data.service" @update:model-value="(v) => updateService(v as string)" :disabled="masonry?.isLoading">
-                        <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
-                            <SelectValue placeholder="Select a service..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="service in availableServices.filter(s => s.key !== 'local')"
-                                :key="service.key" :value="service.key" data-test="service-select-item">
-                                {{ service.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <!-- Source Dropdown (only show when feed is 'local') -->
-                <div v-if="form.data.feed === 'local'" class="flex-1">
-                    <Select v-model="form.data.source" :disabled="masonry?.isLoading">
-                        <SelectTrigger class="w-[200px]" data-test="source-select-trigger">
-                            <SelectValue placeholder="Select a source..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="source in availableSources" :key="source" :value="source"
-                                data-test="source-select-item">
-                                {{ source }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <!-- Filters Button (Primary) -->
-                <TabFilter v-model:open="isFilterSheetOpen" :available-services="availableServices" :local-def="localService" :masonry="masonry"
-                    @reset="handleResetFilters" @apply="applyFilters" />
-
-                <!-- Moderation Rules Button (Info) -->
-                <ModerationRulesManager :disabled="masonry?.isLoading" @rules-changed="handleModerationRulesChanged" />
-
-                <!-- Container Blacklists Button (Warning) -->
-                <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading"
-                    @blacklists-changed="handleModerationRulesChanged" />
-
-                <!-- Cancel Loading Button -->
-                <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
-                    data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
-                    <X :size="14" />
-                </Button>
-
-                <!-- Load Next Page Button -->
-                <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
-                    data-test="load-next-page-button" title="Load next page"
-                    :disabled="masonry?.isLoading || masonry?.hasReachedEnd">
-                    <ChevronDown :size="14" />
-                </Button>
-
-                <!-- Apply Service Button -->
-                <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
-                    :loading="masonry?.isLoading"
-                    :disabled="masonry?.isLoading || (form.data.feed === 'online' && !form.data.service)"
-                    title="Apply selected service">
-                    <Play :size="14" />
-                </Button>
-            </div>
-        </div>
+        <TabContentServiceHeader v-if="!shouldShowForm" :form="form" :available-services="availableServices"
+            :available-sources="availableSources" :local-service="localService ?? null" :masonry="masonry"
+            :filter-sheet-open="isFilterSheetOpen"
+            :update-filter-sheet-open="(value) => isFilterSheetOpen = value"
+            :update-feed="(value) => form.data.feed = value" :update-service="updateService"
+            :update-source="(value) => form.data.source = value" :apply-service="applyService"
+            :apply-filters="applyFilters" :reset-filters="handleResetFilters"
+            :rules-changed="handleModerationRulesChanged" :cancel-masonry-load="cancelMasonryLoad" :load-next-page="loadNextPage">
+            <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading"
+                @blacklists-changed="handleModerationRulesChanged" />
+        </TabContentServiceHeader>
 
         <!-- Masonry Content -->
         <div class="flex-1 min-h-0 overflow-hidden">
@@ -808,66 +293,11 @@ defineExpose({
             <div class="relative flex h-full min-h-0 flex-col overflow-hidden masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
 
-                <div v-if="shouldShowForm" class="flex items-center justify-center h-full" data-test="new-tab-form">
-                    <div
-                        class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
-                        <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
-                        <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click play to begin</p>
-
-                        <!-- Online/Local Switch -->
-                        <div class="w-full flex items-center justify-between">
-                            <label class="block text-sm font-medium text-twilight-indigo-200">Source</label>
-                            <div class="flex items-center gap-3">
-                                <span class="text-sm text-twilight-indigo-300"
-                                    :class="{ 'text-twilight-indigo-100 font-medium': !form.isLocalMode.value }">Online</span>
-                                <Switch :model-value="form.isLocalMode.value"
-                                    @update:model-value="(val: boolean) => form.isLocalMode.value = val"
-                                    data-test="source-type-switch" />
-                                <span class="text-sm text-twilight-indigo-300"
-                                    :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Local</span>
-                            </div>
-                        </div>
-
-                        <!-- Service Dropdown (only show when Online) -->
-                        <div v-if="form.data.feed === 'online'" class="w-full">
-                            <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
-                            <Select :model-value="form.data.service" @update:model-value="(v) => updateService(v as string)" :disabled="masonry?.isLoading">
-                                <SelectTrigger class="w-full" data-test="service-select-trigger">
-                                    <SelectValue placeholder="Select a service..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="service in availableServices.filter(s => s.key !== 'local')"
-                                        :key="service.key" :value="service.key" data-test="service-select-item">
-                                        {{ service.label }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <!-- Source Dropdown (only show when Local) -->
-                        <div v-if="form.data.feed === 'local'" class="w-full">
-                            <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Source</label>
-                            <Select v-model="form.data.source" :disabled="masonry?.isLoading">
-                                <SelectTrigger class="w-full" data-test="source-select-trigger">
-                                    <SelectValue placeholder="Select a source..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="source in availableSources" :key="source" :value="source"
-                                        data-test="source-select-item">
-                                        {{ source }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div class="flex gap-3 w-full mt-2 items-center">
-                            <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
-                                :disabled="form.data.feed === 'online' && !form.data.service">
-                                <Play :size="16" />
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <TabContentStartForm v-if="shouldShowForm" :form="form" :available-services="availableServices"
+                    :available-sources="availableSources" :is-loading="masonry?.isLoading ?? false"
+                    :set-local-mode="(value) => form.isLocalMode.value = value"
+                    :update-service="updateService" :update-source="(value) => form.data.source = value"
+                    :apply-service="applyService" />
 
                 <Masonry v-else :key="`${tab.id}-${masonryRenderKey}`" ref="masonry" v-model:items="items"
                     class="min-h-0 flex-1 !mt-0 !py-0 !border-0"
@@ -978,46 +408,11 @@ defineExpose({
             :visible="tab !== null && tab !== undefined && !shouldShowForm" :total="totalAvailable"
             @first-page="goToFirstPage" />
 
-        <!-- Prompt Dialog -->
-        <Dialog v-model="promptData.promptDialogOpen.value" @update:model-value="handlePromptDialogUpdate">
-            <DialogContent class="sm:max-w-[600px] bg-prussian-blue-600">
-                <DialogHeader>
-                    <DialogTitle class="text-twilight-indigo-100">Prompt</DialogTitle>
-                </DialogHeader>
-                <div class="space-y-4 mt-4">
-                    <div v-if="promptData.promptDialogItemId.value !== null && promptData.promptDataLoading.value.get(promptData.promptDialogItemId.value)"
-                        class="flex items-center gap-2 text-sm text-twilight-indigo-100">
-                        <Loader2 :size="16" class="animate-spin" />
-                        <span>Loading prompt...</span>
-                    </div>
-                    <div v-else-if="promptData.currentPromptData.value" class="space-y-2">
-                        <div
-                            class="flex-1 whitespace-pre-wrap wrap-break-word text-sm text-twilight-indigo-100 max-h-[60vh] overflow-y-auto">
-                            {{ promptData.currentPromptData.value }}
-                        </div>
-                    </div>
-                    <div v-else class="text-sm text-twilight-indigo-300">
-                        No prompt data available
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" size="sm" @click="handleCopyPromptClick" aria-label="Copy prompt">
-                        <Copy :size="16" class="mr-2" />
-                        Copy
-                    </Button>
-                    <Button v-if="promptData.currentPromptData.value" variant="outline" size="sm"
-                        @click="handleTestPromptClick" aria-label="Test prompt against moderation rules">
-                        <TestTube :size="16" class="mr-2" />
-                        Test
-                    </Button>
-                    <DialogClose as-child>
-                        <Button variant="outline" size="sm" @click="promptData.closePromptDialog()">
-                            Close
-                        </Button>
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+        <TabContentPromptDialog :open="promptData.promptDialogOpen.value"
+            :item-id="promptData.promptDialogItemId.value" :loading="promptData.promptDataLoading.value"
+            :prompt="promptData.currentPromptData.value" :update-open="handlePromptDialogUpdate"
+            :copy-prompt="handleCopyPromptClick" :test-prompt="handleTestPromptClick"
+            :close-prompt="promptData.closePromptDialog" />
 
     </div>
     <div v-else class="flex items-center justify-center h-full" data-test="no-tab-message">

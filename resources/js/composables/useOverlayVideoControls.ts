@@ -77,13 +77,24 @@ export function useOverlayVideoControls(params: {
         videoVolume.value = video.volume;
     }
 
+    function safelyPlayVideo(video: HTMLVideoElement): void {
+        try {
+            const playback = video.play();
+            if (playback && typeof playback.catch === 'function') {
+                void playback.catch(() => {});
+            }
+        } catch {
+            // Ignore autoplay and unimplemented-media errors in non-browser test environments.
+        }
+    }
+
     function toggleVideoPlayback(): void {
         const video = params.overlayVideoRef.value;
         if (!video) {
             return;
         }
         if (video.paused || video.ended) {
-            void video.play().catch(() => {});
+            safelyPlayVideo(video);
         } else {
             video.pause();
         }
@@ -148,7 +159,7 @@ export function useOverlayVideoControls(params: {
         video.muted = false;
         video.volume = 1;
         videoVolume.value = video.volume;
-        void video.play().catch(() => {});
+        safelyPlayVideo(video);
     }
 
     watch(

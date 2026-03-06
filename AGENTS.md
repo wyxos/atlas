@@ -189,6 +189,7 @@ After you've finished editing
   - Browser tests: `tests/Browser/`
   - Unit tests: `tests/Unit/`
   - JS tests: `resources/js/**/*.test.ts`
+- Browser-media test gotcha: do not assume `HTMLMediaElement.play()` returns a promise; jsdom can return `undefined`, so guard the return before chaining `.catch()` in video/audio composables.
 
 ### Database
 - Migrations: `database/migrations/`
