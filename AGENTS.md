@@ -178,6 +178,7 @@ After you've finished editing
   - Build + package command: `npm run package:extension` (creates `public/downloads/atlas-extension.zip` and a versioned archive)
   - Version bump helpers: `npm run package:extension -- --bump=patch|minor|major` or set explicit version with `npm run package:extension -- --version=1.2.3`
   - Content script build gotcha: if `extension/vite.content.config.ts` builds a `.vue` import, keep `@vitejs/plugin-vue` enabled there, set `build.lib.cssFileName`, and include the emitted CSS file in `manifest.json` `content_scripts[].css`.
+  - Extension automation gotcha: Chrome stable no longer reliably honors `--load-extension` for side-loaded unpacked extensions; use Brave/Chromium with an isolated `userDataDir` for automated extension testing so it does not collide with a live profile.
 
 ### Testing
 - **Test Suite**: `tests/` → [see tests/AGENTS.md](tests/AGENTS.md)

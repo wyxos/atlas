@@ -37,6 +37,7 @@ type SubmitReactionPayload = {
     type: 'ATLAS_SUBMIT_REACTION';
     atlasDomain: string;
     apiToken: string;
+    endpoint: string;
     body: Record<string, unknown>;
 };
 
@@ -444,13 +445,16 @@ chrome.runtime.onMessage.addListener((
         const submitPayload = message as SubmitReactionPayload;
         const atlasDomain = typeof submitPayload.atlasDomain === 'string' ? submitPayload.atlasDomain.trim().replace(/\/+$/, '') : '';
         const apiToken = typeof submitPayload.apiToken === 'string' ? submitPayload.apiToken.trim() : '';
+        const endpoint = typeof submitPayload.endpoint === 'string' ? submitPayload.endpoint.trim() : '';
         const body = submitPayload.body;
-        if (atlasDomain === '' || apiToken === '' || typeof body !== 'object' || body === null) {
+        const isAllowedEndpoint = endpoint === `${atlasDomain}/api/extension/reactions`
+            || endpoint === `${atlasDomain}/api/extension/reactions/batch`;
+        if (atlasDomain === '' || apiToken === '' || !isAllowedEndpoint || typeof body !== 'object' || body === null) {
             sendResponse({ ok: false, status: 0, payload: null });
             return false;
         }
 
-        void fetch(`${atlasDomain}/api/extension/reactions`, {
+        void fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

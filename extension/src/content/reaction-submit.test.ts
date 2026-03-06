@@ -84,6 +84,7 @@ describe('submitBadgeReaction', () => {
 
         const submitCall = runtimeSendMessage.mock.calls[1] as [Record<string, unknown>, (response: unknown) => void];
         expect(submitCall[0].type).toBe('ATLAS_SUBMIT_REACTION');
+        expect(submitCall[0].endpoint).toBe('https://atlas.test/api/extension/reactions');
         const body = submitCall[0].body as Record<string, unknown>;
 
         expect(body.url).toBe(window.location.href);
@@ -291,6 +292,7 @@ describe('submitBadgeReaction', () => {
         expect(fetchMock).not.toHaveBeenCalled();
         const submitCall = runtimeSendMessage.mock.calls[1] as [Record<string, unknown>, (response: unknown) => void];
         expect(submitCall[0].type).toBe('ATLAS_SUBMIT_REACTION');
+        expect(submitCall[0].endpoint).toBe('https://atlas.test/api/extension/reactions/batch');
         const body = submitCall[0].body as Record<string, unknown>;
         expect(body.primary_candidate_id).toBe('image-1');
         expect(body.items).toEqual([
@@ -312,6 +314,7 @@ describe('submitBadgeReaction', () => {
 
         const submitPayload = runtimeSendMessage.mock.calls[1]?.[0] as Record<string, unknown>;
         expect(submitPayload.atlasDomain).toBe('https://atlas.test');
+        expect(submitPayload.endpoint).toBe('https://atlas.test/api/extension/reactions/batch');
         expect(result.fileId).toBe(42);
         expect(result.downloadTransferId).toBe(99);
         expect(result.downloadStatus).toBe('queued');
