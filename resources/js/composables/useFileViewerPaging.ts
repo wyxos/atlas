@@ -85,15 +85,20 @@ export function useFileViewerPaging(params: {
         return item.type === 'video' ? 'video' : 'image';
     };
 
-    const normalizeVideoUrl = (url: string, mediaType: OverlayMediaType): string => {
-        if (mediaType !== 'video') {
-            return url;
+    const normalizeVideoUrl = (url: string | null | undefined, mediaType: OverlayMediaType): string => {
+        if (typeof url !== 'string') {
+            return '';
+        }
+
+        const value = url.trim();
+        if (mediaType !== 'video' || value === '') {
+            return value;
         }
 
         // Guard against malformed payloads that pass preview endpoint as the playback URL.
-        const match = url.match(/^(.*\/api\/files\/\d+)\/preview(\?.*)?$/);
+        const match = value.match(/^(.*\/api\/files\/\d+)\/preview(\?.*)?$/);
         if (!match) {
-            return url;
+            return value;
         }
 
         const base = match[1];
@@ -118,6 +123,23 @@ export function useFileViewerPaging(params: {
         }
 
         return normalizeVideoUrl(fallback, mediaType);
+    };
+
+    const resolvePreviewUrl = (item: FeedItem): string => {
+        const candidates = [item.preview, item.original, item.src, item.thumbnail, item.originalUrl];
+
+        for (const candidate of candidates) {
+            if (typeof candidate !== 'string') {
+                continue;
+            }
+
+            const value = candidate.trim();
+            if (value !== '') {
+                return value;
+            }
+        }
+
+        return '';
     };
 
     async function navigateToNext(): Promise<void> {
@@ -177,7 +199,7 @@ export function useFileViewerPaging(params: {
         const nextIsVideo = nextMediaType === 'video';
         const nextIsAudio = nextMediaType === 'audio';
         const nextIsFile = nextMediaType === 'file';
-        const nextImageSrc = (nextItem.preview || nextItem.original) as string;
+        const nextImageSrc = resolvePreviewUrl(nextItem);
         const nextFullSizeUrl = resolveFullSizeUrl(nextItem, nextImageSrc, nextMediaType);
 
         image.value = {
