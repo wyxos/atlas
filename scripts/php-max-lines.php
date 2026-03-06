@@ -46,6 +46,7 @@ foreach ($args as $arg) {
 
     if ($arg === '--report-baseline') {
         $reportBaseline = true;
+
         continue;
     }
 
@@ -102,6 +103,7 @@ foreach ($roots as $root) {
                 'lines' => $lineCount,
                 'reason' => 'new',
             ];
+
             continue;
         }
 
@@ -112,6 +114,7 @@ foreach ($roots as $root) {
                 'reason' => 'regressed',
                 'baseline' => $baselineLimit,
             ];
+
             continue;
         }
 
