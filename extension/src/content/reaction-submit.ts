@@ -152,6 +152,19 @@ function batchQueuedDownloadRequested(value: unknown): boolean {
     });
 }
 
+function batchDownloadRequested(value: unknown): boolean {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const batch = (value as Record<string, unknown>).batch;
+    if (!batch || typeof batch !== 'object') {
+        return false;
+    }
+
+    return (batch as Record<string, unknown>).download_requested === true;
+}
+
 function normalizeCookieUrls(urls: Array<string | null>): string[] {
     const normalized = urls
         .map((url) => normalizeUrl(url))
@@ -438,7 +451,9 @@ export async function submitBadgeReaction(
             : {};
         const fileId = numberOrNull(filePayload.id);
         const downloadRequested = downloadPayload.requested === true;
-        const shouldCloseTabAfterQueue = downloadRequested || batchQueuedDownloadRequested(payload);
+        const shouldCloseTabAfterQueue = downloadRequested
+            || batchDownloadRequested(payload)
+            || batchQueuedDownloadRequested(payload);
         const downloadTransferId = numberOrNull(downloadPayload.transfer_id);
         const downloadStatus = stringOrNull(downloadPayload.status);
         const downloadProgressPercent = numberOrNull(downloadPayload.progress_percent);

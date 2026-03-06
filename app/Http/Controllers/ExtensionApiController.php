@@ -197,6 +197,7 @@ class ExtensionApiController extends Controller
         $batchItems = [];
         $primaryPayload = null;
         $primaryCandidateId = $validated['primary_candidate_id'];
+        $batchDownloadRequested = false;
 
         foreach ($validated['items'] as $item) {
             $payload = $this->processReactionItem(
@@ -213,6 +214,9 @@ class ExtensionApiController extends Controller
                 ...$payload,
             ];
             $batchItems[] = $candidatePayload;
+            if (data_get($payload, 'download.requested') === true) {
+                $batchDownloadRequested = true;
+            }
 
             if ($item['candidate_id'] === $primaryCandidateId) {
                 $primaryPayload = $payload;
@@ -231,6 +235,7 @@ class ExtensionApiController extends Controller
             'batch' => [
                 'count' => count($batchItems),
                 'primary_candidate_id' => $primaryCandidateId,
+                'download_requested' => $batchDownloadRequested,
                 'items' => $batchItems,
             ],
         ]);
