@@ -6,10 +6,15 @@ export const STORAGE_KEYS = {
     apiToken: 'apiToken',
     matchRules: 'matchRules',
     closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
+    reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
 } as const;
 
 export const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
 export type CloseTabAfterQueueByDomain = Record<string, boolean>;
+
+function parseStoredBoolean(value: unknown): boolean {
+    return value === true;
+}
 
 export function normalizeDomain(input: string): string {
     return input.trim().replace(/\/+$/, '');
@@ -158,6 +163,37 @@ export async function setCloseTabAfterQueuePreferenceForHostname(hostname: strin
         chrome.storage.local.set(
             {
                 [STORAGE_KEYS.closeTabAfterQueueByDomain]: nextPreferences,
+            },
+            () => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+
+                resolve();
+            },
+        );
+    });
+}
+
+export function getReactAllItemsInPostPreference(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.get([STORAGE_KEYS.reactAllItemsInPostEnabled], (stored: Record<string, unknown>) => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+            }
+
+            resolve(parseStoredBoolean(stored[STORAGE_KEYS.reactAllItemsInPostEnabled]));
+        });
+    });
+}
+
+export function setReactAllItemsInPostPreference(enabled: boolean): Promise<void> {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.set(
+            {
+                [STORAGE_KEYS.reactAllItemsInPostEnabled]: enabled,
             },
             () => {
                 if (chrome.runtime.lastError) {

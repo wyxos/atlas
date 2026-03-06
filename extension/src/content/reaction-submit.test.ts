@@ -103,6 +103,7 @@ describe('submitBadgeReaction', () => {
             },
         ]);
         expect(body.user_agent).toBe(navigator.userAgent);
+        expect(result.shouldCloseTabAfterQueue).toBe(false);
 
         const [requestLog] = getAtlasRequestLogSnapshot();
         expect(requestLog.endpoint).toBe('https://atlas.test/api/extension/reactions');
@@ -318,5 +319,105 @@ describe('submitBadgeReaction', () => {
         expect(result.fileId).toBe(42);
         expect(result.downloadTransferId).toBe(99);
         expect(result.downloadStatus).toBe('queued');
+        expect(result.shouldCloseTabAfterQueue).toBe(true);
+    });
+
+    it('keeps batch auto-close enabled when only a non-primary item was newly queued', async () => {
+        mockGetStoredOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'test-api-token',
+            matchRules: [],
+        });
+
+        vi.stubGlobal('fetch', vi.fn());
+        const runtimeSendMessage = vi.fn((payload: unknown, callback: (response: unknown) => void) => {
+            const typed = payload as { type?: string };
+            if (typed.type === 'ATLAS_GET_URL_COOKIES') {
+                callback({ cookies: [] });
+                return;
+            }
+
+            if (typed.type === 'ATLAS_SUBMIT_REACTION') {
+                callback({
+                    ok: true,
+                    status: 200,
+                    payload: {
+                        reaction: 'love',
+                        file: {
+                            id: 42,
+                            url: 'https://images.example.com/direct-image-1.jpg',
+                            referrer_url: 'https://www.deviantart.com/artist/art/post-1',
+                            preview_url: 'https://images.example.com/direct-image-1.jpg',
+                        },
+                        download: {
+                            requested: false,
+                            transfer_id: null,
+                            status: null,
+                            progress_percent: null,
+                        },
+                        batch: {
+                            count: 2,
+                            primary_candidate_id: 'image-1',
+                            items: [
+                                {
+                                    candidate_id: 'image-1',
+                                    download: {
+                                        requested: false,
+                                        transfer_id: null,
+                                        status: null,
+                                        progress_percent: null,
+                                    },
+                                },
+                                {
+                                    candidate_id: 'image-2',
+                                    download: {
+                                        requested: true,
+                                        transfer_id: 123,
+                                        status: 'queued',
+                                        progress_percent: 0,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                });
+                return;
+            }
+
+            callback(null);
+        });
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: runtimeSendMessage,
+            },
+        });
+
+        const { submitBadgeReaction } = await import('./reaction-submit');
+        const image = document.createElement('img');
+        image.src = 'https://images.example.com/direct-image-1.jpg';
+
+        const result = await submitBadgeReaction(image, 'love', {
+            batchItems: [
+                {
+                    candidateId: 'image-1',
+                    url: 'https://images.example.com/direct-image-1.jpg',
+                    referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1',
+                    pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                    tagName: 'img',
+                },
+                {
+                    candidateId: 'image-2',
+                    url: 'https://images.example.com/direct-image-2.jpg',
+                    referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1#image-2',
+                    pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                    tagName: 'img',
+                },
+            ],
+        });
+
+        expect(result.ok).toBe(true);
+        expect(result.downloadRequested).toBe(false);
+        expect(result.shouldCloseTabAfterQueue).toBe(true);
     });
 });

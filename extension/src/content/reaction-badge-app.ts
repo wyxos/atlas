@@ -18,7 +18,9 @@ import { renderReactionBadge, type BadgeTimestampDisplay } from './reaction-badg
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
 import {
     getCloseTabAfterQueuePreferenceForHostname,
+    getReactAllItemsInPostPreference,
     setCloseTabAfterQueuePreferenceForHostname,
+    setReactAllItemsInPostPreference,
 } from '../atlas-options';
 import {
     getPersistedBadgeState,
@@ -55,7 +57,6 @@ function isTerminalStatus(status: string | null): boolean {
 type TabCountChangedListener = (count: number) => void;
 
 const tabCountChangedListeners = new Set<TabCountChangedListener>();
-const reactAllItemsPreferenceByPageUrl = new Map<string, boolean>();
 let tabCountRuntimeBound = false;
 
 function toSafeCount(value: unknown): number {
@@ -208,22 +209,12 @@ const AtlasReactionBadge = defineComponent({
             lastReactionMediaUrl.value = trackedMediaUrls.value[0] ?? null;
         }
 
-        function resolveReactAllItemsPageKey(): string | null {
-            return normalizeUrl(window.location.href);
-        }
-
-        function persistReactAllItemsPreference(enabled: boolean): void {
-            const key = resolveReactAllItemsPageKey();
-            if (key === null) {
-                return;
+        async function loadReactAllItemsInPostPreference(): Promise<void> {
+            try {
+                reactAllItemsInPost.value = await getReactAllItemsInPostPreference();
+            } catch {
+                reactAllItemsInPost.value = false;
             }
-
-            if (enabled) {
-                reactAllItemsPreferenceByPageUrl.set(key, true);
-                return;
-            }
-
-            reactAllItemsPreferenceByPageUrl.delete(key);
         }
 
         function syncRelatedPostThumbnailContext(): void {
@@ -233,14 +224,6 @@ const AtlasReactionBadge = defineComponent({
             }
 
             showReactAllItemsInPost.value = nextVisible;
-            if (nextVisible) {
-                const pageKey = resolveReactAllItemsPageKey();
-                reactAllItemsInPost.value = pageKey !== null && reactAllItemsPreferenceByPageUrl.get(pageKey) === true;
-                return;
-            }
-
-            reactAllItemsInPost.value = false;
-            persistReactAllItemsPreference(false);
         }
 
         function resolvePersistenceUrl(): string | null {
@@ -523,6 +506,7 @@ const AtlasReactionBadge = defineComponent({
             });
             void refreshOpenTabCount();
             void loadCloseTabAfterQueuePreference();
+            void loadReactAllItemsInPostPreference();
             syncRelatedPostThumbnailContext();
             void refreshMatchForCurrentMedia(true);
         });
@@ -570,7 +554,7 @@ const AtlasReactionBadge = defineComponent({
 
             try {
                 let batchItems = null;
-                if (reactAllItemsInPost.value) {
+                if (showReactAllItemsInPost.value && reactAllItemsInPost.value) {
                     suppressMediaContextUpdates = true;
                     try {
                         batchItems = await collectDeviantArtBatchReactionItems(props.media, {
@@ -622,12 +606,12 @@ const AtlasReactionBadge = defineComponent({
                     if (isTerminalStatus(result.downloadStatus)) {
                         handleTerminalUnlock();
                     }
-
-                    if (closeTabAfterQueueEnabled.value) {
-                        void requestCloseCurrentTab();
-                    }
                 } else {
                     handleTerminalUnlock();
+                }
+
+                if (closeTabAfterQueueEnabled.value && result.shouldCloseTabAfterQueue) {
+                    void requestCloseCurrentTab();
                 }
             } finally {
                 if (isActive && !isDownloadLocked.value) {
@@ -636,13 +620,19 @@ const AtlasReactionBadge = defineComponent({
             }
         }
 
-        function handleReactAllItemsInPostToggle(): void {
+        async function handleReactAllItemsInPostToggle(): Promise<void> {
             if (!showReactAllItemsInPost.value || controlsDisabled.value) {
                 return;
             }
 
-            reactAllItemsInPost.value = !reactAllItemsInPost.value;
-            persistReactAllItemsPreference(reactAllItemsInPost.value);
+            const nextEnabled = !reactAllItemsInPost.value;
+            reactAllItemsInPost.value = nextEnabled;
+
+            try {
+                await setReactAllItemsInPostPreference(nextEnabled);
+            } catch {
+                reactAllItemsInPost.value = !nextEnabled;
+            }
         }
 
         return () => {
@@ -696,7 +686,7 @@ const AtlasReactionBadge = defineComponent({
                         void toggleCloseTabAfterQueuePreference();
                     },
                     onReactAllItemsInPostToggle: () => {
-                        handleReactAllItemsInPostToggle();
+                        void handleReactAllItemsInPostToggle();
                     },
                 },
             );

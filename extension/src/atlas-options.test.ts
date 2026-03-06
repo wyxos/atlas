@@ -97,4 +97,21 @@ describe('atlas-options close-tab-after-queue preferences', () => {
             'disabled.example': false,
         });
     });
+
+    it('stores and reads the global react-all-items preference', async () => {
+        const { STORAGE_KEYS, getReactAllItemsInPostPreference, setReactAllItemsInPostPreference } = await import('./atlas-options');
+
+        await setReactAllItemsInPostPreference(true);
+
+        expect(storageState[STORAGE_KEYS.reactAllItemsInPostEnabled]).toBe(true);
+        await expect(getReactAllItemsInPostPreference()).resolves.toBe(true);
+    });
+
+    it('defaults the global react-all-items preference to false', async () => {
+        const { STORAGE_KEYS, getReactAllItemsInPostPreference } = await import('./atlas-options');
+
+        storageState[STORAGE_KEYS.reactAllItemsInPostEnabled] = 'yes';
+
+        await expect(getReactAllItemsInPostPreference()).resolves.toBe(false);
+    });
 });
