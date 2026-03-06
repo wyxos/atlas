@@ -49,6 +49,9 @@
         "lint:php:max-lines": [
             "@php scripts/php-max-lines.php --max=500"
         ],
+        "lint:php:max-lines:report": [
+            "@php scripts/php-max-lines.php --max=500 --report-baseline"
+        ],
         "lint:php": [
             "@php vendor/bin/pint --test",
             "@composer lint:php:max-lines"

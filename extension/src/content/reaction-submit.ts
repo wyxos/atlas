@@ -127,6 +127,20 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
     };
 }
 
+
+function batchDownloadRequested(value: unknown): boolean {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const batch = (value as Record<string, unknown>).batch;
+    if (!batch || typeof batch !== 'object') {
+        return false;
+    }
+
+    return (batch as Record<string, unknown>).download_requested === true;
+}
+
 function batchQueuedDownloadRequested(value: unknown): boolean {
     if (!value || typeof value !== 'object') {
         return false;
@@ -150,19 +164,6 @@ function batchQueuedDownloadRequested(value: unknown): boolean {
         const download = (entry as Record<string, unknown>).download;
         return !!download && typeof download === 'object' && (download as Record<string, unknown>).requested === true;
     });
-}
-
-function batchDownloadRequested(value: unknown): boolean {
-    if (!value || typeof value !== 'object') {
-        return false;
-    }
-
-    const batch = (value as Record<string, unknown>).batch;
-    if (!batch || typeof batch !== 'object') {
-        return false;
-    }
-
-    return (batch as Record<string, unknown>).download_requested === true;
 }
 
 function normalizeCookieUrls(urls: Array<string | null>): string[] {
@@ -451,6 +452,8 @@ export async function submitBadgeReaction(
             : {};
         const fileId = numberOrNull(filePayload.id);
         const downloadRequested = downloadPayload.requested === true;
+        // Keep both checks while older Atlas deployments may omit the aggregated
+        // batch.download_requested flag and only report queueing per item.
         const shouldCloseTabAfterQueue = downloadRequested
             || batchDownloadRequested(payload)
             || batchQueuedDownloadRequested(payload);
