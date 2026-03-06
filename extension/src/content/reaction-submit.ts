@@ -11,6 +11,7 @@ type SubmitReactionResult = {
     exists: boolean;
     fileId: number | null;
     downloadRequested: boolean;
+    shouldCloseTabAfterQueue: boolean;
     downloadTransferId: number | null;
     downloadStatus: string | null;
     downloadProgressPercent: number | null;
@@ -124,6 +125,31 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
         scheme,
         channel,
     };
+}
+
+function batchQueuedDownloadRequested(value: unknown): boolean {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const batch = (value as Record<string, unknown>).batch;
+    if (!batch || typeof batch !== 'object') {
+        return false;
+    }
+
+    const items = (batch as Record<string, unknown>).items;
+    if (!Array.isArray(items)) {
+        return false;
+    }
+
+    return items.some((entry) => {
+        if (!entry || typeof entry !== 'object') {
+            return false;
+        }
+
+        const download = (entry as Record<string, unknown>).download;
+        return !!download && typeof download === 'object' && (download as Record<string, unknown>).requested === true;
+    });
 }
 
 function normalizeCookieUrls(urls: Array<string | null>): string[] {
@@ -283,6 +309,7 @@ export async function submitBadgeReaction(
             exists: false,
             fileId: null,
             downloadRequested: false,
+            shouldCloseTabAfterQueue: false,
             downloadTransferId: null,
             downloadStatus: null,
             downloadProgressPercent: null,
@@ -299,6 +326,7 @@ export async function submitBadgeReaction(
                 exists: false,
                 fileId: null,
                 downloadRequested: false,
+                shouldCloseTabAfterQueue: false,
                 downloadTransferId: null,
                 downloadStatus: null,
                 downloadProgressPercent: null,
@@ -357,6 +385,7 @@ export async function submitBadgeReaction(
                     exists: false,
                     fileId: null,
                     downloadRequested: false,
+                    shouldCloseTabAfterQueue: false,
                     downloadTransferId: null,
                     downloadStatus: null,
                     downloadProgressPercent: null,
@@ -383,6 +412,7 @@ export async function submitBadgeReaction(
                     exists: false,
                     fileId: null,
                     downloadRequested: false,
+                    shouldCloseTabAfterQueue: false,
                     downloadTransferId: null,
                     downloadStatus: null,
                     downloadProgressPercent: null,
@@ -408,6 +438,7 @@ export async function submitBadgeReaction(
             : {};
         const fileId = numberOrNull(filePayload.id);
         const downloadRequested = downloadPayload.requested === true;
+        const shouldCloseTabAfterQueue = downloadRequested || batchQueuedDownloadRequested(payload);
         const downloadTransferId = numberOrNull(downloadPayload.transfer_id);
         const downloadStatus = stringOrNull(downloadPayload.status);
         const downloadProgressPercent = numberOrNull(downloadPayload.progress_percent);
@@ -420,6 +451,7 @@ export async function submitBadgeReaction(
                 exists: extractedExists ?? true,
                 fileId,
                 downloadRequested,
+                shouldCloseTabAfterQueue,
                 downloadTransferId,
                 downloadStatus,
                 downloadProgressPercent,
@@ -433,6 +465,7 @@ export async function submitBadgeReaction(
             exists: extractedExists ?? true,
             fileId,
             downloadRequested,
+            shouldCloseTabAfterQueue,
             downloadTransferId,
             downloadStatus,
             downloadProgressPercent,
@@ -445,6 +478,7 @@ export async function submitBadgeReaction(
             exists: false,
             fileId: null,
             downloadRequested: false,
+            shouldCloseTabAfterQueue: false,
             downloadTransferId: null,
             downloadStatus: null,
             downloadProgressPercent: null,
