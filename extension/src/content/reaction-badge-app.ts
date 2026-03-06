@@ -572,6 +572,17 @@ const AtlasReactionBadge = defineComponent({
                 const result = await submitBadgeReaction(props.media, type, {
                     batchItems,
                 });
+                const shouldCloseCurrentTab = result.ok
+                    && closeTabAfterQueueEnabled.value
+                    && result.shouldCloseTabAfterQueue;
+
+                // DeviantArt gallery navigation can replace the active media node and unmount this
+                // badge instance before the batch submit resolves. The tab-close side effect still
+                // belongs to the successful submit, even if this component instance is now stale.
+                if (shouldCloseCurrentTab) {
+                    void requestCloseCurrentTab();
+                }
+
                 if (!isActive || !result.ok) {
                     return;
                 }
@@ -610,9 +621,6 @@ const AtlasReactionBadge = defineComponent({
                     handleTerminalUnlock();
                 }
 
-                if (closeTabAfterQueueEnabled.value && result.shouldCloseTabAfterQueue) {
-                    void requestCloseCurrentTab();
-                }
             } finally {
                 if (isActive && !isDownloadLocked.value) {
                     submittingReactionType.value = null;
