@@ -13,7 +13,7 @@ export function isMediaElement(element: Element): element is MediaElement {
     return element instanceof HTMLImageElement || element instanceof HTMLVideoElement;
 }
 
-function resolveDeclaredImageUrl(element: HTMLImageElement): string | null {
+function resolveDeclaredMediaSrc(element: HTMLImageElement | HTMLVideoElement): string | null {
     const declaredSource = element.getAttribute('src');
     if (typeof declaredSource !== 'string' || declaredSource.trim() === '') {
         return null;
@@ -24,10 +24,10 @@ function resolveDeclaredImageUrl(element: HTMLImageElement): string | null {
 
 export function resolveMediaUrl(element: MediaElement): string | null {
     if (element instanceof HTMLImageElement) {
-        return resolveDeclaredImageUrl(element);
+        return resolveDeclaredMediaSrc(element);
     }
 
-    return element.currentSrc || element.src || element.poster || element.getAttribute('src') || null;
+    return resolveDeclaredMediaSrc(element);
 }
 
 function resolveSourceUrl(source: HTMLSourceElement): string | null {
@@ -45,7 +45,7 @@ function isLikelyMp4Source(source: HTMLSourceElement, sourceUrl: string): boolea
 
 export function resolveReactionMediaUrl(element: MediaElement): string | null {
     if (element instanceof HTMLImageElement) {
-        return normalizeUrl(resolveDeclaredImageUrl(element));
+        return normalizeUrl(resolveDeclaredMediaSrc(element));
     }
 
     const sources = Array.from(element.querySelectorAll('source'))
@@ -64,7 +64,7 @@ export function resolveReactionMediaUrl(element: MediaElement): string | null {
         return normalizeUrl(sources[0].sourceUrl);
     }
 
-    return normalizeUrl(element.currentSrc || element.src || element.getAttribute('src') || null);
+    return normalizeUrl(resolveDeclaredMediaSrc(element));
 }
 
 export function resolveReactionTargetUrl(element: MediaElement, pageUrl: string | null): string | null {

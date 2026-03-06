@@ -59,7 +59,40 @@ describe('resolveReactionMediaUrl', () => {
         const video = document.createElement('video');
         video.src = 'https://cdn.example.com/video.mp4#fragment';
 
+        expect(resolveMediaUrl(video)).toBe('https://cdn.example.com/video.mp4#fragment');
         expect(resolveReactionMediaUrl(video)).toBe('https://cdn.example.com/video.mp4');
+    });
+
+    it('ignores video currentSrc when a declared src exists', () => {
+        const video = document.createElement('video');
+        video.setAttribute('src', 'https://cdn.example.com/full-video.mp4#player');
+        Object.defineProperty(video, 'currentSrc', {
+            configurable: true,
+            value: 'https://cdn.example.com/preview-video.m3u8',
+        });
+
+        expect(resolveMediaUrl(video)).toBe('https://cdn.example.com/full-video.mp4#player');
+        expect(resolveReactionMediaUrl(video)).toBe('https://cdn.example.com/full-video.mp4');
+    });
+
+    it('prefers mp4 sources before other source candidates', () => {
+        const video = document.createElement('video');
+        video.innerHTML = `
+            <source src="https://cdn.example.com/stream.m3u8" type="application/x-mpegURL">
+            <source src="https://cdn.example.com/video.mp4#fragment" type="video/mp4">
+        `;
+
+        expect(resolveReactionMediaUrl(video)).toBe('https://cdn.example.com/video.mp4');
+    });
+
+    it('uses the first source when no mp4 source exists', () => {
+        const video = document.createElement('video');
+        video.innerHTML = `
+            <source src="https://cdn.example.com/stream.m3u8#fragment" type="application/x-mpegURL">
+            <source src="https://cdn.example.com/stream.webm" type="video/webm">
+        `;
+
+        expect(resolveReactionMediaUrl(video)).toBe('https://cdn.example.com/stream.m3u8');
     });
 });
 
