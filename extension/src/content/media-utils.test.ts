@@ -4,6 +4,7 @@ import {
     normalizeHashAwareUrl,
     normalizeUrl,
     resolveIdentifiedMediaResolution,
+    resolveMediaUrl,
     resolveMediaResolution,
     resolveReactionMediaUrl,
     resolveReactionTargetUrl,
@@ -35,6 +36,18 @@ function setMockRect(
 }
 
 describe('resolveReactionMediaUrl', () => {
+    it('uses the declared image src and ignores currentSrc variants', () => {
+        const image = document.createElement('img');
+        image.setAttribute('src', 'https://cdn.example.com/full.jpg#viewer');
+        Object.defineProperty(image, 'currentSrc', {
+            configurable: true,
+            value: 'https://cdn.example.com/preview-fit.jpg',
+        });
+
+        expect(resolveMediaUrl(image)).toBe('https://cdn.example.com/full.jpg#viewer');
+        expect(resolveReactionMediaUrl(image)).toBe('https://cdn.example.com/full.jpg');
+    });
+
     it('does not use video poster as reaction media url fallback', () => {
         const video = document.createElement('video');
         video.poster = 'https://cdn.example.com/poster.jpg';

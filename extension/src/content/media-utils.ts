@@ -13,9 +13,18 @@ export function isMediaElement(element: Element): element is MediaElement {
     return element instanceof HTMLImageElement || element instanceof HTMLVideoElement;
 }
 
+function resolveDeclaredImageUrl(element: HTMLImageElement): string | null {
+    const declaredSource = element.getAttribute('src');
+    if (typeof declaredSource !== 'string' || declaredSource.trim() === '') {
+        return null;
+    }
+
+    return element.src;
+}
+
 export function resolveMediaUrl(element: MediaElement): string | null {
     if (element instanceof HTMLImageElement) {
-        return element.currentSrc || element.src || element.getAttribute('src') || null;
+        return resolveDeclaredImageUrl(element);
     }
 
     return element.currentSrc || element.src || element.poster || element.getAttribute('src') || null;
@@ -36,7 +45,7 @@ function isLikelyMp4Source(source: HTMLSourceElement, sourceUrl: string): boolea
 
 export function resolveReactionMediaUrl(element: MediaElement): string | null {
     if (element instanceof HTMLImageElement) {
-        return normalizeUrl(resolveMediaUrl(element));
+        return normalizeUrl(resolveDeclaredImageUrl(element));
     }
 
     const sources = Array.from(element.querySelectorAll('source'))
