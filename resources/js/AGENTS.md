@@ -64,6 +64,7 @@ npm run check:js
 - ❌ DON'T: Create composables that only wrap a single method call
 - ❌ DON'T: Use composables for pure utility functions (use `utils/` instead)
 - ✅ DO: Group composables by feature capability (`browseState`, `containerActions`, `promptDialog`) instead of returning one flat bag of unrelated handlers
+- ✅ DO: Consume broad composables through grouped APIs like `state`, `derived`, and `actions` rather than top-level destructuring 10+ mixed fields into the parent scope
 - ❌ DON'T: Build god composables that mix hover state, dialog state, masonry events, tab routing, and toolbar actions in one API
 - ✅ Example: `resources/js/composables/useBrowseService.ts` - browse logic
 - ✅ Example: `resources/js/composables/useTabs.ts` - tab management

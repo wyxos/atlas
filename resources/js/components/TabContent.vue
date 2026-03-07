@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, provide, ref, shallowRef, toRef, watch } from 'vue';
+import { computed, provide, reactive, ref, shallowRef, toRef, watch } from 'vue';
 import type { TabData, FeedItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem } from '@wyxos/vibe';
 import type { MasonryInstance } from '@wyxos/vibe';
@@ -94,24 +94,7 @@ function resetItemPreloads(): void {
     itemInteractions.preload.reset();
 }
 
-const {
-    totalAvailable,
-    masonryRenderKey,
-    startPageToken,
-    restoredPages,
-    loadAtPage,
-    isTabRestored,
-    shouldShowForm,
-    selectedService,
-    currentTabService,
-    hasServiceSelected,
-    updateService,
-    formatTabLabel,
-    getPage,
-    applyFilters,
-    goToFirstPage,
-    applyService,
-} = useTabContentBrowseState({
+const browse = useTabContentBrowseState({
     tabId: toRef(props, 'tabId'),
     form,
     items,
@@ -126,6 +109,17 @@ const {
     onLoadingStop: handleLoadingStop,
     onUpdateTabLabel: props.onUpdateTabLabel,
 });
+const browseState = reactive(browse.state);
+const browseDerived = browse.derived;
+const browseActions = browse.actions;
+// Compatibility aliases for tests/debugging. Keep the public surface narrow.
+const selectedService = browseDerived.selectedService;
+const currentTabService = browseDerived.currentTabService;
+const hasServiceSelected = browseDerived.hasServiceSelected;
+const loadAtPage = browse.state.loadAtPage;
+const isTabRestored = browse.state.isTabRestored;
+const getPage = browseActions.getPage;
+const applyService = browseActions.applyService;
 
 const containerInteractions = useTabContentContainerInteractions({
     items,
@@ -133,7 +127,7 @@ const containerInteractions = useTabContentContainerInteractions({
     form,
     masonry,
     availableServices,
-    formatTabLabel,
+    formatTabLabel: browse.formatters.formatTabLabel,
     onReaction: props.onReaction,
     onOpenContainerTab: props.onOpenContainerTab,
 });
@@ -239,6 +233,8 @@ defineExpose({
     hasServiceSelected,
     loadAtPage,
     isTabRestored,
+    getPage,
+    applyService,
     hoveredItemIndex: itemInteractions.state.hoveredItemIndex,
     hoveredItemId: itemInteractions.state.hoveredItemId,
     containerBadges: containerInteractions.badges,
@@ -251,13 +247,13 @@ defineExpose({
 
 <template>
     <div v-if="tab" ref="tabContentContainer" class="flex-1 min-h-0 flex flex-col relative">
-        <TabContentServiceHeader v-if="!shouldShowForm" :form="form" :available-services="availableServices"
+        <TabContentServiceHeader v-if="!browseState.shouldShowForm" :form="form" :available-services="availableServices"
             :available-sources="availableSources" :local-service="localService ?? null" :masonry="masonry"
             :filter-sheet-open="isFilterSheetOpen"
             :update-filter-sheet-open="(value) => isFilterSheetOpen = value"
-            :update-feed="(value) => form.data.feed = value" :update-service="updateService"
-            :update-source="(value) => form.data.source = value" :apply-service="applyService"
-            :apply-filters="applyFilters" :reset-filters="handleResetFilters"
+            :update-feed="(value) => form.data.feed = value" :update-service="browseActions.updateService"
+            :update-source="(value) => form.data.source = value" :apply-service="browseActions.applyService"
+            :apply-filters="browseActions.applyFilters" :reset-filters="handleResetFilters"
             :rules-changed="handleModerationRulesChanged" :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
             :load-next-page="itemInteractions.masonry.loadNextPage">
             <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"
@@ -271,16 +267,16 @@ defineExpose({
                 @click="itemInteractions.masonry.onClick" @contextmenu.prevent="itemInteractions.masonry.onClick"
                 @mousedown="itemInteractions.masonry.onMouseDown">
 
-                <TabContentStartForm v-if="shouldShowForm" :form="form" :available-services="availableServices"
+                <TabContentStartForm v-if="browseState.shouldShowForm" :form="form" :available-services="availableServices"
                     :available-sources="availableSources" :is-loading="masonry?.isLoading ?? false"
                     :set-local-mode="(value) => form.isLocalMode.value = value"
-                    :update-service="updateService" :update-source="(value) => form.data.source = value"
-                    :apply-service="applyService" />
+                    :update-service="browseActions.updateService" :update-source="(value) => form.data.source = value"
+                    :apply-service="browseActions.applyService" />
 
-                <Masonry v-else :key="`${tab.id}-${masonryRenderKey}`" ref="masonry" v-model:items="items"
+                <Masonry v-else :key="`${tab.id}-${browseState.masonryRenderKey}`" ref="masonry" v-model:items="items"
                     class="min-h-0 flex-1 !mt-0 !py-0 !border-0"
                      :mode="form.isLocalMode.value ? 'default' : 'backfill'"
-                    :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
+                    :get-content="browseActions.getPage" :page="browseState.startPageToken" :restored-pages="browseState.restoredPages ?? undefined"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
                     @preloaded="itemInteractions.preload.onBatchPreloaded" @failures="itemInteractions.preload.onBatchFailures"
@@ -314,8 +310,8 @@ defineExpose({
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
-            :visible="tab !== null && tab !== undefined && !shouldShowForm" :total="totalAvailable"
-            @first-page="goToFirstPage" />
+            :visible="tab !== null && tab !== undefined && !browseState.shouldShowForm" :total="browseState.totalAvailable"
+            @first-page="browseActions.goToFirstPage" />
 
         <TabContentPromptDialog :open="promptDialog.data.promptDialogOpen.value"
             :item-id="promptDialog.data.promptDialogItemId.value" :loading="promptDialog.data.promptDataLoading.value"
