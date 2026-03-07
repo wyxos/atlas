@@ -1,4 +1,9 @@
 import { watch, toRefs, type Ref } from 'vue';
+import {
+    calculateBestFitSize,
+    getAvailableWidth,
+    getCenteredPosition,
+} from '@/utils/fileViewer';
 
 export function useFileViewerSheetSizing(params: {
     sheet: {
@@ -8,30 +13,21 @@ export function useFileViewerSheetSizing(params: {
         rect: { top: number; left: number; width: number; height: number } | null;
         imageSize: { width: number; height: number } | null;
         originalDimensions: { width: number; height: number } | null;
+        isFilled: boolean;
         fillComplete: boolean;
+        isClosing: boolean;
         centerPosition: { top: number; left: number } | null;
     };
     containerRef: Ref<HTMLElement | null>;
-    getAvailableWidth: (containerWidth: number, borderWidth: number) => number;
-    calculateBestFitSize: (
-        originalWidth: number,
-        originalHeight: number,
-        containerWidth: number,
-        containerHeight: number
-    ) => { width: number; height: number };
-    getCenteredPosition: (
-        containerWidth: number,
-        containerHeight: number,
-        imageWidth: number,
-        imageHeight: number
-    ) => { top: number; left: number };
 }) {
     const { isOpen } = toRefs(params.sheet);
     const {
         rect,
         imageSize,
         originalDimensions,
+        isFilled,
         fillComplete,
+        isClosing,
         centerPosition,
     } = toRefs(params.overlay);
 
@@ -42,10 +38,17 @@ export function useFileViewerSheetSizing(params: {
             const containerWidth = tabContentBox.width;
             const containerHeight = tabContentBox.height;
             const borderWidth = 4;
-            const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+            const availableWidth = getAvailableWidth(
+                containerWidth,
+                borderWidth,
+                isFilled.value,
+                fillComplete.value,
+                isClosing.value,
+                isOpen.value,
+            );
             const availableHeight = containerHeight - (borderWidth * 2);
 
-            const bestFitSize = params.calculateBestFitSize(
+            const bestFitSize = calculateBestFitSize(
                 originalDimensions.value.width,
                 originalDimensions.value.height,
                 availableWidth,
@@ -53,7 +56,7 @@ export function useFileViewerSheetSizing(params: {
             );
 
             imageSize.value = bestFitSize;
-            centerPosition.value = params.getCenteredPosition(
+            centerPosition.value = getCenteredPosition(
                 availableWidth,
                 availableHeight,
                 bestFitSize.width,

@@ -1,7 +1,14 @@
 import { nextTick, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
-
-type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
+import {
+    calculateBestFitSize,
+    getAvailableWidth,
+    getCenteredPosition,
+    preloadImage,
+    resolveFileViewerFullSizeUrl,
+    resolveFileViewerMediaType,
+    type FileViewerOverlayMediaType,
+} from '@/utils/fileViewer';
 
 export function useFileViewerOpen(params: {
     containerRef: Ref<HTMLElement | null>;
@@ -14,7 +21,7 @@ export function useFileViewerOpen(params: {
     overlay: {
         rect: { top: number; left: number; width: number; height: number } | null;
         image: { src: string; srcset?: string; sizes?: string; alt?: string } | null;
-        mediaType: OverlayMediaType;
+        mediaType: FileViewerOverlayMediaType;
         videoSrc: string | null;
         audioSrc: string | null;
         borderRadius: string | null;
@@ -34,20 +41,9 @@ export function useFileViewerOpen(params: {
         currentItemIndex: number | null;
         imageScale: number;
     };
-    getAvailableWidth: (containerWidth: number, borderWidth: number) => number;
-    calculateBestFitSize: (
-        originalWidth: number,
-        originalHeight: number,
-        containerWidth: number,
-        containerHeight: number
-    ) => { width: number; height: number };
-    getCenteredPosition: (
-        containerWidth: number,
-        containerHeight: number,
-        imageWidth: number,
-        imageHeight: number
-    ) => { top: number; left: number };
-    preloadImage: (url: string) => Promise<{ width: number; height: number }>;
+    sheet: {
+        isOpen: boolean;
+    };
     handleItemSeen: (fileId: number) => Promise<void>;
     closeOverlay: () => void;
     emitOpen: () => void;
@@ -73,6 +69,7 @@ export function useFileViewerOpen(params: {
         centerPosition,
     } = toRefs(params.overlay);
     const { currentItemIndex, imageScale } = toRefs(params.navigation);
+    const { isOpen } = toRefs(params.sheet);
 
     function getClickedItemId(target: HTMLElement): number | null {
         const el = target.closest('[data-file-id]') as HTMLElement | null;
@@ -87,41 +84,6 @@ export function useFileViewerOpen(params: {
 
         const id = Number(raw);
         return Number.isFinite(id) ? id : null;
-    }
-
-    function normalizeVideoUrl(url: string, mediaType: OverlayMediaType): string {
-        if (mediaType !== 'video') {
-            return url;
-        }
-
-        // Guard against malformed payloads that pass preview endpoint as the playback URL.
-        const match = url.match(/^(.*\/api\/files\/\d+)\/preview(\?.*)?$/);
-        if (!match) {
-            return url;
-        }
-
-        const base = match[1];
-        const query = match[2] ?? '';
-        return `${base}/downloaded${query}`;
-    }
-
-    function resolveFullSizeUrl(item: FeedItem, fallback: string, mediaType: OverlayMediaType): string {
-        const candidates = [item.original, item.originalUrl, fallback];
-
-        for (const candidate of candidates) {
-            if (typeof candidate !== 'string') {
-                continue;
-            }
-
-            const value = candidate.trim();
-            if (value === '') {
-                continue;
-            }
-
-            return normalizeVideoUrl(value, mediaType);
-        }
-
-        return normalizeVideoUrl(fallback, mediaType);
     }
 
     async function openFromClick(e: MouseEvent): Promise<void> {
@@ -158,21 +120,7 @@ export function useFileViewerOpen(params: {
             return;
         }
 
-        const resolveMediaType = (item: FeedItem): OverlayMediaType => {
-            const kind = typeof item.media_kind === 'string' ? item.media_kind : null;
-            if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'file') {
-                return kind;
-            }
-
-            const mime = typeof item.mime_type === 'string' ? item.mime_type : '';
-            if (mime.startsWith('video/')) return 'video';
-            if (mime.startsWith('image/')) return 'image';
-            if (mime.startsWith('audio/')) return 'audio';
-
-            return item.type === 'video' ? 'video' : 'image';
-        };
-
-        const nextMediaType = resolveMediaType(masonryItem);
+        const nextMediaType = resolveFileViewerMediaType(masonryItem);
         mediaType.value = nextMediaType;
         videoSrc.value = null;
         audioSrc.value = null;
@@ -200,7 +148,7 @@ export function useFileViewerOpen(params: {
         const computedStyle = window.getComputedStyle(itemEl);
         const radius = computedStyle.borderRadius || '';
 
-        const fullSizeUrl = resolveFullSizeUrl(masonryItem, src, nextMediaType);
+        const fullSizeUrl = resolveFileViewerFullSizeUrl(masonryItem, src, nextMediaType);
         currentItemIndex.value = params.items.value.findIndex((it) => it.id === masonryItem.id);
 
         key.value++;
@@ -258,7 +206,7 @@ export function useFileViewerOpen(params: {
                 await params.handleItemSeen(masonryItem.id);
                 await nextTick();
             } else {
-                const imageDimensions = await params.preloadImage(fullSizeUrl);
+                const imageDimensions = await preloadImage(fullSizeUrl);
                 originalDimensions.value = imageDimensions;
                 fullSizeImage.value = fullSizeUrl;
                 isLoading.value = false;
@@ -273,7 +221,7 @@ export function useFileViewerOpen(params: {
             fullSizeImage.value = src;
             isLoading.value = false;
             try {
-                const fallbackDimensions = await params.preloadImage(src);
+                const fallbackDimensions = await preloadImage(src);
                 originalDimensions.value = fallbackDimensions;
             } catch {
                 originalDimensions.value = {
@@ -289,7 +237,7 @@ export function useFileViewerOpen(params: {
         const initialContentHeight = height - (borderWidth * 2);
 
         if (imageSize.value) {
-            centerPosition.value = params.getCenteredPosition(
+            centerPosition.value = getCenteredPosition(
                 initialContentWidth,
                 initialContentHeight,
                 imageSize.value.width,
@@ -313,7 +261,7 @@ export function useFileViewerOpen(params: {
         const contentWidth = width - (borderWidth * 2);
         const contentHeight = height - (borderWidth * 2);
 
-        centerPosition.value = params.getCenteredPosition(
+        centerPosition.value = getCenteredPosition(
             contentWidth,
             contentHeight,
             imageSize.value.width,
@@ -331,9 +279,16 @@ export function useFileViewerOpen(params: {
         setTimeout(() => {
             if (!container || !rect.value || !imageSize.value || !originalDimensions.value) return;
 
-            const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+            const availableWidth = getAvailableWidth(
+                containerWidth,
+                borderWidth,
+                isFilled.value,
+                fillComplete.value,
+                isClosing.value,
+                isOpen.value,
+            );
             const availableHeight = containerHeight - (borderWidth * 2);
-            const bestFitSize = params.calculateBestFitSize(
+            const bestFitSize = calculateBestFitSize(
                 originalDimensions.value.width,
                 originalDimensions.value.height,
                 availableWidth,
@@ -341,7 +296,7 @@ export function useFileViewerOpen(params: {
             );
 
             imageSize.value = bestFitSize;
-            centerPosition.value = params.getCenteredPosition(
+            centerPosition.value = getCenteredPosition(
                 availableWidth,
                 availableHeight,
                 bestFitSize.width,
