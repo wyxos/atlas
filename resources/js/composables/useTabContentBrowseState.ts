@@ -274,23 +274,29 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     });
 
     return {
-        items: options.items,
-        totalAvailable,
-        tab: options.tab,
-        masonryRenderKey,
-        startPageToken,
-        restoredPages,
-        loadAtPage,
-        isTabRestored,
-        shouldShowForm,
-        selectedService,
-        currentTabService,
-        hasServiceSelected,
-        updateService,
-        formatTabLabel,
-        getPage,
-        applyFilters,
-        goToFirstPage,
-        applyService,
+        state: {
+            totalAvailable,
+            masonryRenderKey,
+            startPageToken,
+            restoredPages,
+            loadAtPage,
+            isTabRestored,
+            shouldShowForm,
+        },
+        derived: {
+            selectedService,
+            currentTabService,
+            hasServiceSelected,
+        },
+        actions: {
+            updateService,
+            getPage,
+            applyFilters,
+            goToFirstPage,
+            applyService,
+        },
+        formatters: {
+            formatTabLabel,
+        },
     };
 }
