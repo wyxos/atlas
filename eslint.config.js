@@ -4,11 +4,6 @@ import vue from 'eslint-plugin-vue';
 import vueParser from 'vue-eslint-parser';
 import globals from 'globals';
 
-const legacyVueMaxLinesFiles = [
-    'resources/js/components/TabFilter.vue',
-    'resources/js/pages/Dashboard.vue',
-];
-
 export default tseslint.config(
     js.configs.recommended,
     ...tseslint.configs.recommended,
@@ -62,12 +57,6 @@ export default tseslint.config(
         rules: {
             'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],
             'vue/multi-word-component-names': 'off',
-        },
-    },
-    {
-        files: legacyVueMaxLinesFiles,
-        rules: {
-            'max-lines': 'off',
         },
     },
     {

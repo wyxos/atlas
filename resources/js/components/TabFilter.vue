@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
+import { computed, toRef } from 'vue';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Switch } from '@/components/ui/switch';
-import Checkbox from '@/components/ui/Checkbox.vue';
 import { SlidersHorizontal } from 'lucide-vue-next';
-import { useBrowseForm } from '@/composables/useBrowseForm';
 import { Masonry } from '@wyxos/vibe';
 import Input from '@/components/ui/input/Input.vue';
-import type { ServiceOption, ServiceFilterField } from '@/composables/useBrowseService';
-import { computed, watch } from 'vue';
-import { coerceBoolean } from '@/utils/coerceBoolean';
+import type { ServiceOption } from '@/composables/useBrowseService';
+import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
+import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
+import { useTabFilterState } from '@/composables/useTabFilterState';
+import { shouldShowTabFilterDescriptionBelow, type TabFilterFieldUpdate } from '@/utils/tabFilter';
 
 interface Props {
     open: boolean;
@@ -32,512 +31,44 @@ const emit = defineEmits<{
     'reset': [];
 }>();
 
-// Use the singleton composable
-const form = useBrowseForm();
-
-const selectedServiceDef = computed(() => {
-    if (!form.data.service) {
-        return null;
-    }
-    // In online mode, `local` is not a valid service selection.
-    if (form.data.feed === 'online' && form.data.service === 'local') {
-        return null;
-    }
-    return props.availableServices.find((s) => s.key === form.data.service) ?? null;
-});
-
-const selectedLocalDef = computed(() => props.localDef ?? null);
 const inputClass = 'text-twilight-indigo-100 placeholder:text-twilight-indigo-300';
 
-const activeSchema = computed(() => {
-    if (form.data.feed === 'local') {
-        return selectedLocalDef.value?.schema ?? null;
-    }
-
-    return selectedServiceDef.value?.schema ?? null;
+const filter = useTabFilterState({
+    availableServices: toRef(props, 'availableServices'),
+    localDef: toRef(props, 'localDef'),
+    onApply: () => emit('apply'),
+    onReset: () => emit('reset'),
+    onOpenChange: (value) => emit('update:open', value),
 });
 
-const localSourceField = computed(() => {
-    if (form.data.feed !== 'local') {
-        return null;
-    }
+const form = filter.form;
+const isOnlineFeed = filter.derived.isOnlineFeed;
+const isLocalFeed = filter.derived.isLocalFeed;
+const activeSchema = filter.derived.activeSchema;
+const selectedServiceDef = filter.derived.selectedServiceDef;
+const visibleServiceFields = filter.derived.visibleServiceFields;
+const localSourceField = filter.derived.localSourceField;
+const localPresets = filter.derived.localPresets;
+const selectedLocalPreset = filter.derived.selectedLocalPreset;
+const selectedLocalPresetLabel = filter.derived.selectedLocalPresetLabel;
+const localPageInput = filter.models.localPageInput;
+const onlineServices = computed(() => props.availableServices.filter((service) => service.key !== 'local'));
 
-    const schema = activeSchema.value;
-    if (!schema?.fields?.length) {
-        return null;
-    }
-
-    return schema.fields.find((f) => f.uiKey === 'source') ?? null;
-});
-
-const visibleServiceFields = computed(() => {
-    const schema = activeSchema.value;
-    if (!schema?.fields?.length) {
-        return [] as ServiceFilterField[];
-    }
-
-    return schema.fields.filter((f) => {
-        if (f.type === 'hidden') {
-            return false;
-        }
-        if (f.uiKey === 'page' || f.uiKey === 'limit') {
-            return false;
-        }
-        if (form.data.feed === 'local' && f.uiKey === 'source') {
-            return false;
-        }
-        return true;
-    });
-});
-
-type LocalPreset = {
-    label: string;
-    value: string;
-    // Only serviceFilters keys go here; global keys (limit/source) are left untouched.
-    filters: Record<string, unknown>;
-};
-
-const localPresets = computed<LocalPreset[]>(() => {
-    if (form.data.feed !== 'local') {
-        return [];
-    }
-
-    const baseCap = null;
-    const moderatedCap = 2;
-
-    return [
-        {
-            label: 'All',
-            value: 'all',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'any',
-                auto_disliked: 'any',
-                blacklisted: 'any',
-                blacklist_type: 'any',
-                max_previewed_count: baseCap,
-                sort: 'downloaded_at',
-                seed: null,
-            },
-        },
-        {
-            label: 'Reacted (Random)',
-            value: 'reacted_random',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'reacted',
-                blacklisted: 'no',
-                auto_disliked: 'no',
-                max_previewed_count: baseCap,
-                sort: 'random',
-            },
-        },
-        {
-            label: 'Reacted (Newest)',
-            value: 'reacted_newest',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'reacted',
-                blacklisted: 'no',
-                auto_disliked: 'no',
-                max_previewed_count: baseCap,
-                sort: 'reaction_at',
-            },
-        },
-        {
-            label: 'Reacted (Oldest)',
-            value: 'reacted_oldest',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'reacted',
-                blacklisted: 'no',
-                auto_disliked: 'no',
-                max_previewed_count: baseCap,
-                sort: 'reaction_at_asc',
-            },
-        },
-        {
-            label: 'Inbox (Fresh)',
-            value: 'inbox_fresh',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'unreacted',
-                blacklisted: 'no',
-                auto_disliked: 'no',
-                // Fresh means: never previewed.
-                max_previewed_count: 0,
-                sort: 'created_at',
-            },
-        },
-        {
-            label: 'Inbox (Newest)',
-            value: 'inbox_newest',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'unreacted',
-                blacklisted: 'no',
-                auto_disliked: 'no',
-                max_previewed_count: baseCap,
-                sort: 'created_at',
-            },
-        },
-        {
-            label: 'Inbox (Oldest)',
-            value: 'inbox_oldest',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'unreacted',
-                blacklisted: 'no',
-                auto_disliked: 'no',
-                max_previewed_count: baseCap,
-                sort: 'created_at_asc',
-            },
-        },
-        {
-            label: 'Disliked (Any)',
-            value: 'disliked_any',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'types',
-                reaction: ['dislike'],
-                blacklisted: 'no',
-                blacklist_type: 'any',
-                auto_disliked: 'any',
-                include_total: true,
-                max_previewed_count: moderatedCap,
-                // Newest disliked first.
-                sort: 'reaction_at',
-            },
-        },
-        {
-            label: 'Disliked (Manual)',
-            value: 'disliked_manual',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'types',
-                reaction: ['dislike'],
-                blacklisted: 'no',
-                blacklist_type: 'any',
-                auto_disliked: 'no',
-                include_total: true,
-                max_previewed_count: moderatedCap,
-                // Newest disliked first.
-                sort: 'reaction_at',
-            },
-        },
-        {
-            label: 'Disliked (Auto)',
-            value: 'disliked_auto',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'types',
-                reaction: ['dislike'],
-                blacklisted: 'no',
-                blacklist_type: 'any',
-                auto_disliked: 'yes',
-                include_total: true,
-                max_previewed_count: moderatedCap,
-                // Newest disliked first.
-                sort: 'reaction_at',
-            },
-        },
-        {
-            label: 'Blacklisted (Any)',
-            value: 'blacklisted_any',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'any',
-                blacklisted: 'yes',
-                blacklist_type: 'any',
-                auto_disliked: 'any',
-                max_previewed_count: moderatedCap,
-                // Newest blacklisted first.
-                sort: 'blacklisted_at',
-            },
-        },
-        {
-            label: 'Blacklisted (Manual)',
-            value: 'blacklisted_manual',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'any',
-                blacklisted: 'yes',
-                blacklist_type: 'manual',
-                auto_disliked: 'any',
-                max_previewed_count: moderatedCap,
-                // Newest blacklisted first.
-                sort: 'blacklisted_at',
-            },
-        },
-        {
-            label: 'Blacklisted (Auto)',
-            value: 'blacklisted_auto',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'any',
-                blacklisted: 'yes',
-                blacklist_type: 'auto',
-                auto_disliked: 'any',
-                max_previewed_count: moderatedCap,
-                // Newest blacklisted first.
-                sort: 'blacklisted_at',
-            },
-        },
-        {
-            label: 'Disliked + Blacklisted (Auto)',
-            value: 'disliked_blacklisted_auto',
-            filters: {
-                downloaded: 'any',
-                reaction_mode: 'any',
-                blacklisted: 'any',
-                blacklist_type: 'any',
-                auto_disliked: 'any',
-                moderation_union: 'auto_disliked_or_blacklisted_auto',
-                include_total: true,
-                max_previewed_count: moderatedCap,
-                // Newest blacklisted first.
-                sort: 'blacklisted_at',
-            },
-        },
-    ];
-});
-
-const localPageInput = computed<number>({
-    get() {
-        const raw = form.data.page;
-        const n = typeof raw === 'number' ? raw : Number(raw);
-        if (!Number.isFinite(n) || n < 1) {
-            return 1;
-        }
-        return Math.floor(n);
-    },
-    set(value) {
-        const n = typeof value === 'number' ? value : Number(value);
-        form.data.page = Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
-    },
-});
-
-function valueOrDefault(field: ServiceFilterField): unknown {
-    const existing = form.data.serviceFilters[field.uiKey];
-    if (existing !== undefined && existing !== null && existing !== '') {
-        return existing;
-    }
-
-    return field.default;
+function updateLimit(value: string): void {
+    form.data.limit = value;
 }
 
-function checkboxGroupSelection(field: ServiceFilterField): string[] {
-    const raw = valueOrDefault(field);
-    if (Array.isArray(raw)) {
-        return raw.map((v) => String(v));
-    }
-    return [];
+function updateSource(value: string): void {
+    form.data.source = value;
 }
 
-function setCheckboxGroupValue(field: ServiceFilterField, value: string, checked: boolean): void {
-    // Special-case: local file type filter has an "All" option that is exclusive.
-    // Values: all, image, video, audio, other
-    if (field.uiKey === 'file_type') {
-        const allTypes = ['image', 'video', 'audio', 'other'];
-        const current = new Set(checkboxGroupSelection(field));
-
-        if (checked) {
-            if (value === 'all') {
-                updateServiceFilterValue(field.uiKey, ['all']);
-                return;
-            }
-
-            current.delete('all');
-            current.add(value);
-
-            const hasAll = allTypes.every((t) => current.has(t));
-            updateServiceFilterValue(field.uiKey, hasAll ? ['all'] : Array.from(current));
-            return;
-        }
-
-        // Unchecking
-        if (value === 'all') {
-            // Keep "all" selected unless the user explicitly selects specific types.
-            updateServiceFilterValue(field.uiKey, ['all']);
-            return;
-        }
-
-        current.delete(value);
-
-        if (current.size === 0) {
-            updateServiceFilterValue(field.uiKey, ['all']);
-            return;
-        }
-
-        updateServiceFilterValue(field.uiKey, Array.from(current));
-        return;
-    }
-
-    const current = new Set(checkboxGroupSelection(field));
-
-    if (checked) {
-        current.add(value);
-    } else {
-        current.delete(value);
-    }
-
-    const ordered = (field.options || [])
-        .map((opt) => String(opt.value))
-        .filter((v) => current.has(v));
-
-    updateServiceFilterValue(field.uiKey, ordered);
+function updateLocalPage(value: string | number): void {
+    const page = typeof value === 'number' ? value : Number(value);
+    localPageInput.value = page;
 }
 
-function placeholderForField(field: ServiceFilterField): string | undefined {
-    if (field.placeholder) {
-        return field.placeholder;
-    }
-
-    // Prefer using hint text as placeholder for text/number inputs.
-    if ((field.type === 'text' || field.type === 'number') && field.description) {
-        return field.description;
-    }
-
-    return undefined;
-}
-
-function shouldShowDescriptionBelow(field: ServiceFilterField): boolean {
-    if (!field.description) {
-        return false;
-    }
-
-    // Boolean renders its hint inline.
-    if (field.type === 'boolean') {
-        return false;
-    }
-
-    // If we're using description as placeholder for inputs, don't repeat it below.
-    if ((field.type === 'text' || field.type === 'number') && !field.placeholder) {
-        return false;
-    }
-
-    return true;
-}
-
-function updateService(nextService: string): void {
-    // Online-mode service selector must not allow switching to the local pseudo-service.
-    if (nextService === 'local') {
-        return;
-    }
-    const defaults = props.availableServices.find((s) => s.key === nextService)?.defaults;
-    form.setService(nextService, defaults);
-}
-
-function updateServiceFilterValue(uiKey: string, value: unknown): void {
-    form.data.serviceFilters[uiKey] = value;
-}
-
-function isCheckboxGroupDisabled(field: ServiceFilterField): boolean {
-    if (form.data.feed !== 'local') {
-        return false;
-    }
-
-    // Local reaction types only apply when reaction_mode is "types".
-    if (field.uiKey === 'reaction') {
-        const mode = String(form.data.serviceFilters.reaction_mode ?? 'any');
-        return mode !== 'types';
-    }
-
-    return false;
-}
-
-// Handle apply button
-function handleApply(): void {
-    emit('apply');
-    emit('update:open', false);
-}
-
-// Handle reset button
-function handleReset(): void {
-    const feed = form.data.feed;
-    const tabId = form.data.tab_id;
-
-    form.reset();
-
-    // Keep the current tab and browse mode (online/local) so reset doesn't "kick" the user out.
-    form.data.feed = feed;
-    form.data.tab_id = tabId;
-    form.data.page = 1;
-    emit('reset');
-}
-
-function ensureRandomSeed(): void {
-    if (form.data.feed !== 'local') {
-        return;
-    }
-
-    if (form.data.serviceFilters.sort !== 'random') {
-        return;
-    }
-
-    const raw = form.data.serviceFilters.seed;
-    const seed = typeof raw === 'number' ? raw : Number(raw);
-    if (Number.isFinite(seed) && seed > 0) {
-        return;
-    }
-
-    // Typesense requires a positive integer seed.
-    form.data.serviceFilters.seed = Math.floor(Date.now() / 1000);
-}
-
-watch(
-    () => [form.data.feed, form.data.serviceFilters.sort],
-    () => ensureRandomSeed(),
-    { immediate: true }
-);
-
-const selectedLocalPreset = computed<string>({
-    get() {
-        if (form.data.feed !== 'local') {
-            return '';
-        }
-        const raw = form.data.serviceFilters.local_preset;
-        return typeof raw === 'string' ? raw : '';
-    },
-    set(value) {
-        if (form.data.feed !== 'local') {
-            return;
-        }
-
-        if (typeof value === 'string' && value.length > 0) {
-            form.data.serviceFilters.local_preset = value;
-            return;
-        }
-
-        delete form.data.serviceFilters.local_preset;
-    },
-});
-const selectedLocalPresetLabel = computed(() => {
-    if (!selectedLocalPreset.value) {
-        return null;
-    }
-    return localPresets.value.find((p) => p.value === selectedLocalPreset.value)?.label ?? selectedLocalPreset.value;
-});
-
-function applyLocalPreset(value: string): void {
-    selectedLocalPreset.value = value;
-
-    const preset = localPresets.value.find((p) => p.value === value);
-    if (!preset) {
-        return;
-    }
-
-    // Presets may define hidden filter flags that should not leak across presets.
-    delete form.data.serviceFilters.moderation_union;
-
-    // Apply only the preset keys; user may already have other serviceFilters.
-    form.data.serviceFilters = {
-        ...form.data.serviceFilters,
-        ...preset.filters,
-    };
-
-    form.data.page = 1;
-    ensureRandomSeed();
+function handleFieldUpdate(field: TabFilterFieldUpdate): void {
+    filter.actions.updateServiceFilterValue(field.uiKey, field.value);
 }
 </script>
 
@@ -548,31 +79,34 @@ function applyLocalPreset(value: string): void {
                 <SlidersHorizontal :size="14" />
             </Button>
         </SheetTrigger>
+
         <SheetContent side="right" class="w-full sm:max-w-lg">
             <SheetHeader>
                 <SheetTitle>Advanced Filters</SheetTitle>
             </SheetHeader>
-            <div class="flex-1 p-6 overflow-y-auto space-y-6">
-                <!-- Service Filter (online only) -->
-                <div v-if="form.data.feed === 'online'" class="form-field">
+
+            <div class="flex-1 space-y-6 overflow-y-auto p-6">
+                <div v-if="isOnlineFeed" class="form-field">
                     <label class="form-label">Service</label>
-                    <Select :model-value="form.data.service" @update:model-value="(v) => updateService(v as string)">
+                    <Select :model-value="form.data.service" @update:model-value="(value) => filter.actions.updateService(String(value))">
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem v-for="service in availableServices.filter((s) => s.key !== 'local')" :key="service.key" :value="service.key">
+                            <SelectItem v-for="service in onlineServices" :key="service.key" :value="service.key">
                                 {{ service.label }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <!-- Local mode fields -->
-                <template v-if="form.data.feed === 'local' && activeSchema">
+                <template v-if="isLocalFeed && activeSchema">
                     <div class="form-field">
                         <label class="form-label">Preset</label>
-                        <Select :model-value="selectedLocalPreset" @update:model-value="(v) => applyLocalPreset(v as string)">
+                        <Select
+                            :model-value="selectedLocalPreset"
+                            @update:model-value="(value) => filter.actions.applyLocalPreset(String(value))"
+                        >
                             <SelectTrigger class="w-full">
                                 <span class="truncate">
                                     {{ selectedLocalPresetLabel || 'Select a preset…' }}
@@ -589,237 +123,73 @@ function applyLocalPreset(value: string): void {
                         </p>
                     </div>
 
-                    <!-- Limit (global) -->
-                    <div class="form-field">
-                        <label class="form-label">Limit</label>
-                        <Select v-model="form.data.limit">
-                            <SelectTrigger class="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="20">20</SelectItem>
-                                <SelectItem value="40">40</SelectItem>
-                                <SelectItem value="60">60</SelectItem>
-                                <SelectItem value="80">80</SelectItem>
-                                <SelectItem value="100">100</SelectItem>
-                                <SelectItem value="200">200</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <TabFilterLimitField :model-value="form.data.limit" @update:model-value="updateLimit" />
 
-                    <!-- Page (local only, numeric). -->
                     <div class="form-field">
                         <label class="form-label">Page</label>
                         <Input
-                            v-model="localPageInput"
+                            :model-value="localPageInput"
                             type="number"
                             min="1"
                             step="1"
                             placeholder="1"
                             :class="inputClass"
+                            @update:model-value="updateLocalPage"
                         />
                         <p class="form-help">Jump to a specific local page (1-based).</p>
                     </div>
 
-                    <!-- Source (global) -->
                     <div v-if="localSourceField" class="form-field">
-                        <label class="form-label">
-                            {{ localSourceField.label }}
-                        </label>
-                        <Select :model-value="form.data.source" @update:model-value="(v) => (form.data.source = v as string)">
+                        <label class="form-label">{{ localSourceField.label }}</label>
+                        <Select :model-value="form.data.source" @update:model-value="(value) => updateSource(String(value))">
                             <SelectTrigger class="w-full">
                                 <SelectValue :placeholder="localSourceField.placeholder || 'Select…'" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem
-                                    v-for="opt in (localSourceField.options || [])"
-                                    :key="String(opt.value)"
-                                    :value="opt.value as any"
+                                    v-for="option in localSourceField.options ?? []"
+                                    :key="String(option.value)"
+                                    :value="option.value as any"
                                 >
-                                    {{ opt.label }}
+                                    {{ option.label }}
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                        <p v-if="shouldShowDescriptionBelow(localSourceField)" class="form-help">{{ localSourceField.description }}</p>
+                        <p v-if="shouldShowTabFilterDescriptionBelow(localSourceField)" class="form-help">
+                            {{ localSourceField.description }}
+                        </p>
                     </div>
 
-                    <div v-for="field in visibleServiceFields" :key="field.uiKey" class="form-field">
-                        <label class="form-label">
-                            {{ field.label }}
-                        </label>
-
-                        <div v-if="field.type === 'checkbox-group'" class="space-y-2">
-                                <div class="flex flex-wrap gap-2">
-                                <Checkbox
-                                    v-for="opt in (field.options || [])"
-                                    :key="String(opt.value)"
-                                    :model-value="checkboxGroupSelection(field).includes(String(opt.value))"
-                                    :disabled="isCheckboxGroupDisabled(field)"
-                                    @update:model-value="(checked: boolean) => setCheckboxGroupValue(field, String(opt.value), checked)"
-                                >
-                                    {{ opt.label }}
-                                </Checkbox>
-                            </div>
-                        </div>
-
-                        <div v-else-if="field.type === 'boolean'" class="flex items-center justify-between">
-                            <span class="form-inline-help">{{ field.description || '' }}</span>
-                            <Switch
-                                :model-value="coerceBoolean(valueOrDefault(field))"
-                                @update:model-value="(v: boolean) => updateServiceFilterValue(field.uiKey, v)"
-                            />
-                        </div>
-
-                        <Select
-                            v-else-if="field.type === 'select'"
-                            :model-value="(valueOrDefault(field) ?? null) as any"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                        >
-                            <SelectTrigger class="w-full">
-                                <SelectValue :placeholder="field.placeholder || 'Select…'" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="opt in (field.options || [])"
-                                    :key="String(opt.value)"
-                                    :value="opt.value as any"
-                                >
-                                    {{ opt.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Input
-                            v-else-if="field.type === 'number'"
-                            :model-value="(valueOrDefault(field) ?? '') as any"
-                            type="number"
-                            :placeholder="placeholderForField(field)"
-                            :min="field.min"
-                            :max="field.max"
-                            :step="field.step"
-                            :class="inputClass"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                        />
-
-                        <RadioGroup
-                            v-else-if="field.type === 'radio'"
-                            :model-value="String(valueOrDefault(field) ?? '')"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                            class="flex flex-wrap items-center gap-4"
-                        >
-                            <div v-for="opt in (field.options || [])" :key="String(opt.value)" class="flex items-center gap-2">
-                                <RadioGroupItem :value="String(opt.value)" />
-                                <span class="form-option-label">{{ opt.label }}</span>
-                            </div>
-                        </RadioGroup>
-
-                        <Input
-                            v-else
-                            :model-value="(valueOrDefault(field) ?? '') as any"
-                            type="text"
-                            :placeholder="placeholderForField(field)"
-                            :class="inputClass"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                        />
-
-                        <p v-if="shouldShowDescriptionBelow(field)" class="form-help">{{ field.description }}</p>
-                    </div>
+                    <TabFilterFieldControl
+                        v-for="field in visibleServiceFields"
+                        :key="field.uiKey"
+                        :field="field"
+                        :model-value="form.data.serviceFilters[field.uiKey]"
+                        :disabled="filter.actions.isFieldDisabled(field)"
+                        :input-class="inputClass"
+                        @update:model-value="(value) => handleFieldUpdate({ uiKey: field.uiKey, value })"
+                    />
                 </template>
 
-                <!-- Service fields (online services only). If no service selected, show nothing. -->
-                <template v-if="form.data.feed === 'online' && selectedServiceDef">
-                    <!-- Limit (global across all services) -->
-                    <div class="form-field">
-                        <label class="form-label">Limit</label>
-                        <Select v-model="form.data.limit">
-                            <SelectTrigger class="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="20">20</SelectItem>
-                                <SelectItem value="40">40</SelectItem>
-                                <SelectItem value="60">60</SelectItem>
-                                <SelectItem value="80">80</SelectItem>
-                                <SelectItem value="100">100</SelectItem>
-                                <SelectItem value="200">200</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <template v-if="isOnlineFeed && selectedServiceDef">
+                    <TabFilterLimitField :model-value="form.data.limit" @update:model-value="updateLimit" />
 
-                    <div v-for="field in visibleServiceFields" :key="field.uiKey" class="form-field">
-                        <label class="form-label">
-                            {{ field.label }}
-                        </label>
-
-                        <div v-if="field.type === 'boolean'" class="flex items-center justify-between">
-                            <span class="form-inline-help">{{ field.description || '' }}</span>
-                            <Switch
-                                :model-value="coerceBoolean(valueOrDefault(field))"
-                                @update:model-value="(v: boolean) => updateServiceFilterValue(field.uiKey, v)"
-                            />
-                        </div>
-
-                        <Select
-                            v-else-if="field.type === 'select'"
-                            :model-value="(valueOrDefault(field) ?? null) as any"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                        >
-                            <SelectTrigger class="w-full">
-                                <SelectValue :placeholder="field.placeholder || 'Select…'" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="opt in (field.options || [])"
-                                    :key="String(opt.value)"
-                                    :value="opt.value as any"
-                                >
-                                    {{ opt.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Input
-                            v-else-if="field.type === 'number'"
-                            :model-value="(valueOrDefault(field) ?? '') as any"
-                            type="number"
-                            :placeholder="placeholderForField(field)"
-                            :min="field.min"
-                            :max="field.max"
-                            :step="field.step"
-                            :class="inputClass"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                        />
-
-                        <RadioGroup
-                            v-else-if="field.type === 'radio'"
-                            :model-value="String(valueOrDefault(field) ?? '')"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                            class="flex flex-wrap items-center gap-4"
-                        >
-                            <div v-for="opt in (field.options || [])" :key="String(opt.value)" class="flex items-center gap-2">
-                                <RadioGroupItem :value="String(opt.value)" />
-                                <span class="form-option-label">{{ opt.label }}</span>
-                            </div>
-                        </RadioGroup>
-
-                        <Input
-                            v-else
-                            :model-value="(valueOrDefault(field) ?? '') as any"
-                            type="text"
-                            :placeholder="placeholderForField(field)"
-                            :class="inputClass"
-                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
-                        />
-
-                        <p v-if="shouldShowDescriptionBelow(field)" class="form-help">{{ field.description }}</p>
-                    </div>
+                    <TabFilterFieldControl
+                        v-for="field in visibleServiceFields"
+                        :key="field.uiKey"
+                        :field="field"
+                        :model-value="form.data.serviceFilters[field.uiKey]"
+                        :input-class="inputClass"
+                        @update:model-value="(value) => handleFieldUpdate({ uiKey: field.uiKey, value })"
+                    />
                 </template>
             </div>
+
             <SheetFooter>
-                <Button variant="destructive" @click="handleReset">
+                <Button variant="destructive" @click="filter.actions.handleReset">
                     Reset
                 </Button>
-                <Button variant="default" @click="handleApply">
+                <Button variant="default" @click="filter.actions.handleApply">
                     Apply
                 </Button>
             </SheetFooter>
