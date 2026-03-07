@@ -11,6 +11,7 @@ import BatchReactionQueueToast from '@/components/toasts/BatchReactionQueueToast
 const toast = useToast();
 
 const queue = useQueue();
+const queueCollection = queue.collection;
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
 const BATCH_REACTION_THRESHOLD = 25;
 type ReactionQueueMetadata = {
@@ -33,10 +34,10 @@ export function queueReaction(
     const queueId = `${reactionType}-${fileId}`;
 
     // Remove existing reaction for this file if any
-    const existingItems = queue.getAll();
+    const existingItems = queueCollection.getAll();
     const existingItem = existingItems.find((item) => item.id.startsWith(`${reactionType}-${fileId}`) || item.id.startsWith(`reaction-${fileId}`));
     if (existingItem) {
-        queue.remove(existingItem.id);
+        queueCollection.remove(existingItem.id);
         toast.dismiss(existingItem.id);
     }
 
@@ -44,7 +45,7 @@ export function queueReaction(
     const reactionCallback = createReactionCallback();
 
     // Add to queue
-    queue.add({
+    queueCollection.add({
         id: queueId,
         duration: REACTION_COUNTDOWN_DURATION,
         onComplete: async () => {
@@ -198,13 +199,13 @@ export function queueBatchReaction(
  */
 export async function cancelQueuedReaction(fileId: number, reactionType: ReactionType): Promise<void> {
     const queueId = `${reactionType}-${fileId}`;
-    const item = queue.getAll().find((item) => item.id === queueId);
+    const item = queueCollection.getAll().find((item) => item.id === queueId);
     
     // Get restore callback from metadata before removing
     const restoreCallback = (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback;
     
     // Remove from queue
-    queue.remove(queueId);
+    queueCollection.remove(queueId);
     toast.dismiss(queueId);
     
     // Restore to masonry if callback exists
@@ -221,13 +222,13 @@ export async function cancelQueuedReaction(fileId: number, reactionType: Reactio
  * Cancel a queued batch reaction and restore to masonry if restore callback exists.
  */
 export async function cancelBatchQueuedReaction(queueId: string): Promise<void> {
-    const item = queue.getAll().find((item) => item.id === queueId);
+    const item = queueCollection.getAll().find((item) => item.id === queueId);
     
     // Get restore callback from metadata before removing
     const restoreCallback = (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback;
     
     // Remove from queue
-    queue.remove(queueId);
+    queueCollection.remove(queueId);
     toast.dismiss(queueId);
     
     // Restore to masonry if callback exists
@@ -239,4 +240,3 @@ export async function cancelBatchQueuedReaction(queueId: string): Promise<void> 
         }
     }
 }
-

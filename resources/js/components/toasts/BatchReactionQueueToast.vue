@@ -4,7 +4,8 @@ import { useToast } from 'vue-toastification';
 import { useQueue } from '@/composables/useQueue';
 import { cancelBatchQueuedReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
-import { Heart, ThumbsUp, ThumbsDown, Smile, Undo2, Plus } from 'lucide-vue-next';
+import { Heart, ThumbsUp, ThumbsDown, Smile, Undo2 } from 'lucide-vue-next';
+import ToastPreviewStrip from './ToastPreviewStrip.vue';
 
 const toast = useToast();
 
@@ -22,14 +23,17 @@ interface Props {
 
 const props = defineProps<Props>();
 const queue = useQueue();
+const queueFreeze = queue.freeze;
+const progress = queue.query.getProgressComputed(props.queueId);
+const remainingTime = queue.query.getRemainingTimeComputed(props.queueId);
 
-// Use computed for reactive updates
-const progress = computed(() => queue.getProgress(props.queueId));
-const remainingTime = computed(() => queue.getRemainingTime(props.queueId));
-
-// Show up to 5 previews, with + icon if more
-const visiblePreviews = computed(() => props.previews.slice(0, 5));
-const hasMore = computed(() => props.totalCount > 5);
+const previewItems = computed(() =>
+    props.previews.map((preview) => ({
+        key: preview.fileId,
+        label: preview.fileId,
+        thumbnail: preview.thumbnail,
+    })),
+);
 
 const reactionConfig = computed(() => {
     const configs: Record<ReactionType, { label: string; icon: typeof Heart; color: string }> = {
@@ -144,51 +148,6 @@ const formattedCountdown = computed(() => {
     return `${seconds.toString().padStart(2, '0')}:${centiseconds.toString().padStart(2, '0')}`;
 });
 
-/**
- * Calculate the overlap offset in pixels for each preview based on its index.
- * Image 1: 0px offset (100% visible)
- * Image 2: 12.8px offset (20% of 64px, 80% visible, 20% behind image 1)
- * Image 3: 25.6px offset (40% of 64px, 60% visible, 40% behind image 2)
- * Image 4: 38.4px offset (60% of 64px, 40% visible, 60% behind image 3)
- * Image 5: 51.2px offset (80% of 64px, 20% visible, 80% behind image 4)
- *
- * The offset is calculated as a percentage of the image width (64px).
- * Each subsequent image is offset by 20% more than the previous one.
- */
-function getPreviewOffset(index: number): number {
-    return (index * 20 / 100) * 64; // Convert percentage to pixels: 0px, 12.8px, 25.6px, 38.4px, 51.2px
-}
-
-/**
- * Calculate the total width needed for all previews and the plus icon.
- * Each image is 64px wide, and they overlap by 80% of the previous image.
- * Image 1: 64px (full width)
- * Image 2: 64px - 12.8px (20% of 64px) = 51.2px additional width
- * Image 3: 64px - 25.6px (40% of 64px) = 38.4px additional width
- * Image 4: 64px - 38.4px (60% of 64px) = 25.6px additional width
- * Image 5: 64px - 51.2px (80% of 64px) = 12.8px additional width
- * Total: 64 + 51.2 + 38.4 + 25.6 + 12.8 = 192px
- * Plus icon: +64px = 256px total
- */
-const previewsContainerWidth = computed(() => {
-    if (visiblePreviews.value.length === 0) return '64px';
-
-    // Calculate width based on overlapping images
-    // First image takes full 64px, each subsequent adds (64px - overlap)
-    let totalWidth = 64; // First image
-    for (let i = 1; i < visiblePreviews.value.length; i++) {
-        const overlap = (i * 20) / 100 * 64; // Overlap in pixels
-        totalWidth += (64 - overlap);
-    }
-
-    // Add space for plus icon if needed
-    if (hasMore.value) {
-        totalWidth += 64;
-    }
-
-    return `${totalWidth}px`;
-});
-
 async function handleUndo(): Promise<void> {
     await cancelBatchQueuedReaction(props.queueId);
 }
@@ -201,48 +160,11 @@ function handleDismiss(): void {
 <template>
     <div
         :class="toastClasses"
-        @mouseenter="queue.freezeAll()"
-        @mouseleave="queue.unfreezeAll()"
+        @mouseenter="queueFreeze.freezeAll()"
+        @mouseleave="queueFreeze.unfreezeAll()"
         class="flex! gap-4!"
     >
-        <!-- Overlapping Preview Thumbnails -->
-        <div class="relative shrink-0 flex items-center" :style="{ width: previewsContainerWidth, height: '64px' }">
-            <div
-                v-for="(preview, index) in visiblePreviews"
-                :key="preview.fileId"
-                class="relative rounded object-cover border-2"
-                :class="isDislike ? 'border-danger-500/50' : 'border-twilight-indigo-500/50'"
-                :style="{
-                    width: '64px',
-                    height: '64px',
-                    zIndex: visiblePreviews.length - index,
-                    marginLeft: index === 0 ? '0' : `-${getPreviewOffset(index)}px`,
-                }"
-            >
-                <img
-                    v-if="preview.thumbnail"
-                    :src="preview.thumbnail"
-                    :alt="`File ${preview.fileId}`"
-                    class="size-full rounded object-cover"
-                />
-                <div
-                    v-else
-                    class="size-full rounded bg-twilight-indigo-500/20 flex items-center justify-center"
-                >
-                    <span class="text-xs text-twilight-indigo-300">#{{ preview.fileId }}</span>
-                </div>
-            </div>
-            <!-- + Icon positioned to the right of the last preview -->
-            <div
-                v-if="hasMore"
-                class="relative rounded flex flex-col items-center justify-center border-2 ml-2"
-                :class="isDislike ? 'border-danger-500/50 bg-danger-500/20' : 'border-twilight-indigo-500/50 bg-twilight-indigo-500/20'"
-                style="width: 64px; height: 64px;"
-            >
-                <Plus class="size-6" :class="isDislike ? 'text-white' : 'text-twilight-indigo-300'" />
-                <span class="text-xs font-bold mt-1" :class="isDislike ? 'text-white' : 'text-twilight-indigo-300'">{{ totalCount - 5 }}</span>
-            </div>
-        </div>
+        <ToastPreviewStrip :items="previewItems" :total-count="totalCount" :danger="isDislike" />
 
         <!-- Content -->
         <div class="flex-1 min-w-0">
@@ -295,4 +217,3 @@ function handleDismiss(): void {
     max-width: 600px;
 }
 </style>
-

@@ -67,6 +67,7 @@ npm run check:js
 - ✅ DO: Consume broad composables through grouped APIs like `state`, `derived`, and `actions` rather than top-level destructuring 10+ mixed fields into the parent scope
 - ✅ DO: Alias grouped refs you need to top-level bindings before using them in templates; nested refs inside grouped objects do not unwrap as predictably as top-level refs
 - ✅ DO: Import stable shared helpers inside a composable when every caller would pass the same dependency; pass state and true collaborators, not helper plumbing
+- ✅ DO: Keep singleton-manager internals actually singleton; shared timers/timeouts and mutation state belong at module scope, not inside each `useX()` call
 - ❌ DON'T: Build god composables that mix hover state, dialog state, masonry events, tab routing, and toolbar actions in one API
 - ✅ Example: `resources/js/composables/useBrowseService.ts` - browse logic
 - ✅ Example: `resources/js/composables/useTabs.ts` - tab management

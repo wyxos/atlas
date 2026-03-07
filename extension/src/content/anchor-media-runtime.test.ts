@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockUrlMatchesAnyRule = vi.fn();
 const mockEnqueueReferrerCheck = vi.fn();
@@ -49,6 +49,7 @@ async function flushPromises(): Promise<void> {
 
 describe('anchor-media-runtime', () => {
     beforeEach(() => {
+        vi.useRealTimers();
         vi.resetModules();
         vi.clearAllMocks();
         document.body.innerHTML = '';
@@ -56,6 +57,10 @@ describe('anchor-media-runtime', () => {
         mockUrlMatchesAnyRule.mockReturnValue(true);
         mockIsUrlOpenInAnotherTab.mockResolvedValue(false);
         mockGetCachedReferrerCheck.mockReturnValue(null);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('shows a checking outline and spinner while the referrer check is pending, then clears on a miss', async () => {

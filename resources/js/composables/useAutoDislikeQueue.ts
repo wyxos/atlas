@@ -30,7 +30,11 @@ export function useAutoDislikeQueue(
     masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
     const { isLocal } = useBrowseForm();
-    const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen, stop, resume, getAll } = useQueue();
+    const queue = useQueue();
+    const queueCollection = queue.collection;
+    const queueCountdown = queue.countdown;
+    const queueFreeze = queue.freeze;
+    const queueQuery = queue.query;
 
     // Track auto-dislike items that are frozen (for FileViewer)
     const frozenAutoDislikeItems = ref<Set<number>>(new Set());
@@ -103,12 +107,12 @@ export function useAutoDislikeQueue(
      */
     function startAutoDislikeCountdown(fileId: number, item: FeedItem): void {
         // Don't start if already queued
-        if (hasInQueue(`auto-dislike-${fileId}`)) {
+        if (queueCollection.has(`auto-dislike-${fileId}`)) {
             return;
         }
 
         // Add to queue with countdown
-        addToQueue({
+        queueCollection.add({
             id: `auto-dislike-${fileId}`,
             duration: COUNTDOWN_DURATION_MS,
             metadata: { fileId, item },
@@ -120,7 +124,7 @@ export function useAutoDislikeQueue(
                 });
 
                 // Remove from queue
-                removeFromQueue(`auto-dislike-${fileId}`);
+                queueCollection.remove(`auto-dislike-${fileId}`);
 
                 // Schedule debounced batch execution
                 scheduleBatchDislike();
@@ -129,7 +133,7 @@ export function useAutoDislikeQueue(
 
         // If FileViewer is open, freeze this item immediately
         if (isFileViewerOpen.value) {
-            stop(`auto-dislike-${fileId}`);
+            queueCountdown.stop(`auto-dislike-${fileId}`);
             frozenAutoDislikeItems.value.add(fileId);
         }
     }
@@ -139,8 +143,8 @@ export function useAutoDislikeQueue(
      */
     function cancelAutoDislikeCountdown(fileId: number): void {
         const queueId = `auto-dislike-${fileId}`;
-        if (hasInQueue(queueId)) {
-            removeFromQueue(queueId);
+        if (queueCollection.has(queueId)) {
+            queueCollection.remove(queueId);
         }
 
         // Also remove from pending dislikes if it's there
@@ -154,21 +158,21 @@ export function useAutoDislikeQueue(
      * Get remaining time for an item's countdown.
      */
     function getCountdownRemainingTime(fileId: number): number {
-        return getRemainingTime(`auto-dislike-${fileId}`);
+        return queueQuery.getRemainingTime(`auto-dislike-${fileId}`);
     }
 
     /**
      * Get progress (0-100) for an item's countdown.
      */
     function getCountdownProgress(fileId: number): number {
-        return getProgress(`auto-dislike-${fileId}`);
+        return queueQuery.getProgress(`auto-dislike-${fileId}`);
     }
 
     /**
      * Check if an item has an active countdown.
      */
     function hasActiveCountdown(fileId: number): boolean {
-        return hasInQueue(`auto-dislike-${fileId}`);
+        return queueCollection.has(`auto-dislike-${fileId}`);
     }
 
     /**
@@ -188,12 +192,12 @@ export function useAutoDislikeQueue(
         isFileViewerOpen.value = true;
 
         // Find all auto-dislike items in the queue and stop them individually
-        const allItems = getAll();
+        const allItems = queueCollection.getAll();
         allItems.forEach((item) => {
             if (item.id.startsWith('auto-dislike-')) {
                 const fileId = parseInt(item.id.replace('auto-dislike-', ''), 10);
                 if (!isNaN(fileId)) {
-                    stop(item.id);
+                    queueCountdown.stop(item.id);
                     frozenAutoDislikeItems.value.add(fileId);
                 }
             }
@@ -218,7 +222,7 @@ export function useAutoDislikeQueue(
             // Resume all frozen auto-dislike items
             frozenAutoDislikeItems.value.forEach((fileId) => {
                 const queueId = `auto-dislike-${fileId}`;
-                resume(queueId);
+                queueCountdown.resume(queueId);
             });
             frozenAutoDislikeItems.value.clear();
             fileViewerUnfreezeTimeout = null;
@@ -230,10 +234,10 @@ export function useAutoDislikeQueue(
      * Used when switching tabs to avoid cross-tab timers.
      */
     function clearAutoDislikeCountdowns(): void {
-        const allItems = getAll();
+        const allItems = queueCollection.getAll();
         allItems.forEach((item) => {
             if (item.id.startsWith('auto-dislike-')) {
-                removeFromQueue(item.id);
+                queueCollection.remove(item.id);
             }
         });
 
@@ -259,11 +263,11 @@ export function useAutoDislikeQueue(
         getCountdownProgress,
         hasActiveCountdown,
         formatCountdown,
-        freezeAll, // For hover freeze (freezes all countdowns)
-        unfreezeAll, // For hover unfreeze (unfreezes all countdowns)
+        freezeAll: queueFreeze.freezeAll, // For hover freeze (freezes all countdowns)
+        unfreezeAll: queueFreeze.unfreezeAll, // For hover unfreeze (unfreezes all countdowns)
         freezeAutoDislikeOnly, // For FileViewer (freezes only auto-dislike countdowns)
         unfreezeAutoDislikeOnly, // For FileViewer (unfreezes only auto-dislike countdowns)
-        isFrozen, // Expose frozen state for UI indicators
+        isFrozen: queueFreeze.isFrozen, // Expose frozen state for UI indicators
         clearAutoDislikeCountdowns,
     };
 }
