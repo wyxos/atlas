@@ -129,15 +129,6 @@ async function ensureMoreItems(): Promise<boolean> {
     return true;
 }
 
-function preloadImage(url: string): Promise<{ width: number; height: number }> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-        img.src = url;
-    });
-}
-
 const viewerData = useFileViewerData({
     items,
     navigation: navigationState,
@@ -149,9 +140,6 @@ useFileViewerSheetSizing({
     sheet: sheetState,
     overlay: overlayState,
     containerRef: computed(() => props.containerRef),
-    getAvailableWidth: sizing.getAvailableWidth,
-    calculateBestFitSize: sizing.calculateBestFitSize,
-    getCenteredPosition: sizing.getCenteredPosition,
 });
 
 const opener = useFileViewerOpen({
@@ -161,10 +149,7 @@ const opener = useFileViewerOpen({
     container: containerState,
     overlay: overlayState,
     navigation: navigationState,
-    getAvailableWidth: sizing.getAvailableWidth,
-    calculateBestFitSize: sizing.calculateBestFitSize,
-    getCenteredPosition: sizing.getCenteredPosition,
-    preloadImage,
+    sheet: sheetState,
     handleItemSeen: viewerData.handleItemSeen,
     closeOverlay: overlayLifecycle.closeOverlay,
     emitOpen: () => emit('open'),
@@ -174,11 +159,8 @@ const paging = useFileViewerPaging({
     containerRef: computed(() => props.containerRef),
     items,
     overlay: overlayState,
+    sheet: sheetState,
     navigation: navigationState,
-    getAvailableWidth: sizing.getAvailableWidth,
-    calculateBestFitSize: sizing.calculateBestFitSize,
-    getCenteredPosition: sizing.getCenteredPosition,
-    preloadImage,
     handleItemSeen: viewerData.handleItemSeen,
     ensureMoreItems,
 });

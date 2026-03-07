@@ -1,5 +1,4 @@
-import { ref, type Ref, type ComputedRef } from 'vue';
-import type { FeedItem, TabData } from './useTabs';
+import { ref } from 'vue';
 import { services as browseServices, sources as browseSources } from '@/actions/App/Http/Controllers/BrowseController';
 
 
@@ -45,17 +44,7 @@ export type ServiceFilterSchema = {
     fields: ServiceFilterField[];
 };
 
-export type UseBrowseServiceOptions = {
-    hasServiceSelected: ComputedRef<boolean>;
-    isInitializing: Ref<boolean>;
-    items: Ref<FeedItem[]>;
-    currentTabService: ComputedRef<string | null>;
-    activeTabId: Ref<number | null>;
-    getActiveTab: () => TabData | undefined;
-    updateActiveTab: (items: FeedItem[]) => void;
-};
-
-export function useBrowseService(_options?: UseBrowseServiceOptions) {
+export function useBrowseService() {
     const availableServices = ref<ServiceOption[]>([]);
     const availableSources = ref<string[]>([]);
     const localService = ref<ServiceOption | null>(null);
@@ -107,4 +96,3 @@ export function useBrowseService(_options?: UseBrowseServiceOptions) {
         getCurrentService,
     };
 }
-

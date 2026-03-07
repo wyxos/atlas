@@ -1,7 +1,15 @@
 import { nextTick, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
-
-type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
+import {
+    calculateBestFitSize,
+    getAvailableWidth,
+    getCenteredPosition,
+    preloadImage,
+    resolveFileViewerFullSizeUrl,
+    resolveFileViewerMediaType,
+    resolveFileViewerPreviewUrl,
+    type FileViewerOverlayMediaType,
+} from '@/utils/fileViewer';
 
 export function useFileViewerPaging(params: {
     containerRef: Ref<HTMLElement | null>;
@@ -10,7 +18,7 @@ export function useFileViewerPaging(params: {
         rect: { top: number; left: number; width: number; height: number } | null;
         fillComplete: boolean;
         isAnimating: boolean;
-        mediaType: OverlayMediaType;
+        mediaType: FileViewerOverlayMediaType;
         videoSrc: string | null;
         audioSrc: string | null;
         isLoading: boolean;
@@ -20,6 +28,11 @@ export function useFileViewerPaging(params: {
         key: number;
         originalDimensions: { width: number; height: number } | null;
         centerPosition: { top: number; left: number } | null;
+        isFilled: boolean;
+        isClosing: boolean;
+    };
+    sheet: {
+        isOpen: boolean;
     };
     navigation: {
         currentItemIndex: number | null;
@@ -29,20 +42,6 @@ export function useFileViewerPaging(params: {
         isNavigating: boolean;
         direction: 'up' | 'down' | null;
     };
-    getAvailableWidth: (containerWidth: number, borderWidth: number) => number;
-    calculateBestFitSize: (
-        originalWidth: number,
-        originalHeight: number,
-        containerWidth: number,
-        containerHeight: number
-    ) => { width: number; height: number };
-    getCenteredPosition: (
-        containerWidth: number,
-        containerHeight: number,
-        imageWidth: number,
-        imageHeight: number
-    ) => { top: number; left: number };
-    preloadImage: (url: string) => Promise<{ width: number; height: number }>;
     handleItemSeen: (fileId: number) => Promise<void>;
     ensureMoreItems: () => Promise<boolean>;
 }) {
@@ -60,7 +59,10 @@ export function useFileViewerPaging(params: {
         key,
         originalDimensions,
         centerPosition,
+        isFilled,
+        isClosing,
     } = toRefs(params.overlay);
+    const { isOpen } = toRefs(params.sheet);
     const {
         currentItemIndex,
         currentTarget,
@@ -70,77 +72,14 @@ export function useFileViewerPaging(params: {
         direction,
     } = toRefs(params.navigation);
     const waitForLayout = () => new Promise(resolve => setTimeout(resolve, 0));
-
-    const resolveMediaType = (item: FeedItem): OverlayMediaType => {
-        const kind = typeof item.media_kind === 'string' ? item.media_kind : null;
-        if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'file') {
-            return kind;
-        }
-
-        const mime = typeof item.mime_type === 'string' ? item.mime_type : '';
-        if (mime.startsWith('video/')) return 'video';
-        if (mime.startsWith('image/')) return 'image';
-        if (mime.startsWith('audio/')) return 'audio';
-
-        return item.type === 'video' ? 'video' : 'image';
-    };
-
-    const normalizeVideoUrl = (url: string | null | undefined, mediaType: OverlayMediaType): string => {
-        if (typeof url !== 'string') {
-            return '';
-        }
-
-        const value = url.trim();
-        if (mediaType !== 'video' || value === '') {
-            return value;
-        }
-
-        // Guard against malformed payloads that pass preview endpoint as the playback URL.
-        const match = value.match(/^(.*\/api\/files\/\d+)\/preview(\?.*)?$/);
-        if (!match) {
-            return value;
-        }
-
-        const base = match[1];
-        const query = match[2] ?? '';
-        return `${base}/downloaded${query}`;
-    };
-
-    const resolveFullSizeUrl = (item: FeedItem, fallback: string, mediaType: OverlayMediaType): string => {
-        const candidates = [item.original, item.originalUrl, fallback];
-
-        for (const candidate of candidates) {
-            if (typeof candidate !== 'string') {
-                continue;
-            }
-
-            const value = candidate.trim();
-            if (value === '') {
-                continue;
-            }
-
-            return normalizeVideoUrl(value, mediaType);
-        }
-
-        return normalizeVideoUrl(fallback, mediaType);
-    };
-
-    const resolvePreviewUrl = (item: FeedItem): string => {
-        const candidates = [item.preview, item.original, item.src, item.thumbnail, item.originalUrl];
-
-        for (const candidate of candidates) {
-            if (typeof candidate !== 'string') {
-                continue;
-            }
-
-            const value = candidate.trim();
-            if (value !== '') {
-                return value;
-            }
-        }
-
-        return '';
-    };
+    const getAvailableFrameWidth = (containerWidth: number, borderWidth: number): number => getAvailableWidth(
+        containerWidth,
+        borderWidth,
+        isFilled.value,
+        fillComplete.value,
+        isClosing.value,
+        isOpen.value,
+    );
 
     async function navigateToNext(): Promise<void> {
         if (!rect.value || !fillComplete.value || currentItemIndex.value === null) return;
@@ -195,12 +134,12 @@ export function useFileViewerPaging(params: {
             return;
         }
 
-        const nextMediaType = resolveMediaType(nextItem);
+        const nextMediaType = resolveFileViewerMediaType(nextItem);
         const nextIsVideo = nextMediaType === 'video';
         const nextIsAudio = nextMediaType === 'audio';
         const nextIsFile = nextMediaType === 'file';
-        const nextImageSrc = resolvePreviewUrl(nextItem);
-        const nextFullSizeUrl = resolveFullSizeUrl(nextItem, nextImageSrc, nextMediaType);
+        const nextImageSrc = resolveFileViewerPreviewUrl(nextItem);
+        const nextFullSizeUrl = resolveFileViewerFullSizeUrl(nextItem, nextImageSrc, nextMediaType);
 
         image.value = {
             src: nextImageSrc,
@@ -222,14 +161,14 @@ export function useFileViewerPaging(params: {
         const containerWidth = tabContentBox.width;
         const containerHeight = tabContentBox.height;
         const borderWidth = 4;
-        const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+        const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
         const availableHeight = containerHeight - (borderWidth * 2);
 
         const previewDimensions = {
             width: nextItem.width,
             height: nextItem.height,
         };
-        const initialBestFit = params.calculateBestFitSize(
+        const initialBestFit = calculateBestFitSize(
             previewDimensions.width,
             previewDimensions.height,
             availableWidth,
@@ -237,7 +176,7 @@ export function useFileViewerPaging(params: {
         );
 
         imageSize.value = initialBestFit;
-        centerPosition.value = params.getCenteredPosition(
+        centerPosition.value = getCenteredPosition(
             availableWidth,
             availableHeight,
             initialBestFit.width,
@@ -272,10 +211,10 @@ export function useFileViewerPaging(params: {
                 const containerWidth = tabContentBox.width;
                 const containerHeight = tabContentBox.height;
                 const borderWidth = 4;
-                const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+                const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
                 const availableHeight = containerHeight - (borderWidth * 2);
 
-                const bestFitSize = params.calculateBestFitSize(
+                const bestFitSize = calculateBestFitSize(
                     nextItem.width,
                     nextItem.height,
                     availableWidth,
@@ -283,7 +222,7 @@ export function useFileViewerPaging(params: {
                 );
 
                 imageSize.value = bestFitSize;
-                centerPosition.value = params.getCenteredPosition(
+                centerPosition.value = getCenteredPosition(
                     availableWidth,
                     availableHeight,
                     bestFitSize.width,
@@ -338,10 +277,10 @@ export function useFileViewerPaging(params: {
                 const containerWidth = tabContentBox.width;
                 const containerHeight = tabContentBox.height;
                 const borderWidth = 4;
-                const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+                const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
                 const availableHeight = containerHeight - (borderWidth * 2);
 
-                const bestFitSize = params.calculateBestFitSize(
+                const bestFitSize = calculateBestFitSize(
                     nextItem.width,
                     nextItem.height,
                     availableWidth,
@@ -349,7 +288,7 @@ export function useFileViewerPaging(params: {
                 );
 
                 imageSize.value = bestFitSize;
-                centerPosition.value = params.getCenteredPosition(
+                centerPosition.value = getCenteredPosition(
                     availableWidth,
                     availableHeight,
                     bestFitSize.width,
@@ -381,7 +320,7 @@ export function useFileViewerPaging(params: {
                 return;
             }
 
-            const imageDimensions = await params.preloadImage(nextFullSizeUrl);
+            const imageDimensions = await preloadImage(nextFullSizeUrl);
 
             if (currentTarget.value !== preloadTarget) {
                 isNavigating.value = false;
@@ -407,10 +346,10 @@ export function useFileViewerPaging(params: {
             const containerHeight = tabContentBox.height;
             const borderWidth = 4;
 
-            const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+            const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
             const availableHeight = containerHeight - (borderWidth * 2);
 
-            const bestFitSize = params.calculateBestFitSize(
+            const bestFitSize = calculateBestFitSize(
                 imageDimensions.width,
                 imageDimensions.height,
                 availableWidth,
@@ -418,7 +357,7 @@ export function useFileViewerPaging(params: {
             );
 
             imageSize.value = bestFitSize;
-            centerPosition.value = params.getCenteredPosition(
+            centerPosition.value = getCenteredPosition(
                 availableWidth,
                 availableHeight,
                 bestFitSize.width,
@@ -471,17 +410,17 @@ export function useFileViewerPaging(params: {
             isLoading.value = false;
 
             try {
-                const fallbackDimensions = await params.preloadImage(nextImageSrc);
+                const fallbackDimensions = await preloadImage(nextImageSrc);
                 originalDimensions.value = fallbackDimensions;
 
                 const tabContentBox = tabContent.getBoundingClientRect();
                 const containerWidth = tabContentBox.width;
                 const containerHeight = tabContentBox.height;
                 const borderWidth = 4;
-                const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+                const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
                 const availableHeight = containerHeight - (borderWidth * 2);
 
-                const bestFitSize = params.calculateBestFitSize(
+                const bestFitSize = calculateBestFitSize(
                     fallbackDimensions.width,
                     fallbackDimensions.height,
                     availableWidth,
@@ -489,7 +428,7 @@ export function useFileViewerPaging(params: {
                 );
 
                 imageSize.value = bestFitSize;
-                centerPosition.value = params.getCenteredPosition(
+                centerPosition.value = getCenteredPosition(
                     availableWidth,
                     availableHeight,
                     bestFitSize.width,
