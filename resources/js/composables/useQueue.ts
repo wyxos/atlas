@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 
 export interface QueueItem {
     id: string;
@@ -14,481 +14,449 @@ export interface QueueItem {
     elapsedWhenPaused: number;
 }
 
-// Global state (singleton pattern)
-const queue = ref<Map<string, QueueItem>>(new Map());
+type QueueAddOptions = {
+    id: string;
+    duration: number;
+    onComplete: () => void | Promise<void>;
+    onStart?: () => void | Promise<void>;
+    metadata?: unknown;
+    startImmediately?: boolean;
+};
+
+type QueueUpdateOptions = Partial<Pick<QueueItem, 'onComplete' | 'metadata'>>;
+
+const queueItems = ref<Map<string, QueueItem>>(new Map());
 const isFrozen = ref(false);
 const isModalOpen = ref(false);
-// Reactive trigger to force Vue reactivity on timer updates
 const updateTrigger = ref(0);
+
 let lastUpdateTime: number | null = null;
-let updateIntervalId: ReturnType<typeof setInterval> | null = null;
-// Throttle UI updates to reduce reactivity overhead (update every 100ms for display)
 let lastUIUpdateTime: number | null = null;
+let updateIntervalId: ReturnType<typeof setInterval> | null = null;
+let pendingUnfreezeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+const UPDATE_INTERVAL_MS = 16;
 const UI_UPDATE_INTERVAL_MS = 100;
+const UNFREEZE_DELAY_MS = 2000;
+
+function bumpUpdateTrigger(): void {
+    updateTrigger.value++;
+}
+
+function getQueueItem(id: string): QueueItem | undefined {
+    return queueItems.value.get(id);
+}
+
+function getQueueEntries(): QueueItem[] {
+    return Array.from(queueItems.value.values());
+}
+
+function isPromiseLike(value: unknown): value is Promise<unknown> {
+    return value instanceof Promise;
+}
+
+function runQueueCallback(
+    callback: (() => void | Promise<void>) | undefined,
+    callbackName: 'onStart' | 'onComplete',
+    id: string,
+): void {
+    if (!callback) {
+        return;
+    }
+
+    try {
+        const result = callback();
+        if (isPromiseLike(result)) {
+            void result.catch((error) => {
+                console.error(`Error executing ${callbackName} for queue item ${id}:`, error);
+            });
+        }
+    } catch (error) {
+        console.error(`Error executing ${callbackName} for queue item ${id}:`, error);
+    }
+}
+
+function clearPendingUnfreeze(): void {
+    if (pendingUnfreezeTimeoutId !== null) {
+        clearTimeout(pendingUnfreezeTimeoutId);
+        pendingUnfreezeTimeoutId = null;
+    }
+}
+
+function stopTimerLoop(): void {
+    if (updateIntervalId !== null) {
+        clearInterval(updateIntervalId);
+        updateIntervalId = null;
+    }
+
+    lastUpdateTime = null;
+    lastUIUpdateTime = null;
+}
+
+function updateQueueItems(deltaTime: number): void {
+    if (isFrozen.value) {
+        return;
+    }
+
+    const expiredIds: string[] = [];
+
+    queueItems.value.forEach((item, id) => {
+        if (!item.isStarted || item.isPaused) {
+            return;
+        }
+
+        item.remainingTime -= deltaTime;
+
+        if (item.remainingTime <= 0) {
+            expiredIds.push(id);
+            runQueueCallback(item.onComplete, 'onComplete', id);
+        }
+    });
+
+    if (expiredIds.length === 0) {
+        return;
+    }
+
+    expiredIds.forEach((id) => {
+        queueItems.value.delete(id);
+    });
+
+    bumpUpdateTrigger();
+}
+
+function startTimerLoop(): void {
+    if (updateIntervalId !== null) {
+        return;
+    }
+
+    lastUpdateTime = performance.now();
+    lastUIUpdateTime = lastUpdateTime;
+
+    updateIntervalId = setInterval(() => {
+        const currentTime = performance.now();
+
+        if (lastUpdateTime === null) {
+            lastUpdateTime = currentTime;
+            return;
+        }
+
+        const deltaTime = currentTime - lastUpdateTime;
+        lastUpdateTime = currentTime;
+
+        updateQueueItems(deltaTime);
+
+        if (lastUIUpdateTime === null || currentTime - lastUIUpdateTime >= UI_UPDATE_INTERVAL_MS) {
+            lastUIUpdateTime = currentTime;
+            bumpUpdateTrigger();
+        }
+
+        if (queueItems.value.size === 0 && !isFrozen.value) {
+            stopTimerLoop();
+        }
+    }, UPDATE_INTERVAL_MS) as unknown as ReturnType<typeof setInterval>;
+}
+
+function add(item: QueueAddOptions): string {
+    if (queueItems.value.has(item.id)) {
+        remove(item.id);
+    }
+
+    const startImmediately = item.startImmediately !== false;
+    const queueItem: QueueItem = {
+        id: item.id,
+        duration: item.duration,
+        remainingTime: item.duration,
+        onComplete: item.onComplete,
+        onStart: item.onStart,
+        metadata: item.metadata,
+        isPaused: false,
+        isStarted: startImmediately,
+        startTime: performance.now(),
+        elapsedWhenPaused: 0,
+    };
+
+    queueItems.value.set(item.id, queueItem);
+    bumpUpdateTrigger();
+
+    if (startImmediately) {
+        runQueueCallback(queueItem.onStart, 'onStart', item.id);
+    }
+
+    startTimerLoop();
+    return item.id;
+}
+
+function update(id: string, updates: QueueUpdateOptions): boolean {
+    const item = getQueueItem(id);
+    if (!item) {
+        return false;
+    }
+
+    if (updates.onComplete !== undefined) {
+        item.onComplete = updates.onComplete;
+    }
+
+    if (updates.metadata !== undefined) {
+        item.metadata = updates.metadata;
+    }
+
+    bumpUpdateTrigger();
+    return true;
+}
+
+function stop(id: string): boolean {
+    const item = getQueueItem(id);
+    if (!item || !item.isStarted || item.isPaused) {
+        return false;
+    }
+
+    item.isPaused = true;
+    item.pausedAt = performance.now();
+    item.elapsedWhenPaused = item.duration - item.remainingTime;
+    bumpUpdateTrigger();
+
+    return true;
+}
+
+function resume(id: string): boolean {
+    const item = getQueueItem(id);
+    if (!item || !item.isStarted || !item.isPaused) {
+        return false;
+    }
+
+    item.isPaused = false;
+    item.pausedAt = undefined;
+    bumpUpdateTrigger();
+
+    startTimerLoop();
+    return true;
+}
+
+function start(id: string): boolean {
+    const item = getQueueItem(id);
+    if (!item || item.isStarted) {
+        return false;
+    }
+
+    item.isStarted = true;
+    item.startTime = performance.now();
+    bumpUpdateTrigger();
+
+    runQueueCallback(item.onStart, 'onStart', id);
+    startTimerLoop();
+    return true;
+}
+
+function remove(id: string): boolean {
+    const existed = queueItems.value.delete(id);
+    if (!existed) {
+        return false;
+    }
+
+    if (queueItems.value.size === 0) {
+        stopTimerLoop();
+    }
+
+    bumpUpdateTrigger();
+    return true;
+}
+
+function has(id: string): boolean {
+    return queueItems.value.has(id);
+}
+
+function getProgress(id: string): number {
+    updateTrigger.value;
+
+    const item = getQueueItem(id);
+    if (!item) {
+        return 0;
+    }
+
+    const elapsed = item.duration - item.remainingTime;
+    return Math.max(0, Math.min(100, (elapsed / item.duration) * 100));
+}
+
+function getRemainingTime(id: string): number {
+    updateTrigger.value;
+
+    const item = getQueueItem(id);
+    if (!item) {
+        return 0;
+    }
+
+    return Math.max(0, item.remainingTime);
+}
+
+function getProgressComputed(id: string) {
+    return computed(() => getProgress(id));
+}
+
+function getRemainingTimeComputed(id: string) {
+    return computed(() => getRemainingTime(id));
+}
+
+function getAll(): QueueItem[] {
+    updateTrigger.value;
+    return getQueueEntries();
+}
+
+function getAllComputed() {
+    return computed(() => {
+        updateTrigger.value;
+        return getQueueEntries();
+    });
+}
+
+function freezeAll(): void {
+    clearPendingUnfreeze();
+
+    if (isFrozen.value) {
+        return;
+    }
+
+    isFrozen.value = true;
+    bumpUpdateTrigger();
+}
+
+function unfreezeAll(): void {
+    clearPendingUnfreeze();
+
+    pendingUnfreezeTimeoutId = setTimeout(() => {
+        pendingUnfreezeTimeoutId = null;
+
+        if (!isFrozen.value) {
+            return;
+        }
+
+        isFrozen.value = false;
+        bumpUpdateTrigger();
+
+        if (queueItems.value.size > 0) {
+            startTimerLoop();
+        }
+    }, UNFREEZE_DELAY_MS);
+}
+
+function unfreezeImmediately(): void {
+    clearPendingUnfreeze();
+
+    if (!isFrozen.value) {
+        return;
+    }
+
+    isFrozen.value = false;
+    bumpUpdateTrigger();
+
+    if (queueItems.value.size > 0) {
+        startTimerLoop();
+    }
+}
+
+function setModalOpen(open: boolean): void {
+    if (isModalOpen.value === open) {
+        return;
+    }
+
+    isModalOpen.value = open;
+    bumpUpdateTrigger();
+}
+
+function clear(): void {
+    queueItems.value.clear();
+    clearPendingUnfreeze();
+    stopTimerLoop();
+    bumpUpdateTrigger();
+}
+
+function reset(): void {
+    clear();
+    isFrozen.value = false;
+    isModalOpen.value = false;
+    lastUpdateTime = null;
+    lastUIUpdateTime = null;
+    bumpUpdateTrigger();
+}
+
+const queueState = {
+    queue: computed(() => {
+        updateTrigger.value;
+        return queueItems.value;
+    }),
+};
+
+const queueCollection = {
+    add,
+    update,
+    remove,
+    has,
+    getAll,
+    getAllComputed,
+    clear,
+    reset,
+};
+
+const queueCountdown = {
+    stop,
+    resume,
+    start,
+};
+
+const queueFreeze = {
+    freezeAll,
+    unfreezeAll,
+    unfreezeImmediately,
+    isFrozen: computed(() => isFrozen.value),
+};
+
+const queueModal = {
+    setModalOpen,
+    isModalOpen: computed(() => isModalOpen.value),
+};
+
+const queueQuery = {
+    getProgress,
+    getRemainingTime,
+    getProgressComputed,
+    getRemainingTimeComputed,
+};
+
+const queueApi = {
+    collection: queueCollection,
+    countdown: queueCountdown,
+    freeze: queueFreeze,
+    modal: queueModal,
+    query: queueQuery,
+    state: queueState,
+
+    add,
+    update,
+    remove,
+    has,
+    getAll,
+    getAllComputed,
+    clear,
+    reset,
+    stop,
+    resume,
+    start,
+    freezeAll,
+    unfreezeAll,
+    unfreezeImmediately,
+    isFrozen: queueFreeze.isFrozen,
+    setModalOpen,
+    isModalOpen: queueModal.isModalOpen,
+    getProgress,
+    getRemainingTime,
+    getProgressComputed,
+    getRemainingTimeComputed,
+    queue: queueState.queue,
+};
 
 /**
  * Global queue manager with built-in countdown timers.
  * Manages queued items with countdowns, freeze control, and execution.
  */
 export function useQueue() {
-    /**
-     * Update all queue items (called by timer loop).
-     */
-    function updateQueueItems(deltaTime: number): void {
-        // Only update if not frozen
-        if (isFrozen.value) {
-            return;
-        }
-
-        const itemsToRemove: string[] = [];
-
-        queue.value.forEach((item, id) => {
-            // Skip items that haven't started yet
-            if (!item.isStarted) {
-                return;
-            }
-
-            // Skip paused items
-            if (item.isPaused) {
-                return;
-            }
-
-            // Update remaining time
-            item.remainingTime -= deltaTime;
-
-            // Check if countdown expired
-            if (item.remainingTime <= 0) {
-                itemsToRemove.push(id);
-                // Execute onComplete callback
-                try {
-                    const result = item.onComplete();
-                    // Handle promise if returned
-                    if (result instanceof Promise) {
-                        result.catch((error) => {
-                            console.error(`Error executing onComplete for queue item ${id}:`, error);
-                        });
-                    }
-                } catch (error) {
-                    console.error(`Error executing onComplete for queue item ${id}:`, error);
-                }
-            }
-        });
-
-        // Remove expired items
-        itemsToRemove.forEach((id) => {
-            queue.value.delete(id);
-        });
-        // Trigger reactivity for removal
-        if (itemsToRemove.length > 0) {
-            updateTrigger.value++;
-        }
-
-    }
-
-    /**
-     * Start the timer loop if not already running.
-     */
-    function startTimerLoop(): void {
-        if (updateIntervalId !== null) {
-            return; // Already running
-        }
-
-        lastUpdateTime = performance.now();
-        const UPDATE_INTERVAL_MS = 16; // ~60fps
-        updateIntervalId = setInterval(() => {
-            const currentTime = performance.now();
-            if (lastUpdateTime !== null) {
-                const deltaTime = currentTime - lastUpdateTime;
-                lastUpdateTime = currentTime;
-            updateQueueItems(deltaTime);
-
-            // Throttle UI update trigger to reduce reactivity overhead
-            // Update every 100ms instead of every frame (~60fps) for better performance
-            if (lastUIUpdateTime === null || currentTime - lastUIUpdateTime >= UI_UPDATE_INTERVAL_MS) {
-                lastUIUpdateTime = currentTime;
-                // Trigger reactivity for progress updates (components will re-render)
-                updateTrigger.value++;
-            }
-            } else {
-                lastUpdateTime = currentTime;
-            }
-
-            // Stop if no items and not frozen
-            if (queue.value.size === 0 && !isFrozen.value) {
-                stopTimerLoop();
-            }
-        }, UPDATE_INTERVAL_MS) as unknown as ReturnType<typeof setInterval>;
-    }
-
-    /**
-     * Stop the timer loop.
-     */
-    function stopTimerLoop(): void {
-        if (updateIntervalId !== null) {
-            clearInterval(updateIntervalId);
-            updateIntervalId = null;
-        }
-
-        lastUpdateTime = null;
-    }
-
-    /**
-     * Add an item to the queue.
-     */
-    function add(item: {
-        id: string;
-        duration: number;
-        onComplete: () => void | Promise<void>;
-        onStart?: () => void | Promise<void>;
-        metadata?: unknown;
-        startImmediately?: boolean;
-    }): string {
-        // If item already exists, remove it first
-        if (queue.value.has(item.id)) {
-            remove(item.id);
-        }
-
-        const startImmediately = item.startImmediately !== false; // Default to true
-
-        const queueItem: QueueItem = {
-            id: item.id,
-            duration: item.duration,
-            remainingTime: item.duration,
-            onComplete: item.onComplete,
-            onStart: item.onStart,
-            metadata: item.metadata,
-            isPaused: false,
-            isStarted: startImmediately,
-            startTime: performance.now(),
-            elapsedWhenPaused: 0,
-        };
-
-        queue.value.set(item.id, queueItem);
-
-        // Execute onStart callback if provided and starting immediately
-        if (startImmediately && queueItem.onStart) {
-            try {
-                const result = queueItem.onStart();
-                if (result instanceof Promise) {
-                    result.catch((error) => {
-                        console.error(`Error executing onStart for queue item ${item.id}:`, error);
-                    });
-                }
-            } catch (error) {
-                console.error(`Error executing onStart for queue item ${item.id}:`, error);
-            }
-        }
-
-        // Start timer loop if not running (needed even for non-started items for when they do start)
-        startTimerLoop();
-
-        return item.id;
-    }
-
-    /**
-     * Update an existing queue item.
-     */
-    function update(id: string, updates: Partial<Pick<QueueItem, 'onComplete' | 'metadata'>>): boolean {
-        const item = queue.value.get(id);
-        if (!item) {
-            return false;
-        }
-
-        if (updates.onComplete !== undefined) {
-            item.onComplete = updates.onComplete;
-        }
-
-        if (updates.metadata !== undefined) {
-            item.metadata = updates.metadata;
-        }
-
-        return true;
-    }
-
-    /**
-     * Stop (pause) a queue item's countdown.
-     * Only works on items that have started.
-     */
-    function stop(id: string): boolean {
-        const item = queue.value.get(id);
-        if (!item || !item.isStarted || item.isPaused) {
-            return false;
-        }
-
-        item.isPaused = true;
-        item.pausedAt = performance.now();
-        // Calculate elapsed time so far
-        item.elapsedWhenPaused = item.duration - item.remainingTime;
-
-        return true;
-    }
-
-    /**
-     * Resume (unpause) a queue item's countdown.
-     * Only works on items that have started.
-     */
-    function resume(id: string): boolean {
-        const item = queue.value.get(id);
-        if (!item || !item.isStarted || !item.isPaused) {
-            return false;
-        }
-
-        item.isPaused = false;
-        // Remaining time is already correct (wasn't being decremented while paused)
-        item.pausedAt = undefined;
-        // Note: elapsedWhenPaused is kept for reference but not used in calculation
-
-        // Ensure timer loop is running
-        startTimerLoop();
-
-        return true;
-    }
-
-    /**
-     * Start the countdown for an item that was added with startImmediately: false.
-     * Items that haven't started are not affected by freeze/unfreeze.
-     */
-    function start(id: string): boolean {
-        const item = queue.value.get(id);
-        if (!item || item.isStarted) {
-            return false;
-        }
-
-        item.isStarted = true;
-        item.startTime = performance.now();
-
-        // Execute onStart callback if provided
-        if (item.onStart) {
-            try {
-                const result = item.onStart();
-                if (result instanceof Promise) {
-                    result.catch((error) => {
-                        console.error(`Error executing onStart for queue item ${id}:`, error);
-                    });
-                }
-            } catch (error) {
-                console.error(`Error executing onStart for queue item ${id}:`, error);
-            }
-        }
-
-        // Ensure timer loop is running
-        startTimerLoop();
-
-        return true;
-    }
-
-    /**
-     * Remove an item from the queue.
-     */
-    function remove(id: string): boolean {
-        const existed = queue.value.delete(id);
-
-        // Stop timer loop if no items left
-        if (queue.value.size === 0) {
-            stopTimerLoop();
-        }
-
-        return existed;
-    }
-
-    /**
-     * Check if an item exists in the queue.
-     */
-    function has(id: string): boolean {
-        return queue.value.has(id);
-    }
-
-    /**
-     * Get progress percentage (0-100) for an item.
-     * Reactive: will trigger re-renders when countdown updates.
-     */
-    function getProgress(id: string): number {
-        // Access updateTrigger to make this reactive
-        updateTrigger.value;  
-
-        const item = queue.value.get(id);
-        if (!item) {
-            return 0;
-        }
-
-        const elapsed = item.duration - item.remainingTime;
-        const progress = Math.max(0, Math.min(100, (elapsed / item.duration) * 100));
-
-        return progress;
-    }
-
-    /**
-     * Get remaining time in milliseconds for an item.
-     * Reactive: will trigger re-renders when countdown updates.
-     */
-    function getRemainingTime(id: string): number {
-        // Access updateTrigger to make this reactive
-        updateTrigger.value;  
-
-        const item = queue.value.get(id);
-        if (!item) {
-            return 0;
-        }
-
-        return Math.max(0, item.remainingTime);
-    }
-
-    /**
-     * Get a reactive computed for an item's progress.
-     * Use this in components for better performance (computed is cached).
-     */
-    function getProgressComputed(id: string) {
-        return computed(() => getProgress(id));
-    }
-
-    /**
-     * Get a reactive computed for an item's remaining time.
-     * Use this in components for better performance (computed is cached).
-     */
-    function getRemainingTimeComputed(id: string) {
-        return computed(() => getRemainingTime(id));
-    }
-
-    /**
-     * Get all queue items as an array.
-     * Reactive: will trigger re-renders when items are added/removed.
-     */
-    function getAll(): QueueItem[] {
-        // Access updateTrigger to make this reactive
-        updateTrigger.value;  
-        return Array.from(queue.value.values());
-    }
-
-    /**
-     * Get a reactive computed for all queue items.
-     * Use this in components for better performance (computed is cached).
-     */
-    function getAllComputed() {
-        return computed(() => {
-            updateTrigger.value; // Access to make reactive
-            return Array.from(queue.value.values());
-        });
-    }
-
-    // Track unfreeze timeout to allow cancellation if freeze is called again
-    let unfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    /**
-     * Freeze all countdowns (pause timer loop).
-     */
-    function freezeAll(): void {
-        // Cancel any pending unfreeze timeout
-        if (unfreezeTimeout) {
-            clearTimeout(unfreezeTimeout);
-            unfreezeTimeout = null;
-        }
-        isFrozen.value = true;
-        // Timer loop will continue but won't update items when frozen
-    }
-
-    /**
-     * Unfreeze all countdowns (resume timer loop).
-     * Resumes after a 2 second delay to give user time to move mouse away.
-     */
-    function unfreezeAll(): void {
-        // Clear any pending unfreeze timeout
-        if (unfreezeTimeout) {
-            clearTimeout(unfreezeTimeout);
-            unfreezeTimeout = null;
-        }
-
-        // Keep isFrozen = true during the delay, then set to false and resume
-        // This ensures the UI shows frozen state during the delay
-        unfreezeTimeout = setTimeout(() => {
-            isFrozen.value = false;
-            unfreezeTimeout = null;
-            // Timer loop will resume updating items
-            if (queue.value.size > 0) {
-                startTimerLoop();
-            }
-        }, 2000);
-    }
-
-    /**
-     * Immediately unfreeze all countdowns (no delay).
-     * Use this for modals or other cases where immediate unfreezing is needed.
-     */
-    function unfreezeImmediately(): void {
-        // Clear any pending unfreeze timeout
-        if (unfreezeTimeout) {
-            clearTimeout(unfreezeTimeout);
-            unfreezeTimeout = null;
-        }
-
-        // Immediately unfreeze
-        isFrozen.value = false;
-        // Timer loop will resume updating items
-        if (queue.value.size > 0) {
-            startTimerLoop();
-        }
-    }
-
-    /**
-     * Set modal open state (affects new items).
-     */
-    function setModalOpen(open: boolean): void {
-        isModalOpen.value = open;
-    }
-
-    /**
-     * Clear all items from the queue.
-     */
-    function clear(): void {
-        queue.value.clear();
-        stopTimerLoop();
-    }
-
-    /**
-     * Reset all state (useful for tests).
-     */
-    function reset(): void {
-        clear();
-        isFrozen.value = false;
-        isModalOpen.value = false;
-        updateTrigger.value = 0;
-        lastUIUpdateTime = null;
-    }
-
-    return {
-        // Queue management
-        add,
-        update,
-        remove,
-        has,
-        getAll,
-        clear,
-        reset,
-
-        // Countdown control
-        stop,
-        resume,
-        start,
-
-        // Freeze control
-        freezeAll,
-        unfreezeAll,
-        unfreezeImmediately,
-        // Expose isFrozen as computed to ensure reactivity when passed as prop
-        // The computed will re-evaluate whenever isFrozen.value changes
-        isFrozen: computed(() => isFrozen.value),
-
-        // Modal state
-        setModalOpen,
-        isModalOpen: computed(() => isModalOpen.value),
-
-        // Query methods
-        getProgress,
-        getRemainingTime,
-        getProgressComputed,
-        getRemainingTimeComputed,
-        getAllComputed,
-
-        // Internal state (for testing)
-        queue: computed(() => queue.value),
-    };
+    return queueApi;
 }

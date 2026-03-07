@@ -147,6 +147,24 @@ describe('useQueue', () => {
             // Now it should be unfrozen
             expect(queue.isFrozen.value).toBe(false);
         });
+
+        it('cancels a pending unfreeze across queue instances', async () => {
+            const firstQueue = useQueue();
+            const secondQueue = useQueue();
+
+            firstQueue.freezeAll();
+            firstQueue.unfreezeAll();
+
+            secondQueue.freezeAll();
+
+            vi.advanceTimersByTime(2000);
+            await vi.runAllTimersAsync();
+
+            expect(firstQueue.isFrozen.value).toBe(true);
+
+            secondQueue.unfreezeImmediately();
+            expect(firstQueue.isFrozen.value).toBe(false);
+        });
     });
     describe('countdown expiration', () => {
         it('executes onComplete when countdown expires', async () => {

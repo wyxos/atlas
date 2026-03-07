@@ -17,10 +17,9 @@ interface Props {
 
 const props = defineProps<Props>();
 const queue = useQueue();
-
-// Use computed for reactive updates
-const progress = computed(() => queue.getProgress(props.queueId));
-const remainingTime = computed(() => queue.getRemainingTime(props.queueId));
+const queueFreeze = queue.freeze;
+const progress = queue.query.getProgressComputed(props.queueId);
+const remainingTime = queue.query.getRemainingTimeComputed(props.queueId);
 
 const reactionConfig = computed(() => {
     const configs: Record<ReactionType, { label: string; icon: typeof Heart; color: string }> = {
@@ -145,7 +144,7 @@ function handleDismiss(): void {
 </script>
 
 <template>
-    <div :class="toastClasses" @mouseenter="queue.freezeAll()" @mouseleave="queue.unfreezeAll()" class="flex! gap-4!">
+    <div :class="toastClasses" @mouseenter="queueFreeze.freezeAll()" @mouseleave="queueFreeze.unfreezeAll()" class="flex! gap-4!">
         <!-- File Preview Thumbnail -->
         <div v-if="thumbnail" class="shrink-0">
             <img :src="thumbnail" :alt="`File ${fileId}`" class="size-16 rounded object-cover" />
