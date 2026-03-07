@@ -5,10 +5,8 @@ import vueParser from 'vue-eslint-parser';
 import globals from 'globals';
 
 const legacyVueMaxLinesFiles = [
-    'resources/js/pages/DownloadsQueue.vue',
     'resources/js/components/TabFilter.vue',
     'resources/js/pages/Dashboard.vue',
-    'resources/js/components/FileViewer.vue',
 ];
 
 export default tseslint.config(
