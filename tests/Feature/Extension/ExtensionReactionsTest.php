@@ -196,6 +196,49 @@ test('extension reactions payload forwards cookies and user agent to queued down
     });
 });
 
+test('single deviantart downloads create a derived user container', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $artUrl = 'https://www.deviantart.com/deviantartbender/art/Visionaries-Leoric-Star-Comics-1307302462';
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://images.example.test/single-da-image.jpg',
+        'referrer_url_hash_aware' => $artUrl,
+        'page_url' => $artUrl,
+        'tag_name' => 'img',
+    ]);
+
+    $response->assertSuccessful();
+
+    $file = File::query()->where('url', 'https://images.example.test/single-da-image.jpg')->first();
+
+    expect($file)->not->toBeNull();
+    expect(data_get($file?->listing_metadata, 'post_container_referrer_url'))->toBeNull();
+    expect(data_get($file?->listing_metadata, 'user_container_source'))->toBe('deviantart.com');
+    expect(data_get($file?->listing_metadata, 'user_container_source_id'))->toBe('deviantartbender');
+    expect(data_get($file?->listing_metadata, 'user_container_referrer_url'))
+        ->toBe('https://www.deviantart.com/deviantartbender/gallery');
+
+    $this->assertDatabaseHas('containers', [
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => 'deviantartbender',
+        'referrer' => 'https://www.deviantart.com/deviantartbender/gallery',
+    ]);
+
+    $this->assertDatabaseMissing('containers', [
+        'type' => 'Post',
+        'source' => 'deviantart.com',
+        'source_id' => $artUrl,
+    ]);
+});
+
 test('extension batch reactions queue all submitted gallery items and return the selected primary item', function () {
     Queue::fake();
 
@@ -350,4 +393,38 @@ test('extension batch reactions create a user container for deviantart gallery u
         'source_id' => 'aipayop',
         'referrer' => 'https://www.deviantart.com/aipayop/gallery',
     ]);
+});
+
+test('extension batch reactions do not create post or user containers for non-deviantart urls', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $postUrl = 'https://www.example.test/post/123';
+
+    $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions/batch', [
+        'type' => 'like',
+        'primary_candidate_id' => 'image-1',
+        'items' => [
+            [
+                'candidate_id' => 'image-1',
+                'url' => 'https://images.example.test/non-da-image-1.jpg',
+                'referrer_url_hash_aware' => $postUrl,
+                'page_url' => $postUrl,
+                'tag_name' => 'img',
+            ],
+            [
+                'candidate_id' => 'image-2',
+                'url' => 'https://images.example.test/non-da-image-2.jpg',
+                'referrer_url_hash_aware' => $postUrl,
+                'page_url' => $postUrl,
+                'tag_name' => 'img',
+            ],
+        ],
+    ])->assertSuccessful();
+
+    $this->assertDatabaseCount('containers', 0);
 });
