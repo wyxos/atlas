@@ -445,6 +445,22 @@ class BrowsePersister
             }
         }
 
+        if (isset($listingMetadata['user_container_source_id']) && is_string($listingMetadata['user_container_source_id'])) {
+            $userContainerSourceId = trim($listingMetadata['user_container_source_id']);
+            if ($userContainerSourceId !== '') {
+                $containers[] = [
+                    'type' => 'User',
+                    'source' => isset($listingMetadata['user_container_source']) && is_string($listingMetadata['user_container_source']) && $listingMetadata['user_container_source'] !== ''
+                        ? $listingMetadata['user_container_source']
+                        : null,
+                    'source_id' => $userContainerSourceId,
+                    'referrer' => isset($listingMetadata['user_container_referrer_url']) && is_string($listingMetadata['user_container_referrer_url']) && $listingMetadata['user_container_referrer_url'] !== ''
+                        ? $listingMetadata['user_container_referrer_url']
+                        : null,
+                ];
+            }
+        }
+
         return $containers;
     }
 }
