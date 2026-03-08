@@ -7,7 +7,9 @@ use App\Models\Reaction;
 use App\Models\User;
 use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
+uses(TestCase::class);
 uses(RefreshDatabase::class);
 
 it('includes original URL in non-terminal progress payloads', function () {
@@ -137,4 +139,66 @@ it('prefers downloaded file URLs for terminal yt-dlp payloads', function () {
 
     expect($originalPath)->toBe("/api/files/{$file->id}/downloaded")
         ->and($previewPath)->toBe("/api/files/{$file->id}/preview");
+});
+
+it('does not reuse extension payload lookups across different transfer models', function () {
+    $firstUser = User::factory()->create();
+    $secondUser = User::factory()->create();
+    $file = File::factory()->create();
+
+    Reaction::query()->create([
+        'user_id' => $firstUser->id,
+        'file_id' => $file->id,
+        'type' => 'funny',
+    ]);
+
+    Reaction::query()->create([
+        'user_id' => $secondUser->id,
+        'file_id' => $file->id,
+        'type' => 'like',
+    ]);
+
+    $firstTransfer = new DownloadTransfer([
+        'id' => 1,
+        'file_id' => $file->id,
+        'url' => 'https://images.example.com/media/cached.jpg',
+        'status' => DownloadTransferStatus::QUEUED,
+        'last_broadcast_percent' => 0,
+    ]);
+    $firstTransfer->created_at = now();
+    $firstTransfer->setRelation('file', new File([
+        'id' => $file->id,
+        'listing_metadata' => [
+            'extension_channel' => str_repeat('a', 64),
+            'extension_user_id' => $firstUser->id,
+        ],
+        'referrer_url' => 'https://example.com/first',
+    ]));
+
+    $secondTransfer = new DownloadTransfer([
+        'id' => 1,
+        'file_id' => $file->id,
+        'url' => 'https://images.example.com/media/cached.jpg',
+        'status' => DownloadTransferStatus::QUEUED,
+        'last_broadcast_percent' => 0,
+    ]);
+    $secondTransfer->created_at = $firstTransfer->created_at->copy();
+    $secondTransfer->setRelation('file', new File([
+        'id' => $file->id,
+        'listing_metadata' => [
+            'extension_channel' => str_repeat('b', 64),
+            'extension_user_id' => $secondUser->id,
+        ],
+        'referrer_url' => 'https://example.com/second',
+    ]));
+
+    $firstPayload = DownloadTransferPayload::forList($firstTransfer);
+    $secondPayload = DownloadTransferPayload::forList($secondTransfer);
+
+    expect($firstPayload['extension_channel'])->toBe(str_repeat('a', 64))
+        ->and($firstPayload['reaction'])->toBe('funny')
+        ->and($firstPayload['referrer_url'])->toBe('https://example.com/first')
+        ->and($secondPayload['extension_channel'])->toBe(str_repeat('b', 64))
+        ->and($secondPayload['reaction'])->toBe('like')
+        ->and($secondPayload['referrer_url'])->toBe('https://example.com/second');
 });

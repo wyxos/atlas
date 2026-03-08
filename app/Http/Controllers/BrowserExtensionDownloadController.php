@@ -38,6 +38,7 @@ class BrowserExtensionDownloadController extends Controller
             $latestArchivePath,
             basename($latestArchivePath),
             [
+                'Content-Type' => 'application/zip',
                 'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
                 'Pragma' => 'no-cache',
             ],

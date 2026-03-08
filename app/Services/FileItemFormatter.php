@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Container;
 use App\Models\File;
+use App\Support\FileApiPath;
 use App\Support\FileMimeType;
+use Illuminate\Container\Container as IoCContainer;
 use Illuminate\Database\Eloquent\Collection;
 
 class FileItemFormatter
@@ -26,7 +28,10 @@ class FileItemFormatter
             return $url;
         }
 
-        $requestHost = request()?->getHost();
+        $container = IoCContainer::getInstance();
+        $requestHost = $container?->bound('request') === true
+            ? $container->make('request')->getHost()
+            : null;
         if (! is_string($requestHost) || strtolower($requestHost) !== $host) {
             return $url;
         }
@@ -43,19 +48,32 @@ class FileItemFormatter
     {
         // Eager load containers relationship to avoid N+1 queries
         if ($files instanceof Collection) {
-            $files->load('containers');
-        } elseif (is_array($files) && ! empty($files)) {
-            $fileIds = array_map(fn (File $file) => $file->id, $files);
-            $filesWithContainers = File::query()
-                ->whereIn('id', $fileIds)
-                ->with('containers')
-                ->get()
-                ->keyBy('id');
+            $persistedFiles = $files->filter(
+                fn (File $file): bool => $file->exists && ! $file->relationLoaded('containers')
+            );
 
-            // Update files in array with loaded containers
-            foreach ($files as $file) {
-                if (isset($filesWithContainers[$file->id])) {
-                    $file->setRelation('containers', $filesWithContainers[$file->id]->containers);
+            if ($persistedFiles->isNotEmpty()) {
+                $persistedFiles->load('containers');
+            }
+        } elseif (is_array($files) && ! empty($files)) {
+            $filesNeedingContainers = array_values(array_filter(
+                $files,
+                fn (File $file): bool => $file->exists && ! $file->relationLoaded('containers')
+            ));
+
+            if ($filesNeedingContainers !== []) {
+                $fileIds = array_map(fn (File $file) => $file->id, $filesNeedingContainers);
+                $filesWithContainers = File::query()
+                    ->whereIn('id', $fileIds)
+                    ->with('containers')
+                    ->get()
+                    ->keyBy('id');
+
+                // Update files in array with loaded containers
+                foreach ($filesNeedingContainers as $file) {
+                    if (isset($filesWithContainers[$file->id])) {
+                        $file->setRelation('containers', $filesWithContainers[$file->id]->containers);
+                    }
                 }
             }
         }
@@ -109,11 +127,11 @@ class FileItemFormatter
             $thumbnailUrl = $file->preview_url;
 
             if ($file->downloaded && $file->path) {
-                $originalUrl = route('api.files.downloaded', ['file' => $file->id], false);
-                $thumbnailUrl = route('api.files.preview', ['file' => $file->id], false);
+                $originalUrl = FileApiPath::downloaded($file->id);
+                $thumbnailUrl = FileApiPath::preview($file->id);
             } else {
                 if (! $originalUrl && $file->path) {
-                    $originalUrl = route('api.files.serve', ['file' => $file->id], false);
+                    $originalUrl = FileApiPath::serve($file->id);
                 }
             }
 
@@ -128,7 +146,7 @@ class FileItemFormatter
             $vibeType = $isVideo ? 'video' : 'image';
 
             if ($mediaKind !== 'image' && $mediaKind !== 'video') {
-                $thumbnailUrl = route('api.files.icon', ['file' => $file->id], false);
+                $thumbnailUrl = FileApiPath::icon($file->id);
             }
 
             $originalUrl = self::toRelativeInternalApiUrl($originalUrl);

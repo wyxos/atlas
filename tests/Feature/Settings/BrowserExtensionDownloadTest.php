@@ -51,6 +51,7 @@ test('browser extension download prefers the canonical archive', function () {
         $response = $this->actingAs($user)->get('/settings/browser-extension/download');
 
         $response->assertDownload('atlas-extension.zip');
+        $response->assertHeader('Content-Type', 'application/zip');
         expect($response->baseResponse->getFile()->getPathname())->toBe($canonicalArchivePath);
     });
 });

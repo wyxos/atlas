@@ -5,66 +5,18 @@ namespace App\Services\Downloads;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Support\FileApiPath;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 final class DownloadTransferPayload
 {
     /**
-     * @var array<string, string|null>
-     */
-    private static array $extensionChannelCacheByTransferId = [];
-
-    /**
-     * @var array<string, array<string, mixed>>
-     */
-    private static array $listingMetadataCacheByTransferId = [];
-
-    /**
-     * @var array<string, string|null>
-     */
-    private static array $extensionReactionCacheByTransferId = [];
-
-    /**
-     * @var array<string, string|null>
-     */
-    private static array $referrerUrlCacheByTransferId = [];
-
-    /**
-     * @var array<string, string|null>
-     */
-    private static array $downloadedAtCacheByTransferId = [];
-
-    /**
-     * @var array<string, string|null>
-     */
-    private static array $blacklistedAtCacheByTransferId = [];
-
-    /**
      * @return array<string, mixed>
      */
     public static function forList(DownloadTransfer $transfer): array
     {
-        $payload = [
-            'id' => $transfer->id,
-            'fileId' => $transfer->file_id,
-            'file_id' => $transfer->file_id,
-            'status' => $transfer->status,
-            'created_at' => $transfer->created_at?->toISOString(),
-            'queued_at' => $transfer->queued_at?->toISOString(),
-            'started_at' => $transfer->started_at?->toISOString(),
-            'finished_at' => $transfer->finished_at?->toISOString(),
-            'failed_at' => $transfer->failed_at?->toISOString(),
-            'percent' => (int) ($transfer->last_broadcast_percent ?? 0),
-            'error' => $transfer->error,
-            'extension_channel' => self::extensionChannelForTransfer($transfer),
-            'reaction' => self::extensionReactionForTransfer($transfer),
-            'referrer_url' => self::referrerUrlForTransfer($transfer),
-            'downloaded_at' => self::downloadedAtForTransfer($transfer),
-            'blacklisted_at' => self::blacklistedAtForTransfer($transfer),
-        ];
-
-        return $payload;
+        return self::listPayload($transfer);
     }
 
     /**
@@ -73,9 +25,11 @@ final class DownloadTransferPayload
      */
     public static function forListCollection(Collection $transfers): Collection
     {
-        self::preloadListLookups($transfers);
+        $lookups = self::buildListLookups($transfers);
 
-        return $transfers->map(fn (DownloadTransfer $transfer): array => self::forList($transfer));
+        return $transfers->map(
+            fn (DownloadTransfer $transfer): array => self::listPayload($transfer, $lookups)
+        );
     }
 
     /**
@@ -95,7 +49,7 @@ final class DownloadTransferPayload
     public static function forQueued(DownloadTransfer $transfer): array
     {
         return [
-            ...self::forList($transfer),
+            ...self::listPayload($transfer),
             ...self::filePayload($transfer->relationLoaded('file') ? $transfer->file : $transfer->file()->first(), $transfer->url),
         ];
     }
@@ -106,24 +60,22 @@ final class DownloadTransferPayload
     public static function forProgress(DownloadTransfer $transfer, int $percent): array
     {
         $payload = [
-            'downloadTransferId' => $transfer->id,
+            'id' => $transfer->id,
             'fileId' => $transfer->file_id,
             'file_id' => $transfer->file_id,
             'status' => $transfer->status,
-            'percent' => $percent,
-            'original' => $transfer->url,
             'created_at' => $transfer->created_at?->toISOString(),
             'queued_at' => $transfer->queued_at?->toISOString(),
             'started_at' => $transfer->started_at?->toISOString(),
             'finished_at' => $transfer->finished_at?->toISOString(),
             'failed_at' => $transfer->failed_at?->toISOString(),
+            'percent' => $percent,
             'error' => $transfer->error,
-            'extension_channel' => self::extensionChannelForTransfer($transfer),
-            'reaction' => self::extensionReactionForTransfer($transfer),
-            'referrer_url' => self::referrerUrlForTransfer($transfer),
-            'downloaded_at' => self::downloadedAtForTransfer($transfer),
-            'blacklisted_at' => self::blacklistedAtForTransfer($transfer),
+            ...self::transferFacts($transfer),
         ];
+
+        $payload['downloadTransferId'] = $transfer->id;
+        $payload['original'] = $transfer->url;
 
         if ($transfer->isTerminal()) {
             $file = $transfer->file()->first();
@@ -139,6 +91,80 @@ final class DownloadTransferPayload
     }
 
     /**
+     * @param  array<int, array{
+     *     extension_channel:string|null,
+     *     reaction:string|null,
+     *     referrer_url:string|null,
+     *     downloaded_at:string|null,
+     *     blacklisted_at:string|null
+     * }>  $lookups
+     * @return array<string, mixed>
+     */
+    private static function listPayload(DownloadTransfer $transfer, array $lookups = []): array
+    {
+        return [
+            'id' => $transfer->id,
+            'fileId' => $transfer->file_id,
+            'file_id' => $transfer->file_id,
+            'status' => $transfer->status,
+            'created_at' => $transfer->created_at?->toISOString(),
+            'queued_at' => $transfer->queued_at?->toISOString(),
+            'started_at' => $transfer->started_at?->toISOString(),
+            'finished_at' => $transfer->finished_at?->toISOString(),
+            'failed_at' => $transfer->failed_at?->toISOString(),
+            'percent' => (int) ($transfer->last_broadcast_percent ?? 0),
+            'error' => $transfer->error,
+            ...self::transferFacts($transfer, $lookups),
+        ];
+    }
+
+    /**
+     * @param  array<int, array{
+     *     extension_channel:string|null,
+     *     reaction:string|null,
+     *     referrer_url:string|null,
+     *     downloaded_at:string|null,
+     *     blacklisted_at:string|null
+     * }>  $lookups
+     * @return array{
+     *     extension_channel:string|null,
+     *     reaction:string|null,
+     *     referrer_url:string|null,
+     *     downloaded_at:string|null,
+     *     blacklisted_at:string|null
+     * }
+     */
+    private static function transferFacts(DownloadTransfer $transfer, array $lookups = []): array
+    {
+        $lookupKey = self::transferLookupKey($transfer);
+        if (array_key_exists($lookupKey, $lookups)) {
+            return $lookups[$lookupKey];
+        }
+
+        $file = self::listingMetadataFileForTransfer($transfer);
+        $metadata = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
+        $reaction = null;
+        $extensionUserId = self::extensionUserIdFromListingMetadata($metadata);
+
+        if ($transfer->file_id !== null && $extensionUserId !== null) {
+            $resolved = Reaction::query()
+                ->where('file_id', $transfer->file_id)
+                ->where('user_id', $extensionUserId)
+                ->value('type');
+
+            $reaction = is_string($resolved) ? $resolved : null;
+        }
+
+        return [
+            'extension_channel' => self::extensionChannelFromListingMetadata($metadata),
+            'reaction' => $reaction,
+            'referrer_url' => self::trimmedStringOrNull($file?->referrer_url),
+            'downloaded_at' => self::datetimeToIsoStringOrNull($file?->downloaded_at),
+            'blacklisted_at' => self::datetimeToIsoStringOrNull($file?->blacklisted_at),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private static function filePayload(?File $file, ?string $sourceUrl): array
@@ -146,17 +172,17 @@ final class DownloadTransferPayload
         $isDownloadedFile = (bool) ($file?->downloaded && $file?->path);
 
         $original = $isDownloadedFile
-            ? route('api.files.downloaded', ['file' => $file->id])
+            ? FileApiPath::downloaded($file->id)
             : $sourceUrl;
         if (! $original && $file?->url) {
             $original = $file->url;
         }
         if (! $original && $file?->path) {
-            $original = route('api.files.serve', ['file' => $file->id]);
+            $original = FileApiPath::serve($file->id);
         }
 
         $preview = $isDownloadedFile && $file?->preview_path
-            ? route('api.files.preview', ['file' => $file->id])
+            ? FileApiPath::preview($file->id)
             : ($file?->preview_url ?? $original);
         $plannedPath = self::plannedPath($file, $sourceUrl);
         $path = $file?->path ?? $plannedPath;
@@ -232,86 +258,58 @@ final class DownloadTransferPayload
         return $extension !== '' ? strtolower($extension) : null;
     }
 
-    private static function extensionChannelForTransfer(DownloadTransfer $transfer): ?string
-    {
-        $cacheKey = self::cacheKeyForTransfer($transfer);
-        if (array_key_exists($cacheKey, self::$extensionChannelCacheByTransferId)) {
-            return self::$extensionChannelCacheByTransferId[$cacheKey];
-        }
-
-        $channel = self::extensionChannelFromListingMetadata(
-            self::listingMetadataForTransfer($transfer)
-        );
-        self::$extensionChannelCacheByTransferId[$cacheKey] = $channel;
-
-        return $channel;
-    }
-
-    private static function extensionReactionForTransfer(DownloadTransfer $transfer): ?string
-    {
-        $cacheKey = self::cacheKeyForTransfer($transfer);
-        if (array_key_exists($cacheKey, self::$extensionReactionCacheByTransferId)) {
-            return self::$extensionReactionCacheByTransferId[$cacheKey];
-        }
-
-        if ($transfer->file_id === null) {
-            self::$extensionReactionCacheByTransferId[$cacheKey] = null;
-
-            return null;
-        }
-
-        $extensionUserId = self::extensionUserIdFromListingMetadata(
-            self::listingMetadataForTransfer($transfer)
-        );
-        if ($extensionUserId === null) {
-            self::$extensionReactionCacheByTransferId[$cacheKey] = null;
-
-            return null;
-        }
-
-        $reaction = Reaction::query()
-            ->where('file_id', $transfer->file_id)
-            ->where('user_id', $extensionUserId)
-            ->value('type');
-
-        $resolved = is_string($reaction) ? $reaction : null;
-        self::$extensionReactionCacheByTransferId[$cacheKey] = $resolved;
-
-        return $resolved;
-    }
-
     /**
      * @param  Collection<int, DownloadTransfer>  $transfers
+     * @return array<int, array{
+     *     extension_channel:string|null,
+     *     reaction:string|null,
+     *     referrer_url:string|null,
+     *     downloaded_at:string|null,
+     *     blacklisted_at:string|null
+     * }>
      */
-    private static function preloadListLookups(Collection $transfers): void
+    private static function buildListLookups(Collection $transfers): array
     {
         if ($transfers->isEmpty()) {
-            return;
+            return [];
         }
 
         self::preloadListFiles($transfers);
 
         /** @var array<string, array{file_id:int,user_id:int}> $pairs */
         $pairs = [];
-        /** @var array<string, string> $pairByTransferCacheKey */
-        $pairByTransferCacheKey = [];
+        /** @var array<int, string> $pairByTransferLookupKey */
+        $pairByTransferLookupKey = [];
+        /** @var array<int, array{
+         *     extension_channel:string|null,
+         *     reaction:string|null,
+         *     referrer_url:string|null,
+         *     downloaded_at:string|null,
+         *     blacklisted_at:string|null
+         * }> $lookups
+         */
+        $lookups = [];
 
         foreach ($transfers as $transfer) {
-            $cacheKey = self::cacheKeyForTransfer($transfer);
+            $lookupKey = self::transferLookupKey($transfer);
+            $file = self::listingMetadataFileForTransfer($transfer);
+            $listing = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
+
+            $lookups[$lookupKey] = [
+                'extension_channel' => self::extensionChannelFromListingMetadata($listing),
+                'reaction' => null,
+                'referrer_url' => self::trimmedStringOrNull($file?->referrer_url),
+                'downloaded_at' => self::datetimeToIsoStringOrNull($file?->downloaded_at),
+                'blacklisted_at' => self::datetimeToIsoStringOrNull($file?->blacklisted_at),
+            ];
 
             if ($transfer->file_id === null) {
-                self::$extensionReactionCacheByTransferId[$cacheKey] = null;
-
                 continue;
             }
 
-            $extensionUserId = self::extensionUserIdFromListingMetadata(
-                self::listingMetadataForTransfer($transfer)
-            );
+            $extensionUserId = self::extensionUserIdFromListingMetadata($listing);
 
             if ($extensionUserId === null) {
-                self::$extensionReactionCacheByTransferId[$cacheKey] = null;
-
                 continue;
             }
 
@@ -320,11 +318,11 @@ final class DownloadTransferPayload
                 'file_id' => (int) $transfer->file_id,
                 'user_id' => $extensionUserId,
             ];
-            $pairByTransferCacheKey[$cacheKey] = $pairKey;
+            $pairByTransferLookupKey[$lookupKey] = $pairKey;
         }
 
         if ($pairs === []) {
-            return;
+            return $lookups;
         }
 
         $fileIds = array_values(array_unique(array_column($pairs, 'file_id')));
@@ -352,9 +350,11 @@ final class DownloadTransferPayload
                 [],
             );
 
-        foreach ($pairByTransferCacheKey as $cacheKey => $pairKey) {
-            self::$extensionReactionCacheByTransferId[$cacheKey] = $reactionByPair[$pairKey] ?? null;
+        foreach ($pairByTransferLookupKey as $lookupKey => $pairKey) {
+            $lookups[$lookupKey]['reaction'] = $reactionByPair[$pairKey] ?? null;
         }
+
+        return $lookups;
     }
 
     /**
@@ -389,75 +389,30 @@ final class DownloadTransferPayload
         }
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private static function listingMetadataForTransfer(DownloadTransfer $transfer): array
+    private static function reactionPairKey(int $fileId, int $userId): string
     {
-        $cacheKey = self::cacheKeyForTransfer($transfer);
-        if (array_key_exists($cacheKey, self::$listingMetadataCacheByTransferId)) {
-            return self::$listingMetadataCacheByTransferId[$cacheKey];
-        }
+        return "{$fileId}:{$userId}";
+    }
 
+    private static function transferLookupKey(DownloadTransfer $transfer): int
+    {
+        return spl_object_id($transfer);
+    }
+
+    private static function listingMetadataFileForTransfer(DownloadTransfer $transfer): ?File
+    {
         $file = $transfer->relationLoaded('file') ? $transfer->file : null;
         if ($file instanceof File && ! self::hasListingMetadataAttribute($file)) {
             $file = null;
         }
 
-        if (! $file) {
-            $file = $transfer->file()->select(['id', 'listing_metadata', 'referrer_url', 'downloaded_at', 'blacklisted_at'])->first();
+        if ($file) {
+            return $file;
         }
 
-        $metadata = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
-        self::$listingMetadataCacheByTransferId[$cacheKey] = $metadata;
-        self::$referrerUrlCacheByTransferId[$cacheKey] = self::trimmedStringOrNull($file?->referrer_url);
-        self::$downloadedAtCacheByTransferId[$cacheKey] = self::datetimeToIsoStringOrNull($file?->downloaded_at);
-        self::$blacklistedAtCacheByTransferId[$cacheKey] = self::datetimeToIsoStringOrNull($file?->blacklisted_at);
-
-        return $metadata;
-    }
-
-    private static function referrerUrlForTransfer(DownloadTransfer $transfer): ?string
-    {
-        $cacheKey = self::cacheKeyForTransfer($transfer);
-        if (! array_key_exists($cacheKey, self::$referrerUrlCacheByTransferId)) {
-            self::listingMetadataForTransfer($transfer);
-        }
-
-        return self::$referrerUrlCacheByTransferId[$cacheKey] ?? null;
-    }
-
-    private static function downloadedAtForTransfer(DownloadTransfer $transfer): ?string
-    {
-        $cacheKey = self::cacheKeyForTransfer($transfer);
-        if (! array_key_exists($cacheKey, self::$downloadedAtCacheByTransferId)) {
-            self::listingMetadataForTransfer($transfer);
-        }
-
-        return self::$downloadedAtCacheByTransferId[$cacheKey] ?? null;
-    }
-
-    private static function blacklistedAtForTransfer(DownloadTransfer $transfer): ?string
-    {
-        $cacheKey = self::cacheKeyForTransfer($transfer);
-        if (! array_key_exists($cacheKey, self::$blacklistedAtCacheByTransferId)) {
-            self::listingMetadataForTransfer($transfer);
-        }
-
-        return self::$blacklistedAtCacheByTransferId[$cacheKey] ?? null;
-    }
-
-    private static function cacheKeyForTransfer(DownloadTransfer $transfer): string
-    {
-        $createdAt = $transfer->created_at?->format('Y-m-d H:i:s.u') ?? 'na';
-        $urlHash = hash('sha256', (string) ($transfer->url ?? ''));
-
-        return "{$transfer->id}:{$transfer->file_id}:{$createdAt}:{$urlHash}";
-    }
-
-    private static function reactionPairKey(int $fileId, int $userId): string
-    {
-        return "{$fileId}:{$userId}";
+        return $transfer->file()
+            ->select(['id', 'listing_metadata', 'referrer_url', 'downloaded_at', 'blacklisted_at'])
+            ->first();
     }
 
     private static function hasListingMetadataAttribute(File $file): bool
