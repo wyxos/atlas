@@ -175,13 +175,13 @@ $requestedBump = isset($options['bump']) ? trim((string) $options['bump']) : nul
 $bumpIfExtensionChanged = array_key_exists('bump-if-extension-changed', $options);
 $requestedOutputDirectory = isset($options['output-dir']) ? trim((string) $options['output-dir']) : null;
 $requestedExtractDirectory = isset($options['extract-dir']) ? trim((string) $options['extract-dir']) : null;
-$envPackageDirectory = getenv('EXTENSION_LOCAL_PACKAGE_DIR');
-if ($envPackageDirectory === false || trim((string) $envPackageDirectory) === '') {
-    $envPackageDirectory = readDotEnvValue($dotenvPath, 'EXTENSION_LOCAL_PACKAGE_DIR');
-}
 $envExtractDirectory = getenv('EXTENSION_LOCAL_EXTRACT_DIR');
 if ($envExtractDirectory === false || trim((string) $envExtractDirectory) === '') {
     $envExtractDirectory = readDotEnvValue($dotenvPath, 'EXTENSION_LOCAL_EXTRACT_DIR');
+}
+$envPackageDirectory = getenv('EXTENSION_LOCAL_PACKAGE_DIR');
+if ($envPackageDirectory === false || trim((string) $envPackageDirectory) === '') {
+    $envPackageDirectory = readDotEnvValue($dotenvPath, 'EXTENSION_LOCAL_PACKAGE_DIR');
 }
 
 if ($requestedVersion !== null && $requestedVersion !== '' && parseSemver($requestedVersion) === null) {
@@ -298,10 +298,6 @@ if (! file_exists($distDirectory.'/content.js')) {
     exit(1);
 }
 
-if (($requestedOutputDirectory === null || $requestedOutputDirectory === '') && is_string($envPackageDirectory) && trim($envPackageDirectory) !== '') {
-    $requestedOutputDirectory = trim($envPackageDirectory);
-}
-
 if ($requestedOutputDirectory === null || $requestedOutputDirectory === '') {
     $downloadsDirectory = $defaultDownloadsDirectory;
 } else {
@@ -347,12 +343,13 @@ if (! copy($versionedArchive, $latestArchive)) {
 fwrite(STDOUT, "Created extension package: {$versionedArchive}\n");
 fwrite(STDOUT, "Updated latest package: {$latestArchive}\n");
 
-if (($requestedExtractDirectory === null || $requestedExtractDirectory === '') && is_string($envExtractDirectory) && trim($envExtractDirectory) !== '') {
-    $requestedExtractDirectory = trim($envExtractDirectory);
-}
-
-if (($requestedExtractDirectory === null || $requestedExtractDirectory === '') && is_string($envPackageDirectory) && trim($envPackageDirectory) !== '') {
-    $requestedExtractDirectory = trim($envPackageDirectory);
+if ($requestedExtractDirectory === null || $requestedExtractDirectory === '') {
+    if (is_string($envExtractDirectory) && trim($envExtractDirectory) !== '') {
+        $requestedExtractDirectory = trim($envExtractDirectory);
+    } elseif (is_string($envPackageDirectory) && trim($envPackageDirectory) !== '') {
+        // Keep the old env var working as a local unpacked extension target.
+        $requestedExtractDirectory = trim($envPackageDirectory);
+    }
 }
 
 if ($requestedExtractDirectory !== null && $requestedExtractDirectory !== '') {
