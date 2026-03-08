@@ -19,8 +19,8 @@ describe('download-progress-bus', () => {
 
         mockConnectRuntimeReverb.mockResolvedValue({
             kind: 'connected',
-            domain: 'https://atlas-v2.test',
-            endpoint: 'https://atlas-v2.test:443',
+            domain: 'https://atlas.test',
+            endpoint: 'https://atlas.test:443',
             client: {
                 onEvent: (handler: typeof eventHandler) => {
                     eventHandler = handler;
