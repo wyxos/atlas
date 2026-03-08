@@ -177,7 +177,7 @@ After you've finished editing
   - Types: `resources/js/types/`
   - UI design system: `resources/js/components/ui/` → [see resources/js/components/ui/AGENTS.md](resources/js/components/ui/AGENTS.md)
 - **Browser Extension Source**: `extension/` (Vite + Vue + TypeScript, popup entry: `extension/popup.html`)
-  - Build + package command: `npm run package:extension` (creates `public/downloads/atlas-extension.zip` and a versioned archive)
+  - Build + package command: `npm run package:extension` (creates `public/downloads/atlas-extension.zip` and a versioned archive; if `EXTENSION_LOCAL_EXTRACT_DIR` or legacy `EXTENSION_LOCAL_PACKAGE_DIR` is set, it also refreshes a local unpacked extension folder)
   - Version bump helpers: `npm run package:extension -- --bump=patch|minor|major` or set explicit version with `npm run package:extension -- --version=1.2.3`
   - Content script build gotcha: if `extension/vite.content.config.ts` builds a `.vue` import, keep `@vitejs/plugin-vue` enabled there, set `build.lib.cssFileName`, and include the emitted CSS file in `manifest.json` `content_scripts[].css`.
   - Extension automation gotcha: Chrome stable no longer reliably honors `--load-extension` for side-loaded unpacked extensions; use Brave/Chromium with an isolated `userDataDir` for automated extension testing so it does not collide with a live profile.
