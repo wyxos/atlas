@@ -40,12 +40,17 @@ class QueueMissingPreviewAssets extends Command
                     ->whereNull('preview_path')
                     // Missing poster for videos
                     ->orWhere(function ($q) {
-                        $q->where('mime_type', 'like', 'video/%')->whereNull('poster_path');
+                        $q->where(function ($qq) {
+                            $qq->where('mime_type', 'like', 'video/%')
+                                ->orWhere('mime_type', 'application/mp4');
+                        })->whereNull('poster_path');
                     });
             })
             ->where(function ($q) {
                 // Only queue jobs that can actually produce assets.
-                $q->where('mime_type', 'like', 'image/%')->orWhere('mime_type', 'like', 'video/%');
+                $q->where('mime_type', 'like', 'image/%')
+                    ->orWhere('mime_type', 'like', 'video/%')
+                    ->orWhere('mime_type', 'application/mp4');
             })
             ->orderBy('id');
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ActionType;
+use App\Support\FileMimeType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -226,18 +227,7 @@ class File extends Model
         }
 
         // mime_group for easy filtering - always calculate from current mime_type
-        $mime = $this->mime_type ? (string) $this->mime_type : '';
-        if ($mime === '') {
-            $array['mime_group'] = 'other';
-        } elseif (str_starts_with($mime, 'audio/')) {
-            $array['mime_group'] = 'audio';
-        } elseif (str_starts_with($mime, 'video/')) {
-            $array['mime_group'] = 'video';
-        } elseif (str_starts_with($mime, 'image/')) {
-            $array['mime_group'] = 'image';
-        } else {
-            $array['mime_group'] = 'other';
-        }
+        $array['mime_group'] = FileMimeType::category($this->mime_type);
 
         // Include metadata fields if available
         if ($this->metadata && $this->metadata->payload) {

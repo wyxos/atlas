@@ -1,5 +1,14 @@
 export type MimeTypeCategory = 'image' | 'video' | 'audio' | 'other' | 'unknown';
 
+function normalizeMimeType(mimeType: string | null | undefined): string {
+    return typeof mimeType === 'string' ? mimeType.trim().toLowerCase() : '';
+}
+
+export function isVideoMimeType(mimeType: string | null | undefined): boolean {
+    const normalized = normalizeMimeType(mimeType);
+    return normalized.startsWith('video/') || normalized === 'application/mp4';
+}
+
 export function formatFileSize(bytes: number | null): string {
     if (bytes === null || bytes === 0) {
         return '0 B';
@@ -13,16 +22,17 @@ export function formatFileSize(bytes: number | null): string {
 }
 
 export function getMimeTypeCategory(mimeType: string | null): MimeTypeCategory {
-    if (!mimeType) {
+    const normalized = normalizeMimeType(mimeType);
+    if (!normalized) {
         return 'unknown';
     }
-    if (mimeType.startsWith('image/')) {
+    if (normalized.startsWith('image/')) {
         return 'image';
     }
-    if (mimeType.startsWith('video/')) {
+    if (isVideoMimeType(normalized)) {
         return 'video';
     }
-    if (mimeType.startsWith('audio/')) {
+    if (normalized.startsWith('audio/')) {
         return 'audio';
     }
     return 'other';
@@ -39,4 +49,3 @@ export function getMimeTypeBadgeClasses(mimeType: string | null): string {
     };
     return classMap[category];
 }
-

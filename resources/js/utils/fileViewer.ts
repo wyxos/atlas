@@ -5,6 +5,7 @@
  * for consistency and safer refactors.
  */
 import type { FeedItem } from '@/composables/useTabs';
+import { getMimeTypeCategory } from '@/utils/file';
 
 export type FileViewerOverlayMediaType = 'image' | 'video' | 'audio' | 'file';
 
@@ -85,10 +86,10 @@ export function resolveFileViewerMediaType(item: FeedItem): FileViewerOverlayMed
         return kind;
     }
 
-    const mime = typeof item.mime_type === 'string' ? item.mime_type : '';
-    if (mime.startsWith('video/')) return 'video';
-    if (mime.startsWith('image/')) return 'image';
-    if (mime.startsWith('audio/')) return 'audio';
+    const mimeCategory = getMimeTypeCategory(typeof item.mime_type === 'string' ? item.mime_type : null);
+    if (mimeCategory === 'video') return 'video';
+    if (mimeCategory === 'image') return 'image';
+    if (mimeCategory === 'audio') return 'audio';
 
     return item.type === 'video' ? 'video' : 'image';
 }

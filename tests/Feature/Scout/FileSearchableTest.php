@@ -51,6 +51,7 @@ it('correctly maps mime types to mime groups', function (string $mimeType, strin
 })->with([
     ['image/jpeg', 'image'],
     ['image/png', 'image'],
+    ['application/mp4', 'video'],
     ['video/mp4', 'video'],
     ['video/webm', 'video'],
     ['audio/mpeg', 'audio'],
