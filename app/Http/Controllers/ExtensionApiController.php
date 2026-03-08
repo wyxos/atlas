@@ -8,6 +8,7 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use App\Services\BrowsePersister;
+use App\Services\Extension\ExtensionContainerMetadataService;
 use App\Services\Extension\ExtensionMediaMatchService;
 use App\Services\ExtensionApiKeyService;
 use App\Services\FileReactionService;
@@ -115,6 +116,7 @@ class ExtensionApiController extends Controller
     public function react(
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
+        ExtensionContainerMetadataService $containerMetadataService,
         FileReactionService $fileReactionService,
     ): JsonResponse {
         $user = $this->resolveExtensionUser($request, $extensionApiKey);
@@ -144,7 +146,11 @@ class ExtensionApiController extends Controller
         ]);
 
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
-        $listingMetadataOverrides = $this->singleListingMetadataOverrides($validated);
+        $listingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
+            $validated['referrer_url_hash_aware'] ?? null,
+            $validated['referrer_url'] ?? null,
+            $validated['page_url'] ?? null,
+        ], includePostContainer: false);
         $payload = $this->processReactionItem(
             $validated,
             $validated['type'],
@@ -165,6 +171,7 @@ class ExtensionApiController extends Controller
     public function reactBatch(
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
+        ExtensionContainerMetadataService $containerMetadataService,
         FileReactionService $fileReactionService,
     ): JsonResponse {
         $user = $this->resolveExtensionUser($request, $extensionApiKey);
@@ -198,7 +205,12 @@ class ExtensionApiController extends Controller
 
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
         $runtimeContext = $this->downloadRuntimeContext($validated, $request);
-        $listingMetadataOverrides = $this->batchListingMetadataOverrides($validated['items']);
+        $firstItem = $validated['items'][0] ?? [];
+        $listingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
+            is_array($firstItem) ? ($firstItem['referrer_url_hash_aware'] ?? null) : null,
+            is_array($firstItem) ? ($firstItem['referrer_url'] ?? null) : null,
+            is_array($firstItem) ? ($firstItem['page_url'] ?? null) : null,
+        ], includePostContainer: true);
         $batchItems = [];
         $primaryPayload = null;
         $primaryCandidateId = $validated['primary_candidate_id'];
@@ -534,149 +546,6 @@ class ExtensionApiController extends Controller
                 ->whereIn('id', array_values(array_unique($fileIds)))
                 ->get()
         );
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $items
-     * @return array<string, string>
-     */
-    private function batchListingMetadataOverrides(array $items): array
-    {
-        $firstItem = $items[0] ?? null;
-        if (! is_array($firstItem)) {
-            return [];
-        }
-
-        return $this->containerMetadataOverridesFromCandidates([
-            $firstItem['referrer_url_hash_aware'] ?? null,
-            $firstItem['referrer_url'] ?? null,
-            $firstItem['page_url'] ?? null,
-        ], includePostContainer: true);
-    }
-
-    /**
-     * @param  array<string, mixed>  $item
-     * @return array<string, string>
-     */
-    private function singleListingMetadataOverrides(array $item): array
-    {
-        return $this->containerMetadataOverridesFromCandidates([
-            $item['referrer_url_hash_aware'] ?? null,
-            $item['referrer_url'] ?? null,
-            $item['page_url'] ?? null,
-        ], includePostContainer: false);
-    }
-
-    /**
-     * @param  list<mixed>  $candidateUrls
-     * @return array<string, string>
-     */
-    private function containerMetadataOverridesFromCandidates(array $candidateUrls, bool $includePostContainer): array
-    {
-        $containerUrl = null;
-        foreach ($candidateUrls as $candidateUrl) {
-            $containerUrl = $this->normalizeUrl(is_string($candidateUrl) ? $candidateUrl : null);
-            if ($containerUrl !== null) {
-                break;
-            }
-        }
-
-        if ($containerUrl === null) {
-            return [];
-        }
-
-        $source = $this->containerSourceFromUrl($containerUrl);
-        if ($source !== 'deviantart.com') {
-            return [];
-        }
-
-        $postContainerOverrides = $includePostContainer
-            ? [
-                'post_container_referrer_url' => $containerUrl,
-                'post_container_source' => $source,
-            ]
-            : [];
-
-        return array_filter(
-            [
-                ...$postContainerOverrides,
-                ...$this->userContainerOverridesFromUrl($containerUrl, $source),
-            ],
-            static fn (?string $value): bool => $value !== null && $value !== ''
-        );
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function userContainerOverridesFromUrl(string $url, ?string $source): array
-    {
-        if ($source !== 'deviantart.com') {
-            return [];
-        }
-
-        $path = parse_url($url, PHP_URL_PATH);
-        if (! is_string($path)) {
-            return [];
-        }
-
-        $segments = array_values(array_filter(explode('/', trim($path, '/'))));
-        $username = $segments[0] ?? null;
-        if (! is_string($username) || ! $this->isValidDeviantArtUsernameSegment($username)) {
-            return [];
-        }
-
-        return [
-            'user_container_source' => $source,
-            'user_container_source_id' => $username,
-            'user_container_referrer_url' => "https://www.deviantart.com/{$username}/gallery",
-        ];
-    }
-
-    private function isValidDeviantArtUsernameSegment(string $value): bool
-    {
-        $normalized = strtolower(trim($value));
-        if ($normalized === '') {
-            return false;
-        }
-
-        if (in_array($normalized, [
-            'about',
-            'art',
-            'browse',
-            'daily-deviations',
-            'gallery',
-            'morelikethis',
-            'notifications',
-            'prints',
-            'search',
-            'settings',
-            'shop',
-            'watch',
-        ], true)) {
-            return false;
-        }
-
-        return preg_match('/^[a-z0-9_-]+$/i', $value) === 1;
-    }
-
-    private function containerSourceFromUrl(string $url): ?string
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-        if (! is_string($host)) {
-            return null;
-        }
-
-        $normalizedHost = strtolower(trim($host));
-        if ($normalizedHost === '') {
-            return null;
-        }
-
-        if ($normalizedHost === 'deviantart.com' || str_ends_with($normalizedHost, '.deviantart.com')) {
-            return 'deviantart.com';
-        }
-
-        return preg_replace('/^www\./', '', $normalizedHost) ?: null;
     }
 
     private function extensionChannelHash(string $apiKey): string
