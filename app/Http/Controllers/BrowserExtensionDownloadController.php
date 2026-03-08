@@ -13,19 +13,26 @@ class BrowserExtensionDownloadController extends Controller
             abort(404, 'Extension download is not available yet.');
         }
 
-        $extensionArchives = glob($downloadsDirectory.DIRECTORY_SEPARATOR.'atlas-extension*.zip') ?: [];
-        if ($extensionArchives === []) {
-            abort(404, 'Extension download is not available yet.');
+        $latestArchivePath = $downloadsDirectory.DIRECTORY_SEPARATOR.'atlas-extension.zip';
+        if (! is_file($latestArchivePath)) {
+            $extensionArchives = glob($downloadsDirectory.DIRECTORY_SEPARATOR.'atlas-extension-*.zip') ?: [];
+            if ($extensionArchives === []) {
+                abort(404, 'Extension download is not available yet.');
+            }
+
+            usort($extensionArchives, static function (string $left, string $right): int {
+                $leftModifiedAt = filemtime($left) ?: 0;
+                $rightModifiedAt = filemtime($right) ?: 0;
+
+                return $rightModifiedAt <=> $leftModifiedAt;
+            });
+
+            $latestArchivePath = $extensionArchives[0];
         }
 
-        usort($extensionArchives, static function (string $left, string $right): int {
-            $leftModifiedAt = filemtime($left) ?: 0;
-            $rightModifiedAt = filemtime($right) ?: 0;
-
-            return $rightModifiedAt <=> $leftModifiedAt;
-        });
-
-        $latestArchivePath = $extensionArchives[0];
+        if (! is_file($latestArchivePath)) {
+            abort(404, 'Extension download is not available yet.');
+        }
 
         return response()->download(
             $latestArchivePath,

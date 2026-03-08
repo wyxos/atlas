@@ -31,7 +31,7 @@ test-results/
 /resources/js/actions
 /resources/js/routes
 /extension/dist
-/public/downloads/atlas-extension*.zip
+/public/downloads/atlas-extension-*.zip
 package-lock.json
 .zephyr/
 /tasks
