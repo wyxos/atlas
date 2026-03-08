@@ -8,7 +8,9 @@ import {
 
 describe('atlas-request-log', () => {
     beforeEach(() => {
+        vi.restoreAllMocks();
         vi.unstubAllGlobals();
+        document.body.innerHTML = '';
         clearAtlasRequestLog();
     });
 
@@ -36,7 +38,39 @@ describe('atlas-request-log', () => {
         expect(entry.timestamp).toBeTypeOf('string');
     });
 
+    it('shows a toast and logs to the console for non-ok fetch responses', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Server error' }), { status: 500 })));
+
+        const response = await atlasLoggedFetch(
+            'https://atlas.test/api/extension/badges/checks',
+            'POST',
+            { items: [{ request_id: 'req-1' }] },
+            {
+                method: 'POST',
+                body: JSON.stringify({ items: [{ request_id: 'req-1' }] }),
+            },
+        );
+
+        expect(response.status).toBe(500);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[Atlas Extension] Request failed',
+            expect.objectContaining({
+                endpoint: 'https://atlas.test/api/extension/badges/checks',
+                method: 'POST',
+                status: 500,
+                responsePayload: { message: 'Server error' },
+            }),
+        );
+
+        const toast = document.querySelector('[data-atlas-request-failure-toast="1"]');
+        expect(toast).not.toBeNull();
+        expect(toast?.textContent).toContain('Atlas request failed (500).');
+        expect((toast as HTMLElement).style.pointerEvents).toBe('auto');
+    });
+
     it('logs runtime unavailable state and response payload when present', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const unavailable = await atlasLoggedRuntimeRequest(
             'https://atlas.test/api/extension/reactions',
             'POST',
@@ -47,6 +81,8 @@ describe('atlas-request-log', () => {
         expect(unavailable).toBeNull();
         const first = getAtlasRequestLogSnapshot()[0];
         expect(first.status).toBe('runtime_unavailable');
+        expect(consoleError).not.toHaveBeenCalled();
+        expect(document.querySelector('[data-atlas-request-failure-toast="1"]')).toBeNull();
 
         const response = await atlasLoggedRuntimeRequest(
             'https://atlas.test/api/extension/reactions',
@@ -63,6 +99,36 @@ describe('atlas-request-log', () => {
         const latest = getAtlasRequestLogSnapshot()[0];
         expect(latest.status).toBe(200);
         expect(latest.responsePayload).toEqual({ reaction: 'like' });
+    });
+
+    it('shows a toast and logs to the console for non-ok runtime responses', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const response = await atlasLoggedRuntimeRequest(
+            'https://atlas.test/api/extension/reactions',
+            'POST',
+            { type: 'like' },
+            async () => ({
+                ok: false,
+                status: 401,
+                payload: { message: 'Invalid API key' },
+            }),
+        );
+
+        expect(response?.ok).toBe(false);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[Atlas Extension] Request failed',
+            expect.objectContaining({
+                endpoint: 'https://atlas.test/api/extension/reactions',
+                method: 'POST',
+                status: 401,
+                responsePayload: { message: 'Invalid API key' },
+            }),
+        );
+
+        const toast = document.querySelector('[data-atlas-request-failure-toast="1"]');
+        expect(toast).not.toBeNull();
+        expect(toast?.textContent).toContain('Atlas request failed (401).');
     });
 
     it('retains only the latest 20 request entries', async () => {

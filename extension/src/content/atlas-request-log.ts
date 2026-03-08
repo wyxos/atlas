@@ -1,3 +1,8 @@
+import {
+    clearAtlasRequestFailureFeedback,
+    reportAtlasRequestFailure,
+} from './atlas-request-failure-feedback';
+
 export type AtlasRequestStatus = number | 'runtime_unavailable' | 'network_error';
 
 export type AtlasRequestLogEntry = {
@@ -101,6 +106,7 @@ export function subscribeToAtlasRequestLog(listener: AtlasRequestListener): () =
 
 export function clearAtlasRequestLog(): void {
     entries = [];
+    clearAtlasRequestFailureFeedback();
     notifyListeners();
 }
 
@@ -128,16 +134,33 @@ export async function atlasLoggedFetch(
             status: response.status,
             durationMs: resolveDurationMs(startedAt),
         });
+        if (!response.ok) {
+            reportAtlasRequestFailure({
+                endpoint,
+                method,
+                requestPayload,
+                responsePayload,
+                status: response.status,
+            });
+        }
 
         return response;
     } catch (error) {
+        const responsePayload = error instanceof Error ? error.message : 'Request failed';
         pushLogEntry({
             endpoint,
             method,
             requestPayload,
-            responsePayload: error instanceof Error ? error.message : 'Request failed',
+            responsePayload,
             status: 'network_error',
             durationMs: resolveDurationMs(startedAt),
+        });
+        reportAtlasRequestFailure({
+            endpoint,
+            method,
+            requestPayload,
+            responsePayload,
+            status: 'network_error',
         });
 
         throw error;
@@ -174,16 +197,33 @@ export async function atlasLoggedRuntimeRequest(
             status: runtimeResponse.status,
             durationMs: resolveDurationMs(startedAt),
         });
+        if (!runtimeResponse.ok) {
+            reportAtlasRequestFailure({
+                endpoint,
+                method,
+                requestPayload,
+                responsePayload: runtimeResponse.payload,
+                status: runtimeResponse.status,
+            });
+        }
 
         return runtimeResponse;
     } catch (error) {
+        const responsePayload = error instanceof Error ? error.message : 'Runtime request failed';
         pushLogEntry({
             endpoint,
             method,
             requestPayload,
-            responsePayload: error instanceof Error ? error.message : 'Runtime request failed',
+            responsePayload,
             status: 'network_error',
             durationMs: resolveDurationMs(startedAt),
+        });
+        reportAtlasRequestFailure({
+            endpoint,
+            method,
+            requestPayload,
+            responsePayload,
+            status: 'network_error',
         });
 
         throw error;
