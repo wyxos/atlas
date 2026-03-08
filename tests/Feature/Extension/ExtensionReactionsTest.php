@@ -247,6 +247,18 @@ test('extension batch reactions queue all submitted gallery items and return the
         ->toBe('deviantart.com');
     expect(data_get($secondFile?->listing_metadata, 'post_container_source'))
         ->toBe('deviantart.com');
+    expect(data_get($firstFile?->listing_metadata, 'user_container_source'))
+        ->toBe('deviantart.com');
+    expect(data_get($secondFile?->listing_metadata, 'user_container_source'))
+        ->toBe('deviantart.com');
+    expect(data_get($firstFile?->listing_metadata, 'user_container_source_id'))
+        ->toBe('artist');
+    expect(data_get($secondFile?->listing_metadata, 'user_container_source_id'))
+        ->toBe('artist');
+    expect(data_get($firstFile?->listing_metadata, 'user_container_referrer_url'))
+        ->toBe('https://www.deviantart.com/artist/gallery');
+    expect(data_get($secondFile?->listing_metadata, 'user_container_referrer_url'))
+        ->toBe('https://www.deviantart.com/artist/gallery');
 
     expect(Reaction::query()
         ->where('user_id', $user->id)
@@ -274,5 +286,68 @@ test('extension batch reactions queue all submitted gallery items and return the
     expect($firstFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
     expect($secondFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
 
+    $this->assertDatabaseHas('containers', [
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => 'artist',
+        'referrer' => 'https://www.deviantart.com/artist/gallery',
+    ]);
+
+    $userContainer = Container::query()
+        ->where('type', 'User')
+        ->where('source', 'deviantart.com')
+        ->where('source_id', 'artist')
+        ->first();
+
+    expect($userContainer)->not->toBeNull();
+    expect($firstFile?->containers()->where('containers.id', $userContainer?->id)->exists())->toBeTrue();
+    expect($secondFile?->containers()->where('containers.id', $userContainer?->id)->exists())->toBeTrue();
+
     Queue::assertPushed(DownloadFile::class, 2);
+});
+
+test('extension batch reactions create a user container for deviantart gallery urls', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $galleryUrl = 'https://www.deviantart.com/aipayop/gallery';
+
+    $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions/batch', [
+        'type' => 'like',
+        'primary_candidate_id' => 'image-1',
+        'items' => [
+            [
+                'candidate_id' => 'image-1',
+                'url' => 'https://images.example.test/gallery-image-1.jpg',
+                'referrer_url_hash_aware' => $galleryUrl,
+                'page_url' => $galleryUrl,
+                'tag_name' => 'img',
+            ],
+            [
+                'candidate_id' => 'image-2',
+                'url' => 'https://images.example.test/gallery-image-2.jpg',
+                'referrer_url_hash_aware' => $galleryUrl,
+                'page_url' => $galleryUrl,
+                'tag_name' => 'img',
+            ],
+        ],
+    ])->assertSuccessful();
+
+    $this->assertDatabaseHas('containers', [
+        'type' => 'Post',
+        'source' => 'deviantart.com',
+        'source_id' => $galleryUrl,
+        'referrer' => $galleryUrl,
+    ]);
+
+    $this->assertDatabaseHas('containers', [
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => 'aipayop',
+        'referrer' => 'https://www.deviantart.com/aipayop/gallery',
+    ]);
 });

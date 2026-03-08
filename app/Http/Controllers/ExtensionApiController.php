@@ -551,7 +551,62 @@ class ExtensionApiController extends Controller
         return array_filter([
             'post_container_referrer_url' => $postContainerReferrerUrl,
             'post_container_source' => $source,
+            ...$this->userContainerOverridesFromUrl($postContainerReferrerUrl, $source),
         ], static fn (?string $value): bool => $value !== null && $value !== '');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function userContainerOverridesFromUrl(string $url, ?string $source): array
+    {
+        if ($source !== 'deviantart.com') {
+            return [];
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! is_string($path)) {
+            return [];
+        }
+
+        $segments = array_values(array_filter(explode('/', trim($path, '/'))));
+        $username = $segments[0] ?? null;
+        if (! is_string($username) || ! $this->isValidDeviantArtUsernameSegment($username)) {
+            return [];
+        }
+
+        return [
+            'user_container_source' => $source,
+            'user_container_source_id' => $username,
+            'user_container_referrer_url' => "https://www.deviantart.com/{$username}/gallery",
+        ];
+    }
+
+    private function isValidDeviantArtUsernameSegment(string $value): bool
+    {
+        $normalized = strtolower(trim($value));
+        if ($normalized === '') {
+            return false;
+        }
+
+        if (in_array($normalized, [
+            'about',
+            'art',
+            'browse',
+            'daily-deviations',
+            'gallery',
+            'morelikethis',
+            'notifications',
+            'prints',
+            'search',
+            'settings',
+            'shop',
+            'watch',
+        ], true)) {
+            return false;
+        }
+
+        return preg_match('/^[a-z0-9_-]+$/i', $value) === 1;
     }
 
     private function containerSourceFromUrl(string $url): ?string
