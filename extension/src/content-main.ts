@@ -1,14 +1,12 @@
 import { getStoredOptions } from './atlas-options';
-import { DEFAULT_MATCH_RULES, urlMatchesAnyRule, type UrlMatchRule } from './match-rules';
+import { DEFAULT_MATCH_RULES, type UrlMatchRule } from './match-rules';
 import {
     collectMediaFromNode,
     isMediaElement,
-    normalizeUrl,
     resolveMediaResolution,
-    resolveReactionTargetUrl,
-    shouldExcludeMediaOrAnchorUrl,
     type MediaElement,
 } from './content/media-utils';
+import { mediaMatchesRulesForPage } from './content/media-rule-match';
 import { OverlayManager } from './content/overlay-manager';
 import { createAnchorMediaRuntime } from './content/anchor-media-runtime';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
@@ -28,13 +26,7 @@ const anchorMediaRuntime = createAnchorMediaRuntime({
 });
 
 function mediaMatchesRules(element: MediaElement): boolean {
-    const pageUrl = normalizeUrl(window.location.href);
-    const mediaUrl = resolveReactionTargetUrl(element, pageUrl);
-    if (mediaUrl === null || shouldExcludeMediaOrAnchorUrl(mediaUrl)) {
-        return false;
-    }
-
-    return urlMatchesAnyRule(mediaUrl, currentRules, currentPageHostname);
+    return mediaMatchesRulesForPage(element, window.location.href, currentRules, currentPageHostname);
 }
 
 function mediaHasEligibleWidgetWidth(element: MediaElement): boolean {
