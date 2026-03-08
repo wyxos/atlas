@@ -5,6 +5,7 @@ namespace App\Services\Downloads;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Services\MetricsService;
+use App\Support\FileMimeType;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -29,7 +30,7 @@ class FileDownloadFinalizer
         }
 
         $absolutePath = $disk->path($file->path);
-        $mimeType = $file->mime_type ?? $this->getMimeTypeFromFile($absolutePath);
+        $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->getMimeTypeFromFile($absolutePath));
 
         $updates = [];
 
@@ -101,13 +102,16 @@ class FileDownloadFinalizer
 
         // Ensure mime_type/ext reflect the actual downloaded file. This matters for yt-dlp downloads
         // where the source URL can be a page URL (text/html), not a direct media URL.
-        $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
+        $mimeType = FileMimeType::canonicalize($this->getMimeTypeFromFile($absolutePath, $contentTypeHeader));
+        $currentMimeType = FileMimeType::canonicalize($file->mime_type);
+        $resolvedMimeType = $mimeType ?? $currentMimeType;
         if (
             ! $file->mime_type
             || $file->mime_type === 'application/octet-stream'
             || str_starts_with((string) $file->mime_type, 'text/')
+            || $currentMimeType !== $file->mime_type
         ) {
-            $updates['mime_type'] = $mimeType;
+            $updates['mime_type'] = $resolvedMimeType;
         }
         if (! $file->ext || $file->ext === 'bin') {
             $updates['ext'] = $extension;
@@ -118,14 +122,14 @@ class FileDownloadFinalizer
         }
 
         if ($generatePreviews) {
-            if ($this->isImageMimeType($mimeType)) {
+            if ($this->isImageMimeType($resolvedMimeType)) {
                 $this->persistImageDimensions($file, $absolutePath);
                 $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
                 if ($previewPath) {
                     $updates['preview_path'] = $previewPath;
                 }
             }
-            if ($this->isVideoMimeType($mimeType)) {
+            if ($this->isVideoMimeType($resolvedMimeType)) {
                 [$previewPath, $posterPath] = $this->generateVideoPreview($disk, $absolutePath, $finalPath);
 
                 if ($previewPath) {
@@ -285,11 +289,7 @@ class FileDownloadFinalizer
 
     private function isVideoMimeType(?string $mimeType): bool
     {
-        if (! $mimeType) {
-            return false;
-        }
-
-        return str_starts_with(strtolower($mimeType), 'video/');
+        return FileMimeType::isVideo($mimeType);
     }
 
     /**

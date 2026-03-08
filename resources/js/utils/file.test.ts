@@ -42,6 +42,7 @@ describe('file', () => {
         });
 
         it('categorizes video mime types', () => {
+            expect(getMimeTypeCategory('application/mp4')).toBe('video');
             expect(getMimeTypeCategory('video/mp4')).toBe('video');
             expect(getMimeTypeCategory('video/webm')).toBe('video');
         });

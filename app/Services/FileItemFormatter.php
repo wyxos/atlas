@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Container;
 use App\Models\File;
+use App\Support\FileMimeType;
 use Illuminate\Database\Eloquent\Collection;
 
 class FileItemFormatter
@@ -116,10 +117,9 @@ class FileItemFormatter
                 }
             }
 
-            $mime = $file->mime_type ? (string) $file->mime_type : '';
-            $isVideo = $mime !== '' && str_starts_with($mime, 'video/');
-            $isImage = $mime !== '' && str_starts_with($mime, 'image/');
-            $isAudio = $mime !== '' && str_starts_with($mime, 'audio/');
+            $isVideo = FileMimeType::isVideo($file->mime_type);
+            $isImage = FileMimeType::isImage($file->mime_type);
+            $isAudio = FileMimeType::isAudio($file->mime_type);
 
             // Vibe currently only knows how to load "image" and "video" items.
             // For audio/other files, use an icon SVG as the preview image, but keep the real

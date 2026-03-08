@@ -3,7 +3,7 @@ import { Download, FileText, Copy, ExternalLink } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '../utils/date';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatFileSize, getMimeTypeBadgeClasses } from '../utils/file';
+import { formatFileSize, getMimeTypeBadgeClasses, getMimeTypeCategory } from '../utils/file';
 import { openUrl } from '../utils/url';
 import type { File } from '../types/file';
 
@@ -234,14 +234,14 @@ defineProps<Props>();
                         </div>
                         <div class="mt-2">
                             <img
-                                v-if="file.mime_type?.startsWith('image/')"
+                                v-if="getMimeTypeCategory(file.mime_type) === 'image'"
                                 :src="file.preview_url"
                                 :alt="`Preview for ${file.filename}`"
                                 class="max-w-xs max-h-48 rounded border border-twilight-indigo-500"
                                 @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }"
                             />
                             <video
-                                v-else-if="file.mime_type?.startsWith('video/')"
+                                v-else-if="getMimeTypeCategory(file.mime_type) === 'video'"
                                 :src="file.preview_url"
                                 class="max-w-xs max-h-48 rounded border border-twilight-indigo-500"
                                 muted

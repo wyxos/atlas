@@ -25,6 +25,14 @@ test('atlas:queue-missing-previews dispatches jobs for downloaded files missing 
         'poster_path' => null,
     ]);
 
+    $legacyVideo = File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/legacy.mp4',
+        'mime_type' => 'application/mp4',
+        'preview_path' => 'previews/legacy.webp',
+        'poster_path' => null,
+    ]);
+
     $alreadyOk = File::factory()->create([
         'downloaded' => true,
         'path' => 'downloads/ok.jpg',
@@ -37,6 +45,7 @@ test('atlas:queue-missing-previews dispatches jobs for downloaded files missing 
 
     Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $image->id);
     Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $video->id);
+    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $legacyVideo->id);
     Bus::assertNotDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $alreadyOk->id);
 });
 

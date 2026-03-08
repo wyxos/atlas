@@ -26,6 +26,24 @@ it('uses preview route for downloaded video thumbnails', function () {
     expect($item['original'])->toBe(route('api.files.downloaded', ['file' => $file->id], false));
 });
 
+it('treats application/mp4 as video for remote items', function () {
+    $file = File::factory()->create([
+        'mime_type' => 'application/mp4',
+        'url' => 'https://image.civitai.com/example/video.mp4',
+        'preview_url' => 'https://image.civitai.com/example/preview.mp4',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $items = FileItemFormatter::format([$file], 1);
+    $item = $items[0];
+
+    expect($item['media_kind'])->toBe('video');
+    expect($item['type'])->toBe('video');
+    expect($item['src'])->toBe('https://image.civitai.com/example/preview.mp4');
+    expect($item['original'])->toBe('https://image.civitai.com/example/video.mp4');
+});
+
 it('uses an icon preview for downloaded audio files but keeps the original URL', function () {
     $file = File::factory()->create([
         'mime_type' => 'audio/mpeg',

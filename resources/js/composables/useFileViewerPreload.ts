@@ -1,5 +1,6 @@
 import { ref, watch, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
+import { getMimeTypeCategory } from '@/utils/file';
 
 interface PreloadOptions {
     items: Ref<FeedItem[]>;
@@ -69,13 +70,14 @@ export function useFileViewerPreload({
     function preloadItem(item: FeedItem): void {
         const mediaKind = typeof item.media_kind === 'string' ? item.media_kind : null;
         const mimeType = typeof item.mime_type === 'string' ? item.mime_type : null;
+        const mimeCategory = getMimeTypeCategory(mimeType);
 
         const isVideo = mediaKind === 'video' ||
-            mimeType?.startsWith('video/') ||
+            mimeCategory === 'video' ||
             item.preview?.includes('/video/') ||
             item.original?.includes('/video/');
 
-        const isAudio = mediaKind === 'audio' || mimeType?.startsWith('audio/');
+        const isAudio = mediaKind === 'audio' || mimeCategory === 'audio';
         const isFile = mediaKind === 'file';
 
         if (isVideo) {
