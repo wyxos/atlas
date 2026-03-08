@@ -8,7 +8,7 @@ class BrowserExtensionDownloadController extends Controller
 {
     public function download(): BinaryFileResponse
     {
-        $downloadsDirectory = public_path('downloads');
+        $downloadsDirectory = storage_path('app/browser-extension-downloads');
         if (! is_dir($downloadsDirectory)) {
             abort(404, 'Extension download is not available yet.');
         }

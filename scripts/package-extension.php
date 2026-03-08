@@ -144,7 +144,7 @@ $projectRoot = dirname(__DIR__);
 $extensionRoot = $projectRoot.'/extension';
 $distDirectory = $extensionRoot.'/dist';
 $manifestPath = $extensionRoot.'/manifest.json';
-$defaultDownloadsDirectory = $projectRoot.'/public/downloads';
+$defaultDownloadsDirectory = $projectRoot.'/storage/app/browser-extension-downloads';
 $dotenvPath = $projectRoot.'/.env';
 
 if (! is_dir($distDirectory)) {
