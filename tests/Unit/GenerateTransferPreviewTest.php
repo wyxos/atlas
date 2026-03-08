@@ -6,9 +6,11 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 use function Pest\Laravel\mock;
 
+uses(TestCase::class);
 uses(RefreshDatabase::class);
 
 it('completes the transfer after preview generation', function () {

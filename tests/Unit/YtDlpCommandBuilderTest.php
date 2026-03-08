@@ -1,6 +1,9 @@
 <?php
 
 use App\Services\Downloads\YtDlpCommandBuilder;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 it('builds a yt-dlp command including ffmpeg location and an audio-capable format', function () {
     config()->set('downloads.yt_dlp_path', 'yt-dlp');

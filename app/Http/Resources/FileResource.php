@@ -2,13 +2,14 @@
 
 namespace App\Http\Resources;
 
+use App\Support\FileApiPath;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
 
 class FileResource extends JsonResource
 {
-    private static function toRelativeInternalApiUrl(?string $url): ?string
+    private static function toRelativeInternalApiUrl(?string $url, ?Request $request = null): ?string
     {
         if (! is_string($url) || $url === '') {
             return $url;
@@ -25,7 +26,7 @@ class FileResource extends JsonResource
             return $url;
         }
 
-        $requestHost = request()?->getHost();
+        $requestHost = $request?->getHost();
         if (! is_string($requestHost) || strtolower($requestHost) !== $host) {
             return $url;
         }
@@ -96,10 +97,10 @@ class FileResource extends JsonResource
 
         $diskUrl = null;
         if ($this->downloaded && $this->path) {
-            $diskUrl = route('api.files.downloaded', ['file' => $this->id], false);
+            $diskUrl = FileApiPath::downloaded($this->id);
         }
-        $previewFileUrl = $this->preview_path ? route('api.files.preview', ['file' => $this->id], false) : null;
-        $posterUrl = $this->poster_path ? route('api.files.poster', ['file' => $this->id], false) : null;
+        $previewFileUrl = $this->preview_path ? FileApiPath::preview($this->id) : null;
+        $posterUrl = $this->poster_path ? FileApiPath::poster($this->id) : null;
 
         // For downloaded files, always prefer the local downloaded stream URL.
         $fileUrl = $diskUrl;
@@ -108,18 +109,18 @@ class FileResource extends JsonResource
                 $fileUrl = $this->url;
             } elseif ($this->path) {
                 // Generate URL for local files
-                $fileUrl = route('api.files.serve', ['file' => $this->id], false);
+                $fileUrl = FileApiPath::serve($this->id);
             }
         }
 
         // For downloaded files with generated previews, prefer the internal preview route.
         $previewUrl = $previewFileUrl ?: $this->preview_url;
 
-        $fileUrl = self::toRelativeInternalApiUrl($fileUrl);
-        $diskUrl = self::toRelativeInternalApiUrl($diskUrl);
-        $previewUrl = self::toRelativeInternalApiUrl($previewUrl);
-        $previewFileUrl = self::toRelativeInternalApiUrl($previewFileUrl);
-        $posterUrl = self::toRelativeInternalApiUrl($posterUrl);
+        $fileUrl = self::toRelativeInternalApiUrl($fileUrl, $request);
+        $diskUrl = self::toRelativeInternalApiUrl($diskUrl, $request);
+        $previewUrl = self::toRelativeInternalApiUrl($previewUrl, $request);
+        $previewFileUrl = self::toRelativeInternalApiUrl($previewFileUrl, $request);
+        $posterUrl = self::toRelativeInternalApiUrl($posterUrl, $request);
 
         $blacklistType = null;
         $blacklistRule = null;
