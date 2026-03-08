@@ -136,7 +136,7 @@ function handleOverlayImageAuxClick(event: MouseEvent): void {
 </script>
 
 <template>
-    <div class="relative flex-1 min-h-0 overflow-hidden" :style="overlayMediaStyle">
+    <div class="relative flex-1 min-h-0 h-full w-full overflow-hidden">
         <img v-if="overlay.isLoading" :key="overlay.key + '-preview'" :src="overlay.image?.src"
             :srcset="overlay.image?.srcset" :sizes="overlay.image?.sizes" :alt="overlay.image?.alt" :class="[
                 'absolute select-none pointer-events-none object-cover',

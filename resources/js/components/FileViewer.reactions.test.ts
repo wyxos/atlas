@@ -16,8 +16,21 @@ containerRef.getBoundingClientRect = () => ({
     toJSON: () => ({}),
 });
 
+function clearLocalStorage(): void {
+    const storage = window.localStorage as Storage & Record<string, unknown>;
+
+    if (typeof storage?.clear === 'function') {
+        storage.clear();
+        return;
+    }
+
+    for (const key of Object.keys(storage ?? {})) {
+        delete storage[key];
+    }
+}
+
 beforeEach(() => {
-    window.localStorage.clear();
+    clearLocalStorage();
 
     const mockAxios = {
         post: vi.fn().mockResolvedValue({ data: { seen_count: 1 } }),
