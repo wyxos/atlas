@@ -542,9 +542,31 @@ class ExtensionApiController extends Controller
             }
         }
 
-        return $postContainerReferrerUrl === null
-            ? []
-            : ['post_container_referrer_url' => $postContainerReferrerUrl];
+        if ($postContainerReferrerUrl === null) {
+            return [];
+        }
+
+        $source = $this->containerSourceFromUrl($postContainerReferrerUrl);
+
+        return array_filter([
+            'post_container_referrer_url' => $postContainerReferrerUrl,
+            'post_container_source' => $source,
+        ], static fn (?string $value): bool => $value !== null && $value !== '');
+    }
+
+    private function containerSourceFromUrl(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! is_string($host)) {
+            return null;
+        }
+
+        $normalizedHost = strtolower(trim($host));
+        if ($normalizedHost === '') {
+            return null;
+        }
+
+        return preg_replace('/^www\./', '', $normalizedHost) ?: null;
     }
 
     private function extensionChannelHash(string $apiKey): string
