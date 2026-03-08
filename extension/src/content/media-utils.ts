@@ -80,6 +80,23 @@ export function resolveReactionTargetUrl(element: MediaElement, pageUrl: string 
     return null;
 }
 
+function isBlobUrl(value: string | null | undefined): boolean {
+    return typeof value === 'string' && value.trim().toLowerCase().startsWith('blob:');
+}
+
+export function isBlobBackedVideo(element: MediaElement): boolean {
+    if (!(element instanceof HTMLVideoElement)) {
+        return false;
+    }
+
+    if (isBlobUrl(element.getAttribute('src')) || isBlobUrl(element.src) || isBlobUrl(element.currentSrc)) {
+        return true;
+    }
+
+    return Array.from(element.querySelectorAll('source')).some((source) =>
+        isBlobUrl(source.getAttribute('src')) || isBlobUrl(source.src));
+}
+
 export function resolveIdentifiedMediaResolution(element: MediaElement): MediaResolution | null {
     if (element instanceof HTMLImageElement) {
         const width = element.naturalWidth;
