@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\DownloadFile;
+use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -238,6 +239,10 @@ test('extension batch reactions queue all submitted gallery items and return the
     expect($secondFile)->not->toBeNull();
     expect($firstFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/post-1');
     expect($secondFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/post-1#image-2');
+    expect(data_get($firstFile?->listing_metadata, 'post_container_referrer_url'))
+        ->toBe('https://www.deviantart.com/artist/art/post-1');
+    expect(data_get($secondFile?->listing_metadata, 'post_container_referrer_url'))
+        ->toBe('https://www.deviantart.com/artist/art/post-1');
 
     expect(Reaction::query()
         ->where('user_id', $user->id)
@@ -247,6 +252,23 @@ test('extension batch reactions queue all submitted gallery items and return the
         ->where('user_id', $user->id)
         ->where('file_id', $secondFile?->id)
         ->value('type'))->toBe('like');
+
+    $this->assertDatabaseHas('containers', [
+        'type' => 'Post',
+        'source' => 'extension',
+        'source_id' => 'https://www.deviantart.com/artist/art/post-1',
+        'referrer' => 'https://www.deviantart.com/artist/art/post-1',
+    ]);
+
+    $container = Container::query()
+        ->where('type', 'Post')
+        ->where('source', 'extension')
+        ->where('source_id', 'https://www.deviantart.com/artist/art/post-1')
+        ->first();
+
+    expect($container)->not->toBeNull();
+    expect($firstFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
+    expect($secondFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
 
     Queue::assertPushed(DownloadFile::class, 2);
 });

@@ -7,6 +7,7 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\BrowsePersister;
 use App\Services\Extension\ExtensionMediaMatchService;
 use App\Services\ExtensionApiKeyService;
 use App\Services\FileReactionService;
@@ -194,10 +195,12 @@ class ExtensionApiController extends Controller
 
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
         $runtimeContext = $this->downloadRuntimeContext($validated, $request);
+        $listingMetadataOverrides = $this->batchListingMetadataOverrides($validated['items']);
         $batchItems = [];
         $primaryPayload = null;
         $primaryCandidateId = $validated['primary_candidate_id'];
         $batchDownloadRequested = false;
+        $fileIds = [];
 
         foreach ($validated['items'] as $item) {
             $payload = $this->processReactionItem(
@@ -206,7 +209,8 @@ class ExtensionApiController extends Controller
                 $fileReactionService,
                 $user,
                 $extensionChannel,
-                $runtimeContext
+                $runtimeContext,
+                $listingMetadataOverrides
             );
 
             $candidatePayload = [
@@ -214,6 +218,10 @@ class ExtensionApiController extends Controller
                 ...$payload,
             ];
             $batchItems[] = $candidatePayload;
+            $fileId = data_get($payload, 'file.id');
+            if (is_numeric($fileId)) {
+                $fileIds[] = (int) $fileId;
+            }
             if (data_get($payload, 'download.requested') === true) {
                 $batchDownloadRequested = true;
             }
@@ -227,6 +235,14 @@ class ExtensionApiController extends Controller
             throw ValidationException::withMessages([
                 'primary_candidate_id' => 'The selected primary candidate was not found in the submitted items.',
             ]);
+        }
+
+        if ($listingMetadataOverrides !== [] && $fileIds !== []) {
+            app(BrowsePersister::class)->attachContainersForFiles(
+                File::query()
+                    ->whereIn('id', array_values(array_unique($fileIds)))
+                    ->get()
+            );
         }
 
         return response()->json([
@@ -349,6 +365,7 @@ class ExtensionApiController extends Controller
         int $extensionUserId,
         ?string $pageUrl,
         ?string $tagName,
+        array $listingMetadataOverrides = [],
     ): File {
         $downloadVia = $this->shouldUseYtDlp($url, $pageUrl, $tagName) ? 'yt-dlp' : null;
         $canonicalUrl = $downloadVia === 'yt-dlp' && $pageUrl !== null ? $pageUrl : $url;
@@ -359,6 +376,7 @@ class ExtensionApiController extends Controller
             'page_url' => $pageUrl,
             'tag_name' => $tagName,
             'download_via' => $downloadVia,
+            ...$listingMetadataOverrides,
         ], static fn ($value) => $value !== null && $value !== '');
 
         $file = File::query()
@@ -387,24 +405,22 @@ class ExtensionApiController extends Controller
         }
         $listingMetadata = is_array($file->listing_metadata) ? $file->listing_metadata : [];
         $listingChanged = false;
-        if (($listingMetadata['extension_channel'] ?? null) !== $extensionChannel) {
-            $listingMetadata['extension_channel'] = $extensionChannel;
-            $listingChanged = true;
-        }
-        if (($listingMetadata['extension_user_id'] ?? null) !== $extensionUserId) {
-            $listingMetadata['extension_user_id'] = $extensionUserId;
-            $listingChanged = true;
-        }
-        if ($pageUrl !== null && ($listingMetadata['page_url'] ?? null) !== $pageUrl) {
-            $listingMetadata['page_url'] = $pageUrl;
-            $listingChanged = true;
-        }
-        if ($tagName !== null && ($listingMetadata['tag_name'] ?? null) !== $tagName) {
-            $listingMetadata['tag_name'] = $tagName;
-            $listingChanged = true;
-        }
-        if ($downloadVia !== null && ($listingMetadata['download_via'] ?? null) !== $downloadVia) {
-            $listingMetadata['download_via'] = $downloadVia;
+        foreach ($listingMetadataOverrides + [
+            'extension_channel' => $extensionChannel,
+            'extension_user_id' => $extensionUserId,
+            'page_url' => $pageUrl,
+            'tag_name' => $tagName,
+            'download_via' => $downloadVia,
+        ] as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            if (($listingMetadata[$key] ?? null) === $value) {
+                continue;
+            }
+
+            $listingMetadata[$key] = $value;
             $listingChanged = true;
         }
         if ($listingChanged) {
@@ -439,6 +455,7 @@ class ExtensionApiController extends Controller
     /**
      * @param  array<string, mixed>  $item
      * @param  array<string, mixed>  $runtimeContext
+     * @param  array<string, string>  $listingMetadataOverrides
      * @return array<string, mixed>
      */
     private function processReactionItem(
@@ -448,6 +465,7 @@ class ExtensionApiController extends Controller
         User $user,
         string $extensionChannel,
         array $runtimeContext,
+        array $listingMetadataOverrides = [],
     ): array {
         $url = $this->normalizeUrl($item['url'] ?? null);
         if ($url === null) {
@@ -469,7 +487,8 @@ class ExtensionApiController extends Controller
             $extensionChannel,
             (int) $user->id,
             $pageUrl,
-            $tagName
+            $tagName,
+            $listingMetadataOverrides
         );
         $result = $fileReactionService->set(
             $file,
@@ -498,6 +517,34 @@ class ExtensionApiController extends Controller
             ],
             'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return array<string, string>
+     */
+    private function batchListingMetadataOverrides(array $items): array
+    {
+        $firstItem = $items[0] ?? null;
+        if (! is_array($firstItem)) {
+            return [];
+        }
+
+        $postContainerReferrerUrl = null;
+        foreach ([
+            $firstItem['referrer_url_hash_aware'] ?? null,
+            $firstItem['referrer_url'] ?? null,
+            $firstItem['page_url'] ?? null,
+        ] as $candidateUrl) {
+            $postContainerReferrerUrl = $this->normalizeUrl(is_string($candidateUrl) ? $candidateUrl : null);
+            if ($postContainerReferrerUrl !== null) {
+                break;
+            }
+        }
+
+        return $postContainerReferrerUrl === null
+            ? []
+            : ['post_container_referrer_url' => $postContainerReferrerUrl];
     }
 
     private function extensionChannelHash(string $apiKey): string

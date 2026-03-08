@@ -5,10 +5,16 @@ namespace App\Services;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class BrowsePersister
 {
+    public function attachContainersForFiles(Collection $files): void
+    {
+        $this->createContainersForFiles($files);
+    }
+
     /**
      * Persist transformed rows produced by a browse service.
      */
@@ -409,6 +415,15 @@ class BrowsePersister
                     'type' => 'Post',
                     'source_id' => $postId,
                     'referrer' => null,
+                ];
+            }
+        } elseif (isset($listingMetadata['post_container_referrer_url']) && is_string($listingMetadata['post_container_referrer_url'])) {
+            $postContainerReferrerUrl = trim($listingMetadata['post_container_referrer_url']);
+            if ($postContainerReferrerUrl !== '') {
+                $containers[] = [
+                    'type' => 'Post',
+                    'source_id' => $postContainerReferrerUrl,
+                    'referrer' => $postContainerReferrerUrl,
                 ];
             }
         }
