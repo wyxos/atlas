@@ -144,14 +144,17 @@ class ExtensionApiController extends Controller
         ]);
 
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
+        $listingMetadataOverrides = $this->singleListingMetadataOverrides($validated);
         $payload = $this->processReactionItem(
             $validated,
             $validated['type'],
             $fileReactionService,
             $user,
             $extensionChannel,
-            $this->downloadRuntimeContext($validated, $request)
+            $this->downloadRuntimeContext($validated, $request),
+            $listingMetadataOverrides,
         );
+        $this->attachDerivedContainers([$payload], $listingMetadataOverrides);
 
         return response()->json([
             ...$payload,
@@ -200,7 +203,6 @@ class ExtensionApiController extends Controller
         $primaryPayload = null;
         $primaryCandidateId = $validated['primary_candidate_id'];
         $batchDownloadRequested = false;
-        $fileIds = [];
 
         foreach ($validated['items'] as $item) {
             $payload = $this->processReactionItem(
@@ -218,10 +220,6 @@ class ExtensionApiController extends Controller
                 ...$payload,
             ];
             $batchItems[] = $candidatePayload;
-            $fileId = data_get($payload, 'file.id');
-            if (is_numeric($fileId)) {
-                $fileIds[] = (int) $fileId;
-            }
             if (data_get($payload, 'download.requested') === true) {
                 $batchDownloadRequested = true;
             }
@@ -237,13 +235,7 @@ class ExtensionApiController extends Controller
             ]);
         }
 
-        if ($listingMetadataOverrides !== [] && $fileIds !== []) {
-            app(BrowsePersister::class)->attachContainersForFiles(
-                File::query()
-                    ->whereIn('id', array_values(array_unique($fileIds)))
-                    ->get()
-            );
-        }
+        $this->attachDerivedContainers($batchItems, $listingMetadataOverrides);
 
         return response()->json([
             ...$primaryPayload,
@@ -519,6 +511,31 @@ class ExtensionApiController extends Controller
         ];
     }
 
+    private function attachDerivedContainers(array $payloads, array $listingMetadataOverrides): void
+    {
+        if ($listingMetadataOverrides === []) {
+            return;
+        }
+
+        $fileIds = [];
+        foreach ($payloads as $payload) {
+            $fileId = data_get($payload, 'file.id');
+            if (is_numeric($fileId)) {
+                $fileIds[] = (int) $fileId;
+            }
+        }
+
+        if ($fileIds === []) {
+            return;
+        }
+
+        app(BrowsePersister::class)->attachContainersForFiles(
+            File::query()
+                ->whereIn('id', array_values(array_unique($fileIds)))
+                ->get()
+        );
+    }
+
     /**
      * @param  list<array<string, mixed>>  $items
      * @return array<string, string>
@@ -530,29 +547,63 @@ class ExtensionApiController extends Controller
             return [];
         }
 
-        $postContainerReferrerUrl = null;
-        foreach ([
+        return $this->containerMetadataOverridesFromCandidates([
             $firstItem['referrer_url_hash_aware'] ?? null,
             $firstItem['referrer_url'] ?? null,
             $firstItem['page_url'] ?? null,
-        ] as $candidateUrl) {
-            $postContainerReferrerUrl = $this->normalizeUrl(is_string($candidateUrl) ? $candidateUrl : null);
-            if ($postContainerReferrerUrl !== null) {
+        ], includePostContainer: true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, string>
+     */
+    private function singleListingMetadataOverrides(array $item): array
+    {
+        return $this->containerMetadataOverridesFromCandidates([
+            $item['referrer_url_hash_aware'] ?? null,
+            $item['referrer_url'] ?? null,
+            $item['page_url'] ?? null,
+        ], includePostContainer: false);
+    }
+
+    /**
+     * @param  list<mixed>  $candidateUrls
+     * @return array<string, string>
+     */
+    private function containerMetadataOverridesFromCandidates(array $candidateUrls, bool $includePostContainer): array
+    {
+        $containerUrl = null;
+        foreach ($candidateUrls as $candidateUrl) {
+            $containerUrl = $this->normalizeUrl(is_string($candidateUrl) ? $candidateUrl : null);
+            if ($containerUrl !== null) {
                 break;
             }
         }
 
-        if ($postContainerReferrerUrl === null) {
+        if ($containerUrl === null) {
             return [];
         }
 
-        $source = $this->containerSourceFromUrl($postContainerReferrerUrl);
+        $source = $this->containerSourceFromUrl($containerUrl);
+        if ($source !== 'deviantart.com') {
+            return [];
+        }
 
-        return array_filter([
-            'post_container_referrer_url' => $postContainerReferrerUrl,
-            'post_container_source' => $source,
-            ...$this->userContainerOverridesFromUrl($postContainerReferrerUrl, $source),
-        ], static fn (?string $value): bool => $value !== null && $value !== '');
+        $postContainerOverrides = $includePostContainer
+            ? [
+                'post_container_referrer_url' => $containerUrl,
+                'post_container_source' => $source,
+            ]
+            : [];
+
+        return array_filter(
+            [
+                ...$postContainerOverrides,
+                ...$this->userContainerOverridesFromUrl($containerUrl, $source),
+            ],
+            static fn (?string $value): bool => $value !== null && $value !== ''
+        );
     }
 
     /**
@@ -619,6 +670,10 @@ class ExtensionApiController extends Controller
         $normalizedHost = strtolower(trim($host));
         if ($normalizedHost === '') {
             return null;
+        }
+
+        if ($normalizedHost === 'deviantart.com' || str_ends_with($normalizedHost, '.deviantart.com')) {
+            return 'deviantart.com';
         }
 
         return preg_replace('/^www\./', '', $normalizedHost) ?: null;
