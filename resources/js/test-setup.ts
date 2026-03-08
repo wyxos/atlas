@@ -23,6 +23,42 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     });
 }
 
+if (typeof window !== 'undefined') {
+    const localStorageCandidate = window.localStorage as Partial<Storage> | undefined;
+    const hasStorageMethods = typeof localStorageCandidate?.getItem === 'function'
+        && typeof localStorageCandidate?.setItem === 'function'
+        && typeof localStorageCandidate?.removeItem === 'function'
+        && typeof localStorageCandidate?.clear === 'function';
+
+    if (!hasStorageMethods) {
+        const storage = new Map<string, string>();
+
+        Object.defineProperty(window, 'localStorage', {
+            configurable: true,
+            value: {
+                get length() {
+                    return storage.size;
+                },
+                clear() {
+                    storage.clear();
+                },
+                getItem(key: string) {
+                    return storage.get(String(key)) ?? null;
+                },
+                key(index: number) {
+                    return Array.from(storage.keys())[index] ?? null;
+                },
+                removeItem(key: string) {
+                    storage.delete(String(key));
+                },
+                setItem(key: string, value: string) {
+                    storage.set(String(key), String(value));
+                },
+            } satisfies Storage,
+        });
+    }
+}
+
 // Mock IntersectionObserver for @wyxos/vibe and other components
 if (typeof window !== 'undefined' && !window.IntersectionObserver) {
     class MockIntersectionObserver {
