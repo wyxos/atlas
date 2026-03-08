@@ -205,13 +205,16 @@ class BrowsePersister
                     continue;
                 }
 
+                $containerSource = isset($container['source']) && is_string($container['source']) && $container['source'] !== ''
+                    ? $container['source']
+                    : $source;
                 $sourceId = (string) $sourceId;
-                $containerKey = "{$type}:{$source}:{$sourceId}";
+                $containerKey = "{$type}:{$containerSource}:{$sourceId}";
 
                 if (! isset($containerData[$containerKey])) {
                     $containerData[$containerKey] = [
                         'type' => $type,
-                        'source' => $source,
+                        'source' => $containerSource,
                         'source_id' => $sourceId,
                         'referrer' => $container['referrer'] ?? null,
                         'created_at' => now(),
@@ -422,6 +425,9 @@ class BrowsePersister
             if ($postContainerReferrerUrl !== '') {
                 $containers[] = [
                     'type' => 'Post',
+                    'source' => isset($listingMetadata['post_container_source']) && is_string($listingMetadata['post_container_source']) && $listingMetadata['post_container_source'] !== ''
+                        ? $listingMetadata['post_container_source']
+                        : null,
                     'source_id' => $postContainerReferrerUrl,
                     'referrer' => $postContainerReferrerUrl,
                 ];

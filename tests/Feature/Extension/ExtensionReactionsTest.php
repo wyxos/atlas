@@ -243,6 +243,10 @@ test('extension batch reactions queue all submitted gallery items and return the
         ->toBe('https://www.deviantart.com/artist/art/post-1');
     expect(data_get($secondFile?->listing_metadata, 'post_container_referrer_url'))
         ->toBe('https://www.deviantart.com/artist/art/post-1');
+    expect(data_get($firstFile?->listing_metadata, 'post_container_source'))
+        ->toBe('deviantart.com');
+    expect(data_get($secondFile?->listing_metadata, 'post_container_source'))
+        ->toBe('deviantart.com');
 
     expect(Reaction::query()
         ->where('user_id', $user->id)
@@ -255,14 +259,14 @@ test('extension batch reactions queue all submitted gallery items and return the
 
     $this->assertDatabaseHas('containers', [
         'type' => 'Post',
-        'source' => 'extension',
+        'source' => 'deviantart.com',
         'source_id' => 'https://www.deviantart.com/artist/art/post-1',
         'referrer' => 'https://www.deviantart.com/artist/art/post-1',
     ]);
 
     $container = Container::query()
         ->where('type', 'Post')
-        ->where('source', 'extension')
+        ->where('source', 'deviantart.com')
         ->where('source_id', 'https://www.deviantart.com/artist/art/post-1')
         ->first();
 
