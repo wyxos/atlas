@@ -8,7 +8,7 @@ uses(RefreshDatabase::class);
 
 function withIsolatedBrowserExtensionArchives(callable $callback): void
 {
-    $downloadsDirectory = public_path('downloads');
+    $downloadsDirectory = storage_path('app/browser-extension-downloads');
     File::ensureDirectoryExists($downloadsDirectory);
 
     $backupDirectory = storage_path('framework/testing/browser-extension-download-'.bin2hex(random_bytes(8)));

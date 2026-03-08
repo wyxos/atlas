@@ -59,7 +59,7 @@ const menuItems = [
     { name: 'videos', path: '/videos', label: 'Videos', icon: Video },
     { name: 'photos', path: '/photos', label: 'Photos', icon: Image },
     { name: 'files', path: '/files', label: 'Files', icon: Folder },
-    { name: 'downloads', path: '/downloads', label: 'Downloads', icon: Download },
+    { name: 'downloads', path: '/downloads-queue', label: 'Downloads', icon: Download },
     { name: 'users', path: '/users', label: 'Users', icon: Users },
     { name: 'settings', path: '/settings', label: 'Settings', icon: Settings },
 ];
