@@ -7,10 +7,13 @@ export const STORAGE_KEYS = {
     matchRules: 'matchRules',
     closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
     reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
+    reactAllItemsInPostByDomain: 'reactAllItemsInPostByDomain',
 } as const;
 
 export const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
-export type CloseTabAfterQueueByDomain = Record<string, boolean>;
+export type DomainBooleanPreferences = Record<string, boolean>;
+export type CloseTabAfterQueueByDomain = DomainBooleanPreferences;
+export type ReactAllItemsInPostByDomain = DomainBooleanPreferences;
 
 function parseStoredBoolean(value: unknown): boolean {
     return value === true;
@@ -100,12 +103,12 @@ function normalizePreferenceDomainKey(input: string): string {
     return trimmed.replace(/^\.+/, '').replace(/\.+$/, '');
 }
 
-function parseStoredCloseTabAfterQueueByDomain(value: unknown): CloseTabAfterQueueByDomain {
+function parseStoredDomainBooleanPreferences(value: unknown): DomainBooleanPreferences {
     if (!value || typeof value !== 'object') {
         return {};
     }
 
-    const parsed: CloseTabAfterQueueByDomain = {};
+    const parsed: DomainBooleanPreferences = {};
     for (const [rawKey, rawValue] of Object.entries(value as Record<string, unknown>)) {
         if (rawValue !== true && rawValue !== false) {
             continue;
@@ -130,7 +133,7 @@ export function getCloseTabAfterQueueByDomain(): Promise<CloseTabAfterQueueByDom
                 return;
             }
 
-            resolve(parseStoredCloseTabAfterQueueByDomain(stored[STORAGE_KEYS.closeTabAfterQueueByDomain]));
+            resolve(parseStoredDomainBooleanPreferences(stored[STORAGE_KEYS.closeTabAfterQueueByDomain]));
         });
     });
 }
@@ -176,7 +179,7 @@ export async function setCloseTabAfterQueuePreferenceForHostname(hostname: strin
     });
 }
 
-export function getReactAllItemsInPostPreference(): Promise<boolean> {
+function getLegacyReactAllItemsInPostPreference(): Promise<boolean> {
     return new Promise((resolve, reject) => {
         chrome.storage.local.get([STORAGE_KEYS.reactAllItemsInPostEnabled], (stored: Record<string, unknown>) => {
             if (chrome.runtime.lastError) {
@@ -189,11 +192,48 @@ export function getReactAllItemsInPostPreference(): Promise<boolean> {
     });
 }
 
-export function setReactAllItemsInPostPreference(enabled: boolean): Promise<void> {
+export function getReactAllItemsInPostByDomain(): Promise<ReactAllItemsInPostByDomain> {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.get([STORAGE_KEYS.reactAllItemsInPostByDomain], (stored: Record<string, unknown>) => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+            }
+
+            resolve(parseStoredDomainBooleanPreferences(stored[STORAGE_KEYS.reactAllItemsInPostByDomain]));
+        });
+    });
+}
+
+export async function getReactAllItemsInPostPreferenceForHostname(hostname: string): Promise<boolean> {
+    const key = normalizePreferenceDomainKey(hostname);
+    if (key === '') {
+        return false;
+    }
+
+    const preferences = await getReactAllItemsInPostByDomain();
+    if (Object.prototype.hasOwnProperty.call(preferences, key)) {
+        return preferences[key] === true;
+    }
+
+    return await getLegacyReactAllItemsInPostPreference();
+}
+
+export async function setReactAllItemsInPostPreferenceForHostname(hostname: string, enabled: boolean): Promise<void> {
+    const key = normalizePreferenceDomainKey(hostname);
+    if (key === '') {
+        return;
+    }
+
+    const preferences = await getReactAllItemsInPostByDomain();
+
     return new Promise((resolve, reject) => {
         chrome.storage.local.set(
             {
-                [STORAGE_KEYS.reactAllItemsInPostEnabled]: enabled,
+                [STORAGE_KEYS.reactAllItemsInPostByDomain]: {
+                    ...preferences,
+                    [key]: enabled,
+                },
             },
             () => {
                 if (chrome.runtime.lastError) {

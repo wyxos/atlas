@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockCollectDeviantArtBatchReactionItems = vi.fn();
 const mockEnqueueReactionCheck = vi.fn();
 const mockSubmitBadgeReaction = vi.fn();
+const mockHasRelatedPostThumbnailsBelowMedia = vi.fn();
 const mockGetCloseTabAfterQueuePreferenceForHostname = vi.fn();
-const mockGetReactAllItemsInPostPreference = vi.fn();
+const mockGetReactAllItemsInPostPreferenceForHostname = vi.fn();
 const mockSetCloseTabAfterQueuePreferenceForHostname = vi.fn();
-const mockSetReactAllItemsInPostPreference = vi.fn();
+const mockSetReactAllItemsInPostPreferenceForHostname = vi.fn();
 const mockSubscribeToDownloadProgress = vi.fn();
 const mockGetPersistedBadgeState = vi.fn();
 const mockPersistBadgeCheckResult = vi.fn();
@@ -18,7 +19,7 @@ vi.mock('./match-timestamp', () => ({
 }));
 
 vi.mock('./media-utils', () => ({
-    hasRelatedPostThumbnailsBelowMedia: () => false,
+    hasRelatedPostThumbnailsBelowMedia: mockHasRelatedPostThumbnailsBelowMedia,
     normalizeUrl: (value: string | null | undefined) => typeof value === 'string' ? value : null,
     resolveIdentifiedMediaResolution: () => '1200 x 1800',
     resolveMediaUrl: (media: HTMLImageElement | HTMLVideoElement) => media instanceof HTMLImageElement ? media.src : media.currentSrc,
@@ -44,11 +45,13 @@ vi.mock('./download-progress-bus', () => ({
 vi.mock('../atlas-options', () => ({
     STORAGE_KEYS: {
         closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
+        reactAllItemsInPostByDomain: 'reactAllItemsInPostByDomain',
+        reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
     },
     getCloseTabAfterQueuePreferenceForHostname: mockGetCloseTabAfterQueuePreferenceForHostname,
-    getReactAllItemsInPostPreference: mockGetReactAllItemsInPostPreference,
+    getReactAllItemsInPostPreferenceForHostname: mockGetReactAllItemsInPostPreferenceForHostname,
     setCloseTabAfterQueuePreferenceForHostname: mockSetCloseTabAfterQueuePreferenceForHostname,
-    setReactAllItemsInPostPreference: mockSetReactAllItemsInPostPreference,
+    setReactAllItemsInPostPreferenceForHostname: mockSetReactAllItemsInPostPreferenceForHostname,
 }));
 
 vi.mock('./badge-state-cache', () => ({
@@ -73,6 +76,7 @@ describe('createReactionBadgeHost', () => {
         history.replaceState({}, '', '/artseize/art/Untitled-1305712740');
 
         mockCollectDeviantArtBatchReactionItems.mockResolvedValue(null);
+        mockHasRelatedPostThumbnailsBelowMedia.mockReturnValue(false);
         mockEnqueueReactionCheck.mockResolvedValue({
             exists: false,
             reaction: null,
@@ -81,9 +85,9 @@ describe('createReactionBadgeHost', () => {
             blacklistedAt: null,
         });
         mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(true);
-        mockGetReactAllItemsInPostPreference.mockResolvedValue(false);
+        mockGetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(false);
         mockSetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(undefined);
-        mockSetReactAllItemsInPostPreference.mockResolvedValue(undefined);
+        mockSetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(undefined);
         mockSubscribeToDownloadProgress.mockReturnValue(() => {});
         mockGetPersistedBadgeState.mockReturnValue(null);
         mockPersistBadgeCheckResult.mockReturnValue(undefined);
@@ -244,6 +248,72 @@ describe('createReactionBadgeHost', () => {
         expect(mockSetCloseTabAfterQueuePreferenceForHostname).toHaveBeenCalledWith(window.location.hostname, true);
         expect(firstToggleAfter).toBeTruthy();
         expect(secondToggleAfter).toBeTruthy();
+
+        firstHost.unmount();
+        secondHost.unmount();
+    });
+
+    it('keeps the react-all-items toggle synchronized across mounted badges on the same hostname', async () => {
+        mockHasRelatedPostThumbnailsBelowMedia.mockReturnValue(true);
+        mockGetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(false);
+
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: vi.fn((message: unknown, callback?: (response: unknown) => void) => {
+                    const payload = message as { type?: string };
+
+                    if (payload.type === 'ATLAS_GET_TAB_COUNT') {
+                        callback?.({ count: 2 });
+                        return;
+                    }
+
+                    callback?.(null);
+                }),
+                onMessage: {
+                    addListener: vi.fn(),
+                },
+            },
+            storage: {
+                onChanged: {
+                    addListener: vi.fn(),
+                },
+            },
+        });
+
+        const { createReactionBadgeHost } = await import('./reaction-badge-app');
+
+        const firstImage = document.createElement('img');
+        firstImage.src = 'https://images.example.com/first.jpg';
+        document.body.appendChild(firstImage);
+
+        const secondImage = document.createElement('img');
+        secondImage.src = 'https://images.example.com/second.jpg';
+        document.body.appendChild(secondImage);
+
+        const firstHost = createReactionBadgeHost(firstImage);
+        const secondHost = createReactionBadgeHost(secondImage);
+        document.body.appendChild(firstHost.element);
+        document.body.appendChild(secondHost.element);
+
+        await flushPromises();
+        await flushPromises();
+
+        const firstCheckbox = firstHost.element.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+        const secondCheckboxBefore = secondHost.element.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+
+        expect(firstCheckbox?.checked).toBe(false);
+        expect(secondCheckboxBefore?.checked).toBe(false);
+
+        firstCheckbox?.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+        await flushPromises();
+
+        const secondCheckboxAfter = secondHost.element.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+
+        expect(mockSetReactAllItemsInPostPreferenceForHostname).toHaveBeenCalledWith(window.location.hostname, true);
+        expect(firstCheckbox?.checked).toBe(true);
+        expect(secondCheckboxAfter?.checked).toBe(true);
 
         firstHost.unmount();
         secondHost.unmount();

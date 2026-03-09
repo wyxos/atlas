@@ -15,10 +15,6 @@ import { submitBadgeReaction } from './reaction-submit';
 import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
 import type { BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
-import {
-    loadReactAllItemsInPostPreference,
-    toggleReactAllItemsInPostPreference,
-} from './reaction-badge-preferences';
 import { requestCloseCurrentTab, requestTabCount, subscribeToTabCountChanged } from './reaction-badge-tab-runtime';
 import { resolveReactionBadgeProgressState } from './reaction-badge-progress';
 import { emptyMatchResult, isTerminalStatus } from './reaction-badge-utils';
@@ -30,6 +26,7 @@ import {
     type PersistedBadgeState,
 } from './badge-state-cache';
 import { useCloseTabAfterQueuePreference } from './close-tab-after-queue-state';
+import { useReactAllItemsInPostPreference } from './react-all-items-in-post-state';
 
 type UseReactionBadgeProps = {
     media: MediaElement;
@@ -40,6 +37,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     ensureReactionBadgeRuntimeStyles();
     const pageHostname = window.location.hostname.trim().toLowerCase();
     const closeTabAfterQueuePreference = useCloseTabAfterQueuePreference(pageHostname);
+    const reactAllItemsInPostPreference = useReactAllItemsInPostPreference(pageHostname);
 
     const isChecking = ref(true);
     const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
@@ -54,7 +52,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     const trackedTransferId = ref<number | null>(null);
     const hasSeenActiveTransfer = ref(false);
     const showReactAllItemsInPost = ref(false);
-    const reactAllItemsInPost = ref(false);
     const lastCheckedMediaUrl = ref<string | null>(null);
     const lastReactionMediaUrl = ref<string | null>(null);
     const trackedMediaUrls = ref<string[]>([]);
@@ -361,9 +358,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             openTabCount.value = count;
         });
         void refreshOpenTabCount();
-        void loadReactAllItemsInPostPreference().then((value) => {
-            reactAllItemsInPost.value = value;
-        });
         syncRelatedPostThumbnailContext();
         void refreshMatchForCurrentMedia(true);
     });
@@ -401,7 +395,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
         try {
             let batchItems = null;
-            if (showReactAllItemsInPost.value && reactAllItemsInPost.value) {
+            if (showReactAllItemsInPost.value && reactAllItemsInPostPreference.enabled.value) {
                 suppressMediaContextUpdates = true;
                 try {
                     batchItems = await collectDeviantArtBatchReactionItems(props.media, {
@@ -466,7 +460,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             return;
         }
 
-        reactAllItemsInPost.value = await toggleReactAllItemsInPostPreference(reactAllItemsInPost.value);
+        await reactAllItemsInPostPreference.toggle();
     }
 
     return {
@@ -481,7 +475,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         mediaResolution,
         openTabCount,
         progressState,
-        reactAllItemsInPost,
+        reactAllItemsInPost: reactAllItemsInPostPreference.enabled,
         showReactAllItemsInPost,
         submittingReactionType,
         timestampText,
