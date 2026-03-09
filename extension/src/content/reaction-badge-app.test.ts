@@ -42,6 +42,9 @@ vi.mock('./download-progress-bus', () => ({
 }));
 
 vi.mock('../atlas-options', () => ({
+    STORAGE_KEYS: {
+        closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
+    },
     getCloseTabAfterQueuePreferenceForHostname: mockGetCloseTabAfterQueuePreferenceForHostname,
     getReactAllItemsInPostPreference: mockGetReactAllItemsInPostPreference,
     setCloseTabAfterQueuePreferenceForHostname: mockSetCloseTabAfterQueuePreferenceForHostname,
@@ -130,6 +133,11 @@ describe('createReactionBadgeHost', () => {
                     addListener: vi.fn(),
                 },
             },
+            storage: {
+                onChanged: {
+                    addListener: vi.fn(),
+                },
+            },
         });
 
         const { createReactionBadgeHost } = await import('./reaction-badge-app');
@@ -169,5 +177,75 @@ describe('createReactionBadgeHost', () => {
             { type: 'ATLAS_CLOSE_CURRENT_TAB' },
             expect.any(Function),
         );
+    });
+
+    it('keeps the close-tab toggle synchronized across mounted badges on the same hostname', async () => {
+        mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(false);
+
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: vi.fn((message: unknown, callback?: (response: unknown) => void) => {
+                    const payload = message as { type?: string };
+
+                    if (payload.type === 'ATLAS_GET_TAB_COUNT') {
+                        callback?.({ count: 2 });
+                        return;
+                    }
+
+                    callback?.(null);
+                }),
+                onMessage: {
+                    addListener: vi.fn(),
+                },
+            },
+            storage: {
+                onChanged: {
+                    addListener: vi.fn(),
+                },
+            },
+        });
+
+        const { createReactionBadgeHost } = await import('./reaction-badge-app');
+
+        const firstImage = document.createElement('img');
+        firstImage.src = 'https://images.example.com/first.jpg';
+        document.body.appendChild(firstImage);
+
+        const secondImage = document.createElement('img');
+        secondImage.src = 'https://images.example.com/second.jpg';
+        document.body.appendChild(secondImage);
+
+        const firstHost = createReactionBadgeHost(firstImage);
+        const secondHost = createReactionBadgeHost(secondImage);
+        document.body.appendChild(firstHost.element);
+        document.body.appendChild(secondHost.element);
+
+        await flushPromises();
+        await flushPromises();
+
+        const firstToggle = Array.from(firstHost.element.querySelectorAll('button'))
+            .find((button) => button.textContent === 'Off');
+        const secondToggleBefore = Array.from(secondHost.element.querySelectorAll('button'))
+            .find((button) => button.textContent === 'Off');
+
+        expect(firstToggle).toBeTruthy();
+        expect(secondToggleBefore).toBeTruthy();
+
+        firstToggle?.click();
+        await flushPromises();
+        await flushPromises();
+
+        const firstToggleAfter = Array.from(firstHost.element.querySelectorAll('button'))
+            .find((button) => button.textContent === 'On');
+        const secondToggleAfter = Array.from(secondHost.element.querySelectorAll('button'))
+            .find((button) => button.textContent === 'On');
+
+        expect(mockSetCloseTabAfterQueuePreferenceForHostname).toHaveBeenCalledWith(window.location.hostname, true);
+        expect(firstToggleAfter).toBeTruthy();
+        expect(secondToggleAfter).toBeTruthy();
+
+        firstHost.unmount();
+        secondHost.unmount();
     });
 });

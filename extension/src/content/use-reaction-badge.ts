@@ -16,9 +16,7 @@ import { subscribeToDownloadProgress, type ProgressEvent } from './download-prog
 import type { BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
 import {
-    loadCloseTabAfterQueuePreference,
     loadReactAllItemsInPostPreference,
-    saveCloseTabAfterQueuePreference,
     toggleReactAllItemsInPostPreference,
 } from './reaction-badge-preferences';
 import { requestCloseCurrentTab, requestTabCount, subscribeToTabCountChanged } from './reaction-badge-tab-runtime';
@@ -31,6 +29,7 @@ import {
     persistDownloadProgressEvent,
     type PersistedBadgeState,
 } from './badge-state-cache';
+import { useCloseTabAfterQueuePreference } from './close-tab-after-queue-state';
 
 type UseReactionBadgeProps = {
     media: MediaElement;
@@ -39,6 +38,8 @@ type UseReactionBadgeProps = {
 
 export function useReactionBadge(props: UseReactionBadgeProps) {
     ensureReactionBadgeRuntimeStyles();
+    const pageHostname = window.location.hostname.trim().toLowerCase();
+    const closeTabAfterQueuePreference = useCloseTabAfterQueuePreference(pageHostname);
 
     const isChecking = ref(true);
     const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
@@ -47,8 +48,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     const hoveredReaction = ref<BadgeReactionType | null>(null);
     const submittingReactionType = ref<BadgeReactionType | null>(null);
     const isDownloadLocked = ref(false);
-    const closeTabAfterQueueEnabled = ref(false);
-    const isSavingCloseTabAfterQueuePreference = ref(false);
     const progressPercent = ref<number | null>(null);
     const transferStatus = ref<string | null>(null);
     const trackedFileId = ref<number | null>(null);
@@ -66,7 +65,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     let mediaMutationObserver: MutationObserver | null = null;
     let checkSequence = 0;
     let suppressMediaContextUpdates = false;
-    const pageHostname = window.location.hostname.trim().toLowerCase();
 
     const controlsDisabled = computed(() =>
         isChecking.value || submittingReactionType.value !== null || isDownloadLocked.value);
@@ -363,9 +361,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             openTabCount.value = count;
         });
         void refreshOpenTabCount();
-        void loadCloseTabAfterQueuePreference(pageHostname).then((value) => {
-            closeTabAfterQueueEnabled.value = value;
-        });
         void loadReactAllItemsInPostPreference().then((value) => {
             reactAllItemsInPost.value = value;
         });
@@ -423,7 +418,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
             const result = await submitBadgeReaction(props.media, type, { batchItems });
             const shouldCloseCurrentTab = result.ok
-                && closeTabAfterQueueEnabled.value
+                && closeTabAfterQueuePreference.enabled.value
                 && result.shouldCloseTabAfterQueue;
 
             // DeviantArt gallery navigation can replace the active media node and unmount this
@@ -466,25 +461,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         }
     }
 
-    async function toggleCloseTabAfterQueuePreference(): Promise<void> {
-        if (isSavingCloseTabAfterQueuePreference.value || pageHostname === '') {
-            return;
-        }
-
-        const nextEnabled = !closeTabAfterQueueEnabled.value;
-        closeTabAfterQueueEnabled.value = nextEnabled;
-        isSavingCloseTabAfterQueuePreference.value = true;
-
-        try {
-            const didPersist = await saveCloseTabAfterQueuePreference(pageHostname, nextEnabled);
-            if (!didPersist) {
-                closeTabAfterQueueEnabled.value = !nextEnabled;
-            }
-        } finally {
-            isSavingCloseTabAfterQueuePreference.value = false;
-        }
-    }
-
     async function handleReactAllItemsInPostToggle(): Promise<void> {
         if (!showReactAllItemsInPost.value || controlsDisabled.value) {
             return;
@@ -495,13 +471,13 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
     return {
         activeReaction,
-        closeTabAfterQueueEnabled,
+        closeTabAfterQueueEnabled: closeTabAfterQueuePreference.enabled,
         controlsDisabled,
         handleReactAllItemsInPostToggle,
         handleReactionClick,
         hoveredReaction,
         isChecking,
-        isSavingCloseTabAfterQueuePreference,
+        isSavingCloseTabAfterQueuePreference: closeTabAfterQueuePreference.saving,
         mediaResolution,
         openTabCount,
         progressState,
@@ -509,7 +485,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         showReactAllItemsInPost,
         submittingReactionType,
         timestampText,
-        toggleCloseTabAfterQueuePreference,
+        toggleCloseTabAfterQueuePreference: closeTabAfterQueuePreference.toggle,
         transferStatus,
     };
 }
