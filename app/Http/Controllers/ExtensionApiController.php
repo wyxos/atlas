@@ -155,6 +155,7 @@ class ExtensionApiController extends Controller
             $validated,
             $validated['type'],
             $fileReactionService,
+            $containerMetadataService,
             $user,
             $extensionChannel,
             $this->downloadRuntimeContext($validated, $request),
@@ -221,6 +222,7 @@ class ExtensionApiController extends Controller
                 $item,
                 $validated['type'],
                 $fileReactionService,
+                $containerMetadataService,
                 $user,
                 $extensionChannel,
                 $runtimeContext,
@@ -363,6 +365,7 @@ class ExtensionApiController extends Controller
 
     private function findOrCreateFile(
         string $url,
+        string $source,
         ?string $referrerUrl,
         ?string $previewUrl,
         string $extensionChannel,
@@ -390,7 +393,7 @@ class ExtensionApiController extends Controller
 
         if (! $file) {
             return File::query()->create([
-                'source' => 'extension',
+                'source' => $source,
                 'url' => $canonicalUrl,
                 'referrer_url' => $referrerUrl,
                 'preview_url' => $previewUrl,
@@ -401,6 +404,10 @@ class ExtensionApiController extends Controller
         }
 
         $updates = [];
+        $currentSource = strtolower(trim((string) $file->source));
+        if (($currentSource === '' || $currentSource === 'extension') && $file->source !== $source) {
+            $updates['source'] = $source;
+        }
         if ($referrerUrl !== null && $file->referrer_url !== $referrerUrl) {
             $updates['referrer_url'] = $referrerUrl;
         }
@@ -466,6 +473,7 @@ class ExtensionApiController extends Controller
         array $item,
         string $reactionType,
         FileReactionService $fileReactionService,
+        ExtensionContainerMetadataService $containerMetadataService,
         User $user,
         string $extensionChannel,
         array $runtimeContext,
@@ -483,9 +491,11 @@ class ExtensionApiController extends Controller
         $previewUrl = $url;
         $pageUrl = $this->normalizeOptionalUrl($item['page_url'] ?? null);
         $tagName = isset($item['tag_name']) && is_string($item['tag_name']) ? $item['tag_name'] : null;
+        $source = $containerMetadataService->sourceFromCandidateUrls([$referrerUrl, $pageUrl, $url]) ?? 'extension';
 
         $file = $this->findOrCreateFile(
             $url,
+            $source,
             $referrerUrl,
             $previewUrl,
             $extensionChannel,
