@@ -4,6 +4,7 @@ import type { BatchReactionItem } from './deviantart-batch-reaction';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
+import { shouldUseKeepaliveRequest } from '../request-keepalive';
 
 type SubmitReactionResult = {
     ok: boolean;
@@ -380,6 +381,7 @@ export async function submitBadgeReaction(
                 cookies: cookies.length > 0 ? cookies : null,
                 user_agent: userAgent,
             };
+        const requestBodyJson = JSON.stringify(requestBody);
         const endpoint = usesBatchEndpoint
             ? `${stored.atlasDomain}/api/extension/reactions/batch`
             : `${stored.atlasDomain}/api/extension/reactions`;
@@ -415,8 +417,8 @@ export async function submitBadgeReaction(
                     'Content-Type': 'application/json',
                     'X-Atlas-Api-Key': stored.apiToken,
                 },
-                body: JSON.stringify(requestBody),
-                keepalive: true,
+                body: requestBodyJson,
+                keepalive: shouldUseKeepaliveRequest(requestBodyJson),
             });
 
             if (!response.ok) {
