@@ -1,6 +1,7 @@
 import { collectCookiesForUrls } from './background-cookie-runtime';
 import { notifyTabsExtensionReloaded } from './background-reload-overlay';
-import { normalizeComparableUrl, normalizeComparableUrls } from './background-url-utils';
+import { normalizeComparableUrls } from './background-url-utils';
+import { normalizeComparableOpenTabUrl } from './open-tab-url';
 import { shouldUseKeepaliveRequest } from './request-keepalive';
 
 type TabPresenceChangedMessage = {
@@ -102,7 +103,7 @@ function initializeTrackedTabUrls(): void {
                 continue;
             }
 
-            const comparableUrl = typeof tab.url === 'string' ? normalizeComparableUrl(tab.url) : null;
+            const comparableUrl = typeof tab.url === 'string' ? normalizeComparableOpenTabUrl(tab.url) : null;
             if (comparableUrl === null) {
                 openComparableUrlByTabId.delete(tab.id);
                 continue;
@@ -286,11 +287,22 @@ chrome.runtime.onMessage.addListener((
         return true;
     }
 
+    if (payload.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
+        chrome.tabs.query({}, (tabs: BrowserTab[]) => {
+            const urls = tabs
+                .map((tab) => (typeof tab.url === 'string' ? normalizeComparableOpenTabUrl(tab.url) : null))
+                .filter((url): url is string => url !== null);
+
+            sendResponse({ urls });
+        });
+        return true;
+    }
+
     if (payload.type !== 'ATLAS_IS_URL_OPEN' || typeof payload.url !== 'string') {
         return false;
     }
 
-    const target = normalizeComparableUrl(payload.url);
+    const target = normalizeComparableOpenTabUrl(payload.url);
     if (target === null) {
         sendResponse({ isOpenInAnotherTab: false });
         return false;
@@ -303,13 +315,11 @@ chrome.runtime.onMessage.addListener((
                 return false;
             }
 
-            const tabUrl = normalizeComparableUrl(tab.url);
-            return tabUrl !== null && tabUrl === target;
+            return normalizeComparableOpenTabUrl(tab.url) === target;
         });
 
         sendResponse({ isOpenInAnotherTab });
     });
-
     return true;
 });
 
@@ -318,7 +328,7 @@ chrome.tabs.onCreated.addListener((tab: BrowserTab) => {
         return;
     }
 
-    const comparableUrl = typeof tab.url === 'string' ? normalizeComparableUrl(tab.url) : null;
+    const comparableUrl = typeof tab.url === 'string' ? normalizeComparableOpenTabUrl(tab.url) : null;
     const changedUrls = updateTrackedComparableTabUrl(tab.id, comparableUrl);
     broadcastTabPresenceChanged(changedUrls);
     broadcastTabCountChanged();
@@ -333,7 +343,7 @@ chrome.tabs.onRemoved.addListener((tabId: number) => {
 chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string; status?: string }, tab: BrowserTab) => {
     if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
         const sourceUrl = typeof changeInfo.url === 'string' ? changeInfo.url : tab.url ?? null;
-        const comparableUrl = sourceUrl === null ? null : normalizeComparableUrl(sourceUrl);
+        const comparableUrl = sourceUrl === null ? null : normalizeComparableOpenTabUrl(sourceUrl);
         const changedUrls = updateTrackedComparableTabUrl(tabId, comparableUrl);
         broadcastTabPresenceChanged(changedUrls);
     }

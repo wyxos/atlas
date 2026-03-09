@@ -1,35 +1,16 @@
-import { isLikelyDomainRootUrl, normalizeUrl } from './media-utils';
+import { normalizeComparableOpenTabUrl } from '../open-tab-url';
 
 const CACHE_TTL_MS = 20 * 1000;
 
 const resultCache = new Map<string, { value: boolean; cachedAt: number }>();
 const inFlight = new Map<string, Promise<boolean>>();
 
-function normalizeComparableUrl(value: string | null): string | null {
-    if (isLikelyDomainRootUrl(value)) {
-        return null;
-    }
-
-    const normalized = normalizeUrl(value);
-    if (normalized === null) {
-        return null;
-    }
-
-    try {
-        const parsed = new URL(normalized);
-        parsed.hash = '';
-        return parsed.toString();
-    } catch {
-        return null;
-    }
-}
-
 export function toComparableOpenTabUrl(url: string | null): string | null {
-    return normalizeComparableUrl(url);
+    return normalizeComparableOpenTabUrl(url);
 }
 
 export async function isUrlOpenInAnotherTab(url: string | null): Promise<boolean> {
-    const comparableUrl = normalizeComparableUrl(url);
+    const comparableUrl = normalizeComparableOpenTabUrl(url);
     if (comparableUrl === null) {
         return false;
     }
@@ -71,7 +52,7 @@ export async function isUrlOpenInAnotherTab(url: string | null): Promise<boolean
 
 export function invalidateOpenTabCheckCache(urls: string[]): void {
     for (const url of urls) {
-        const comparableUrl = normalizeComparableUrl(url);
+        const comparableUrl = normalizeComparableOpenTabUrl(url);
         if (comparableUrl === null) {
             continue;
         }

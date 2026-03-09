@@ -11,6 +11,7 @@ import { OverlayManager } from './content/overlay-manager';
 import { createAnchorMediaRuntime } from './content/anchor-media-runtime';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { createDownloadEventSheet } from './content/download-event-sheet';
+import { createDuplicateAnchorTabGuard } from './content/duplicate-anchor-tab-guard';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
@@ -24,6 +25,7 @@ const anchorMediaRuntime = createAnchorMediaRuntime({
     getRules: () => currentRules,
     getPageHostname: () => currentPageHostname,
 });
+let duplicateAnchorTabGuard: ReturnType<typeof createDuplicateAnchorTabGuard> | null = null;
 
 function mediaMatchesRules(element: MediaElement): boolean {
     return mediaMatchesRulesForPage(element, window.location.href, currentRules, currentPageHostname);
@@ -179,6 +181,7 @@ function installRuntimeMessageListener(): void {
 
         if ((message as { type?: unknown }).type === 'ATLAS_TAB_PRESENCE_CHANGED') {
             anchorMediaRuntime.handleTabPresenceChanged((message as { urls?: unknown }).urls);
+            duplicateAnchorTabGuard?.handleTabPresenceChanged();
         }
     });
 }
@@ -233,6 +236,7 @@ async function loadRulesAndProcess(): Promise<void> {
 }
 
 function bootstrap(): void {
+    duplicateAnchorTabGuard = createDuplicateAnchorTabGuard();
     installMutationObserver();
     installStorageListener();
     installRuntimeMessageListener();
