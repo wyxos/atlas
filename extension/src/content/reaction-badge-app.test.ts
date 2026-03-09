@@ -318,4 +318,108 @@ describe('createReactionBadgeHost', () => {
         firstHost.unmount();
         secondHost.unmount();
     });
+
+    it('refreshes the hostname batch preference before deciding whether to batch react', async () => {
+        mockHasRelatedPostThumbnailsBelowMedia.mockReturnValue(true);
+        mockGetReactAllItemsInPostPreferenceForHostname
+            .mockResolvedValueOnce(false)
+            .mockResolvedValue(true);
+        mockCollectDeviantArtBatchReactionItems.mockResolvedValue([
+            {
+                candidateId: 'image-1',
+                url: 'https://images.example.com/first.jpg',
+                referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1',
+                pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                tagName: 'img',
+            },
+            {
+                candidateId: 'image-2',
+                url: 'https://images.example.com/second.jpg',
+                referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1#image-2',
+                pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                tagName: 'img',
+            },
+        ]);
+        mockSubmitBadgeReaction.mockResolvedValue({
+            ok: true,
+            reaction: 'love',
+            exists: true,
+            fileId: 123,
+            downloadRequested: true,
+            shouldCloseTabAfterQueue: true,
+            downloadTransferId: 456,
+            downloadStatus: 'queued',
+            downloadProgressPercent: 0,
+            reverbConfig: null,
+        });
+
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: vi.fn((message: unknown, callback?: (response: unknown) => void) => {
+                    const payload = message as { type?: string };
+
+                    if (payload.type === 'ATLAS_GET_TAB_COUNT') {
+                        callback?.({ count: 2 });
+                        return;
+                    }
+
+                    if (payload.type === 'ATLAS_CLOSE_CURRENT_TAB') {
+                        callback?.({ ok: true });
+                        return;
+                    }
+
+                    callback?.(null);
+                }),
+                onMessage: {
+                    addListener: vi.fn(),
+                },
+            },
+            storage: {
+                onChanged: {
+                    addListener: vi.fn(),
+                },
+            },
+        });
+
+        const { createReactionBadgeHost } = await import('./reaction-badge-app');
+
+        const image = document.createElement('img');
+        image.src = 'https://images.example.com/first.jpg';
+        document.body.appendChild(image);
+
+        const host = createReactionBadgeHost(image);
+        document.body.appendChild(host.element);
+
+        await flushPromises();
+        await flushPromises();
+
+        host.triggerReaction('love');
+        await flushPromises();
+        await flushPromises();
+
+        expect(mockCollectDeviantArtBatchReactionItems).toHaveBeenCalledWith(image, {
+            hostname: window.location.hostname,
+        });
+        expect(mockSubmitBadgeReaction).toHaveBeenCalledWith(image, 'love', {
+            batchItems: [
+                {
+                    candidateId: 'image-1',
+                    url: 'https://images.example.com/first.jpg',
+                    referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1',
+                    pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                    tagName: 'img',
+                },
+                {
+                    candidateId: 'image-2',
+                    url: 'https://images.example.com/second.jpg',
+                    referrerUrlHashAware: 'https://www.deviantart.com/artist/art/post-1#image-2',
+                    pageUrl: 'https://www.deviantart.com/artist/art/post-1',
+                    tagName: 'img',
+                },
+            ],
+        });
+
+        host.unmount();
+    });
 });

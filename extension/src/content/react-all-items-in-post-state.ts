@@ -80,6 +80,7 @@ function installStorageListener(): void {
 
 export function useReactAllItemsInPostPreference(hostname: string): {
     enabled: Ref<boolean>;
+    refresh: () => Promise<void>;
     saving: Ref<boolean>;
     toggle: () => Promise<void>;
 } {
@@ -114,6 +115,7 @@ export function useReactAllItemsInPostPreference(hostname: string): {
 
     return {
         enabled: state.enabled,
+        refresh: () => refreshPreference(normalizedHostname),
         saving: state.saving,
         toggle,
     };

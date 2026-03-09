@@ -15,10 +15,6 @@ export type DomainBooleanPreferences = Record<string, boolean>;
 export type CloseTabAfterQueueByDomain = DomainBooleanPreferences;
 export type ReactAllItemsInPostByDomain = DomainBooleanPreferences;
 
-function parseStoredBoolean(value: unknown): boolean {
-    return value === true;
-}
-
 export function normalizeDomain(input: string): string {
     return input.trim().replace(/\/+$/, '');
 }
@@ -179,19 +175,6 @@ export async function setCloseTabAfterQueuePreferenceForHostname(hostname: strin
     });
 }
 
-function getLegacyReactAllItemsInPostPreference(): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-        chrome.storage.local.get([STORAGE_KEYS.reactAllItemsInPostEnabled], (stored: Record<string, unknown>) => {
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-                return;
-            }
-
-            resolve(parseStoredBoolean(stored[STORAGE_KEYS.reactAllItemsInPostEnabled]));
-        });
-    });
-}
-
 export function getReactAllItemsInPostByDomain(): Promise<ReactAllItemsInPostByDomain> {
     return new Promise((resolve, reject) => {
         chrome.storage.local.get([STORAGE_KEYS.reactAllItemsInPostByDomain], (stored: Record<string, unknown>) => {
@@ -212,11 +195,7 @@ export async function getReactAllItemsInPostPreferenceForHostname(hostname: stri
     }
 
     const preferences = await getReactAllItemsInPostByDomain();
-    if (Object.prototype.hasOwnProperty.call(preferences, key)) {
-        return preferences[key] === true;
-    }
-
-    return await getLegacyReactAllItemsInPostPreference();
+    return preferences[key] === true;
 }
 
 export async function setReactAllItemsInPostPreferenceForHostname(hostname: string, enabled: boolean): Promise<void> {
