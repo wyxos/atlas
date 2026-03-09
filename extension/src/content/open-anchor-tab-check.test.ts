@@ -42,4 +42,27 @@ describe('isUrlOpenInAnotherTab', () => {
         expect(hashResult).toBe(true);
         expect(sendMessage).toHaveBeenCalledTimes(2);
     });
+
+    it('preserves hashes when checking whether a url is open in another tab', async () => {
+        const sendMessage = vi.fn((payload: unknown, callback: (response: unknown) => void) => {
+            callback({ isOpenInAnotherTab: true });
+        });
+        vi.stubGlobal('chrome', {
+            runtime: {
+                sendMessage,
+            },
+        });
+
+        const { isUrlOpenInAnotherTab } = await import('./open-anchor-tab-check');
+        const result = await isUrlOpenInAnotherTab('https://youtube.com/watch?v=abc123#image-4');
+
+        expect(result).toBe(true);
+        expect(sendMessage).toHaveBeenCalledWith(
+            {
+                type: 'ATLAS_IS_URL_OPEN',
+                url: 'https://youtube.com/watch?v=abc123#image-4',
+            },
+            expect.any(Function),
+        );
+    });
 });
