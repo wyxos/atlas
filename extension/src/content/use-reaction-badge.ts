@@ -64,7 +64,10 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     let suppressMediaContextUpdates = false;
 
     const controlsDisabled = computed(() =>
-        isChecking.value || submittingReactionType.value !== null || isDownloadLocked.value);
+        isChecking.value
+        || submittingReactionType.value !== null
+        || isDownloadLocked.value
+        || reactAllItemsInPostPreference.saving.value);
     const activeReaction = computed(() => (matchResult.value.exists ? matchResult.value.reaction : null));
     const timestampText = computed<BadgeTimestampDisplay>(() => {
         const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
@@ -395,6 +398,10 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
         try {
             let batchItems = null;
+            if (showReactAllItemsInPost.value) {
+                await reactAllItemsInPostPreference.refresh();
+            }
+
             if (showReactAllItemsInPost.value && reactAllItemsInPostPreference.enabled.value) {
                 suppressMediaContextUpdates = true;
                 try {

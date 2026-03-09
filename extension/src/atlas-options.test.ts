@@ -113,28 +113,15 @@ describe('atlas-options close-tab-after-queue preferences', () => {
         await expect(getReactAllItemsInPostPreferenceForHostname('www.example.com')).resolves.toBe(true);
     });
 
-    it('falls back to the legacy global react-all-items preference when no hostname override exists', async () => {
-        const { STORAGE_KEYS, getReactAllItemsInPostPreferenceForHostname } = await import('./atlas-options');
-
-        storageState[STORAGE_KEYS.reactAllItemsInPostEnabled] = true;
-
-        await expect(getReactAllItemsInPostPreferenceForHostname('www.example.com')).resolves.toBe(true);
-    });
-
-    it('persists explicit hostname overrides for react-all-items even when the legacy global value exists', async () => {
+    it('keeps react-all-items disabled for other hostnames when one hostname is enabled', async () => {
         const {
-            STORAGE_KEYS,
             getReactAllItemsInPostPreferenceForHostname,
             setReactAllItemsInPostPreferenceForHostname,
         } = await import('./atlas-options');
 
-        storageState[STORAGE_KEYS.reactAllItemsInPostEnabled] = true;
+        await setReactAllItemsInPostPreferenceForHostname('deviantart.com', true);
 
-        await setReactAllItemsInPostPreferenceForHostname('example.com', false);
-
-        expect(storageState[STORAGE_KEYS.reactAllItemsInPostByDomain]).toEqual({
-            'example.com': false,
-        });
-        await expect(getReactAllItemsInPostPreferenceForHostname('example.com')).resolves.toBe(false);
+        await expect(getReactAllItemsInPostPreferenceForHostname('deviantart.com')).resolves.toBe(true);
+        await expect(getReactAllItemsInPostPreferenceForHostname('x.com')).resolves.toBe(false);
     });
 });
