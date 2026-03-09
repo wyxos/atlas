@@ -4,6 +4,28 @@ namespace App\Services\Extension;
 
 class ExtensionContainerMetadataService
 {
+    public function sourceFromCandidateUrls(array $candidateUrls): ?string
+    {
+        foreach ($candidateUrls as $candidateUrl) {
+            $source = $this->sourceFromUrl(is_string($candidateUrl) ? $candidateUrl : null);
+            if ($source !== null) {
+                return $source;
+            }
+        }
+
+        return null;
+    }
+
+    public function sourceFromUrl(?string $url): ?string
+    {
+        $normalizedUrl = $this->normalizeUrl($url);
+        if ($normalizedUrl === null) {
+            return null;
+        }
+
+        return $this->containerSourceFromUrl($normalizedUrl);
+    }
+
     public function metadataOverridesFromCandidateUrls(array $candidateUrls, bool $includePostContainer): array
     {
         $containerUrl = $this->firstSupportedContainerUrl($candidateUrls);
@@ -36,11 +58,7 @@ class ExtensionContainerMetadataService
     {
         foreach ($candidateUrls as $candidateUrl) {
             $normalizedUrl = $this->normalizeUrl(is_string($candidateUrl) ? $candidateUrl : null);
-            if ($normalizedUrl === null) {
-                continue;
-            }
-
-            if ($this->containerSourceFromUrl($normalizedUrl) === 'deviantart.com') {
+            if ($normalizedUrl !== null && $this->sourceFromUrl($normalizedUrl) === 'deviantart.com') {
                 return $normalizedUrl;
             }
         }

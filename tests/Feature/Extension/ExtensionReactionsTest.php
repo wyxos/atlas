@@ -70,7 +70,7 @@ test('extension reactions endpoint creates file applies reaction and queues down
 
     $file = File::query()->where('url', 'https://cdn.example.test/media/new-file.jpg')->first();
     expect($file)->not->toBeNull();
-    expect($file?->source)->toBe('extension');
+    expect($file?->source)->toBe('example.test');
     expect($file?->referrer_url)->toBe('https://www.example.test/post/123#media-id-42');
     expect($file?->preview_url)->toBe('https://cdn.example.test/media/new-file.jpg');
     expect(data_get($file?->listing_metadata, 'extension_user_id'))->toBe($user->id);
@@ -149,8 +149,41 @@ test('extension video reactions prefer page url when yt-dlp is selected', functi
 
     $file = File::query()->where('url', 'https://www.facebook.com/reel/735842842730500')->first();
     expect($file)->not->toBeNull();
+    expect($file?->source)->toBe('facebook.com');
     expect(data_get($file?->listing_metadata, 'download_via'))->toBe('yt-dlp');
     expect(data_get($file?->listing_metadata, 'tag_name'))->toBe('video');
+});
+
+test('extension reactions update legacy extension source rows to the referrer domain', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $legacyFile = File::query()->create([
+        'source' => 'extension',
+        'url' => 'https://cdn.example.test/media/legacy-file.jpg',
+        'referrer_url' => 'https://old.example.test/post/1',
+        'preview_url' => 'https://cdn.example.test/media/legacy-file.jpg',
+        'listing_metadata' => [],
+        'filename' => 'legacy-file',
+        'ext' => 'jpg',
+    ]);
+
+    $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://cdn.example.test/media/legacy-file.jpg',
+        'referrer_url_hash_aware' => 'https://www.example.test/post/123#image-1',
+        'page_url' => 'https://www.example.test/post/123',
+        'tag_name' => 'img',
+    ])->assertSuccessful();
+
+    $legacyFile->refresh();
+
+    expect($legacyFile->source)->toBe('example.test');
+    expect($legacyFile->referrer_url)->toBe('https://www.example.test/post/123#image-1');
 });
 
 test('extension reactions payload forwards cookies and user agent to queued download job', function () {
@@ -280,6 +313,8 @@ test('extension batch reactions queue all submitted gallery items and return the
 
     expect($firstFile)->not->toBeNull();
     expect($secondFile)->not->toBeNull();
+    expect($firstFile?->source)->toBe('deviantart.com');
+    expect($secondFile?->source)->toBe('deviantart.com');
     expect($firstFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/post-1');
     expect($secondFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/post-1#image-2');
     expect(data_get($firstFile?->listing_metadata, 'post_container_referrer_url'))
