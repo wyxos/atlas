@@ -98,20 +98,43 @@ describe('atlas-options close-tab-after-queue preferences', () => {
         });
     });
 
-    it('stores and reads the global react-all-items preference', async () => {
-        const { STORAGE_KEYS, getReactAllItemsInPostPreference, setReactAllItemsInPostPreference } = await import('./atlas-options');
+    it('stores and reads the react-all-items preference per hostname', async () => {
+        const {
+            STORAGE_KEYS,
+            getReactAllItemsInPostPreferenceForHostname,
+            setReactAllItemsInPostPreferenceForHostname,
+        } = await import('./atlas-options');
 
-        await setReactAllItemsInPostPreference(true);
+        await setReactAllItemsInPostPreferenceForHostname('WWW.Example.com', true);
 
-        expect(storageState[STORAGE_KEYS.reactAllItemsInPostEnabled]).toBe(true);
-        await expect(getReactAllItemsInPostPreference()).resolves.toBe(true);
+        expect(storageState[STORAGE_KEYS.reactAllItemsInPostByDomain]).toEqual({
+            'www.example.com': true,
+        });
+        await expect(getReactAllItemsInPostPreferenceForHostname('www.example.com')).resolves.toBe(true);
     });
 
-    it('defaults the global react-all-items preference to false', async () => {
-        const { STORAGE_KEYS, getReactAllItemsInPostPreference } = await import('./atlas-options');
+    it('falls back to the legacy global react-all-items preference when no hostname override exists', async () => {
+        const { STORAGE_KEYS, getReactAllItemsInPostPreferenceForHostname } = await import('./atlas-options');
 
-        storageState[STORAGE_KEYS.reactAllItemsInPostEnabled] = 'yes';
+        storageState[STORAGE_KEYS.reactAllItemsInPostEnabled] = true;
 
-        await expect(getReactAllItemsInPostPreference()).resolves.toBe(false);
+        await expect(getReactAllItemsInPostPreferenceForHostname('www.example.com')).resolves.toBe(true);
+    });
+
+    it('persists explicit hostname overrides for react-all-items even when the legacy global value exists', async () => {
+        const {
+            STORAGE_KEYS,
+            getReactAllItemsInPostPreferenceForHostname,
+            setReactAllItemsInPostPreferenceForHostname,
+        } = await import('./atlas-options');
+
+        storageState[STORAGE_KEYS.reactAllItemsInPostEnabled] = true;
+
+        await setReactAllItemsInPostPreferenceForHostname('example.com', false);
+
+        expect(storageState[STORAGE_KEYS.reactAllItemsInPostByDomain]).toEqual({
+            'example.com': false,
+        });
+        await expect(getReactAllItemsInPostPreferenceForHostname('example.com')).resolves.toBe(false);
     });
 });
