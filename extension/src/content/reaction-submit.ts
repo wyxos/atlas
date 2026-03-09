@@ -456,7 +456,8 @@ export async function submitBadgeReaction(
         const downloadRequested = downloadPayload.requested === true;
         // Keep both checks while older Atlas deployments may omit the aggregated
         // batch.download_requested flag and only report queueing per item.
-        const shouldCloseTabAfterQueue = downloadRequested
+        const shouldCloseTabAfterQueue = reactionType === 'dislike'
+            || downloadRequested
             || batchDownloadRequested(payload)
             || batchQueuedDownloadRequested(payload);
         const downloadTransferId = numberOrNull(downloadPayload.transfer_id);
