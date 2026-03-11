@@ -69,6 +69,9 @@ npm run check:js
 - ✅ DO: Import stable shared helpers inside a composable when every caller would pass the same dependency; pass state and true collaborators, not helper plumbing
 - ✅ DO: Keep singleton-manager internals actually singleton; shared timers/timeouts and mutation state belong at module scope, not inside each `useX()` call
 - ❌ DON'T: Build god composables that mix hover state, dialog state, masonry events, tab routing, and toolbar actions in one API
+- ✅ DO: Treat long options objects as a hint to check responsibility boundaries first; split initialization, fetch state, and UI side effects before inventing more wrapper objects
+- ✅ DO: Keep a long options object only when every field serves one coherent feature seam
+- ❌ DON'T: Pass flat lists of unrelated refs and callbacks when a smaller number of domain-specific collaborators would make ownership clearer
 - ✅ Example: `resources/js/composables/useBrowseService.ts` - browse logic
 - ✅ Example: `resources/js/composables/useTabs.ts` - tab management
 
@@ -208,6 +211,35 @@ files.value = data
 
 // ✅ DO: Add abstraction only when you have 3+ concrete use cases
 ```
+
+**4a. Small Function Test**
+```typescript
+// ✅ DO: Keep a small function when it is a real boundary adapter
+function handleLoadingStop(): void {
+  emit('update:loading', false)
+  props.onLoadingChange?.(false)
+  flushModerationToast()
+}
+
+// ❌ DON'T: Keep pass-throughs only for naming
+function handleResetFilters(): void {
+  form.reset()
+}
+
+// ❌ DON'T: Commit empty handlers or TODO placeholders
+function handleModerationRulesChanged(): void {
+  // TODO
+}
+```
+- Keep a tiny function only when it bridges component boundaries, owns a side effect, hides non-trivial intent, or is reused.
+- Inline or delete one-line pass-through handlers when they add no real behavior.
+- Remove TODO handlers instead of leaving dead event paths in refactors.
+
+**4b. Refactor Direction**
+- Remove stale test assumptions and compatibility shims when the underlying library or component contract changed.
+- Prefer explicit UI affordances over fragile shortcut-only behavior when the shortcut path is glitch-prone.
+- Keep parent components focused on orchestration. If a helper starts owning fetch logic, tab restoration, label formatting, and loading side effects together, split it by responsibility rather than renaming the bag of callbacks.
+- Backend-owned domain rules stay in Laravel/services. Do not reconstruct service-specific URLs, labels, or container metadata in Vue if the backend can return them directly.
 
 **5. No Unnecessary Mappings**
 ```typescript
