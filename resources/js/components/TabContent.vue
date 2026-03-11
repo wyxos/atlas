@@ -97,22 +97,29 @@ function resetItemPreloads(): void {
 const browse = useTabContentBrowseState({
     tabId: toRef(props, 'tabId'),
     form,
-    items,
-    tab,
-    availableServices,
-    localService,
-    fetchServices,
-    fetchSources,
-    clearPreviewedItems: itemPreview.clearPreviewedItems,
-    resetPreloadedItems: resetItemPreloads,
-    onLoadingStart: handleLoadingStart,
-    onLoadingStop: handleLoadingStop,
-    onUpdateTabLabel: props.onUpdateTabLabel,
+    data: {
+        items,
+        tab,
+    },
+    services: {
+        availableServices,
+        localService,
+        fetchServices,
+        fetchSources,
+    },
+    view: {
+        clearPreviewedItems: itemPreview.clearPreviewedItems,
+        resetPreloadedItems: resetItemPreloads,
+    },
+    events: {
+        onPageLoadingChange: setBrowseLoading,
+        onTabDataLoadingChange: setTabDataLoading,
+        onUpdateTabLabel: props.onUpdateTabLabel,
+    },
 });
 const browseState = reactive(browse.state);
 const browseDerived = browse.derived;
 const browseActions = browse.actions;
-// Compatibility aliases for tests/debugging. Keep the public surface narrow.
 const selectedService = browseDerived.selectedService;
 const currentTabService = browseDerived.currentTabService;
 const hasServiceSelected = browseDerived.hasServiceSelected;
@@ -200,34 +207,20 @@ const layout = {
     sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
 };
 
-// Handle masonry loading state changes via events
-function handleLoadingStart(): void {
-    emit('update:loading', true);
-    if (props.onLoadingChange) {
-        props.onLoadingChange(true);
+function setBrowseLoading(isLoading: boolean): void {
+    emit('update:loading', isLoading);
+    props.onLoadingChange?.(isLoading);
+
+    if (!isLoading) {
+        onLoadingStop();
     }
 }
 
-function handleLoadingStop(): void {
-    emit('update:loading', false);
-    if (props.onLoadingChange) {
-        props.onLoadingChange(false);
-    }
-
-    // Also call onLoadingStop for moderation toast handling
-    onLoadingStop();
-}
-
-function handleResetFilters(): void {
-    form.reset();
-}
-
-function handleModerationRulesChanged(): void {
-    // TODO: Implement moderation rules changed logic.
+function setTabDataLoading(isLoading: boolean): void {
+    props.onTabDataLoadingChange?.(isLoading);
 }
 
 defineExpose({
-    // Expose compatibility fields used by some Browse tests
     selectedService,
     currentTabService,
     hasServiceSelected,
@@ -253,11 +246,11 @@ defineExpose({
             :update-filter-sheet-open="(value) => isFilterSheetOpen = value"
             :update-feed="(value) => form.data.feed = value" :update-service="browseActions.updateService"
             :update-source="(value) => form.data.source = value" :apply-service="browseActions.applyService"
-            :apply-filters="browseActions.applyFilters" :reset-filters="handleResetFilters"
-            :rules-changed="handleModerationRulesChanged" :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
+            :apply-filters="browseActions.applyFilters" :reset-filters="form.reset"
+            :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
             :load-next-page="itemInteractions.masonry.loadNextPage">
             <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"
-                @blacklists-changed="handleModerationRulesChanged" />
+            />
         </TabContentServiceHeader>
 
         <!-- Masonry Content -->
