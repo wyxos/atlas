@@ -12,17 +12,35 @@ import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 type UseTabContentBrowseStateOptions = {
     tabId: Ref<number | null>;
     form: BrowseFormInstance;
-    items: ShallowRef<FeedItem[]>;
-    tab: Ref<TabData | null>;
-    availableServices: ComputedRef<ServiceOption[]>;
-    localService?: Ref<ServiceOption | null | undefined>;
-    fetchServices: () => Promise<void>;
-    fetchSources: () => Promise<void>;
-    clearPreviewedItems: () => void;
-    resetPreloadedItems: () => void;
-    onLoadingStart: () => void;
-    onLoadingStop: () => void;
-    onUpdateTabLabel?: (label: string) => void;
+    data: {
+        items: ShallowRef<FeedItem[]>;
+        tab: Ref<TabData | null>;
+    };
+    services: {
+        availableServices: ComputedRef<ServiceOption[]>;
+        localService?: Ref<ServiceOption | null | undefined>;
+        fetchServices: () => Promise<void>;
+        fetchSources: () => Promise<void>;
+    };
+    view: {
+        clearPreviewedItems: () => void;
+        resetPreloadedItems: () => void;
+    };
+    events: {
+        onPageLoadingChange: (isLoading: boolean) => void;
+        onTabDataLoadingChange?: (isLoading: boolean) => void;
+        onUpdateTabLabel?: (label: string) => void;
+    };
+};
+
+type TabContentBrowseStateRefs = {
+    totalAvailable: Ref<number | null>;
+    masonryRenderKey: Ref<number>;
+    startPageToken: Ref<PageToken>;
+    restoredPages: Ref<MasonryRestoredPages | null>;
+    loadAtPage: Ref<number | string | null>;
+    isTabRestored: Ref<boolean>;
+    shouldShowForm: Ref<boolean>;
 };
 
 function normalizeContainerValue(value: unknown): string | null {
@@ -49,6 +67,212 @@ function normalizeTotal(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
+function getContainerLabelFromFilters(formData: BrowseFormData): string | null {
+    if (formData.feed !== 'online') {
+        return null;
+    }
+
+    if (formData.service === 'civit-ai-images') {
+        const username = normalizeContainerValue(formData.serviceFilters?.username);
+        if (username) {
+            return `User ${username}`;
+        }
+
+        const postId = normalizeContainerValue(formData.serviceFilters?.postId);
+        if (postId) {
+            return `Post ${postId}`;
+        }
+    }
+
+    return null;
+}
+
+function formatTabLabel(serviceLabel: string, pageToken: PageToken, containerLabel?: string | null): string {
+    const prefix = containerLabel ? `${serviceLabel}: ${containerLabel}` : serviceLabel;
+
+    return `${prefix} - ${String(pageToken)}`;
+}
+
+function normalizeLocalPage(form: BrowseFormInstance): number {
+    const raw = form.data.page;
+    const page = typeof raw === 'number' ? raw : Number(raw);
+
+    if (!Number.isFinite(page) || page < 1) {
+        return 1;
+    }
+
+    return Math.floor(page);
+}
+
+function resetBrowseResults(
+    state: TabContentBrowseStateRefs,
+    options: UseTabContentBrowseStateOptions,
+    nextStart: PageToken,
+): void {
+    state.shouldShowForm.value = false;
+    state.totalAvailable.value = null;
+    options.view.clearPreviewedItems();
+    options.data.items.value = [];
+    options.view.resetPreloadedItems();
+    state.restoredPages.value = null;
+    state.startPageToken.value = nextStart;
+    state.masonryRenderKey.value += 1;
+}
+
+function createTabContentPageLoader(args: {
+    form: BrowseFormInstance;
+    services: UseTabContentBrowseStateOptions['services'];
+    totalAvailable: Ref<number | null>;
+    toast: ReturnType<typeof useToast>;
+    events: UseTabContentBrowseStateOptions['events'];
+}) {
+    function updateTabLabel(formData: BrowseFormData, page: PageToken): void {
+        if (!args.events.onUpdateTabLabel) {
+            return;
+        }
+
+        if (formData.feed === 'online' && !formData.service) {
+            return;
+        }
+
+        const baseServiceLabel = formData.feed === 'local'
+            ? (args.services.localService?.value?.label ?? 'Local')
+            : (
+                args.services.availableServices.value.find((service) => service.key === formData.service)?.label
+                ?? formData.service
+            );
+
+        const localPresetLabel = formData.feed === 'local'
+            ? getLocalPresetLabel(formData.serviceFilters?.local_preset)
+            : null;
+        const serviceLabel = localPresetLabel ? `${baseServiceLabel} - ${localPresetLabel}` : baseServiceLabel;
+        const containerLabel = getContainerLabelFromFilters(formData);
+
+        args.events.onUpdateTabLabel(formatTabLabel(serviceLabel, page, containerLabel));
+    }
+
+    async function getPage(page: PageToken, context?: BrowseFormData) {
+        const formData = context ?? args.form.getData();
+        const params: Record<string, unknown> = {
+            feed: formData.feed,
+            tab_id: formData.tab_id,
+            page,
+            limit: formData.limit,
+        };
+
+        if (formData.feed === 'online') {
+            params.service = formData.service;
+        } else {
+            params.source = formData.source;
+        }
+
+        appendBrowseServiceFilters(params, formData.serviceFilters);
+        updateTabLabel(formData, page);
+
+        args.events.onPageLoadingChange(true);
+
+        try {
+            const { data } = await window.axios.get(browseIndex.url({ query: params }));
+
+            args.totalAvailable.value = normalizeTotal(data.total);
+
+            return {
+                items: data.items || [],
+                nextPage: data.nextPage,
+            };
+        } catch (error: unknown) {
+            const err = error as { message?: unknown; response?: { data?: { message?: unknown } } };
+            const message =
+                (typeof err?.response?.data?.message === 'string' ? err.response.data.message : null)
+                || (typeof err?.message === 'string' ? err.message : null)
+                || 'Browse request failed.';
+            const trimmed = message.length > 280 ? `${message.slice(0, 280)}…` : message;
+
+            args.toast.error(trimmed);
+            console.error('Browse request failed', { params, error });
+            args.totalAvailable.value = null;
+
+            return {
+                items: [],
+                nextPage: null,
+            };
+        } finally {
+            args.events.onPageLoadingChange(false);
+        }
+    }
+
+    return {
+        getPage,
+    };
+}
+
+function createTabContentBootstrap(args: {
+    options: UseTabContentBrowseStateOptions;
+    state: TabContentBrowseStateRefs;
+    updateService: (nextService: string) => void;
+}) {
+    async function initialize(): Promise<void> {
+        if (!args.options.tabId.value) {
+            return;
+        }
+
+        args.options.events.onTabDataLoadingChange?.(true);
+
+        try {
+            const { data } = await window.axios.get(tabsShow.url(args.options.tabId.value));
+
+            if (data.tab) {
+                args.options.data.tab.value = data.tab;
+                args.options.form.syncFromTab(args.options.data.tab.value ?? undefined);
+
+                const params = (args.options.data.tab.value?.params ?? {}) as Record<string, unknown>;
+                const itemsToRestore = Array.isArray(data.tab.items) ? data.tab.items : [];
+                const hasRestoredItems = itemsToRestore.length > 0;
+                const hasMeaningfulParams = Object.keys(params).length > 0;
+
+                if (hasRestoredItems || hasMeaningfulParams) {
+                    args.state.shouldShowForm.value = false;
+                    args.state.isTabRestored.value = hasRestoredItems;
+
+                    const savedNextToken = params.page as PageToken | null | undefined;
+
+                    args.options.data.items.value = itemsToRestore as FeedItem[];
+                    args.options.view.resetPreloadedItems();
+                    args.state.restoredPages.value = null;
+                    args.state.startPageToken.value = (savedNextToken ?? 1) as PageToken;
+                    args.state.masonryRenderKey.value += 1;
+
+                    await nextTick();
+                }
+            }
+
+            await args.options.services.fetchServices();
+
+            if (args.options.form.data.feed === 'online' && !args.options.form.data.service) {
+                const legacyCandidate = args.options.data.tab.value?.params?.source;
+
+                if (typeof legacyCandidate === 'string' && legacyCandidate.length > 0) {
+                    const isKnownService = args.options.services.availableServices.value
+                        .some((service) => service.key === legacyCandidate);
+
+                    if (isKnownService) {
+                        args.updateService(legacyCandidate);
+                        args.options.form.data.source = 'all';
+                    }
+                }
+            }
+
+            await args.options.services.fetchSources();
+        } finally {
+            args.options.events.onTabDataLoadingChange?.(false);
+        }
+    }
+
+    return {
+        initialize,
+    };
+}
+
 export function useTabContentBrowseState(options: UseTabContentBrowseStateOptions) {
     const toast = useToast();
 
@@ -68,7 +292,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     });
 
     const currentTabService = computed(() => {
-        const fromTab = options.tab.value?.params?.service;
+        const fromTab = options.data.tab.value?.params?.service;
 
         return (typeof fromTab === 'string' && fromTab.length > 0)
             ? fromTab
@@ -84,128 +308,36 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     });
 
     function updateService(nextService: string): void {
-        const defaults = options.availableServices.value.find((service) => service.key === nextService)?.defaults;
+        const defaults = options.services.availableServices.value.find((service) => service.key === nextService)?.defaults;
         options.form.setService(nextService, defaults);
     }
-
-    function getContainerLabelFromFilters(formData: BrowseFormData): string | null {
-        if (formData.feed !== 'online') {
-            return null;
-        }
-
-        if (formData.service === 'civit-ai-images') {
-            const username = normalizeContainerValue(formData.serviceFilters?.username);
-            if (username) {
-                return `User ${username}`;
-            }
-
-            const postId = normalizeContainerValue(formData.serviceFilters?.postId);
-            if (postId) {
-                return `Post ${postId}`;
-            }
-        }
-
-        return null;
-    }
-
-    function formatTabLabel(serviceLabel: string, pageToken: PageToken, containerLabel?: string | null): string {
-        const prefix = containerLabel ? `${serviceLabel}: ${containerLabel}` : serviceLabel;
-
-        return `${prefix} - ${String(pageToken)}`;
-    }
-
-    function resetBrowseResults(nextStart: PageToken): void {
-        shouldShowForm.value = false;
-        options.clearPreviewedItems();
-        options.items.value = [];
-        options.resetPreloadedItems();
-        restoredPages.value = null;
-        startPageToken.value = nextStart;
-        masonryRenderKey.value += 1;
-    }
-
-    function normalizeLocalPage(): number {
-        const raw = options.form.data.page;
-        const page = typeof raw === 'number' ? raw : Number(raw);
-
-        if (!Number.isFinite(page) || page < 1) {
-            return 1;
-        }
-
-        return Math.floor(page);
-    }
-
-    async function getPage(page: PageToken, context?: BrowseFormData) {
-        const formData = context ?? options.form.getData();
-        const params: Record<string, unknown> = {
-            feed: formData.feed,
-            tab_id: formData.tab_id,
-            page,
-            limit: formData.limit,
-        };
-
-        if (formData.feed === 'online') {
-            params.service = formData.service;
-        } else {
-            params.source = formData.source;
-        }
-
-        appendBrowseServiceFilters(params, formData.serviceFilters);
-
-        if (
-            options.onUpdateTabLabel
-            && (formData.feed === 'local' || (formData.feed === 'online' && formData.service))
-        ) {
-            const baseServiceLabel = formData.feed === 'local'
-                ? (options.localService?.value?.label ?? 'Local')
-                : (options.availableServices.value.find((service) => service.key === formData.service)?.label ?? formData.service);
-
-            const localPresetLabel = formData.feed === 'local'
-                ? getLocalPresetLabel(formData.serviceFilters?.local_preset)
-                : null;
-
-            const serviceLabel = localPresetLabel ? `${baseServiceLabel} - ${localPresetLabel}` : baseServiceLabel;
-            const containerLabel = getContainerLabelFromFilters(formData);
-            options.onUpdateTabLabel(formatTabLabel(serviceLabel, page, containerLabel));
-        }
-
-        options.onLoadingStart();
-
-        try {
-            const { data } = await window.axios.get(browseIndex.url({ query: params }));
-
-            totalAvailable.value = normalizeTotal(data.total);
-
-            return {
-                items: data.items || [],
-                nextPage: data.nextPage,
-            };
-        } catch (error: unknown) {
-            const err = error as { message?: unknown; response?: { data?: { message?: unknown } } };
-            const message =
-                (typeof err?.response?.data?.message === 'string' ? err.response.data.message : null)
-                || (typeof err?.message === 'string' ? err.message : null)
-                || 'Browse request failed.';
-            const trimmed = message.length > 280 ? `${message.slice(0, 280)}…` : message;
-
-            toast.error(trimmed);
-            console.error('Browse request failed', { params, error });
-            totalAvailable.value = null;
-
-            return {
-                items: [],
-                nextPage: null,
-            };
-        } finally {
-            options.onLoadingStop();
-        }
-    }
+    const state: TabContentBrowseStateRefs = {
+        totalAvailable,
+        masonryRenderKey,
+        startPageToken,
+        restoredPages,
+        loadAtPage,
+        isTabRestored,
+        shouldShowForm,
+    };
+    const loader = createTabContentPageLoader({
+        form: options.form,
+        services: options.services,
+        totalAvailable,
+        toast,
+        events: options.events,
+    });
+    const bootstrap = createTabContentBootstrap({
+        options,
+        state,
+        updateService,
+    });
 
     async function applyFilters(): Promise<void> {
-        const nextStart: PageToken = options.form.data.feed === 'local' ? normalizeLocalPage() : 1;
+        const nextStart: PageToken = options.form.data.feed === 'local' ? normalizeLocalPage(options.form) : 1;
 
         options.form.data.page = nextStart;
-        resetBrowseResults(nextStart);
+        resetBrowseResults(state, options, nextStart);
         await nextTick();
     }
 
@@ -215,62 +347,12 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     }
 
     async function applyService(): Promise<void> {
-        resetBrowseResults(1);
-    }
-
-    async function initialize(): Promise<void> {
-        if (!options.tabId.value) {
-            return;
-        }
-
-        const { data } = await window.axios.get(tabsShow.url(options.tabId.value));
-
-        if (data.tab) {
-            options.tab.value = data.tab;
-            options.form.syncFromTab(options.tab.value ?? undefined);
-
-            const params = (options.tab.value?.params ?? {}) as Record<string, unknown>;
-            const itemsToRestore = Array.isArray(data.tab.items) ? data.tab.items : [];
-            const hasRestoredItems = itemsToRestore.length > 0;
-            const hasMeaningfulParams = Object.keys(params).length > 0;
-            const shouldRestoreUi = hasRestoredItems || hasMeaningfulParams;
-
-            if (shouldRestoreUi) {
-                shouldShowForm.value = false;
-                isTabRestored.value = hasRestoredItems;
-
-                const savedNextToken = params.page as PageToken | null | undefined;
-
-                options.items.value = itemsToRestore as FeedItem[];
-                options.resetPreloadedItems();
-                restoredPages.value = null;
-                startPageToken.value = (savedNextToken ?? 1) as PageToken;
-                masonryRenderKey.value += 1;
-
-                await nextTick();
-            }
-        }
-
-        await options.fetchServices();
-
-        if (options.form.data.feed === 'online' && !options.form.data.service) {
-            const legacyCandidate = options.tab.value?.params?.source;
-
-            if (typeof legacyCandidate === 'string' && legacyCandidate.length > 0) {
-                const isKnownService = options.availableServices.value.some((service) => service.key === legacyCandidate);
-
-                if (isKnownService) {
-                    updateService(legacyCandidate);
-                    options.form.data.source = 'all';
-                }
-            }
-        }
-
-        await options.fetchSources();
+        resetBrowseResults(state, options, 1);
+        await nextTick();
     }
 
     onMounted(() => {
-        void initialize();
+        void bootstrap.initialize();
     });
 
     return {
@@ -290,7 +372,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
         },
         actions: {
             updateService,
-            getPage,
+            getPage: loader.getPage,
             applyFilters,
             goToFirstPage,
             applyService,

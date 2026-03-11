@@ -22,7 +22,6 @@ interface Props {
     applyService: () => void | Promise<void>;
     applyFilters: () => void | Promise<void>;
     resetFilters: () => void;
-    rulesChanged: () => void;
     cancelMasonryLoad: () => void;
     loadNextPage: () => void | Promise<void>;
 }
@@ -86,7 +85,7 @@ withDefaults(defineProps<Props>(), {
             <TabFilter :open="filterSheetOpen" :available-services="availableServices" :local-def="localService"
                 :masonry="masonry" @update:open="updateFilterSheetOpen" @reset="resetFilters" @apply="applyFilters" />
 
-            <ModerationRulesManager :disabled="masonry?.isLoading" @rules-changed="rulesChanged" />
+            <ModerationRulesManager :disabled="masonry?.isLoading" />
 
             <slot />
 
