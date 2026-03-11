@@ -1,15 +1,14 @@
 import { nextTick, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 import {
-    calculateBestFitSize,
-    getAvailableWidth,
-    getCenteredPosition,
     preloadImage,
-    resolveFileViewerFullSizeUrl,
-    resolveFileViewerMediaType,
-    resolveFileViewerPreviewUrl,
     type FileViewerOverlayMediaType,
 } from '@/utils/fileViewer';
+import {
+    calculateFileViewerPagingLayout,
+    resolveFileViewerPagingMediaTarget,
+    type FileViewerPagingMediaTarget,
+} from '@/utils/fileViewerPaging';
 
 export function useFileViewerPaging(params: {
     containerRef: Ref<HTMLElement | null>;
@@ -71,15 +70,197 @@ export function useFileViewerPaging(params: {
         isNavigating,
         direction,
     } = toRefs(params.navigation);
-    const waitForLayout = () => new Promise(resolve => setTimeout(resolve, 0));
-    const getAvailableFrameWidth = (containerWidth: number, borderWidth: number): number => getAvailableWidth(
-        containerWidth,
-        borderWidth,
-        isFilled.value,
-        fillComplete.value,
-        isClosing.value,
-        isOpen.value,
-    );
+    const transitionDurationMs = 500;
+    const borderWidth = 4;
+
+    function wait(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function waitForLayoutPasses(): Promise<void> {
+        await wait(0);
+        await wait(0);
+    }
+
+    function stopNavigation(): void {
+        isNavigating.value = false;
+        isAnimating.value = false;
+    }
+
+    function isNavigationSuperseded(targetIndex: number): boolean {
+        return currentTarget.value !== targetIndex;
+    }
+
+    function stopNavigationIfSuperseded(targetIndex: number): boolean {
+        if (!isNavigationSuperseded(targetIndex)) {
+            return false;
+        }
+
+        stopNavigation();
+        return true;
+    }
+
+    function getContainerSize(container: HTMLElement): { width: number; height: number } {
+        const box = container.getBoundingClientRect();
+
+        return {
+            width: box.width,
+            height: box.height,
+        };
+    }
+
+    function updateOverlayLayout(container: HTMLElement, width: number, height: number): void {
+        const { width: containerWidth, height: containerHeight } = getContainerSize(container);
+        const layout = calculateFileViewerPagingLayout({
+            containerWidth,
+            containerHeight,
+            borderWidth,
+            mediaWidth: width,
+            mediaHeight: height,
+            isFilled: isFilled.value,
+            fillComplete: fillComplete.value,
+            isClosing: isClosing.value,
+            isSheetOpen: isOpen.value,
+        });
+
+        imageSize.value = layout.imageSize;
+        centerPosition.value = layout.centerPosition;
+    }
+
+    function applyPreparedMedia(target: FileViewerPagingMediaTarget): void {
+        image.value = target.overlayImage;
+        mediaType.value = target.mediaType;
+        videoSrc.value = target.isVideo ? target.fullSizeUrl : null;
+        audioSrc.value = target.isAudio ? target.fullSizeUrl : null;
+        isLoading.value = target.isLoading;
+        fullSizeImage.value = target.initialFullSizeImage;
+        key.value += 1;
+    }
+
+    async function markItemSeen(item: FeedItem): Promise<void> {
+        await params.handleItemSeen(item.id);
+    }
+
+    async function finishSlideIn(targetIndex: number): Promise<boolean> {
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        imageTranslateY.value = 0;
+        await wait(transitionDurationMs);
+
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        stopNavigation();
+        return true;
+    }
+
+    async function revealImmediateMedia(
+        item: FeedItem,
+        target: FileViewerPagingMediaTarget,
+        container: HTMLElement,
+        targetIndex: number,
+    ): Promise<boolean> {
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        originalDimensions.value = target.originalDimensions;
+
+        if (target.isVideo) {
+            videoSrc.value = target.fullSizeUrl;
+        }
+
+        if (target.isAudio || target.isFile) {
+            fullSizeImage.value = target.previewSrc;
+        }
+
+        await markItemSeen(item);
+
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        updateOverlayLayout(container, target.originalDimensions.width, target.originalDimensions.height);
+        isLoading.value = false;
+
+        await nextTick();
+        await waitForLayoutPasses();
+
+        return finishSlideIn(targetIndex);
+    }
+
+    async function revealImageMedia(
+        item: FeedItem,
+        target: FileViewerPagingMediaTarget,
+        container: HTMLElement,
+        targetIndex: number,
+    ): Promise<boolean> {
+        const dimensions = await preloadImage(target.fullSizeUrl);
+
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        originalDimensions.value = dimensions;
+        fullSizeImage.value = target.fullSizeUrl;
+
+        await markItemSeen(item);
+
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        updateOverlayLayout(container, dimensions.width, dimensions.height);
+        imageScale.value = 1;
+
+        await nextTick();
+
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        await waitForLayoutPasses();
+
+        if (stopNavigationIfSuperseded(targetIndex)) {
+            return false;
+        }
+
+        isLoading.value = false;
+        await nextTick();
+        await waitForLayoutPasses();
+        await wait(10);
+
+        return finishSlideIn(targetIndex);
+    }
+
+    async function revealImageFallback(
+        item: FeedItem,
+        target: FileViewerPagingMediaTarget,
+        container: HTMLElement,
+        error: unknown,
+    ): Promise<void> {
+        console.warn('Failed to preload next image:', error);
+        fullSizeImage.value = target.previewSrc;
+        isLoading.value = false;
+
+        try {
+            const fallbackDimensions = await preloadImage(target.previewSrc);
+            originalDimensions.value = fallbackDimensions;
+            updateOverlayLayout(container, fallbackDimensions.width, fallbackDimensions.height);
+        } catch {
+            originalDimensions.value = {
+                width: item.width,
+                height: item.height,
+            };
+        }
+
+        imageScale.value = 1;
+        imageTranslateY.value = 0;
+        await nextTick();
+    }
 
     async function navigateToNext(): Promise<void> {
         if (!rect.value || !fillComplete.value || currentItemIndex.value === null) return;
@@ -88,14 +269,14 @@ export function useFileViewerPaging(params: {
             if (currentItemIndex.value < params.items.value.length - 1) {
                 const nextIndex = currentItemIndex.value + 1;
                 currentItemIndex.value = nextIndex;
-                navigateToIndex(nextIndex, 'down');
+                await navigateToIndex(nextIndex, 'down');
             }
             return;
         }
 
         const nextIndex = currentItemIndex.value + 1;
         currentItemIndex.value = nextIndex;
-        navigateToIndex(nextIndex, 'down');
+        await navigateToIndex(nextIndex, 'down');
     }
 
     async function navigateToPrevious(): Promise<void> {
@@ -104,7 +285,7 @@ export function useFileViewerPaging(params: {
 
         const prevIndex = currentItemIndex.value - 1;
         currentItemIndex.value = prevIndex;
-        navigateToIndex(prevIndex, 'up');
+        await navigateToIndex(prevIndex, 'up');
     }
 
     async function navigateToIndex(index: number, dir?: 'up' | 'down'): Promise<void> {
@@ -114,342 +295,49 @@ export function useFileViewerPaging(params: {
         const tabContent = params.containerRef.value;
         if (!tabContent) return;
 
-        if (!dir && currentItemIndex.value !== null) {
-            dir = index > currentItemIndex.value ? 'down' : 'up';
-        }
-        direction.value = dir || 'down';
+        const resolvedDirection = dir
+            ?? (currentItemIndex.value !== null && index < currentItemIndex.value ? 'up' : 'down');
+
+        direction.value = resolvedDirection;
 
         currentTarget.value = index;
         isNavigating.value = true;
 
-        const slideOutDistance = tabContent.getBoundingClientRect().height;
-        imageTranslateY.value = dir === 'down' ? -slideOutDistance : slideOutDistance;
+        const { height: slideOutDistance } = getContainerSize(tabContent);
+        imageTranslateY.value = resolvedDirection === 'down' ? -slideOutDistance : slideOutDistance;
         isAnimating.value = true;
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await wait(transitionDurationMs);
 
         const nextItem = params.items.value[index];
         if (!nextItem) {
-            isNavigating.value = false;
+            stopNavigation();
             return;
         }
 
-        const nextMediaType = resolveFileViewerMediaType(nextItem);
-        const nextIsVideo = nextMediaType === 'video';
-        const nextIsAudio = nextMediaType === 'audio';
-        const nextIsFile = nextMediaType === 'file';
-        const nextImageSrc = resolveFileViewerPreviewUrl(nextItem);
-        const nextFullSizeUrl = resolveFileViewerFullSizeUrl(nextItem, nextImageSrc, nextMediaType);
+        const target = resolveFileViewerPagingMediaTarget(nextItem);
+        applyPreparedMedia(target);
+        updateOverlayLayout(tabContent, target.originalDimensions.width, target.originalDimensions.height);
 
-        image.value = {
-            src: nextImageSrc,
-            srcset: undefined,
-            sizes: undefined,
-            alt: nextItem.id.toString(),
-        };
-        mediaType.value = nextMediaType;
-        videoSrc.value = nextIsVideo ? nextFullSizeUrl : null;
-        audioSrc.value = nextIsAudio ? nextFullSizeUrl : null;
-        isLoading.value = nextMediaType === 'image';
-        fullSizeImage.value = null;
-        if (nextIsAudio || nextIsFile) {
-            fullSizeImage.value = nextImageSrc;
-        }
-        key.value++;
-
-        const tabContentBox = tabContent.getBoundingClientRect();
-        const containerWidth = tabContentBox.width;
-        const containerHeight = tabContentBox.height;
-        const borderWidth = 4;
-        const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
-        const availableHeight = containerHeight - (borderWidth * 2);
-
-        const previewDimensions = {
-            width: nextItem.width,
-            height: nextItem.height,
-        };
-        const initialBestFit = calculateBestFitSize(
-            previewDimensions.width,
-            previewDimensions.height,
-            availableWidth,
-            availableHeight
-        );
-
-        imageSize.value = initialBestFit;
-        centerPosition.value = getCenteredPosition(
-            availableWidth,
-            availableHeight,
-            initialBestFit.width,
-            initialBestFit.height
-        );
-
-        const slideInDistance = tabContent.getBoundingClientRect().height;
-        imageTranslateY.value = dir === 'down' ? slideInDistance : -slideInDistance;
+        const { height: slideInDistance } = getContainerSize(tabContent);
+        imageTranslateY.value = resolvedDirection === 'down' ? slideInDistance : -slideInDistance;
         imageScale.value = 1;
         await nextTick();
 
         const preloadTarget = index;
+
         try {
-            if (nextIsVideo) {
-                if (currentTarget.value !== preloadTarget) {
-                    isNavigating.value = false;
-                    isAnimating.value = false;
-                    return;
-                }
-
-                originalDimensions.value = {
-                    width: nextItem.width,
-                    height: nextItem.height,
-                };
-                videoSrc.value = nextFullSizeUrl;
-
-                if (nextItem?.id) {
-                    await params.handleItemSeen(nextItem.id);
-                }
-
-                const tabContentBox = tabContent.getBoundingClientRect();
-                const containerWidth = tabContentBox.width;
-                const containerHeight = tabContentBox.height;
-                const borderWidth = 4;
-                const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
-                const availableHeight = containerHeight - (borderWidth * 2);
-
-                const bestFitSize = calculateBestFitSize(
-                    nextItem.width,
-                    nextItem.height,
-                    availableWidth,
-                    availableHeight
-                );
-
-                imageSize.value = bestFitSize;
-                centerPosition.value = getCenteredPosition(
-                    availableWidth,
-                    availableHeight,
-                    bestFitSize.width,
-                    bestFitSize.height
-                );
-
-                isLoading.value = false;
-
-                await nextTick();
-
-                await waitForLayout();
-                await waitForLayout();
-
-                if (currentTarget.value !== preloadTarget) {
-                    isNavigating.value = false;
-                    isAnimating.value = false;
-                    return;
-                }
-
-                imageTranslateY.value = 0;
-                await new Promise(resolve => setTimeout(resolve, 500));
-                if (currentTarget.value !== preloadTarget) {
-                    isNavigating.value = false;
-                    isAnimating.value = false;
-                    return;
-                }
-
-                isNavigating.value = false;
-                isAnimating.value = false;
+            if (target.isVideo || target.isAudio || target.isFile) {
+                await revealImmediateMedia(nextItem, target, tabContent, preloadTarget);
                 return;
             }
 
-            if (nextIsAudio || nextIsFile) {
-                if (currentTarget.value !== preloadTarget) {
-                    isNavigating.value = false;
-                    isAnimating.value = false;
-                    return;
-                }
-
-                originalDimensions.value = {
-                    width: nextItem.width,
-                    height: nextItem.height,
-                };
-                // Display stays as icon image; audioSrc already set for audio.
-                fullSizeImage.value = nextImageSrc;
-
-                if (nextItem?.id) {
-                    await params.handleItemSeen(nextItem.id);
-                }
-
-                const tabContentBox = tabContent.getBoundingClientRect();
-                const containerWidth = tabContentBox.width;
-                const containerHeight = tabContentBox.height;
-                const borderWidth = 4;
-                const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
-                const availableHeight = containerHeight - (borderWidth * 2);
-
-                const bestFitSize = calculateBestFitSize(
-                    nextItem.width,
-                    nextItem.height,
-                    availableWidth,
-                    availableHeight
-                );
-
-                imageSize.value = bestFitSize;
-                centerPosition.value = getCenteredPosition(
-                    availableWidth,
-                    availableHeight,
-                    bestFitSize.width,
-                    bestFitSize.height
-                );
-
-                isLoading.value = false;
-
-                await nextTick();
-                await waitForLayout();
-                await waitForLayout();
-
-                if (currentTarget.value !== preloadTarget) {
-                    isNavigating.value = false;
-                    isAnimating.value = false;
-                    return;
-                }
-
-                imageTranslateY.value = 0;
-                await new Promise(resolve => setTimeout(resolve, 500));
-                if (currentTarget.value !== preloadTarget) {
-                    isNavigating.value = false;
-                    isAnimating.value = false;
-                    return;
-                }
-
-                isNavigating.value = false;
-                isAnimating.value = false;
-                return;
-            }
-
-            const imageDimensions = await preloadImage(nextFullSizeUrl);
-
-            if (currentTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                isAnimating.value = false;
-                return;
-            }
-
-            originalDimensions.value = imageDimensions;
-            fullSizeImage.value = nextFullSizeUrl;
-
-            if (nextItem?.id) {
-                await params.handleItemSeen(nextItem.id);
-            }
-
-            if (currentTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                isAnimating.value = false;
-                return;
-            }
-
-            const tabContentBox = tabContent.getBoundingClientRect();
-            const containerWidth = tabContentBox.width;
-            const containerHeight = tabContentBox.height;
-            const borderWidth = 4;
-
-            const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
-            const availableHeight = containerHeight - (borderWidth * 2);
-
-            const bestFitSize = calculateBestFitSize(
-                imageDimensions.width,
-                imageDimensions.height,
-                availableWidth,
-                availableHeight
-            );
-
-            imageSize.value = bestFitSize;
-            centerPosition.value = getCenteredPosition(
-                availableWidth,
-                availableHeight,
-                bestFitSize.width,
-                bestFitSize.height
-            );
-
-            imageScale.value = 1;
-
-            await nextTick();
-
-            if (currentTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                isAnimating.value = false;
-                return;
-            }
-
-            await waitForLayout();
-            await waitForLayout();
-
-            if (currentTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                isAnimating.value = false;
-                return;
-            }
-
-            isLoading.value = false;
-            await nextTick();
-
-            await waitForLayout();
-            await waitForLayout();
-            await new Promise(resolve => setTimeout(resolve, 10));
-
-            if (currentTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                isAnimating.value = false;
-                return;
-            }
-
-            imageTranslateY.value = 0;
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            if (currentTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                isAnimating.value = false;
-                return;
-            }
+            await revealImageMedia(nextItem, target, tabContent, preloadTarget);
         } catch (error) {
-            console.warn('Failed to preload next image:', error);
-            fullSizeImage.value = nextImageSrc;
-            isLoading.value = false;
-
-            try {
-                const fallbackDimensions = await preloadImage(nextImageSrc);
-                originalDimensions.value = fallbackDimensions;
-
-                const tabContentBox = tabContent.getBoundingClientRect();
-                const containerWidth = tabContentBox.width;
-                const containerHeight = tabContentBox.height;
-                const borderWidth = 4;
-                const availableWidth = getAvailableFrameWidth(containerWidth, borderWidth);
-                const availableHeight = containerHeight - (borderWidth * 2);
-
-                const bestFitSize = calculateBestFitSize(
-                    fallbackDimensions.width,
-                    fallbackDimensions.height,
-                    availableWidth,
-                    availableHeight
-                );
-
-                imageSize.value = bestFitSize;
-                centerPosition.value = getCenteredPosition(
-                    availableWidth,
-                    availableHeight,
-                    bestFitSize.width,
-                    bestFitSize.height
-                );
-            } catch {
-                if (nextItem) {
-                    originalDimensions.value = {
-                        width: nextItem.width,
-                        height: nextItem.height,
-                    };
-                }
-            }
-
-            imageScale.value = 1;
-            imageTranslateY.value = 0;
-            await nextTick();
+            await revealImageFallback(nextItem, target, tabContent, error);
         }
 
-        isNavigating.value = false;
-        isAnimating.value = false;
+        stopNavigation();
     }
 
     return {
