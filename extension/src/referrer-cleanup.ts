@@ -1,6 +1,7 @@
 import { hostMatchesRuleDomain } from './match-rules';
 
 export type ReferrerQueryParamsToStripByDomain = Record<string, string[]>;
+export const STRIP_ALL_QUERY_PARAMS = '*';
 
 const QUERY_PARAM_NAME_PATTERN = /^[^\s&#=?,]+$/;
 
@@ -22,17 +23,23 @@ function normalizeDomainKey(input: string): string {
 }
 
 export function normalizeReferrerQueryParams(params: string[]): string[] {
-    return Array.from(new Set(
+    const normalized = Array.from(new Set(
         params
             .map((param) => param.trim().toLowerCase())
             .filter((param) => param !== ''),
     ));
+
+    return normalized.includes(STRIP_ALL_QUERY_PARAMS) ? [STRIP_ALL_QUERY_PARAMS] : normalized;
 }
 
 export function validateReferrerQueryParam(input: string): string | null {
     const trimmed = input.trim();
     if (trimmed === '') {
         return 'Referrer query parameter name cannot be empty.';
+    }
+
+    if (trimmed === STRIP_ALL_QUERY_PARAMS) {
+        return null;
     }
 
     if (!QUERY_PARAM_NAME_PATTERN.test(trimmed)) {
@@ -107,6 +114,12 @@ export function cleanupReferrerUrl(
 
         if (queryParamsToStrip.size === 0) {
             return trimmed;
+        }
+
+        if (queryParamsToStrip.has(STRIP_ALL_QUERY_PARAMS)) {
+            parsed.search = '';
+
+            return parsed.toString();
         }
 
         for (const key of Array.from(parsed.searchParams.keys())) {
