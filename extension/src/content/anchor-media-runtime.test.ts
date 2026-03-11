@@ -73,6 +73,7 @@ describe('anchor-media-runtime', () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
             getRules: () => [],
+            getReferrerQueryParamsToStripByDomain: () => ({}),
             getPageHostname: () => 'example.com',
         });
 
@@ -123,6 +124,7 @@ describe('anchor-media-runtime', () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
             getRules: () => [],
+            getReferrerQueryParamsToStripByDomain: () => ({}),
             getPageHostname: () => 'example.com',
         });
 
@@ -141,5 +143,43 @@ describe('anchor-media-runtime', () => {
         expect(mockEnqueueReferrerCheck).not.toHaveBeenCalled();
         expect(image.getAttribute('data-atlas-anchor-checking')).toBeNull();
         expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')?.getAttribute('data-atlas-anchor-badge-kind')).toBe('reaction');
+    });
+
+    it('strips configured referrer query params before enqueuing checks', async () => {
+        mockEnqueueReferrerCheck.mockResolvedValue({
+            exists: false,
+            reaction: null,
+            reactedAt: null,
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
+
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getRules: () => [],
+            getReferrerQueryParamsToStripByDomain: () => ({
+                'domain.com': ['tag', 'tags'],
+            }),
+            getPageHostname: () => 'domain.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://domain.com/?id=123&tag=blue+sky';
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.registerFromDocument();
+        await flushPromises();
+
+        expect(mockGetCachedReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', {
+            'domain.com': ['tag', 'tags'],
+        });
+        expect(mockEnqueueReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', {
+            'domain.com': ['tag', 'tags'],
+        });
     });
 });

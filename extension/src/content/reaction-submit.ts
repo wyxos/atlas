@@ -1,4 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
+import { cleanupReferrerUrl } from '../referrer-cleanup';
 import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import type { BatchReactionItem } from './deviantart-batch-reaction';
 import type { BadgeReactionType } from './reaction-check-queue';
@@ -358,6 +359,9 @@ export async function submitBadgeReaction(
             : normalizeCookieUrls([reactionUrl, pageUrl]);
         const cookies = await getRuntimeCookies(cookieUrls);
         const userAgent = getSafeUserAgent();
+        const referrerQueryParamsToStripByDomain = stored.referrerQueryParamsToStripByDomain;
+        const cleanedPageReferrerUrl = cleanupReferrerUrl(window.location.href, referrerQueryParamsToStripByDomain)
+            ?? window.location.href;
         const requestBody = usesBatchEndpoint
             ? {
                 type: reactionType,
@@ -365,7 +369,8 @@ export async function submitBadgeReaction(
                 items: batchItems.map((item) => ({
                     candidate_id: item.candidateId,
                     url: item.url,
-                    referrer_url_hash_aware: item.referrerUrlHashAware,
+                    referrer_url_hash_aware: cleanupReferrerUrl(item.referrerUrlHashAware, referrerQueryParamsToStripByDomain)
+                        ?? item.referrerUrlHashAware,
                     page_url: item.pageUrl,
                     tag_name: item.tagName,
                 })),
@@ -375,7 +380,7 @@ export async function submitBadgeReaction(
             : {
                 type: reactionType,
                 url: reactionUrl,
-                referrer_url_hash_aware: window.location.href,
+                referrer_url_hash_aware: cleanedPageReferrerUrl,
                 page_url: window.location.href,
                 tag_name: isVideo ? 'video' : 'img',
                 cookies: cookies.length > 0 ? cookies : null,

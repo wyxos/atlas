@@ -1,5 +1,6 @@
 import { getStoredOptions } from './atlas-options';
 import { DEFAULT_MATCH_RULES, type UrlMatchRule } from './match-rules';
+import type { ReferrerQueryParamsToStripByDomain } from './referrer-cleanup';
 import {
     collectMediaFromNode,
     isMediaElement,
@@ -18,11 +19,13 @@ const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
 const MIN_WIDGET_MEDIA_WIDTH = 200;
 
 let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
+let currentReferrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {};
 let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
 const downloadEventSheet = createDownloadEventSheet();
 const anchorMediaRuntime = createAnchorMediaRuntime({
     getRules: () => currentRules,
+    getReferrerQueryParamsToStripByDomain: () => currentReferrerQueryParamsToStripByDomain,
     getPageHostname: () => currentPageHostname,
 });
 let duplicateAnchorTabGuard: ReturnType<typeof createDuplicateAnchorTabGuard> | null = null;
@@ -226,8 +229,10 @@ async function loadRulesAndProcess(): Promise<void> {
     try {
         const stored = await getStoredOptions();
         currentRules = stored.matchRules;
+        currentReferrerQueryParamsToStripByDomain = stored.referrerQueryParamsToStripByDomain;
     } catch {
         currentRules = [...DEFAULT_MATCH_RULES];
+        currentReferrerQueryParamsToStripByDomain = {};
     }
 
     currentPageHostname = window.location.hostname;
