@@ -248,7 +248,6 @@ describe('Browse - Tab Restoration', () => {
             return;
         }
 
-        tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
 
         const getNextPageResult = await tabContentVm.getPage(currentToken);

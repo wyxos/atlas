@@ -297,7 +297,6 @@ describe('Browse - Core', () => {
             return;
         }
 
-        tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
         const getNextPage = tabContentVm.getPage;
 
@@ -364,7 +363,6 @@ describe('Browse - Core', () => {
             return;
         }
 
-        tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
         const result = await tabContentVm.getPage(100);
 

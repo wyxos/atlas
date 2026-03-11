@@ -123,8 +123,6 @@ const browseActions = browse.actions;
 const selectedService = browseDerived.selectedService;
 const currentTabService = browseDerived.currentTabService;
 const hasServiceSelected = browseDerived.hasServiceSelected;
-const loadAtPage = browse.state.loadAtPage;
-const isTabRestored = browse.state.isTabRestored;
 const getPage = browseActions.getPage;
 const applyService = browseActions.applyService;
 
@@ -224,8 +222,6 @@ defineExpose({
     selectedService,
     currentTabService,
     hasServiceSelected,
-    loadAtPage,
-    isTabRestored,
     getPage,
     applyService,
     hoveredItemIndex: itemInteractions.state.hoveredItemIndex,
@@ -269,7 +265,7 @@ defineExpose({
                 <Masonry v-else :key="`${tab.id}-${browseState.masonryRenderKey}`" ref="masonry" v-model:items="items"
                     class="min-h-0 flex-1 !mt-0 !py-0 !border-0"
                      :mode="form.isLocalMode.value ? 'default' : 'backfill'"
-                    :get-content="browseActions.getPage" :page="browseState.startPageToken" :restored-pages="browseState.restoredPages ?? undefined"
+                    :get-content="browseActions.getPage" :page="browseState.startPageToken"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
                     @preloaded="itemInteractions.preload.onBatchPreloaded" @failures="itemInteractions.preload.onBatchFailures"

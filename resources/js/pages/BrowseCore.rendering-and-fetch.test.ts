@@ -293,7 +293,6 @@ describe('Browse - Core', () => {
             return;
         }
 
-        tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
         const activeTab = vm.getActiveTab();
         if (activeTab && !activeTab.params.service) {
