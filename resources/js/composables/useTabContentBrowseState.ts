@@ -1,5 +1,5 @@
 import { computed, nextTick, onMounted, ref, type ComputedRef, type Ref, type ShallowRef } from 'vue';
-import type { MasonryRestoredPages, PageToken } from '@wyxos/vibe';
+import type { PageToken } from '@wyxos/vibe';
 import { useToast } from 'vue-toastification';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
@@ -37,9 +37,6 @@ type TabContentBrowseStateRefs = {
     totalAvailable: Ref<number | null>;
     masonryRenderKey: Ref<number>;
     startPageToken: Ref<PageToken>;
-    restoredPages: Ref<MasonryRestoredPages | null>;
-    loadAtPage: Ref<number | string | null>;
-    isTabRestored: Ref<boolean>;
     shouldShowForm: Ref<boolean>;
 };
 
@@ -114,7 +111,6 @@ function resetBrowseResults(
     options.view.clearPreviewedItems();
     options.data.items.value = [];
     options.view.resetPreloadedItems();
-    state.restoredPages.value = null;
     state.startPageToken.value = nextStart;
     state.masonryRenderKey.value += 1;
 }
@@ -232,13 +228,11 @@ function createTabContentBootstrap(args: {
 
                 if (hasRestoredItems || hasMeaningfulParams) {
                     args.state.shouldShowForm.value = false;
-                    args.state.isTabRestored.value = hasRestoredItems;
 
                     const savedNextToken = params.page as PageToken | null | undefined;
 
                     args.options.data.items.value = itemsToRestore as FeedItem[];
                     args.options.view.resetPreloadedItems();
-                    args.state.restoredPages.value = null;
                     args.state.startPageToken.value = (savedNextToken ?? 1) as PageToken;
                     args.state.masonryRenderKey.value += 1;
 
@@ -279,9 +273,6 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     const totalAvailable = ref<number | null>(null);
     const masonryRenderKey = ref(0);
     const startPageToken = ref<PageToken>(1);
-    const restoredPages = ref<MasonryRestoredPages | null>(null);
-    const loadAtPage = ref<number | string | null>(null);
-    const isTabRestored = ref(false);
     const shouldShowForm = ref(true);
 
     const selectedService = computed({
@@ -315,9 +306,6 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
         totalAvailable,
         masonryRenderKey,
         startPageToken,
-        restoredPages,
-        loadAtPage,
-        isTabRestored,
         shouldShowForm,
     };
     const loader = createTabContentPageLoader({
@@ -360,9 +348,6 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
             totalAvailable,
             masonryRenderKey,
             startPageToken,
-            restoredPages,
-            loadAtPage,
-            isTabRestored,
             shouldShowForm,
         },
         derived: {

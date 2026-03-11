@@ -262,9 +262,6 @@ describe('Browse - Service Selection', () => {
         const tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.hasServiceSelected).toBe(false);
-            // loadAtPage is null by default and only set when needed (e.g., applying filters)
-            // The important part is that no items are loaded until service is selected
-            expect(tabContentVm.loadAtPage).toBeNull();
             expect(tabContentVm.items.length).toBe(0);
         } else {
             const itemLoadingCalls = mocks.mockAxios.get.mock.calls
@@ -511,8 +508,6 @@ describe('Browse - Service Selection', () => {
             return;
         }
 
-        tabContentVm.isTabRestored = false;
-
         await tabContentVm.getPage(1);
         await flushPromises();
 
@@ -526,6 +521,5 @@ describe('Browse - Service Selection', () => {
     });
 
 });
-
 
 
