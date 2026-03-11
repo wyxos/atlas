@@ -3,7 +3,7 @@ import type { MasonryInstance } from '@wyxos/vibe';
 import { useContainerBadges } from './useContainerBadges';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { BrowseFormInstance } from './useBrowseForm';
-import type { ServiceOption } from './useBrowseService';
+import type { ServiceOption } from '@/lib/browseCatalog';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';

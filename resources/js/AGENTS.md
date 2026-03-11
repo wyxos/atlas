@@ -72,8 +72,9 @@ npm run check:js
 - ✅ DO: Treat long options objects as a hint to check responsibility boundaries first; split initialization, fetch state, and UI side effects before inventing more wrapper objects
 - ✅ DO: Keep a long options object only when every field serves one coherent feature seam
 - ❌ DON'T: Pass flat lists of unrelated refs and callbacks when a smaller number of domain-specific collaborators would make ownership clearer
-- ✅ Example: `resources/js/composables/useBrowseService.ts` - browse logic
+- ✅ DO: Use a plain factory or `lib/` module instead of `useX()` when a module only creates local refs and fetch helpers without Vue lifecycle behavior
 - ✅ Example: `resources/js/composables/useTabs.ts` - tab management
+- ✅ Example: `resources/js/lib/browseCatalog.ts` - plain browse catalog factory
 
 **Routes** (`resources/js/routes/`)
 - ✅ DO: Use Laravel Wayfinder for type-safe route generation
@@ -97,7 +98,7 @@ npm run check:js
 ### Naming Conventions
 
 - **Components**: PascalCase (e.g., `FileViewer.vue`, `AppHeader.vue`)
-- **Composables**: camelCase with `use` prefix (e.g., `useBrowseService.ts`)
+- **Composables**: camelCase with `use` prefix when they are real composables (e.g., `useTabs.ts`)
 - **Pages**: PascalCase matching route name (e.g., `Browse.vue`, `Dashboard.vue`)
 - **Types**: camelCase files, PascalCase interfaces (e.g., `file.ts` with `File` interface)
 - **Utils**: camelCase (e.g., `date.ts`, `file.ts`)
@@ -435,11 +436,11 @@ See `resources/js/pages/Browse.vue`:
 - Focuses on layout
 - Uses Vue Router
 
-**✅ DO: Composable**
-See `resources/js/composables/useBrowseService.ts`:
-- Returns reactive state
-- Exposes methods
-- Handles API calls
+**✅ DO: Plain reactive factory when no lifecycle is involved**
+See `resources/js/lib/browseCatalog.ts`:
+- Creates local refs for a single feature seam
+- Exposes grouped `state` and `actions`
+- Keeps API fetch helpers out of unrelated UI code
 
 ---
 
@@ -465,11 +466,13 @@ See `resources/js/composables/useBrowseService.ts`:
   - `BrowseStatusBar.vue` - Browse status display
 
 ### Key Composables
-- `resources/js/composables/useBrowseService.ts` - Browse API integration
 - `resources/js/composables/useTabs.ts` - Tab management
 - `resources/js/composables/useBrowseForm.ts` - Browse form state
 - `resources/js/composables/useModerationRules.ts` - Moderation rules
 - `resources/js/composables/useAutoDislikeQueue.ts` - Auto-dislike queue management
+
+### Key Lib Modules
+- `resources/js/lib/browseCatalog.ts` - Browse services/sources catalog state and fetch helpers
 
 ### Types
 - `resources/js/types/file.ts` - File types
@@ -669,7 +672,7 @@ it('should do something', () => {
 
 ### Example Tests
 - `resources/js/components/AppHeader.test.ts` - Component test
-- `resources/js/composables/useBrowseService.test.ts` - Composable test
+- `resources/js/lib/browseCatalog.test.ts` - Plain reactive factory test
 - `resources/js/pages/BrowseCore.test.ts` - Page integration test
 
 

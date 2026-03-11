@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import TabFilter from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
-import type { ServiceOption } from '@/composables/useBrowseService';
+import type { ServiceOption } from '@/lib/browseCatalog';
 
 interface Props {
     form: BrowseFormInstance;

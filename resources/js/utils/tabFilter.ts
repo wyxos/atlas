@@ -1,5 +1,5 @@
 import type { BrowseFormData } from '@/composables/useBrowseForm';
-import type { ServiceFilterField, ServiceFilterSchema } from '@/composables/useBrowseService';
+import type { ServiceFilterField, ServiceFilterSchema } from '@/lib/browseCatalog';
 
 export type LocalPreset = {
     label: string;

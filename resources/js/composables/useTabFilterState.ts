@@ -1,6 +1,6 @@
 import { computed, watch, type Ref } from 'vue';
 import { useBrowseForm } from '@/composables/useBrowseForm';
-import type { ServiceFilterField, ServiceOption } from '@/composables/useBrowseService';
+import type { ServiceFilterField, ServiceOption } from '@/lib/browseCatalog';
 import {
     LOCAL_TAB_FILTER_PRESETS,
     getLocalSourceField,
