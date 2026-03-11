@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import TabContent from './TabContent.vue';
-import { useBrowseForm } from '../composables/useBrowseForm';
 
 // Minimal axios mock (TabContent fetches tab data on mount)
 const mockAxios = {
@@ -38,9 +37,6 @@ beforeEach(() => {
             },
         },
     });
-
-    // Reset singleton form between tests
-    useBrowseForm().reset();
 });
 
 describe('TabContent - Service defaults', () => {

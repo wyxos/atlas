@@ -156,13 +156,14 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         }
     }
 
-    const pillInteractions = useContainerPillInteractions(
-        options.items,
-        options.masonry,
-        computed(() => options.tab.value?.id),
-        options.onReaction,
-        handleContainerNavigation,
-    );
+    const pillInteractions = useContainerPillInteractions({
+        items: options.items,
+        masonry: options.masonry,
+        tabId: computed(() => options.tab.value?.id),
+        isLocal: options.form.isLocal,
+        onReaction: options.onReaction,
+        onOpenContainerTab: handleContainerNavigation,
+    });
 
     function clearHoveredContainer(): void {
         badges.setHoveredContainerId(null);

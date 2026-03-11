@@ -12,15 +12,10 @@ vi.mock('@/utils/reactionQueue', () => ({
     queueBatchReaction: vi.fn(),
 }));
 
-vi.mock('./useBrowseForm', () => ({
-    useBrowseForm: () => ({
-        isLocal: computed(() => false), // Online mode for tests
-    }),
-}));
-
 describe('useContainerPillInteractions', () => {
     const mockOnReaction = vi.fn();
     const mockRemove = vi.fn().mockResolvedValue(undefined);
+    const onlineMode = computed(() => false);
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -65,12 +60,13 @@ describe('useContainerPillInteractions', () => {
             remove: mockRemove,
         });
 
-        const { batchReactToSiblings } = useContainerPillInteractions(
+        const { batchReactToSiblings } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+        });
 
         await batchReactToSiblings(1, 'like');
 
@@ -112,12 +108,13 @@ describe('useContainerPillInteractions', () => {
             remove: mockRemoveMany,
         });
 
-        const { handlePillAuxClick } = useContainerPillInteractions(
+        const { handlePillAuxClick } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+        });
 
         // Simulate alt + middle click
         const mockEvent = {
@@ -158,13 +155,14 @@ describe('useContainerPillInteractions', () => {
         const masonry = ref({});
         const onOpenContainerTab = vi.fn();
 
-        const { handlePillAuxClick } = useContainerPillInteractions(
+        const { handlePillAuxClick } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction,
-            onOpenContainerTab
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+            onOpenContainerTab,
+        });
 
         // Simulate middle click without alt
         const mockEvent = {
@@ -216,12 +214,13 @@ describe('useContainerPillInteractions', () => {
             remove: mockRemoveMany,
         });
 
-        const { handlePillClick } = useContainerPillInteractions(
+        const { handlePillClick } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+        });
 
         // Simulate alt + right click (contextmenu event)
         const mockEvent = {
@@ -274,12 +273,13 @@ describe('useContainerPillInteractions', () => {
             remove: mockRemoveMany,
         });
 
-        const { handlePillClick } = useContainerPillInteractions(
+        const { handlePillClick } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+        });
 
         // Simulate double left click (without alt)
         const mockEvent = {
@@ -332,12 +332,13 @@ describe('useContainerPillInteractions', () => {
             remove: mockRemoveMany,
         });
 
-        const { handlePillClick } = useContainerPillInteractions(
+        const { handlePillClick } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+        });
 
         // Simulate double right click (without alt) - need to track the button from previous click
         // First click
@@ -399,12 +400,13 @@ describe('useContainerPillInteractions', () => {
             remove: mockRemoveMany,
         });
 
-        const { handlePillAuxClick } = useContainerPillInteractions(
+        const { handlePillAuxClick } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+        });
 
         const firstClick = {
             button: 1,
@@ -460,13 +462,14 @@ describe('useContainerPillInteractions', () => {
         });
         const onOpenContainerTab = vi.fn();
 
-        const { handlePillAuxClick } = useContainerPillInteractions(
+        const { handlePillAuxClick } = useContainerPillInteractions({
             items,
             masonry,
-            1,
-            mockOnReaction,
-            onOpenContainerTab
-        );
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+            onOpenContainerTab,
+        });
 
         const firstClick = {
             button: 1,

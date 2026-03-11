@@ -18,6 +18,13 @@ type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
     items?: Ref<FeedItem[]>;
 };
+type QueueReactionOptions = {
+    allowRedownloadPrompt?: boolean;
+    updateLocalState?: boolean;
+};
+type QueueBatchReactionOptions = {
+    updateLocalState?: boolean;
+};
 
 /**
  * Queue a reaction with countdown toast.
@@ -29,7 +36,7 @@ export function queueReaction(
     thumbnail?: string,
     restoreCallback?: () => Promise<void> | void,
     items?: Ref<FeedItem[]>,
-    options?: { allowRedownloadPrompt?: boolean }
+    options?: QueueReactionOptions,
 ): void {
     const queueId = `${reactionType}-${fileId}`;
 
@@ -53,8 +60,7 @@ export function queueReaction(
                 // Execute the reaction
                 const result = await reactionCallback(fileId, reactionType);
                 
-                // Update reaction state in local mode (if items provided)
-                if (items) {
+                if (options?.updateLocalState === true && items) {
                     updateReactionState(items, fileId, reactionType);
                 }
 
@@ -122,7 +128,8 @@ export function queueBatchReaction(
     reactionType: ReactionType,
     previews: Array<{ fileId: number; thumbnail?: string }>,
     restoreCallback?: () => Promise<void> | void,
-    items?: Ref<FeedItem[]>
+    items?: Ref<FeedItem[]>,
+    options?: QueueBatchReactionOptions,
 ): void {
     if (fileIds.length === 0) {
         return;
@@ -149,8 +156,7 @@ export function queueBatchReaction(
                     await Promise.all(fileIds.map((fileId) => reactionCallback(fileId, reactionType)));
                 }
                 
-                // Update reaction state in local mode for all files (if items provided)
-                if (items) {
+                if (options?.updateLocalState === true && items) {
                     fileIds.forEach((fileId) => {
                         updateReactionState(items, fileId, reactionType);
                     });

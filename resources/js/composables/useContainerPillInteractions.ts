@@ -3,7 +3,6 @@ import type { FeedItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import { Masonry } from '@wyxos/vibe';
-import { useBrowseForm } from './useBrowseForm';
 
 type Container = {
     id: number;
@@ -29,20 +28,25 @@ function isContainerEntry(container: ContainerEntry): container is Container {
  * Composable for handling container pill interactions (clicks, batch reactions, etc.).
  */
 type OpenContainerTabHandler = (container: Container) => void;
+type UseContainerPillInteractionsOptions = {
+    items: Ref<FeedItem[]>;
+    masonry: Ref<InstanceType<typeof Masonry> | null>;
+    tabId: number | undefined | ComputedRef<number | undefined>;
+    isLocal: Readonly<Ref<boolean>>;
+    onReaction: (fileId: number, type: ReactionType) => void;
+    onOpenContainerTab?: OpenContainerTabHandler;
+};
 
 export function useContainerPillInteractions(
-    items: Ref<FeedItem[]>,
-    masonry: Ref<InstanceType<typeof Masonry> | null>,
-    tabId: number | undefined | ComputedRef<number | undefined>,
-    onReaction: (fileId: number, type: ReactionType) => void,
-    onOpenContainerTab?: OpenContainerTabHandler
+    options: UseContainerPillInteractionsOptions,
 ) {
     // Unwrap computed/ref to get the actual value
-    const tabIdValue = computed(() => typeof tabId === 'object' && 'value' in tabId ? tabId.value : tabId);
+    const tabIdValue = computed(() => (
+        typeof options.tabId === 'object' && 'value' in options.tabId ? options.tabId.value : options.tabId
+    ));
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
     const DOUBLE_CLICK_DELAY_MS = 300; // Maximum time between clicks to count as double-click
     let pendingMiddleClickTimer: ReturnType<typeof setTimeout> | null = null;
-    const { isLocal } = useBrowseForm();
 
     /**
      * Get full container data for an item (including referrer URL).
@@ -56,7 +60,7 @@ export function useContainerPillInteractions(
      * Get all sibling items (items with the same container ID).
      */
     function getSiblingItems(containerId: number): FeedItem[] {
-        return items.value.filter((item) => {
+        return options.items.value.filter((item) => {
             const containers = getContainersForItem(item);
             return containers.some((container) => container.id === containerId);
         });
@@ -66,7 +70,7 @@ export function useContainerPillInteractions(
      * Get the referrer URL for a container (from the first item that has this container).
      */
     function getContainerUrl(containerId: number): string | null {
-        for (const item of items.value) {
+        for (const item of options.items.value) {
             const containers = getContainersForItem(item);
             const container = containers.find((c) => c.id === containerId);
             if (container?.referrer) {
@@ -77,7 +81,7 @@ export function useContainerPillInteractions(
     }
 
     function getContainer(containerId: number): Container | null {
-        for (const item of items.value) {
+        for (const item of options.items.value) {
             const containers = getContainersForItem(item);
             const container = containers.find((c) => c.id === containerId);
             if (container) {
@@ -102,15 +106,15 @@ export function useContainerPillInteractions(
 
         // Only remove from masonry in online mode (not in local mode)
         // Vibe tracks removals and restores internally; restoring does not require indices.
-        if (!isLocal.value) {
-            await masonry.value?.remove(siblings);
+        if (!options.isLocal.value) {
+            await options.masonry.value?.remove(siblings);
         }
 
         // Create batch restore callback (only in online mode)
         const currentTabId = tabIdValue.value;
-        const batchRestoreCallback = !isLocal.value && currentTabId !== undefined
+        const batchRestoreCallback = !options.isLocal.value && currentTabId !== undefined
             ? async () => {
-                await masonry.value?.restore(siblings);
+                await options.masonry.value?.restore(siblings);
             }
             : undefined;
 
@@ -122,14 +126,16 @@ export function useContainerPillInteractions(
         }));
 
         // Queue batch reaction with countdown toast (pass items for local mode updates)
-        queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback, items);
+        queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback, options.items, {
+            updateLocalState: options.isLocal.value,
+        });
 
         // Call onReaction once for the batch (not per item)
         // This is just a callback to notify parent
         if (siblings.length > 0) {
             // Call onReaction for the first item as a representative of the batch
             // This maintains compatibility
-            onReaction(siblings[0].id, reactionType);
+            options.onReaction(siblings[0].id, reactionType);
         }
     }
 
@@ -137,10 +143,10 @@ export function useContainerPillInteractions(
      * Handle middle click to open container URL in new tab without focus.
      */
     function handleMiddleClick(containerId: number): void {
-        if (onOpenContainerTab) {
+        if (options.onOpenContainerTab) {
             const container = getContainer(containerId);
             if (container) {
-                onOpenContainerTab(container);
+                options.onOpenContainerTab(container);
                 return;
             }
         }

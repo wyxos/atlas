@@ -3,7 +3,6 @@ import { queueManager } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 import type { FeedItem } from './useTabs';
 import { Masonry } from '@wyxos/vibe';
-import { useBrowseForm } from './useBrowseForm';
 import updateReactionState from '@/utils/reactionStateUpdater';
 
 const COUNTDOWN_DURATION_MS = 5 * 1000; // 5 seconds
@@ -13,6 +12,12 @@ interface PendingDislike {
     fileId: number;
     item: FeedItem;
 }
+
+type UseAutoDislikeQueueOptions = {
+    items: Ref<FeedItem[]>;
+    masonry: Ref<InstanceType<typeof Masonry> | null>;
+    isLocal: Readonly<Ref<boolean>>;
+};
 
 // Global state for pending dislikes (debounced batch)
 const pendingDislikes = ref<Map<number, PendingDislike>>(new Map());
@@ -26,10 +31,8 @@ let fileViewerUnfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
  * In local mode, items are NOT removed (visual treatment only).
  */
 export function useAutoDislikeQueue(
-    items: Ref<FeedItem[]>,
-    masonry: Ref<InstanceType<typeof Masonry> | null>
+    options: UseAutoDislikeQueueOptions,
 ) {
-    const { isLocal } = useBrowseForm();
     const queue = queueManager;
     const queueCollection = queue.collection;
     const queueCountdown = queue.countdown;
@@ -63,8 +66,8 @@ export function useAutoDislikeQueue(
         const itemsToRemove = Array.from(dislikes.values()).map((pending) => pending.item);
 
         // Only remove items from masonry in online mode (not in local mode)
-        if (!isLocal.value) {
-            await masonry.value?.remove(itemsToRemove);
+        if (!options.isLocal.value) {
+            await options.masonry.value?.remove(itemsToRemove);
         }
 
         // Batch dislike API call
@@ -74,9 +77,9 @@ export function useAutoDislikeQueue(
             });
 
             // Update reaction state in local mode (if items provided)
-            if (isLocal.value && items) {
+            if (options.isLocal.value) {
                 fileIds.forEach((fileId) => {
-                    updateReactionState(items, fileId, 'dislike');
+                    updateReactionState(options.items, fileId, 'dislike');
                 });
             }
         } catch (error) {

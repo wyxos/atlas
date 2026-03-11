@@ -17,9 +17,6 @@ export type BrowseFormInstance = ReturnType<typeof createFormInstance>;
 
 export const BrowseFormKey: InjectionKey<BrowseFormInstance> = Symbol('BrowseForm');
 
-// Singleton instance
-let formInstance: ReturnType<typeof createFormInstance> | null = null;
-
 function createFormInstance() {
     const defaultData: BrowseFormData = {
         service: '',
@@ -338,20 +335,16 @@ export function createBrowseForm(): BrowseFormInstance {
     return createFormInstance();
 }
 
-export function useBrowseForm() {
-    // Prefer a provided per-component instance (e.g., TabContent scope)
-    // Only attempt inject() when we're in a component setup/injection context.
-    if (hasInjectionContext()) {
-        const injected = inject(BrowseFormKey, null);
-        if (injected) {
-            return injected;
-        }
+export function useBrowseForm(): BrowseFormInstance {
+    if (!hasInjectionContext()) {
+        throw new Error('useBrowseForm() must be called from component setup.');
     }
 
-    // Fallback to singleton instance (legacy/global usage)
-    if (!formInstance) {
-        formInstance = createFormInstance();
+    const injected = inject(BrowseFormKey, null);
+
+    if (!injected) {
+        throw new Error('useBrowseForm() requires a provided browse form.');
     }
 
-    return formInstance;
+    return injected;
 }
