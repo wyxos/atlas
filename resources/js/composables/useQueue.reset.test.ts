@@ -1,58 +1,58 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useQueue } from './useQueue';
+import { queueManager } from './useQueue';
 
-describe('useQueue', () => {
+describe('queueManager', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         // Reset queue state before each test
-        const queue = useQueue();
-        queue.reset();
+        const queue = queueManager;
+        queue.collection.reset();
     });
 
     afterEach(() => {
         vi.useRealTimers();
-        const queue = useQueue();
-        queue.reset();
+        const queue = queueManager;
+        queue.collection.reset();
     });
 
     describe('clear and reset', () => {
         it('clears all items', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-2',
                 duration: 3000,
                 onComplete: vi.fn(),
             });
 
-            queue.clear();
+            queue.collection.clear();
 
-            expect(queue.getAll()).toHaveLength(0);
+            expect(queue.collection.getAll()).toHaveLength(0);
         });
 
         it('resets all state', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
-            queue.freezeAll();
-            queue.setModalOpen(true);
+            queue.freeze.freezeAll();
+            queue.modal.setModalOpen(true);
 
-            queue.reset();
+            queue.collection.reset();
 
-            expect(queue.getAll()).toHaveLength(0);
-            expect(queue.isFrozen.value).toBe(false);
-            expect(queue.isModalOpen.value).toBe(false);
+            expect(queue.collection.getAll()).toHaveLength(0);
+            expect(queue.freeze.isFrozen.value).toBe(false);
+            expect(queue.modal.isModalOpen.value).toBe(false);
         });
     });
 });

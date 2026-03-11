@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue';
-import { useQueue } from './useQueue';
+import { queueManager } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 import type { FeedItem } from './useTabs';
 import { Masonry } from '@wyxos/vibe';
@@ -17,7 +17,7 @@ interface PendingDislike {
 // Global state for pending dislikes (debounced batch)
 const pendingDislikes = ref<Map<number, PendingDislike>>(new Map());
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
-// Track unfreeze timeout for FileViewer (separate from hover unfreeze in useQueue)
+// Track unfreeze timeout for FileViewer (separate from hover unfreeze in the shared queue manager)
 let fileViewerUnfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
@@ -30,7 +30,7 @@ export function useAutoDislikeQueue(
     masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
     const { isLocal } = useBrowseForm();
-    const queue = useQueue();
+    const queue = queueManager;
     const queueCollection = queue.collection;
     const queueCountdown = queue.countdown;
     const queueFreeze = queue.freeze;

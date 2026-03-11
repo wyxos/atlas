@@ -1,100 +1,100 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useQueue } from './useQueue';
+import { queueManager } from './useQueue';
 
-describe('useQueue', () => {
+describe('queueManager', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         // Reset queue state before each test
-        const queue = useQueue();
-        queue.reset();
+        const queue = queueManager;
+        queue.collection.reset();
     });
 
     afterEach(() => {
         vi.useRealTimers();
-        const queue = useQueue();
-        queue.reset();
+        const queue = queueManager;
+        queue.collection.reset();
     });
 
     describe('query methods', () => {
         it('checks if item exists', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            expect(queue.has('test-1')).toBe(false);
+            expect(queue.collection.has('test-1')).toBe(false);
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
-            expect(queue.has('test-1')).toBe(true);
+            expect(queue.collection.has('test-1')).toBe(true);
         });
 
         it('gets progress percentage', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
             // Initially 0%
-            expect(queue.getProgress('test-1')).toBe(0);
+            expect(queue.query.getProgress('test-1')).toBe(0);
 
             // Advance time by 50% of duration
             vi.advanceTimersByTime(2500);
 
             // Progress should be approximately 50%
-            const progress = queue.getProgress('test-1');
+            const progress = queue.query.getProgress('test-1');
             expect(progress).toBeGreaterThan(45);
             expect(progress).toBeLessThan(55);
         });
 
         it('gets remaining time', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
             // Initially full duration
-            expect(queue.getRemainingTime('test-1')).toBeCloseTo(5000, 0);
+            expect(queue.query.getRemainingTime('test-1')).toBeCloseTo(5000, 0);
 
             // Advance time
             vi.advanceTimersByTime(2000);
 
             // Remaining should be approximately 3000ms
-            const remaining = queue.getRemainingTime('test-1');
+            const remaining = queue.query.getRemainingTime('test-1');
             expect(remaining).toBeGreaterThan(2900);
             expect(remaining).toBeLessThan(3100);
         });
 
         it('returns 0 for non-existent items', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            expect(queue.getProgress('non-existent')).toBe(0);
-            expect(queue.getRemainingTime('non-existent')).toBe(0);
+            expect(queue.query.getProgress('non-existent')).toBe(0);
+            expect(queue.query.getRemainingTime('non-existent')).toBe(0);
         });
 
         it('gets all items', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-2',
                 duration: 3000,
                 onComplete: vi.fn(),
             });
 
-            const all = queue.getAll();
+            const all = queue.collection.getAll();
 
             expect(all).toHaveLength(2);
             expect(all.map((item) => item.id)).toEqual(['test-1', 'test-2']);
@@ -102,76 +102,76 @@ describe('useQueue', () => {
     });
     describe('freeze control', () => {
         it('freezes all countdowns', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
-            const initialRemaining = queue.getRemainingTime('test-1');
+            const initialRemaining = queue.query.getRemainingTime('test-1');
 
-            queue.freezeAll();
+            queue.freeze.freezeAll();
 
-            expect(queue.isFrozen.value).toBe(true);
+            expect(queue.freeze.isFrozen.value).toBe(true);
 
             // Advance time
             vi.advanceTimersByTime(2000);
 
             // Remaining time should not change when frozen
-            expect(queue.getRemainingTime('test-1')).toBeCloseTo(initialRemaining, 0);
+            expect(queue.query.getRemainingTime('test-1')).toBeCloseTo(initialRemaining, 0);
         });
 
         it('unfreezes all countdowns', async () => {
-            const queue = useQueue();
+            const queue = queueManager;
             const onComplete = vi.fn();
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete,
             });
 
-            queue.freezeAll();
-            expect(queue.isFrozen.value).toBe(true);
+            queue.freeze.freezeAll();
+            expect(queue.freeze.isFrozen.value).toBe(true);
 
-            queue.unfreezeAll();
+            queue.freeze.unfreezeAll();
             // isFrozen should still be true immediately (2 second delay)
-            expect(queue.isFrozen.value).toBe(true);
+            expect(queue.freeze.isFrozen.value).toBe(true);
 
             // Advance time past the 2 second delay
             vi.advanceTimersByTime(2000);
             await vi.runAllTimersAsync();
 
             // Now it should be unfrozen
-            expect(queue.isFrozen.value).toBe(false);
+            expect(queue.freeze.isFrozen.value).toBe(false);
         });
 
         it('cancels a pending unfreeze across queue instances', async () => {
-            const firstQueue = useQueue();
-            const secondQueue = useQueue();
+            const firstQueue = queueManager;
+            const secondQueue = queueManager;
 
-            firstQueue.freezeAll();
-            firstQueue.unfreezeAll();
+            firstQueue.freeze.freezeAll();
+            firstQueue.freeze.unfreezeAll();
 
-            secondQueue.freezeAll();
+            secondQueue.freeze.freezeAll();
 
             vi.advanceTimersByTime(2000);
             await vi.runAllTimersAsync();
 
-            expect(firstQueue.isFrozen.value).toBe(true);
+            expect(firstQueue.freeze.isFrozen.value).toBe(true);
 
-            secondQueue.unfreezeImmediately();
-            expect(firstQueue.isFrozen.value).toBe(false);
+            secondQueue.freeze.unfreezeImmediately();
+            expect(firstQueue.freeze.isFrozen.value).toBe(false);
         });
     });
     describe('countdown expiration', () => {
         it('executes onComplete when countdown expires', async () => {
-            const queue = useQueue();
+            const queue = queueManager;
             const onComplete = vi.fn();
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete,
@@ -182,32 +182,32 @@ describe('useQueue', () => {
             await vi.runAllTimersAsync();
 
             expect(onComplete).toHaveBeenCalledTimes(1);
-            expect(queue.has('test-1')).toBe(false);
+            expect(queue.collection.has('test-1')).toBe(false);
         });
 
         it('removes item after countdown expires', async () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete: vi.fn(),
             });
 
-            expect(queue.has('test-1')).toBe(true);
+            expect(queue.collection.has('test-1')).toBe(true);
 
             // Advance time past duration
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
-            expect(queue.has('test-1')).toBe(false);
+            expect(queue.collection.has('test-1')).toBe(false);
         });
 
         it('handles async onComplete callbacks', async () => {
-            const queue = useQueue();
+            const queue = queueManager;
             const onComplete = vi.fn().mockResolvedValue(undefined);
 
-            queue.add({
+            queue.collection.add({
                 id: 'test-1',
                 duration: 5000,
                 onComplete,
@@ -222,15 +222,15 @@ describe('useQueue', () => {
     });
     describe('modal state', () => {
         it('sets modal open state', () => {
-            const queue = useQueue();
+            const queue = queueManager;
 
-            expect(queue.isModalOpen.value).toBe(false);
+            expect(queue.modal.isModalOpen.value).toBe(false);
 
-            queue.setModalOpen(true);
-            expect(queue.isModalOpen.value).toBe(true);
+            queue.modal.setModalOpen(true);
+            expect(queue.modal.isModalOpen.value).toBe(true);
 
-            queue.setModalOpen(false);
-            expect(queue.isModalOpen.value).toBe(false);
+            queue.modal.setModalOpen(false);
+            expect(queue.modal.isModalOpen.value).toBe(false);
         });
     });
 });
