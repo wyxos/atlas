@@ -111,6 +111,15 @@ Services gotcha:
 **6. Virtual Lists**
 - For long fixed-height lists, reuse `resources/js/components/VirtualList.vue` instead of re-implementing scroll windowing math per page/component.
 
+**7. Refactor Rubric**
+- Prefer fixing the root cause over adding another wrapper, adapter, or fallback layer around the current behavior.
+- Delete obsolete code and tests as soon as the underlying contract changes. Do not keep legacy branches, TODO handlers, or compatibility residue without a live caller.
+- Small functions are only justified when they add a real boundary: bridging emits/props, owning a side effect, encapsulating non-trivial logic, or being reused meaningfully. Do not extract one-line pass-throughs only for naming.
+- Long parameter lists are a design signal, not an automatic problem. First ask whether the callee is mixing responsibilities. Split the feature seam before introducing cosmetic grouping objects.
+- If parameters still belong to one coherent feature, group them by domain (`services`, `results`, `lifecycle`) rather than as flat unrelated callbacks and refs.
+- Prefer backend/service-layer ownership for domain shaping such as container URLs, labels, and browse metadata. The Vue side should consume that shape directly instead of rebuilding it.
+- Be cautious with Laravel observers for behavior that must also hold across `upsert`, bulk insert, or queued backfills. Prefer explicit services/actions when those write paths exist.
+
 ### Code edit instructions
 
 After you've finished editing
