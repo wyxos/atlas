@@ -71,7 +71,7 @@ describe('background', () => {
         vi.unstubAllGlobals();
     });
 
-    it('returns the current comparable open-tab snapshot, preserving hashes and excluding plain roots', async () => {
+    it('returns cached comparable open-tab urls and counts, preserving hashes and excluding plain roots', async () => {
         const { chromeMock, getRuntimeMessageListener } = createChromeMock([
             { id: 1, url: 'https://example.com/post#image-1' },
             { id: 2, url: 'https://example.com/post#image-1' },
@@ -85,6 +85,7 @@ describe('background', () => {
 
         const listener = getRuntimeMessageListener();
         expect(listener).toBeTypeOf('function');
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
 
         const response = await sendRuntimeMessage(listener!, { type: 'ATLAS_GET_OPEN_COMPARABLE_URLS' }) as {
             urls?: unknown;
@@ -96,6 +97,18 @@ describe('background', () => {
             'https://example.com/post#image-2',
             'https://example.com/?view=full',
         ]);
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
+
+        const countsResponse = await sendRuntimeMessage(listener!, { type: 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS' }) as {
+            counts?: unknown;
+        };
+
+        expect(countsResponse.counts).toEqual({
+            'https://example.com/post#image-1': 2,
+            'https://example.com/post#image-2': 1,
+            'https://example.com/?view=full': 1,
+        });
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
     });
 
     it('checks duplicate tabs with sender exclusion and hash-sensitive matching', async () => {
@@ -117,6 +130,7 @@ describe('background', () => {
             { tab: { id: 1 } },
         ) as { isOpenInAnotherTab?: unknown };
         expect(duplicateResponse.isOpenInAnotherTab).toBe(true);
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
 
         const uniqueHashResponse = await sendRuntimeMessage(
             listener!,
@@ -124,5 +138,6 @@ describe('background', () => {
             { tab: { id: 3 } },
         ) as { isOpenInAnotherTab?: unknown };
         expect(uniqueHashResponse.isOpenInAnotherTab).toBe(false);
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
     });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type RuntimeMessage =
-    | { type: 'ATLAS_GET_OPEN_COMPARABLE_URLS' }
+    | { type: 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS' }
     | { type?: string };
 
 function flushPromises(): Promise<void> {
@@ -22,12 +22,11 @@ describe('duplicate-anchor-tab-guard', () => {
     it('blocks eligible duplicate middle-clicks and shows the dialog', async () => {
         const currentUrl = `${window.location.origin}/post#image-1`;
         const runtimeSendMessage = vi.fn((message: RuntimeMessage, callback: (response: unknown) => void) => {
-            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
+            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS') {
                 callback({
-                    urls: [
-                        currentUrl,
-                        currentUrl,
-                    ],
+                    counts: {
+                        [currentUrl]: 2,
+                    },
                 });
             }
         });
@@ -59,12 +58,11 @@ describe('duplicate-anchor-tab-guard', () => {
         const currentUrl = `${window.location.origin}/post#image-1`;
         const alternateHashUrl = `${window.location.origin}/post#image-2`;
         const runtimeSendMessage = vi.fn((message: RuntimeMessage, callback: (response: unknown) => void) => {
-            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
+            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS') {
                 callback({
-                    urls: [
-                        alternateHashUrl,
-                        'https://x.com/',
-                    ],
+                    counts: {
+                        [alternateHashUrl]: 1,
+                    },
                 });
             }
         });
@@ -105,11 +103,11 @@ describe('duplicate-anchor-tab-guard', () => {
     it('does not block when the matching url is only open in the current tab', async () => {
         const currentUrl = `${window.location.origin}/post#image-1`;
         const runtimeSendMessage = vi.fn((message: RuntimeMessage, callback: (response: unknown) => void) => {
-            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
+            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS') {
                 callback({
-                    urls: [
-                        currentUrl,
-                    ],
+                    counts: {
+                        [currentUrl]: 1,
+                    },
                 });
             }
         });
@@ -137,12 +135,11 @@ describe('duplicate-anchor-tab-guard', () => {
         guard.destroy();
     });
 
-    it('refreshes its open-tab snapshot after a tab presence change', async () => {
+    it('applies changed counts from tab presence messages without re-snapshotting', async () => {
         const currentUrl = `${window.location.origin}/post#image-1`;
-        let openComparableUrls: string[] = [];
         const runtimeSendMessage = vi.fn((message: RuntimeMessage, callback: (response: unknown) => void) => {
-            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
-                callback({ urls: openComparableUrls });
+            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS') {
+                callback({ counts: {} });
             }
         });
         vi.stubGlobal('chrome', {
@@ -164,16 +161,17 @@ describe('duplicate-anchor-tab-guard', () => {
         anchor.dispatchEvent(beforeRefreshEvent);
         expect(beforeRefreshEvent.defaultPrevented).toBe(false);
 
-        openComparableUrls = [
-            currentUrl,
-            currentUrl,
-        ];
-        guard.handleTabPresenceChanged();
-        await flushPromises();
+        guard.handleTabPresenceChanged({
+            urls: [currentUrl],
+            counts: {
+                [currentUrl]: 2,
+            },
+        });
 
         const afterRefreshEvent = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 1 });
         anchor.dispatchEvent(afterRefreshEvent);
         expect(afterRefreshEvent.defaultPrevented).toBe(true);
+        expect(runtimeSendMessage).toHaveBeenCalledTimes(1);
 
         guard.destroy();
     });
@@ -181,13 +179,12 @@ describe('duplicate-anchor-tab-guard', () => {
     it('allows middle-clicks while the snapshot is still loading', async () => {
         const currentUrl = `${window.location.origin}/post#image-1`;
         const runtimeSendMessage = vi.fn((message: RuntimeMessage, callback: (response: unknown) => void) => {
-            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
+            if (message.type === 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS') {
                 setTimeout(() => {
                     callback({
-                        urls: [
-                            currentUrl,
-                            currentUrl,
-                        ],
+                        counts: {
+                            [currentUrl]: 2,
+                        },
                     });
                 }, 10);
             }
