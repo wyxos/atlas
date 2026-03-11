@@ -130,19 +130,19 @@ describe('atlas-options close-tab-after-queue preferences', () => {
 
         await saveStoredOptions('https://atlas.test', 'token', [], {
             'https://www.example.com/path': ['tag', 'tags', 'tag'],
-            '.sub.example.com.': ['Filter'],
+            '.sub.example.com.': ['*', 'Filter'],
             'empty.example.com': [],
         });
 
         expect(storageState[STORAGE_KEYS.referrerQueryParamsToStripByDomain]).toEqual({
             'www.example.com': ['tag', 'tags'],
-            'sub.example.com': ['filter'],
+            'sub.example.com': ['*'],
         });
 
         await expect(getStoredOptions()).resolves.toMatchObject({
             referrerQueryParamsToStripByDomain: {
                 'www.example.com': ['tag', 'tags'],
-                'sub.example.com': ['filter'],
+                'sub.example.com': ['*'],
             },
         });
     });

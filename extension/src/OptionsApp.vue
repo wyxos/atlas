@@ -106,7 +106,7 @@ async function saveOptions(): Promise<void> {
 
         const queryParams = normalizeReferrerQueryParams(splitReferrerCleanupQueryParams(rule.queryParamsText));
         if (queryParams.length === 0) {
-            errorMessage.value = `Domain "${domain}" must have at least one referrer query parameter.`;
+            errorMessage.value = `Domain "${domain}" must have at least one referrer query parameter or "*".`;
             return;
         }
 
@@ -392,7 +392,7 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                             <textarea
                                 v-model="rule.queryParamsText"
                                 rows="2"
-                                placeholder="Comma-separated query params (e.g. tag, tags)"
+                                placeholder='Comma-separated query params (e.g. tag, tags, or "*")'
                                 class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
                             />
                         </div>
@@ -400,7 +400,7 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
 
                     <p class="text-xs text-twilight-indigo-300">
                         Atlas strips these query parameter names from referrer URLs before anchor matching and reaction submit for
-                        matching domains. Example: <span class="font-mono">tag, tags</span>
+                        matching domains. Use <span class="font-mono">*</span> to strip all query params for a domain.
                     </p>
                 </div>
 
