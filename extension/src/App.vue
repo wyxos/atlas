@@ -2,7 +2,6 @@
 /* global chrome */
 import { onMounted, onUnmounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
-import { resolveApiConnectionStatus } from './atlas-api';
 
 const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 
@@ -14,6 +13,8 @@ const reverbEndpoint = ref<string | null>(null);
 const tabCount = ref<number | null>(null);
 const isDiscardingTabs = ref(false);
 const discardTabsResult = ref<string | null>(null);
+let statusRefreshHandle: number | null = null;
+let isPopupActive = true;
 
 type DiscardInactiveTabsResponse = {
     ok?: unknown;
@@ -56,6 +57,31 @@ function refreshTabCount(): void {
 
 function handleTabPresenceChanged(): void {
     refreshTabCount();
+}
+
+async function refreshConnectionStatus(): Promise<void> {
+    const { resolveApiConnectionStatus } = await import('./atlas-api');
+    const status = await resolveApiConnectionStatus();
+    if (!isPopupActive) {
+        return;
+    }
+
+    statusLabel.value = status.label;
+    statusDetail.value = status.detail;
+    reverbStatusLabel.value = status.reverbLabel;
+    reverbStatusDetail.value = status.reverbDetail;
+    reverbEndpoint.value = status.reverbEndpoint;
+}
+
+function scheduleConnectionStatusRefresh(): void {
+    if (statusRefreshHandle !== null) {
+        window.clearTimeout(statusRefreshHandle);
+    }
+
+    statusRefreshHandle = window.setTimeout(() => {
+        statusRefreshHandle = null;
+        void refreshConnectionStatus();
+    }, 0);
 }
 
 async function discardInactiveTabs(): Promise<void> {
@@ -117,24 +143,22 @@ async function discardInactiveTabs(): Promise<void> {
 }
 
 onMounted(() => {
-    void resolveApiConnectionStatus().then((status) => {
-        statusLabel.value = status.label;
-        statusDetail.value = status.detail;
-        reverbStatusLabel.value = status.reverbLabel;
-        reverbStatusDetail.value = status.reverbDetail;
-        reverbEndpoint.value = status.reverbEndpoint;
-    });
-
+    isPopupActive = true;
     refreshTabCount();
+    scheduleConnectionStatusRefresh();
     chrome.tabs?.onCreated?.addListener(handleTabPresenceChanged);
     chrome.tabs?.onRemoved?.addListener(handleTabPresenceChanged);
-    chrome.tabs?.onUpdated?.addListener(handleTabPresenceChanged);
 });
 
 onUnmounted(() => {
+    isPopupActive = false;
+    if (statusRefreshHandle !== null) {
+        window.clearTimeout(statusRefreshHandle);
+        statusRefreshHandle = null;
+    }
+
     chrome.tabs?.onCreated?.removeListener(handleTabPresenceChanged);
     chrome.tabs?.onRemoved?.removeListener(handleTabPresenceChanged);
-    chrome.tabs?.onUpdated?.removeListener(handleTabPresenceChanged);
 });
 </script>
 
