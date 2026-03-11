@@ -421,42 +421,17 @@ const queueQuery = {
     getRemainingTimeComputed,
 };
 
-const queueApi = {
+/**
+ * Shared queue manager module with built-in countdown timers.
+ * This is a single reactive manager, not a per-component composable.
+ */
+export const queueManager = {
     collection: queueCollection,
     countdown: queueCountdown,
     freeze: queueFreeze,
     modal: queueModal,
     query: queueQuery,
     state: queueState,
+} as const;
 
-    add,
-    update,
-    remove,
-    has,
-    getAll,
-    getAllComputed,
-    clear,
-    reset,
-    stop,
-    resume,
-    start,
-    freezeAll,
-    unfreezeAll,
-    unfreezeImmediately,
-    isFrozen: queueFreeze.isFrozen,
-    setModalOpen,
-    isModalOpen: queueModal.isModalOpen,
-    getProgress,
-    getRemainingTime,
-    getProgressComputed,
-    getRemainingTimeComputed,
-    queue: queueState.queue,
-};
-
-/**
- * Global queue manager with built-in countdown timers.
- * Manages queued items with countdowns, freeze control, and execution.
- */
-export function useQueue() {
-    return queueApi;
-}
+export type QueueManager = typeof queueManager;

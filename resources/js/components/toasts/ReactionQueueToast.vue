@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useToast } from 'vue-toastification';
-import { useQueue } from '@/composables/useQueue';
+import { queueManager } from '@/composables/useQueue';
 import { cancelQueuedReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Undo2 } from 'lucide-vue-next';
@@ -16,7 +16,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const queue = useQueue();
+const queue = queueManager;
 const queueFreeze = queue.freeze;
 const progress = queue.query.getProgressComputed(props.queueId);
 const remainingTime = queue.query.getRemainingTimeComputed(props.queueId);

@@ -1,5 +1,5 @@
 import { useToast } from 'vue-toastification';
-import { useQueue } from '@/composables/useQueue';
+import { queueManager } from '@/composables/useQueue';
 import { createReactionCallback, createBatchReactionCallback } from './reactions';
 import updateReactionState from '@/utils/reactionStateUpdater';
 import type { ReactionType } from '@/types/reaction';
@@ -10,7 +10,7 @@ import BatchReactionQueueToast from '@/components/toasts/BatchReactionQueueToast
 
 const toast = useToast();
 
-const queue = useQueue();
+const queue = queueManager;
 const queueCollection = queue.collection;
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
 const BATCH_REACTION_THRESHOLD = 25;
@@ -135,7 +135,7 @@ export function queueBatchReaction(
     const batchReactionCallback = createBatchReactionCallback();
 
     // Add to queue
-    queue.add({
+    queue.collection.add({
         id: queueId,
         duration: REACTION_COUNTDOWN_DURATION,
         onComplete: async () => {

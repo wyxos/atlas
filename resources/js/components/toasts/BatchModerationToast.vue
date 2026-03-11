@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useToast } from 'vue-toastification';
-import { useQueue } from '@/composables/useQueue';
+import { queueManager } from '@/composables/useQueue';
 import { Shield, Eye } from 'lucide-vue-next';
 import ModerationReviewModal from '@/components/moderation/ModerationReviewModal.vue';
 import ToastPreviewStrip from './ToastPreviewStrip.vue';
 
 const toast = useToast();
-const queue = useQueue();
+const queue = queueManager;
 const queueFreeze = queue.freeze;
 
 interface PreviewItem {

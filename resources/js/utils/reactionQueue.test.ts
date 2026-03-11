@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { queueReaction, cancelQueuedReaction, queueBatchReaction, cancelBatchQueuedReaction } from './reactionQueue';
-import { useQueue } from '@/composables/useQueue';
+import { queueManager } from '@/composables/useQueue';
 import type { ReactionType } from '@/types/reaction';
 
 // Hoist mocks to avoid initialization issues
@@ -39,27 +39,27 @@ Object.defineProperty(window, 'axios', {
 });
 
 describe('reactionQueue', () => {
-    let queue: ReturnType<typeof useQueue>;
+    let queue: typeof queueManager;
 
     beforeEach(() => {
         vi.useFakeTimers();
         vi.clearAllMocks();
         mockReactionCallback.mockResolvedValue(undefined);
         mockBatchReactionCallback.mockResolvedValue(undefined);
-        queue = useQueue();
-        queue.reset();
+        queue = queueManager;
+        queue.collection.reset();
     });
 
     afterEach(() => {
         vi.useRealTimers();
-        queue.reset();
+        queue.collection.reset();
     });
 
     describe('queueReaction', () => {
         it('adds reaction to queue with correct id', () => {
             queueReaction(123, 'like');
 
-            expect(queue.has('like-123')).toBe(true);
+            expect(queue.collection.has('like-123')).toBe(true);
         });
 
         it('shows toast immediately', () => {
@@ -87,12 +87,12 @@ describe('reactionQueue', () => {
 
         it('replaces existing reaction for same file and type', () => {
             queueReaction(123, 'like');
-            expect(queue.has('like-123')).toBe(true);
+            expect(queue.collection.has('like-123')).toBe(true);
 
             queueReaction(123, 'like');
             
             // Should still have only one item
-            expect(queue.getAll().filter((item) => item.id === 'like-123')).toHaveLength(1);
+            expect(queue.collection.getAll().filter((item) => item.id === 'like-123')).toHaveLength(1);
             expect(mockToast.dismiss).toHaveBeenCalledWith('like-123');
         });
 
@@ -141,7 +141,7 @@ describe('reactionQueue', () => {
             const restoreCallback = vi.fn();
             queueReaction(123, 'love', thumbnail, restoreCallback);
 
-            const item = queue.getAll().find((item) => item.id === 'love-123');
+            const item = queue.collection.getAll().find((item) => item.id === 'love-123');
             expect(item?.metadata).toMatchObject({
                 fileId: 123,
                 reactionType: 'love',
@@ -155,7 +155,7 @@ describe('reactionQueue', () => {
 
             types.forEach((type) => {
                 queueReaction(123, type);
-                expect(queue.has(`${type}-123`)).toBe(true);
+                expect(queue.collection.has(`${type}-123`)).toBe(true);
             });
         });
     });
@@ -163,11 +163,11 @@ describe('reactionQueue', () => {
     describe('cancelQueuedReaction', () => {
         it('removes reaction from queue', async () => {
             queueReaction(123, 'like');
-            expect(queue.has('like-123')).toBe(true);
+            expect(queue.collection.has('like-123')).toBe(true);
 
             await cancelQueuedReaction(123, 'like');
 
-            expect(queue.has('like-123')).toBe(false);
+            expect(queue.collection.has('like-123')).toBe(false);
         });
 
         it('dismisses toast when canceling', async () => {
@@ -207,14 +207,14 @@ describe('reactionQueue', () => {
             queueBatchReaction([], 'like', []);
 
             expect(mockToast).not.toHaveBeenCalled();
-            expect(queue.getAll().length).toBe(0);
+            expect(queue.collection.getAll().length).toBe(0);
         });
 
         it('adds batch reaction to queue with correct id pattern', () => {
             const fileIds = [123, 456, 789];
             queueBatchReaction(fileIds, 'like', []);
 
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             expect(items.length).toBe(1);
             expect(items[0].id).toMatch(/^batch-like-123-456-789-\d+$/);
         });
@@ -286,7 +286,7 @@ describe('reactionQueue', () => {
 
             queueBatchReaction(fileIds, 'dislike', []);
 
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             const queueId = items[0]?.id;
             expect(queueId).toBeDefined();
 
@@ -304,7 +304,7 @@ describe('reactionQueue', () => {
             queueBatchReaction(fileIds, 'like', []);
 
             // Get queueId before advancing time
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             const queueId = items[0]?.id;
             expect(queueId).toBeDefined();
 
@@ -324,7 +324,7 @@ describe('reactionQueue', () => {
             queueBatchReaction(fileIds, 'like', []);
 
             // Get queueId before advancing time
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             const queueId = items[0]?.id;
             expect(queueId).toBeDefined();
 
@@ -351,7 +351,7 @@ describe('reactionQueue', () => {
             const restoreCallback = vi.fn();
             queueBatchReaction(fileIds, 'dislike', previews, restoreCallback);
 
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             expect(items[0]?.metadata).toMatchObject({
                 fileIds,
                 reactionType: 'dislike',
@@ -366,7 +366,7 @@ describe('reactionQueue', () => {
 
             types.forEach((type) => {
                 queueBatchReaction(fileIds, type, []);
-                const items = queue.getAll();
+                const items = queue.collection.getAll();
                 expect(items.some((item) => item.id.includes(`batch-${type}`))).toBe(true);
             });
         });
@@ -377,20 +377,20 @@ describe('reactionQueue', () => {
             const fileIds = [123, 456, 789];
             queueBatchReaction(fileIds, 'like', []);
 
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             const queueId = items[0]?.id;
-            expect(queue.has(queueId)).toBe(true);
+            expect(queue.collection.has(queueId)).toBe(true);
 
             await cancelBatchQueuedReaction(queueId);
 
-            expect(queue.has(queueId)).toBe(false);
+            expect(queue.collection.has(queueId)).toBe(false);
         });
 
         it('dismisses toast when canceling', async () => {
             const fileIds = [123, 456];
             queueBatchReaction(fileIds, 'like', []);
 
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             const queueId = items[0]?.id;
 
             await cancelBatchQueuedReaction(queueId);
@@ -403,7 +403,7 @@ describe('reactionQueue', () => {
             const fileIds = [123, 456];
             queueBatchReaction(fileIds, 'like', [], restoreCallback);
 
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             const queueId = items[0]?.id;
 
             await cancelBatchQueuedReaction(queueId);
@@ -418,7 +418,7 @@ describe('reactionQueue', () => {
             const fileIds = [123, 456];
             queueBatchReaction(fileIds, 'like', [], restoreCallback);
 
-            const items = queue.getAll();
+            const items = queue.collection.getAll();
             const queueId = items[0]?.id;
 
             await expect(cancelBatchQueuedReaction(queueId)).resolves.not.toThrow();
