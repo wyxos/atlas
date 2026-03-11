@@ -1,10 +1,16 @@
 /* global chrome */
 import { DEFAULT_MATCH_RULES, parseStoredMatchRules, type UrlMatchRule } from './match-rules';
+import {
+    normalizeReferrerQueryParamsToStripByDomain,
+    parseStoredReferrerQueryParamsToStripByDomain,
+    type ReferrerQueryParamsToStripByDomain,
+} from './referrer-cleanup';
 
 export const STORAGE_KEYS = {
     atlasDomain: 'atlasDomain',
     apiToken: 'apiToken',
     matchRules: 'matchRules',
+    referrerQueryParamsToStripByDomain: 'referrerQueryParamsToStripByDomain',
     closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
     reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
     reactAllItemsInPostByDomain: 'reactAllItemsInPostByDomain',
@@ -14,6 +20,12 @@ export const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
 export type DomainBooleanPreferences = Record<string, boolean>;
 export type CloseTabAfterQueueByDomain = DomainBooleanPreferences;
 export type ReactAllItemsInPostByDomain = DomainBooleanPreferences;
+export type StoredOptions = {
+    atlasDomain: string;
+    apiToken: string;
+    matchRules: UrlMatchRule[];
+    referrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain;
+};
 
 export function normalizeDomain(input: string): string {
     return input.trim().replace(/\/+$/, '');
@@ -37,10 +49,15 @@ export function validateDomain(input: string): string | null {
     return null;
 }
 
-export function getStoredOptions(): Promise<{ atlasDomain: string; apiToken: string; matchRules: UrlMatchRule[] }> {
+export function getStoredOptions(): Promise<StoredOptions> {
     return new Promise((resolve, reject) => {
         chrome.storage.local.get(
-            [STORAGE_KEYS.atlasDomain, STORAGE_KEYS.apiToken, STORAGE_KEYS.matchRules],
+            [
+                STORAGE_KEYS.atlasDomain,
+                STORAGE_KEYS.apiToken,
+                STORAGE_KEYS.matchRules,
+                STORAGE_KEYS.referrerQueryParamsToStripByDomain,
+            ],
             (stored: Record<string, unknown>) => {
                 if (chrome.runtime.lastError) {
                     reject(new Error(chrome.runtime.lastError.message));
@@ -51,24 +68,35 @@ export function getStoredOptions(): Promise<{ atlasDomain: string; apiToken: str
                 const atlasDomain = storedDomain !== '' ? storedDomain : DEFAULT_ATLAS_DOMAIN;
                 const apiToken = typeof stored.apiToken === 'string' ? stored.apiToken.trim() : '';
                 const matchRules = parseStoredMatchRules(stored.matchRules);
+                const referrerQueryParamsToStripByDomain = parseStoredReferrerQueryParamsToStripByDomain(
+                    stored[STORAGE_KEYS.referrerQueryParamsToStripByDomain],
+                );
 
                 resolve({
                     atlasDomain,
                     apiToken,
                     matchRules: matchRules.length > 0 ? matchRules : DEFAULT_MATCH_RULES,
+                    referrerQueryParamsToStripByDomain,
                 });
             },
         );
     });
 }
 
-export function saveStoredOptions(atlasDomain: string, apiToken: string, matchRules: UrlMatchRule[]): Promise<void> {
+export function saveStoredOptions(
+    atlasDomain: string,
+    apiToken: string,
+    matchRules: UrlMatchRule[],
+    referrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {},
+): Promise<void> {
     return new Promise((resolve, reject) => {
         chrome.storage.local.set(
             {
                 [STORAGE_KEYS.atlasDomain]: atlasDomain,
                 [STORAGE_KEYS.apiToken]: apiToken.trim(),
                 [STORAGE_KEYS.matchRules]: matchRules,
+                [STORAGE_KEYS.referrerQueryParamsToStripByDomain]:
+                    normalizeReferrerQueryParamsToStripByDomain(referrerQueryParamsToStripByDomain),
             },
             () => {
                 if (chrome.runtime.lastError) {

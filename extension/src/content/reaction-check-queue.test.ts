@@ -21,6 +21,7 @@ describe('reaction-check-queue', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
     });
 

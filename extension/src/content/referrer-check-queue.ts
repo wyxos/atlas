@@ -1,4 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
+import { cleanupReferrerUrl, type ReferrerQueryParamsToStripByDomain } from '../referrer-cleanup';
 import { atlasLoggedFetch } from './atlas-request-log';
 import { normalizeHashAwareUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
@@ -189,8 +190,11 @@ function scheduleFlush(): void {
     }, BATCH_DELAY_MS);
 }
 
-export async function enqueueReferrerCheck(referrerUrl: string | null): Promise<ReferrerMatchResult> {
-    const normalizedReferrerUrl = normalizeHashAwareUrl(referrerUrl);
+export async function enqueueReferrerCheck(
+    referrerUrl: string | null,
+    referrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {},
+): Promise<ReferrerMatchResult> {
+    const normalizedReferrerUrl = normalizeHashAwareUrl(cleanupReferrerUrl(referrerUrl, referrerQueryParamsToStripByDomain));
     if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
         return Promise.resolve(emptyResult());
     }
@@ -228,8 +232,12 @@ export async function enqueueReferrerCheck(referrerUrl: string | null): Promise<
     return promise;
 }
 
-export function upsertReferrerCheckCache(referrerUrl: string | null, update: ReferrerCheckCacheUpdate): void {
-    const normalizedReferrerUrl = normalizeHashAwareUrl(referrerUrl);
+export function upsertReferrerCheckCache(
+    referrerUrl: string | null,
+    update: ReferrerCheckCacheUpdate,
+    referrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {},
+): void {
+    const normalizedReferrerUrl = normalizeHashAwareUrl(cleanupReferrerUrl(referrerUrl, referrerQueryParamsToStripByDomain));
     if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
         return;
     }
@@ -265,8 +273,11 @@ export function upsertReferrerCheckCache(referrerUrl: string | null, update: Ref
     }
 }
 
-export function getCachedReferrerCheck(referrerUrl: string | null): ReferrerMatchResult | null {
-    const normalizedReferrerUrl = normalizeHashAwareUrl(referrerUrl);
+export function getCachedReferrerCheck(
+    referrerUrl: string | null,
+    referrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {},
+): ReferrerMatchResult | null {
+    const normalizedReferrerUrl = normalizeHashAwareUrl(cleanupReferrerUrl(referrerUrl, referrerQueryParamsToStripByDomain));
     if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
         return null;
     }

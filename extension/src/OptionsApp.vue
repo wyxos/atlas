@@ -16,13 +16,25 @@ import {
     validateDomainRule,
     validateRegexPattern,
 } from './match-rules';
+import {
+    normalizeReferrerQueryParams,
+    validateReferrerQueryParam,
+    type ReferrerQueryParamsToStripByDomain,
+} from './referrer-cleanup';
+
+type ReferrerCleanupRuleForm = {
+    domain: string;
+    queryParamsText: string;
+};
 
 const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 const atlasDomain = ref(DEFAULT_ATLAS_DOMAIN);
 const apiToken = ref('');
 const showApiToken = ref(false);
 const matchRules = ref<UrlMatchRule[]>([]);
+const referrerCleanupRules = ref<ReferrerCleanupRuleForm[]>([]);
 const newRuleDomain = ref('');
+const newReferrerCleanupDomain = ref('');
 const errorMessage = ref('');
 const isSaved = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
@@ -30,6 +42,10 @@ const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
+
+function splitReferrerCleanupQueryParams(input: string): string[] {
+    return input.split(/[,\n]+/);
+}
 
 async function refreshApiConnectionStatus(): Promise<void> {
     const status = await resolveApiConnectionStatus();
@@ -74,9 +90,45 @@ async function saveOptions(): Promise<void> {
         }
     }
 
+    const normalizedReferrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {};
+    for (const rule of referrerCleanupRules.value) {
+        const domain = rule.domain.trim().toLowerCase();
+        const ruleDomainError = validateDomainRule(domain);
+        if (ruleDomainError !== null) {
+            errorMessage.value = ruleDomainError;
+            return;
+        }
+
+        if (normalizedReferrerQueryParamsToStripByDomain[domain]) {
+            errorMessage.value = `Domain "${domain}" already has referrer cleanup rules.`;
+            return;
+        }
+
+        const queryParams = normalizeReferrerQueryParams(splitReferrerCleanupQueryParams(rule.queryParamsText));
+        if (queryParams.length === 0) {
+            errorMessage.value = `Domain "${domain}" must have at least one referrer query parameter.`;
+            return;
+        }
+
+        for (const queryParam of queryParams) {
+            const queryParamError = validateReferrerQueryParam(queryParam);
+            if (queryParamError !== null) {
+                errorMessage.value = queryParamError;
+                return;
+            }
+        }
+
+        normalizedReferrerQueryParamsToStripByDomain[domain] = queryParams;
+    }
+
     atlasDomain.value = normalizedDomain;
     try {
-        await saveStoredOptions(normalizedDomain, apiToken.value, normalizedRules);
+        await saveStoredOptions(
+            normalizedDomain,
+            apiToken.value,
+            normalizedRules,
+            normalizedReferrerQueryParamsToStripByDomain,
+        );
         isSaved.value = true;
         await refreshApiConnectionStatus();
         setTimeout(() => {
@@ -97,6 +149,11 @@ onMounted(() => {
                 domain: rule.domain,
                 regexes: [...rule.regexes],
             }));
+            referrerCleanupRules.value = Object.entries(stored.referrerQueryParamsToStripByDomain)
+                .map(([domain, queryParams]) => ({
+                    domain,
+                    queryParamsText: queryParams.join(', '),
+                }));
             void refreshApiConnectionStatus();
         })
         .catch((error) => {
@@ -127,6 +184,31 @@ function addRuleDomain(): void {
 
 function removeRuleDomain(index: number): void {
     matchRules.value.splice(index, 1);
+}
+
+function addReferrerCleanupDomain(): void {
+    const domain = newReferrerCleanupDomain.value.trim().toLowerCase();
+    const domainError = validateDomainRule(domain);
+    if (domainError !== null) {
+        errorMessage.value = domainError;
+        return;
+    }
+
+    if (referrerCleanupRules.value.some((rule) => rule.domain === domain)) {
+        errorMessage.value = `Domain "${domain}" already exists.`;
+        return;
+    }
+
+    referrerCleanupRules.value.push({
+        domain,
+        queryParamsText: '',
+    });
+    newReferrerCleanupDomain.value = '';
+    errorMessage.value = '';
+}
+
+function removeReferrerCleanupDomain(index: number): void {
+    referrerCleanupRules.value.splice(index, 1);
 }
 
 function addRegex(domainIndex: number): void {
@@ -265,6 +347,60 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                     <p class="text-xs text-twilight-indigo-300">
                         Subdomains are included. If this page host has rules, at least one regex must match. If this page host has
                         no rule, all eligible media URLs are sent.
+                    </p>
+                </div>
+
+                <div class="space-y-2">
+                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">Referrer Query Params To Strip</span>
+                    <div class="flex items-center gap-2">
+                        <input
+                            v-model="newReferrerCleanupDomain"
+                            type="text"
+                            placeholder="Add domain (e.g. example.com)"
+                            class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                        />
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
+                            @click="addReferrerCleanupDomain"
+                        >
+                            Add Domain
+                        </button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div
+                            v-for="(rule, domainIndex) in referrerCleanupRules"
+                            :key="`${rule.domain}-${domainIndex}`"
+                            class="rounded-md border border-smart-blue-500/30 bg-prussian-blue-800/40 p-3 space-y-2"
+                        >
+                            <div class="flex items-center gap-2">
+                                <input
+                                    v-model="rule.domain"
+                                    type="text"
+                                    class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                                />
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center justify-center rounded-md border border-danger-500/60 bg-danger-500/20 px-2 py-1 text-xs font-medium text-danger-100 transition hover:bg-danger-500/30"
+                                    @click="removeReferrerCleanupDomain(domainIndex)"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+
+                            <textarea
+                                v-model="rule.queryParamsText"
+                                rows="2"
+                                placeholder="Comma-separated query params (e.g. tag, tags)"
+                                class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                            />
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-twilight-indigo-300">
+                        Atlas strips these query parameter names from referrer URLs before anchor matching and reaction submit for
+                        matching domains. Example: <span class="font-mono">tag, tags</span>
                     </p>
                 </div>
 

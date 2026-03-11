@@ -19,6 +19,7 @@ describe('submitBadgeReaction keepalive', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
 
         const fetchMock = vi.fn().mockResolvedValue(

@@ -19,6 +19,7 @@ describe('submitBadgeReaction', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
 
         const fetchMock = vi.fn();
@@ -130,6 +131,7 @@ describe('submitBadgeReaction', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
 
         const fetchMock = vi.fn().mockResolvedValue(
@@ -219,6 +221,7 @@ describe('submitBadgeReaction', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
 
         const fetchMock = vi.fn();
@@ -328,6 +331,7 @@ describe('submitBadgeReaction', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
 
         vi.stubGlobal('fetch', vi.fn());
@@ -427,6 +431,7 @@ describe('submitBadgeReaction', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
 
         vi.stubGlobal('fetch', vi.fn());

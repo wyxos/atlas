@@ -124,4 +124,43 @@ describe('atlas-options close-tab-after-queue preferences', () => {
         await expect(getReactAllItemsInPostPreferenceForHostname('deviantart.com')).resolves.toBe(true);
         await expect(getReactAllItemsInPostPreferenceForHostname('x.com')).resolves.toBe(false);
     });
+
+    it('stores and reads referrer query params to strip by domain', async () => {
+        const { STORAGE_KEYS, getStoredOptions, saveStoredOptions } = await import('./atlas-options');
+
+        await saveStoredOptions('https://atlas.test', 'token', [], {
+            'https://www.example.com/path': ['tag', 'tags', 'tag'],
+            '.sub.example.com.': ['Filter'],
+            'empty.example.com': [],
+        });
+
+        expect(storageState[STORAGE_KEYS.referrerQueryParamsToStripByDomain]).toEqual({
+            'www.example.com': ['tag', 'tags'],
+            'sub.example.com': ['filter'],
+        });
+
+        await expect(getStoredOptions()).resolves.toMatchObject({
+            referrerQueryParamsToStripByDomain: {
+                'www.example.com': ['tag', 'tags'],
+                'sub.example.com': ['filter'],
+            },
+        });
+    });
+
+    it('sanitizes legacy stored referrer cleanup values', async () => {
+        const { STORAGE_KEYS, getStoredOptions } = await import('./atlas-options');
+
+        storageState[STORAGE_KEYS.referrerQueryParamsToStripByDomain] = {
+            'https://example.com/path': 'tag, tags',
+            'sub.example.com': ['tag', 123, 'filter'],
+            'invalid.example': [],
+        };
+
+        await expect(getStoredOptions()).resolves.toMatchObject({
+            referrerQueryParamsToStripByDomain: {
+                'example.com': ['tag', 'tags'],
+                'sub.example.com': ['tag', 'filter'],
+            },
+        });
+    });
 });

@@ -21,6 +21,7 @@ describe('referrer-check-queue', () => {
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
             matchRules: [],
+            referrerQueryParamsToStripByDomain: {},
         });
     });
 
@@ -63,6 +64,43 @@ describe('referrer-check-queue', () => {
         });
         expect(sentBody.items[0].referrer_hash).toEqual(expect.any(String));
         expect(sentBody.items[0].referrer_url).toBeUndefined();
+    });
+
+    it('hashes the cleaned referrer url when query params are configured to be stripped', async () => {
+        mockAtlasLoggedFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                matches: [
+                    {
+                        request_id: 'ref-0',
+                        exists: true,
+                        reaction: 'like',
+                    },
+                ],
+            }),
+        });
+
+        const queue = await import('./referrer-check-queue');
+        await queue.enqueueReferrerCheck('https://domain.com/?id=123&tag=blue+sky', {
+            'domain.com': ['tag', 'tags'],
+        });
+
+        const [, , requestLogPayload, init] = mockAtlasLoggedFetch.mock.calls[0] as [
+            string,
+            string,
+            { items: Array<Record<string, unknown>> },
+            { body: string },
+        ];
+
+        expect(requestLogPayload.items[0].referrer_url).toBe('https://domain.com/?id=123');
+
+        const sentBody = JSON.parse(init.body) as { items: Array<Record<string, unknown>> };
+        const encoder = new TextEncoder();
+        const digest = await crypto.subtle.digest('SHA-256', encoder.encode('https://domain.com/?id=123'));
+        const expectedHash = Array.from(new Uint8Array(digest))
+            .map((byte) => byte.toString(16).padStart(2, '0'))
+            .join('');
+        expect(sentBody.items[0].referrer_hash).toBe(expectedHash);
     });
 
     it('treats different hash fragments as distinct referrer checks', async () => {
