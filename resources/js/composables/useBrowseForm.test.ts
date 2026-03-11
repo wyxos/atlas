@@ -6,7 +6,7 @@ import type { TabData } from './useTabs';
 
 describe('useBrowseForm - defaults merging', () => {
     it('fills null cached service filters from defaults', () => {
-        const form = useBrowseForm();
+        const form = createBrowseForm();
         form.reset();
 
         const tab: TabData = {
@@ -37,7 +37,7 @@ describe('useBrowseForm - defaults merging', () => {
     });
 
     it('does not override non-null cached values with defaults', () => {
-        const form = useBrowseForm();
+        const form = createBrowseForm();
         form.reset();
 
         const tab: TabData = {
@@ -63,7 +63,7 @@ describe('useBrowseForm - defaults merging', () => {
     });
 
     it('clears per-service cached limit when reset (new tab should start from defaults)', () => {
-        const form = useBrowseForm();
+        const form = createBrowseForm();
         form.reset();
 
         // Simulate tab A: select service + change limit, then switch away so values get cached.
@@ -84,7 +84,7 @@ describe('useBrowseForm - defaults merging', () => {
     });
 
     it('infers filters from tab params when serviceFiltersByKey lacks the current service', () => {
-        const form = useBrowseForm();
+        const form = createBrowseForm();
         form.reset();
 
         const tab: TabData = {
@@ -109,7 +109,7 @@ describe('useBrowseForm - defaults merging', () => {
     });
 
     it('merges top-level params into serviceFiltersByKey when entries are missing', () => {
-        const form = useBrowseForm();
+        const form = createBrowseForm();
         form.reset();
 
         const tab: TabData = {
@@ -139,7 +139,7 @@ describe('useBrowseForm - defaults merging', () => {
     });
 
     it('does not let online service cache override local limit and preset', () => {
-        const form = useBrowseForm();
+        const form = createBrowseForm();
         form.reset();
 
         const tab: TabData = {
@@ -202,9 +202,6 @@ describe('useBrowseForm - defaults merging', () => {
         expect(childForm).toBe(parentScoped);
         expect(childForm.data.service).toBe('wallhaven');
 
-        // Outside of injection context, useBrowseForm() still returns the singleton fallback
-        // (and must not magically become the scoped instance).
-        const globalForm = useBrowseForm();
-        expect(globalForm).not.toBe(parentScoped);
+        expect(() => useBrowseForm()).toThrow('useBrowseForm() must be called from component setup.');
     });
 });

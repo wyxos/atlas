@@ -70,15 +70,15 @@ const mockHandlePillClick = vi.fn();
 const mockHandlePillAuxClick = vi.fn();
 let capturedOpenContainerTab: ((container: any) => void) | null = null;
 vi.mock('@/composables/useContainerPillInteractions', () => ({
-    useContainerPillInteractions: vi.fn((_items, _masonry, _tabId, _onReaction, onOpenContainerTab) => {
-        capturedOpenContainerTab = onOpenContainerTab ?? null;
+    useContainerPillInteractions: vi.fn((options: { onOpenContainerTab?: (container: any) => void }) => {
+        capturedOpenContainerTab = options.onOpenContainerTab ?? null;
         return {
-        getContainersForItem: vi.fn((item: any) => (item as any).containers || []),
-        getSiblingItems: vi.fn((_containerId: number) => []),
-        getContainerUrl: vi.fn((containerId: number) => `https://example.com/container/${containerId}`),
-        batchReactToSiblings: mockBatchReactToSiblings,
-        handlePillClick: mockHandlePillClick,
-        handlePillAuxClick: mockHandlePillAuxClick,
+            getContainersForItem: vi.fn((item: any) => (item as any).containers || []),
+            getSiblingItems: vi.fn((_containerId: number) => []),
+            getContainerUrl: vi.fn((containerId: number) => `https://example.com/container/${containerId}`),
+            batchReactToSiblings: mockBatchReactToSiblings,
+            handlePillClick: mockHandlePillClick,
+            handlePillAuxClick: mockHandlePillAuxClick,
         };
     }),
 }));

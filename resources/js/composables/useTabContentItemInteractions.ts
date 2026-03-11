@@ -83,12 +83,13 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         return Boolean(item.reaction?.type);
     }
 
-    const { handleMasonryReaction } = useMasonryReactionHandler(
-        options.items,
-        options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
-        computed(() => options.tab.value ?? undefined),
-        options.onReaction,
-    );
+    const { handleMasonryReaction } = useMasonryReactionHandler({
+        items: options.items,
+        masonry: options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
+        tab: computed(() => options.tab.value ?? undefined),
+        isLocal: options.form.isLocal,
+        onReaction: options.onReaction,
+    });
 
     const masonryInteractions = createMasonryInteractions(
         options.items,
@@ -124,10 +125,11 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         }
     }
 
-    const autoDislikeQueue = useAutoDislikeQueue(
-        options.items,
-        options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
-    );
+    const autoDislikeQueue = useAutoDislikeQueue({
+        items: options.items,
+        masonry: options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
+        isLocal: options.form.isLocal,
+    });
 
     function findNearestVideoElement(from: EventTarget | null): HTMLVideoElement | null {
         let element = from as HTMLElement | null;

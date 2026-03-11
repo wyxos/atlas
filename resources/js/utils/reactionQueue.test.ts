@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ref } from 'vue';
 import { queueReaction, cancelQueuedReaction, queueBatchReaction, cancelBatchQueuedReaction } from './reactionQueue';
 import { queueManager } from '@/composables/useQueue';
 import type { ReactionType } from '@/types/reaction';
 
 // Hoist mocks to avoid initialization issues
-const { mockToast, mockReactionCallback, mockBatchReactionCallback } = vi.hoisted(() => {
+const { mockToast, mockReactionCallback, mockBatchReactionCallback, mockUpdateReactionState } = vi.hoisted(() => {
     const toast = vi.fn();
     toast.dismiss = vi.fn();
     toast.error = vi.fn();
@@ -13,7 +14,13 @@ const { mockToast, mockReactionCallback, mockBatchReactionCallback } = vi.hoiste
     toast.warning = vi.fn();
     const callback = vi.fn().mockResolvedValue(undefined);
     const batchCallback = vi.fn().mockResolvedValue(undefined);
-    return { mockToast: toast, mockReactionCallback: callback, mockBatchReactionCallback: batchCallback };
+    const updateReactionState = vi.fn();
+    return {
+        mockToast: toast,
+        mockReactionCallback: callback,
+        mockBatchReactionCallback: batchCallback,
+        mockUpdateReactionState: updateReactionState,
+    };
 });
 
 // Mock vue-toastification
@@ -26,6 +33,10 @@ vi.mock('vue-toastification', () => ({
 vi.mock('./reactions', () => ({
     createReactionCallback: () => mockReactionCallback,
     createBatchReactionCallback: () => mockBatchReactionCallback,
+}));
+
+vi.mock('@/utils/reactionStateUpdater', () => ({
+    default: mockUpdateReactionState,
 }));
 
 // Mock axios
@@ -157,6 +168,16 @@ describe('reactionQueue', () => {
                 queueReaction(123, type);
                 expect(queue.collection.has(`${type}-123`)).toBe(true);
             });
+        });
+
+        it('updates local item state only when requested', async () => {
+            const items = ref([{ id: 123 }] as any[]);
+
+            queueReaction(123, 'like', undefined, undefined, items, { updateLocalState: true });
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(mockUpdateReactionState).toHaveBeenCalledWith(items, 123, 'like');
         });
     });
 
@@ -369,6 +390,18 @@ describe('reactionQueue', () => {
                 const items = queue.collection.getAll();
                 expect(items.some((item) => item.id.includes(`batch-${type}`))).toBe(true);
             });
+        });
+
+        it('updates local item state for batch reactions only when requested', async () => {
+            const fileIds = [123, 456];
+            const items = ref([{ id: 123 }, { id: 456 }] as any[]);
+
+            queueBatchReaction(fileIds, 'dislike', [], undefined, items, { updateLocalState: true });
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(mockUpdateReactionState).toHaveBeenNthCalledWith(1, items, 123, 'dislike');
+            expect(mockUpdateReactionState).toHaveBeenNthCalledWith(2, items, 456, 'dislike');
         });
     });
 
