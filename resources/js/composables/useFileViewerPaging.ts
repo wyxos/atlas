@@ -5,10 +5,10 @@ import {
     type FileViewerOverlayMediaType,
 } from '@/utils/fileViewer';
 import {
-    calculateFileViewerPagingLayout,
-    resolveFileViewerPagingMediaTarget,
-    type FileViewerPagingMediaTarget,
-} from '@/utils/fileViewerPaging';
+    calculateFileViewerOverlayLayout,
+    resolveFileViewerOverlayMediaTarget,
+    type FileViewerOverlayMediaTarget,
+} from '@/utils/fileViewerOverlay';
 
 export function useFileViewerPaging(params: {
     containerRef: Ref<HTMLElement | null>;
@@ -111,7 +111,7 @@ export function useFileViewerPaging(params: {
 
     function updateOverlayLayout(container: HTMLElement, width: number, height: number): void {
         const { width: containerWidth, height: containerHeight } = getContainerSize(container);
-        const layout = calculateFileViewerPagingLayout({
+        const layout = calculateFileViewerOverlayLayout({
             containerWidth,
             containerHeight,
             borderWidth,
@@ -127,7 +127,7 @@ export function useFileViewerPaging(params: {
         centerPosition.value = layout.centerPosition;
     }
 
-    function applyPreparedMedia(target: FileViewerPagingMediaTarget): void {
+    function applyPreparedMedia(target: FileViewerOverlayMediaTarget): void {
         image.value = target.overlayImage;
         mediaType.value = target.mediaType;
         videoSrc.value = target.isVideo ? target.fullSizeUrl : null;
@@ -159,7 +159,7 @@ export function useFileViewerPaging(params: {
 
     async function revealImmediateMedia(
         item: FeedItem,
-        target: FileViewerPagingMediaTarget,
+        target: FileViewerOverlayMediaTarget,
         container: HTMLElement,
         targetIndex: number,
     ): Promise<boolean> {
@@ -194,7 +194,7 @@ export function useFileViewerPaging(params: {
 
     async function revealImageMedia(
         item: FeedItem,
-        target: FileViewerPagingMediaTarget,
+        target: FileViewerOverlayMediaTarget,
         container: HTMLElement,
         targetIndex: number,
     ): Promise<boolean> {
@@ -238,7 +238,7 @@ export function useFileViewerPaging(params: {
 
     async function revealImageFallback(
         item: FeedItem,
-        target: FileViewerPagingMediaTarget,
+        target: FileViewerOverlayMediaTarget,
         container: HTMLElement,
         error: unknown,
     ): Promise<void> {
@@ -315,7 +315,7 @@ export function useFileViewerPaging(params: {
             return;
         }
 
-        const target = resolveFileViewerPagingMediaTarget(nextItem);
+        const target = resolveFileViewerOverlayMediaTarget(nextItem);
         applyPreparedMedia(target);
         updateOverlayLayout(tabContent, target.originalDimensions.width, target.originalDimensions.height);
 

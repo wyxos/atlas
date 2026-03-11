@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { FeedItem } from '@/composables/useTabs';
 import {
-    calculateFileViewerPagingLayout,
-    resolveFileViewerPagingMediaTarget,
-} from './fileViewerPaging';
+    calculateFileViewerOverlayLayout,
+    calculateFileViewerPreviewLayout,
+    resolveFileViewerOverlayMediaTarget,
+} from './fileViewerOverlay';
 
 function createFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
     return {
@@ -18,9 +19,9 @@ function createFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
     };
 }
 
-describe('fileViewerPaging', () => {
+describe('fileViewerOverlay', () => {
     it('resolves image targets with preview and full-size sources', () => {
-        const target = resolveFileViewerPagingMediaTarget(createFeedItem({
+        const target = resolveFileViewerOverlayMediaTarget(createFeedItem({
             id: 5,
             preview: 'preview.jpg',
             original: 'full.jpg',
@@ -39,8 +40,29 @@ describe('fileViewerPaging', () => {
         expect(target.isLoading).toBe(true);
     });
 
+    it('keeps the clicked image attributes when provided', () => {
+        const target = resolveFileViewerOverlayMediaTarget(createFeedItem({
+            id: 9,
+            preview: 'preview.jpg',
+            original: 'full.jpg',
+        }), {
+            previewSrc: 'current.jpg',
+            srcset: 'current.jpg 1x',
+            sizes: '(max-width: 300px) 300px',
+            alt: 'Clicked image',
+        });
+
+        expect(target.previewSrc).toBe('current.jpg');
+        expect(target.overlayImage).toEqual({
+            src: 'current.jpg',
+            srcset: 'current.jpg 1x',
+            sizes: '(max-width: 300px) 300px',
+            alt: 'Clicked image',
+        });
+    });
+
     it('uses the preview image as the initial media for audio targets', () => {
-        const target = resolveFileViewerPagingMediaTarget(createFeedItem({
+        const target = resolveFileViewerOverlayMediaTarget(createFeedItem({
             preview: 'audio-icon.jpg',
             original: 'audio.mp3',
             media_kind: 'audio',
@@ -54,7 +76,7 @@ describe('fileViewerPaging', () => {
     });
 
     it('calculates centered filled layout with the sheet width applied', () => {
-        const layout = calculateFileViewerPagingLayout({
+        const layout = calculateFileViewerOverlayLayout({
             containerWidth: 1200,
             containerHeight: 900,
             borderWidth: 4,
@@ -70,5 +92,12 @@ describe('fileViewerPaging', () => {
         expect(layout.availableHeight).toBe(892);
         expect(layout.imageSize).toEqual({ width: 800, height: 600 });
         expect(layout.centerPosition).toEqual({ top: 146, left: 36 });
+    });
+
+    it('keeps the preview image covering the opening frame', () => {
+        const layout = calculateFileViewerPreviewLayout(300, 400, 4);
+
+        expect(layout.imageSize).toEqual({ width: 300, height: 400 });
+        expect(layout.centerPosition).toEqual({ top: -4, left: -4 });
     });
 });

@@ -9,7 +9,6 @@ import type { Masonry } from '@wyxos/vibe';
 import { useOverlayVideoControls } from '@/composables/useOverlayVideoControls';
 import { useOverlayAudioControls } from '@/composables/useOverlayAudioControls';
 import { useFileViewerNavigation } from '@/composables/useFileViewerNavigation';
-import { useFileViewerSizing } from '@/composables/useFileViewerSizing';
 import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlayState';
 import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
 import { useFileViewerPaging } from '@/composables/useFileViewerPaging';
@@ -19,6 +18,7 @@ import { useFileViewerOverlayStyles } from '@/composables/useFileViewerOverlaySt
 import { useFileViewerPreload } from '@/composables/useFileViewerPreload';
 import { useFileViewerSheetState } from '@/composables/useFileViewerSheetState';
 import { useFileViewerReactionFlow } from '@/composables/useFileViewerReactionFlow';
+import { calculateFileViewerOverlayLayout } from '@/utils/fileViewerOverlay';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -97,11 +97,6 @@ const audio = useOverlayAudioControls({
     overlayFillComplete: toRef(overlayState, 'fillComplete'),
     overlayIsClosing: toRef(overlayState, 'isClosing'),
     overlayAudioSrc: toRef(overlayState, 'audioSrc'),
-});
-
-const sizing = useFileViewerSizing({
-    overlay: overlayState,
-    sheet: sheetState,
 });
 
 const overlayLifecycle = useFileViewerOverlayState({
@@ -275,24 +270,20 @@ function recomputeOverlayMediaFit(width: number, height: number): void {
     const tabContentBox = tabContent.getBoundingClientRect();
     const frameWidth = overlayState.isFilled ? tabContentBox.width : overlayState.rect.width;
     const frameHeight = overlayState.isFilled ? tabContentBox.height : overlayState.rect.height;
-    const availableWidth = overlayState.isFilled
-        ? sizing.getAvailableWidth(frameWidth, borderWidth)
-        : Math.max(frameWidth - (borderWidth * 2), 0);
-    const availableHeight = Math.max(frameHeight - (borderWidth * 2), 0);
+    const layout = calculateFileViewerOverlayLayout({
+        containerWidth: frameWidth,
+        containerHeight: frameHeight,
+        borderWidth,
+        mediaWidth: width,
+        mediaHeight: height,
+        isFilled: overlayState.isFilled,
+        fillComplete: overlayState.fillComplete,
+        isClosing: overlayState.isClosing,
+        isSheetOpen: sheetState.isOpen,
+    });
 
-    if (availableWidth <= 0 || availableHeight <= 0) {
-        return;
-    }
-
-    const bestFitSize = sizing.calculateBestFitSize(width, height, availableWidth, availableHeight);
-
-    overlayState.imageSize = bestFitSize;
-    overlayState.centerPosition = sizing.getCenteredPosition(
-        availableWidth,
-        availableHeight,
-        bestFitSize.width,
-        bestFitSize.height,
-    );
+    overlayState.imageSize = layout.imageSize;
+    overlayState.centerPosition = layout.centerPosition;
 }
 
 function handleOverlayVideoLoadedMetadata(): void {
