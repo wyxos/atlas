@@ -5,6 +5,7 @@ import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseContr
 import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import { getLocalPresetLabel } from '@/lib/localPresets';
+import { extractRestoredBrowseSession, resolveLegacyBrowseService } from '@/lib/tabContentBrowseBootstrap';
 import type { BrowseFormData, BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
@@ -207,6 +208,37 @@ function createTabContentBootstrap(args: {
     state: TabContentBrowseStateRefs;
     updateService: (nextService: string) => void;
 }) {
+    async function restoreTabState(): Promise<void> {
+        const restoredSession = extractRestoredBrowseSession(args.options.data.tab.value);
+
+        if (!restoredSession) {
+            return;
+        }
+
+        args.state.shouldShowForm.value = false;
+        args.options.data.items.value = restoredSession.items;
+        args.options.view.resetPreloadedItems();
+        args.state.startPageToken.value = restoredSession.startPageToken;
+        args.state.masonryRenderKey.value += 1;
+
+        await nextTick();
+    }
+
+    function applyLegacyServiceFallback(): void {
+        const serviceKey = resolveLegacyBrowseService(
+            args.options.form.data,
+            args.options.data.tab.value,
+            args.options.catalog.availableServices.value,
+        );
+
+        if (!serviceKey) {
+            return;
+        }
+
+        args.updateService(serviceKey);
+        args.options.form.data.source = 'all';
+    }
+
     async function initialize(): Promise<void> {
         if (!args.options.tabId.value) {
             return;
@@ -220,42 +252,11 @@ function createTabContentBootstrap(args: {
             if (data.tab) {
                 args.options.data.tab.value = data.tab;
                 args.options.form.syncFromTab(args.options.data.tab.value ?? undefined);
-
-                const params = (args.options.data.tab.value?.params ?? {}) as Record<string, unknown>;
-                const itemsToRestore = Array.isArray(data.tab.items) ? data.tab.items : [];
-                const hasRestoredItems = itemsToRestore.length > 0;
-                const hasMeaningfulParams = Object.keys(params).length > 0;
-
-                if (hasRestoredItems || hasMeaningfulParams) {
-                    args.state.shouldShowForm.value = false;
-
-                    const savedNextToken = params.page as PageToken | null | undefined;
-
-                    args.options.data.items.value = itemsToRestore as FeedItem[];
-                    args.options.view.resetPreloadedItems();
-                    args.state.startPageToken.value = (savedNextToken ?? 1) as PageToken;
-                    args.state.masonryRenderKey.value += 1;
-
-                    await nextTick();
-                }
+                await restoreTabState();
             }
 
             await args.options.catalog.loadServices();
-
-            if (args.options.form.data.feed === 'online' && !args.options.form.data.service) {
-                const legacyCandidate = args.options.data.tab.value?.params?.source;
-
-                if (typeof legacyCandidate === 'string' && legacyCandidate.length > 0) {
-                    const isKnownService = args.options.catalog.availableServices.value
-                        .some((service) => service.key === legacyCandidate);
-
-                    if (isKnownService) {
-                        args.updateService(legacyCandidate);
-                        args.options.form.data.source = 'all';
-                    }
-                }
-            }
-
+            applyLegacyServiceFallback();
             await args.options.catalog.loadSources();
         } finally {
             args.options.events.onTabDataLoadingChange?.(false);

@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import type { BrowseFormData } from '@/composables/useBrowseForm';
+import type { TabData } from '@/composables/useTabs';
+import { extractRestoredBrowseSession, resolveLegacyBrowseService } from './tabContentBrowseBootstrap';
+
+function createTab(overrides: Partial<TabData> & { items?: unknown[] } = {}) {
+    return {
+        id: 1,
+        label: 'Browse',
+        params: {},
+        position: 0,
+        isActive: true,
+        ...overrides,
+    };
+}
+
+function createBrowseFormData(overrides: Partial<BrowseFormData> = {}): BrowseFormData {
+    return {
+        service: '',
+        limit: '20',
+        page: 1,
+        feed: 'online',
+        source: 'all',
+        tab_id: null,
+        serviceFilters: {},
+        ...overrides,
+    };
+}
+
+describe('tabContentBrowseBootstrap', () => {
+    it('extracts a restored browse session from saved items and page token', () => {
+        const session = extractRestoredBrowseSession(createTab({
+            params: {
+                service: 'test-service',
+                page: 'CURSOR_NEXT',
+            },
+            items: [{ id: 1 }],
+        }));
+
+        expect(session).toEqual({
+            items: [{ id: 1 }],
+            startPageToken: 'CURSOR_NEXT',
+        });
+    });
+
+    it('treats saved params without items as a restorable session', () => {
+        const session = extractRestoredBrowseSession(createTab({
+            params: {
+                service: 'test-service',
+            },
+        }));
+
+        expect(session).toEqual({
+            items: [],
+            startPageToken: 1,
+        });
+    });
+
+    it('returns null when there is no saved tab state', () => {
+        expect(extractRestoredBrowseSession(createTab())).toBeNull();
+        expect(extractRestoredBrowseSession(null)).toBeNull();
+    });
+
+    it('resolves a legacy online service from tab source when it is still known', () => {
+        const serviceKey = resolveLegacyBrowseService(
+            createBrowseFormData(),
+            createTab({
+                params: {
+                    source: 'legacy-service',
+                },
+            }) as TabData,
+            [
+                { key: 'legacy-service', label: 'Legacy Service' },
+                { key: 'other-service', label: 'Other Service' },
+            ],
+        );
+
+        expect(serviceKey).toBe('legacy-service');
+    });
+
+    it('ignores legacy source fallback for local mode, selected services, or unknown services', () => {
+        expect(resolveLegacyBrowseService(
+            createBrowseFormData({ feed: 'local' }),
+            createTab({
+                params: { source: 'legacy-service' },
+            }) as TabData,
+            [{ key: 'legacy-service', label: 'Legacy Service' }],
+        )).toBeNull();
+
+        expect(resolveLegacyBrowseService(
+            createBrowseFormData({ service: 'already-selected' }),
+            createTab({
+                params: { source: 'legacy-service' },
+            }) as TabData,
+            [{ key: 'legacy-service', label: 'Legacy Service' }],
+        )).toBeNull();
+
+        expect(resolveLegacyBrowseService(
+            createBrowseFormData(),
+            createTab({
+                params: { source: 'missing-service' },
+            }) as TabData,
+            [{ key: 'legacy-service', label: 'Legacy Service' }],
+        )).toBeNull();
+    });
+});
