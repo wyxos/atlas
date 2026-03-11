@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SlidersHorizontal } from 'lucide-vue-next';
 import { Masonry } from '@wyxos/vibe';
 import Input from '@/components/ui/input/Input.vue';
-import type { ServiceOption } from '@/composables/useBrowseService';
+import type { ServiceOption } from '@/lib/browseCatalog';
 import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
 import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
 import { useTabFilterState } from '@/composables/useTabFilterState';

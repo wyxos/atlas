@@ -305,16 +305,19 @@ vi.mock('@wyxos/vibe', () => {
 
 // Mock FileViewer
 import './TabContent.test.setup.ui-mocks';
-vi.mock('@/composables/useBrowseService', async () => {
+vi.mock('@/lib/browseCatalog', async () => {
     const { ref } = await import('vue');
     return {
-        useBrowseService: () => ({
-            availableServices: ref([]),
-            availableSources: ref([]),
-            fetchServices: vi.fn(),
-            fetchSources: vi.fn(),
-            getPage: vi.fn().mockResolvedValue({ items: [], nextPage: null }),
-            applyService: vi.fn().mockResolvedValue(undefined),
+        createBrowseCatalog: () => ({
+            state: {
+                availableServices: ref([]),
+                availableSources: ref([]),
+                localService: ref(null),
+            },
+            actions: {
+                loadServices: vi.fn(),
+                loadSources: vi.fn(),
+            },
         }),
     };
 });

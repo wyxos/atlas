@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from '@/components/ui/switch';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
-import type { ServiceOption } from '@/composables/useBrowseService';
+import type { ServiceOption } from '@/lib/browseCatalog';
 
 interface Props {
     form: BrowseFormInstance;

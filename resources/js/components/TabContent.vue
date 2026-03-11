@@ -6,10 +6,9 @@ import type { MasonryInstance } from '@wyxos/vibe';
 import { Loader2 } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
-import { useBrowseService } from '@/composables/useBrowseService';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
-import type { ServiceOption } from '@/composables/useBrowseService';
+import { createBrowseCatalog, type ServiceOption } from '@/lib/browseCatalog';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
@@ -80,13 +79,15 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 // Item preview composable (needs to be initialized early)
 const itemPreview = useItemPreview(items, computed(() => tab.value ?? undefined));
 
-// Browse service composable - fetch services if not provided via prop
-const { availableServices: localServices, availableSources, localService, fetchServices, fetchSources } = useBrowseService();
+const browseCatalog = createBrowseCatalog();
+const browseCatalogState = browseCatalog.state;
 
 // Use prop services if available, otherwise use local services
 const availableServices = computed(() => {
-    return props.availableServices.length > 0 ? props.availableServices : localServices.value;
+    return props.availableServices.length > 0 ? props.availableServices : browseCatalogState.availableServices.value;
 });
+const availableSources = browseCatalogState.availableSources;
+const localService = browseCatalogState.localService;
 
 const promptDialog = useTabContentPromptDialog(items);
 
@@ -101,11 +102,11 @@ const browse = useTabContentBrowseState({
         items,
         tab,
     },
-    services: {
+    catalog: {
         availableServices,
         localService,
-        fetchServices,
-        fetchSources,
+        loadServices: browseCatalog.actions.loadServices,
+        loadSources: browseCatalog.actions.loadSources,
     },
     view: {
         clearPreviewedItems: itemPreview.clearPreviewedItems,

@@ -3,9 +3,9 @@ import type { PageToken } from '@wyxos/vibe';
 import { useToast } from 'vue-toastification';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
+import type { ServiceOption } from '@/lib/browseCatalog';
 import { getLocalPresetLabel } from '@/lib/localPresets';
 import type { BrowseFormData, BrowseFormInstance } from './useBrowseForm';
-import type { ServiceOption } from './useBrowseService';
 import type { FeedItem, TabData } from './useTabs';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 
@@ -16,11 +16,11 @@ type UseTabContentBrowseStateOptions = {
         items: ShallowRef<FeedItem[]>;
         tab: Ref<TabData | null>;
     };
-    services: {
+    catalog: {
         availableServices: ComputedRef<ServiceOption[]>;
         localService?: Ref<ServiceOption | null | undefined>;
-        fetchServices: () => Promise<void>;
-        fetchSources: () => Promise<void>;
+        loadServices: () => Promise<void>;
+        loadSources: () => Promise<void>;
     };
     view: {
         clearPreviewedItems: () => void;
@@ -117,7 +117,7 @@ function resetBrowseResults(
 
 function createTabContentPageLoader(args: {
     form: BrowseFormInstance;
-    services: UseTabContentBrowseStateOptions['services'];
+    catalog: UseTabContentBrowseStateOptions['catalog'];
     totalAvailable: Ref<number | null>;
     toast: ReturnType<typeof useToast>;
     events: UseTabContentBrowseStateOptions['events'];
@@ -132,9 +132,9 @@ function createTabContentPageLoader(args: {
         }
 
         const baseServiceLabel = formData.feed === 'local'
-            ? (args.services.localService?.value?.label ?? 'Local')
+            ? (args.catalog.localService?.value?.label ?? 'Local')
             : (
-                args.services.availableServices.value.find((service) => service.key === formData.service)?.label
+                args.catalog.availableServices.value.find((service) => service.key === formData.service)?.label
                 ?? formData.service
             );
 
@@ -240,13 +240,13 @@ function createTabContentBootstrap(args: {
                 }
             }
 
-            await args.options.services.fetchServices();
+            await args.options.catalog.loadServices();
 
             if (args.options.form.data.feed === 'online' && !args.options.form.data.service) {
                 const legacyCandidate = args.options.data.tab.value?.params?.source;
 
                 if (typeof legacyCandidate === 'string' && legacyCandidate.length > 0) {
-                    const isKnownService = args.options.services.availableServices.value
+                    const isKnownService = args.options.catalog.availableServices.value
                         .some((service) => service.key === legacyCandidate);
 
                     if (isKnownService) {
@@ -256,7 +256,7 @@ function createTabContentBootstrap(args: {
                 }
             }
 
-            await args.options.services.fetchSources();
+            await args.options.catalog.loadSources();
         } finally {
             args.options.events.onTabDataLoadingChange?.(false);
         }
@@ -299,7 +299,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     });
 
     function updateService(nextService: string): void {
-        const defaults = options.services.availableServices.value.find((service) => service.key === nextService)?.defaults;
+        const defaults = options.catalog.availableServices.value.find((service) => service.key === nextService)?.defaults;
         options.form.setService(nextService, defaults);
     }
     const state: TabContentBrowseStateRefs = {
@@ -310,7 +310,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     };
     const loader = createTabContentPageLoader({
         form: options.form,
-        services: options.services,
+        catalog: options.catalog,
         totalAvailable,
         toast,
         events: options.events,
