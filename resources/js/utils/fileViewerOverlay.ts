@@ -9,11 +9,18 @@ import {
     type FileViewerOverlayMediaType,
 } from './fileViewer';
 
-export type FileViewerPagingMediaTarget = {
+export type FileViewerOverlayImage = {
+    src: string;
+    srcset?: string;
+    sizes?: string;
+    alt?: string;
+};
+
+export type FileViewerOverlayMediaTarget = {
     mediaType: FileViewerOverlayMediaType;
     previewSrc: string;
     fullSizeUrl: string;
-    overlayImage: { src: string; srcset?: string; sizes?: string; alt?: string };
+    overlayImage: FileViewerOverlayImage;
     originalDimensions: { width: number; height: number };
     initialFullSizeImage: string | null;
     isLoading: boolean;
@@ -22,7 +29,7 @@ export type FileViewerPagingMediaTarget = {
     isFile: boolean;
 };
 
-type FileViewerPagingLayoutOptions = {
+type FileViewerOverlayLayoutOptions = {
     containerWidth: number;
     containerHeight: number;
     borderWidth: number;
@@ -34,9 +41,30 @@ type FileViewerPagingLayoutOptions = {
     isSheetOpen: boolean;
 };
 
-export function resolveFileViewerPagingMediaTarget(item: FeedItem): FileViewerPagingMediaTarget {
+type FileViewerOverlayMediaOverrides = {
+    previewSrc?: string;
+    srcset?: string;
+    sizes?: string;
+    alt?: string;
+};
+
+function resolveOverlayPreviewSrc(item: FeedItem, previewSrc?: string): string {
+    if (typeof previewSrc === 'string') {
+        const value = previewSrc.trim();
+        if (value !== '') {
+            return value;
+        }
+    }
+
+    return resolveFileViewerPreviewUrl(item);
+}
+
+export function resolveFileViewerOverlayMediaTarget(
+    item: FeedItem,
+    overrides: FileViewerOverlayMediaOverrides = {},
+): FileViewerOverlayMediaTarget {
     const mediaType = resolveFileViewerMediaType(item);
-    const previewSrc = resolveFileViewerPreviewUrl(item);
+    const previewSrc = resolveOverlayPreviewSrc(item, overrides.previewSrc);
     const fullSizeUrl = resolveFileViewerFullSizeUrl(item, previewSrc, mediaType);
     const isVideo = mediaType === 'video';
     const isAudio = mediaType === 'audio';
@@ -48,9 +76,9 @@ export function resolveFileViewerPagingMediaTarget(item: FeedItem): FileViewerPa
         fullSizeUrl,
         overlayImage: {
             src: previewSrc,
-            srcset: undefined,
-            sizes: undefined,
-            alt: item.id.toString(),
+            srcset: overrides.srcset,
+            sizes: overrides.sizes,
+            alt: typeof overrides.alt === 'string' ? overrides.alt : item.id.toString(),
         },
         originalDimensions: {
             width: item.width,
@@ -64,7 +92,7 @@ export function resolveFileViewerPagingMediaTarget(item: FeedItem): FileViewerPa
     };
 }
 
-export function calculateFileViewerPagingLayout(options: FileViewerPagingLayoutOptions): {
+export function calculateFileViewerOverlayLayout(options: FileViewerOverlayLayoutOptions): {
     availableWidth: number;
     availableHeight: number;
     imageSize: { width: number; height: number };
@@ -93,6 +121,32 @@ export function calculateFileViewerPagingLayout(options: FileViewerPagingLayoutO
         centerPosition: getCenteredPosition(
             availableWidth,
             availableHeight,
+            imageSize.width,
+            imageSize.height,
+        ),
+    };
+}
+
+export function calculateFileViewerPreviewLayout(
+    frameWidth: number,
+    frameHeight: number,
+    borderWidth: number,
+): {
+    imageSize: { width: number; height: number };
+    centerPosition: { top: number; left: number };
+} {
+    const contentWidth = Math.max(frameWidth - (borderWidth * 2), 0);
+    const contentHeight = Math.max(frameHeight - (borderWidth * 2), 0);
+    const imageSize = {
+        width: frameWidth,
+        height: frameHeight,
+    };
+
+    return {
+        imageSize,
+        centerPosition: getCenteredPosition(
+            contentWidth,
+            contentHeight,
             imageSize.width,
             imageSize.height,
         ),

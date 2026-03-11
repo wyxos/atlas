@@ -1,14 +1,14 @@
 import { nextTick, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 import {
-    calculateBestFitSize,
-    getAvailableWidth,
-    getCenteredPosition,
     preloadImage,
-    resolveFileViewerFullSizeUrl,
-    resolveFileViewerMediaType,
     type FileViewerOverlayMediaType,
 } from '@/utils/fileViewer';
+import {
+    calculateFileViewerOverlayLayout,
+    calculateFileViewerPreviewLayout,
+    resolveFileViewerOverlayMediaTarget,
+} from '@/utils/fileViewerOverlay';
 
 export function useFileViewerOpen(params: {
     containerRef: Ref<HTMLElement | null>;
@@ -70,6 +70,39 @@ export function useFileViewerOpen(params: {
     } = toRefs(params.overlay);
     const { currentItemIndex, imageScale } = toRefs(params.navigation);
     const { isOpen } = toRefs(params.sheet);
+    const borderWidth = 4;
+    const transitionDurationMs = 500;
+
+    function wait(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function getContainerSize(container: HTMLElement): { width: number; height: number } {
+        const box = container.getBoundingClientRect();
+
+        return {
+            width: box.width,
+            height: box.height,
+        };
+    }
+
+    function updateOverlayLayout(container: HTMLElement, width: number, height: number): void {
+        const { width: containerWidth, height: containerHeight } = getContainerSize(container);
+        const layout = calculateFileViewerOverlayLayout({
+            containerWidth,
+            containerHeight,
+            borderWidth,
+            mediaWidth: width,
+            mediaHeight: height,
+            isFilled: isFilled.value,
+            fillComplete: fillComplete.value,
+            isClosing: isClosing.value,
+            isSheetOpen: isOpen.value,
+        });
+
+        imageSize.value = layout.imageSize;
+        centerPosition.value = layout.centerPosition;
+    }
 
     function getClickedItemId(target: HTMLElement): number | null {
         const el = target.closest('[data-file-id]') as HTMLElement | null;
@@ -98,17 +131,17 @@ export function useFileViewerOpen(params: {
             tabContent.style.overscrollBehavior = 'contain';
         }
 
-        const target = e.target as HTMLElement | null;
-        if (!target) return;
+        const clickTarget = e.target as HTMLElement | null;
+        if (!clickTarget) return;
 
-        const itemEl = target.closest('[data-testid="item-card"]') as HTMLElement | null;
+        const itemEl = clickTarget.closest('[data-testid="item-card"]') as HTMLElement | null;
 
         if (!itemEl || !container.contains(itemEl)) {
             params.closeOverlay();
             return;
         }
 
-        const clickedItemId = getClickedItemId(target);
+        const clickedItemId = getClickedItemId(clickTarget);
         if (clickedItemId === null) {
             params.closeOverlay();
             return;
@@ -120,19 +153,13 @@ export function useFileViewerOpen(params: {
             return;
         }
 
-        const nextMediaType = resolveFileViewerMediaType(masonryItem);
-        mediaType.value = nextMediaType;
-        videoSrc.value = null;
-        audioSrc.value = null;
-
         const itemBox = itemEl.getBoundingClientRect();
         const tabContentBox = tabContent.getBoundingClientRect();
 
-        const overlayBorderWidth = 4;
-        const top = itemBox.top - tabContentBox.top - overlayBorderWidth;
-        const left = itemBox.left - tabContentBox.left - overlayBorderWidth;
-        const width = itemBox.width + (overlayBorderWidth * 2);
-        const height = itemBox.height + (overlayBorderWidth * 2);
+        const top = itemBox.top - tabContentBox.top - borderWidth;
+        const left = itemBox.left - tabContentBox.left - borderWidth;
+        const width = itemBox.width + (borderWidth * 2);
+        const height = itemBox.height + (borderWidth * 2);
 
         const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
 
@@ -147,24 +174,34 @@ export function useFileViewerOpen(params: {
 
         const computedStyle = window.getComputedStyle(itemEl);
         const radius = computedStyle.borderRadius || '';
-
-        const fullSizeUrl = resolveFileViewerFullSizeUrl(masonryItem, src, nextMediaType);
+        const target = resolveFileViewerOverlayMediaTarget(masonryItem, {
+            previewSrc: src,
+            srcset,
+            sizes,
+            alt,
+        });
+        const previewLayout = calculateFileViewerPreviewLayout(width, height, borderWidth);
         currentItemIndex.value = params.items.value.findIndex((it) => it.id === masonryItem.id);
 
         key.value++;
         imageScale.value = 1;
 
-        imageSize.value = { width, height };
+        imageSize.value = previewLayout.imageSize;
         isFilled.value = false;
         fillComplete.value = false;
         isClosing.value = false;
         scale.value = 1;
-        isLoading.value = nextMediaType === 'image';
+        isLoading.value = target.isLoading;
         fullSizeImage.value = null;
+        centerPosition.value = previewLayout.centerPosition;
+        originalDimensions.value = target.originalDimensions;
 
         rect.value = { top, left, width, height };
-        image.value = { src, srcset, sizes, alt };
+        image.value = target.overlayImage;
         borderRadius.value = radius || null;
+        mediaType.value = target.mediaType;
+        videoSrc.value = null;
+        audioSrc.value = null;
         isAnimating.value = false;
 
         params.emitOpen();
@@ -172,101 +209,59 @@ export function useFileViewerOpen(params: {
         await nextTick();
 
         try {
-            if (nextMediaType === 'video') {
-                originalDimensions.value = {
-                    width: masonryItem.width,
-                    height: masonryItem.height,
-                };
-                videoSrc.value = fullSizeUrl;
+            if (target.isVideo) {
+                videoSrc.value = target.fullSizeUrl;
                 isLoading.value = false;
 
                 await params.handleItemSeen(masonryItem.id);
                 await nextTick();
-            } else if (nextMediaType === 'audio') {
-                originalDimensions.value = {
-                    width: masonryItem.width,
-                    height: masonryItem.height,
-                };
-                // The overlay still renders an image (icon), but we load/play the audio URL.
-                fullSizeImage.value = src;
-                audioSrc.value = fullSizeUrl;
+            } else if (target.isAudio) {
+                fullSizeImage.value = target.initialFullSizeImage;
+                audioSrc.value = target.fullSizeUrl;
                 isLoading.value = false;
 
                 await params.handleItemSeen(masonryItem.id);
                 await nextTick();
-            } else if (nextMediaType === 'file') {
-                originalDimensions.value = {
-                    width: masonryItem.width,
-                    height: masonryItem.height,
-                };
-                // Generic files show the icon in the overlay; sheet can show details/actions.
-                fullSizeImage.value = src;
+            } else if (target.isFile) {
+                fullSizeImage.value = target.initialFullSizeImage;
                 isLoading.value = false;
 
                 await params.handleItemSeen(masonryItem.id);
                 await nextTick();
             } else {
-                const imageDimensions = await preloadImage(fullSizeUrl);
+                const imageDimensions = await preloadImage(target.fullSizeUrl);
                 originalDimensions.value = imageDimensions;
-                fullSizeImage.value = fullSizeUrl;
+                fullSizeImage.value = target.fullSizeUrl;
                 isLoading.value = false;
 
                 await params.handleItemSeen(masonryItem.id);
 
                 await nextTick();
-                await new Promise(resolve => setTimeout(resolve, 50));
+                await wait(50);
             }
         } catch (error) {
             console.warn('Failed to preload full-size image, using original:', error);
-            fullSizeImage.value = src;
+            fullSizeImage.value = target.previewSrc;
             isLoading.value = false;
             try {
-                const fallbackDimensions = await preloadImage(src);
+                const fallbackDimensions = await preloadImage(target.previewSrc);
                 originalDimensions.value = fallbackDimensions;
             } catch {
-                originalDimensions.value = {
-                    width: masonryItem.width,
-                    height: masonryItem.height,
-                };
+                originalDimensions.value = target.originalDimensions;
             }
             await nextTick();
         }
 
-        const borderWidth = 4;
-        const initialContentWidth = width - (borderWidth * 2);
-        const initialContentHeight = height - (borderWidth * 2);
-
-        if (imageSize.value) {
-            centerPosition.value = getCenteredPosition(
-                initialContentWidth,
-                initialContentHeight,
-                imageSize.value.width,
-                imageSize.value.height
-            );
-        }
-
         await nextTick();
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await wait(50);
+        await wait(0);
 
-        if (!tabContent || !rect.value || !imageSize.value) return;
+        if (!rect.value) return;
 
-        const tabContentBoxAfter = tabContent.getBoundingClientRect();
-        const containerWidth = tabContentBoxAfter.width;
-        const containerHeight = tabContentBoxAfter.height;
+        const { width: containerWidth, height: containerHeight } = getContainerSize(tabContent);
 
         const centerLeft = Math.round((containerWidth - width) / 2);
         const centerTop = Math.round((containerHeight - height) / 2);
-
-        const contentWidth = width - (borderWidth * 2);
-        const contentHeight = height - (borderWidth * 2);
-
-        centerPosition.value = getCenteredPosition(
-            contentWidth,
-            contentHeight,
-            imageSize.value.width,
-            imageSize.value.height
-        );
 
         isAnimating.value = true;
         rect.value = {
@@ -277,30 +272,12 @@ export function useFileViewerOpen(params: {
         };
 
         setTimeout(() => {
-            if (!container || !rect.value || !imageSize.value || !originalDimensions.value) return;
+            if (!container || !rect.value || !originalDimensions.value) return;
 
-            const availableWidth = getAvailableWidth(
-                containerWidth,
-                borderWidth,
-                isFilled.value,
-                fillComplete.value,
-                isClosing.value,
-                isOpen.value,
-            );
-            const availableHeight = containerHeight - (borderWidth * 2);
-            const bestFitSize = calculateBestFitSize(
+            updateOverlayLayout(
+                tabContent,
                 originalDimensions.value.width,
                 originalDimensions.value.height,
-                availableWidth,
-                availableHeight
-            );
-
-            imageSize.value = bestFitSize;
-            centerPosition.value = getCenteredPosition(
-                availableWidth,
-                availableHeight,
-                bestFitSize.width,
-                bestFitSize.height
             );
 
             isFilled.value = true;
@@ -313,8 +290,8 @@ export function useFileViewerOpen(params: {
 
             setTimeout(() => {
                 fillComplete.value = true;
-            }, 500);
-        }, 500);
+            }, transitionDurationMs);
+        }, transitionDurationMs);
     }
 
     return {
