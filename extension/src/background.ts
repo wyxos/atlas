@@ -7,6 +7,7 @@ import { shouldUseKeepaliveRequest } from './request-keepalive';
 type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
     urls: string[];
+    counts: Record<string, number>;
 };
 
 type TabCountChangedMessage = {
@@ -36,21 +37,54 @@ type BrowserTab = {
 };
 
 const openComparableUrlByTabId = new Map<number, string>();
+const openComparableUrlCountByUrl = new Map<string, number>();
 let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
 
 function updateTrackedComparableTabUrl(tabId: number, nextComparableUrl: string | null): string[] {
     const previousComparableUrl = openComparableUrlByTabId.get(tabId) ?? null;
-    if (nextComparableUrl === null) {
-        openComparableUrlByTabId.delete(tabId);
-    } else {
-        openComparableUrlByTabId.set(tabId, nextComparableUrl);
-    }
-
     if (previousComparableUrl === nextComparableUrl) {
         return [];
     }
 
+    if (previousComparableUrl !== null) {
+        const previousCount = (openComparableUrlCountByUrl.get(previousComparableUrl) ?? 0) - 1;
+        if (previousCount > 0) {
+            openComparableUrlCountByUrl.set(previousComparableUrl, previousCount);
+        } else {
+            openComparableUrlCountByUrl.delete(previousComparableUrl);
+        }
+    }
+
+    if (nextComparableUrl === null) {
+        openComparableUrlByTabId.delete(tabId);
+    } else {
+        openComparableUrlByTabId.set(tabId, nextComparableUrl);
+        openComparableUrlCountByUrl.set(nextComparableUrl, (openComparableUrlCountByUrl.get(nextComparableUrl) ?? 0) + 1);
+    }
+
     return Array.from(new Set([previousComparableUrl, nextComparableUrl].filter((url): url is string => url !== null)));
+}
+
+function getComparableOpenTabCounts(urls?: string[]): Record<string, number> {
+    const counts: Record<string, number> = {};
+
+    if (Array.isArray(urls)) {
+        for (const url of Array.from(new Set(urls))) {
+            counts[url] = openComparableUrlCountByUrl.get(url) ?? 0;
+        }
+
+        return counts;
+    }
+
+    for (const [url, count] of openComparableUrlCountByUrl.entries()) {
+        counts[url] = count;
+    }
+
+    return counts;
+}
+
+function getComparableOpenTabUrls(): string[] {
+    return Array.from(openComparableUrlByTabId.values());
 }
 
 function broadcastTabPresenceChanged(urls: string[]): void {
@@ -59,6 +93,7 @@ function broadcastTabPresenceChanged(urls: string[]): void {
     }
 
     const dedupedUrls = Array.from(new Set(urls));
+    const counts = getComparableOpenTabCounts(dedupedUrls);
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
         tabs.forEach((tab) => {
             if (typeof tab.id !== 'number') {
@@ -68,6 +103,7 @@ function broadcastTabPresenceChanged(urls: string[]): void {
             const message: TabPresenceChangedMessage = {
                 type: 'ATLAS_TAB_PRESENCE_CHANGED',
                 urls: dedupedUrls,
+                counts,
             };
             chrome.tabs.sendMessage(tab.id, message, () => {
                 void chrome.runtime.lastError;
@@ -97,6 +133,9 @@ function broadcastTabCountChanged(): void {
 }
 
 function initializeTrackedTabUrls(): void {
+    openComparableUrlByTabId.clear();
+    openComparableUrlCountByUrl.clear();
+
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
         for (const tab of tabs) {
             if (typeof tab.id !== 'number') {
@@ -104,12 +143,7 @@ function initializeTrackedTabUrls(): void {
             }
 
             const comparableUrl = typeof tab.url === 'string' ? normalizeComparableOpenTabUrl(tab.url) : null;
-            if (comparableUrl === null) {
-                openComparableUrlByTabId.delete(tab.id);
-                continue;
-            }
-
-            openComparableUrlByTabId.set(tab.id, comparableUrl);
+            updateTrackedComparableTabUrl(tab.id, comparableUrl);
         }
     });
 }
@@ -288,14 +322,13 @@ chrome.runtime.onMessage.addListener((
     }
 
     if (payload.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
-        chrome.tabs.query({}, (tabs: BrowserTab[]) => {
-            const urls = tabs
-                .map((tab) => (typeof tab.url === 'string' ? normalizeComparableOpenTabUrl(tab.url) : null))
-                .filter((url): url is string => url !== null);
+        sendResponse({ urls: getComparableOpenTabUrls() });
+        return false;
+    }
 
-            sendResponse({ urls });
-        });
-        return true;
+    if (payload.type === 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS') {
+        sendResponse({ counts: getComparableOpenTabCounts() });
+        return false;
     }
 
     if (payload.type !== 'ATLAS_IS_URL_OPEN' || typeof payload.url !== 'string') {
@@ -309,18 +342,20 @@ chrome.runtime.onMessage.addListener((
     }
 
     const senderTabId = sender.tab?.id;
-    chrome.tabs.query({}, (tabs: BrowserTab[]) => {
-        const isOpenInAnotherTab = tabs.some((tab) => {
-            if (tab.id === undefined || tab.id === senderTabId || typeof tab.url !== 'string') {
-                return false;
-            }
+    const openCount = openComparableUrlCountByUrl.get(target) ?? 0;
+    if (openCount === 0) {
+        sendResponse({ isOpenInAnotherTab: false });
+        return false;
+    }
 
-            return normalizeComparableOpenTabUrl(tab.url) === target;
-        });
-
-        sendResponse({ isOpenInAnotherTab });
-    });
-    return true;
+    const senderComparableUrl = typeof senderTabId === 'number'
+        ? (openComparableUrlByTabId.get(senderTabId) ?? null)
+        : null;
+    const isOpenInAnotherTab = senderComparableUrl === target
+        ? openCount > 1
+        : openCount > 0;
+    sendResponse({ isOpenInAnotherTab });
+    return false;
 });
 
 chrome.tabs.onCreated.addListener((tab: BrowserTab) => {

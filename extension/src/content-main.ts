@@ -181,7 +181,7 @@ function installRuntimeMessageListener(): void {
 
         if ((message as { type?: unknown }).type === 'ATLAS_TAB_PRESENCE_CHANGED') {
             anchorMediaRuntime.handleTabPresenceChanged((message as { urls?: unknown }).urls);
-            duplicateAnchorTabGuard?.handleTabPresenceChanged();
+            duplicateAnchorTabGuard?.handleTabPresenceChanged(message);
         }
     });
 }

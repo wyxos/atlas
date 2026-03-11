@@ -1,34 +1,40 @@
-import { normalizeComparableOpenTabUrl } from '../open-tab-url';
+import { normalizeComparableOpenTabUrl, normalizeComparableOpenTabUrls } from '../open-tab-url';
 import { shouldExcludeAnchorHref } from './media-utils';
 import { createDuplicateAnchorTabDialog } from './duplicate-anchor-tab-dialog';
 
 type DuplicateAnchorTabGuard = {
     destroy: () => void;
-    handleTabPresenceChanged: () => void;
+    handleTabPresenceChanged: (payload: unknown) => void;
     refreshSnapshot: () => Promise<void>;
 };
 
-type OpenComparableUrlsResponse = {
+type OpenComparableUrlCountsResponse = {
+    counts?: unknown;
+};
+
+type TabPresenceChangedPayload = {
     urls?: unknown;
+    counts?: unknown;
 };
 
 function buildComparableUrlCounts(values: unknown): Map<string, number> {
-    if (!Array.isArray(values)) {
+    if (typeof values !== 'object' || values === null) {
         return new Map<string, number>();
     }
 
     const counts = new Map<string, number>();
-    for (const value of values) {
-        if (typeof value !== 'string') {
+    for (const [key, rawCount] of Object.entries(values)) {
+        const comparableUrl = normalizeComparableOpenTabUrl(key);
+        if (comparableUrl === null || typeof rawCount !== 'number' || !Number.isFinite(rawCount)) {
             continue;
         }
 
-        const comparableUrl = normalizeComparableOpenTabUrl(value);
-        if (comparableUrl === null) {
+        const count = Math.max(0, Math.floor(rawCount));
+        if (count === 0) {
             continue;
         }
 
-        counts.set(comparableUrl, (counts.get(comparableUrl) ?? 0) + 1);
+        counts.set(comparableUrl, count);
     }
 
     return counts;
@@ -78,17 +84,17 @@ export function createDuplicateAnchorTabGuard(): DuplicateAnchorTabGuard {
 
         refreshInFlight = new Promise<void>((resolve) => {
             chrome.runtime.sendMessage(
-                { type: 'ATLAS_GET_OPEN_COMPARABLE_URLS' },
+                { type: 'ATLAS_GET_OPEN_COMPARABLE_URL_COUNTS' },
                 (response: unknown) => {
                     if (destroyed) {
                         resolve();
                         return;
                     }
 
-                    const urls = typeof response === 'object' && response !== null
-                        ? (response as OpenComparableUrlsResponse).urls
-                        : [];
-                    openComparableUrlCounts = buildComparableUrlCounts(urls);
+                    const counts = typeof response === 'object' && response !== null
+                        ? (response as OpenComparableUrlCountsResponse).counts
+                        : {};
+                    openComparableUrlCounts = buildComparableUrlCounts(counts);
                     snapshotReady = true;
                     resolve();
                 },
@@ -150,8 +156,27 @@ export function createDuplicateAnchorTabGuard(): DuplicateAnchorTabGuard {
             document.removeEventListener('auxclick', handleAuxClick, true);
             dialog.destroy();
         },
-        handleTabPresenceChanged: () => {
-            void refreshSnapshot();
+        handleTabPresenceChanged: (payload: unknown) => {
+            if (!snapshotReady || typeof payload !== 'object' || payload === null) {
+                return;
+            }
+
+            const { urls, counts } = payload as TabPresenceChangedPayload;
+            const changedUrls = normalizeComparableOpenTabUrls(urls);
+            if (changedUrls.length === 0) {
+                return;
+            }
+
+            const nextCounts = buildComparableUrlCounts(counts);
+            for (const url of changedUrls) {
+                const nextCount = nextCounts.get(url) ?? 0;
+                if (nextCount === 0) {
+                    openComparableUrlCounts.delete(url);
+                    continue;
+                }
+
+                openComparableUrlCounts.set(url, nextCount);
+            }
         },
         refreshSnapshot,
     };
