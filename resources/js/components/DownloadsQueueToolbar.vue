@@ -11,11 +11,13 @@ interface Props {
     statusCounts: Record<string, number>;
     selectedCount: number;
     selectedInFilterCount: number;
-    failedCount: number;
+    resumableFailedCount: number;
+    restartableFailedCount: number;
     completedCount: number;
     batchIsPausing: boolean;
     batchIsCanceling: boolean;
-    batchIsRetryingFailed: boolean;
+    batchIsResumingFailed: boolean;
+    batchIsRestartingFailed: boolean;
     removeIsDeleting: boolean;
 }
 
@@ -23,7 +25,8 @@ defineProps<Props>();
 
 defineEmits<{
     selectStatus: [status: DownloadQueueFilterStatus];
-    retryFailed: [];
+    resumeFailed: [];
+    restartFailed: [];
     removeCompleted: [];
     pauseSelection: [];
     cancelSelection: [];
@@ -63,16 +66,24 @@ defineEmits<{
                 Selected: {{ selectedCount }} | In filter: {{ selectedInFilterCount }}
             </span>
             <div
-                v-if="selectedCount || filteredCount || failedCount || completedCount"
+                v-if="selectedCount || filteredCount || resumableFailedCount || restartableFailedCount || completedCount"
                 class="flex items-center gap-2"
             >
                 <Button
                     variant="outline"
                     size="sm"
-                    :disabled="batchIsRetryingFailed || failedCount === 0"
-                    @click="$emit('retryFailed')"
+                    :disabled="batchIsResumingFailed || resumableFailedCount === 0"
+                    @click="$emit('resumeFailed')"
                 >
-                    {{ batchIsRetryingFailed ? 'Retrying failed...' : `Retry failed (${failedCount})` }}
+                    {{ batchIsResumingFailed ? 'Resuming failed...' : `Resume failed (${resumableFailedCount})` }}
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    :disabled="batchIsRestartingFailed || restartableFailedCount === 0"
+                    @click="$emit('restartFailed')"
+                >
+                    {{ batchIsRestartingFailed ? 'Restarting failed...' : `Restart failed (${restartableFailedCount})` }}
                 </Button>
                 <Button
                     variant="outline"

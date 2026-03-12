@@ -1,5 +1,3 @@
-import type { DownloadTransfer } from '@/types/downloadTransfer';
-
 export const DOWNLOAD_QUEUE_STATUSES = [
     'pending',
     'queued',
@@ -19,10 +17,19 @@ export const DOWNLOAD_QUEUE_FILTERS = ['all', ...DOWNLOAD_QUEUE_STATUSES] as con
 
 export type DownloadQueueFilterStatus = typeof DOWNLOAD_QUEUE_FILTERS[number];
 
-export type DownloadQueueItem = Pick<
-    DownloadTransfer,
-    'id' | 'status' | 'created_at' | 'queued_at' | 'started_at' | 'finished_at' | 'failed_at' | 'percent' | 'error'
->;
+export interface DownloadQueueItem {
+    id: number;
+    status: DownloadQueueStatus;
+    created_at: string | null;
+    queued_at: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+    failed_at: string | null;
+    percent: number;
+    error: string | null;
+    can_resume?: boolean;
+    can_restart?: boolean;
+}
 
 export interface DownloadQueueDetails {
     path: string | null;
@@ -56,7 +63,7 @@ export type DownloadQueueQueuedPayload = DownloadQueueItem & DownloadQueueDetail
 
 export interface DownloadQueueProgressPayload {
     downloadTransferId: number;
-    status: string;
+    status: DownloadQueueStatus;
     percent: number;
     created_at?: string | null;
     queued_at?: string | null;
@@ -64,6 +71,8 @@ export interface DownloadQueueProgressPayload {
     finished_at?: string | null;
     failed_at?: string | null;
     error?: string | null;
+    can_resume?: boolean;
+    can_restart?: boolean;
     path?: string | null;
     absolute_path?: string | null;
     original?: string | null;

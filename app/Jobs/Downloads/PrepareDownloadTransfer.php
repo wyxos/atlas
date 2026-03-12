@@ -56,8 +56,8 @@ class PrepareDownloadTransfer implements ShouldQueue
             if (data_get($transfer->file->listing_metadata, 'download_via') === 'yt-dlp') {
                 $transfer->update([
                     'bytes_total' => null,
-                    'bytes_downloaded' => 0,
-                    'last_broadcast_percent' => 0,
+                    'bytes_downloaded' => max(0, (int) ($transfer->bytes_downloaded ?? 0)),
+                    'last_broadcast_percent' => max(0, min(99, (int) ($transfer->last_broadcast_percent ?? 0))),
                     'status' => DownloadTransferStatus::DOWNLOADING,
                     'started_at' => $transfer->started_at ?? now(),
                     'failed_at' => null,

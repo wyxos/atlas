@@ -101,6 +101,8 @@ export function useDownloadsQueueTransfers() {
             failed_at: incomingNullable(value.failed_at, existing?.failed_at),
             percent: value.percent ?? 0,
             error: incomingNullable(value.error, existing?.error),
+            can_resume: value.can_resume ?? existing?.can_resume ?? false,
+            can_restart: value.can_restart ?? existing?.can_restart ?? false,
         };
 
         upsertDownload(item);
@@ -132,6 +134,8 @@ export function useDownloadsQueueTransfers() {
             finished_at: incomingNullable(value.finished_at, current.finished_at),
             failed_at: incomingNullable(value.failed_at, current.failed_at),
             error: incomingNullable(value.error, current.error),
+            can_resume: value.can_resume ?? current.can_resume ?? false,
+            can_restart: value.can_restart ?? current.can_restart ?? false,
         }));
 
         if (

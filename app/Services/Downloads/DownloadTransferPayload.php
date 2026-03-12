@@ -71,6 +71,7 @@ final class DownloadTransferPayload
             'failed_at' => $transfer->failed_at?->toISOString(),
             'percent' => $percent,
             'error' => $transfer->error,
+            ...DownloadTransferActionAvailability::forPayload($transfer),
             ...self::transferFacts($transfer),
         ];
 
@@ -114,6 +115,7 @@ final class DownloadTransferPayload
             'failed_at' => $transfer->failed_at?->toISOString(),
             'percent' => (int) ($transfer->last_broadcast_percent ?? 0),
             'error' => $transfer->error,
+            ...DownloadTransferActionAvailability::forPayload($transfer),
             ...self::transferFacts($transfer, $lookups),
         ];
     }

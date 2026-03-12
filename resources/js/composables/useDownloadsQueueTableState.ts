@@ -49,8 +49,15 @@ export function useDownloadsQueueTableState(params: {
     const lastSelectedId = computed(() =>
         lastSelectedIndex.value === null ? null : (sortedItems.value[lastSelectedIndex.value]?.id ?? null),
     );
-    const failedIds = computed(() =>
-        params.downloads.value.filter((item) => item.status === 'failed').map((item) => item.id),
+    const resumableFailedIds = computed(() =>
+        params.downloads.value
+            .filter((item) => item.status === 'failed' && item.can_resume)
+            .map((item) => item.id),
+    );
+    const restartableFailedIds = computed(() =>
+        params.downloads.value
+            .filter((item) => item.status === 'failed' && item.can_restart)
+            .map((item) => item.id),
     );
     const completedIds = computed(() =>
         params.downloads.value.filter((item) => item.status === 'completed').map((item) => item.id),
@@ -203,7 +210,8 @@ export function useDownloadsQueueTableState(params: {
         selectedInFilterCount,
         selectedIdsList,
         lastSelectedId,
-        failedIds,
+        resumableFailedIds,
+        restartableFailedIds,
         completedIds,
         allFilteredSelected,
         someFilteredSelected,

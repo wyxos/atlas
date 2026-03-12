@@ -46,7 +46,8 @@ const {
     selectedInFilterCount,
     selectedIdsList,
     lastSelectedId,
-    failedIds,
+    resumableFailedIds,
+    restartableFailedIds,
     completedIds,
     allFilteredSelected,
     someFilteredSelected,
@@ -60,7 +61,8 @@ const {
 const actionState = useDownloadsQueueActions({
     selectedIds,
     selectedIdsList,
-    failedIds,
+    resumableFailedIds,
+    restartableFailedIds,
     completedIds,
     removeDownloads,
     setSelection,
@@ -69,7 +71,8 @@ const {
     actionBusy,
     batchIsPausing,
     batchIsCanceling,
-    batchIsRetryingFailed,
+    batchIsResumingFailed,
+    batchIsRestartingFailed,
     removeDialogOpen,
     removeIsDeleting,
     removeTitle,
@@ -79,7 +82,8 @@ const {
     confirmRemove,
     pauseSelection,
     cancelSelection,
-    retryFailedDownloads,
+    resumeFailedDownloads,
+    restartFailedDownloads,
     removeCompletedDownloads,
     pauseDownload,
     resumeDownload,
@@ -154,14 +158,17 @@ watch([sortKey, sortDirection], () => {
                 :status-counts="statusCounts"
                 :selected-count="selectedCount"
                 :selected-in-filter-count="selectedInFilterCount"
-                :failed-count="failedIds.length"
+                :resumable-failed-count="resumableFailedIds.length"
+                :restartable-failed-count="restartableFailedIds.length"
                 :completed-count="completedIds.length"
                 :batch-is-pausing="batchIsPausing"
                 :batch-is-canceling="batchIsCanceling"
-                :batch-is-retrying-failed="batchIsRetryingFailed"
+                :batch-is-resuming-failed="batchIsResumingFailed"
+                :batch-is-restarting-failed="batchIsRestartingFailed"
                 :remove-is-deleting="removeIsDeleting"
                 @select-status="handleStatusSelect"
-                @retry-failed="retryFailedDownloads"
+                @resume-failed="resumeFailedDownloads"
+                @restart-failed="restartFailedDownloads"
                 @remove-completed="removeCompletedDownloads"
                 @pause-selection="pauseSelection"
                 @cancel-selection="cancelSelection"

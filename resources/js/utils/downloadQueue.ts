@@ -87,7 +87,7 @@ export function canPauseDownloadQueueItem(item: DownloadQueueItem): boolean {
 }
 
 export function canResumeDownloadQueueItem(item: DownloadQueueItem): boolean {
-    return item.status === 'paused';
+    return item.can_resume ?? item.status === 'paused';
 }
 
 export function canCancelDownloadQueueItem(item: DownloadQueueItem): boolean {
@@ -99,7 +99,7 @@ export function canCancelDownloadQueueItem(item: DownloadQueueItem): boolean {
 }
 
 export function canRestartDownloadQueueItem(item: DownloadQueueItem): boolean {
-    return ['failed', 'canceled', 'completed'].includes(item.status);
+    return item.can_restart ?? ['failed', 'canceled', 'completed'].includes(item.status);
 }
 
 function pad2(value: number): string {

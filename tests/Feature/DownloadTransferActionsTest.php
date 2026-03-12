@@ -80,6 +80,88 @@ it('resumes a paused transfer and requeues it', function () {
     Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'example.com');
 });
 
+it('resumes an eligible failed yt-dlp transfer without discarding temp state', function () {
+    Bus::fake();
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/watch?v=resumable',
+        'listing_metadata' => ['download_via' => 'yt-dlp', 'tag_name' => 'video'],
+    ]);
+    File::query()->whereKey($file->id)->update(['download_progress' => 61]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 61,
+        'last_broadcast_percent' => 61,
+        'failed_at' => now(),
+        'error' => 'HTTP Error 503: Service Unavailable',
+    ]);
+
+    $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+    $fragmentPath = $tmpDir.'/download.mp4.part-Frag35.part';
+    Storage::disk('atlas-app')->put($fragmentPath, 'partial-fragment');
+
+    $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/resume");
+
+    $response->assertSuccessful();
+
+    $transfer->refresh();
+    $file->refresh();
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::PENDING);
+    expect($transfer->bytes_downloaded)->toBe(61);
+    expect($transfer->last_broadcast_percent)->toBe(61);
+    expect($transfer->error)->toBeNull();
+    expect($transfer->failed_at)->toBeNull();
+    expect($file->download_progress)->toBe(61);
+
+    Storage::disk('atlas-app')->assertExists($fragmentPath);
+
+    Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'example.com');
+});
+
+it('rejects resume for failed transfers that require a scratch restart', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/watch?v=restart-only',
+        'listing_metadata' => ['download_via' => 'yt-dlp', 'tag_name' => 'video'],
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 42,
+        'last_broadcast_percent' => 42,
+        'failed_at' => now(),
+        'error' => 'WARNING: .ytdl file is corrupt. Atlas discarded the temporary yt-dlp fragments for this transfer. Use Restart to fetch the file from scratch.',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/resume");
+
+    $response->assertStatus(409)
+        ->assertJson([
+            'message' => 'Download cannot resume. Use Restart to fetch it from scratch.',
+        ]);
+
+    $transfer->refresh();
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::FAILED);
+    expect($transfer->error)->toContain('Use Restart to fetch the file from scratch.');
+
+    Bus::assertNotDispatched(PumpDomainDownloads::class);
+});
+
 it('cancels an active transfer and clears progress', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
