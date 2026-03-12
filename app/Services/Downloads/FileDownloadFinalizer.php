@@ -109,7 +109,7 @@ class FileDownloadFinalizer
             ! $file->mime_type
             || $file->mime_type === 'application/octet-stream'
             || str_starts_with((string) $file->mime_type, 'text/')
-            || $currentMimeType !== $file->mime_type
+            || $resolvedMimeType !== $currentMimeType
         ) {
             $updates['mime_type'] = $resolvedMimeType;
         }
@@ -543,7 +543,9 @@ class FileDownloadFinalizer
             return false;
         }
 
-        return $this->estimateThumbnailMemoryUsage($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight) < $availableMemory;
+        $estimatedUsage = $this->estimateThumbnailMemoryUsage($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight);
+
+        return $estimatedUsage <= (int) floor($availableMemory * 0.5);
     }
 
     protected function availableMemoryForThumbnailGeneration(): ?int
@@ -559,8 +561,8 @@ class FileDownloadFinalizer
     protected function estimateThumbnailMemoryUsage(int $originalWidth, int $originalHeight, int $thumbnailWidth, int $thumbnailHeight): int
     {
         // GD keeps a decoded bitmap of the source image and the resized destination in memory.
-        // Use a conservative estimate so oversized images are skipped instead of crashing the worker.
-        return (int) ceil(($originalWidth * $originalHeight * 5) + ($thumbnailWidth * $thumbnailHeight * 5) + (8 * 1024 * 1024));
+        // Use a deliberately pessimistic estimate so large images are skipped instead of crashing a 128 MB worker.
+        return (int) ceil(($originalWidth * $originalHeight * 8) + ($thumbnailWidth * $thumbnailHeight * 8) + (16 * 1024 * 1024));
     }
 
     protected function parseMemoryLimitToBytes(string|false $memoryLimit): ?int

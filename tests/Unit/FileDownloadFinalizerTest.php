@@ -52,6 +52,12 @@ it('skips thumbnails when the estimated GD memory exceeds what is available', fu
     expect($probe->canGenerate(8000, 8000, 450, 450))->toBeFalse();
 });
 
+it('skips large portrait png-like images on a 128 MB worker budget', function () {
+    $probe = fileDownloadFinalizerProbe(128 * 1024 * 1024);
+
+    expect($probe->canGenerate(3088, 4608, 450, 671))->toBeFalse();
+});
+
 it('allows thumbnails when the image memory estimate fits the worker budget', function () {
     $probe = fileDownloadFinalizerProbe(128 * 1024 * 1024);
 

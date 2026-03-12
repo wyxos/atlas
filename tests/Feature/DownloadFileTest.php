@@ -205,6 +205,36 @@ test('determines extension from file content when Content-Type header is missing
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
 });
 
+test('corrects stale mime type when downloaded file content disagrees', function () {
+    $image = imagecreatetruecolor(1, 1);
+    $white = imagecolorallocate($image, 255, 255, 255);
+    imagefill($image, 0, 0, $white);
+
+    ob_start();
+    imagepng($image);
+    $pngContent = ob_get_clean();
+    imagedestroy($image);
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/test-image.jpeg',
+        'filename' => 'test-image',
+        'ext' => null,
+        'mime_type' => 'image/jpeg',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $tmpPath = 'downloads/.tmp/transfer-1/mismatch.tmp';
+    Storage::disk('atlas-app')->put($tmpPath, $pngContent);
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath);
+
+    $file->refresh();
+
+    expect($file->mime_type)->toBe('image/png');
+    expect($file->path)->toEndWith('.png');
+});
+
 test('generates thumbnail for image files (finalizer)', function () {
     // Create a simple 1x1 pixel JPEG image for testing
     // This is a minimal but valid JPEG that GD can process
