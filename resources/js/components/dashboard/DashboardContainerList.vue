@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import type { ContainerMetricItem } from '@/types/dashboard';
-import {
-    buildDashboardContainerTabPayload,
-    formatDashboardContainerLabel,
-    formatDashboardCount,
-} from '@/utils/dashboard';
+import { formatDashboardContainerLabel, formatDashboardCount } from '@/utils/dashboard';
 
 interface Props {
     title: string;
@@ -18,7 +14,7 @@ const emit = defineEmits<{
 }>();
 
 function canOpenInApp(item: ContainerMetricItem): boolean {
-    return buildDashboardContainerTabPayload(item) !== null;
+    return item.browse_tab !== null && item.browse_tab !== undefined;
 }
 </script>
 

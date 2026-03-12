@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Container;
 use App\Models\File;
+use App\Support\ContainerBrowseTabPayload;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
 use Illuminate\Container\Container as IoCContainer;
@@ -44,7 +45,7 @@ class FileItemFormatter
     /**
      * Format files into items structure for frontend.
      */
-    public static function format($files, int|string $page = 1, array $willAutoDislikeIds = []): array
+    public static function format($files, int|string $page = 1, array $willAutoDislikeIds = [], array $browseContext = []): array
     {
         // Eager load containers relationship to avoid N+1 queries
         if ($files instanceof Collection) {
@@ -100,13 +101,19 @@ class FileItemFormatter
                 $file->load('containers');
             }
 
-            $containers = $file->containers->map(function (Container $container) {
+            $containers = $file->containers->map(function (Container $container) use ($browseContext) {
                 return [
                     'id' => $container->id,
                     'type' => $container->type,
                     'source' => $container->source,
                     'source_id' => $container->source_id,
                     'referrer' => $container->referrer,
+                    'browse_tab' => ContainerBrowseTabPayload::build([
+                        'id' => $container->id,
+                        'type' => $container->type,
+                        'source' => $container->source,
+                        'source_id' => $container->source_id,
+                    ], $browseContext),
                     'action_type' => $container->action_type,
                     'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
                 ];

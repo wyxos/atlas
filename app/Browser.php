@@ -292,7 +292,12 @@ class Browser
         // Pass flagged IDs so they get will_auto_dislike = true (includes both moderation and container blacklist)
         // Page can be int (page number) or string (cursor) for pagination tracking
         $page = request()->input('page', 1);
-        $items = FileItemFormatter::format($persisted, $page, $flaggedIds);
+        $items = FileItemFormatter::format($persisted, $page, $flaggedIds, [
+            ...$params,
+            'feed' => $isLocalMode ? 'local' : 'online',
+            'service' => $serviceKey,
+            'limit' => $params['limit'] ?? ($filter['limit'] ?? ($service->defaultParams()['limit'] ?? 20)),
+        ]);
 
         return [
             'items' => $items,

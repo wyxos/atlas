@@ -7,7 +7,7 @@ import DashboardContainerList from '@/components/dashboard/DashboardContainerLis
 import DashboardMetricChartCard from '@/components/dashboard/DashboardMetricChartCard.vue';
 import { useDashboardMetrics } from '@/composables/useDashboardMetrics';
 import type { ContainerMetricItem } from '@/types/dashboard';
-import { buildDashboardContainerTabPayload, formatDashboardCount } from '@/utils/dashboard';
+import { formatDashboardCount } from '@/utils/dashboard';
 import PageLayout from '../components/PageLayout.vue';
 
 const router = useRouter();
@@ -19,7 +19,7 @@ const containerGroups = dashboard.derived.containerGroups;
 const containerTotals = dashboard.derived.containerTotals;
 
 async function openContainerInApp(item: ContainerMetricItem): Promise<void> {
-    const payload = buildDashboardContainerTabPayload(item);
+    const payload = item.browse_tab;
     if (!payload) {
         return;
     }

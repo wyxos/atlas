@@ -235,6 +235,16 @@ describe('TabContent - Container Badges', () => {
                 type: 'User',
                 source: 'CivitAI',
                 source_id: 'atlasUser',
+                browse_tab: {
+                    label: 'CivitAI Images: User atlasUser - 1',
+                    params: {
+                        feed: 'online',
+                        service: 'civit-ai-images',
+                        page: 1,
+                        limit: '20',
+                        username: 'atlasUser',
+                    },
+                },
             });
 
             expect(onOpenContainerTab).toHaveBeenCalledWith({
@@ -289,6 +299,16 @@ describe('TabContent - Container Badges', () => {
                 type: 'Post',
                 source: 'CivitAI',
                 source_id: '12345',
+                browse_tab: {
+                    label: 'CivitAI Images: Post 12345 - 1',
+                    params: {
+                        feed: 'online',
+                        service: 'civit-ai-images',
+                        page: 1,
+                        limit: '20',
+                        postId: '12345',
+                    },
+                },
             });
 
             expect(onOpenContainerTab).toHaveBeenCalledWith({

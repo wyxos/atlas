@@ -6,6 +6,7 @@ export type ContainerMetricItem = {
     source: string;
     source_id: string;
     referrer: string | null;
+    browse_tab?: DashboardContainerTabPayload | null;
     files_count: number;
 };
 
