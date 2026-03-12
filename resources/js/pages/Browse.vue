@@ -46,7 +46,7 @@ const {
     getActiveTab,
     updateActiveTab,
     updateTabLabel,
-    updateTabNickname,
+    updateTabCustomLabel,
     setActiveTab,
 } = useTabs(switchTab);
 
@@ -107,8 +107,8 @@ function handleUpdateTabLabel(label: string): void {
     updateTabLabel(activeTabId.value, label);
 }
 
-function handleRenameTab(tabId: number, nickname: string | null): void {
-    updateTabNickname(tabId, nickname);
+function handleRenameTab(tabId: number, customLabel: string | null): void {
+    updateTabCustomLabel(tabId, customLabel);
 }
 
 type ContainerTabPayload = {
@@ -170,7 +170,7 @@ onMounted(async () => {
         <div class="flex-1 min-h-0 relative flex">
             <TabPanel :model-value="true" v-model:is-minimized="isPanelMinimized">
                 <template #tabs="{ isMinimized }">
-                    <Tab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label" :nickname="tab.nickname ?? null"
+                    <Tab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label" :custom-label="tab.customLabel ?? null"
                         :is-active="tab.id === activeTabId" :is-minimized="isMinimized"
                         :is-loading="isTabDataLoading(tab.id)"
                         :is-masonry-loading="tabMasonryLoadingStates.get(tab.id) ?? false" @click="switchTab(tab.id)"

@@ -46,7 +46,7 @@ class TabController extends Controller
         $tab = Tab::create([
             'user_id' => $userId,
             'label' => $request->label,
-            'nickname' => $this->normalizeNickname($request->input('nickname')),
+            'custom_label' => $this->normalizeCustomLabel($request->input('custom_label')),
             'params' => $params,
             'position' => $request->position ?? ($maxPosition + 1),
         ]);
@@ -71,8 +71,8 @@ class TabController extends Controller
         }
 
         $validated = $request->validated();
-        if (array_key_exists('nickname', $validated)) {
-            $validated['nickname'] = $this->normalizeNickname($validated['nickname']);
+        if (array_key_exists('custom_label', $validated)) {
+            $validated['custom_label'] = $this->normalizeCustomLabel($validated['custom_label']);
         }
 
         $tab->update($validated);
@@ -174,7 +174,7 @@ class TabController extends Controller
             'tab' => [
                 'id' => $tab->id,
                 'label' => $tab->label,
-                'nickname' => $tab->nickname,
+                'custom_label' => $tab->custom_label,
                 'params' => $params,
                 'items' => $items,
                 'position' => $tab->position ?? 0,
@@ -252,13 +252,13 @@ class TabController extends Controller
         ]);
     }
 
-    private function normalizeNickname(mixed $nickname): ?string
+    private function normalizeCustomLabel(mixed $customLabel): ?string
     {
-        if (! is_string($nickname)) {
+        if (! is_string($customLabel)) {
             return null;
         }
 
-        $trimmed = trim($nickname);
+        $trimmed = trim($customLabel);
 
         return $trimmed === '' ? null : $trimmed;
     }

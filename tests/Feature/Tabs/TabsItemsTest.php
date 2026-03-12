@@ -104,18 +104,18 @@ test('tab without files returns empty items', function () {
     expect($data['tab']['items'])->toBeEmpty();
 });
 
-test('tab show returns nickname alongside the generated label', function () {
+test('tab show returns custom label alongside the generated label', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create([
         'label' => 'Generated Label',
-        'nickname' => 'Pinned Search',
+        'custom_label' => 'Pinned Search',
     ]);
 
     $response = $this->actingAs($user)->getJson(route('api.tabs.show', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
     expect($response->json('tab.label'))->toBe('Generated Label');
-    expect($response->json('tab.nickname'))->toBe('Pinned Search');
+    expect($response->json('tab.custom_label'))->toBe('Pinned Search');
 });
 
 test('user cannot load items for another users tab', function () {

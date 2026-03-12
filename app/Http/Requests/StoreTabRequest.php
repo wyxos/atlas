@@ -21,7 +21,7 @@ class StoreTabRequest extends FormRequest
     {
         return [
             'label' => ['required', 'string', 'max:255'],
-            'nickname' => ['nullable', 'string', 'max:255'],
+            'custom_label' => ['nullable', 'string', 'max:255'],
             'params' => ['nullable', 'array'],
             'params.feed' => ['nullable', 'string', 'in:online,local'],
             'position' => ['nullable', 'integer', 'min:0'],

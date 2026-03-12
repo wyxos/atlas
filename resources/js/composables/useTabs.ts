@@ -28,7 +28,7 @@ export type FeedItem = {
 export type TabData = {
     id: number;
     label: string;
-    nickname?: string | null;
+    customLabel?: string | null;
     params: Record<string, string | number | boolean | null | Array<unknown>>; // Contains 'page' and 'next' keys (service handles format)
     position: number;
     isActive: boolean;
@@ -39,7 +39,7 @@ export type OnTabSwitchCallback = (tabId: number) => Promise<void> | void;
 
 type CreateTabOptions = {
     label?: string;
-    nickname?: string | null;
+    customLabel?: string | null;
     params?: Record<string, string | number | boolean | null | Array<unknown>>;
     activate?: boolean;
 };
@@ -57,7 +57,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             tabs.value = data.map((tab: {
                 id: number;
                 label: string;
-                nickname?: string | null;
+                custom_label?: string | null;
                 params?: Record<string, string | number | boolean | null | Array<unknown>>;
                 items?: FeedItem[]; // Not included in initial load, loaded lazily when restoring a tab
                 position?: number;
@@ -67,7 +67,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 return {
                     id: tab.id,
                     label: tab.label,
-                    nickname: tab.nickname ?? null,
+                    customLabel: tab.custom_label ?? null,
                     params: params,
                     position: tab.position || 0,
                     isActive: tab.is_active ?? false,
@@ -87,7 +87,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     }
 
     async function createTab(options: CreateTabOptions = {}): Promise<TabData> {
-        const { label, nickname, params, activate = true } = options;
+        const { label, customLabel, params, activate = true } = options;
         const maxPosition = tabs.value.length > 0
             ? Math.max(...tabs.value.map(t => t.position))
             : -1;
@@ -101,7 +101,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         const newTab: TabData = {
             id: 0, // Temporary ID, will be set from response
             label: label ?? `Browse ${tabs.value.length + 1}`,
-            nickname: nickname ?? null,
+            customLabel: customLabel ?? null,
             params: normalizedParams ?? {
                 // Don't set page or service - user must select service first
             },
@@ -112,14 +112,14 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         try {
             const { data } = await window.axios.post(tabsStore.url(), {
                 label: newTab.label,
-                nickname: newTab.nickname,
+                custom_label: newTab.customLabel,
                 params: newTab.params,
                 position: newTab.position,
             });
 
             newTab.id = data.id;
             newTab.isActive = data.is_active ?? false;
-            newTab.nickname = data.nickname ?? null;
+            newTab.customLabel = data.custom_label ?? null;
             const params = data.params || {};
             newTab.params = params;
             newTab.feed = (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local';
@@ -215,17 +215,17 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         void saveTab(tab);
     }
 
-    function updateTabNickname(tabId: number, nickname: string | null): void {
+    function updateTabCustomLabel(tabId: number, customLabel: string | null): void {
         const tab = tabs.value.find(t => t.id === tabId);
         if (!tab) {
             return;
         }
 
-        if ((tab.nickname ?? null) === nickname) {
+        if ((tab.customLabel ?? null) === customLabel) {
             return;
         }
 
-        tab.nickname = nickname;
+        tab.customLabel = customLabel;
         void saveTab(tab);
     }
 
@@ -247,7 +247,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             // Files are managed via the tab_file relationship, not through file_ids.
             await window.axios.put(tabsUpdate.url(tab.id), {
                 label: tab.label,
-                nickname: tab.nickname ?? null,
+                custom_label: tab.customLabel ?? null,
                 position: tab.position,
                 // Do not send params - backend manages them.
             });
@@ -301,7 +301,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         getActiveTab,
         updateActiveTab,
         updateTabLabel,
-        updateTabNickname,
+        updateTabCustomLabel,
         loadTabItems,
         setActiveTab,
     };
