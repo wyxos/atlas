@@ -404,34 +404,27 @@ class FileDownloadFinalizer
 
     private function generateThumbnailFromFile(Filesystem $disk, string $absolutePath, string $filename, string $hash): ?string
     {
-        $fileContents = @file_get_contents($absolutePath);
-        if ($fileContents === false) {
+        $imageSize = @getimagesize($absolutePath);
+        if (! is_array($imageSize)) {
             return null;
         }
 
-        $image = @imagecreatefromstring($fileContents);
-        if (! $image) {
-            return null;
-        }
-
-        $originalWidth = imagesx($image);
-        $originalHeight = imagesy($image);
+        $originalWidth = isset($imageSize[0]) ? (int) $imageSize[0] : 0;
+        $originalHeight = isset($imageSize[1]) ? (int) $imageSize[1] : 0;
 
         if ($originalWidth <= 0 || $originalHeight <= 0) {
-            imagedestroy($image);
-
             return null;
         }
 
-        $targetWidth = 450;
-        $aspectRatio = $originalWidth / $originalHeight;
+        [$thumbnailWidth, $thumbnailHeight] = $this->resolveThumbnailDimensions($originalWidth, $originalHeight);
 
-        if ($originalWidth <= $targetWidth) {
-            $thumbnailWidth = $originalWidth;
-            $thumbnailHeight = $originalHeight;
-        } else {
-            $thumbnailWidth = $targetWidth;
-            $thumbnailHeight = (int) round($targetWidth / $aspectRatio);
+        if (! $this->canGenerateThumbnail($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight)) {
+            return null;
+        }
+
+        $image = $this->createImageResourceFromFile($absolutePath);
+        if (! $image) {
+            return null;
         }
 
         $thumbnail = imagecreatetruecolor($thumbnailWidth, $thumbnailHeight);
@@ -502,16 +495,132 @@ class FileDownloadFinalizer
             return null;
         }
 
-        $thumbnailContents = file_get_contents($tempFile);
-        @unlink($tempFile);
+        $stream = fopen($tempFile, 'rb');
+        if ($stream === false) {
+            @unlink($tempFile);
 
-        if ($thumbnailContents === false) {
             return null;
         }
 
-        $disk->put($thumbnailPath, $thumbnailContents);
+        try {
+            $stored = $disk->put($thumbnailPath, $stream);
+        } finally {
+            fclose($stream);
+            @unlink($tempFile);
+        }
+
+        if (! $stored) {
+            return null;
+        }
 
         return $thumbnailPath;
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    protected function resolveThumbnailDimensions(int $originalWidth, int $originalHeight): array
+    {
+        $targetWidth = 450;
+
+        if ($originalWidth <= $targetWidth) {
+            return [$originalWidth, $originalHeight];
+        }
+
+        $aspectRatio = $originalWidth / $originalHeight;
+
+        return [$targetWidth, (int) round($targetWidth / $aspectRatio)];
+    }
+
+    protected function canGenerateThumbnail(int $originalWidth, int $originalHeight, int $thumbnailWidth, int $thumbnailHeight): bool
+    {
+        $availableMemory = $this->availableMemoryForThumbnailGeneration();
+        if ($availableMemory === null) {
+            return true;
+        }
+
+        if ($availableMemory <= 0) {
+            return false;
+        }
+
+        return $this->estimateThumbnailMemoryUsage($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight) < $availableMemory;
+    }
+
+    protected function availableMemoryForThumbnailGeneration(): ?int
+    {
+        $memoryLimit = $this->parseMemoryLimitToBytes(ini_get('memory_limit'));
+        if ($memoryLimit === null) {
+            return null;
+        }
+
+        return $memoryLimit - memory_get_usage(true);
+    }
+
+    protected function estimateThumbnailMemoryUsage(int $originalWidth, int $originalHeight, int $thumbnailWidth, int $thumbnailHeight): int
+    {
+        // GD keeps a decoded bitmap of the source image and the resized destination in memory.
+        // Use a conservative estimate so oversized images are skipped instead of crashing the worker.
+        return (int) ceil(($originalWidth * $originalHeight * 5) + ($thumbnailWidth * $thumbnailHeight * 5) + (8 * 1024 * 1024));
+    }
+
+    protected function parseMemoryLimitToBytes(string|false $memoryLimit): ?int
+    {
+        if ($memoryLimit === false) {
+            return null;
+        }
+
+        $memoryLimit = trim(strtolower($memoryLimit));
+        if ($memoryLimit === '' || $memoryLimit === '-1') {
+            return null;
+        }
+
+        if (! preg_match('/^(?<value>\d+)(?<unit>[kmg])?$/', $memoryLimit, $matches)) {
+            return null;
+        }
+
+        $value = (int) $matches['value'];
+        $unit = $matches['unit'] ?? '';
+
+        return match ($unit) {
+            'g' => $value * 1024 * 1024 * 1024,
+            'm' => $value * 1024 * 1024,
+            'k' => $value * 1024,
+            default => $value,
+        };
+    }
+
+    /**
+     * @return \GdImage|false
+     */
+    private function createImageResourceFromFile(string $absolutePath)
+    {
+        $type = function_exists('exif_imagetype') ? @exif_imagetype($absolutePath) : false;
+
+        if ($type === IMAGETYPE_JPEG) {
+            return @imagecreatefromjpeg($absolutePath);
+        }
+
+        if ($type === IMAGETYPE_PNG) {
+            return @imagecreatefrompng($absolutePath);
+        }
+
+        if ($type === IMAGETYPE_GIF) {
+            return @imagecreatefromgif($absolutePath);
+        }
+
+        if ($type === IMAGETYPE_WEBP) {
+            return function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($absolutePath) : false;
+        }
+
+        if (defined('IMAGETYPE_BMP') && $type === IMAGETYPE_BMP) {
+            return function_exists('imagecreatefrombmp') ? @imagecreatefrombmp($absolutePath) : false;
+        }
+
+        if (defined('IMAGETYPE_AVIF') && $type === IMAGETYPE_AVIF) {
+            return function_exists('imagecreatefromavif') ? @imagecreatefromavif($absolutePath) : false;
+        }
+
+        return false;
     }
 
     /**
