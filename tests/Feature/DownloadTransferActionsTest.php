@@ -7,6 +7,7 @@ use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\User;
+use App\Services\Downloads\DownloadTransferExecutionLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
@@ -198,6 +199,45 @@ it('cancels an active transfer and clears progress', function () {
     expect(DownloadChunk::query()->where('download_transfer_id', $transfer->id)->count())->toBe(0);
 });
 
+it('keeps active yt-dlp fragments on cancel until the running process exits', function () {
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/watch?v=active-cancel',
+        'listing_metadata' => ['download_via' => 'yt-dlp', 'tag_name' => 'video'],
+    ]);
+    File::query()->whereKey($file->id)->update(['download_progress' => 35]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'attempt' => 0,
+        'bytes_total' => null,
+        'bytes_downloaded' => 35,
+        'last_broadcast_percent' => 35,
+    ]);
+
+    $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+    $fragmentPath = $tmpDir.'/download.mp4.part-Frag33.part';
+    Storage::disk('atlas-app')->put($fragmentPath, 'partial-fragment');
+    $lock = app(DownloadTransferExecutionLock::class)->acquireYtDlp($transfer->id, 30);
+
+    $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/cancel");
+
+    $response->assertSuccessful();
+
+    $transfer->refresh();
+    $file->refresh();
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::CANCELED);
+    expect($file->download_progress)->toBe(0);
+    Storage::disk('atlas-app')->assertExists($fragmentPath);
+
+    $lock?->release();
+});
+
 it('restarts a canceled transfer', function () {
     Bus::fake();
 
@@ -230,6 +270,51 @@ it('restarts a canceled transfer', function () {
     expect($file->download_progress)->toBe(0);
 
     Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'example.com');
+});
+
+it('defers restarting yt-dlp until the superseded process releases the transfer lock', function () {
+    Bus::fake();
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/watch?v=restart-race',
+        'listing_metadata' => ['download_via' => 'yt-dlp', 'tag_name' => 'video'],
+    ]);
+    File::query()->whereKey($file->id)->update(['download_progress' => 40]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::CANCELED,
+        'attempt' => 0,
+        'bytes_total' => null,
+        'bytes_downloaded' => 40,
+        'last_broadcast_percent' => 40,
+    ]);
+
+    $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+    $fragmentPath = $tmpDir.'/download.mp4.part-Frag33.part';
+    Storage::disk('atlas-app')->put($fragmentPath, 'partial-fragment');
+    $lock = app(DownloadTransferExecutionLock::class)->acquireYtDlp($transfer->id, 30);
+
+    $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/restart");
+
+    $response->assertSuccessful();
+
+    $transfer->refresh();
+    $file->refresh();
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::PENDING);
+    expect($transfer->attempt)->toBe(1);
+    expect($transfer->bytes_downloaded)->toBe(0);
+    expect($transfer->last_broadcast_percent)->toBe(0);
+    expect($file->download_progress)->toBe(0);
+
+    Storage::disk('atlas-app')->assertExists($fragmentPath);
+    Bus::assertNotDispatched(PumpDomainDownloads::class);
+
+    $lock?->release();
 });
 
 it('removes a transfer and deletes the file from disk', function () {

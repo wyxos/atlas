@@ -8,6 +8,7 @@ use App\Events\DownloadTransferProgressUpdated;
 use App\Events\DownloadTransferQueued;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRequestOptions;
 use Illuminate\Bus\Queueable;
@@ -39,9 +40,12 @@ class PrepareDownloadTransfer implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(?DownloadTransferRequestOptions $requestOptions = null): void
-    {
+    public function handle(
+        ?DownloadTransferRequestOptions $requestOptions = null,
+        ?DownloadTransferExecutionLock $executionLock = null
+    ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
+        $executionLock ??= app(DownloadTransferExecutionLock::class);
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
@@ -54,6 +58,10 @@ class PrepareDownloadTransfer implements ShouldQueue
             }
 
             if (data_get($transfer->file->listing_metadata, 'download_via') === 'yt-dlp') {
+                if ($executionLock->isYtDlpActive($transfer->id)) {
+                    return;
+                }
+
                 $transfer->update([
                     'bytes_total' => null,
                     'bytes_downloaded' => max(0, (int) ($transfer->bytes_downloaded ?? 0)),
@@ -73,7 +81,7 @@ class PrepareDownloadTransfer implements ShouldQueue
                     // Broadcast errors shouldn't fail downloads.
                 }
 
-                DownloadTransferYtDlp::dispatch($transfer->id);
+                DownloadTransferYtDlp::dispatch($transfer->id, (int) ($transfer->attempt ?? 0));
 
                 return;
             }
@@ -117,6 +125,10 @@ class PrepareDownloadTransfer implements ShouldQueue
                 $headLooksLikeHtml = in_array($headMime, ['text/html', 'application/xhtml+xml'], true);
                 $headProbeUnavailable = $headStatus >= 400 || $headMime === '';
                 if ($headLooksLikeHtml || $headProbeUnavailable) {
+                    if ($executionLock->isYtDlpActive($transfer->id)) {
+                        return;
+                    }
+
                     try {
                         $metadata = $transfer->file->listing_metadata;
                         if ($metadata instanceof \Illuminate\Support\Collection) {
@@ -166,7 +178,7 @@ class PrepareDownloadTransfer implements ShouldQueue
                         // Broadcast errors shouldn't fail downloads.
                     }
 
-                    DownloadTransferYtDlp::dispatch($transfer->id);
+                    DownloadTransferYtDlp::dispatch($transfer->id, (int) ($transfer->attempt ?? 0));
 
                     return;
                 }

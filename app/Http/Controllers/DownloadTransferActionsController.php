@@ -9,7 +9,9 @@ use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferActionAvailability;
+use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferPayload;
+use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\MetricsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,7 +62,7 @@ class DownloadTransferActionsController extends Controller
 
         $this->broadcastState($downloadTransfer);
 
-        PumpDomainDownloads::dispatch($downloadTransfer->domain);
+        $this->dispatchPumpIfReady($downloadTransfer);
 
         return response()->json([
             'message' => 'Download resumed.',
@@ -182,7 +184,7 @@ class DownloadTransferActionsController extends Controller
 
         $this->broadcastState($downloadTransfer);
 
-        PumpDomainDownloads::dispatch($downloadTransfer->domain);
+        $this->dispatchPumpIfReady($downloadTransfer);
 
         return response()->json([
             'message' => 'Download restarted.',
@@ -314,12 +316,18 @@ class DownloadTransferActionsController extends Controller
 
     private function cleanupTransferParts(DownloadTransfer $downloadTransfer): void
     {
+        $downloadTransfer->loadMissing('file');
+
         DownloadChunk::query()
             ->where('download_transfer_id', $downloadTransfer->id)
             ->delete();
 
+        if ($this->shouldDeferYtDlpTempCleanup($downloadTransfer)) {
+            return;
+        }
+
         $disk = Storage::disk(config('downloads.disk'));
-        $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$downloadTransfer->id;
+        $tmpDir = app(DownloadTransferTempDirectory::class)->forTransfer($downloadTransfer);
 
         if ($disk->exists($tmpDir)) {
             $disk->deleteDirectory($tmpDir);
@@ -351,6 +359,10 @@ class DownloadTransferActionsController extends Controller
             if ($host) {
                 $updates['domain'] = strtolower($host);
             }
+        }
+
+        if ($this->isYtDlpTransfer($downloadTransfer)) {
+            $updates['attempt'] = ((int) ($downloadTransfer->attempt ?? 0)) + 1;
         }
 
         $downloadTransfer->update($updates);
@@ -426,5 +438,25 @@ class DownloadTransferActionsController extends Controller
         } catch (\Throwable) {
             // Broadcast errors shouldn't fail download actions.
         }
+    }
+
+    private function dispatchPumpIfReady(DownloadTransfer $downloadTransfer): void
+    {
+        if ($this->shouldDeferYtDlpTempCleanup($downloadTransfer)) {
+            return;
+        }
+
+        PumpDomainDownloads::dispatch($downloadTransfer->domain);
+    }
+
+    private function shouldDeferYtDlpTempCleanup(DownloadTransfer $downloadTransfer): bool
+    {
+        return $this->isYtDlpTransfer($downloadTransfer)
+            && app(DownloadTransferExecutionLock::class)->isYtDlpActive($downloadTransfer->id);
+    }
+
+    private function isYtDlpTransfer(DownloadTransfer $downloadTransfer): bool
+    {
+        return data_get($downloadTransfer->file?->listing_metadata, 'download_via') === 'yt-dlp';
     }
 }
