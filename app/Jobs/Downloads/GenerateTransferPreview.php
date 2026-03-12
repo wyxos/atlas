@@ -39,6 +39,11 @@ class GenerateTransferPreview implements ShouldBeUnique, ShouldQueue
 
     public function handle(FileDownloadFinalizer $finalizer): void
     {
+        $previewMemoryLimit = (string) config('downloads.preview_php_memory_limit', '');
+        if ($previewMemoryLimit !== '') {
+            @ini_set('memory_limit', $previewMemoryLimit);
+        }
+
         $transfer = DownloadTransfer::query()->with('file')->find($this->transferId);
         if (! $transfer || ! $transfer->file) {
             return;

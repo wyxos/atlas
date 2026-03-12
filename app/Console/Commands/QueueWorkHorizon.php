@@ -15,6 +15,16 @@ class QueueWorkHorizon extends Command
         $environment = app()->environment();
         $defaults = config('horizon.defaults', []);
         $overrides = config("horizon.environments.{$environment}", []);
+        $supervisors = collect($defaults);
+
+        foreach ($overrides as $name => $override) {
+            $base = $supervisors->get($name, []);
+
+            $supervisors->put(
+                $name,
+                array_replace(is_array($base) ? $base : [], is_array($override) ? $override : []),
+            );
+        }
 
         $queues = collect();
         $addQueues = function ($value) use (&$queues): void {
@@ -61,9 +71,27 @@ class QueueWorkHorizon extends Command
             return self::SUCCESS;
         }
 
+        $maxMemory = (int) $supervisors->pluck('memory')->filter()->max();
+        $maxTimeout = (int) $supervisors->pluck('timeout')->filter()->max();
+        $maxTries = (int) $supervisors->pluck('tries')->filter()->max();
+
+        $previewMemoryLimit = (string) config('downloads.preview_php_memory_limit', '');
+        if ($previewMemoryLimit !== '') {
+            @ini_set('memory_limit', $previewMemoryLimit);
+        }
+
         $arguments = ['--queue' => $queueArg];
         if ($this->option('connection')) {
             $arguments['--connection'] = $this->option('connection');
+        }
+        if ($maxMemory > 0) {
+            $arguments['--memory'] = $maxMemory;
+        }
+        if ($maxTimeout > 0) {
+            $arguments['--timeout'] = $maxTimeout;
+        }
+        if ($maxTries > 0) {
+            $arguments['--tries'] = $maxTries;
         }
 
         return $this->call('queue:work', $arguments);
