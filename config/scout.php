@@ -29,7 +29,7 @@ return [
     |
     */
 
-    'prefix' => env('SCOUT_PREFIX', ''),
+    'prefix' => env('SCOUT_PREFIX', env('APP_ENV') === 'local' ? 'atlas_local_' : ''),
 
     /*
     |--------------------------------------------------------------------------
