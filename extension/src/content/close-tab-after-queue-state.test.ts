@@ -25,18 +25,20 @@ describe('close-tab-after-queue-state', () => {
     });
 
     it('shares the same hostname preference across callers and refreshes on storage changes', async () => {
-        let persistedEnabled = false;
+        let persistedMode: 'off' | 'queued' | 'completed' = 'off';
         let storageChangeListener: ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void) | null = null;
 
-        mockGetCloseTabAfterQueuePreferenceForHostname.mockImplementation(async () => persistedEnabled);
-        mockSetCloseTabAfterQueuePreferenceForHostname.mockImplementation(async (_hostname: string, enabled: boolean) => {
-            persistedEnabled = enabled;
-            storageChangeListener?.({
-                closeTabAfterQueueByDomain: {
-                    newValue: enabled ? { 'example.com': true } : {},
-                },
-            }, 'local');
-        });
+        mockGetCloseTabAfterQueuePreferenceForHostname.mockImplementation(async () => persistedMode);
+        mockSetCloseTabAfterQueuePreferenceForHostname.mockImplementation(
+            async (_hostname: string, mode: 'off' | 'queued' | 'completed') => {
+                persistedMode = mode;
+                storageChangeListener?.({
+                    closeTabAfterQueueByDomain: {
+                        newValue: mode === 'off' ? {} : { 'example.com': mode },
+                    },
+                }, 'local');
+            },
+        );
 
         vi.stubGlobal('chrome', {
             storage: {
@@ -56,24 +58,24 @@ describe('close-tab-after-queue-state', () => {
         await flushPromises();
 
         expect(mockGetCloseTabAfterQueuePreferenceForHostname).toHaveBeenCalledTimes(1);
-        expect(first.enabled.value).toBe(false);
-        expect(second.enabled.value).toBe(false);
+        expect(first.mode.value).toBe('off');
+        expect(second.mode.value).toBe('off');
 
-        await first.toggle();
+        await first.cycleMode();
         await flushPromises();
 
-        expect(first.enabled.value).toBe(true);
-        expect(second.enabled.value).toBe(true);
+        expect(first.mode.value).toBe('queued');
+        expect(second.mode.value).toBe('queued');
 
-        persistedEnabled = false;
+        persistedMode = 'completed';
         storageChangeListener?.({
             closeTabAfterQueueByDomain: {
-                newValue: {},
+                newValue: { 'example.com': 'completed' },
             },
         }, 'local');
         await flushPromises();
 
-        expect(first.enabled.value).toBe(false);
-        expect(second.enabled.value).toBe(false);
+        expect(first.mode.value).toBe('completed');
+        expect(second.mode.value).toBe('completed');
     });
 });

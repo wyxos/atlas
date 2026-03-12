@@ -1,12 +1,13 @@
 import { ref, type Ref } from 'vue';
 import {
+    type CloseTabAfterQueueMode,
     getCloseTabAfterQueuePreferenceForHostname,
     setCloseTabAfterQueuePreferenceForHostname,
     STORAGE_KEYS,
 } from '../atlas-options';
 
 type CloseTabAfterQueueState = {
-    enabled: Ref<boolean>;
+    mode: Ref<CloseTabAfterQueueMode>;
     saving: Ref<boolean>;
     loadPromise: Promise<void> | null;
 };
@@ -25,7 +26,7 @@ function ensureState(hostname: string): CloseTabAfterQueueState {
     }
 
     const state: CloseTabAfterQueueState = {
-        enabled: ref(false),
+        mode: ref('off'),
         saving: ref(false),
         loadPromise: null,
     };
@@ -45,9 +46,9 @@ async function refreshPreference(hostname: string): Promise<void> {
 
     state.loadPromise = (async () => {
         try {
-            state.enabled.value = await getCloseTabAfterQueuePreferenceForHostname(hostname);
+            state.mode.value = await getCloseTabAfterQueuePreferenceForHostname(hostname);
         } catch {
-            state.enabled.value = false;
+            state.mode.value = 'off';
         } finally {
             state.loadPromise = null;
         }
@@ -74,9 +75,9 @@ function installStorageListener(): void {
 }
 
 export function useCloseTabAfterQueuePreference(hostname: string): {
-    enabled: Ref<boolean>;
+    mode: Ref<CloseTabAfterQueueMode>;
     saving: Ref<boolean>;
-    toggle: () => Promise<void>;
+    cycleMode: () => Promise<void>;
 } {
     const normalizedHostname = normalizeHostname(hostname);
     const state = ensureState(normalizedHostname);
@@ -84,7 +85,7 @@ export function useCloseTabAfterQueuePreference(hostname: string): {
     installStorageListener();
     void refreshPreference(normalizedHostname);
 
-    async function toggle(): Promise<void> {
+    async function cycleMode(): Promise<void> {
         if (normalizedHostname === '' || state.saving.value) {
             return;
         }
@@ -94,13 +95,17 @@ export function useCloseTabAfterQueuePreference(hostname: string): {
         try {
             await refreshPreference(normalizedHostname);
 
-            const nextEnabled = !state.enabled.value;
-            state.enabled.value = nextEnabled;
+            const nextMode: CloseTabAfterQueueMode = state.mode.value === 'off'
+                ? 'queued'
+                : state.mode.value === 'queued'
+                    ? 'completed'
+                    : 'off';
+            state.mode.value = nextMode;
 
             try {
-                await setCloseTabAfterQueuePreferenceForHostname(normalizedHostname, nextEnabled);
+                await setCloseTabAfterQueuePreferenceForHostname(normalizedHostname, nextMode);
             } catch {
-                state.enabled.value = !nextEnabled;
+                await refreshPreference(normalizedHostname);
             }
         } finally {
             state.saving.value = false;
@@ -108,8 +113,8 @@ export function useCloseTabAfterQueuePreference(hostname: string): {
     }
 
     return {
-        enabled: state.enabled,
+        mode: state.mode,
         saving: state.saving,
-        toggle,
+        cycleMode,
     };
 }

@@ -18,7 +18,9 @@ export const STORAGE_KEYS = {
 
 export const DEFAULT_ATLAS_DOMAIN = 'https://atlas.test';
 export type DomainBooleanPreferences = Record<string, boolean>;
-export type CloseTabAfterQueueByDomain = DomainBooleanPreferences;
+export const CLOSE_TAB_AFTER_QUEUE_MODES = ['off', 'queued', 'completed'] as const;
+export type CloseTabAfterQueueMode = typeof CLOSE_TAB_AFTER_QUEUE_MODES[number];
+export type CloseTabAfterQueueByDomain = Record<string, Exclude<CloseTabAfterQueueMode, 'off'>>;
 export type ReactAllItemsInPostByDomain = DomainBooleanPreferences;
 export type StoredOptions = {
     atlasDomain: string;
@@ -149,6 +151,31 @@ function parseStoredDomainBooleanPreferences(value: unknown): DomainBooleanPrefe
     return parsed;
 }
 
+function parseStoredCloseTabAfterQueueByDomain(value: unknown): CloseTabAfterQueueByDomain {
+    if (!value || typeof value !== 'object') {
+        return {};
+    }
+
+    const parsed: CloseTabAfterQueueByDomain = {};
+    for (const [rawKey, rawValue] of Object.entries(value as Record<string, unknown>)) {
+        const key = normalizePreferenceDomainKey(rawKey);
+        if (key === '') {
+            continue;
+        }
+
+        if (rawValue === true || rawValue === 'queued') {
+            parsed[key] = 'queued';
+            continue;
+        }
+
+        if (rawValue === 'completed') {
+            parsed[key] = 'completed';
+        }
+    }
+
+    return parsed;
+}
+
 export function getCloseTabAfterQueueByDomain(): Promise<CloseTabAfterQueueByDomain> {
     return new Promise((resolve, reject) => {
         chrome.storage.local.get([STORAGE_KEYS.closeTabAfterQueueByDomain], (stored: Record<string, unknown>) => {
@@ -157,22 +184,25 @@ export function getCloseTabAfterQueueByDomain(): Promise<CloseTabAfterQueueByDom
                 return;
             }
 
-            resolve(parseStoredDomainBooleanPreferences(stored[STORAGE_KEYS.closeTabAfterQueueByDomain]));
+            resolve(parseStoredCloseTabAfterQueueByDomain(stored[STORAGE_KEYS.closeTabAfterQueueByDomain]));
         });
     });
 }
 
-export async function getCloseTabAfterQueuePreferenceForHostname(hostname: string): Promise<boolean> {
+export async function getCloseTabAfterQueuePreferenceForHostname(hostname: string): Promise<CloseTabAfterQueueMode> {
     const key = normalizePreferenceDomainKey(hostname);
     if (key === '') {
-        return false;
+        return 'off';
     }
 
     const preferences = await getCloseTabAfterQueueByDomain();
-    return preferences[key] === true;
+    return preferences[key] ?? 'off';
 }
 
-export async function setCloseTabAfterQueuePreferenceForHostname(hostname: string, enabled: boolean): Promise<void> {
+export async function setCloseTabAfterQueuePreferenceForHostname(
+    hostname: string,
+    mode: CloseTabAfterQueueMode,
+): Promise<void> {
     const key = normalizePreferenceDomainKey(hostname);
     if (key === '') {
         return;
@@ -180,8 +210,8 @@ export async function setCloseTabAfterQueuePreferenceForHostname(hostname: strin
 
     const preferences = await getCloseTabAfterQueueByDomain();
     const nextPreferences: CloseTabAfterQueueByDomain = { ...preferences };
-    if (enabled) {
-        nextPreferences[key] = true;
+    if (mode === 'queued' || mode === 'completed') {
+        nextPreferences[key] = mode;
     } else {
         delete nextPreferences[key];
     }

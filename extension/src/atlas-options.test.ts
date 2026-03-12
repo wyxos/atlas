@@ -56,45 +56,44 @@ describe('atlas-options close-tab-after-queue preferences', () => {
     it('stores and reads enabled preference per hostname', async () => {
         const { STORAGE_KEYS, getCloseTabAfterQueuePreferenceForHostname, setCloseTabAfterQueuePreferenceForHostname } = await import('./atlas-options');
 
-        await setCloseTabAfterQueuePreferenceForHostname('WWW.Example.com', true);
+        await setCloseTabAfterQueuePreferenceForHostname('WWW.Example.com', 'queued');
 
         expect(storageState[STORAGE_KEYS.closeTabAfterQueueByDomain]).toEqual({
-            'www.example.com': true,
+            'www.example.com': 'queued',
         });
-        await expect(getCloseTabAfterQueuePreferenceForHostname('www.example.com')).resolves.toBe(true);
+        await expect(getCloseTabAfterQueuePreferenceForHostname('www.example.com')).resolves.toBe('queued');
     });
 
     it('removes stored preference when disabling domain option', async () => {
         const { STORAGE_KEYS, getCloseTabAfterQueuePreferenceForHostname, setCloseTabAfterQueuePreferenceForHostname } = await import('./atlas-options');
 
         storageState[STORAGE_KEYS.closeTabAfterQueueByDomain] = {
-            'example.com': true,
-            'other.example': true,
+            'example.com': 'queued',
+            'other.example': 'completed',
         };
 
-        await setCloseTabAfterQueuePreferenceForHostname('example.com', false);
+        await setCloseTabAfterQueuePreferenceForHostname('example.com', 'off');
 
         expect(storageState[STORAGE_KEYS.closeTabAfterQueueByDomain]).toEqual({
-            'other.example': true,
+            'other.example': 'completed',
         });
-        await expect(getCloseTabAfterQueuePreferenceForHostname('example.com')).resolves.toBe(false);
+        await expect(getCloseTabAfterQueuePreferenceForHostname('example.com')).resolves.toBe('off');
     });
 
-    it('sanitizes stored per-domain map to valid host keys and boolean values', async () => {
+    it('sanitizes stored per-domain map to valid host keys and supported mode values', async () => {
         const { STORAGE_KEYS, getCloseTabAfterQueueByDomain } = await import('./atlas-options');
 
         storageState[STORAGE_KEYS.closeTabAfterQueueByDomain] = {
             '': true,
             'https://sub.example.com/path': true,
-            '.valid.example.': true,
+            '.valid.example.': 'completed',
             'ignored.example': 'yes',
             'disabled.example': false,
         };
 
         await expect(getCloseTabAfterQueueByDomain()).resolves.toEqual({
-            'sub.example.com': true,
-            'valid.example': true,
-            'disabled.example': false,
+            'sub.example.com': 'queued',
+            'valid.example': 'completed',
         });
     });
 

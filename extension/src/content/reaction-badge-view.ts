@@ -1,6 +1,7 @@
 import { h, type VNode } from 'vue';
 import { Ban, Download, Heart, Loader2, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
 import type { BadgeReactionType } from './reaction-check-queue';
+import type { CloseTabAfterQueueMode } from '../atlas-options';
 
 export type BadgeTimestampDisplay = {
     icon: typeof Ban | typeof Download;
@@ -13,7 +14,7 @@ type BadgeViewModel = {
     activeReaction: BadgeReactionType | null;
     hoveredReaction: BadgeReactionType | null;
     submittingReactionType: BadgeReactionType | null;
-    closeTabAfterQueueEnabled: boolean;
+    closeTabAfterQueueMode: CloseTabAfterQueueMode;
     closeTabAfterQueueSaving: boolean;
     mediaResolution: string | null;
     openTabCount: number | null;
@@ -86,6 +87,12 @@ const reactionPalette: Record<BadgeReactionType, { activeBackground: string; hov
         activeBackground: '#eab308',
         hoverColor: '#facc15',
     },
+};
+
+const closeTabAfterQueueModeLabel: Record<CloseTabAfterQueueMode, string> = {
+    off: 'Off',
+    queued: 'Queued',
+    completed: 'Complete',
 };
 
 function iconColor(type: BadgeReactionType, model: BadgeViewModel): string {
@@ -299,7 +306,7 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                     },
                 },
                 [
-                    h('span', 'Auto-close after complete'),
+                    h('span', 'Auto-close'),
                     h(
                         'button',
                         {
@@ -314,15 +321,13 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                                 fontWeight: 700,
                                 cursor: model.closeTabAfterQueueSaving ? 'not-allowed' : 'pointer',
                                 opacity: model.closeTabAfterQueueSaving ? 0.7 : 1,
-                                background: model.closeTabAfterQueueEnabled ? '#14b8a6' : 'rgba(255,255,255,0.22)',
-                                color: model.closeTabAfterQueueEnabled ? '#052e2b' : '#ffffff',
+                                background: model.closeTabAfterQueueMode === 'off' ? 'rgba(255,255,255,0.22)' : '#14b8a6',
+                                color: model.closeTabAfterQueueMode === 'off' ? '#ffffff' : '#052e2b',
                             },
                         },
                         model.closeTabAfterQueueSaving
                             ? 'Saving...'
-                            : model.closeTabAfterQueueEnabled
-                                ? 'On'
-                                : 'Off',
+                            : closeTabAfterQueueModeLabel[model.closeTabAfterQueueMode],
                     ),
                 ],
             ),
