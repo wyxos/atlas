@@ -19,6 +19,7 @@ type UseTabContentItemInteractionsOptions = {
     fileViewer: Ref<FileViewerRef | null>;
     itemPreview: {
         incrementPreviewCount: (fileId: number) => Promise<{ will_auto_dislike: boolean } | null>;
+        clearPreviewedItems: () => void;
     };
     onReaction: (fileId: number, type: ReactionType) => void;
     clearHoveredContainer: () => void;
@@ -249,6 +250,33 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         }
     }
 
+    async function resetPreviewedState(): Promise<number> {
+        const fileIds = options.items.value
+            .map((item) => item.id)
+            .filter((itemId): itemId is number => typeof itemId === 'number');
+
+        if (fileIds.length === 0) {
+            return 0;
+        }
+
+        await window.axios.post('/api/files/preview/reset/batch', {
+            file_ids: fileIds,
+        });
+
+        autoDislikeQueue.clearAutoDislikeCountdowns();
+        options.itemPreview.clearPreviewedItems();
+
+        for (const item of options.items.value) {
+            item.previewed_count = 0;
+            item.will_auto_dislike = false;
+        }
+
+        triggerRef(options.items);
+        await nextTick();
+
+        return fileIds.length;
+    }
+
     const preloadHandlers = {
         reset: resetPreloadedItems,
         isItemPreloaded,
@@ -309,6 +337,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         reactions: reactionHandlers,
         viewer: viewerHandlers,
         autoDislikeQueue,
+        resetPreviewedState,
     };
 }
 

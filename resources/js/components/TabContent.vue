@@ -230,6 +230,7 @@ defineExpose({
     // Expose the per-tab form for tests/debugging
     browseForm: form,
     masonry,
+    resetPreviewedState: itemInteractions.resetPreviewedState,
 });
 </script>
 

@@ -500,6 +500,40 @@ SVG;
     }
 
     /**
+     * Reset preview counts for multiple files.
+     */
+    public function batchResetPreview(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $request->validate([
+            'file_ids' => 'required|array',
+            'file_ids.*' => 'required|integer|exists:files,id',
+        ]);
+
+        $fileIds = $request->input('file_ids');
+
+        File::whereIn('id', $fileIds)->update([
+            'previewed_count' => 0,
+            'previewed_at' => null,
+        ]);
+
+        $files = File::query()
+            ->whereIn('id', $fileIds)
+            ->with(['metadata', 'reactions'])
+            ->get();
+
+        // previewed_count/previewed_at are Typesense-filterable; ensure the index stays in sync.
+        $files->searchable();
+
+        return response()->json([
+            'message' => 'Preview counts reset.',
+            'results' => $files->map(static fn (File $file): array => [
+                'id' => $file->id,
+                'previewed_count' => (int) $file->previewed_count,
+            ]),
+        ]);
+    }
+
+    /**
      * Perform auto-dislike on multiple files (called after countdown expires).
      */
     public function batchPerformAutoDislike(\Illuminate\Http\Request $request): JsonResponse
