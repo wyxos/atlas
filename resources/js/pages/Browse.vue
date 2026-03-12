@@ -46,6 +46,7 @@ const {
     getActiveTab,
     updateActiveTab,
     updateTabLabel,
+    updateTabNickname,
     setActiveTab,
 } = useTabs(switchTab);
 
@@ -104,6 +105,10 @@ function handleUpdateTabLabel(label: string): void {
     }
 
     updateTabLabel(activeTabId.value, label);
+}
+
+function handleRenameTab(tabId: number, nickname: string | null): void {
+    updateTabNickname(tabId, nickname);
 }
 
 type ContainerTabPayload = {
@@ -165,11 +170,11 @@ onMounted(async () => {
         <div class="flex-1 min-h-0 relative flex">
             <TabPanel :model-value="true" v-model:is-minimized="isPanelMinimized">
                 <template #tabs="{ isMinimized }">
-                    <Tab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label"
+                    <Tab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label" :nickname="tab.nickname ?? null"
                         :is-active="tab.id === activeTabId" :is-minimized="isMinimized"
                         :is-loading="isTabDataLoading(tab.id)"
                         :is-masonry-loading="tabMasonryLoadingStates.get(tab.id) ?? false" @click="switchTab(tab.id)"
-                        @close="closeTab(tab.id)" :data-test="`browse-tab-${tab.id}`" />
+                        @close="closeTab(tab.id)" @rename="handleRenameTab(tab.id, $event)" :data-test="`browse-tab-${tab.id}`" />
                 </template>
                 <template #footer="{ isMinimized }">
                     <Button variant="dashed" size="sm" @click="createTab"

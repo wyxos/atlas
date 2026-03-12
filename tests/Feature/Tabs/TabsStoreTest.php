@@ -26,6 +26,24 @@ test('authenticated user can create browse tab', function () {
     ]);
 });
 
+test('authenticated user can create a browse tab nickname', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/tabs', [
+        'label' => 'Generated Label',
+        'nickname' => 'Pinned Search',
+    ]);
+
+    $response->assertStatus(201);
+    expect($response->json('nickname'))->toBe('Pinned Search');
+
+    $this->assertDatabaseHas('tabs', [
+        'label' => 'Generated Label',
+        'nickname' => 'Pinned Search',
+        'user_id' => $user->id,
+    ]);
+});
+
 test('tab creation requires label', function () {
     $user = User::factory()->create();
 
