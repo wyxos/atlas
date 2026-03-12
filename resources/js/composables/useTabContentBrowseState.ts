@@ -4,7 +4,7 @@ import { useToast } from 'vue-toastification';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
 import type { ServiceOption } from '@/lib/browseCatalog';
-import { getLocalPresetLabel } from '@/lib/localPresets';
+import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession, resolveLegacyBrowseService } from '@/lib/tabContentBrowseBootstrap';
 import type { BrowseFormData, BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
@@ -41,20 +41,6 @@ type TabContentBrowseStateRefs = {
     shouldShowForm: Ref<boolean>;
 };
 
-function normalizeContainerValue(value: unknown): string | null {
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-
-        return trimmed.length > 0 ? trimmed : null;
-    }
-
-    if (typeof value === 'number') {
-        return Number.isFinite(value) ? String(value) : null;
-    }
-
-    return null;
-}
-
 function normalizeTotal(value: unknown): number | null {
     if (typeof value === 'number') {
         return value;
@@ -63,32 +49,6 @@ function normalizeTotal(value: unknown): number | null {
     const parsed = Number(value);
 
     return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getContainerLabelFromFilters(formData: BrowseFormData): string | null {
-    if (formData.feed !== 'online') {
-        return null;
-    }
-
-    if (formData.service === 'civit-ai-images') {
-        const username = normalizeContainerValue(formData.serviceFilters?.username);
-        if (username) {
-            return `User ${username}`;
-        }
-
-        const postId = normalizeContainerValue(formData.serviceFilters?.postId);
-        if (postId) {
-            return `Post ${postId}`;
-        }
-    }
-
-    return null;
-}
-
-function formatTabLabel(serviceLabel: string, pageToken: PageToken, containerLabel?: string | null): string {
-    const prefix = containerLabel ? `${serviceLabel}: ${containerLabel}` : serviceLabel;
-
-    return `${prefix} - ${String(pageToken)}`;
 }
 
 function normalizeLocalPage(form: BrowseFormInstance): number {
@@ -128,24 +88,18 @@ function createTabContentPageLoader(args: {
             return;
         }
 
-        if (formData.feed === 'online' && !formData.service) {
+        const label = buildBrowseTabLabel({
+            formData,
+            pageToken: page,
+            availableServices: args.catalog.availableServices.value,
+            localService: args.catalog.localService?.value ?? null,
+        });
+
+        if (!label) {
             return;
         }
 
-        const baseServiceLabel = formData.feed === 'local'
-            ? (args.catalog.localService?.value?.label ?? 'Local')
-            : (
-                args.catalog.availableServices.value.find((service) => service.key === formData.service)?.label
-                ?? formData.service
-            );
-
-        const localPresetLabel = formData.feed === 'local'
-            ? getLocalPresetLabel(formData.serviceFilters?.local_preset)
-            : null;
-        const serviceLabel = localPresetLabel ? `${baseServiceLabel} - ${localPresetLabel}` : baseServiceLabel;
-        const containerLabel = getContainerLabelFromFilters(formData);
-
-        args.events.onUpdateTabLabel(formatTabLabel(serviceLabel, page, containerLabel));
+        args.events.onUpdateTabLabel(label);
     }
 
     async function getPage(page: PageToken, context?: BrowseFormData) {
@@ -362,9 +316,6 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
             applyFilters,
             goToFirstPage,
             applyService,
-        },
-        formatters: {
-            formatTabLabel,
         },
     };
 }
