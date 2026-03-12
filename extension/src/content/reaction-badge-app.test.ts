@@ -97,7 +97,7 @@ describe('createReactionBadgeHost', () => {
             downloadedAt: null,
             blacklistedAt: null,
         });
-        mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(true);
+        mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue('completed');
         mockGetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(false);
         mockSetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(undefined);
         mockSetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(undefined);
@@ -242,7 +242,7 @@ describe('createReactionBadgeHost', () => {
     });
 
     it('keeps the close-tab toggle synchronized across mounted badges on the same hostname', async () => {
-        mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(false);
+        mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue('off');
 
         vi.stubGlobal('chrome', {
             runtime: {
@@ -299,11 +299,11 @@ describe('createReactionBadgeHost', () => {
         await flushPromises();
 
         const firstToggleAfter = Array.from(firstHost.element.querySelectorAll('button'))
-            .find((button) => button.textContent === 'On');
+            .find((button) => button.textContent === 'Queued');
         const secondToggleAfter = Array.from(secondHost.element.querySelectorAll('button'))
-            .find((button) => button.textContent === 'On');
+            .find((button) => button.textContent === 'Queued');
 
-        expect(mockSetCloseTabAfterQueuePreferenceForHostname).toHaveBeenCalledWith(window.location.hostname, true);
+        expect(mockSetCloseTabAfterQueuePreferenceForHostname).toHaveBeenCalledWith(window.location.hostname, 'queued');
         expect(firstToggleAfter).toBeTruthy();
         expect(secondToggleAfter).toBeTruthy();
 
@@ -485,6 +485,84 @@ describe('createReactionBadgeHost', () => {
                 },
             ],
         });
+
+        host.unmount();
+    });
+
+    it('closes the tab immediately when auto-close mode is queued', async () => {
+        mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue('queued');
+        mockSubmitBadgeReaction.mockResolvedValue({
+            ok: true,
+            reaction: 'love',
+            exists: true,
+            fileId: 123,
+            downloadRequested: true,
+            shouldCloseTabAfterQueue: true,
+            downloadTransferId: 456,
+            downloadStatus: 'queued',
+            downloadProgressPercent: 0,
+            downloadCloseTargets: [
+                {
+                    fileId: 123,
+                    transferId: 456,
+                    status: 'queued',
+                    downloadedAt: null,
+                },
+            ],
+            reverbConfig: null,
+        });
+
+        const runtimeSendMessage = vi.fn((message: unknown, callback?: (response: unknown) => void) => {
+            const payload = message as { type?: string };
+
+            if (payload.type === 'ATLAS_GET_TAB_COUNT') {
+                callback?.({ count: 2 });
+                return;
+            }
+
+            if (payload.type === 'ATLAS_CLOSE_CURRENT_TAB') {
+                callback?.({ ok: true });
+                return;
+            }
+
+            callback?.(null);
+        });
+
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: runtimeSendMessage,
+                onMessage: {
+                    addListener: vi.fn(),
+                },
+            },
+            storage: {
+                onChanged: {
+                    addListener: vi.fn(),
+                },
+            },
+        });
+
+        const { createReactionBadgeHost } = await import('./reaction-badge-app');
+
+        const image = document.createElement('img');
+        image.src = 'https://images.example.com/queued-close.jpg';
+        document.body.appendChild(image);
+
+        const host = createReactionBadgeHost(image);
+        document.body.appendChild(host.element);
+
+        await flushPromises();
+        await flushPromises();
+
+        host.triggerReaction('love');
+        await flushPromises();
+        await flushPromises();
+
+        expect(runtimeSendMessage).toHaveBeenCalledWith(
+            { type: 'ATLAS_CLOSE_CURRENT_TAB' },
+            expect.any(Function),
+        );
 
         host.unmount();
     });

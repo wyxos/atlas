@@ -28,7 +28,7 @@ export const AtlasReactionBadge = defineComponent({
                 activeReaction: badge.activeReaction.value,
                 hoveredReaction: badge.hoveredReaction.value,
                 submittingReactionType: badge.submittingReactionType.value,
-                closeTabAfterQueueEnabled: badge.closeTabAfterQueueEnabled.value,
+                closeTabAfterQueueMode: badge.closeTabAfterQueueMode.value,
                 closeTabAfterQueueSaving: badge.isSavingCloseTabAfterQueuePreference.value,
                 mediaResolution: badge.mediaResolution.value,
                 openTabCount: badge.openTabCount.value,
@@ -47,7 +47,7 @@ export const AtlasReactionBadge = defineComponent({
                     badge.hoveredReaction.value = reactionType;
                 },
                 onCloseTabAfterQueueToggle: () => {
-                    void badge.toggleCloseTabAfterQueuePreference();
+                    void badge.cycleCloseTabAfterQueuePreference();
                 },
                 onReactAllItemsInPostToggle: () => {
                     void badge.handleReactAllItemsInPostToggle();
