@@ -23,7 +23,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-/tests/Browser
 /.playwright-mcp
 test-results/
 .cursor/commands
