@@ -41,6 +41,7 @@ const attrs = useAttrs();
 const isEditingCustomLabel = ref(false);
 const customLabelInput = ref<HTMLInputElement | null>(null);
 const draftCustomLabel = ref(props.customLabel ?? '');
+const preventContextMenuCloseAutoFocus = ref(false);
 
 watch(() => props.customLabel, (nextCustomLabel) => {
     if (!isEditingCustomLabel.value) {
@@ -83,9 +84,19 @@ function startCustomLabelEdit(): void {
 }
 
 function queueCustomLabelEdit(): void {
+    preventContextMenuCloseAutoFocus.value = true;
     window.setTimeout(() => {
         startCustomLabelEdit();
     }, 0);
+}
+
+function handleContextMenuCloseAutoFocus(event: Event): void {
+    if (!preventContextMenuCloseAutoFocus.value) {
+        return;
+    }
+
+    event.preventDefault();
+    preventContextMenuCloseAutoFocus.value = false;
 }
 
 function commitCustomLabelEdit(): void {
@@ -213,7 +224,10 @@ function handleCustomLabelKeydown(event: KeyboardEvent): void {
                 </div>
             </div>
         </ContextMenuTrigger>
-        <ContextMenuContent class="w-48 bg-prussian-blue-600 border-twilight-indigo-500 text-twilight-indigo-100">
+        <ContextMenuContent
+            class="w-48 bg-prussian-blue-600 border-twilight-indigo-500 text-twilight-indigo-100"
+            @close-auto-focus="handleContextMenuCloseAutoFocus"
+        >
             <ContextMenuItem
                 :disabled="isMinimized"
                 class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
