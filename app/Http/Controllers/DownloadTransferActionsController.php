@@ -224,6 +224,44 @@ class DownloadTransferActionsController extends Controller
         ]);
     }
 
+    public function destroyCompleted(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'also_from_disk' => 'sometimes|boolean',
+        ]);
+
+        $alsoFromDisk = (bool) ($validated['also_from_disk'] ?? false);
+
+        if (! $alsoFromDisk) {
+            $removedCount = DownloadTransfer::query()
+                ->where('status', DownloadTransferStatus::COMPLETED)
+                ->delete();
+
+            return response()->json([
+                'message' => 'Completed downloads removed.',
+                'count' => $removedCount,
+            ]);
+        }
+
+        $removedCount = 0;
+        DownloadTransfer::query()
+            ->where('status', DownloadTransferStatus::COMPLETED)
+            ->with('file')
+            ->orderBy('id')
+            ->chunkById(200, function ($transfers) use (&$removedCount): void {
+                foreach ($transfers as $transfer) {
+                    $this->deleteFileFromDisk($transfer);
+                    $transfer->delete();
+                    $removedCount++;
+                }
+            });
+
+        return response()->json([
+            'message' => 'Completed downloads removed.',
+            'count' => $removedCount,
+        ]);
+    }
+
     private function canPause(DownloadTransfer $downloadTransfer): bool
     {
         return in_array($downloadTransfer->status, [
