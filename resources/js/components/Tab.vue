@@ -176,7 +176,8 @@ function handleCustomLabelKeydown(event: KeyboardEvent): void {
                                 class="h-6 w-full rounded border border-white/20 bg-black/20 px-2 text-xs text-white outline-none placeholder:text-white/50"
                                 placeholder="Custom label"
                                 data-test="tab-custom-label-input"
-                                @keydown="handleCustomLabelKeydown"
+                                @keydown.stop="handleCustomLabelKeydown"
+                                @keyup.stop
                                 @blur="commitCustomLabelEdit"
                             >
                             <span class="truncate text-[10px] text-current/70">

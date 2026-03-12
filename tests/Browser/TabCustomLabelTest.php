@@ -25,7 +25,7 @@ it('keeps the custom label editor open and persists the custom label', function 
     $tabSelector = sprintf('[data-test="browse-tab-%d"]', $tab->id);
     $renameActionSelector = '[data-test="tab-context-rename"]';
     $inputSelector = '[data-test="tab-custom-label-input"]';
-    $customLabel = 'Pinned Search';
+    $customLabel = 'Pinned Search V2!?';
 
     $page = visit('/browse');
 
@@ -40,7 +40,7 @@ it('keeps the custom label editor open and persists the custom label', function 
         ->wait(0.2)
         ->assertScript(sprintf('document.querySelector(%s) !== null', json_encode($inputSelector)))
         ->assertScript("document.activeElement?.dataset?.test === 'tab-custom-label-input'")
-        ->type($inputSelector, $customLabel)
+        ->typeSlowly($inputSelector, $customLabel, 25)
         ->keys($inputSelector, 'Enter')
         ->wait(0.5)
         ->assertSeeIn($tabSelector, $customLabel)
