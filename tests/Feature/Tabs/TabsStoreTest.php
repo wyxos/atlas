@@ -26,20 +26,20 @@ test('authenticated user can create browse tab', function () {
     ]);
 });
 
-test('authenticated user can create a browse tab nickname', function () {
+test('authenticated user can create a browse tab custom label', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'Generated Label',
-        'nickname' => 'Pinned Search',
+        'custom_label' => 'Pinned Search',
     ]);
 
     $response->assertStatus(201);
-    expect($response->json('nickname'))->toBe('Pinned Search');
+    expect($response->json('custom_label'))->toBe('Pinned Search');
 
     $this->assertDatabaseHas('tabs', [
         'label' => 'Generated Label',
-        'nickname' => 'Pinned Search',
+        'custom_label' => 'Pinned Search',
         'user_id' => $user->id,
     ]);
 });

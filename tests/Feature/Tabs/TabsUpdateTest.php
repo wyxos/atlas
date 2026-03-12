@@ -23,25 +23,25 @@ test('user can update their own browse tab', function () {
     ]);
 });
 
-test('user can update their tab nickname without overwriting the generated label', function () {
+test('user can update their tab custom label without overwriting the generated label', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create([
         'label' => 'Generated Label',
-        'nickname' => null,
+        'custom_label' => null,
     ]);
 
     $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
-        'nickname' => 'Pinned Search',
+        'custom_label' => 'Pinned Search',
     ]);
 
     $response->assertSuccessful();
-    expect($response->json('nickname'))->toBe('Pinned Search');
+    expect($response->json('custom_label'))->toBe('Pinned Search');
     expect($response->json('label'))->toBe('Generated Label');
 
     $this->assertDatabaseHas('tabs', [
         'id' => $tab->id,
         'label' => 'Generated Label',
-        'nickname' => 'Pinned Search',
+        'custom_label' => 'Pinned Search',
     ]);
 });
 

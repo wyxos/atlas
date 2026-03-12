@@ -44,7 +44,7 @@ describe('useTabs', () => {
             {
                 id: 1,
                 label: 'Tab 1',
-                nickname: 'Pinned 1',
+                custom_label: 'Pinned 1',
                 params: { page: 1 },
                 position: 0,
                 is_active: false,
@@ -68,10 +68,10 @@ describe('useTabs', () => {
         expect(tabs.value).toHaveLength(2);
         expect(tabs.value[0].id).toBe(1);
         expect(tabs.value[0].label).toBe('Tab 1');
-        expect(tabs.value[0].nickname).toBe('Pinned 1');
+        expect(tabs.value[0].customLabel).toBe('Pinned 1');
         expect(tabs.value[1].id).toBe(2);
         expect(tabs.value[1].label).toBe('Tab 2');
-        expect(tabs.value[1].nickname).toBeNull();
+        expect(tabs.value[1].customLabel).toBeNull();
         expect(isLoadingTabs.value).toBe(false);
     });
 
@@ -170,7 +170,7 @@ describe('useTabs', () => {
 
         expect(mockAxios.post).toHaveBeenCalledWith('/api/tabs', {
             label: 'Browse 1',
-            nickname: null,
+            custom_label: null,
             params: {},
             position: 0,
         });
@@ -332,29 +332,29 @@ describe('useTabs', () => {
         // params are managed by the backend (Browser.php), not sent from frontend
         expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/1', {
             label: 'Tab 1',
-            nickname: null,
+            custom_label: null,
             position: 0,
             // params are not sent - backend manages them
         });
     });
 
-    it('updates tab nickname without overwriting the generated label', async () => {
-        const { tabs, updateTabNickname } = useTabs();
+    it('updates tab custom label without overwriting the generated label', async () => {
+        const { tabs, updateTabCustomLabel } = useTabs();
 
         tabs.value = [
-            { id: 1, label: 'Generated Label', nickname: null, params: {}, position: 0, isActive: false },
+            { id: 1, label: 'Generated Label', customLabel: null, params: {}, position: 0, isActive: false },
         ];
 
         mockAxios.put.mockResolvedValueOnce({});
 
-        updateTabNickname(1, 'Pinned Search');
+        updateTabCustomLabel(1, 'Pinned Search');
         await new Promise(resolve => setTimeout(resolve, 0));
 
         expect(tabs.value[0].label).toBe('Generated Label');
-        expect(tabs.value[0].nickname).toBe('Pinned Search');
+        expect(tabs.value[0].customLabel).toBe('Pinned Search');
         expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/1', {
             label: 'Generated Label',
-            nickname: 'Pinned Search',
+            custom_label: 'Pinned Search',
             position: 0,
         });
     });

@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int id
  * @property int user_id
  * @property string label
- * @property string|null nickname
+ * @property string|null custom_label
  * @property array|null params
  * @property int position
  * @property bool is_active
@@ -47,7 +47,7 @@ class Tab extends Model
     protected $fillable = [
         'user_id',
         'label',
-        'nickname',
+        'custom_label',
         'params',
         'position',
         'is_active',

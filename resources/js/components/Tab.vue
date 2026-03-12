@@ -5,7 +5,7 @@ import { X, Layers, Loader2, SquarePen } from 'lucide-vue-next';
 interface Props {
     id: number | string;
     label: string;
-    nickname?: string | null;
+    customLabel?: string | null;
     isActive?: boolean;
     isMinimized?: boolean;
     isLoading?: boolean; // Tab data loading (spinner)
@@ -15,24 +15,24 @@ interface Props {
 const emit = defineEmits<{
     click: [];
     close: [];
-    rename: [nickname: string | null];
+    rename: [customLabel: string | null];
 }>();
 
 const props = withDefaults(defineProps<Props>(), {
-    nickname: null,
+    customLabel: null,
     isActive: false,
     isMinimized: false,
     isLoading: false,
     isMasonryLoading: false,
 });
 
-const isEditingNickname = ref(false);
-const nicknameInput = ref<HTMLInputElement | null>(null);
-const draftNickname = ref(props.nickname ?? '');
+const isEditingCustomLabel = ref(false);
+const customLabelInput = ref<HTMLInputElement | null>(null);
+const draftCustomLabel = ref(props.customLabel ?? '');
 
-watch(() => props.nickname, (nextNickname) => {
-    if (!isEditingNickname.value) {
-        draftNickname.value = nextNickname ?? '';
+watch(() => props.customLabel, (nextCustomLabel) => {
+    if (!isEditingCustomLabel.value) {
+        draftCustomLabel.value = nextCustomLabel ?? '';
     }
 });
 
@@ -59,51 +59,51 @@ function handleMouseDown(event: MouseEvent): void {
     }
 }
 
-function startNicknameEdit(event: MouseEvent): void {
+function startCustomLabelEdit(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
     if (props.isMinimized) {
         return;
     }
 
-    isEditingNickname.value = true;
-    draftNickname.value = props.nickname ?? '';
+    isEditingCustomLabel.value = true;
+    draftCustomLabel.value = props.customLabel ?? '';
     void nextTick(() => {
-        nicknameInput.value?.focus();
-        nicknameInput.value?.select();
+        customLabelInput.value?.focus();
+        customLabelInput.value?.select();
     });
 }
 
-function commitNicknameEdit(): void {
-    if (!isEditingNickname.value) {
+function commitCustomLabelEdit(): void {
+    if (!isEditingCustomLabel.value) {
         return;
     }
 
-    isEditingNickname.value = false;
-    const nextNickname = draftNickname.value.trim();
-    const normalizedNickname = nextNickname === '' ? null : nextNickname;
-    if ((props.nickname ?? null) === normalizedNickname) {
+    isEditingCustomLabel.value = false;
+    const nextCustomLabel = draftCustomLabel.value.trim();
+    const normalizedCustomLabel = nextCustomLabel === '' ? null : nextCustomLabel;
+    if ((props.customLabel ?? null) === normalizedCustomLabel) {
         return;
     }
 
-    emit('rename', normalizedNickname);
+    emit('rename', normalizedCustomLabel);
 }
 
-function cancelNicknameEdit(): void {
-    isEditingNickname.value = false;
-    draftNickname.value = props.nickname ?? '';
+function cancelCustomLabelEdit(): void {
+    isEditingCustomLabel.value = false;
+    draftCustomLabel.value = props.customLabel ?? '';
 }
 
-function handleNicknameKeydown(event: KeyboardEvent): void {
+function handleCustomLabelKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
         event.preventDefault();
-        commitNicknameEdit();
+        commitCustomLabelEdit();
         return;
     }
 
     if (event.key === 'Escape') {
         event.preventDefault();
-        cancelNicknameEdit();
+        cancelCustomLabelEdit();
     }
 }
 </script>
@@ -118,7 +118,7 @@ function handleNicknameKeydown(event: KeyboardEvent): void {
                 ? 'bg-smart-blue-600/80 text-white'
                 : 'text-twilight-indigo-200 hover:bg-prussian-blue-700/50 hover:text-twilight-indigo-100',
         ]"
-        :title="nickname ? `${nickname} - ${label}` : label"
+        :title="customLabel ? `${customLabel} - ${label}` : label"
         role="button"
         tabindex="0"
         @keydown.enter="handleClick"
@@ -128,27 +128,27 @@ function handleNicknameKeydown(event: KeyboardEvent): void {
             <Layers class="w-4 h-4 shrink-0" />
             <div v-show="!isMinimized" class="min-w-0 flex-1 transition-opacity duration-200"
                 :class="!isMinimized ? 'opacity-100' : 'opacity-0'">
-                <div v-if="isEditingNickname" class="min-w-0 flex flex-col gap-0.5" @click.stop @mousedown.stop>
+                <div v-if="isEditingCustomLabel" class="min-w-0 flex flex-col gap-0.5" @click.stop @mousedown.stop>
                     <input
-                        ref="nicknameInput"
-                        v-model="draftNickname"
+                        ref="customLabelInput"
+                        v-model="draftCustomLabel"
                         type="text"
                         maxlength="255"
                         class="h-6 w-full rounded border border-white/20 bg-black/20 px-2 text-xs text-white outline-none placeholder:text-white/50"
-                        placeholder="Nickname"
-                        data-test="tab-nickname-input"
-                        @keydown="handleNicknameKeydown"
-                        @blur="commitNicknameEdit"
+                        placeholder="Custom label"
+                        data-test="tab-custom-label-input"
+                        @keydown="handleCustomLabelKeydown"
+                        @blur="commitCustomLabelEdit"
                     >
                     <span class="truncate text-[10px] text-current/70">
                         {{ label }}
                     </span>
                 </div>
-                <div v-else class="min-w-0" @dblclick="startNicknameEdit">
+                <div v-else class="min-w-0" @dblclick="startCustomLabelEdit">
                     <span class="block truncate text-xs font-medium whitespace-nowrap">
-                        {{ nickname ?? label }}
+                        {{ customLabel ?? label }}
                     </span>
-                    <span v-if="nickname" class="block truncate text-[10px] text-current/70 whitespace-nowrap">
+                    <span v-if="customLabel" class="block truncate text-[10px] text-current/70 whitespace-nowrap">
                         {{ label }}
                     </span>
                 </div>
@@ -174,9 +174,9 @@ function handleNicknameKeydown(event: KeyboardEvent): void {
         <div v-show="!isMinimized" class="flex items-center shrink-0" :class="!isMinimized ? 'opacity-100' : 'opacity-0'">
             <button
                 type="button"
-                @click.stop="startNicknameEdit"
+                @click.stop="startCustomLabelEdit"
                 class="flex items-center justify-center h-6 w-6 rounded text-current opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-black/20 focus:opacity-100 focus:outline-none shrink-0"
-                aria-label="Rename tab"
+                aria-label="Edit tab label"
                 data-test="tab-rename-button"
             >
                 <SquarePen :size="13" />
