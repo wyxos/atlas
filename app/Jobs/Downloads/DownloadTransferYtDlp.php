@@ -80,7 +80,11 @@ class DownloadTransferYtDlp implements ShouldQueue
 
             if (! $process->isSuccessful()) {
                 $error = trim($process->getErrorOutput() ?: $process->getOutput());
-                $this->failTransfer($transfer, $error !== '' ? $error : 'yt-dlp failed.');
+                $this->failTransfer(
+                    $transfer,
+                    $error !== '' ? $error : 'yt-dlp failed.',
+                    cleanupTempArtifacts: $this->shouldDiscardTempArtifacts($error)
+                );
 
                 return;
             }
@@ -93,11 +97,10 @@ class DownloadTransferYtDlp implements ShouldQueue
                 return;
             }
 
-            $candidates = glob($absoluteTmpDir.DIRECTORY_SEPARATOR.'download.*') ?: [];
-            $candidates = array_values(array_filter($candidates, fn ($path) => is_string($path) && is_file($path)));
+            $candidates = $this->finalizedOutputCandidates($absoluteTmpDir);
 
             if ($candidates === []) {
-                $this->failTransfer($transfer, 'yt-dlp completed but no output file was found.');
+                $this->failTransfer($transfer, 'yt-dlp completed without a finalized output file.', cleanupTempArtifacts: true);
 
                 return;
             }
@@ -110,6 +113,12 @@ class DownloadTransferYtDlp implements ShouldQueue
                     $best = $candidate;
                     $bestSize = $size;
                 }
+            }
+
+            if ($bestSize <= 0) {
+                $this->failTransfer($transfer, 'yt-dlp produced an empty output file.', cleanupTempArtifacts: true);
+
+                return;
             }
 
             $relativeDownloadedPath = $tmpDir.'/'.basename($best);
@@ -160,7 +169,11 @@ class DownloadTransferYtDlp implements ShouldQueue
 
             PumpDomainDownloads::dispatch((string) $transfer->domain);
         } catch (Throwable $e) {
-            $this->failTransfer($transfer, $e->getMessage());
+            $this->failTransfer(
+                $transfer,
+                $e->getMessage(),
+                cleanupTempArtifacts: $this->shouldDiscardTempArtifacts($e->getMessage())
+            );
         } finally {
             if (is_string($runtimeCookieJarPath) && $runtimeCookieJarPath !== '' && is_file($runtimeCookieJarPath)) {
                 @unlink($runtimeCookieJarPath);
@@ -168,9 +181,16 @@ class DownloadTransferYtDlp implements ShouldQueue
         }
     }
 
-    private function failTransfer(DownloadTransfer $transfer, string $message): void
+    private function failTransfer(DownloadTransfer $transfer, string $message, bool $cleanupTempArtifacts = false): void
     {
         $normalizedMessage = $this->normalizeFailureMessage($message);
+
+        if ($cleanupTempArtifacts) {
+            $this->cleanupTempArtifacts($transfer);
+            if (! str_contains($normalizedMessage, 'Use Restart to fetch the file from scratch.')) {
+                $normalizedMessage .= ' Atlas discarded the temporary yt-dlp fragments for this transfer. Use Restart to fetch the file from scratch.';
+            }
+        }
 
         DownloadTransfer::query()->whereKey($transfer->id)->update([
             'status' => DownloadTransferStatus::FAILED,
@@ -208,7 +228,56 @@ class DownloadTransferYtDlp implements ShouldQueue
             return $trimmed.' Ensure the Atlas extension is running on a logged-in page so auth cookies can be attached for this download.';
         }
 
+        if ($this->shouldDiscardTempArtifacts($trimmed)) {
+            return $trimmed.' Atlas discarded the temporary yt-dlp fragments for this transfer. Use Restart to fetch the file from scratch.';
+        }
+
         return $trimmed;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function finalizedOutputCandidates(string $absoluteTmpDir): array
+    {
+        $candidates = glob($absoluteTmpDir.DIRECTORY_SEPARATOR.'download.*') ?: [];
+
+        return array_values(array_filter($candidates, function ($path): bool {
+            if (! is_string($path) || ! is_file($path)) {
+                return false;
+            }
+
+            $lower = strtolower($path);
+
+            return ! str_ends_with($lower, '.part')
+                && ! str_ends_with($lower, '.ytdl')
+                && ! str_ends_with($lower, '.tmp');
+        }));
+    }
+
+    private function shouldDiscardTempArtifacts(string $message): bool
+    {
+        $lower = strtolower(trim($message));
+        if ($lower === '') {
+            return false;
+        }
+
+        return str_contains($lower, '.ytdl file is corrupt')
+            || str_contains($lower, 'downloaded file is empty')
+            || (
+                str_contains($lower, 'unable to rename file')
+                && str_contains($lower, '.part-frag')
+            );
+    }
+
+    private function cleanupTempArtifacts(DownloadTransfer $transfer): void
+    {
+        $disk = Storage::disk(config('downloads.disk'));
+        $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+
+        if ($disk->exists($tmpDir)) {
+            $disk->deleteDirectory($tmpDir);
+        }
     }
 
     private function broadcastProgressFromChunk(
