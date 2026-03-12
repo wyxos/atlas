@@ -49,6 +49,7 @@ it('dispatches yt-dlp downloader when download_via is yt-dlp', function () {
     expect($transfer->status)->toBe(DownloadTransferStatus::DOWNLOADING);
 
     Bus::assertDispatched(DownloadTransferYtDlp::class, function (DownloadTransferYtDlp $job) use ($transfer) {
-        return $job->downloadTransferId === $transfer->id;
+        return $job->downloadTransferId === $transfer->id
+            && $job->attempt === (int) $transfer->attempt;
     });
 });

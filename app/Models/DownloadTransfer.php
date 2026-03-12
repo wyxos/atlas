@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string url
  * @property string domain
  * @property string status
+ * @property int attempt
  * @property int|null bytes_total
  * @property int bytes_downloaded
  * @property int last_broadcast_percent
@@ -46,6 +47,7 @@ class DownloadTransfer extends Model
         'url',
         'domain',
         'status',
+        'attempt',
         'bytes_total',
         'bytes_downloaded',
         'last_broadcast_percent',
@@ -63,6 +65,7 @@ class DownloadTransfer extends Model
             'bytes_total' => 'integer',
             'bytes_downloaded' => 'integer',
             'last_broadcast_percent' => 'integer',
+            'attempt' => 'integer',
             'queued_at' => 'datetime',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',

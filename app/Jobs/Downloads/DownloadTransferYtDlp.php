@@ -6,12 +6,15 @@ use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\Downloads\YtDlpCommandBuilder;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -31,7 +34,7 @@ class DownloadTransferYtDlp implements ShouldQueue
     // yt-dlp downloads can take a long time (especially for videos + merging).
     public int $timeout = 1900;
 
-    public function __construct(public int $downloadTransferId)
+    public function __construct(public int $downloadTransferId, public int $attempt = 0)
     {
         $this->onQueue('downloads');
     }
@@ -39,26 +42,41 @@ class DownloadTransferYtDlp implements ShouldQueue
     public function handle(
         FileDownloadFinalizer $finalizer,
         YtDlpCommandBuilder $commandBuilder,
-        ?DownloadTransferRequestOptions $requestOptions = null
+        ?DownloadTransferRequestOptions $requestOptions = null,
+        ?DownloadTransferExecutionLock $executionLock = null,
+        ?DownloadTransferTempDirectory $tempDirectory = null
     ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
+        $executionLock ??= app(DownloadTransferExecutionLock::class);
+        $tempDirectory ??= app(DownloadTransferTempDirectory::class);
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
             return;
         }
 
+        if (! $this->matchesAttempt($transfer)) {
+            return;
+        }
+
         $file = $transfer->file;
         $runtimeCookieJarPath = null;
+        $lock = null;
 
         try {
             if ($transfer->status !== DownloadTransferStatus::DOWNLOADING) {
                 return;
             }
 
+            $timeoutSeconds = (int) config('downloads.yt_dlp_timeout_seconds', 1800);
+            $lock = $executionLock->acquireYtDlp($transfer->id, $timeoutSeconds + 60);
+            if (! $lock) {
+                return;
+            }
+
             $disk = Storage::disk(config('downloads.disk'));
 
-            $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+            $tmpDir = $tempDirectory->ytDlpAttempt($transfer->id, $this->attempt);
             if (! $disk->exists($tmpDir)) {
                 $disk->makeDirectory($tmpDir, 0755, true);
             }
@@ -67,16 +85,38 @@ class DownloadTransferYtDlp implements ShouldQueue
             $outputTemplate = $absoluteTmpDir.DIRECTORY_SEPARATOR.'download.%(ext)s';
             [$runtimeOptions, $runtimeCookieJarPath] = $this->buildRuntimeOptions($transfer, $absoluteTmpDir, $requestOptions);
 
-            $timeoutSeconds = (int) config('downloads.yt_dlp_timeout_seconds', 1800);
             $lastBroadcastPercent = (int) ($transfer->last_broadcast_percent ?? 0);
             $progressBuffer = '';
+            $aborted = false;
 
             $process = new Process($commandBuilder->build((string) $transfer->url, $outputTemplate, $runtimeOptions));
             $process->setTimeout(max(60, $timeoutSeconds));
-            $process->run(function (string $type, string $buffer) use ($transfer, &$lastBroadcastPercent, &$progressBuffer): void {
+            $process->start(function (string $type, string $buffer) use ($transfer, &$lastBroadcastPercent, &$progressBuffer): void {
                 $this->broadcastProgressFromChunk($transfer, $type, $buffer, $lastBroadcastPercent, $progressBuffer);
             });
+
+            while ($process->isRunning()) {
+                if (! $this->shouldKeepRunning($transfer->id)) {
+                    $aborted = true;
+                    $process->stop(1);
+                    break;
+                }
+
+                usleep(250000);
+            }
+
+            if (! $aborted) {
+                $process->wait();
+            }
+
             $this->broadcastProgressFromChunk($transfer, Process::OUT, '', $lastBroadcastPercent, $progressBuffer, true);
+
+            if ($aborted) {
+                $this->cleanupTempArtifacts($transfer->id, $this->attempt);
+                PumpDomainDownloads::dispatch((string) $transfer->domain);
+
+                return;
+            }
 
             if (! $process->isSuccessful()) {
                 $error = trim($process->getErrorOutput() ?: $process->getOutput());
@@ -89,11 +129,13 @@ class DownloadTransferYtDlp implements ShouldQueue
                 return;
             }
 
-            $currentStatus = DownloadTransfer::query()
+            $currentTransfer = DownloadTransfer::query()
                 ->whereKey($transfer->id)
-                ->value('status');
-            if ($currentStatus !== DownloadTransferStatus::DOWNLOADING) {
-                // Transfer was canceled/paused/changed while yt-dlp was running; stop here.
+                ->first(['status', 'attempt']);
+            if (! $currentTransfer || $currentTransfer->status !== DownloadTransferStatus::DOWNLOADING || (int) $currentTransfer->attempt !== $this->attempt) {
+                $this->cleanupTempArtifacts($transfer->id, $this->attempt);
+                PumpDomainDownloads::dispatch((string) $transfer->domain);
+
                 return;
             }
 
@@ -126,15 +168,23 @@ class DownloadTransferYtDlp implements ShouldQueue
             // Finalize moves the file into downloads/ and marks it downloaded.
             $finalizer->finalize($file, $relativeDownloadedPath, null, false);
 
-            $transfer->update([
-                'status' => DownloadTransferStatus::PREVIEWING,
-                'finished_at' => null,
-                'failed_at' => null,
-                'error' => null,
-            ]);
+            $updated = DownloadTransfer::query()->whereKey($transfer->id)
+                ->where('attempt', $this->attempt)
+                ->update([
+                    'status' => DownloadTransferStatus::PREVIEWING,
+                    'finished_at' => null,
+                    'failed_at' => null,
+                    'error' => null,
+                ]);
+            if ($updated === 0) {
+                $this->cleanupTempArtifacts($transfer->id, $this->attempt);
+                PumpDomainDownloads::dispatch((string) $transfer->domain);
+
+                return;
+            }
             app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 
-            DownloadTransfer::query()->whereKey($transfer->id)->update([
+            DownloadTransfer::query()->whereKey($transfer->id)->where('attempt', $this->attempt)->update([
                 'last_broadcast_percent' => 100,
                 'updated_at' => now(),
             ]);
@@ -175,6 +225,10 @@ class DownloadTransferYtDlp implements ShouldQueue
                 cleanupTempArtifacts: $this->shouldDiscardTempArtifacts($e->getMessage())
             );
         } finally {
+            if ($lock instanceof Lock) {
+                $lock->release();
+            }
+
             if (is_string($runtimeCookieJarPath) && $runtimeCookieJarPath !== '' && is_file($runtimeCookieJarPath)) {
                 @unlink($runtimeCookieJarPath);
             }
@@ -186,17 +240,24 @@ class DownloadTransferYtDlp implements ShouldQueue
         $normalizedMessage = $this->normalizeFailureMessage($message);
 
         if ($cleanupTempArtifacts) {
-            $this->cleanupTempArtifacts($transfer);
+            $this->cleanupTempArtifacts($transfer->id, $this->attempt);
             if (! str_contains($normalizedMessage, 'Use Restart to fetch the file from scratch.')) {
                 $normalizedMessage .= ' Atlas discarded the temporary yt-dlp fragments for this transfer. Use Restart to fetch the file from scratch.';
             }
         }
 
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'status' => DownloadTransferStatus::FAILED,
-            'failed_at' => now(),
-            'error' => $normalizedMessage !== '' ? $normalizedMessage : 'yt-dlp failed.',
-        ]);
+        $updatedCount = DownloadTransfer::query()->whereKey($transfer->id)
+            ->where('attempt', $this->attempt)
+            ->update([
+                'status' => DownloadTransferStatus::FAILED,
+                'failed_at' => now(),
+                'error' => $normalizedMessage !== '' ? $normalizedMessage : 'yt-dlp failed.',
+            ]);
+        if ($updatedCount === 0) {
+            PumpDomainDownloads::dispatch((string) $transfer->domain);
+
+            return;
+        }
         app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
 
         $updated = DownloadTransfer::query()->find($transfer->id);
@@ -270,10 +331,10 @@ class DownloadTransferYtDlp implements ShouldQueue
             );
     }
 
-    private function cleanupTempArtifacts(DownloadTransfer $transfer): void
+    private function cleanupTempArtifacts(int $transferId, int $attempt): void
     {
         $disk = Storage::disk(config('downloads.disk'));
-        $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+        $tmpDir = app(DownloadTransferTempDirectory::class)->ytDlpAttempt($transferId, $attempt);
 
         if ($disk->exists($tmpDir)) {
             $disk->deleteDirectory($tmpDir);
@@ -333,6 +394,7 @@ class DownloadTransferYtDlp implements ShouldQueue
     {
         $updated = DownloadTransfer::query()
             ->whereKey($transfer->id)
+            ->where('attempt', $this->attempt)
             ->where('status', DownloadTransferStatus::DOWNLOADING)
             ->where('last_broadcast_percent', '<', $percent)
             ->update([
@@ -370,5 +432,21 @@ class DownloadTransferYtDlp implements ShouldQueue
         DownloadTransferRequestOptions $requestOptions
     ): array {
         return $requestOptions->ytDlpRuntimeOptions($transfer, $absoluteTmpDir);
+    }
+
+    private function matchesAttempt(DownloadTransfer $transfer): bool
+    {
+        return (int) ($transfer->attempt ?? 0) === $this->attempt;
+    }
+
+    private function shouldKeepRunning(int $transferId): bool
+    {
+        $state = DownloadTransfer::query()
+            ->whereKey($transferId)
+            ->first(['status', 'attempt']);
+
+        return $state
+            && $state->status === DownloadTransferStatus::DOWNLOADING
+            && (int) $state->attempt === $this->attempt;
     }
 }
