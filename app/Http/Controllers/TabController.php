@@ -46,6 +46,7 @@ class TabController extends Controller
         $tab = Tab::create([
             'user_id' => $userId,
             'label' => $request->label,
+            'nickname' => $this->normalizeNickname($request->input('nickname')),
             'params' => $params,
             'position' => $request->position ?? ($maxPosition + 1),
         ]);
@@ -70,6 +71,9 @@ class TabController extends Controller
         }
 
         $validated = $request->validated();
+        if (array_key_exists('nickname', $validated)) {
+            $validated['nickname'] = $this->normalizeNickname($validated['nickname']);
+        }
 
         $tab->update($validated);
 
@@ -170,6 +174,7 @@ class TabController extends Controller
             'tab' => [
                 'id' => $tab->id,
                 'label' => $tab->label,
+                'nickname' => $tab->nickname,
                 'params' => $params,
                 'items' => $items,
                 'position' => $tab->position ?? 0,
@@ -245,5 +250,16 @@ class TabController extends Controller
             'message' => 'All tabs deleted successfully.',
             'deleted_count' => $deletedCount,
         ]);
+    }
+
+    private function normalizeNickname(mixed $nickname): ?string
+    {
+        if (! is_string($nickname)) {
+            return null;
+        }
+
+        $trimmed = trim($nickname);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 }

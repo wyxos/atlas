@@ -20,6 +20,7 @@ class TabFactory extends Factory
         return [
             'user_id' => User::factory(),
             'label' => fake()->words(2, true),
+            'nickname' => null,
             'params' => [
                 'page' => fake()->numberBetween(1, 100),
                 'next' => fake()->optional()->numerify('###|##########'),
