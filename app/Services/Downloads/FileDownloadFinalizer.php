@@ -418,19 +418,40 @@ class FileDownloadFinalizer
 
         [$thumbnailWidth, $thumbnailHeight] = $this->resolveThumbnailDimensions($originalWidth, $originalHeight);
 
+        $imageType = $this->detectImageType($absolutePath);
+        $thumbnailExtension = $this->resolveThumbnailOutputExtension($imageType);
+        $thumbnailFilename = pathinfo($filename, PATHINFO_FILENAME).'_thumb.'.$thumbnailExtension;
+        $thumbnailPath = $this->generateSegmentedPath('thumbnails', $thumbnailFilename, $hash);
+
+        $thumbnailDirectory = dirname($thumbnailPath);
+        if (! $disk->exists($thumbnailDirectory)) {
+            $disk->makeDirectory($thumbnailDirectory, 0755, true);
+        }
+
+        $thumbnailPathFromProcess = $this->generateThumbnailWithFfmpeg(
+            $disk,
+            $absolutePath,
+            $thumbnailPath,
+            $thumbnailWidth,
+            $thumbnailHeight,
+            $thumbnailExtension,
+        );
+        if ($thumbnailPathFromProcess) {
+            return $thumbnailPathFromProcess;
+        }
+
         if (! $this->canGenerateThumbnail($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight)) {
             return null;
         }
 
-        $image = $this->createImageResourceFromFile($absolutePath);
+        $image = $this->createImageResourceFromFile($absolutePath, $imageType);
         if (! $image) {
             return null;
         }
 
         $thumbnail = imagecreatetruecolor($thumbnailWidth, $thumbnailHeight);
 
-        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        if (in_array($extension, ['png', 'gif', 'webp'], true)) {
+        if ($thumbnailExtension === 'png') {
             imagealphablending($thumbnail, false);
             imagesavealpha($thumbnail, true);
             $transparent = imagecolorallocatealpha($thumbnail, 0, 0, 0, 127);
@@ -452,14 +473,6 @@ class FileDownloadFinalizer
 
         imagedestroy($image);
 
-        $thumbnailFilename = pathinfo($filename, PATHINFO_FILENAME).'_thumb.'.pathinfo($filename, PATHINFO_EXTENSION);
-        $thumbnailPath = $this->generateSegmentedPath('thumbnails', $thumbnailFilename, $hash);
-
-        $thumbnailDirectory = dirname($thumbnailPath);
-        if (! $disk->exists($thumbnailDirectory)) {
-            $disk->makeDirectory($thumbnailDirectory, 0755, true);
-        }
-
         $tempFile = tempnam(sys_get_temp_dir(), 'thumb_');
         if (! $tempFile) {
             imagedestroy($thumbnail);
@@ -469,51 +482,20 @@ class FileDownloadFinalizer
 
         $saved = false;
 
-        switch ($extension) {
+        switch ($thumbnailExtension) {
             case 'jpg':
-            case 'jpeg':
                 $saved = imagejpeg($thumbnail, $tempFile, 85);
                 break;
             case 'png':
                 $saved = imagepng($thumbnail, $tempFile, 6);
                 break;
-            case 'gif':
-                $saved = imagegif($thumbnail, $tempFile);
-                break;
-            case 'webp':
-                if (function_exists('imagewebp')) {
-                    $saved = imagewebp($thumbnail, $tempFile, 85);
-                }
-                break;
         }
 
         imagedestroy($thumbnail);
 
-        if (! $saved || ! file_exists($tempFile)) {
-            @unlink($tempFile);
-
-            return null;
-        }
-
-        $stream = fopen($tempFile, 'rb');
-        if ($stream === false) {
-            @unlink($tempFile);
-
-            return null;
-        }
-
-        try {
-            $stored = $disk->put($thumbnailPath, $stream);
-        } finally {
-            fclose($stream);
-            @unlink($tempFile);
-        }
-
-        if (! $stored) {
-            return null;
-        }
-
-        return $thumbnailPath;
+        return $saved && file_exists($tempFile)
+            ? $this->storeTempThumbnail($disk, $thumbnailPath, $tempFile)
+            : null;
     }
 
     /**
@@ -591,13 +573,104 @@ class FileDownloadFinalizer
         };
     }
 
+    private function detectImageType(string $absolutePath): int|false
+    {
+        return function_exists('exif_imagetype') ? @exif_imagetype($absolutePath) : false;
+    }
+
+    private function resolveThumbnailOutputExtension(int|false $imageType): string
+    {
+        if (in_array($imageType, [IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP], true)) {
+            return 'png';
+        }
+
+        if (defined('IMAGETYPE_AVIF') && $imageType === IMAGETYPE_AVIF) {
+            return 'png';
+        }
+
+        return 'jpg';
+    }
+
+    private function generateThumbnailWithFfmpeg(
+        Filesystem $disk,
+        string $absolutePath,
+        string $thumbnailPath,
+        int $thumbnailWidth,
+        int $thumbnailHeight,
+        string $thumbnailExtension
+    ): ?string {
+        $ffmpegPath = $this->resolveFfmpegPath((string) config('downloads.ffmpeg_path'));
+        if (! $ffmpegPath) {
+            return null;
+        }
+
+        $baseTempFile = tempnam(sys_get_temp_dir(), 'thumb_');
+        if (! $baseTempFile) {
+            return null;
+        }
+
+        @unlink($baseTempFile);
+        $tempFile = $baseTempFile.'.'.$thumbnailExtension;
+        $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
+
+        $process = new Process([
+            $ffmpegPath,
+            '-y',
+            '-loglevel',
+            'error',
+            '-i',
+            $absolutePath,
+            '-vf',
+            "scale={$thumbnailWidth}:{$thumbnailHeight}:force_original_aspect_ratio=decrease",
+            '-frames:v',
+            '1',
+            '-update',
+            '1',
+            $tempFile,
+        ]);
+        $process->setTimeout($timeout);
+
+        try {
+            $process->run();
+        } catch (\Throwable) {
+            @unlink($tempFile);
+
+            return null;
+        }
+
+        if (! $process->isSuccessful() || ! file_exists($tempFile)) {
+            @unlink($tempFile);
+
+            return null;
+        }
+
+        return $this->storeTempThumbnail($disk, $thumbnailPath, $tempFile);
+    }
+
+    private function storeTempThumbnail(Filesystem $disk, string $thumbnailPath, string $tempFile): ?string
+    {
+        $stream = fopen($tempFile, 'rb');
+        if ($stream === false) {
+            @unlink($tempFile);
+
+            return null;
+        }
+
+        try {
+            $stored = $disk->put($thumbnailPath, $stream);
+        } finally {
+            fclose($stream);
+            @unlink($tempFile);
+        }
+
+        return $stored ? $thumbnailPath : null;
+    }
+
     /**
      * @return \GdImage|false
      */
-    private function createImageResourceFromFile(string $absolutePath)
+    private function createImageResourceFromFile(string $absolutePath, int|false $type)
     {
-        $type = function_exists('exif_imagetype') ? @exif_imagetype($absolutePath) : false;
-
         if ($type === IMAGETYPE_JPEG) {
             return @imagecreatefromjpeg($absolutePath);
         }
