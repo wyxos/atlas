@@ -34,9 +34,13 @@ type UseReactionBadgeProps = {
     onShortcutReady?: ((handler: ((type: BadgeReactionType) => void) | null) => void) | undefined;
 };
 
+const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
+const RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS = [120, 400, 1000, 2200] as const;
+
 export function useReactionBadge(props: UseReactionBadgeProps) {
     ensureReactionBadgeRuntimeStyles();
     const pageHostname = window.location.hostname.trim().toLowerCase();
+    const isDeviantArtPage = DEVIANT_ART_HOST_PATTERN.test(pageHostname);
     const closeTabAfterQueuePreference = useCloseTabAfterQueuePreference(pageHostname);
     const reactAllItemsInPostPreference = useReactAllItemsInPostPreference(pageHostname);
 
@@ -63,6 +67,8 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     let mediaMutationObserver: MutationObserver | null = null;
     let checkSequence = 0;
     let suppressMediaContextUpdates = false;
+    let relatedPostThumbnailRetryTimer: number | null = null;
+    let relatedPostThumbnailRetryIndex = 0;
 
     const controlsDisabled = computed(() =>
         isChecking.value
@@ -120,6 +126,46 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         }
 
         showReactAllItemsInPost.value = nextVisible;
+        if (nextVisible) {
+            clearRelatedPostThumbnailRetry();
+        }
+    }
+
+    function clearRelatedPostThumbnailRetry(): void {
+        if (relatedPostThumbnailRetryTimer !== null) {
+            window.clearTimeout(relatedPostThumbnailRetryTimer);
+            relatedPostThumbnailRetryTimer = null;
+        }
+    }
+
+    function scheduleRelatedPostThumbnailRetry(): void {
+        if (!isActive || suppressMediaContextUpdates || !isDeviantArtPage || showReactAllItemsInPost.value || relatedPostThumbnailRetryTimer !== null) {
+            return;
+        }
+
+        const nextDelay = RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS[relatedPostThumbnailRetryIndex];
+        if (nextDelay === undefined) {
+            return;
+        }
+
+        relatedPostThumbnailRetryIndex += 1;
+        relatedPostThumbnailRetryTimer = window.setTimeout(() => {
+            relatedPostThumbnailRetryTimer = null;
+            if (!isActive || suppressMediaContextUpdates) {
+                return;
+            }
+
+            syncRelatedPostThumbnailContext();
+            if (!showReactAllItemsInPost.value) {
+                scheduleRelatedPostThumbnailRetry();
+            }
+        }, nextDelay);
+    }
+
+    function restartRelatedPostThumbnailRetry(): void {
+        clearRelatedPostThumbnailRetry();
+        relatedPostThumbnailRetryIndex = 0;
+        scheduleRelatedPostThumbnailRetry();
     }
 
     function resolvePersistenceUrl(): string | null {
@@ -329,6 +375,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
         syncResolution();
         syncRelatedPostThumbnailContext();
+        restartRelatedPostThumbnailRetry();
         void refreshMatchForCurrentMedia();
     };
 
@@ -348,6 +395,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
             syncResolution();
             syncRelatedPostThumbnailContext();
+            restartRelatedPostThumbnailRetry();
             void refreshMatchForCurrentMedia();
         });
         mediaMutationObserver.observe(props.media, {
@@ -363,6 +411,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         });
         void refreshOpenTabCount();
         syncRelatedPostThumbnailContext();
+        restartRelatedPostThumbnailRetry();
         void refreshMatchForCurrentMedia(true);
     });
 
@@ -379,6 +428,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             mediaMutationObserver.disconnect();
             mediaMutationObserver = null;
         }
+        clearRelatedPostThumbnailRetry();
         if (unsubscribeProgress) {
             unsubscribeProgress();
             unsubscribeProgress = null;
