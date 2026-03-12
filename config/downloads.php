@@ -35,6 +35,10 @@ return [
     // Set empty to let yt-dlp defaults apply.
     'yt_dlp_js_runtimes' => env('DOWNLOADS_YT_DLP_JS_RUNTIMES', 'node'),
 
+    // Parallel fragment fetching for segmented yt-dlp downloads (HLS/DASH).
+    // Keep at 1 to disable and raise carefully on domains that tolerate it.
+    'yt_dlp_concurrent_fragments' => (int) env('DOWNLOADS_YT_DLP_CONCURRENT_FRAGMENTS', 1),
+
     // Optional Netscape cookie file path for authenticated yt-dlp runs
     // (useful for age-restricted/auth-required media on X/Twitter/Facebook).
     'yt_dlp_cookies_path' => env('DOWNLOADS_YT_DLP_COOKIES_PATH'),

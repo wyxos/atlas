@@ -17,6 +17,7 @@ class YtDlpCommandBuilder
         $runtimeUserAgent = trim((string) ($runtimeOptions['user_agent'] ?? ''));
         $cookiesPath = trim((string) config('downloads.yt_dlp_cookies_path', ''));
         $cookiesFromBrowser = trim((string) config('downloads.yt_dlp_cookies_from_browser', ''));
+        $concurrentFragments = max(1, (int) config('downloads.yt_dlp_concurrent_fragments', 1));
 
         $args = [
             $ytDlp,
@@ -48,6 +49,11 @@ class YtDlpCommandBuilder
         if ($runtimeUserAgent !== '') {
             $args[] = '--user-agent';
             $args[] = $runtimeUserAgent;
+        }
+
+        if ($concurrentFragments > 1) {
+            $args[] = '--concurrent-fragments';
+            $args[] = (string) $concurrentFragments;
         }
 
         // Prefer mp4+m4a when available (usually browser-friendly), otherwise fall back to "best".

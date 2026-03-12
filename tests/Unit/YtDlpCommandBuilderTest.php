@@ -89,3 +89,16 @@ it('does not add js-runtimes when disabled', function () {
 
     expect($args)->not->toContain('--js-runtimes');
 });
+
+it('adds concurrent fragment fetching when configured above one', function () {
+    config()->set('downloads.yt_dlp_path', 'yt-dlp');
+    config()->set('downloads.ffmpeg_path', 'ffmpeg');
+    config()->set('downloads.yt_dlp_concurrent_fragments', 4);
+
+    $builder = new YtDlpCommandBuilder;
+
+    $args = $builder->build('https://example.com/watch?v=123', '/tmp/download.%(ext)s');
+
+    expect($args)->toContain('--concurrent-fragments');
+    expect($args)->toContain('4');
+});
