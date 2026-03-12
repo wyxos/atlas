@@ -1,13 +1,10 @@
-import { computed, ref, type ComputedRef, type Ref, type ShallowRef } from 'vue';
+import { computed, ref, type Ref, type ShallowRef } from 'vue';
 import type { MasonryInstance } from '@wyxos/vibe';
 import { useContainerBadges } from './useContainerBadges';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { BrowseFormInstance } from './useBrowseForm';
-import type { ServiceOption } from '@/lib/browseCatalog';
-import { formatTabLabel } from '@/lib/browseTabLabel';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
-import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 
 type ContainerBlacklistDialogTarget = {
     id: number;
@@ -17,12 +14,18 @@ type ContainerBlacklistDialogTarget = {
     referrer?: string | null;
 };
 
+type BrowseTabPayload = {
+    label: string;
+    params: Record<string, unknown>;
+};
+
 type ContainerTarget = {
     id: number;
     type: string;
     source?: string;
     source_id?: string;
     referrer?: string | null;
+    browse_tab?: BrowseTabPayload | null;
 };
 
 type ContainerBlacklistDialogRef = {
@@ -34,7 +37,6 @@ type UseTabContentContainerInteractionsOptions = {
     tab: Ref<TabData | null>;
     form: BrowseFormInstance;
     masonry: Ref<MasonryInstance | null>;
-    availableServices: ComputedRef<ServiceOption[]>;
     onReaction: (fileId: number, type: ReactionType) => void;
     onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;
 };
@@ -68,74 +70,13 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         return false;
     }
 
-    function resolveOnlineServiceKey(container: ContainerTarget): string | null {
-        if (options.form.data.feed === 'online' && options.form.data.service) {
-            return options.form.data.service;
-        }
-
-        if (options.form.data.feed === 'local' && container.source) {
-            const match = options.availableServices.value.find((service) => (
-                service.source === container.source || service.key === container.source
-            ));
-
-            return match?.key ?? null;
-        }
-
-        return null;
-    }
-
-    function buildContainerTabPayload(container: ContainerTarget): { label: string; params: Record<string, unknown> } | null {
-        const serviceKey = resolveOnlineServiceKey(container);
-        if (!serviceKey) {
-            return null;
-        }
-
-        const serviceLabel = options.availableServices.value.find((service) => service.key === serviceKey)?.label ?? serviceKey;
-        const containerValue = container.source_id ?? container.id;
-        const params: Record<string, unknown> = {
-            feed: 'online',
-            service: serviceKey,
-            page: 1,
-            limit: options.form.data.limit,
-        };
-
-        if (options.form.data.feed === 'online') {
-            appendBrowseServiceFilters(params, options.form.data.serviceFilters);
-        }
-
-        let hasContainerFilter = false;
-
-        if (serviceKey === 'civit-ai-images' && container.source === 'CivitAI') {
-            if (container.type === 'User' && container.source_id) {
-                params.username = container.source_id;
-                hasContainerFilter = true;
-            }
-
-            if (container.type === 'Post' && container.source_id) {
-                params.postId = container.source_id;
-                hasContainerFilter = true;
-            }
-        }
-
-        if (!hasContainerFilter) {
-            return null;
-        }
-
-        const containerLabel = `${container.type} ${containerValue}`;
-
-        return {
-            label: formatTabLabel(serviceLabel, 1, containerLabel),
-            params,
-        };
-    }
-
     function handleContainerNavigation(container: ContainerTarget): void {
         if (!options.onOpenContainerTab) {
             openExternal(container.referrer ?? null);
             return;
         }
 
-        const payload = buildContainerTabPayload(container);
+        const payload = container.browse_tab ?? null;
         if (!payload) {
             openExternal(container.referrer ?? null);
             return;

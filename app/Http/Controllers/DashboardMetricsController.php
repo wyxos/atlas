@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\MetricsService;
+use App\Support\ContainerBrowseTabPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -110,6 +111,12 @@ class DashboardMetricsController extends Controller
                 'source' => $row->source,
                 'source_id' => $row->source_id,
                 'referrer' => $row->referrer,
+                'browse_tab' => ContainerBrowseTabPayload::build([
+                    'id' => $row->id,
+                    'type' => $row->type,
+                    'source' => $row->source,
+                    'source_id' => $row->source_id,
+                ]),
                 'files_count' => (int) $row->files_count,
             ])
             ->values()

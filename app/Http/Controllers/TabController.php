@@ -161,7 +161,7 @@ class TabController extends Controller
             $page = isset($tab->params['page']) && is_numeric($tab->params['page'])
                 ? (int) $tab->params['page']
                 : 1;
-            $items = Tab::formatFilesToItems($files, $page);
+            $items = Tab::formatFilesToItems($files, $page, is_array($tab->params) ? $tab->params : []);
         }
 
         $params = $tab->params ?? (object) [];

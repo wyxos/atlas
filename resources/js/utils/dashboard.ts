@@ -3,7 +3,6 @@ import type {
     ContainerMetricItem,
     DashboardChartSection,
     DashboardContainerGroup,
-    DashboardContainerTabPayload,
     DashboardContainerTotals,
     DashboardMetrics,
 } from '@/types/dashboard';
@@ -184,30 +183,4 @@ export function createDashboardContainerGroups(metrics: DashboardMetrics | null)
 
 export function formatDashboardContainerLabel(item: ContainerMetricItem): string {
     return `${item.type} • ${item.source} • ${item.source_id}`;
-}
-
-export function buildDashboardContainerTabPayload(item: ContainerMetricItem): DashboardContainerTabPayload | null {
-    if (item.source !== 'CivitAI') {
-        return null;
-    }
-
-    const params: Record<string, unknown> = {
-        feed: 'online',
-        service: 'civit-ai-images',
-        page: 1,
-        limit: 20,
-    };
-
-    if (item.type === 'User') {
-        params.username = item.source_id;
-    } else if (item.type === 'Post') {
-        params.postId = item.source_id;
-    } else {
-        return null;
-    }
-
-    return {
-        label: `CivitAI Images: ${item.type} ${item.source_id} - 1`,
-        params,
-    };
 }

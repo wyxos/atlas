@@ -100,8 +100,8 @@ class Tab extends Model
     /**
      * Format files into items structure for frontend.
      */
-    public static function formatFilesToItems($files, int $page = 1): array
+    public static function formatFilesToItems($files, int|string $page = 1, array $browseContext = []): array
     {
-        return FileItemFormatter::format($files, $page);
+        return FileItemFormatter::format($files, $page, [], $browseContext);
     }
 }

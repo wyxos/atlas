@@ -144,3 +144,51 @@ test('incrementContainersByCounts applies batched deltas and clamps at zero', fu
     expect($first->fresh()->files_downloaded)->toBe(0);
     expect($second->fresh()->files_downloaded)->toBe(3);
 });
+
+test('dashboard metrics include browse payloads for supported containers', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $downloaded = File::factory()->count(2)->create([
+        'downloaded' => true,
+        'source' => 'CivitAI',
+    ]);
+
+    $civitUser = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+        'source_id' => 'atlasUser',
+        'referrer' => 'https://civitai.com/user/atlasUser',
+    ]);
+
+    $otherGallery = Container::factory()->create([
+        'type' => 'Gallery',
+        'source' => 'Booru',
+        'source_id' => 'gallery-1',
+        'referrer' => 'https://example.com/gallery/1',
+    ]);
+
+    $civitUser->files()->attach($downloaded->pluck('id'));
+    $otherGallery->files()->attach($downloaded->take(1)->pluck('id'));
+
+    app(MetricsService::class)->syncAll();
+
+    $response = $this->getJson('/api/dashboard/metrics');
+
+    $response->assertSuccessful();
+    $topDownloads = $response->json('containers.top_downloads');
+
+    expect($topDownloads)->toBeArray();
+    expect($topDownloads[0]['browse_tab'])->toBe([
+        'label' => 'CivitAI Images: User atlasUser - 1',
+        'params' => [
+            'feed' => 'online',
+            'service' => 'civit-ai-images',
+            'page' => 1,
+            'limit' => 20,
+            'username' => 'atlasUser',
+        ],
+    ]);
+    expect(collect($topDownloads)->firstWhere('source', 'Booru')['browse_tab'])->toBeNull();
+});

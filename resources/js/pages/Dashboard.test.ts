@@ -32,6 +32,10 @@ type DashboardMetrics = {
             source: string;
             source_id: string;
             referrer: string | null;
+            browse_tab?: {
+                label: string;
+                params: Record<string, unknown>;
+            } | null;
             files_count: number;
         }>;
         top_favorites: Array<{
@@ -40,6 +44,10 @@ type DashboardMetrics = {
             source: string;
             source_id: string;
             referrer: string | null;
+            browse_tab?: {
+                label: string;
+                params: Record<string, unknown>;
+            } | null;
             files_count: number;
         }>;
         top_blacklisted: Array<{
@@ -48,6 +56,10 @@ type DashboardMetrics = {
             source: string;
             source_id: string;
             referrer: string | null;
+            browse_tab?: {
+                label: string;
+                params: Record<string, unknown>;
+            } | null;
             files_count: number;
         }>;
     };
@@ -157,6 +169,16 @@ describe('Dashboard', () => {
                 source: 'CivitAI',
                 source_id: 'Desync',
                 referrer: 'https://civitai.com/user/Desync',
+                browse_tab: {
+                    label: 'CivitAI Images: User Desync - 1',
+                    params: {
+                        feed: 'online',
+                        service: 'civit-ai-images',
+                        page: 1,
+                        limit: 20,
+                        username: 'Desync',
+                    },
+                },
                 files_count: 12,
             },
             {
@@ -165,6 +187,7 @@ describe('Dashboard', () => {
                 source: 'Other',
                 source_id: '42',
                 referrer: 'https://example.com/post/42',
+                browse_tab: null,
                 files_count: 5,
             },
         ];

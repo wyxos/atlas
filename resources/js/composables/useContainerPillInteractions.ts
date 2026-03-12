@@ -10,6 +10,10 @@ type Container = {
     source?: string;
     source_id?: string;
     referrer?: string;
+    browse_tab?: {
+        label: string;
+        params: Record<string, unknown>;
+    } | null;
 };
 
 type ContainerEntry = {
@@ -18,6 +22,10 @@ type ContainerEntry = {
     source?: string;
     source_id?: string;
     referrer?: string;
+    browse_tab?: {
+        label: string;
+        params: Record<string, unknown>;
+    } | null;
 };
 
 function isContainerEntry(container: ContainerEntry): container is Container {

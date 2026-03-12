@@ -132,7 +132,6 @@ const containerInteractions = useTabContentContainerInteractions({
     tab,
     form,
     masonry,
-    availableServices,
     onReaction: props.onReaction,
     onOpenContainerTab: props.onOpenContainerTab,
 });
