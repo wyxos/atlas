@@ -4,6 +4,7 @@ import { useContainerBadges } from './useContainerBadges';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { BrowseFormInstance } from './useBrowseForm';
 import type { ServiceOption } from '@/lib/browseCatalog';
+import { formatTabLabel } from '@/lib/browseTabLabel';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
@@ -34,7 +35,6 @@ type UseTabContentContainerInteractionsOptions = {
     form: BrowseFormInstance;
     masonry: Ref<MasonryInstance | null>;
     availableServices: ComputedRef<ServiceOption[]>;
-    formatTabLabel: (serviceLabel: string, pageToken: number | string, containerLabel?: string | null) => string;
     onReaction: (fileId: number, type: ReactionType) => void;
     onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;
 };
@@ -124,7 +124,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         const containerLabel = `${container.type} ${containerValue}`;
 
         return {
-            label: options.formatTabLabel(serviceLabel, 1, containerLabel),
+            label: formatTabLabel(serviceLabel, 1, containerLabel),
             params,
         };
     }

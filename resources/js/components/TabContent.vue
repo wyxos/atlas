@@ -133,7 +133,6 @@ const containerInteractions = useTabContentContainerInteractions({
     form,
     masonry,
     availableServices,
-    formatTabLabel: browse.formatters.formatTabLabel,
     onReaction: props.onReaction,
     onOpenContainerTab: props.onOpenContainerTab,
 });
