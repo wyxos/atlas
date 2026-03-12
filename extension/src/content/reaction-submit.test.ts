@@ -324,6 +324,14 @@ describe('submitBadgeReaction', () => {
         expect(result.downloadTransferId).toBe(99);
         expect(result.downloadStatus).toBe('queued');
         expect(result.shouldCloseTabAfterQueue).toBe(true);
+        expect(result.downloadCloseTargets).toEqual([
+            {
+                fileId: 42,
+                transferId: 99,
+                status: 'queued',
+                downloadedAt: null,
+            },
+        ]);
     });
 
     it('keeps batch auto-close enabled when only a non-primary item was newly queued', async () => {
@@ -424,6 +432,14 @@ describe('submitBadgeReaction', () => {
         expect(result.ok).toBe(true);
         expect(result.downloadRequested).toBe(false);
         expect(result.shouldCloseTabAfterQueue).toBe(true);
+        expect(result.downloadCloseTargets).toEqual([
+            {
+                fileId: null,
+                transferId: 123,
+                status: 'queued',
+                downloadedAt: null,
+            },
+        ]);
     });
 
     it('closes on explicit batch download_requested even without item payload details', async () => {
@@ -505,6 +521,7 @@ describe('submitBadgeReaction', () => {
         expect(result.ok).toBe(true);
         expect(result.downloadRequested).toBe(false);
         expect(result.shouldCloseTabAfterQueue).toBe(true);
+        expect(result.downloadCloseTargets).toEqual([]);
     });
 
 
