@@ -41,7 +41,9 @@ vi.mock('lucide-vue-next', () => ({
     ChevronUp: { name: 'ChevronUp', template: '<div class="chevron-up-icon"></div>', props: ['size', 'class'] },
     ChevronLeft: { name: 'ChevronLeft', template: '<div class="chevron-left-icon"></div>', props: ['size', 'class'] },
     ChevronRight: { name: 'ChevronRight', template: '<div class="chevron-right-icon"></div>', props: ['size', 'class'] },
+    Layers: { name: 'Layers', template: '<div class="layers-icon"></div>', props: ['size', 'class'] },
     Play: { name: 'Play', template: '<div class="play-icon"></div>', props: ['size', 'class'] },
+    RotateCcw: { name: 'RotateCcw', template: '<div class="rotate-ccw-icon"></div>', props: ['size', 'class'] },
     RotateCw: { name: 'RotateCw', template: '<div class="rotate-cw-icon"></div>', props: ['size', 'class'] },
     ThumbsDown: { name: 'ThumbsDown', template: '<div class="thumbs-down-icon"></div>', props: ['size', 'class'] },
     ThumbsUp: { name: 'ThumbsUp', template: '<div class="thumbs-up-icon"></div>', props: ['size', 'class'] },
@@ -61,6 +63,7 @@ vi.mock('lucide-vue-next', () => ({
     Undo2: { name: 'Undo2', template: '<div class="undo-icon"></div>', props: ['size', 'class'] },
     Pause: { name: 'Pause', template: '<div class="pause-icon"></div>', props: ['size', 'class'] },
     Menu: { name: 'Menu', template: '<div class="menu-icon"></div>', props: ['size', 'class'] },
+    SquarePen: { name: 'SquarePen', template: '<div class="square-pen-icon"></div>', props: ['size', 'class'] },
 }));
 
 // Mock @wyxos/vibe
@@ -429,6 +432,5 @@ export async function setupOverlayTest() {
     await waitForStable(wrapper);
     return { wrapper, router };
 }
-
 
 

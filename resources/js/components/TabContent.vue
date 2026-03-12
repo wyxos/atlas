@@ -90,6 +90,7 @@ const availableSources = browseCatalogState.availableSources;
 const localService = browseCatalogState.localService;
 
 const promptDialog = useTabContentPromptDialog(items);
+const isResettingPreviewed = ref(false);
 
 function resetItemPreloads(): void {
     itemInteractions.preload.reset();
@@ -188,6 +189,29 @@ function showModerationToast(moderatedFiles: Array<{ id: number; action_type: st
     );
 }
 
+async function handleResetPreviewedCounts(): Promise<void> {
+    if (isResettingPreviewed.value) {
+        return;
+    }
+
+    isResettingPreviewed.value = true;
+
+    try {
+        const resetCount = await itemInteractions.resetPreviewedState();
+        if (resetCount === 0) {
+            toast.info('No loaded items to reset.');
+            return;
+        }
+
+        toast.success(`Reset previewed counts for ${resetCount} item${resetCount === 1 ? '' : 's'}.`);
+    } catch (error) {
+        console.error('Failed to reset previewed counts:', error);
+        toast.error('Failed to reset previewed counts.');
+    } finally {
+        isResettingPreviewed.value = false;
+    }
+}
+
 // Handle loading:stop
 function onLoadingStop(): void {
     // Show moderation toast if there are accumulated moderated files
@@ -243,6 +267,7 @@ defineExpose({
             :update-feed="(value) => form.data.feed = value" :update-service="browseActions.updateService"
             :update-source="(value) => form.data.source = value" :apply-service="browseActions.applyService"
             :apply-filters="browseActions.applyFilters" :reset-filters="form.reset"
+            :on-reset-previewed="handleResetPreviewedCounts" :is-resetting-previewed="isResettingPreviewed"
             :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
             :load-next-page="itemInteractions.masonry.loadNextPage">
             <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"

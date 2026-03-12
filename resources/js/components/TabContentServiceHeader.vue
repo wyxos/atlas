@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, Play, X } from 'lucide-vue-next';
+import { ChevronDown, Play, RotateCcw, X } from 'lucide-vue-next';
 import type { MasonryInstance } from '@wyxos/vibe';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -22,6 +22,8 @@ interface Props {
     applyService: () => void | Promise<void>;
     applyFilters: () => void | Promise<void>;
     resetFilters: () => void;
+    onResetPreviewed: () => void | Promise<void>;
+    isResettingPreviewed: boolean;
     cancelMasonryLoad: () => void;
     loadNextPage: () => void | Promise<void>;
 }
@@ -30,6 +32,7 @@ withDefaults(defineProps<Props>(), {
     localService: null,
     masonry: null,
     filterSheetOpen: false,
+    isResettingPreviewed: false,
 });
 </script>
 
@@ -88,6 +91,13 @@ withDefaults(defineProps<Props>(), {
             <ModerationRulesManager :disabled="masonry?.isLoading" />
 
             <slot />
+
+            <Button @click="onResetPreviewed" size="sm" variant="ghost" :loading="isResettingPreviewed"
+                class="h-10 px-3" data-test="reset-previewed-button" title="Reset previewed items in this tab"
+                :disabled="masonry?.isLoading">
+                <RotateCcw :size="14" />
+                <span>Reset Previewed</span>
+            </Button>
 
             <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                 data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
