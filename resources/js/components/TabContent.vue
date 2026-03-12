@@ -19,6 +19,7 @@ import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentMasonryItemOverlay from './TabContentMasonryItemOverlay.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
+import StatusToast from './toasts/StatusToast.vue';
 import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
@@ -151,6 +152,7 @@ const itemInteractions = useTabContentItemInteractions({
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
 
 const toast = useToast();
+const resetPreviewedToastId = 'reset-previewed-toast';
 
 /**
  * Show moderation toast with accumulated moderated files.
@@ -189,6 +191,30 @@ function showModerationToast(moderatedFiles: Array<{ id: number; action_type: st
     );
 }
 
+function showResetPreviewedToast(
+    variant: 'success' | 'info' | 'error',
+    title: string,
+    description?: string,
+): void {
+    toast.dismiss(resetPreviewedToastId);
+    toast(
+        {
+            component: StatusToast,
+            props: {
+                toastId: resetPreviewedToastId,
+                variant,
+                title,
+                description,
+            },
+        },
+        {
+            id: resetPreviewedToastId,
+            closeButton: false,
+            closeOnClick: false,
+        }
+    );
+}
+
 async function handleResetPreviewedCounts(): Promise<void> {
     if (isResettingPreviewed.value) {
         return;
@@ -199,14 +225,17 @@ async function handleResetPreviewedCounts(): Promise<void> {
     try {
         const resetCount = await itemInteractions.resetPreviewedState();
         if (resetCount === 0) {
-            toast.info('No loaded items to reset.');
+            showResetPreviewedToast('info', 'No loaded items to reset.');
             return;
         }
 
-        toast.success(`Reset previewed counts for ${resetCount} item${resetCount === 1 ? '' : 's'}.`);
+        showResetPreviewedToast(
+            'success',
+            `Reset previewed counts for ${resetCount} item${resetCount === 1 ? '' : 's'}.`,
+        );
     } catch (error) {
         console.error('Failed to reset previewed counts:', error);
-        toast.error('Failed to reset previewed counts.');
+        showResetPreviewedToast('error', 'Failed to reset previewed counts.');
     } finally {
         isResettingPreviewed.value = false;
     }

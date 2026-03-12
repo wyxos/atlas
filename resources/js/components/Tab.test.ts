@@ -33,6 +33,9 @@ describe('Tab', () => {
         });
         await new Promise((resolve) => window.setTimeout(resolve, 0));
 
+        const contextMenu = document.body.querySelector('[data-slot="context-menu-content"]');
+        expect(contextMenu?.className).toContain('z-[70]');
+
         const renameAction = document.body.querySelector('[data-test="tab-context-rename"]');
         if (!(renameAction instanceof HTMLElement)) {
             throw new Error('Rename action did not render.');
