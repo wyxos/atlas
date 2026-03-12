@@ -79,7 +79,7 @@ vi.mock('./ui/button', () => ({
     Button: {
         name: 'Button',
         template: '<button><slot></slot></button>',
-        props: ['variant', 'size', 'disabled', 'color'],
+        props: ['variant', 'size', 'disabled', 'color', 'loading'],
     },
 }));
 
@@ -224,6 +224,7 @@ vi.mock('lucide-vue-next', () => ({
     Check: { name: 'Check', template: '<div class="check-icon"></div>', props: ['size', 'class'] },
     ChevronDown: { name: 'ChevronDown', template: '<div class="chevron-down-icon"></div>', props: ['size', 'class'] },
     Play: { name: 'Play', template: '<div class="play-icon"></div>', props: ['size', 'class'] },
+    RotateCcw: { name: 'RotateCcw', template: '<div class="rotate-ccw-icon"></div>', props: ['size', 'class'] },
     RotateCw: { name: 'RotateCw', template: '<div class="rotate-cw-icon"></div>', props: ['size', 'class'] },
     ThumbsDown: { name: 'ThumbsDown', template: '<div class="thumbs-down-icon"></div>', props: ['size', 'class'] },
     Pause: { name: 'Pause', template: '<div class="pause-icon"></div>', props: ['size', 'class'] },

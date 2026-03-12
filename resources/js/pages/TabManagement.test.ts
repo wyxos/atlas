@@ -286,12 +286,8 @@ describe('Browse - Tab Management', () => {
         expect(vm.tabs.length).toBe(2);
         expect(vm.activeTabId).toBe(tab1Id);
 
-        const browseTabs = wrapper.findAllComponents({ name: 'Tab' });
-        const tab2Component = browseTabs.find((tab: any) => tab.props().id === tab2Id);
-        expect(tab2Component).toBeDefined();
-
         const closeTabSpy = vi.spyOn(vm, 'closeTab');
-        const tab2Element = tab2Component?.element as HTMLElement;
+        const tab2Element = wrapper.get(`[data-test="browse-tab-${tab2Id}"]`).element as HTMLElement;
 
         const mouseDownEvent = new MouseEvent('mousedown', {
             button: 1,
@@ -525,6 +521,5 @@ describe('Browse - Tab Management', () => {
         expect(wrapper.find('[data-test="play-button"]').exists()).toBe(true);
     });
 });
-
 
 

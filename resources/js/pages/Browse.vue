@@ -1,21 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { Plus, RotateCcw } from 'lucide-vue-next';
+import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
 import Tab from '../components/Tab.vue';
 import TabContent from '../components/TabContent.vue';
 import { Button } from '@/components/ui/button';
 import { useTabs } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
-import { useToast } from 'vue-toastification';
 
 const isPanelMinimized = ref(false);
-const isResettingPreviewed = ref(false);
-const toast = useToast();
-type TabContentHandle = {
-    resetPreviewedState: () => Promise<number>;
-};
-const tabContentRef = ref<TabContentHandle | null>(null);
 
 // Track masonry loading state per tab (for pill indicator)
 const tabMasonryLoadingStates = ref<Map<number, boolean>>(new Map());
@@ -131,29 +124,6 @@ async function handleOpenContainerTab(payload: ContainerTabPayload): Promise<voi
     });
 }
 
-async function handleResetPreviewedCounts(): Promise<void> {
-    if (isResettingPreviewed.value || tabContentRef.value === null) {
-        return;
-    }
-
-    isResettingPreviewed.value = true;
-
-    try {
-        const resetCount = await tabContentRef.value.resetPreviewedState();
-        if (resetCount === 0) {
-            toast.info('No loaded items to reset.');
-            return;
-        }
-
-        toast.success(`Reset previewed counts for ${resetCount} item${resetCount === 1 ? '' : 's'}.`);
-    } catch (error) {
-        console.error('Failed to reset previewed counts:', error);
-        toast.error('Failed to reset previewed counts.');
-    } finally {
-        isResettingPreviewed.value = false;
-    }
-}
-
 
 // Tab management function
 // Flow: Load tabs (without files) > Determine focus tab > If has files, load them > Restore query params
@@ -217,14 +187,7 @@ onMounted(async () => {
                 </template>
             </TabPanel>
             <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
-                <div v-if="activeTab" class="flex items-center justify-end border-b border-white/10 bg-prussian-blue-950/30 px-4 py-2">
-                    <Button variant="ghost" size="sm" :loading="isResettingPreviewed"
-                        @click="handleResetPreviewedCounts" data-test="reset-previewed-button">
-                        <RotateCcw :size="14" />
-                        <span>Reset Previewed</span>
-                    </Button>
-                </div>
-                <TabContent v-if="activeTab" ref="tabContentRef" :key="activeTab.id" :tab-id="activeTab.id"
+                <TabContent v-if="activeTab" :key="activeTab.id" :tab-id="activeTab.id"
                     :available-services="[]" :update-active-tab="updateActiveTab"
                     :on-reaction="handleReaction"
                     :on-loading-change="handleMasonryLoadingChangeFromTab"
