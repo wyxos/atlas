@@ -8,6 +8,7 @@ use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferActionAvailability;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\MetricsService;
 use Illuminate\Http\JsonResponse;
@@ -40,14 +41,22 @@ class DownloadTransferActionsController extends Controller
 
     public function resume(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        if ($downloadTransfer->status !== DownloadTransferStatus::PAUSED) {
+        $downloadTransfer->loadMissing('file');
+
+        if (! DownloadTransferActionAvailability::canResume($downloadTransfer)) {
             return response()->json([
-                'message' => 'Download is not paused.',
+                'message' => $downloadTransfer->status === DownloadTransferStatus::FAILED
+                    ? 'Download cannot resume. Use Restart to fetch it from scratch.'
+                    : 'Download is not resumable.',
             ], 409);
         }
 
-        $this->cleanupTransferParts($downloadTransfer);
-        $this->resetTransferProgress($downloadTransfer);
+        if ($downloadTransfer->status === DownloadTransferStatus::PAUSED) {
+            $this->cleanupTransferParts($downloadTransfer);
+            $this->resetTransferProgress($downloadTransfer);
+        } else {
+            $this->queueTransferForResume($downloadTransfer);
+        }
 
         $this->broadcastState($downloadTransfer);
 
@@ -347,6 +356,19 @@ class DownloadTransferActionsController extends Controller
         $downloadTransfer->update($updates);
 
         $this->resetFileProgress($downloadTransfer);
+    }
+
+    private function queueTransferForResume(DownloadTransfer $downloadTransfer): void
+    {
+        $downloadTransfer->update([
+            'status' => DownloadTransferStatus::PENDING,
+            'queued_at' => null,
+            'started_at' => null,
+            'finished_at' => null,
+            'failed_at' => null,
+            'batch_id' => null,
+            'error' => null,
+        ]);
     }
 
     private function resetFileProgress(DownloadTransfer $downloadTransfer): void

@@ -14,7 +14,8 @@ import {
 export function useDownloadsQueueActions(params: {
     selectedIds: Ref<Set<number>>;
     selectedIdsList: ComputedRef<number[]>;
-    failedIds: ComputedRef<number[]>;
+    resumableFailedIds: ComputedRef<number[]>;
+    restartableFailedIds: ComputedRef<number[]>;
     completedIds: ComputedRef<number[]>;
     removeDownloads: (ids: number[]) => void;
     setSelection: (ids: Set<number>) => void;
@@ -22,7 +23,8 @@ export function useDownloadsQueueActions(params: {
     const actionBusy = ref<Record<number, boolean>>({});
     const batchIsPausing = ref(false);
     const batchIsCanceling = ref(false);
-    const batchIsRetryingFailed = ref(false);
+    const batchIsResumingFailed = ref(false);
+    const batchIsRestartingFailed = ref(false);
     const removeDialogOpen = ref(false);
     const removeTargetIds = ref<number[]>([]);
     const removeIsDeleting = ref(false);
@@ -139,25 +141,47 @@ export function useDownloadsQueueActions(params: {
         }
     }
 
-    async function retryFailedDownloads(): Promise<void> {
-        if (batchIsRetryingFailed.value) {
+    async function resumeFailedDownloads(): Promise<void> {
+        if (batchIsResumingFailed.value) {
             return;
         }
 
-        const ids = params.failedIds.value;
+        const ids = params.resumableFailedIds.value;
 
         if (!ids.length) {
             return;
         }
 
-        batchIsRetryingFailed.value = true;
+        batchIsResumingFailed.value = true;
+
+        try {
+            await Promise.allSettled(
+                ids.map((id) => window.axios.post(downloadTransfers.resume.url(id))),
+            );
+        } finally {
+            batchIsResumingFailed.value = false;
+        }
+    }
+
+    async function restartFailedDownloads(): Promise<void> {
+        if (batchIsRestartingFailed.value) {
+            return;
+        }
+
+        const ids = params.restartableFailedIds.value;
+
+        if (!ids.length) {
+            return;
+        }
+
+        batchIsRestartingFailed.value = true;
 
         try {
             await Promise.allSettled(
                 ids.map((id) => window.axios.post(downloadTransfers.restart.url(id))),
             );
         } finally {
-            batchIsRetryingFailed.value = false;
+            batchIsRestartingFailed.value = false;
         }
     }
 
@@ -229,7 +253,8 @@ export function useDownloadsQueueActions(params: {
         actionBusy,
         batchIsPausing,
         batchIsCanceling,
-        batchIsRetryingFailed,
+        batchIsResumingFailed,
+        batchIsRestartingFailed,
         removeDialogOpen,
         removeTargetIds,
         removeIsDeleting,
@@ -245,7 +270,8 @@ export function useDownloadsQueueActions(params: {
         confirmRemove,
         pauseSelection,
         cancelSelection,
-        retryFailedDownloads,
+        resumeFailedDownloads,
+        restartFailedDownloads,
         removeCompletedDownloads,
         pauseDownload,
         resumeDownload,
