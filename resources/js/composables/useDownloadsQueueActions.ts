@@ -76,7 +76,11 @@ export function useDownloadsQueueActions(params: {
         const ids = removeTargetIds.value;
 
         try {
-            if (removeAlsoFromDisk.value) {
+            if (removeMode.value === 'completed') {
+                await window.axios.post(downloadTransfers.destroyCompleted.url(), {
+                    also_from_disk: removeAlsoFromDisk.value,
+                });
+            } else if (removeAlsoFromDisk.value) {
                 await Promise.all(ids.map((id) =>
                     window.axios.delete(downloadTransfers.destroyDisk.url(id)),
                 ));
@@ -158,7 +162,7 @@ export function useDownloadsQueueActions(params: {
     }
 
     function removeCompletedDownloads(): void {
-        openRemoveDialog('all', params.completedIds.value);
+        openRemoveDialog('completed', params.completedIds.value);
     }
 
     async function pauseDownload(item: DownloadQueueItem): Promise<void> {

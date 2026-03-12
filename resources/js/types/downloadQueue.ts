@@ -48,7 +48,7 @@ export const DEFAULT_DOWNLOAD_QUEUE_SORT: DownloadQueueSortState = {
     direction: 'desc',
 };
 
-export type DownloadQueueRemoveMode = 'single' | 'selection' | 'all' | null;
+export type DownloadQueueRemoveMode = 'single' | 'selection' | 'all' | 'completed' | null;
 
 export type DownloadQueueQueuedPayload = DownloadQueueItem & DownloadQueueDetails & {
     downloadTransferId?: number;

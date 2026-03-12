@@ -109,6 +109,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/download-transfers/bulk-pause', [\App\Http\Controllers\DownloadTransferActionsController::class, 'pauseBatchTransfers'])->name('api.download-transfers.pause-batch');
     Route::post('/api/download-transfers/bulk-cancel', [\App\Http\Controllers\DownloadTransferActionsController::class, 'cancelBatchTransfers'])->name('api.download-transfers.cancel-batch');
     Route::post('/api/download-transfers/bulk-delete', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyBatch'])->name('api.download-transfers.destroy-batch');
+    Route::post('/api/download-transfers/bulk-delete-completed', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyCompleted'])->name('api.download-transfers.destroy-completed');
     Route::delete('/api/download-transfers/{downloadTransfer}/disk', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyWithDisk'])->name('api.download-transfers.destroy-disk');
     Route::delete('/api/download-transfers/{downloadTransfer}', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroy'])->name('api.download-transfers.destroy');
     // Moderation Rules

@@ -190,3 +190,101 @@ it('removes a transfer and deletes the file from disk', function () {
     Storage::disk('atlas-app')->assertMissing('downloads/aa/bb/test.jpg');
     Storage::disk('atlas-app')->assertMissing('thumbnails/aa/bb/test_thumb.jpg');
 });
+
+it('removes completed transfers in one request without touching other statuses', function () {
+    $user = User::factory()->create();
+
+    $completedFile = File::factory()->create([
+        'url' => 'https://example.com/completed-1.bin',
+    ]);
+    $secondCompletedFile = File::factory()->create([
+        'url' => 'https://example.com/completed-2.bin',
+    ]);
+    $failedFile = File::factory()->create([
+        'url' => 'https://example.com/failed.bin',
+    ]);
+
+    $completedTransfer = DownloadTransfer::query()->create([
+        'file_id' => $completedFile->id,
+        'url' => $completedFile->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+    ]);
+    $secondCompletedTransfer = DownloadTransfer::query()->create([
+        'file_id' => $secondCompletedFile->id,
+        'url' => $secondCompletedFile->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+    ]);
+    $failedTransfer = DownloadTransfer::query()->create([
+        'file_id' => $failedFile->id,
+        'url' => $failedFile->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 40,
+        'last_broadcast_percent' => 40,
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/api/download-transfers/bulk-delete-completed');
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'count' => 2,
+        ]);
+
+    expect(DownloadTransfer::query()->whereKey($completedTransfer->id)->exists())->toBeFalse();
+    expect(DownloadTransfer::query()->whereKey($secondCompletedTransfer->id)->exists())->toBeFalse();
+    expect(DownloadTransfer::query()->whereKey($failedTransfer->id)->exists())->toBeTrue();
+});
+
+it('removes completed transfers and deletes their files from disk when requested', function () {
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/completed-video.mp4',
+        'filename' => 'completed-video.mp4',
+        'downloaded' => true,
+        'path' => 'downloads/completed-video.mp4',
+        'preview_path' => 'thumbnails/completed-video.jpg',
+    ]);
+    Storage::disk('atlas-app')->put($file->path, 'video');
+    Storage::disk('atlas-app')->put($file->preview_path, 'preview');
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/api/download-transfers/bulk-delete-completed', [
+        'also_from_disk' => true,
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'count' => 1,
+        ]);
+
+    expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
+
+    $file->refresh();
+    expect($file->path)->toBeNull();
+    expect($file->preview_path)->toBeNull();
+    expect($file->downloaded)->toBeFalse();
+    expect($file->download_progress)->toBe(0);
+
+    Storage::disk('atlas-app')->assertMissing('downloads/completed-video.mp4');
+    Storage::disk('atlas-app')->assertMissing('thumbnails/completed-video.jpg');
+});
