@@ -1,4 +1,6 @@
 * text=auto eol=lf
+*.ico binary
+*.png binary
 
 *.blade.php diff=html
 *.css diff=css
