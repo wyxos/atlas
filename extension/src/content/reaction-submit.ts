@@ -6,8 +6,9 @@ import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
 import { shouldUseKeepaliveRequest } from '../request-keepalive';
+import { getDownloadCloseTargets, type DownloadCloseTarget } from './reaction-submit-download-targets';
 
-type SubmitReactionResult = {
+export type SubmitReactionResult = {
     ok: boolean;
     reaction: BadgeReactionType | null;
     exists: boolean;
@@ -17,6 +18,7 @@ type SubmitReactionResult = {
     downloadTransferId: number | null;
     downloadStatus: string | null;
     downloadProgressPercent: number | null;
+    downloadCloseTargets: DownloadCloseTarget[];
     reverbConfig: ReverbConfig | null;
 };
 
@@ -329,6 +331,7 @@ export async function submitBadgeReaction(
             downloadTransferId: null,
             downloadStatus: null,
             downloadProgressPercent: null,
+            downloadCloseTargets: [],
             reverbConfig: null,
         };
     }
@@ -346,6 +349,7 @@ export async function submitBadgeReaction(
                 downloadTransferId: null,
                 downloadStatus: null,
                 downloadProgressPercent: null,
+                downloadCloseTargets: [],
                 reverbConfig: null,
             };
         }
@@ -410,6 +414,7 @@ export async function submitBadgeReaction(
                     downloadTransferId: null,
                     downloadStatus: null,
                     downloadProgressPercent: null,
+                    downloadCloseTargets: [],
                     reverbConfig: null,
                 };
             }
@@ -437,6 +442,7 @@ export async function submitBadgeReaction(
                     downloadTransferId: null,
                     downloadStatus: null,
                     downloadProgressPercent: null,
+                    downloadCloseTargets: [],
                     reverbConfig: null,
                 };
             }
@@ -468,6 +474,7 @@ export async function submitBadgeReaction(
         const downloadTransferId = numberOrNull(downloadPayload.transfer_id);
         const downloadStatus = stringOrNull(downloadPayload.status);
         const downloadProgressPercent = numberOrNull(downloadPayload.progress_percent);
+        const downloadCloseTargets = getDownloadCloseTargets(payload, fileId);
         const reverbConfig = parseReverbConfig(rootPayload.reverb);
 
         if (extractedReaction.found) {
@@ -481,6 +488,7 @@ export async function submitBadgeReaction(
                 downloadTransferId,
                 downloadStatus,
                 downloadProgressPercent,
+                downloadCloseTargets,
                 reverbConfig,
             };
         }
@@ -495,6 +503,7 @@ export async function submitBadgeReaction(
             downloadTransferId,
             downloadStatus,
             downloadProgressPercent,
+            downloadCloseTargets,
             reverbConfig,
         };
     } catch {
@@ -508,6 +517,7 @@ export async function submitBadgeReaction(
             downloadTransferId: null,
             downloadStatus: null,
             downloadProgressPercent: null,
+            downloadCloseTargets: [],
             reverbConfig: null,
         };
     }

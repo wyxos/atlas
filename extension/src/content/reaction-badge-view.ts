@@ -299,7 +299,7 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                     },
                 },
                 [
-                    h('span', 'Close tab after queue'),
+                    h('span', 'Auto-close after complete'),
                     h(
                         'button',
                         {

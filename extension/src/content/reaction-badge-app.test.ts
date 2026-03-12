@@ -13,6 +13,19 @@ const mockGetPersistedBadgeState = vi.fn();
 const mockPersistBadgeCheckResult = vi.fn();
 const mockPersistBadgeState = vi.fn();
 const mockPersistDownloadProgressEvent = vi.fn();
+const progressListeners = new Set<(event: {
+    fileId: number | null;
+    transferId: number | null;
+    sourceUrl: string | null;
+    referrerUrl: string | null;
+    status: string | null;
+    percent: number | null;
+    reaction: 'love' | 'like' | 'dislike' | 'funny' | null;
+    reactedAt?: string | null;
+    downloadedAt?: string | null;
+    blacklistedAt?: string | null;
+    payload: Record<string, unknown>;
+}) => void>();
 
 vi.mock('./match-timestamp', () => ({
     formatMatchTimestamp: () => null,
@@ -88,14 +101,21 @@ describe('createReactionBadgeHost', () => {
         mockGetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(false);
         mockSetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(undefined);
         mockSetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(undefined);
-        mockSubscribeToDownloadProgress.mockReturnValue(() => {});
+        progressListeners.clear();
+        mockSubscribeToDownloadProgress.mockImplementation((listener) => {
+            progressListeners.add(listener);
+
+            return () => {
+                progressListeners.delete(listener);
+            };
+        });
         mockGetPersistedBadgeState.mockReturnValue(null);
         mockPersistBadgeCheckResult.mockReturnValue(undefined);
         mockPersistBadgeState.mockReturnValue(undefined);
         mockPersistDownloadProgressEvent.mockReturnValue(undefined);
     });
 
-    it('closes the tab after a successful submit even if the badge unmounted before the response resolved', async () => {
+    it('closes the tab after tracked download completion even if the badge unmounted before the response resolved', async () => {
         let resolveSubmit: ((value: {
             ok: boolean;
             reaction: 'love';
@@ -106,6 +126,12 @@ describe('createReactionBadgeHost', () => {
             downloadTransferId: number | null;
             downloadStatus: string | null;
             downloadProgressPercent: number | null;
+            downloadCloseTargets: Array<{
+                fileId: number | null;
+                transferId: number | null;
+                status: string | null;
+                downloadedAt: string | null;
+            }>;
             reverbConfig: null;
         }) => void) | null = null;
 
@@ -171,8 +197,40 @@ describe('createReactionBadgeHost', () => {
             downloadTransferId: 456,
             downloadStatus: 'queued',
             downloadProgressPercent: 0,
+            downloadCloseTargets: [
+                {
+                    fileId: 123,
+                    transferId: 456,
+                    status: 'queued',
+                    downloadedAt: null,
+                },
+            ],
             reverbConfig: null,
         });
+
+        await flushPromises();
+        await flushPromises();
+
+        expect(runtimeSendMessage).not.toHaveBeenCalledWith(
+            { type: 'ATLAS_CLOSE_CURRENT_TAB' },
+            expect.any(Function),
+        );
+
+        for (const listener of progressListeners) {
+            listener({
+                fileId: 123,
+                transferId: 456,
+                sourceUrl: image.src,
+                referrerUrl: window.location.href,
+                status: 'completed',
+                percent: 100,
+                reaction: 'love',
+                reactedAt: null,
+                downloadedAt: '2026-03-12T00:00:00Z',
+                blacklistedAt: null,
+                payload: {},
+            });
+        }
 
         await flushPromises();
         await flushPromises();
@@ -350,6 +408,14 @@ describe('createReactionBadgeHost', () => {
             downloadTransferId: 456,
             downloadStatus: 'queued',
             downloadProgressPercent: 0,
+            downloadCloseTargets: [
+                {
+                    fileId: 123,
+                    transferId: 456,
+                    status: 'queued',
+                    downloadedAt: null,
+                },
+            ],
             reverbConfig: null,
         });
 
