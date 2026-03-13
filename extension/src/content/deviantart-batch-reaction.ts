@@ -1,6 +1,10 @@
-import { normalizeHashAwareUrl, normalizeUrl, type MediaElement } from './media-utils';
+import {
+    findRelatedDeviantArtAllImagesSection,
+    normalizeHashAwareUrl,
+    normalizeUrl,
+    type MediaElement,
+} from './media-utils';
 
-const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
 const IMAGE_HASH_PATTERN = /#image-(\d+)$/i;
 
 export type BatchReactionItem = {
@@ -17,28 +21,20 @@ type CollectBatchReactionItemsOptions = {
 
 type CurrentImageResolver = () => HTMLImageElement | null;
 
-function isDeviantArtHostname(hostname: string | null | undefined): boolean {
-    if (typeof hostname !== 'string') {
-        return false;
-    }
-
-    return DEVIANT_ART_HOST_PATTERN.test(hostname.trim().toLowerCase());
-}
-
 function sleep(delayMs: number): Promise<void> {
     return new Promise((resolve) => {
         window.setTimeout(resolve, delayMs);
     });
 }
 
-function parseImageNumber(url: string): number {
+function parseImageNumber(url: string): number | null {
     const match = url.match(IMAGE_HASH_PATTERN);
     if (!match) {
-        return 1;
+        return null;
     }
 
     const parsed = Number(match[1]);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function resolveCurrentImageUrl(media: HTMLImageElement | null): string | null {
@@ -49,7 +45,7 @@ function resolveCurrentImageUrl(media: HTMLImageElement | null): string | null {
     return normalizeUrl(media.getAttribute('src') || media.src || null);
 }
 
-function resolveCurrentLocationState(): { href: string; pageUrl: string; imageNumber: number } | null {
+function resolveCurrentLocationState(): { href: string; pageUrl: string; imageNumber: number | null } | null {
     const href = normalizeHashAwareUrl(window.location.href);
     const pageUrl = normalizeUrl(href);
     if (href === null || pageUrl === null) {
@@ -61,39 +57,6 @@ function resolveCurrentLocationState(): { href: string; pageUrl: string; imageNu
         pageUrl,
         imageNumber: parseImageNumber(href),
     };
-}
-
-function resolveAllImagesSection(media: HTMLImageElement, hostname: string): HTMLElement | null {
-    if (!isDeviantArtHostname(hostname)) {
-        return null;
-    }
-
-    const root = media.closest('main, article, [role="main"]') ?? document.querySelector('main') ?? document.body;
-    const mediaRect = media.getBoundingClientRect();
-    if (mediaRect.width < 1 || mediaRect.height < 1) {
-        return null;
-    }
-
-    const sections = Array.from(root.querySelectorAll('section'));
-
-    return sections.find((section) => {
-        const heading = Array.from(section.querySelectorAll('h1, h2, h3'))
-            .find((element) => element.textContent?.trim() === 'All Images');
-        if (heading === undefined) {
-            return false;
-        }
-
-        const thumbnailButtons = Array.from(section.querySelectorAll('button'))
-            .filter((button): button is HTMLButtonElement => button instanceof HTMLButtonElement)
-            .filter((button) => button.querySelector('img') instanceof HTMLImageElement);
-        if (thumbnailButtons.length < 2) {
-            return false;
-        }
-
-        const sectionRect = section.getBoundingClientRect();
-
-        return sectionRect.top >= mediaRect.bottom - 24 && sectionRect.top <= mediaRect.bottom + 220;
-    }) ?? null;
 }
 
 function resolveThumbnailButtons(section: HTMLElement): HTMLButtonElement[] {
@@ -165,9 +128,11 @@ function buildBatchReactionItem(
     }
 
     return {
-        candidateId: `image-${locationState.imageNumber || candidateIndex + 1}`,
+        candidateId: `image-${locationState.imageNumber ?? candidateIndex + 1}`,
         url,
-        referrerUrlHashAware: locationState.imageNumber === 1 ? locationState.pageUrl : locationState.href,
+        referrerUrlHashAware: locationState.imageNumber === null || locationState.imageNumber === 1
+            ? locationState.pageUrl
+            : locationState.href,
         pageUrl: locationState.pageUrl,
         tagName: 'img',
     };
@@ -208,7 +173,7 @@ export async function collectDeviantArtBatchReactionItems(
     }
 
     const hostname = options.hostname ?? window.location.hostname;
-    const section = resolveAllImagesSection(media, hostname);
+    const section = findRelatedDeviantArtAllImagesSection(media, hostname);
     if (section === null) {
         return null;
     }
@@ -238,7 +203,7 @@ export async function collectDeviantArtBatchReactionItems(
         items.push(item);
     };
 
-    collectCurrentItem(initialLocationState.imageNumber - 1);
+    collectCurrentItem((initialLocationState.imageNumber ?? 1) - 1);
 
     try {
         for (const [index, button] of buttons.entries()) {
@@ -254,7 +219,7 @@ export async function collectDeviantArtBatchReactionItems(
             buttons,
             initialImageUrl,
             initialLocationState.href,
-            initialLocationState.imageNumber,
+            initialLocationState.imageNumber ?? 1,
         );
     }
 

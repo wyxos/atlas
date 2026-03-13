@@ -261,28 +261,75 @@ function isDeviantArtAllImagesSection(section: Element): boolean {
     return thumbnailButtons.length >= 2;
 }
 
-export function hasRelatedPostThumbnailsBelowMedia(
+function nearestBranchUnderRoot(element: Element, root: Element): Element {
+    let current: Element = element;
+
+    while (current.parentElement !== null && current.parentElement !== root) {
+        current = current.parentElement;
+    }
+
+    return current;
+}
+
+function isAssociatedDeviantArtAllImagesSection(
+    section: Element,
     element: MediaElement,
-    hostname: string = window.location.hostname,
+    root: Element,
 ): boolean {
-    if (!isDeviantArtHostname(hostname)) {
+    if (section.contains(element)) {
         return false;
     }
 
     const mediaRect = element.getBoundingClientRect();
-    if (mediaRect.width < 1 || mediaRect.height < 1) {
+    const sectionRect = section.getBoundingClientRect();
+    const directGap = sectionRect.top - mediaRect.bottom;
+    if (directGap >= -24 && directGap <= 220) {
+        return true;
+    }
+
+    const mediaBranch = nearestBranchUnderRoot(element, root);
+    const sectionBranch = nearestBranchUnderRoot(section, root);
+    if (mediaBranch === sectionBranch) {
         return false;
+    }
+
+    const position = mediaBranch.compareDocumentPosition(sectionBranch);
+    if ((position & Node.DOCUMENT_POSITION_FOLLOWING) === 0) {
+        return false;
+    }
+
+    const branchRect = mediaBranch.getBoundingClientRect();
+    const branchGap = sectionRect.top - branchRect.bottom;
+
+    return branchGap >= -24 && branchGap <= 220;
+}
+
+export function findRelatedDeviantArtAllImagesSection(
+    element: MediaElement,
+    hostname: string = window.location.hostname,
+): HTMLElement | null {
+    if (!isDeviantArtHostname(hostname)) {
+        return null;
+    }
+
+    const mediaRect = element.getBoundingClientRect();
+    if (mediaRect.width < 1 || mediaRect.height < 1) {
+        return null;
     }
 
     const root = element.closest('main, article, [role="main"]') ?? document.querySelector('main') ?? document.body;
 
     return Array.from(root.querySelectorAll('section'))
         .filter((section) => isDeviantArtAllImagesSection(section))
-        .some((section) => {
-            const sectionRect = section.getBoundingClientRect();
+        .find((section): section is HTMLElement => isAssociatedDeviantArtAllImagesSection(section, element, root))
+        ?? null;
+}
 
-            return sectionRect.top >= mediaRect.bottom - 24 && sectionRect.top <= mediaRect.bottom + 220;
-        });
+export function hasRelatedPostThumbnailsBelowMedia(
+    element: MediaElement,
+    hostname: string = window.location.hostname,
+): boolean {
+    return findRelatedDeviantArtAllImagesSection(element, hostname) !== null;
 }
 
 export function collectMediaFromNode(node: Node): MediaElement[] {
