@@ -181,4 +181,82 @@ describe('collectDeviantArtBatchReactionItems', () => {
         expect(currentMedia.src).toBe('https://images.example.com/direct-image-1.jpg');
         expect(window.location.href).toBe(basePageUrl);
     });
+
+    it('falls back to thumbnail order for candidate ids when DeviantArt does not update the image hash', async () => {
+        const origin = window.location.origin;
+        const basePageUrl = `${origin}/artseize/art/Untitled-1305712740`;
+        const viewer = document.createElement('div');
+        const media = document.createElement('img');
+        media.src = 'https://images.example.com/direct-image-1.jpg';
+        viewer.appendChild(media);
+        document.body.appendChild(viewer);
+
+        Object.defineProperty(media, 'getBoundingClientRect', {
+            configurable: true,
+            value: () => withRect(560, 560, 80),
+        });
+        Object.defineProperty(viewer, 'getBoundingClientRect', {
+            configurable: true,
+            value: () => withRect(900, 960, 40, 80),
+        });
+
+        const section = document.createElement('section');
+        const headingWrap = document.createElement('span');
+        const heading = document.createElement('h2');
+        heading.textContent = 'All Images';
+        headingWrap.appendChild(heading);
+        section.appendChild(headingWrap);
+
+        const strip = document.createElement('div');
+        const firstButton = document.createElement('button');
+        const firstThumb = document.createElement('img');
+        firstThumb.src = 'https://images.example.com/thumb-image-1.jpg';
+        firstThumb.alt = 'Image 1';
+        firstButton.appendChild(firstThumb);
+        firstButton.addEventListener('click', () => {
+            media.src = 'https://images.example.com/direct-image-1.jpg';
+            history.replaceState({}, '', basePageUrl);
+        });
+
+        const secondButton = document.createElement('button');
+        const secondThumb = document.createElement('img');
+        secondThumb.src = 'https://images.example.com/thumb-image-2.jpg';
+        secondThumb.alt = 'Image 2';
+        secondButton.appendChild(secondThumb);
+        secondButton.addEventListener('click', () => {
+            media.src = 'https://images.example.com/direct-image-2.jpg';
+            history.replaceState({}, '', basePageUrl);
+        });
+
+        strip.appendChild(firstButton);
+        strip.appendChild(secondButton);
+        section.appendChild(strip);
+        document.body.appendChild(section);
+
+        Object.defineProperty(section, 'getBoundingClientRect', {
+            configurable: true,
+            value: () => withRect(360, 60, 1012, 260),
+        });
+
+        const items = await collectDeviantArtBatchReactionItems(media, {
+            hostname: 'www.deviantart.com',
+        });
+
+        expect(items).toEqual([
+            {
+                candidateId: 'image-1',
+                url: 'https://images.example.com/direct-image-1.jpg',
+                referrerUrlHashAware: basePageUrl,
+                pageUrl: basePageUrl,
+                tagName: 'img',
+            },
+            {
+                candidateId: 'image-2',
+                url: 'https://images.example.com/direct-image-2.jpg',
+                referrerUrlHashAware: basePageUrl,
+                pageUrl: basePageUrl,
+                tagName: 'img',
+            },
+        ]);
+    });
 });

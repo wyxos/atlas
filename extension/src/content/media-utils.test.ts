@@ -237,6 +237,49 @@ describe('hasRelatedPostThumbnailsBelowMedia', () => {
         expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.deviantart.com')).toBe(true);
     });
 
+    it('returns true when the All Images strip is below the viewer container but farther from the raw image bounds', () => {
+        document.body.innerHTML = '';
+
+        const main = document.createElement('main');
+        const viewer = document.createElement('div');
+        const figure = document.createElement('figure');
+        const media = document.createElement('img');
+        figure.appendChild(media);
+        viewer.appendChild(figure);
+        main.appendChild(viewer);
+
+        const section = document.createElement('section');
+        const headingWrap = document.createElement('span');
+        const heading = document.createElement('h2');
+        heading.textContent = 'All Images';
+        headingWrap.appendChild(heading);
+        section.appendChild(headingWrap);
+
+        const thumbStrip = document.createElement('div');
+        const firstButton = document.createElement('button');
+        const firstThumb = document.createElement('img');
+        firstThumb.src = 'https://images.example.com/one-150.jpg';
+        firstThumb.alt = 'Image 1';
+        firstButton.appendChild(firstThumb);
+        const secondButton = document.createElement('button');
+        const secondThumb = document.createElement('img');
+        secondThumb.src = 'https://images.example.com/two-150.jpg';
+        secondThumb.alt = 'Image 2';
+        secondButton.appendChild(secondThumb);
+        thumbStrip.appendChild(firstButton);
+        thumbStrip.appendChild(secondButton);
+        section.appendChild(thumbStrip);
+
+        main.appendChild(section);
+        document.body.appendChild(main);
+
+        setMockRect(media, { left: 120, top: 80, width: 560, height: 560 });
+        setMockRect(viewer, { left: 80, top: 40, width: 900, height: 960 });
+        setMockRect(section, { left: 80, top: 1012, width: 340, height: 56 });
+
+        expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.deviantart.com')).toBe(true);
+    });
+
     it('returns false on non-DeviantArt hosts even when similar controls exist', () => {
         const { media } = buildDeviantArtAllImagesSection();
 
@@ -249,5 +292,17 @@ describe('hasRelatedPostThumbnailsBelowMedia', () => {
         secondThumb?.remove();
 
         expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.deviantart.com')).toBe(false);
+    });
+
+    it('returns false for thumbnails rendered inside the All Images section', () => {
+        const { section } = buildDeviantArtAllImagesSection();
+        const thumbnail = section.querySelector('button img');
+        if (!(thumbnail instanceof HTMLImageElement)) {
+            throw new Error('Expected a thumbnail image.');
+        }
+
+        setMockRect(thumbnail, { left: 280, top: 458, width: 40, height: 40 });
+
+        expect(hasRelatedPostThumbnailsBelowMedia(thumbnail, 'www.deviantart.com')).toBe(false);
     });
 });
