@@ -2,6 +2,7 @@ import {
     findRelatedDeviantArtAllImagesSection,
     normalizeHashAwareUrl,
     normalizeUrl,
+    resolveMediaSectionSearchRoot,
     type MediaElement,
 } from './media-utils';
 
@@ -88,7 +89,7 @@ function createCurrentImageResolver(
     media: HTMLImageElement,
     section: HTMLElement,
 ): CurrentImageResolver {
-    const root = media.closest('main, article, [role="main"]') ?? document.querySelector('main') ?? document.body;
+    const root = resolveMediaSectionSearchRoot(media, section);
     const initialRect = media.getBoundingClientRect();
     const minimumWidth = Math.max(160, Math.round(initialRect.width * 0.4));
     const minimumHeight = Math.max(160, Math.round(initialRect.height * 0.4));

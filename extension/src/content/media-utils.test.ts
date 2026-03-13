@@ -280,6 +280,62 @@ describe('hasRelatedPostThumbnailsBelowMedia', () => {
         expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.deviantart.com')).toBe(true);
     });
 
+    it('returns true for DeviantArt overlays that live outside the page main element', () => {
+        document.body.innerHTML = '';
+
+        const main = document.createElement('main');
+        const article = document.createElement('article');
+        const unrelatedImage = document.createElement('img');
+        article.appendChild(unrelatedImage);
+        main.appendChild(article);
+        document.body.appendChild(main);
+
+        const overlay = document.createElement('div');
+        const post = document.createElement('div');
+        const viewer = document.createElement('div');
+        const figure = document.createElement('figure');
+        const mediaShell = document.createElement('div');
+        const media = document.createElement('img');
+        mediaShell.appendChild(media);
+        figure.appendChild(mediaShell);
+        viewer.appendChild(figure);
+        post.appendChild(viewer);
+
+        const section = document.createElement('section');
+        const headingWrap = document.createElement('span');
+        const heading = document.createElement('h2');
+        heading.textContent = 'All Images';
+        headingWrap.appendChild(heading);
+        section.appendChild(headingWrap);
+
+        const thumbStrip = document.createElement('div');
+        const firstButton = document.createElement('button');
+        const firstThumb = document.createElement('img');
+        firstThumb.src = 'https://images.example.com/one-150.jpg';
+        firstThumb.alt = 'Image 1';
+        firstButton.appendChild(firstThumb);
+        const secondButton = document.createElement('button');
+        const secondThumb = document.createElement('img');
+        secondThumb.src = 'https://images.example.com/two-150.jpg';
+        secondThumb.alt = 'Image 2';
+        secondButton.appendChild(secondThumb);
+        thumbStrip.appendChild(firstButton);
+        thumbStrip.appendChild(secondButton);
+        section.appendChild(thumbStrip);
+
+        post.appendChild(section);
+        overlay.appendChild(post);
+        document.body.appendChild(overlay);
+
+        setMockRect(unrelatedImage, { left: 20, top: 20, width: 1280, height: 720 });
+        setMockRect(media, { left: 120, top: 80, width: 560, height: 560 });
+        setMockRect(mediaShell, { left: 120, top: 40, width: 2648, height: 942 });
+        setMockRect(viewer, { left: 80, top: 40, width: 900, height: 960 });
+        setMockRect(section, { left: 80, top: 1012, width: 340, height: 56 });
+
+        expect(hasRelatedPostThumbnailsBelowMedia(media, 'www.deviantart.com')).toBe(true);
+    });
+
     it('returns false on non-DeviantArt hosts even when similar controls exist', () => {
         const { media } = buildDeviantArtAllImagesSection();
 

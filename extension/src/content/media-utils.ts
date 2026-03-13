@@ -261,16 +261,6 @@ function isDeviantArtAllImagesSection(section: Element): boolean {
     return thumbnailButtons.length >= 2;
 }
 
-function nearestBranchUnderRoot(element: Element, root: Element): Element {
-    let current: Element = element;
-
-    while (current.parentElement !== null && current.parentElement !== root) {
-        current = current.parentElement;
-    }
-
-    return current;
-}
-
 function isAssociatedDeviantArtAllImagesSection(
     section: Element,
     element: MediaElement,
@@ -287,21 +277,46 @@ function isAssociatedDeviantArtAllImagesSection(
         return true;
     }
 
-    const mediaBranch = nearestBranchUnderRoot(element, root);
-    const sectionBranch = nearestBranchUnderRoot(section, root);
-    if (mediaBranch === sectionBranch) {
-        return false;
+    let current: Element | null = element.parentElement;
+    while (current !== null && current !== root) {
+        if (current.contains(section)) {
+            return false;
+        }
+
+        const ancestorRect = current.getBoundingClientRect();
+        const ancestorGap = sectionRect.top - ancestorRect.bottom;
+        if (ancestorRect.width >= 1 && ancestorRect.height >= 1 && ancestorGap >= -24 && ancestorGap <= 220) {
+            return true;
+        }
+
+        current = current.parentElement;
     }
 
-    const position = mediaBranch.compareDocumentPosition(sectionBranch);
-    if ((position & Node.DOCUMENT_POSITION_FOLLOWING) === 0) {
-        return false;
+    return false;
+}
+
+function findNearestSharedAncestor(left: Element, right: Element): Element | null {
+    let current: Element | null = left.parentElement;
+    while (current !== null) {
+        if (current.contains(right)) {
+            return current;
+        }
+
+        current = current.parentElement;
     }
 
-    const branchRect = mediaBranch.getBoundingClientRect();
-    const branchGap = sectionRect.top - branchRect.bottom;
+    return null;
+}
 
-    return branchGap >= -24 && branchGap <= 220;
+export function resolveMediaSearchRoot(element: Element): Element {
+    return element.closest('main, article, [role="main"]') ?? document.body;
+}
+
+export function resolveMediaSectionSearchRoot(
+    element: Element,
+    section: Element,
+): Element {
+    return findNearestSharedAncestor(element, section) ?? resolveMediaSearchRoot(element);
 }
 
 export function findRelatedDeviantArtAllImagesSection(
@@ -317,7 +332,7 @@ export function findRelatedDeviantArtAllImagesSection(
         return null;
     }
 
-    const root = element.closest('main, article, [role="main"]') ?? document.querySelector('main') ?? document.body;
+    const root = resolveMediaSearchRoot(element);
 
     return Array.from(root.querySelectorAll('section'))
         .filter((section) => isDeviantArtAllImagesSection(section))
