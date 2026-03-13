@@ -29,6 +29,15 @@ type SubmitReactionPayload = {
     body: Record<string, unknown>;
 };
 
+type AtlasApiRequestPayload = {
+    type: 'ATLAS_API_REQUEST';
+    atlasDomain: string;
+    apiToken: string;
+    endpoint: string;
+    method: 'GET' | 'POST';
+    body?: Record<string, unknown> | null;
+};
+
 type BrowserTab = {
     id?: number;
     url?: string;
@@ -39,6 +48,40 @@ type BrowserTab = {
 const openComparableUrlByTabId = new Map<number, string>();
 const openComparableUrlCountByUrl = new Map<string, number>();
 let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
+
+function parseJsonResponse(response: Response): Promise<unknown> {
+    return response.text()
+        .then((bodyText) => {
+            const trimmed = bodyText.trim();
+            if (trimmed === '') {
+                return null;
+            }
+
+            try {
+                return JSON.parse(trimmed) as unknown;
+            } catch {
+                return bodyText;
+            }
+        })
+        .catch(() => null);
+}
+
+function isAllowedAtlasApiEndpoint(
+    atlasDomain: string,
+    endpoint: string,
+    method: 'GET' | 'POST',
+): boolean {
+    if (atlasDomain === '') {
+        return false;
+    }
+
+    if (method === 'GET') {
+        return endpoint === `${atlasDomain}/api/extension/ping`;
+    }
+
+    return endpoint === `${atlasDomain}/api/extension/badges/checks`
+        || endpoint === `${atlasDomain}/api/extension/referrer-checks`;
+}
 
 function updateTrackedComparableTabUrl(tabId: number, nextComparableUrl: string | null): string[] {
     const previousComparableUrl = openComparableUrlByTabId.get(tabId) ?? null;
@@ -268,6 +311,53 @@ chrome.runtime.onMessage.addListener((
                     ok: response.ok,
                     status: response.status,
                     payload: responsePayload,
+                });
+            })
+            .catch(() => {
+                sendResponse({ ok: false, status: 0, payload: null });
+            });
+
+        return true;
+    }
+
+    if (payload.type === 'ATLAS_API_REQUEST') {
+        const requestPayload = message as AtlasApiRequestPayload;
+        const atlasDomain = typeof requestPayload.atlasDomain === 'string' ? requestPayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+        const apiToken = typeof requestPayload.apiToken === 'string' ? requestPayload.apiToken.trim() : '';
+        const endpoint = typeof requestPayload.endpoint === 'string' ? requestPayload.endpoint.trim() : '';
+        const method = requestPayload.method === 'POST' ? 'POST' : requestPayload.method === 'GET' ? 'GET' : null;
+        const body = requestPayload.body;
+        const requiresBody = method === 'POST';
+
+        if (
+            method === null
+            || apiToken === ''
+            || !isAllowedAtlasApiEndpoint(atlasDomain, endpoint, method)
+            || (requiresBody && (typeof body !== 'object' || body === null))
+        ) {
+            sendResponse({ ok: false, status: 0, payload: null });
+            return false;
+        }
+
+        const headers: Record<string, string> = {
+            'X-Atlas-Api-Key': apiToken,
+        };
+        const init: RequestInit = {
+            method,
+            headers,
+        };
+
+        if (method === 'POST') {
+            headers['Content-Type'] = 'application/json';
+            init.body = JSON.stringify(body);
+        }
+
+        void fetch(endpoint, init)
+            .then(async (response) => {
+                sendResponse({
+                    ok: response.ok,
+                    status: response.status,
+                    payload: await parseJsonResponse(response),
                 });
             })
             .catch(() => {

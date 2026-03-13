@@ -1,6 +1,7 @@
 import { getStoredOptions } from '../atlas-options';
+import { requestAtlasViaRuntime } from '../atlas-runtime-request';
 import { cleanupReferrerUrl, type ReferrerQueryParamsToStripByDomain } from '../referrer-cleanup';
-import { atlasLoggedFetch } from './atlas-request-log';
+import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
 import { normalizeHashAwareUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 export type ReferrerMatchResult = {
@@ -101,20 +102,42 @@ async function requestBatch(batch: QueueItem[]): Promise<Map<string, ReferrerMat
                 referrer_url: keyByRequestId.get(item.request_id) ?? null,
             })),
         };
-        const response = await atlasLoggedFetch(endpoint, 'POST', requestLogPayload, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Atlas-Api-Key': stored.apiToken,
-            },
-            body: JSON.stringify(requestPayload),
-        });
+        let payload: { matches?: unknown } | null = null;
+        const runtimeResponse = await atlasLoggedRuntimeRequest(
+            endpoint,
+            'POST',
+            requestLogPayload,
+            () => requestAtlasViaRuntime({
+                endpoint,
+                atlasDomain: stored.atlasDomain,
+                apiToken: stored.apiToken,
+                method: 'POST',
+                body: requestPayload,
+            }),
+        );
+        if (runtimeResponse !== null) {
+            if (!runtimeResponse.ok) {
+                return new Map();
+            }
 
-        if (!response.ok) {
-            return new Map();
+            payload = runtimeResponse.payload as { matches?: unknown };
+        } else {
+            const response = await atlasLoggedFetch(endpoint, 'POST', requestLogPayload, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Atlas-Api-Key': stored.apiToken,
+                },
+                body: JSON.stringify(requestPayload),
+            });
+
+            if (!response.ok) {
+                return new Map();
+            }
+
+            payload = await response.json() as { matches?: unknown };
         }
 
-        const payload = await response.json() as { matches?: unknown };
         if (!Array.isArray(payload.matches)) {
             return new Map();
         }

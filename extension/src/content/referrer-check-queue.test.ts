@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetStoredOptions = vi.fn();
 const mockAtlasLoggedFetch = vi.fn();
+const mockRequestAtlasViaRuntime = vi.fn();
 
 vi.mock('../atlas-options', () => ({
     getStoredOptions: mockGetStoredOptions,
@@ -9,6 +10,11 @@ vi.mock('../atlas-options', () => ({
 
 vi.mock('./atlas-request-log', () => ({
     atlasLoggedFetch: mockAtlasLoggedFetch,
+    atlasLoggedRuntimeRequest: vi.fn((_: string, __: string, ___: unknown, run: () => Promise<unknown>) => run()),
+}));
+
+vi.mock('../atlas-runtime-request', () => ({
+    requestAtlasViaRuntime: mockRequestAtlasViaRuntime,
 }));
 
 describe('referrer-check-queue', () => {
@@ -23,6 +29,7 @@ describe('referrer-check-queue', () => {
             matchRules: [],
             referrerQueryParamsToStripByDomain: {},
         });
+        mockRequestAtlasViaRuntime.mockResolvedValue(null);
     });
 
     it('logs original referrer url while sending hash-only payload to backend', async () => {
