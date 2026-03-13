@@ -1,5 +1,6 @@
 import { getStoredOptions } from './atlas-options';
 import { connectReverb, type ReverbClient, type ReverbConfig, type ReverbConnectionState } from './reverb-client';
+import { requestAtlasViaRuntime } from './atlas-runtime-request';
 
 type RuntimeReverbStatus =
     | { kind: 'setup_required' }
@@ -73,18 +74,35 @@ async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
             return { kind: 'setup_required' };
         }
 
-        const response = await fetch(`${stored.atlasDomain}/api/extension/ping`, {
+        const pingEndpoint = `${stored.atlasDomain}/api/extension/ping`;
+        let payload: ReverbPingResponse | null = null;
+        const runtimeResponse = await requestAtlasViaRuntime({
+            endpoint: pingEndpoint,
+            atlasDomain: stored.atlasDomain,
+            apiToken: stored.apiToken,
             method: 'GET',
-            headers: {
-                'X-Atlas-Api-Key': stored.apiToken,
-            },
         });
+        if (runtimeResponse !== null) {
+            if (!runtimeResponse.ok) {
+                return { kind: 'auth_failed' };
+            }
 
-        if (!response.ok) {
-            return { kind: 'auth_failed' };
+            payload = runtimeResponse.payload as ReverbPingResponse;
+        } else {
+            const response = await fetch(pingEndpoint, {
+                method: 'GET',
+                headers: {
+                    'X-Atlas-Api-Key': stored.apiToken,
+                },
+            });
+
+            if (!response.ok) {
+                return { kind: 'auth_failed' };
+            }
+
+            payload = await response.json() as ReverbPingResponse;
         }
 
-        const payload = await response.json() as ReverbPingResponse;
         const config = parseReverbConfig(payload.reverb);
         const endpoint = formatReverbEndpoint(config);
 

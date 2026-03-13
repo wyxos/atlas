@@ -1,5 +1,6 @@
 import { getStoredOptions } from '../atlas-options';
-import { atlasLoggedFetch } from './atlas-request-log';
+import { requestAtlasViaRuntime } from '../atlas-runtime-request';
+import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
 import { normalizeUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 export type BadgeReactionType = 'love' | 'like' | 'dislike' | 'funny';
@@ -82,20 +83,42 @@ async function requestBatch(batch: MatchQueueItem[]): Promise<Map<string, BadgeM
 
         const endpoint = `${stored.atlasDomain}/api/extension/badges/checks`;
         const requestPayload = { items };
-        const response = await atlasLoggedFetch(endpoint, 'POST', requestPayload, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Atlas-Api-Key': stored.apiToken,
-            },
-            body: JSON.stringify(requestPayload),
-        });
+        let payload: { matches?: unknown } | null = null;
+        const runtimeResponse = await atlasLoggedRuntimeRequest(
+            endpoint,
+            'POST',
+            requestPayload,
+            () => requestAtlasViaRuntime({
+                endpoint,
+                atlasDomain: stored.atlasDomain,
+                apiToken: stored.apiToken,
+                method: 'POST',
+                body: requestPayload,
+            }),
+        );
+        if (runtimeResponse !== null) {
+            if (!runtimeResponse.ok) {
+                return new Map();
+            }
 
-        if (!response.ok) {
-            return new Map();
+            payload = runtimeResponse.payload as { matches?: unknown };
+        } else {
+            const response = await atlasLoggedFetch(endpoint, 'POST', requestPayload, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Atlas-Api-Key': stored.apiToken,
+                },
+                body: JSON.stringify(requestPayload),
+            });
+
+            if (!response.ok) {
+                return new Map();
+            }
+
+            payload = await response.json() as { matches?: unknown };
         }
 
-        const payload = await response.json() as { matches?: unknown };
         if (!Array.isArray(payload.matches)) {
             return new Map();
         }

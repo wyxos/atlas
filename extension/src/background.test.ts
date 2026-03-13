@@ -140,4 +140,56 @@ describe('background', () => {
         expect(uniqueHashResponse.isOpenInAnotherTab).toBe(false);
         expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
     });
+
+    it('proxies allowed Atlas API requests through the background worker', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({
+                reverb: {
+                    enabled: true,
+                    key: 'atlas-key',
+                    host: 'atlas.wyxos.com',
+                    port: 443,
+                    scheme: 'https',
+                    channel: 'downloads',
+                },
+            }), { status: 200 }),
+        );
+        vi.stubGlobal('chrome', chromeMock);
+        vi.stubGlobal('fetch', fetchMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        const response = await sendRuntimeMessage(listener!, {
+            type: 'ATLAS_API_REQUEST',
+            atlasDomain: 'https://atlas.wyxos.com',
+            apiToken: 'test-api-token',
+            endpoint: 'https://atlas.wyxos.com/api/extension/ping',
+            method: 'GET',
+        }) as Record<string, unknown>;
+
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.wyxos.com/api/extension/ping', {
+            method: 'GET',
+            headers: {
+                'X-Atlas-Api-Key': 'test-api-token',
+            },
+        });
+        expect(response).toEqual({
+            ok: true,
+            status: 200,
+            payload: {
+                reverb: {
+                    enabled: true,
+                    key: 'atlas-key',
+                    host: 'atlas.wyxos.com',
+                    port: 443,
+                    scheme: 'https',
+                    channel: 'downloads',
+                },
+            },
+        });
+    });
 });
