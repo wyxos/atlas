@@ -84,10 +84,11 @@ function startCustomLabelEdit(): void {
 }
 
 function queueCustomLabelEdit(): void {
+    if (props.isMinimized) {
+        return;
+    }
+
     preventContextMenuCloseAutoFocus.value = true;
-    window.setTimeout(() => {
-        startCustomLabelEdit();
-    }, 0);
 }
 
 function handleContextMenuCloseAutoFocus(event: Event): void {
@@ -97,6 +98,7 @@ function handleContextMenuCloseAutoFocus(event: Event): void {
 
     event.preventDefault();
     preventContextMenuCloseAutoFocus.value = false;
+    startCustomLabelEdit();
 }
 
 function commitCustomLabelEdit(): void {
