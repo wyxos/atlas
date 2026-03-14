@@ -269,4 +269,107 @@ describe('TabContent - Container blacklist updates', () => {
         expect(masonry.props('items')).toHaveLength(1);
         expect((masonry.props('items') as FeedItem[])[0].id).toBe(2);
     });
+
+    it('filters later page loads that match a newly blacklisted container in the same tab', async () => {
+        const tab = {
+            id: 889,
+            label: 'Browse 1',
+            params: {
+                feed: 'online',
+                service: 'test-service',
+                page: 1,
+            },
+            items: [],
+            position: 0,
+            isActive: true,
+        };
+
+        mockAxios.get
+            .mockResolvedValueOnce({
+                data: {
+                    tab,
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    items: [
+                        {
+                            id: 10,
+                            width: 500,
+                            height: 500,
+                            page: 'cursor-2',
+                            key: 'cursor-2-10',
+                            index: 0,
+                            src: 'https://example.com/preview10.jpg',
+                            preview: 'https://example.com/preview10.jpg',
+                            original: 'https://example.com/original10.jpg',
+                            type: 'image',
+                            notFound: false,
+                            containers: [
+                                { id: 303, type: 'User', source: 'CivitAI', source_id: 'PYBY_the_Fox' },
+                            ],
+                        },
+                        {
+                            id: 11,
+                            width: 500,
+                            height: 500,
+                            page: 'cursor-2',
+                            key: 'cursor-2-11',
+                            index: 1,
+                            src: 'https://example.com/preview11.jpg',
+                            preview: 'https://example.com/preview11.jpg',
+                            original: 'https://example.com/original11.jpg',
+                            type: 'image',
+                            notFound: false,
+                            containers: [
+                                { id: 404, type: 'User', source: 'CivitAI', source_id: 'allowed-user' },
+                            ],
+                        },
+                    ],
+                    nextPage: null,
+                    total: null,
+                },
+            });
+
+        const wrapper = mount(TabContent, {
+            props: {
+                tabId: tab.id,
+                availableServices: [{ key: 'test-service', label: 'Test Service' }],
+                onReaction: vi.fn(),
+                updateActiveTab: vi.fn(),
+            },
+        });
+
+        await flushPromises();
+        await nextTick();
+
+        const manager = wrapper.findComponent({ name: 'ContainerBlacklistManager' });
+        expect(manager.exists()).toBe(true);
+
+        manager.vm.$emit('blacklists-changed', {
+            action: 'created',
+            blacklist: {
+                id: 101,
+                type: 'User',
+                source: 'CivitAI',
+                source_id: 'PYBY_the_Fox',
+                action_type: 'blacklist',
+                blacklisted_at: '2026-03-15T00:00:00Z',
+            },
+        });
+
+        await nextTick();
+
+        const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+        expect(masonry.exists()).toBe(true);
+
+        const getContent = masonry.props('getContent') as (
+            page: string
+        ) => Promise<{ items: FeedItem[]; nextPage: string | null }>;
+
+        const result = await getContent('cursor-2');
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe(11);
+    });
 });
