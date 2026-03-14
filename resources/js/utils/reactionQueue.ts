@@ -14,9 +14,18 @@ const queue = queueManager;
 const queueCollection = queue.collection;
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
 const BATCH_REACTION_THRESHOLD = 25;
+const REACTION_TYPES: ReactionType[] = ['love', 'like', 'dislike', 'funny'];
 type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
     items?: Ref<FeedItem[]>;
+};
+type SingleReactionQueueMetadata = ReactionQueueMetadata & {
+    fileId: number;
+    reactionType: ReactionType;
+};
+type BatchReactionQueueMetadata = ReactionQueueMetadata & {
+    fileIds: number[];
+    reactionType: ReactionType;
 };
 type QueueReactionOptions = {
     allowRedownloadPrompt?: boolean;
@@ -25,6 +34,44 @@ type QueueReactionOptions = {
 type QueueBatchReactionOptions = {
     updateLocalState?: boolean;
 };
+
+function isReactionType(value: unknown): value is ReactionType {
+    return typeof value === 'string' && REACTION_TYPES.includes(value as ReactionType);
+}
+
+function isSingleReactionQueueMetadata(metadata: unknown): metadata is SingleReactionQueueMetadata {
+    return typeof metadata === 'object'
+        && metadata !== null
+        && typeof (metadata as { fileId?: unknown }).fileId === 'number'
+        && isReactionType((metadata as { reactionType?: unknown }).reactionType);
+}
+
+function isBatchReactionQueueMetadata(metadata: unknown): metadata is BatchReactionQueueMetadata {
+    return typeof metadata === 'object'
+        && metadata !== null
+        && Array.isArray((metadata as { fileIds?: unknown }).fileIds)
+        && (metadata as { fileIds: unknown[] }).fileIds.every((fileId) => typeof fileId === 'number')
+        && isReactionType((metadata as { reactionType?: unknown }).reactionType);
+}
+
+function getLatestQueuedReactionMetadata():
+    | { queueId: string; metadata: SingleReactionQueueMetadata | BatchReactionQueueMetadata }
+    | null {
+    const items = queueCollection.getAll();
+
+    for (let index = items.length - 1; index >= 0; index--) {
+        const item = items[index];
+
+        if (isBatchReactionQueueMetadata(item.metadata) || isSingleReactionQueueMetadata(item.metadata)) {
+            return {
+                queueId: item.id,
+                metadata: item.metadata,
+            };
+        }
+    }
+
+    return null;
+}
 
 /**
  * Queue a reaction with countdown toast.
@@ -245,4 +292,19 @@ export async function cancelBatchQueuedReaction(queueId: string): Promise<void> 
             console.error('Failed to restore batch items to masonry:', error);
         }
     }
+}
+
+export function undoLatestQueuedReaction(): boolean {
+    const latestQueuedReaction = getLatestQueuedReactionMetadata();
+    if (!latestQueuedReaction) {
+        return false;
+    }
+
+    if (isBatchReactionQueueMetadata(latestQueuedReaction.metadata)) {
+        void cancelBatchQueuedReaction(latestQueuedReaction.queueId);
+        return true;
+    }
+
+    void cancelQueuedReaction(latestQueuedReaction.metadata.fileId, latestQueuedReaction.metadata.reactionType);
+    return true;
 }
