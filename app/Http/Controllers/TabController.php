@@ -129,6 +129,7 @@ class TabController extends Controller
                 'files.preview_path',
                 'files.poster_path',
                 'files.downloaded',
+                'files.blacklisted_at',
                 'files.listing_metadata',
                 'files.previewed_count',
                 'files.seen_count',
@@ -153,9 +154,14 @@ class TabController extends Controller
         // Filter out files that were just auto-disliked or blacklisted by moderation
         // Also filter out files that are already marked as auto-disliked or blacklisted
         $files = $files->reject(function ($file) use ($processedIds) {
+            $hasBlacklistedContainer = $file->containers->contains(
+                fn ($container) => $container->blacklisted_at !== null
+            );
+
             return in_array($file->id, $processedIds, true)
                 || $file->auto_disliked
-                || $file->blacklisted_at !== null;
+                || $file->blacklisted_at !== null
+                || $hasBlacklistedContainer;
         });
 
         $items = [];

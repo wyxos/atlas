@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, provide, reactive, ref, shallowRef, toRef, watch } from 'vue';
+import type { PageToken } from '@wyxos/vibe';
 import type { TabData, FeedItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem } from '@wyxos/vibe';
 import type { MasonryInstance } from '@wyxos/vibe';
@@ -8,6 +9,7 @@ import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
+import type { BrowseFormData } from '@/composables/useBrowseForm';
 import { createBrowseCatalog, type ServiceOption } from '@/lib/browseCatalog';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
@@ -24,6 +26,7 @@ import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
+import type { ContainerBlacklist } from '@/types/container-blacklist';
 
 interface Props {
     tabId: number | null;
@@ -126,7 +129,7 @@ const browseActions = browse.actions;
 const selectedService = browseDerived.selectedService;
 const currentTabService = browseDerived.currentTabService;
 const hasServiceSelected = browseDerived.hasServiceSelected;
-const getPage = browseActions.getPage;
+const loadBrowsePage = browseActions.getPage;
 const applyService = browseActions.applyService;
 
 const containerInteractions = useTabContentContainerInteractions({
@@ -150,6 +153,11 @@ const itemInteractions = useTabContentItemInteractions({
 
 // Accumulate moderation data from each page load
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
+const activeContainerBlacklists = ref<ContainerBlacklist[]>([]);
+type ContainerBlacklistChange = {
+    action: 'created' | 'deleted';
+    blacklist: ContainerBlacklist;
+};
 
 const toast = useToast();
 const resetPreviewedToastId = 'reset-previewed-toast';
@@ -270,6 +278,87 @@ function setTabDataLoading(isLoading: boolean): void {
     props.onTabDataLoadingChange?.(isLoading);
 }
 
+function itemMatchesBlacklistedContainer(item: FeedItem, blacklist: ContainerBlacklist): boolean {
+    const containers = Array.isArray(item.containers) ? item.containers : [];
+
+    return containers.some((container) => {
+        if (!container || typeof container !== 'object') {
+            return false;
+        }
+
+        const candidate = container as {
+            id?: number;
+            source?: string;
+            source_id?: string;
+        };
+
+        return candidate.id === blacklist.id
+            || (
+                candidate.source === blacklist.source
+                && candidate.source_id === blacklist.source_id
+            );
+    });
+}
+
+function blacklistsMatch(left: ContainerBlacklist, right: ContainerBlacklist): boolean {
+    return left.id === right.id
+        || (
+            left.source === right.source
+            && left.source_id === right.source_id
+        );
+}
+
+function upsertActiveContainerBlacklist(blacklist: ContainerBlacklist): void {
+    activeContainerBlacklists.value = [
+        blacklist,
+        ...activeContainerBlacklists.value.filter((candidate) => !blacklistsMatch(candidate, blacklist)),
+    ];
+}
+
+function removeActiveContainerBlacklist(blacklist: ContainerBlacklist): void {
+    activeContainerBlacklists.value = activeContainerBlacklists.value.filter(
+        (candidate) => !blacklistsMatch(candidate, blacklist)
+    );
+}
+
+function filterItemsByActiveContainerBlacklists(candidateItems: FeedItem[]): FeedItem[] {
+    if (activeContainerBlacklists.value.length === 0) {
+        return candidateItems;
+    }
+
+    return candidateItems.filter((item) => {
+        return !activeContainerBlacklists.value.some((blacklist) => {
+            return itemMatchesBlacklistedContainer(item, blacklist);
+        });
+    });
+}
+
+function handleContainerBlacklistChange(change: ContainerBlacklistChange): void {
+    if (change.action === 'created' && change.blacklist.action_type === 'blacklist') {
+        upsertActiveContainerBlacklist(change.blacklist);
+        items.value = filterItemsByActiveContainerBlacklists(items.value);
+
+        return;
+    }
+
+    removeActiveContainerBlacklist(change.blacklist);
+}
+
+async function getPage(page: PageToken, context?: BrowseFormData) {
+    const result = await loadBrowsePage(page, context);
+    const pageItems = Array.isArray(result?.items) ? result.items as FeedItem[] : [];
+    const filteredItems = filterItemsByActiveContainerBlacklists(pageItems);
+
+    if (filteredItems.length === pageItems.length) {
+        return result;
+    }
+
+    return {
+        ...result,
+        items: filteredItems,
+    };
+}
+
 defineExpose({
     selectedService,
     currentTabService,
@@ -300,6 +389,7 @@ defineExpose({
             :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
             :load-next-page="itemInteractions.masonry.loadNextPage">
             <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"
+                @blacklists-changed="handleContainerBlacklistChange"
             />
         </TabContentServiceHeader>
 
@@ -319,7 +409,7 @@ defineExpose({
                 <Masonry v-else :key="`${tab.id}-${browseState.masonryRenderKey}`" ref="masonry" v-model:items="items"
                     class="min-h-0 flex-1 !mt-0 !py-0 !border-0"
                      :mode="form.isLocalMode.value ? 'default' : 'backfill'"
-                    :get-content="browseActions.getPage" :page="browseState.startPageToken"
+                    :get-content="getPage" :page="browseState.startPageToken"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
                     @preloaded="itemInteractions.preload.onBatchPreloaded" @failures="itemInteractions.preload.onBatchFailures"
