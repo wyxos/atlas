@@ -2,7 +2,21 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, expect, it, vi } from 'vitest';
 import DownloadsQueue from './DownloadsQueue.vue';
 
+const mockToast = {
+    info: vi.fn(),
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+    dismiss: vi.fn(),
+};
+
+vi.mock('vue-toastification', () => ({
+    useToast: () => mockToast,
+}));
+
 beforeEach(() => {
+    vi.clearAllMocks();
+
     window.axios = {
         get: vi.fn().mockResolvedValue({ data: { items: [] } }),
         post: vi.fn().mockResolvedValue({ data: { items: [] } }),
@@ -143,4 +157,54 @@ it('clears stale error when progress payload sends error as null', async () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).not.toContain('Old failure should disappear');
+});
+
+it('removes rendered downloads when a removal broadcast arrives', async () => {
+    const listeners = new Map<string, (payload: unknown) => void>();
+    window.Echo = {
+        private: () => ({
+            listen: (event: string, cb: (payload: unknown) => void) => {
+                listeners.set(event, cb);
+            },
+        }),
+        leave: () => {},
+    } as typeof window.Echo;
+
+    window.axios.get = vi.fn().mockResolvedValue({
+        data: {
+            items: [
+                {
+                    id: 88,
+                    status: 'failed',
+                    created_at: null,
+                    queued_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    failed_at: '2026-03-05T10:00:00.000000Z',
+                    percent: 12,
+                    error: 'Removed by broadcast',
+                },
+            ],
+        },
+    });
+
+    const wrapper = mount(DownloadsQueue);
+    await flushPromises();
+
+    const container = wrapper.find('.flex-1.overflow-auto');
+    Object.defineProperty(container.element, 'clientHeight', { value: 600, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('Removed by broadcast');
+
+    const onRemoved = listeners.get('.DownloadTransfersRemoved');
+    expect(onRemoved).toBeTypeOf('function');
+
+    onRemoved?.({
+        ids: [88],
+    });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).not.toContain('Removed by broadcast');
 });

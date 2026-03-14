@@ -1,4 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
+import { useToast } from 'vue-toastification';
 import downloadTransfers from '@/routes/api/download-transfers';
 import type {
     DownloadQueueItem,
@@ -20,6 +21,7 @@ export function useDownloadsQueueActions(params: {
     removeDownloads: (ids: number[]) => void;
     setSelection: (ids: Set<number>) => void;
 }) {
+    const toast = useToast();
     const actionBusy = ref<Record<number, boolean>>({});
     const batchIsPausing = ref(false);
     const batchIsCanceling = ref(false);
@@ -41,6 +43,12 @@ export function useDownloadsQueueActions(params: {
     const removeDescription = computed(
         () => `Are you sure you want to remove ${removeLabel.value}? This action cannot be undone.`,
     );
+
+    type RemoveResponse = {
+        ids?: number[];
+        count?: number;
+        queued?: boolean;
+    };
 
     function setActionBusy(id: number, value: boolean): void {
         actionBusy.value = { ...actionBusy.value, [id]: value };
@@ -78,24 +86,39 @@ export function useDownloadsQueueActions(params: {
         const ids = removeTargetIds.value;
 
         try {
+            let removeNow = true;
+            let removedIds = ids;
+
             if (removeMode.value === 'completed') {
-                await window.axios.post(downloadTransfers.destroyCompleted.url(), {
+                const { data } = await window.axios.post<RemoveResponse>(downloadTransfers.destroyCompleted.url(), {
                     also_from_disk: removeAlsoFromDisk.value,
                 });
-            } else if (removeAlsoFromDisk.value) {
-                await Promise.all(ids.map((id) =>
-                    window.axios.delete(downloadTransfers.destroyDisk.url(id)),
-                ));
+                removeNow = data.queued !== true;
+                removedIds = data.ids ?? ids;
+            } else if (ids.length === 1 && removeAlsoFromDisk.value) {
+                await window.axios.delete(downloadTransfers.destroyDisk.url(ids[0]));
             } else if (ids.length === 1) {
                 await window.axios.delete(downloadTransfers.destroy.url(ids[0]));
             } else {
-                await window.axios.post(downloadTransfers.destroyBatch.url(), { ids });
+                const { data } = await window.axios.post<RemoveResponse>(downloadTransfers.destroyBatch.url(), {
+                    ids,
+                    also_from_disk: removeAlsoFromDisk.value,
+                });
+                removeNow = data.queued !== true;
+                removedIds = data.ids ?? ids;
             }
 
-            params.removeDownloads(ids);
             const nextSelection = new Set(params.selectedIds.value);
             ids.forEach((id) => nextSelection.delete(id));
             params.setSelection(nextSelection);
+
+            if (removeNow) {
+                params.removeDownloads(removedIds);
+            } else {
+                toast.info('Removing downloads in the background. Items will disappear as cleanup completes.', {
+                    id: 'downloads-removal-queued',
+                });
+            }
         } finally {
             clearRemoveDialog();
         }
