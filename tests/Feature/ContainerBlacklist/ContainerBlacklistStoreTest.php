@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Container;
+use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -49,6 +50,34 @@ test('can create blacklist with blacklist action type', function () {
     $response->assertStatus(201);
     $data = $response->json();
     expect($data['action_type'])->toBe('blacklist');
+});
+
+test('blacklist action immediately blacklists files already attached to the container', function () {
+    $user = User::factory()->create();
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+    ]);
+
+    $matchedFile = File::factory()->create([
+        'blacklisted_at' => null,
+        'path' => 'downloads/test-user.jpg',
+    ]);
+    $otherFile = File::factory()->create([
+        'blacklisted_at' => null,
+    ]);
+
+    $matchedFile->containers()->attach($container->id);
+
+    $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
+        'container_id' => $container->id,
+        'action_type' => 'blacklist',
+    ]);
+
+    $response->assertStatus(201);
+
+    expect($matchedFile->fresh()->blacklisted_at)->not->toBeNull();
+    expect($otherFile->fresh()->blacklisted_at)->toBeNull();
 });
 
 test('validates container_id is required', function () {
