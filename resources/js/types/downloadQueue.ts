@@ -61,6 +61,10 @@ export type DownloadQueueQueuedPayload = DownloadQueueItem & DownloadQueueDetail
     downloadTransferId?: number;
 };
 
+export interface DownloadQueueRemovedPayload {
+    ids: number[];
+}
+
 export interface DownloadQueueProgressPayload {
     downloadTransferId: number;
     status: DownloadQueueStatus;

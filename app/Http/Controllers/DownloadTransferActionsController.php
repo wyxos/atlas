@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
+use App\Events\DownloadTransfersRemoved;
 use App\Jobs\Downloads\PumpDomainDownloads;
+use App\Jobs\Downloads\RemoveDownloadTransfers;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferActionAvailability;
 use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferPayload;
+use App\Services\Downloads\DownloadTransferRemovalService;
 use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\MetricsService;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +23,8 @@ use Illuminate\Support\Facades\Storage;
 
 class DownloadTransferActionsController extends Controller
 {
+    public function __construct(private readonly DownloadTransferRemovalService $transferRemovalService) {}
+
     public function pause(DownloadTransfer $downloadTransfer): JsonResponse
     {
         if (! $this->canPause($downloadTransfer)) {
@@ -193,22 +198,27 @@ class DownloadTransferActionsController extends Controller
 
     public function destroy(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        $this->prepareForRemoval($downloadTransfer);
-        $downloadTransfer->delete();
+        $this->transferRemovalService->remove($downloadTransfer);
+        $this->broadcastRemoved([$downloadTransfer->id]);
 
         return response()->json([
             'message' => 'Download removed.',
+            'ids' => [$downloadTransfer->id],
+            'count' => 1,
+            'queued' => false,
         ]);
     }
 
     public function destroyWithDisk(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        $this->prepareForRemoval($downloadTransfer);
-        $this->deleteFileFromDisk($downloadTransfer);
-        $downloadTransfer->delete();
+        $this->transferRemovalService->remove($downloadTransfer, true);
+        $this->broadcastRemoved([$downloadTransfer->id]);
 
         return response()->json([
             'message' => 'Download removed and file deleted from disk.',
+            'ids' => [$downloadTransfer->id],
+            'count' => 1,
+            'queued' => false,
         ]);
     }
 
@@ -217,21 +227,33 @@ class DownloadTransferActionsController extends Controller
         $validated = $request->validate([
             'ids' => 'required|array|min:1',
             'ids.*' => 'required|integer|exists:download_transfers,id',
+            'also_from_disk' => 'sometimes|boolean',
         ]);
 
         $ids = $validated['ids'];
-        $transfers = DownloadTransfer::query()->whereIn('id', $ids)->get();
+        $alsoFromDisk = (bool) ($validated['also_from_disk'] ?? false);
+
+        if ($this->shouldQueueBulkRemoval(count($ids))) {
+            RemoveDownloadTransfers::dispatch(ids: $ids, alsoFromDisk: $alsoFromDisk);
+
+            return response()->json([
+                'message' => 'Download removal queued.',
+                'count' => count($ids),
+                'queued' => true,
+            ]);
+        }
 
         $removedIds = [];
-        foreach ($transfers as $transfer) {
-            $this->prepareForRemoval($transfer);
-            $transfer->delete();
-            $removedIds[] = $transfer->id;
-        }
+        $this->transferRemovalService->removeByIds($ids, $alsoFromDisk, function (array $chunkIds) use (&$removedIds): void {
+            $removedIds = [...$removedIds, ...$chunkIds];
+        });
+        $this->broadcastRemoved($removedIds);
 
         return response()->json([
             'message' => 'Downloads removed.',
             'ids' => $removedIds,
+            'count' => count($removedIds),
+            'queued' => false,
         ]);
     }
 
@@ -242,34 +264,38 @@ class DownloadTransferActionsController extends Controller
         ]);
 
         $alsoFromDisk = (bool) ($validated['also_from_disk'] ?? false);
+        $completedCount = $this->transferRemovalService->completedCount();
 
-        if (! $alsoFromDisk) {
-            $removedCount = DownloadTransfer::query()
-                ->where('status', DownloadTransferStatus::COMPLETED)
-                ->delete();
-
+        if ($completedCount === 0) {
             return response()->json([
                 'message' => 'Completed downloads removed.',
-                'count' => $removedCount,
+                'count' => 0,
+                'ids' => [],
+                'queued' => false,
             ]);
         }
 
-        $removedCount = 0;
-        DownloadTransfer::query()
-            ->where('status', DownloadTransferStatus::COMPLETED)
-            ->with('file')
-            ->orderBy('id')
-            ->chunkById(200, function ($transfers) use (&$removedCount): void {
-                foreach ($transfers as $transfer) {
-                    $this->deleteFileFromDisk($transfer);
-                    $transfer->delete();
-                    $removedCount++;
-                }
-            });
+        if ($this->shouldQueueBulkRemoval($completedCount)) {
+            RemoveDownloadTransfers::dispatch(alsoFromDisk: $alsoFromDisk, completedOnly: true);
+
+            return response()->json([
+                'message' => 'Completed download removal queued.',
+                'count' => $completedCount,
+                'queued' => true,
+            ]);
+        }
+
+        $removedIds = [];
+        $removedCount = $this->transferRemovalService->removeCompleted($alsoFromDisk, function (array $chunkIds) use (&$removedIds): void {
+            $removedIds = [...$removedIds, ...$chunkIds];
+        });
+        $this->broadcastRemoved($removedIds);
 
         return response()->json([
             'message' => 'Completed downloads removed.',
             'count' => $removedCount,
+            'ids' => $removedIds,
+            'queued' => false,
         ]);
     }
 
@@ -458,5 +484,26 @@ class DownloadTransferActionsController extends Controller
     private function isYtDlpTransfer(DownloadTransfer $downloadTransfer): bool
     {
         return data_get($downloadTransfer->file?->listing_metadata, 'download_via') === 'yt-dlp';
+    }
+
+    private function shouldQueueBulkRemoval(int $count): bool
+    {
+        return $count > $this->transferRemovalService->bulkRemovalSyncLimit();
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    private function broadcastRemoved(array $ids): void
+    {
+        if ($ids === []) {
+            return;
+        }
+
+        try {
+            event(new DownloadTransfersRemoved($ids));
+        } catch (\Throwable) {
+            // Broadcast errors shouldn't fail removal actions.
+        }
     }
 }

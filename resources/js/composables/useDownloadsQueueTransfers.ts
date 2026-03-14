@@ -5,6 +5,7 @@ import type {
     DownloadQueueItem,
     DownloadQueueProgressPayload,
     DownloadQueueQueuedPayload,
+    DownloadQueueRemovedPayload,
 } from '@/types/downloadQueue';
 import { normalizeDownloadQueueProgress } from '@/utils/downloadQueue';
 
@@ -71,10 +72,16 @@ export function useDownloadsQueueTransfers() {
     }
 
     function removeDownloads(ids: number[]): void {
-        downloads.value = downloads.value.filter((item) => !ids.includes(item.id));
-        visibleItems.value = visibleItems.value.filter((item) => !ids.includes(item.id));
+        if (!ids.length) {
+            return;
+        }
+
+        const removedIds = new Set(ids);
+
+        downloads.value = downloads.value.filter((item) => !removedIds.has(item.id));
+        visibleItems.value = visibleItems.value.filter((item) => !removedIds.has(item.id));
         detailsById.value = Object.fromEntries(
-            Object.entries(detailsById.value).filter(([key]) => !ids.includes(Number(key))),
+            Object.entries(detailsById.value).filter(([key]) => !removedIds.has(Number(key))),
         );
     }
 
@@ -156,6 +163,19 @@ export function useDownloadsQueueTransfers() {
         };
     }
 
+    function applyRemovedPayload(payload: unknown): void {
+        if (!payload || typeof payload !== 'object') {
+            return;
+        }
+
+        const value = payload as DownloadQueueRemovedPayload;
+        if (!Array.isArray(value.ids) || value.ids.length === 0) {
+            return;
+        }
+
+        removeDownloads(value.ids);
+    }
+
     function startEchoListeners(): void {
         const echo = window.Echo as undefined | {
             private: (channel: string) => EchoChannel;
@@ -169,6 +189,7 @@ export function useDownloadsQueueTransfers() {
         echoChannel.listen('.DownloadTransferCreated', applyQueuedPayload);
         echoChannel.listen('.DownloadTransferQueued', applyQueuedPayload);
         echoChannel.listen('.DownloadTransferProgressUpdated', applyProgressPayload);
+        echoChannel.listen('.DownloadTransfersRemoved', applyRemovedPayload);
     }
 
     function stopEchoListeners(): void {

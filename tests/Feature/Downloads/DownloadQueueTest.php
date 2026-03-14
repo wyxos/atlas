@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
-test('pumps at most 20 transfers per domain (queued includes waiting+active)', function () {
+test('pumps at most 5 transfers per domain (queued includes waiting+active)', function () {
     Bus::fake();
     Event::fake([DownloadTransferQueued::class]);
 
@@ -31,7 +31,7 @@ test('pumps at most 20 transfers per domain (queued includes waiting+active)', f
         'downloaded' => false,
     ]);
 
-    for ($i = 0; $i < 21; $i++) {
+    for ($i = 0; $i < 6; $i++) {
         DownloadTransfer::query()->create([
             'file_id' => $file->id,
             'url' => 'https://example.com/test.bin',
@@ -45,11 +45,11 @@ test('pumps at most 20 transfers per domain (queued includes waiting+active)', f
 
     (new PumpDomainDownloads('example.com'))->handle();
 
-    expect(DownloadTransfer::query()->where('domain', 'example.com')->where('status', DownloadTransferStatus::QUEUED)->count())->toBe(20);
+    expect(DownloadTransfer::query()->where('domain', 'example.com')->where('status', DownloadTransferStatus::QUEUED)->count())->toBe(5);
     expect(DownloadTransfer::query()->where('domain', 'example.com')->where('status', DownloadTransferStatus::PENDING)->count())->toBe(1);
 
-    Bus::assertDispatched(QueueDownloadTransfer::class, 20);
-    Event::assertDispatchedTimes(DownloadTransferQueued::class, 20);
+    Bus::assertDispatched(QueueDownloadTransfer::class, 5);
+    Event::assertDispatchedTimes(DownloadTransferQueued::class, 5);
 });
 
 test('pumps respects global transfer cap across domains', function () {
