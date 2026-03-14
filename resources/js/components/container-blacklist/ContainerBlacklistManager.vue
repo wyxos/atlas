@@ -22,7 +22,7 @@ withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-    'blacklists-changed': [];
+    'blacklists-changed': [payload: { action: 'created' | 'deleted'; blacklist: ContainerBlacklist }];
 }>();
 
 const {
@@ -87,7 +87,10 @@ async function handleConfirmBlacklist(containerId: number, actionType: Container
         if (created) {
             isBlacklistDialogOpen.value = false;
             containerToBlacklist.value = null;
-            emit('blacklists-changed');
+            emit('blacklists-changed', {
+                action: 'created',
+                blacklist: created,
+            });
         }
     } catch (error) {
         // Error is already handled by the composable
@@ -109,11 +112,29 @@ async function confirmDeleteBlacklist(container: ContainerBlacklist): Promise<vo
         const success = await deleteBlacklist(container.id);
         if (success) {
             selectedContainer.value = null;
-            emit('blacklists-changed');
+            emit('blacklists-changed', {
+                action: 'deleted',
+                blacklist: container,
+            });
         }
     } finally {
         isDeleting.value = false;
     }
+}
+
+async function handleDialogBlacklistChanged(): Promise<void> {
+    if (containerToBlacklist.value) {
+        emit('blacklists-changed', {
+            action: 'deleted',
+            blacklist: {
+                ...containerToBlacklist.value,
+                action_type: null,
+                blacklisted_at: null,
+            },
+        });
+    }
+
+    await fetchBlacklists();
 }
 
 // Expose method to open blacklist dialog from parent
@@ -302,7 +323,7 @@ defineExpose({
             :open="isBlacklistDialogOpen"
             @update:open="(val) => { isBlacklistDialogOpen = val; if (!val) containerToBlacklist = null; }"
             @confirm="handleConfirmBlacklist"
-            @blacklist-changed="() => { emit('blacklists-changed'); fetchBlacklists(); }"
+            @blacklist-changed="handleDialogBlacklistChanged"
         />
     </div>
 </template>
