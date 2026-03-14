@@ -148,7 +148,7 @@ After you've finished editing
 ### Commit Format
 - Use clear, descriptive commit messages
 - No enforced conventional commits format, but clarity is expected
-- Always create a commit after making code/documentation changes in this project.
+- Create a commit when the user asks for one or when preparing work for handoff/PR.
 - Commits can take a while because hooks run lint/typecheck/tests; once `git commit` starts, let it run in the background and avoid frequent status polling.
 
 ### Branch Strategy
