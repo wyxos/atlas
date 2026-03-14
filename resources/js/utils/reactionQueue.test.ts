@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref } from 'vue';
-import { queueReaction, cancelQueuedReaction, queueBatchReaction, cancelBatchQueuedReaction } from './reactionQueue';
+import {
+    queueReaction,
+    cancelQueuedReaction,
+    queueBatchReaction,
+    cancelBatchQueuedReaction,
+    undoLatestQueuedReaction,
+} from './reactionQueue';
 import { queueManager } from '@/composables/useQueue';
 import type { ReactionType } from '@/types/reaction';
 
@@ -460,6 +466,49 @@ describe('reactionQueue', () => {
 
         it('handles canceling non-existent batch reaction gracefully', async () => {
             await expect(cancelBatchQueuedReaction('non-existent-id')).resolves.not.toThrow();
+        });
+    });
+
+    describe('undoLatestQueuedReaction', () => {
+        it('returns false when no queued reaction exists', () => {
+            expect(undoLatestQueuedReaction()).toBe(false);
+        });
+
+        it('undos the most recently queued single reaction', () => {
+            queueReaction(123, 'like');
+            queueReaction(456, 'love');
+
+            expect(undoLatestQueuedReaction()).toBe(true);
+            expect(queue.collection.has('like-123')).toBe(true);
+            expect(queue.collection.has('love-456')).toBe(false);
+            expect(mockToast.dismiss).toHaveBeenCalledWith('love-456');
+        });
+
+        it('undos the most recently queued batch reaction', () => {
+            queueReaction(123, 'like');
+            queueBatchReaction([456, 789], 'dislike', []);
+
+            const batchQueueId = queue.collection.getAll().find((item) => item.id.startsWith('batch-dislike-'))?.id;
+            expect(batchQueueId).toBeDefined();
+
+            expect(undoLatestQueuedReaction()).toBe(true);
+            expect(queue.collection.has('like-123')).toBe(true);
+            expect(queue.collection.has(batchQueueId!)).toBe(false);
+            expect(mockToast.dismiss).toHaveBeenCalledWith(batchQueueId);
+        });
+
+        it('skips non-reaction queue items when undoing the latest reaction', () => {
+            queueReaction(123, 'like');
+            queue.collection.add({
+                id: 'auto-dislike-999',
+                duration: 5000,
+                onComplete: vi.fn(),
+                metadata: { fileId: 999 },
+            });
+
+            expect(undoLatestQueuedReaction()).toBe(true);
+            expect(queue.collection.has('like-123')).toBe(false);
+            expect(queue.collection.has('auto-dislike-999')).toBe(true);
         });
     });
 });

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
 import Tab from '../components/Tab.vue';
 import TabContent from '../components/TabContent.vue';
 import { Button } from '@/components/ui/button';
 import { useTabs } from '@/composables/useTabs';
+import { undoLatestQueuedReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 
 const isPanelMinimized = ref(false);
@@ -124,6 +125,40 @@ async function handleOpenContainerTab(payload: ContainerTabPayload): Promise<voi
     });
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+        return false;
+    }
+
+    return target.isContentEditable
+        || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+        || target.closest('[contenteditable="true"]') !== null;
+}
+
+function handleUndoShortcut(event: KeyboardEvent): void {
+    if (event.defaultPrevented || event.repeat) {
+        return;
+    }
+
+    if (event.key.toLowerCase() !== 'z') {
+        return;
+    }
+
+    if ((!event.ctrlKey && !event.metaKey) || event.shiftKey || event.altKey) {
+        return;
+    }
+
+    if (isEditableTarget(event.target)) {
+        return;
+    }
+
+    if (!undoLatestQueuedReaction()) {
+        return;
+    }
+
+    event.preventDefault();
+}
+
 
 // Tab management function
 // Flow: Load tabs (without files) > Determine focus tab > If has files, load them > Restore query params
@@ -160,8 +195,14 @@ async function loadTabs(): Promise<void> {
 
 // Initialize on mount
 onMounted(async () => {
+    window.addEventListener('keydown', handleUndoShortcut);
+
     // Load tabs - loadTabs will set the first tab as active if tabs exist
     await loadTabs();
+});
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', handleUndoShortcut);
 });
 </script>
 
