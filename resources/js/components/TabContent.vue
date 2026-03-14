@@ -24,6 +24,7 @@ import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
+import type { ContainerBlacklist } from '@/types/container-blacklist';
 
 interface Props {
     tabId: number | null;
@@ -150,6 +151,10 @@ const itemInteractions = useTabContentItemInteractions({
 
 // Accumulate moderation data from each page load
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
+type ContainerBlacklistChange = {
+    action: 'created' | 'deleted';
+    blacklist: ContainerBlacklist;
+};
 
 const toast = useToast();
 const resetPreviewedToastId = 'reset-previewed-toast';
@@ -270,6 +275,42 @@ function setTabDataLoading(isLoading: boolean): void {
     props.onTabDataLoadingChange?.(isLoading);
 }
 
+function itemMatchesBlacklistedContainer(item: FeedItem, blacklist: ContainerBlacklist): boolean {
+    const containers = Array.isArray(item.containers) ? item.containers : [];
+
+    return containers.some((container) => {
+        if (!container || typeof container !== 'object') {
+            return false;
+        }
+
+        const candidate = container as {
+            id?: number;
+            source?: string;
+            source_id?: string;
+        };
+
+        return candidate.id === blacklist.id
+            || (
+                candidate.source === blacklist.source
+                && candidate.source_id === blacklist.source_id
+            );
+    });
+}
+
+function handleContainerBlacklistChange(change: ContainerBlacklistChange): void {
+    if (change.action !== 'created' || change.blacklist.action_type !== 'blacklist') {
+        return;
+    }
+
+    const nextItems = items.value.filter((item) => !itemMatchesBlacklistedContainer(item, change.blacklist));
+
+    if (nextItems.length === items.value.length) {
+        return;
+    }
+
+    items.value = nextItems;
+}
+
 defineExpose({
     selectedService,
     currentTabService,
@@ -300,6 +341,7 @@ defineExpose({
             :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
             :load-next-page="itemInteractions.masonry.loadNextPage">
             <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"
+                @blacklists-changed="handleContainerBlacklistChange"
             />
         </TabContentServiceHeader>
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Container;
 use App\Models\File;
 use App\Models\ModerationRule;
 use App\Models\Tab;
@@ -196,4 +197,39 @@ test('tab show batches current-user reaction lookup during moderation', function
 
     expect($nPlusOneExistsQueries)->toHaveCount(0);
     expect($batchedReactionQueries)->toHaveCount(1);
+});
+
+test('tab show excludes blacklisted files and files from blacklisted containers', function () {
+    $user = User::factory()->create();
+    $directlyBlacklisted = File::factory()->create([
+        'referrer_url' => 'https://example.com/blacklisted.jpg',
+        'blacklisted_at' => now(),
+    ]);
+    $containerBlacklisted = File::factory()->create([
+        'referrer_url' => 'https://example.com/container-blacklisted.jpg',
+        'blacklisted_at' => null,
+    ]);
+    $visible = File::factory()->create([
+        'referrer_url' => 'https://example.com/visible.jpg',
+        'blacklisted_at' => null,
+    ]);
+
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+        'blacklisted_at' => now(),
+        'action_type' => 'blacklist',
+    ]);
+    $containerBlacklisted->containers()->attach($container->id);
+
+    $tab = Tab::factory()
+        ->for($user)
+        ->withFiles([$directlyBlacklisted->id, $containerBlacklisted->id, $visible->id])
+        ->create();
+
+    $response = $this->actingAs($user)->getJson(route('api.tabs.show', ['tab' => $tab->id]));
+
+    $response->assertSuccessful();
+
+    expect(collect($response->json('tab.items'))->pluck('id')->all())->toBe([$visible->id]);
 });
