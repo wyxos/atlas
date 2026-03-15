@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import downloadTransfers from '@/routes/api/download-transfers';
+import downloadTransfers from '@/routes/api/download-transfers/index';
 import type {
     DownloadQueueDetails,
     DownloadQueueItem,

@@ -1,6 +1,6 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
 import { useToast } from 'vue-toastification';
-import downloadTransfers from '@/routes/api/download-transfers';
+import downloadTransfers from '@/routes/api/download-transfers/index';
 import type {
     DownloadQueueItem,
     DownloadQueueRemoveMode,
