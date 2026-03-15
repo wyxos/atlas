@@ -320,4 +320,104 @@ describe('background', () => {
         expect(unsubscribeState).toHaveBeenCalledTimes(1);
         expect(disconnect).toHaveBeenCalledTimes(1);
     });
+
+    it('keeps download progress subscribers when the tab does not return a response payload', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([
+            { id: 1, url: 'https://example.com/a' },
+        ]);
+        const disconnect = vi.fn();
+        let eventHandler: ((event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated', payload: Record<string, unknown>) => void) | null = null;
+
+        chromeMock.tabs.sendMessage = vi.fn((_: number, __: unknown, callback?: () => void) => {
+            chromeMock.runtime.lastError = {
+                message: 'The message port closed before a response was received.',
+            };
+            callback?.();
+            chromeMock.runtime.lastError = null;
+        });
+
+        mockConnectBackgroundReverb.mockResolvedValue({
+            kind: 'connected',
+            domain: 'https://atlas.wyxos.com',
+            endpoint: 'https://atlas.wyxos.com:443',
+            client: {
+                onEvent: (handler: typeof eventHandler) => {
+                    eventHandler = handler;
+                    return { unsubscribe: vi.fn() };
+                },
+                onConnectionState: () => ({ unsubscribe: vi.fn() }),
+                onConnectionError: () => ({ unsubscribe: vi.fn() }),
+                getConnectionState: () => 'connected',
+                getLastConnectionError: () => null,
+                disconnect,
+            },
+        });
+        vi.stubGlobal('chrome', chromeMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        expect(await sendRuntimeMessage(listener!, { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 1 } })).toEqual({ ok: true });
+
+        await vi.waitFor(() => {
+            expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(1);
+        });
+
+        eventHandler?.('DownloadTransferQueued', { id: 25, file_id: 12, status: 'queued', percent: 10 });
+        eventHandler?.('DownloadTransferProgressUpdated', { id: 25, file_id: 12, status: 'downloading', percent: 55 });
+
+        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(2);
+        expect(disconnect).not.toHaveBeenCalled();
+    });
+
+    it('drops download progress subscribers only when the receiving tab is gone', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([
+            { id: 1, url: 'https://example.com/a' },
+        ]);
+        let eventHandler: ((event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated', payload: Record<string, unknown>) => void) | null = null;
+
+        chromeMock.tabs.sendMessage = vi.fn((_: number, __: unknown, callback?: () => void) => {
+            chromeMock.runtime.lastError = {
+                message: 'Could not establish connection. Receiving end does not exist.',
+            };
+            callback?.();
+            chromeMock.runtime.lastError = null;
+        });
+
+        mockConnectBackgroundReverb.mockResolvedValue({
+            kind: 'connected',
+            domain: 'https://atlas.wyxos.com',
+            endpoint: 'https://atlas.wyxos.com:443',
+            client: {
+                onEvent: (handler: typeof eventHandler) => {
+                    eventHandler = handler;
+                    return { unsubscribe: vi.fn() };
+                },
+                onConnectionState: () => ({ unsubscribe: vi.fn() }),
+                onConnectionError: () => ({ unsubscribe: vi.fn() }),
+                getConnectionState: () => 'connected',
+                getLastConnectionError: () => null,
+                disconnect: vi.fn(),
+            },
+        });
+        vi.stubGlobal('chrome', chromeMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        expect(await sendRuntimeMessage(listener!, { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 1 } })).toEqual({ ok: true });
+
+        await vi.waitFor(() => {
+            expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(1);
+        });
+
+        eventHandler?.('DownloadTransferQueued', { id: 25, file_id: 12, status: 'queued', percent: 10 });
+        eventHandler?.('DownloadTransferProgressUpdated', { id: 25, file_id: 12, status: 'downloading', percent: 55 });
+
+        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
+    });
 });
