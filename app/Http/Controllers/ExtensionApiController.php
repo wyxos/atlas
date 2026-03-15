@@ -134,6 +134,14 @@ class ExtensionApiController extends Controller
             'referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
             'page_url' => ['nullable', 'string', 'max:4096'],
             'tag_name' => ['nullable', 'string', 'in:img,video,iframe'],
+            'listing_metadata_overrides' => ['nullable', 'array'],
+            'listing_metadata_overrides.postId' => ['nullable', 'integer', 'min:1'],
+            'listing_metadata_overrides.username' => ['nullable', 'string', 'max:255'],
+            'listing_metadata_overrides.resource_containers' => ['nullable', 'array', 'max:100'],
+            'listing_metadata_overrides.resource_containers.*.type' => ['required', 'string', 'in:Checkpoint,LoRA'],
+            'listing_metadata_overrides.resource_containers.*.modelId' => ['required', 'integer', 'min:1'],
+            'listing_metadata_overrides.resource_containers.*.modelVersionId' => ['required', 'integer', 'min:1'],
+            'listing_metadata_overrides.resource_containers.*.referrerUrl' => ['required', 'string', 'max:4096'],
             'cookies' => ['nullable', 'array', 'max:300'],
             'cookies.*.name' => ['required', 'string', 'max:255'],
             'cookies.*.value' => ['required', 'string', 'max:4096'],
@@ -147,11 +155,15 @@ class ExtensionApiController extends Controller
         ]);
 
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
-        $listingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
+        $urlDerivedListingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
             $validated['referrer_url_hash_aware'] ?? null,
             $validated['referrer_url'] ?? null,
             $validated['page_url'] ?? null,
         ], includePostContainer: false);
+        $listingMetadataOverrides = $containerMetadataService->mergeListingMetadataOverrides(
+            $urlDerivedListingMetadataOverrides,
+            $this->normalizeListingMetadataOverrides($validated['listing_metadata_overrides'] ?? [])
+        );
         $payload = $this->processReactionItem(
             $validated,
             $validated['type'],
@@ -195,6 +207,14 @@ class ExtensionApiController extends Controller
             'items.*.referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
             'items.*.page_url' => ['nullable', 'string', 'max:4096'],
             'items.*.tag_name' => ['nullable', 'string', 'in:img,video,iframe'],
+            'listing_metadata_overrides' => ['nullable', 'array'],
+            'listing_metadata_overrides.postId' => ['nullable', 'integer', 'min:1'],
+            'listing_metadata_overrides.username' => ['nullable', 'string', 'max:255'],
+            'listing_metadata_overrides.resource_containers' => ['nullable', 'array', 'max:100'],
+            'listing_metadata_overrides.resource_containers.*.type' => ['required', 'string', 'in:Checkpoint,LoRA'],
+            'listing_metadata_overrides.resource_containers.*.modelId' => ['required', 'integer', 'min:1'],
+            'listing_metadata_overrides.resource_containers.*.modelVersionId' => ['required', 'integer', 'min:1'],
+            'listing_metadata_overrides.resource_containers.*.referrerUrl' => ['required', 'string', 'max:4096'],
             'cookies' => ['nullable', 'array', 'max:300'],
             'cookies.*.name' => ['required', 'string', 'max:255'],
             'cookies.*.value' => ['required', 'string', 'max:4096'],
@@ -210,11 +230,15 @@ class ExtensionApiController extends Controller
         $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
         $runtimeContext = $this->downloadRuntimeContext($validated, $request);
         $firstItem = $validated['items'][0] ?? [];
-        $listingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
+        $urlDerivedListingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
             is_array($firstItem) ? ($firstItem['referrer_url_hash_aware'] ?? null) : null,
             is_array($firstItem) ? ($firstItem['referrer_url'] ?? null) : null,
             is_array($firstItem) ? ($firstItem['page_url'] ?? null) : null,
         ], includePostContainer: true);
+        $listingMetadataOverrides = $containerMetadataService->mergeListingMetadataOverrides(
+            $urlDerivedListingMetadataOverrides,
+            $this->normalizeListingMetadataOverrides($validated['listing_metadata_overrides'] ?? [])
+        );
         $batchItems = [];
         $primaryPayload = null;
         $primaryCandidateId = $validated['primary_candidate_id'];
@@ -388,7 +412,12 @@ class ExtensionApiController extends Controller
             'tag_name' => $tagName,
             'download_via' => $downloadVia,
             ...$listingMetadataOverrides,
-        ], static fn ($value) => $value !== null && $value !== '');
+        ], static fn ($value) => match (true) {
+            $value === null => false,
+            is_string($value) => trim($value) !== '',
+            is_array($value) => $value !== [],
+            default => true,
+        });
 
         $file = File::query()
             ->where('url_hash', $urlHash)
@@ -427,7 +456,7 @@ class ExtensionApiController extends Controller
             'tag_name' => $tagName,
             'download_via' => $downloadVia,
         ] as $key => $value) {
-            if ($value === null || $value === '') {
+            if ($value === null || (is_string($value) && trim($value) === '') || (is_array($value) && $value === [])) {
                 continue;
             }
 
@@ -470,7 +499,7 @@ class ExtensionApiController extends Controller
     /**
      * @param  array<string, mixed>  $item
      * @param  array<string, mixed>  $runtimeContext
-     * @param  array<string, string>  $listingMetadataOverrides
+     * @param  array<string, mixed>  $listingMetadataOverrides
      * @return array<string, mixed>
      */
     private function processReactionItem(
@@ -582,6 +611,66 @@ class ExtensionApiController extends Controller
     private function extensionChannelHash(string $apiKey): string
     {
         return hash('sha256', $apiKey);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeListingMetadataOverrides(mixed $overrides): array
+    {
+        if (! is_array($overrides)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        $postId = isset($overrides['postId']) ? (int) $overrides['postId'] : null;
+        if ($postId !== null && $postId > 0) {
+            $normalized['postId'] = $postId;
+        }
+
+        $username = isset($overrides['username']) && is_string($overrides['username'])
+            ? trim($overrides['username'])
+            : null;
+        if ($username !== null && $username !== '') {
+            $normalized['username'] = $username;
+        }
+
+        $resourceContainers = [];
+        foreach ($overrides['resource_containers'] ?? [] as $resourceContainer) {
+            if (! is_array($resourceContainer)) {
+                continue;
+            }
+
+            $type = isset($resourceContainer['type']) && is_string($resourceContainer['type'])
+                ? trim($resourceContainer['type'])
+                : null;
+            $modelId = isset($resourceContainer['modelId']) ? (int) $resourceContainer['modelId'] : null;
+            $modelVersionId = isset($resourceContainer['modelVersionId']) ? (int) $resourceContainer['modelVersionId'] : null;
+            $referrerUrl = isset($resourceContainer['referrerUrl']) && is_string($resourceContainer['referrerUrl'])
+                ? $this->normalizeOptionalUrl($resourceContainer['referrerUrl'])
+                : null;
+
+            if (! in_array($type, ['Checkpoint', 'LoRA'], true)
+                || $modelId === null || $modelId <= 0
+                || $modelVersionId === null || $modelVersionId <= 0
+                || $referrerUrl === null) {
+                continue;
+            }
+
+            $resourceContainers[] = [
+                'type' => $type,
+                'modelId' => $modelId,
+                'modelVersionId' => $modelVersionId,
+                'referrerUrl' => $referrerUrl,
+            ];
+        }
+
+        if ($resourceContainers !== []) {
+            $normalized['resource_containers'] = array_values($resourceContainers);
+        }
+
+        return $normalized;
     }
 
     private function shouldUseYtDlp(string $url, ?string $pageUrl, ?string $tagName): bool

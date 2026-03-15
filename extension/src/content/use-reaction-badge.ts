@@ -10,6 +10,12 @@ import {
     type MediaElement,
 } from './media-utils';
 import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
+import {
+    classifyCivitAiReactionPage,
+    collectCivitAiBatchReactionItems,
+    collectCivitAiListingMetadataOverrides,
+    hasCivitAiBatchReactionItems,
+} from './civitai-reaction-context';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { createDownloadedReactionDialog } from './downloaded-reaction-dialog';
 import { submitBadgeReaction, type SubmitDownloadBehavior } from './reaction-submit';
@@ -36,12 +42,14 @@ type UseReactionBadgeProps = {
 };
 
 const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
+const CIVITAI_HOST_PATTERN = /(^|\.)civitai\.com$/i;
 const RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS = [120, 400, 1000, 2200] as const;
 
 export function useReactionBadge(props: UseReactionBadgeProps) {
     ensureReactionBadgeRuntimeStyles();
     const pageHostname = window.location.hostname.trim().toLowerCase();
     const isDeviantArtPage = DEVIANT_ART_HOST_PATTERN.test(pageHostname);
+    const isCivitAiPage = CIVITAI_HOST_PATTERN.test(pageHostname);
     const closeTabAfterQueuePreference = useCloseTabAfterQueuePreference(pageHostname);
     const reactAllItemsInPostPreference = useReactAllItemsInPostPreference(pageHostname);
     const downloadedReactionDialog = createDownloadedReactionDialog();
@@ -122,7 +130,9 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     }
 
     function syncRelatedPostThumbnailContext(): void {
-        const nextVisible = hasRelatedPostThumbnailsBelowMedia(props.media);
+        const civitAiPageKind = classifyCivitAiReactionPage();
+        const nextVisible = hasRelatedPostThumbnailsBelowMedia(props.media, pageHostname)
+            || (civitAiPageKind === 'post-page' && hasCivitAiBatchReactionItems(props.media));
         if (!nextVisible && submittingReactionType.value !== null) {
             return;
         }
@@ -452,16 +462,25 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
         try {
             let batchItems = null;
+            let listingMetadataOverrides = null;
             if (showReactAllItemsInPost.value) {
                 await reactAllItemsInPostPreference.refresh();
+            }
+
+            if (isCivitAiPage) {
+                listingMetadataOverrides = await collectCivitAiListingMetadataOverrides(props.media);
             }
 
             if (showReactAllItemsInPost.value && reactAllItemsInPostPreference.enabled.value) {
                 suppressMediaContextUpdates = true;
                 try {
-                    batchItems = await collectDeviantArtBatchReactionItems(props.media, {
-                        hostname: pageHostname,
-                    });
+                    if (classifyCivitAiReactionPage() === 'post-page') {
+                        batchItems = await collectCivitAiBatchReactionItems(props.media);
+                    } else {
+                        batchItems = await collectDeviantArtBatchReactionItems(props.media, {
+                            hostname: pageHostname,
+                        });
+                    }
                 } catch {
                     batchItems = null;
                 } finally {
@@ -483,8 +502,10 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             }
 
             const result = await submitBadgeReaction(props.media, type, {
-                batchItems,
                 downloadBehavior,
+                ...(batchItems !== null ? { batchItems } : {}),
+                ...(listingMetadataOverrides !== null ? { listingMetadataOverrides } : {}),
+                ...(downloadBehavior !== undefined ? { downloadBehavior } : {}),
             });
             const closeTabAfterQueueMode = closeTabAfterQueuePreference.mode.value;
             const shouldAutoCloseCurrentTab = result.ok

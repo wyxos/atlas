@@ -272,8 +272,8 @@ class BrowsePersister
         $containerRows = array_values($containerData);
         Container::upsert(
             $containerRows,
-            ['source', 'source_id'], // Unique constraint columns
-            ['type', 'referrer', 'updated_at'] // Columns to update if exists
+            ['type', 'source', 'source_id'],
+            ['referrer', 'updated_at']
         );
 
         // Get all created/updated containers

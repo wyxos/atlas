@@ -524,5 +524,4 @@ describe('submitBadgeReaction', () => {
         expect(result.downloadCloseTargets).toEqual([]);
     });
 
-
 });
