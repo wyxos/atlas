@@ -2,8 +2,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Ban, Download } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
 import {
-    hasRelatedPostThumbnailsBelowMedia, normalizeUrl, resolveIdentifiedMediaResolution,
-    resolveMediaUrl, resolveReactionTargetUrl, type MediaElement,
+    hasRelatedPostThumbnailsBelowMedia,
+    resolveIdentifiedMediaResolution,
+    type MediaElement,
 } from './media-utils';
 import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
 import {
@@ -12,15 +13,21 @@ import {
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { createDownloadedReactionDialog } from './downloaded-reaction-dialog';
 import { submitBadgeReaction, type SubmitDownloadBehavior } from './reaction-submit';
-import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
+import { subscribeToDownloadProgress } from './download-progress-bus';
 import type { BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
 import { requestCloseCurrentTab, requestTabCount, subscribeToTabCountChanged } from './reaction-badge-tab-runtime';
 import { resolveReactionBadgeProgressState } from './reaction-badge-progress';
-import { emptyMatchResult, isTerminalStatus } from './reaction-badge-utils';
+import { emptyMatchResult, isTerminalStatus, preserveTrackedMatchResult, shouldPreserveTrackedTransfer } from './reaction-badge-utils';
+import {
+    getLatestPersistedStateForTrackedUrls as getTrackedPersistedBadgeState,
+    matchingTrackedUrlFromProgressEvent,
+    resolvePersistenceUrl as resolveTrackedPersistenceUrl,
+    resolveTrackedMediaUrls,
+} from './reaction-badge-tracking';
 import { queueCloseCurrentTabAfterDownloadComplete } from './reaction-badge-auto-close';
 import {
-    getPersistedBadgeState, persistBadgeCheckResult, persistBadgeState,
+    persistBadgeCheckResult, persistBadgeState,
     persistDownloadProgressEvent, type PersistedBadgeState,
 } from './badge-state-cache';
 import { useCloseTabAfterQueuePreference } from './close-tab-after-queue-state';
@@ -71,38 +78,19 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     const timestampText = computed<BadgeTimestampDisplay>(() => {
         const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
         if (blacklistedAt) {
-            return {
-                icon: Ban,
-                text: `- ${blacklistedAt}`,
-            };
+            return { icon: Ban, text: `- ${blacklistedAt}` };
         }
-
         const downloadedAt = formatMatchTimestamp(matchResult.value.downloadedAt);
         if (downloadedAt) {
-            return {
-                icon: Download,
-                text: `- ${downloadedAt}`,
-            };
+            return { icon: Download, text: `- ${downloadedAt}` };
         }
-
         return null;
     });
     const progressState = computed(() => resolveReactionBadgeProgressState({
         progressPercent: progressPercent.value, transferStatus: transferStatus.value, downloadedAt: matchResult.value.downloadedAt,
     }));
-    function resolveTrackedUrlsForCurrentMedia(): string[] {
-        const pageUrl = normalizeUrl(window.location.href);
-        const reactionTargetUrl = resolveReactionTargetUrl(props.media, pageUrl);
-        const mediaUrl = normalizeUrl(resolveMediaUrl(props.media));
-        const urls = [
-            reactionTargetUrl,
-            mediaUrl,
-            props.media instanceof HTMLVideoElement ? pageUrl : null,
-        ].filter((url): url is string => url !== null);
-        return Array.from(new Set(urls));
-    }
     function syncTrackedUrlsForCurrentMedia(): void {
-        trackedMediaUrls.value = resolveTrackedUrlsForCurrentMedia();
+        trackedMediaUrls.value = resolveTrackedMediaUrls(props.media, window.location.href);
         lastReactionMediaUrl.value = trackedMediaUrls.value[0] ?? null;
     }
     function syncRelatedPostThumbnailContext(): void {
@@ -146,41 +134,12 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         relatedPostThumbnailRetryIndex = 0;
         scheduleRelatedPostThumbnailRetry();
     }
-    function resolvePersistenceUrl(): string | null {
-        return lastReactionMediaUrl.value ?? trackedMediaUrls.value[0] ?? null;
-    }
-    function getLatestPersistedStateForTrackedUrls(): PersistedBadgeState | null {
-        let latest: PersistedBadgeState | null = null;
-        for (const url of trackedMediaUrls.value) {
-            const snapshot = getPersistedBadgeState(url);
-            if (snapshot === null) {
-                continue;
-            }
-            if (latest === null || snapshot.updatedAt > latest.updatedAt) {
-                latest = snapshot;
-            }
-        }
-        return latest;
-    }
-    function matchingUrlFromProgressEvent(event: ProgressEvent): string | null {
-        if (trackedMediaUrls.value.length === 0) {
-            return null;
-        }
-        const candidate = normalizeUrl(event.sourceUrl);
-        if (candidate !== null && trackedMediaUrls.value.includes(candidate)) {
-            return candidate;
-        }
-        return null;
-    }
     function syncResolution(): void {
         const resolved = resolveIdentifiedMediaResolution(props.media);
         mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
     }
-    async function refreshOpenTabCount(): Promise<void> {
-        openTabCount.value = await requestTabCount();
-    }
     function persistCurrentBadgeState(isLocked: boolean): void {
-        persistBadgeState(resolvePersistenceUrl(), {
+        persistBadgeState(resolveTrackedPersistenceUrl(lastReactionMediaUrl.value, trackedMediaUrls.value), {
             exists: matchResult.value.exists,
             reaction: matchResult.value.reaction,
             fileId: trackedFileId.value,
@@ -220,16 +179,25 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         hasSeenActiveTransfer.value = snapshot.status !== null && !isTerminalStatus(snapshot.status);
     }
     function resetStateForMediaContextChange(): void {
+        const shouldPreserveActiveTransfer = shouldPreserveTrackedTransfer({
+            isDownloadLocked: isDownloadLocked.value,
+            trackedFileId: trackedFileId.value,
+            trackedTransferId: trackedTransferId.value,
+            transferStatus: transferStatus.value,
+        });
+
         isChecking.value = true;
         hoveredReaction.value = null;
-        matchResult.value = emptyMatchResult();
+        matchResult.value = shouldPreserveActiveTransfer ? preserveTrackedMatchResult(matchResult.value) : emptyMatchResult();
         submittingReactionType.value = null;
-        isDownloadLocked.value = false;
-        progressPercent.value = null;
-        transferStatus.value = null;
-        trackedFileId.value = null;
-        trackedTransferId.value = null;
-        hasSeenActiveTransfer.value = false;
+        if (!shouldPreserveActiveTransfer) {
+            isDownloadLocked.value = false;
+            progressPercent.value = null;
+            transferStatus.value = null;
+            trackedFileId.value = null;
+            trackedTransferId.value = null;
+            hasSeenActiveTransfer.value = false;
+        }
     }
     function ensureProgressSubscription(): void {
         if (unsubscribeProgress) {
@@ -242,7 +210,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             }
             const transferMatches = trackedTransferId.value !== null && event.transferId === trackedTransferId.value;
             const fileMatches = trackedFileId.value !== null && event.fileId === trackedFileId.value;
-            const matchedUrl = matchingUrlFromProgressEvent(event);
+            const matchedUrl = matchingTrackedUrlFromProgressEvent(event, trackedMediaUrls.value);
             if (!transferMatches && !fileMatches && matchedUrl === null) {
                 return;
             }
@@ -257,7 +225,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             }
             const priorReaction = matchResult.value.reaction;
             const priorExists = matchResult.value.exists;
-            const persisted = getLatestPersistedStateForTrackedUrls();
+            const persisted = getTrackedPersistedBadgeState(trackedMediaUrls.value);
             if (persisted !== null) {
                 applyPersistedState(persisted);
                 if (persisted.reaction === null && priorReaction !== null) {
@@ -294,7 +262,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         lastCheckedMediaUrl.value = checkUrl;
         const currentSequence = ++checkSequence;
         resetStateForMediaContextChange();
-        const persistedBeforeCheck = getLatestPersistedStateForTrackedUrls();
+        const persistedBeforeCheck = getTrackedPersistedBadgeState(trackedMediaUrls.value);
         if (persistedBeforeCheck !== null) {
             applyPersistedState(persistedBeforeCheck);
         }
@@ -305,8 +273,8 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
                 return;
             }
 
-            persistBadgeCheckResult(resolvePersistenceUrl(), result);
-            const persistedAfterCheck = getLatestPersistedStateForTrackedUrls();
+            persistBadgeCheckResult(resolveTrackedPersistenceUrl(lastReactionMediaUrl.value, trackedMediaUrls.value), result);
+            const persistedAfterCheck = getTrackedPersistedBadgeState(trackedMediaUrls.value);
             if (persistedAfterCheck !== null) {
                 applyPersistedState(persistedAfterCheck);
             } else {
@@ -366,7 +334,9 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         unsubscribeTabCount = subscribeToTabCountChanged((count) => {
             openTabCount.value = count;
         });
-        void refreshOpenTabCount();
+        void requestTabCount().then((count) => {
+            openTabCount.value = count;
+        });
         syncRelatedPostThumbnailContext();
         restartRelatedPostThumbnailRetry();
         void refreshMatchForCurrentMedia(true);

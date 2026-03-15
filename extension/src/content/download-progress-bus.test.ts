@@ -7,6 +7,7 @@ describe('download-progress-bus', () => {
         vi.resetModules();
         vi.clearAllMocks();
         vi.unstubAllGlobals();
+        vi.useRealTimers();
     });
 
     it('subscribes once with the background worker and fans out runtime events', async () => {
@@ -41,6 +42,7 @@ describe('download-progress-bus', () => {
             expect.any(Function),
         );
         expect(runtimeMessageListener).toBeTypeOf('function');
+        const sendResponse = vi.fn();
 
         runtimeMessageListener?.({
             type: 'ATLAS_DOWNLOAD_PROGRESS_EVENT',
@@ -61,7 +63,7 @@ describe('download-progress-bus', () => {
                     downloadTransferId: 25,
                 },
             },
-        });
+        }, undefined, sendResponse);
 
         expect(listenerOne).toHaveBeenCalledWith({
             event: 'DownloadTransferQueued',
@@ -97,12 +99,59 @@ describe('download-progress-bus', () => {
                 downloadTransferId: 25,
             },
         });
+        expect(sendResponse).toHaveBeenCalledWith({ ok: true });
 
         offOne();
         expect(sendMessage).toHaveBeenCalledTimes(1);
 
         offTwo();
         expect(sendMessage).toHaveBeenCalledTimes(2);
+        expect(sendMessage).toHaveBeenLastCalledWith(
+            { type: 'ATLAS_UNSUBSCRIBE_DOWNLOAD_PROGRESS' },
+            expect.any(Function),
+        );
+    });
+
+    it('reasserts the background subscription while listeners remain active', async () => {
+        vi.useFakeTimers();
+
+        const sendMessage = vi.fn((_: unknown, callback?: (response: unknown) => void) => {
+            callback?.({ ok: true });
+        });
+
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage,
+                onMessage: {
+                    addListener: vi.fn(),
+                },
+            },
+        });
+
+        const bus = await import('./download-progress-bus');
+
+        const off = bus.subscribeToDownloadProgress(vi.fn());
+
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+        expect(sendMessage).toHaveBeenNthCalledWith(
+            1,
+            { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' },
+            expect.any(Function),
+        );
+
+        vi.advanceTimersByTime(15000);
+
+        expect(sendMessage).toHaveBeenCalledTimes(2);
+        expect(sendMessage).toHaveBeenNthCalledWith(
+            2,
+            { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' },
+            expect.any(Function),
+        );
+
+        off();
+
+        expect(sendMessage).toHaveBeenCalledTimes(3);
         expect(sendMessage).toHaveBeenLastCalledWith(
             { type: 'ATLAS_UNSUBSCRIBE_DOWNLOAD_PROGRESS' },
             expect.any(Function),

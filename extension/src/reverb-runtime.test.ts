@@ -122,4 +122,57 @@ describe('connectRuntimeReverb', () => {
         });
         expect(mockConnectReverb).not.toHaveBeenCalled();
     });
+
+    it('connects when Reverb is enabled', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({
+                reverb: {
+                    enabled: true,
+                    key: 'atlas-key',
+                    host: 'atlas.wyxos.com',
+                    port: 443,
+                    scheme: 'https',
+                    channel: 'downloads',
+                },
+            }), { status: 200 }),
+        );
+
+        const connectedClient = {
+            onEvent: vi.fn(),
+            onConnectionState: vi.fn(),
+            onConnectionError: vi.fn(),
+            getConnectionState: vi.fn(),
+            getLastConnectionError: vi.fn(),
+            disconnect: vi.fn(),
+        };
+        mockConnectReverb.mockResolvedValue(connectedClient);
+
+        vi.stubGlobal('fetch', fetchMock);
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: vi.fn((_: unknown, callback: (response: unknown) => void) => {
+                    callback(undefined);
+                }),
+            },
+        });
+
+        const { connectRuntimeReverb } = await import('./reverb-runtime');
+        const result = await connectRuntimeReverb();
+
+        expect(mockConnectReverb).toHaveBeenCalledWith({
+            enabled: true,
+            key: 'atlas-key',
+            host: 'atlas.wyxos.com',
+            port: 443,
+            scheme: 'https',
+            channel: 'downloads',
+        });
+        expect(result).toEqual({
+            kind: 'connected',
+            domain: 'https://atlas.wyxos.com',
+            endpoint: 'https://atlas.wyxos.com:443',
+            client: connectedClient,
+        });
+    });
 });

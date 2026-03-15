@@ -3,15 +3,17 @@ import type { ProgressEvent } from '../download-progress-event';
 type BusListener = (event: ProgressEvent) => void;
 
 const listeners = new Set<BusListener>();
+const DOWNLOAD_PROGRESS_RESUBSCRIBE_INTERVAL_MS = 15000;
 let runtimeListenerBound = false;
 let backgroundSubscribed = false;
+let backgroundSubscriptionRefreshTimer: number | null = null;
 
 function bindRuntimeListener(): void {
     if (runtimeListenerBound || !chrome.runtime?.onMessage) {
         return;
     }
 
-    chrome.runtime.onMessage.addListener((message: unknown) => {
+    chrome.runtime.onMessage.addListener((message: unknown, _sender: unknown, sendResponse?: (response?: unknown) => void) => {
         if (typeof message !== 'object' || message === null) {
             return;
         }
@@ -25,13 +27,14 @@ function bindRuntimeListener(): void {
         listeners.forEach((listener) => {
             listener(event);
         });
+        sendResponse?.({ ok: true });
     });
 
     runtimeListenerBound = true;
 }
 
-function subscribeBackgroundIfNeeded(): void {
-    if (backgroundSubscribed || !chrome.runtime?.sendMessage) {
+function requestBackgroundSubscription(): void {
+    if (!chrome.runtime?.sendMessage) {
         return;
     }
 
@@ -48,8 +51,38 @@ function subscribeBackgroundIfNeeded(): void {
     }
 }
 
+function startBackgroundSubscriptionRefresh(): void {
+    if (backgroundSubscriptionRefreshTimer !== null) {
+        return;
+    }
+
+    backgroundSubscriptionRefreshTimer = window.setInterval(() => {
+        if (listeners.size === 0) {
+            stopBackgroundSubscriptionRefresh();
+            return;
+        }
+
+        requestBackgroundSubscription();
+    }, DOWNLOAD_PROGRESS_RESUBSCRIBE_INTERVAL_MS);
+}
+
+function stopBackgroundSubscriptionRefresh(): void {
+    if (backgroundSubscriptionRefreshTimer === null) {
+        return;
+    }
+
+    window.clearInterval(backgroundSubscriptionRefreshTimer);
+    backgroundSubscriptionRefreshTimer = null;
+}
+
 function unsubscribeBackgroundIfUnused(): void {
-    if (listeners.size > 0 || !backgroundSubscribed || !chrome.runtime?.sendMessage) {
+    if (listeners.size > 0) {
+        return;
+    }
+
+    stopBackgroundSubscriptionRefresh();
+
+    if (!backgroundSubscribed || !chrome.runtime?.sendMessage) {
         return;
     }
 
@@ -67,7 +100,10 @@ function unsubscribeBackgroundIfUnused(): void {
 export function subscribeToDownloadProgress(listener: BusListener): () => void {
     listeners.add(listener);
     bindRuntimeListener();
-    subscribeBackgroundIfNeeded();
+    if (listeners.size === 1) {
+        requestBackgroundSubscription();
+    }
+    startBackgroundSubscriptionRefresh();
 
     return () => {
         listeners.delete(listener);

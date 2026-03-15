@@ -2,6 +2,8 @@
 /* global chrome */
 import { onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
+import OptionsBackgroundRelayFeed from './OptionsBackgroundRelayFeed.vue';
+import OptionsReverbFeed from './OptionsReverbFeed.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
 import {
     DEFAULT_ATLAS_DOMAIN,
@@ -222,7 +224,7 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
 
 <template>
     <main class="min-h-screen p-4 app-gradient">
-        <section class="mx-auto max-w-xl rounded-lg border border-smart-blue-500/30 bg-prussian-blue-700/60 p-4 space-y-4">
+        <section class="mx-auto max-w-6xl rounded-lg border border-smart-blue-500/30 bg-prussian-blue-700/60 p-4 space-y-4">
             <header class="space-y-1">
                 <div class="flex items-center justify-between gap-3">
                     <h1 class="text-base font-semibold text-regal-navy-100">Atlas Extension Options</h1>
@@ -244,7 +246,13 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                 </p>
             </header>
 
-            <form class="space-y-4" @submit.prevent="saveOptions">
+            <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+                <div class="space-y-4">
+                    <OptionsBackgroundRelayFeed />
+                    <OptionsReverbFeed />
+                </div>
+
+                <form class="space-y-4" @submit.prevent="saveOptions">
                 <label class="block space-y-1">
                     <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">Atlas Domain</span>
                     <input
@@ -404,17 +412,18 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                     </p>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <button
-                        type="submit"
-                        class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
-                    >
-                        Save
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button
+                            type="submit"
+                            class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
+                        >
+                            Save
+                        </button>
 
-                    <p v-if="isSaved" class="text-sm text-emerald-300">Saved.</p>
-                </div>
-            </form>
+                        <p v-if="isSaved" class="text-sm text-emerald-300">Saved.</p>
+                    </div>
+                </form>
+            </div>
 
             <p v-if="errorMessage" class="text-sm text-red-300">{{ errorMessage }}</p>
         </section>
