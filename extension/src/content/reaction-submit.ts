@@ -22,6 +22,8 @@ export type SubmitReactionResult = {
     reverbConfig: ReverbConfig | null;
 };
 
+export type SubmitDownloadBehavior = 'queue' | 'skip' | 'force';
+
 type RuntimeCookie = {
     name: string;
     value: string;
@@ -41,6 +43,7 @@ type RuntimeReactionSubmitResponse = {
 
 type SubmitBadgeReactionOptions = {
     batchItems?: BatchReactionItem[] | null;
+    downloadBehavior?: SubmitDownloadBehavior;
 };
 
 function parseReactionType(value: unknown): BadgeReactionType | null {
@@ -369,6 +372,7 @@ export async function submitBadgeReaction(
         const requestBody = usesBatchEndpoint
             ? {
                 type: reactionType,
+                download_behavior: options.downloadBehavior,
                 primary_candidate_id: batchItems[0]?.candidateId ?? null,
                 items: batchItems.map((item) => ({
                     candidate_id: item.candidateId,
@@ -383,6 +387,7 @@ export async function submitBadgeReaction(
             }
             : {
                 type: reactionType,
+                download_behavior: options.downloadBehavior,
                 url: reactionUrl,
                 referrer_url_hash_aware: cleanedPageReferrerUrl,
                 page_url: window.location.href,

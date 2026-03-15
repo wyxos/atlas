@@ -16,27 +16,35 @@ class FileReactionService
      * Unlike the UI controller, this does NOT toggle off if the same reaction is set again.
      *
      * @param  array{
-     *     cookies?: list<array{
-     *         name: string,
-     *         value: string,
-     *         domain: string,
-     *         path: string,
-     *         secure: bool,
-     *         http_only: bool,
-     *         host_only: bool,
-     *         expires_at: int|null
-     *     }>,
-     *     user_agent?: string
-     * }  $downloadRuntimeContext
+     *     deferHeavySideEffects?: bool,
+     *     queueDownload?: bool,
+     *     forceDownload?: bool,
+     *     downloadRuntimeContext?: array{
+     *         cookies?: list<array{
+     *             name: string,
+     *             value: string,
+     *             domain: string,
+     *             path: string,
+     *             secure: bool,
+     *             http_only: bool,
+     *             host_only: bool,
+     *             expires_at: int|null
+     *         }>,
+     *         user_agent?: string
+     *     }
+     * }  $options
      * @return array{reaction: array{type: string}|null, reacted_at: string|null, changed: bool}
      */
     public function set(
         File $file,
         User $user,
         string $type,
-        bool $deferHeavySideEffects = false,
-        array $downloadRuntimeContext = [],
+        array $options = [],
     ): array {
+        $deferHeavySideEffects = $options['deferHeavySideEffects'] ?? false;
+        $queueDownload = $options['queueDownload'] ?? true;
+        $forceDownload = $options['forceDownload'] ?? false;
+        $downloadRuntimeContext = $options['downloadRuntimeContext'] ?? [];
         $existingReaction = Reaction::query()
             ->where('user_id', $user->id)
             ->where('file_id', $file->id)
@@ -44,8 +52,8 @@ class FileReactionService
 
         if ($existingReaction && $existingReaction->type === $type) {
             // No-op: keep the existing reaction.
-            if ($type !== 'dislike') {
-                $this->dispatchDownloadFile($file->id, $deferHeavySideEffects, $downloadRuntimeContext);
+            if ($type !== 'dislike' && $queueDownload) {
+                $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
             }
 
             return [
@@ -55,7 +63,16 @@ class FileReactionService
             ];
         }
 
-        $reaction = $this->applyReactionChange($file, $user, $existingReaction, $type, $deferHeavySideEffects, $downloadRuntimeContext);
+        $reaction = $this->applyReactionChange(
+            $file,
+            $user,
+            $existingReaction,
+            $type,
+            $deferHeavySideEffects,
+            $queueDownload,
+            $forceDownload,
+            $downloadRuntimeContext,
+        );
 
         return [
             'reaction' => $reaction ? ['type' => $reaction->type] : null,
@@ -107,6 +124,8 @@ class FileReactionService
         ?Reaction $existingReaction,
         string $type,
         bool $deferHeavySideEffects = false,
+        bool $queueDownload = true,
+        bool $forceDownload = false,
         array $downloadRuntimeContext = [],
     ): Reaction {
         $metrics = app(MetricsService::class);
@@ -141,8 +160,8 @@ class FileReactionService
             ]
         );
 
-        if ($type !== 'dislike') {
-            $this->dispatchDownloadFile($file->id, $deferHeavySideEffects, $downloadRuntimeContext);
+        if ($type !== 'dislike' && $queueDownload) {
+            $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);

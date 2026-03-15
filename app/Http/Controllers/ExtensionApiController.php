@@ -129,6 +129,7 @@ class ExtensionApiController extends Controller
         $validated = $request->validate([
             'type' => ['required', 'string', 'in:love,like,dislike,funny'],
             'url' => ['required', 'string', 'max:4096'],
+            'download_behavior' => ['nullable', 'string', 'in:queue,skip,force'],
             'referrer_url' => ['nullable', 'string', 'max:4096'],
             'referrer_url_hash_aware' => ['nullable', 'string', 'max:4096'],
             'page_url' => ['nullable', 'string', 'max:4096'],
@@ -154,6 +155,7 @@ class ExtensionApiController extends Controller
         $payload = $this->processReactionItem(
             $validated,
             $validated['type'],
+            $validated['download_behavior'] ?? 'queue',
             $fileReactionService,
             $containerMetadataService,
             $user,
@@ -184,6 +186,7 @@ class ExtensionApiController extends Controller
 
         $validated = $request->validate([
             'type' => ['required', 'string', 'in:love,like,dislike,funny'],
+            'download_behavior' => ['nullable', 'string', 'in:queue,skip,force'],
             'primary_candidate_id' => ['required', 'string', 'max:128'],
             'items' => ['required', 'array', 'min:2', 'max:300'],
             'items.*.candidate_id' => ['required', 'string', 'max:128'],
@@ -221,6 +224,7 @@ class ExtensionApiController extends Controller
             $payload = $this->processReactionItem(
                 $item,
                 $validated['type'],
+                $validated['download_behavior'] ?? 'queue',
                 $fileReactionService,
                 $containerMetadataService,
                 $user,
@@ -472,6 +476,7 @@ class ExtensionApiController extends Controller
     private function processReactionItem(
         array $item,
         string $reactionType,
+        string $downloadBehavior,
         FileReactionService $fileReactionService,
         ExtensionContainerMetadataService $containerMetadataService,
         User $user,
@@ -504,12 +509,18 @@ class ExtensionApiController extends Controller
             $tagName,
             $listingMetadataOverrides
         );
+        $queueDownload = $this->shouldQueueExtensionDownload($reactionType, $downloadBehavior);
+        $forceDownload = $this->shouldForceExtensionDownload($downloadBehavior);
         $result = $fileReactionService->set(
             $file,
             $user,
             $reactionType,
-            deferHeavySideEffects: true,
-            downloadRuntimeContext: $runtimeContext
+            [
+                'deferHeavySideEffects' => true,
+                'queueDownload' => $queueDownload,
+                'forceDownload' => $forceDownload,
+                'downloadRuntimeContext' => $runtimeContext,
+            ]
         );
         $activeTransfer = $this->findActiveTransfer($file->id);
 
@@ -523,7 +534,7 @@ class ExtensionApiController extends Controller
             'reaction' => $result['reaction'],
             'reacted_at' => $result['reacted_at'] ?? null,
             'download' => [
-                'requested' => $reactionType !== 'dislike',
+                'requested' => $queueDownload,
                 'transfer_id' => $activeTransfer?->id,
                 'status' => $activeTransfer?->status,
                 'progress_percent' => $activeTransfer?->last_broadcast_percent,
@@ -531,6 +542,16 @@ class ExtensionApiController extends Controller
             ],
             'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
         ];
+    }
+
+    private function shouldQueueExtensionDownload(string $reactionType, string $downloadBehavior): bool
+    {
+        return $reactionType !== 'dislike' && $downloadBehavior !== 'skip';
+    }
+
+    private function shouldForceExtensionDownload(string $downloadBehavior): bool
+    {
+        return $downloadBehavior === 'force';
     }
 
     private function attachDerivedContainers(array $payloads, array $listingMetadataOverrides): void

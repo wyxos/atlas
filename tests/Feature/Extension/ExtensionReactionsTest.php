@@ -88,6 +88,101 @@ test('extension reactions endpoint creates file applies reaction and queues down
     });
 });
 
+test('extension reactions can update a downloaded file without queueing another download', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $downloadedAt = now()->subMinute();
+    $file = File::factory()->create([
+        'source' => 'example.test',
+        'url' => 'https://cdn.example.test/media/already-downloaded.jpg',
+        'referrer_url' => 'https://www.example.test/post/123',
+        'preview_url' => 'https://cdn.example.test/media/already-downloaded.jpg',
+        'downloaded' => true,
+        'downloaded_at' => $downloadedAt,
+        'path' => 'downloads/already-downloaded.jpg',
+        'filename' => 'already-downloaded',
+        'ext' => 'jpg',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'love',
+        'download_behavior' => 'skip',
+        'url' => 'https://cdn.example.test/media/already-downloaded.jpg',
+        'referrer_url_hash_aware' => 'https://www.example.test/post/123#media-id-42',
+        'page_url' => 'https://www.example.test/post/123',
+        'tag_name' => 'img',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('reaction.type', 'love');
+    $response->assertJsonPath('download.requested', false);
+    $response->assertJsonPath('download.downloaded_at', $downloadedAt->toIso8601String());
+
+    expect(Reaction::query()
+        ->where('user_id', $user->id)
+        ->where('file_id', $file->id)
+        ->value('type'))->toBe('love');
+
+    Queue::assertNotPushed(DownloadFile::class);
+});
+
+test('extension reactions can force a fresh download for an already-downloaded file', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $downloadedAt = now()->subMinute();
+    $file = File::factory()->create([
+        'source' => 'example.test',
+        'url' => 'https://cdn.example.test/media/force-redownload.jpg',
+        'referrer_url' => 'https://www.example.test/post/456',
+        'preview_url' => 'https://cdn.example.test/media/force-redownload.jpg',
+        'downloaded' => true,
+        'downloaded_at' => $downloadedAt,
+        'path' => 'downloads/force-redownload.jpg',
+        'filename' => 'force-redownload',
+        'ext' => 'jpg',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'download_behavior' => 'force',
+        'url' => 'https://cdn.example.test/media/force-redownload.jpg',
+        'referrer_url_hash_aware' => 'https://www.example.test/post/456#media-id-42',
+        'page_url' => 'https://www.example.test/post/456',
+        'tag_name' => 'img',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('reaction.type', 'like');
+    $response->assertJsonPath('download.requested', true);
+    $response->assertJsonPath('download.downloaded_at', $downloadedAt->toIso8601String());
+
+    Queue::assertPushed(DownloadFile::class, function (DownloadFile $job) use ($file): bool {
+        return $job->fileId === $file->id && $job->forceDownload === true;
+    });
+});
+
 test('extension reactions endpoint rejects non-http urls', function () {
     $user = User::factory()->create();
     setExtensionReactionApiKey('valid-api-key', $user->id);
