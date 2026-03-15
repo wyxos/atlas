@@ -12,16 +12,22 @@ return new class extends Migration
     {
         $this->deduplicateContainersByTypeSourceAndSourceId();
 
-        Schema::table('containers', function (Blueprint $table) {
+        Schema::whenTableHasIndex('containers', 'containers_source_source_id_unique', static function (Blueprint $table): void {
             $table->dropUnique('containers_source_source_id_unique');
+        });
+
+        Schema::whenTableDoesntHaveIndex('containers', 'containers_type_source_source_id_unique', static function (Blueprint $table): void {
             $table->unique(['type', 'source', 'source_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::table('containers', function (Blueprint $table) {
+        Schema::whenTableHasIndex('containers', 'containers_type_source_source_id_unique', static function (Blueprint $table): void {
             $table->dropUnique('containers_type_source_source_id_unique');
+        });
+
+        Schema::whenTableDoesntHaveIndex('containers', 'containers_source_source_id_unique', static function (Blueprint $table): void {
             $table->unique(['source', 'source_id']);
         });
     }
