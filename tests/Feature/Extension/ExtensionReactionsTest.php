@@ -367,6 +367,83 @@ test('single deviantart downloads create a derived user container', function () 
     ]);
 });
 
+test('single civitai image reactions persist civitai source and derived post user and resource containers', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg',
+        'referrer_url_hash_aware' => 'https://civitai.com/images/76490204',
+        'page_url' => 'https://civitai.com/images/76490204',
+        'tag_name' => 'img',
+        'listing_metadata_overrides' => [
+            'postId' => 23377656,
+            'username' => 'shepretends',
+            'resource_containers' => [
+                [
+                    'type' => 'Checkpoint',
+                    'modelId' => 833294,
+                    'modelVersionId' => 1190596,
+                    'referrerUrl' => 'https://civitai.com/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+                ],
+                [
+                    'type' => 'LoRA',
+                    'modelId' => 1368095,
+                    'modelVersionId' => 1545615,
+                    'referrerUrl' => 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+
+    $file = File::query()->where('url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg')->first();
+
+    expect($file)->not->toBeNull();
+    expect($file?->source)->toBe('CivitAI');
+    expect($file?->referrer_url)->toBe('https://civitai.com/images/76490204');
+    expect(data_get($file?->listing_metadata, 'postId'))->toBe(23377656);
+    expect(data_get($file?->listing_metadata, 'username'))->toBe('shepretends');
+    expect(data_get($file?->listing_metadata, 'resource_containers.0.modelVersionId'))->toBe(1190596);
+    expect(data_get($file?->listing_metadata, 'resource_containers.1.modelVersionId'))->toBe(1545615);
+
+    $this->assertDatabaseHas('containers', [
+        'type' => 'Post',
+        'source' => 'CivitAI',
+        'source_id' => '23377656',
+        'referrer' => 'https://civitai.com/posts/23377656',
+    ]);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'User',
+        'source' => 'CivitAI',
+        'source_id' => 'shepretends',
+        'referrer' => 'https://civitai.com/user/shepretends',
+    ]);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'Checkpoint',
+        'source' => 'CivitAI',
+        'source_id' => '1190596',
+        'referrer' => 'https://civitai.com/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+    ]);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'LoRA',
+        'source' => 'CivitAI',
+        'source_id' => '1545615',
+        'referrer' => 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+    ]);
+
+    expect($file?->containers()->where('type', 'Post')->exists())->toBeTrue();
+    expect($file?->containers()->where('type', 'User')->exists())->toBeTrue();
+    expect($file?->containers()->where('type', 'Checkpoint')->exists())->toBeTrue();
+    expect($file?->containers()->where('type', 'LoRA')->exists())->toBeTrue();
+});
+
 test('extension batch reactions queue all submitted gallery items and return the selected primary item', function () {
     Queue::fake();
 
@@ -523,6 +600,106 @@ test('extension batch reactions create a user container for deviantart gallery u
         'source_id' => 'aipayop',
         'referrer' => 'https://www.deviantart.com/aipayop/gallery',
     ]);
+});
+
+test('extension batch reactions persist civitai shared containers with per-item image referrers', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions/batch', [
+        'type' => 'like',
+        'primary_candidate_id' => 'image-76490204',
+        'listing_metadata_overrides' => [
+            'postId' => 16973563,
+            'username' => 'DigitalPastel',
+            'resource_containers' => [
+                [
+                    'type' => 'Checkpoint',
+                    'modelId' => 621659,
+                    'modelVersionId' => 1763717,
+                    'referrerUrl' => 'https://civitai.com/models/621659/smooth-mix-old-ver-noobaiillustriouspony?modelVersionId=1763717',
+                ],
+                [
+                    'type' => 'LoRA',
+                    'modelId' => 1159892,
+                    'modelVersionId' => 1304665,
+                    'referrerUrl' => 'https://civitai.com/models/1159892/all-disney-princess-illustrious?modelVersionId=1304665',
+                ],
+            ],
+        ],
+        'items' => [
+            [
+                'candidate_id' => 'image-76477306',
+                'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/4MGM4VAVYH67B8TYY43NVH1780.mp4',
+                'referrer_url_hash_aware' => 'https://civitai.com/images/76477306',
+                'page_url' => 'https://civitai.com/posts/16973563',
+                'tag_name' => 'video',
+            ],
+            [
+                'candidate_id' => 'image-76490204',
+                'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg',
+                'referrer_url_hash_aware' => 'https://civitai.com/images/76490204',
+                'page_url' => 'https://civitai.com/posts/16973563',
+                'tag_name' => 'img',
+            ],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg');
+    $response->assertJsonPath('file.referrer_url', 'https://civitai.com/images/76490204');
+
+    $videoFile = File::query()->where('url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/4MGM4VAVYH67B8TYY43NVH1780.mp4')->first();
+    $imageFile = File::query()->where('url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg')->first();
+
+    expect($videoFile)->not->toBeNull();
+    expect($imageFile)->not->toBeNull();
+    expect($videoFile?->source)->toBe('CivitAI');
+    expect($imageFile?->source)->toBe('CivitAI');
+    expect($videoFile?->referrer_url)->toBe('https://civitai.com/images/76477306');
+    expect($imageFile?->referrer_url)->toBe('https://civitai.com/images/76490204');
+    expect(data_get($videoFile?->listing_metadata, 'postId'))->toBe(16973563);
+    expect(data_get($imageFile?->listing_metadata, 'postId'))->toBe(16973563);
+    expect(data_get($videoFile?->listing_metadata, 'resource_containers.0.modelVersionId'))->toBe(1763717);
+    expect(data_get($imageFile?->listing_metadata, 'resource_containers.1.modelVersionId'))->toBe(1304665);
+
+    $this->assertDatabaseHas('containers', [
+        'type' => 'Post',
+        'source' => 'CivitAI',
+        'source_id' => '16973563',
+        'referrer' => 'https://civitai.com/posts/16973563',
+    ]);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'User',
+        'source' => 'CivitAI',
+        'source_id' => 'DigitalPastel',
+        'referrer' => 'https://civitai.com/user/DigitalPastel',
+    ]);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'Checkpoint',
+        'source' => 'CivitAI',
+        'source_id' => '1763717',
+        'referrer' => 'https://civitai.com/models/621659/smooth-mix-old-ver-noobaiillustriouspony?modelVersionId=1763717',
+    ]);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'LoRA',
+        'source' => 'CivitAI',
+        'source_id' => '1304665',
+        'referrer' => 'https://civitai.com/models/1159892/all-disney-princess-illustrious?modelVersionId=1304665',
+    ]);
+
+    expect($videoFile?->containers()->where('type', 'Post')->exists())->toBeTrue();
+    expect($videoFile?->containers()->where('type', 'User')->exists())->toBeTrue();
+    expect($videoFile?->containers()->where('type', 'Checkpoint')->exists())->toBeTrue();
+    expect($videoFile?->containers()->where('type', 'LoRA')->exists())->toBeTrue();
+    expect($imageFile?->containers()->where('type', 'Post')->exists())->toBeTrue();
+    expect($imageFile?->containers()->where('type', 'User')->exists())->toBeTrue();
+    expect($imageFile?->containers()->where('type', 'Checkpoint')->exists())->toBeTrue();
+    expect($imageFile?->containers()->where('type', 'LoRA')->exists())->toBeTrue();
 });
 
 test('extension batch reactions do not create post or user containers for non-deviantart urls', function () {

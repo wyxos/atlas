@@ -170,6 +170,12 @@ class ContainerBrowseTabPayload
             return $params;
         }
 
+        if ($containerType === 'Checkpoint' || $containerType === 'LoRA') {
+            $params['modelVersionId'] = $sourceId;
+
+            return $params;
+        }
+
         return null;
     }
 

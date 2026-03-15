@@ -5,16 +5,9 @@ import {
     resolveMediaSectionSearchRoot,
     type MediaElement,
 } from './media-utils';
+import type { BatchReactionItem } from './reaction-batch-types';
 
 const IMAGE_HASH_PATTERN = /#image-(\d+)$/i;
-
-export type BatchReactionItem = {
-    candidateId: string;
-    url: string;
-    referrerUrlHashAware: string;
-    pageUrl: string;
-    tagName: 'img';
-};
 
 type CollectBatchReactionItemsOptions = {
     hostname?: string;

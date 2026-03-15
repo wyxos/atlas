@@ -2,6 +2,8 @@
 
 namespace App\Services\Extension;
 
+use App\Services\CivitAiImages;
+
 class ExtensionContainerMetadataService
 {
     public function sourceFromCandidateUrls(array $candidateUrls): ?string
@@ -52,6 +54,21 @@ class ExtensionContainerMetadataService
             ],
             static fn (?string $value): bool => $value !== null && $value !== ''
         );
+    }
+
+    public function mergeListingMetadataOverrides(array $urlDerivedOverrides, array $submittedOverrides): array
+    {
+        if ($submittedOverrides === []) {
+            return $urlDerivedOverrides;
+        }
+
+        $merged = array_replace($urlDerivedOverrides, $submittedOverrides);
+
+        if (isset($submittedOverrides['resource_containers']) && is_array($submittedOverrides['resource_containers'])) {
+            $merged['resource_containers'] = array_values($submittedOverrides['resource_containers']);
+        }
+
+        return $merged;
     }
 
     public function firstSupportedContainerUrl(array $candidateUrls): ?string
@@ -156,6 +173,10 @@ class ExtensionContainerMetadataService
 
         if ($normalizedHost === 'deviantart.com' || str_ends_with($normalizedHost, '.deviantart.com')) {
             return 'deviantart.com';
+        }
+
+        if ($normalizedHost === 'civitai.com' || str_ends_with($normalizedHost, '.civitai.com')) {
+            return CivitAiImages::source();
         }
 
         return preg_replace('/^www\./', '', $normalizedHost) ?: null;

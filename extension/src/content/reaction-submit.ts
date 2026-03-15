@@ -1,7 +1,7 @@
 import { getStoredOptions } from '../atlas-options';
 import { cleanupReferrerUrl } from '../referrer-cleanup';
 import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
-import type { BatchReactionItem } from './deviantart-batch-reaction';
+import type { BatchReactionItem, ListingMetadataOverrides } from './reaction-batch-types';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
@@ -44,6 +44,7 @@ type RuntimeReactionSubmitResponse = {
 type SubmitBadgeReactionOptions = {
     batchItems?: BatchReactionItem[] | null;
     downloadBehavior?: SubmitDownloadBehavior;
+    listingMetadataOverrides?: ListingMetadataOverrides | null;
 };
 
 function parseReactionType(value: unknown): BadgeReactionType | null {
@@ -322,6 +323,7 @@ export async function submitBadgeReaction(
     const reactionUrl = resolveReactionTargetUrl(media, pageUrl);
     const isVideo = media instanceof HTMLVideoElement;
     const batchItems = options.batchItems?.filter((item) => item.url.trim() !== '') ?? [];
+    const listingMetadataOverrides = options.listingMetadataOverrides ?? null;
     const usesBatchEndpoint = batchItems.length >= 2;
     if (reactionUrl === null && !usesBatchEndpoint) {
         return {
@@ -382,6 +384,7 @@ export async function submitBadgeReaction(
                     page_url: item.pageUrl,
                     tag_name: item.tagName,
                 })),
+                listing_metadata_overrides: listingMetadataOverrides,
                 cookies: cookies.length > 0 ? cookies : null,
                 user_agent: userAgent,
             }
@@ -392,6 +395,7 @@ export async function submitBadgeReaction(
                 referrer_url_hash_aware: cleanedPageReferrerUrl,
                 page_url: window.location.href,
                 tag_name: isVideo ? 'video' : 'img',
+                listing_metadata_overrides: listingMetadataOverrides,
                 cookies: cookies.length > 0 ? cookies : null,
                 user_agent: userAgent,
             };

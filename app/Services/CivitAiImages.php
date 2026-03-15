@@ -93,6 +93,27 @@ class CivitAiImages extends BaseService
             $containers[] = $this->makeContainer('User', $username, $listingMetadata);
         }
 
+        $resourceContainers = $listingMetadata['resource_containers'] ?? null;
+        if (is_array($resourceContainers)) {
+            foreach ($resourceContainers as $resourceContainer) {
+                if (! is_array($resourceContainer)) {
+                    continue;
+                }
+
+                $type = isset($resourceContainer['type']) && is_string($resourceContainer['type'])
+                    ? trim($resourceContainer['type'])
+                    : null;
+                $modelVersionId = isset($resourceContainer['modelVersionId'])
+                    ? (int) $resourceContainer['modelVersionId']
+                    : null;
+                if (! in_array($type, ['Checkpoint', 'LoRA'], true) || ! $modelVersionId || $modelVersionId <= 0) {
+                    continue;
+                }
+
+                $containers[] = $this->makeContainer($type, (string) $modelVersionId, $listingMetadata, $resourceContainer);
+            }
+        }
+
         return $containers;
     }
 
@@ -427,21 +448,39 @@ class CivitAiImages extends BaseService
         ];
     }
 
-    private function makeContainer(string $type, string $sourceId, array $listingMetadata): array
+    private function makeContainer(string $type, string $sourceId, array $listingMetadata, array $resourceContainer = []): array
     {
         return [
             'type' => $type,
             'source_id' => $sourceId,
-            'referrer' => $this->buildContainerReferrer($type, $sourceId, $listingMetadata),
+            'referrer' => $this->buildContainerReferrer($type, $sourceId, $resourceContainer),
         ];
     }
 
-    private function buildContainerReferrer(string $type, string $sourceId, array $listingMetadata): ?string
+    private function buildContainerReferrer(string $type, string $sourceId, array $resourceContainer = []): ?string
     {
         return match ($type) {
             'Post' => "https://civitai.com/posts/{$sourceId}",
             'User' => "https://civitai.com/user/{$sourceId}",
+            'Checkpoint', 'LoRA' => $this->buildResourceContainerReferrer($sourceId, $resourceContainer),
             default => null,
         };
+    }
+
+    private function buildResourceContainerReferrer(string $sourceId, array $resourceContainer): ?string
+    {
+        $submittedReferrer = isset($resourceContainer['referrerUrl']) && is_string($resourceContainer['referrerUrl'])
+            ? trim($resourceContainer['referrerUrl'])
+            : null;
+        if ($submittedReferrer !== null && $submittedReferrer !== '') {
+            return $submittedReferrer;
+        }
+
+        $modelId = isset($resourceContainer['modelId']) ? (int) $resourceContainer['modelId'] : null;
+        if ($modelId !== null && $modelId > 0) {
+            return "https://civitai.com/models/{$modelId}?modelVersionId={$sourceId}";
+        }
+
+        return null;
     }
 }

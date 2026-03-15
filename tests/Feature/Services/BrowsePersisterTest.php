@@ -119,6 +119,64 @@ it('does not create containers for files with modelId in listing_metadata', func
     expect($file->containers()->count())->toBe(0);
 });
 
+it('creates version-precise resource containers from listing metadata overrides', function () {
+    $persister = new BrowsePersister;
+
+    $transformedItems = [
+        [
+            'file' => [
+                'referrer_url' => 'https://civitai.com/images/105372859',
+                'source' => 'CivitAI',
+                'url' => 'https://image.civitai.com/file-resource.jpg',
+                'filename' => 'file-resource.jpg',
+                'ext' => 'jpg',
+                'mime_type' => 'image/jpeg',
+                'listing_metadata' => json_encode([
+                    'resource_containers' => [
+                        [
+                            'type' => 'Checkpoint',
+                            'modelId' => 833294,
+                            'modelVersionId' => 1190596,
+                            'referrerUrl' => 'https://civitai.com/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+                        ],
+                        [
+                            'type' => 'LoRA',
+                            'modelId' => 1368095,
+                            'modelVersionId' => 1545615,
+                            'referrerUrl' => 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+                        ],
+                    ],
+                ]),
+            ],
+            'metadata' => [
+                'file_referrer_url' => 'https://civitai.com/images/105372859',
+                'payload' => json_encode(['test' => 'data']),
+            ],
+        ],
+    ];
+
+    $result = $persister->persist($transformedItems);
+
+    expect($result)->toHaveCount(1);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'Checkpoint',
+        'source' => 'CivitAI',
+        'source_id' => '1190596',
+        'referrer' => 'https://civitai.com/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+    ]);
+    $this->assertDatabaseHas('containers', [
+        'type' => 'LoRA',
+        'source' => 'CivitAI',
+        'source_id' => '1545615',
+        'referrer' => 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+    ]);
+
+    $file = File::where('referrer_url', 'https://civitai.com/images/105372859')->first();
+    expect($file)->not->toBeNull();
+    expect($file?->containers()->where('type', 'Checkpoint')->exists())->toBeTrue();
+    expect($file?->containers()->where('type', 'LoRA')->exists())->toBeTrue();
+});
+
 it('creates both post and user containers when both are present', function () {
     $persister = new BrowsePersister;
 
@@ -319,6 +377,24 @@ it('updates existing containers instead of creating duplicates', function () {
     // File should be attached to the existing container
     $file = File::where('referrer_url', 'https://example.com/file8.jpg')->first();
     expect($file->containers()->where('containers.id', $existingContainer->id)->exists())->toBeTrue();
+});
+
+it('allows different civitai container types to share the same source id', function () {
+    Container::create([
+        'type' => 'Post',
+        'source' => 'CivitAI',
+        'source_id' => '1763717',
+        'referrer' => 'https://civitai.com/posts/1763717',
+    ]);
+
+    Container::create([
+        'type' => 'Checkpoint',
+        'source' => 'CivitAI',
+        'source_id' => '1763717',
+        'referrer' => 'https://civitai.com/models/621659/smooth-mix-old-ver-noobaiillustriouspony?modelVersionId=1763717',
+    ]);
+
+    $this->assertDatabaseCount('containers', 2);
 });
 
 it('handles non-civitai sources without referrer', function () {
