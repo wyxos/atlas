@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCollectDeviantArtBatchReactionItems = vi.fn();
-const mockClassifyCivitAiReactionPage = vi.fn();
-const mockCollectCivitAiBatchReactionItems = vi.fn();
 const mockCollectCivitAiListingMetadataOverrides = vi.fn();
-const mockHasCivitAiBatchReactionItems = vi.fn();
 const mockEnqueueReactionCheck = vi.fn();
 const mockSubmitBadgeReaction = vi.fn();
 const mockHasRelatedPostThumbnailsBelowMedia = vi.fn();
@@ -48,10 +45,7 @@ vi.mock('./deviantart-batch-reaction', () => ({
 }));
 
 vi.mock('./civitai-reaction-context', () => ({
-    classifyCivitAiReactionPage: mockClassifyCivitAiReactionPage,
-    collectCivitAiBatchReactionItems: mockCollectCivitAiBatchReactionItems,
     collectCivitAiListingMetadataOverrides: mockCollectCivitAiListingMetadataOverrides,
-    hasCivitAiBatchReactionItems: mockHasCivitAiBatchReactionItems,
 }));
 
 vi.mock('./reaction-check-queue', () => ({
@@ -100,10 +94,7 @@ describe('createReactionBadgeHost', () => {
         history.replaceState({}, '', '/artseize/art/Untitled-1305712740');
 
         mockCollectDeviantArtBatchReactionItems.mockResolvedValue(null);
-        mockClassifyCivitAiReactionPage.mockReturnValue(null);
-        mockCollectCivitAiBatchReactionItems.mockResolvedValue(null);
         mockCollectCivitAiListingMetadataOverrides.mockResolvedValue(null);
-        mockHasCivitAiBatchReactionItems.mockReturnValue(false);
         mockHasRelatedPostThumbnailsBelowMedia.mockReturnValue(false);
         mockEnqueueReactionCheck.mockResolvedValue({
             exists: false,
