@@ -1,160 +1,80 @@
-import { type ReverbSubscription } from '../reverb-client';
-import { connectRuntimeReverb } from '../reverb-runtime';
-import type { BadgeReactionType } from './reaction-check-queue';
-
-export type ProgressEvent = {
-    event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated';
-    fileId: number | null;
-    transferId: number | null;
-    sourceUrl: string | null;
-    referrerUrl: string | null;
-    status: string | null;
-    percent: number | null;
-    reaction: BadgeReactionType | null;
-    reactedAt: string | null | undefined;
-    downloadedAt: string | null | undefined;
-    blacklistedAt: string | null | undefined;
-    payload: Record<string, unknown>;
-};
+import type { ProgressEvent } from '../download-progress-event';
 
 type BusListener = (event: ProgressEvent) => void;
 
 const listeners = new Set<BusListener>();
-let connectionPromise: Promise<void> | null = null;
-let activeSubscription: ReverbSubscription | null = null;
-let activeClient: { disconnect: () => void } | null = null;
+let runtimeListenerBound = false;
+let backgroundSubscribed = false;
 
-function asNumber(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-    }
-
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed === '') {
-            return null;
-        }
-
-        const parsed = Number(trimmed);
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-
-    return null;
-}
-
-function asString(value: unknown): string | null {
-    return typeof value === 'string' && value.trim() !== '' ? value : null;
-}
-
-function asReaction(value: unknown): BadgeReactionType | null {
-    if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
-        return value;
-    }
-
-    return null;
-}
-
-function parseReaction(payload: Record<string, unknown>): BadgeReactionType | null {
-    const direct = asReaction(payload.reaction);
-    if (direct !== null) {
-        return direct;
-    }
-
-    const reactionType = asReaction(payload.reactionType ?? payload.reaction_type);
-    if (reactionType !== null) {
-        return reactionType;
-    }
-
-    if (payload.reaction && typeof payload.reaction === 'object') {
-        const nested = payload.reaction as Record<string, unknown>;
-        return asReaction(nested.type);
-    }
-
-    return null;
-}
-
-function parseOptionalString(
-    payload: Record<string, unknown>,
-    ...keys: string[]
-): string | null | undefined {
-    for (const key of keys) {
-        if (!(key in payload)) {
-            continue;
-        }
-
-        return asString(payload[key]);
-    }
-
-    return undefined;
-}
-
-async function ensureConnected(): Promise<void> {
-    if (connectionPromise) {
-        return connectionPromise;
-    }
-    if (activeClient && activeSubscription) {
+function bindRuntimeListener(): void {
+    if (runtimeListenerBound || !chrome.runtime?.onMessage) {
         return;
     }
 
-    connectionPromise = (async () => {
-        const runtime = await connectRuntimeReverb();
-        if (runtime.kind !== 'connected') {
+    chrome.runtime.onMessage.addListener((message: unknown) => {
+        if (typeof message !== 'object' || message === null) {
             return;
         }
 
-        activeClient = runtime.client;
-        activeSubscription = runtime.client.onEvent((event, payload) => {
-            const progressEvent: ProgressEvent = {
-                event,
-                fileId: asNumber(payload.fileId ?? payload.file_id),
-                transferId: asNumber(payload.downloadTransferId ?? payload.id),
-                sourceUrl: asString(payload.original ?? payload.url ?? payload.file_url),
-                referrerUrl: asString(payload.referrer_url ?? payload.referrerUrl ?? payload.page_url),
-                status: asString(payload.status),
-                percent: asNumber(payload.percent),
-                reaction: parseReaction(payload),
-                reactedAt: parseOptionalString(payload, 'reacted_at', 'reactedAt'),
-                downloadedAt: parseOptionalString(payload, 'downloaded_at', 'downloadedAt'),
-                blacklistedAt: parseOptionalString(payload, 'blacklisted_at', 'blacklistedAt'),
-                payload,
-            };
-
-            listeners.forEach((listener) => {
-                listener(progressEvent);
-            });
-        });
-
-        if (listeners.size === 0) {
-            teardownIfUnused();
+        const payload = message as { type?: unknown; event?: unknown };
+        if (payload.type !== 'ATLAS_DOWNLOAD_PROGRESS_EVENT' || !payload.event || typeof payload.event !== 'object') {
+            return;
         }
-    })().finally(() => {
-        connectionPromise = null;
+
+        const event = payload.event as ProgressEvent;
+        listeners.forEach((listener) => {
+            listener(event);
+        });
     });
 
-    return connectionPromise;
+    runtimeListenerBound = true;
 }
 
-function teardownIfUnused(): void {
-    if (listeners.size > 0) {
+function subscribeBackgroundIfNeeded(): void {
+    if (backgroundSubscribed || !chrome.runtime?.sendMessage) {
         return;
     }
 
-    if (activeSubscription) {
-        activeSubscription.unsubscribe();
-        activeSubscription = null;
+    backgroundSubscribed = true;
+
+    try {
+        chrome.runtime.sendMessage({ type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' }, () => {
+            if (chrome.runtime.lastError) {
+                backgroundSubscribed = false;
+            }
+        });
+    } catch {
+        backgroundSubscribed = false;
     }
-    if (activeClient) {
-        activeClient.disconnect();
-        activeClient = null;
+}
+
+function unsubscribeBackgroundIfUnused(): void {
+    if (listeners.size > 0 || !backgroundSubscribed || !chrome.runtime?.sendMessage) {
+        return;
+    }
+
+    backgroundSubscribed = false;
+
+    try {
+        chrome.runtime.sendMessage({ type: 'ATLAS_UNSUBSCRIBE_DOWNLOAD_PROGRESS' }, () => {
+            void chrome.runtime.lastError;
+        });
+    } catch {
+        // Ignore runtime teardown errors during page unload.
     }
 }
 
 export function subscribeToDownloadProgress(listener: BusListener): () => void {
     listeners.add(listener);
-    void ensureConnected();
+    bindRuntimeListener();
+    subscribeBackgroundIfNeeded();
 
     return () => {
         listeners.delete(listener);
-        teardownIfUnused();
+        unsubscribeBackgroundIfUnused();
     };
 }
+
+export type {
+    ProgressEvent,
+};

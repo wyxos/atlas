@@ -1,3 +1,7 @@
+import {
+    handleDownloadProgressRuntimeMessage,
+    removeDownloadProgressSubscriber,
+} from './background-download-progress';
 import { collectCookiesForUrls } from './background-cookie-runtime';
 import { notifyTabsExtensionReloaded } from './background-reload-overlay';
 import { normalizeComparableUrls } from './background-url-utils';
@@ -257,6 +261,10 @@ chrome.runtime.onMessage.addListener((
         return false;
     }
 
+    if (handleDownloadProgressRuntimeMessage(message, sender, sendResponse)) {
+        return false;
+    }
+
     const payload = message as { type?: unknown; url?: unknown; urls?: unknown };
     if (payload.type === 'ATLAS_GET_URL_COOKIES') {
         const urls = normalizeComparableUrls(payload.urls);
@@ -460,6 +468,7 @@ chrome.tabs.onCreated.addListener((tab: BrowserTab) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId: number) => {
+    removeDownloadProgressSubscriber(tabId);
     const changedUrls = updateTrackedComparableTabUrl(tabId, null);
     broadcastTabPresenceChanged(changedUrls);
     broadcastTabCountChanged();

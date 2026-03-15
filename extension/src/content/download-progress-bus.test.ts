@@ -1,32 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockConnectRuntimeReverb = vi.fn();
-
-vi.mock('../reverb-runtime', () => ({
-    connectRuntimeReverb: mockConnectRuntimeReverb,
-}));
+type RuntimeMessageListener = (message: unknown, sender?: unknown, sendResponse?: (response?: unknown) => void) => void;
 
 describe('download-progress-bus', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
+        vi.unstubAllGlobals();
     });
 
-    it('reuses a single reverb connection for multiple subscribers and tears down once', async () => {
-        const unsubscribe = vi.fn();
-        const disconnect = vi.fn();
-        let eventHandler: ((event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated', payload: Record<string, unknown>) => void) | null = null;
+    it('subscribes once with the background worker and fans out runtime events', async () => {
+        let runtimeMessageListener: RuntimeMessageListener | null = null;
+        const sendMessage = vi.fn((_: unknown, callback?: (response: unknown) => void) => {
+            callback?.({ ok: true });
+        });
 
-        mockConnectRuntimeReverb.mockResolvedValue({
-            kind: 'connected',
-            domain: 'https://atlas.test',
-            endpoint: 'https://atlas.test:443',
-            client: {
-                onEvent: (handler: typeof eventHandler) => {
-                    eventHandler = handler;
-                    return { unsubscribe };
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage,
+                onMessage: {
+                    addListener: vi.fn((listener: RuntimeMessageListener) => {
+                        runtimeMessageListener = listener;
+                    }),
                 },
-                disconnect,
             },
         });
 
@@ -38,19 +35,32 @@ describe('download-progress-bus', () => {
         const offOne = bus.subscribeToDownloadProgress(listenerOne);
         const offTwo = bus.subscribeToDownloadProgress(listenerTwo);
 
-        await vi.waitFor(() => {
-            expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(1);
-        });
-        expect(eventHandler).not.toBeNull();
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+        expect(sendMessage).toHaveBeenCalledWith(
+            { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' },
+            expect.any(Function),
+        );
+        expect(runtimeMessageListener).toBeTypeOf('function');
 
-        eventHandler?.('DownloadTransferQueued', {
-            file_id: 12,
-            downloadTransferId: 25,
-            original: 'https://cdn.example.com/video.mp4#frag',
-            referrer_url: 'https://example.com/page#top',
-            status: 'queued',
-            percent: 10,
-            reaction_type: 'funny',
+        runtimeMessageListener?.({
+            type: 'ATLAS_DOWNLOAD_PROGRESS_EVENT',
+            event: {
+                event: 'DownloadTransferQueued',
+                fileId: 12,
+                transferId: 25,
+                sourceUrl: 'https://cdn.example.com/video.mp4#frag',
+                referrerUrl: 'https://example.com/page#top',
+                status: 'queued',
+                percent: 10,
+                reaction: 'funny',
+                reactedAt: undefined,
+                downloadedAt: undefined,
+                blacklistedAt: undefined,
+                payload: {
+                    file_id: 12,
+                    downloadTransferId: 25,
+                },
+            },
         });
 
         expect(listenerOne).toHaveBeenCalledWith({
@@ -68,11 +78,6 @@ describe('download-progress-bus', () => {
             payload: {
                 file_id: 12,
                 downloadTransferId: 25,
-                original: 'https://cdn.example.com/video.mp4#frag',
-                referrer_url: 'https://example.com/page#top',
-                status: 'queued',
-                percent: 10,
-                reaction_type: 'funny',
             },
         });
         expect(listenerTwo).toHaveBeenCalledWith({
@@ -90,20 +95,17 @@ describe('download-progress-bus', () => {
             payload: {
                 file_id: 12,
                 downloadTransferId: 25,
-                original: 'https://cdn.example.com/video.mp4#frag',
-                referrer_url: 'https://example.com/page#top',
-                status: 'queued',
-                percent: 10,
-                reaction_type: 'funny',
             },
         });
 
         offOne();
-        expect(unsubscribe).not.toHaveBeenCalled();
-        expect(disconnect).not.toHaveBeenCalled();
+        expect(sendMessage).toHaveBeenCalledTimes(1);
 
         offTwo();
-        expect(unsubscribe).toHaveBeenCalledTimes(1);
-        expect(disconnect).toHaveBeenCalledTimes(1);
+        expect(sendMessage).toHaveBeenCalledTimes(2);
+        expect(sendMessage).toHaveBeenLastCalledWith(
+            { type: 'ATLAS_UNSUBSCRIBE_DOWNLOAD_PROGRESS' },
+            expect.any(Function),
+        );
     });
 });

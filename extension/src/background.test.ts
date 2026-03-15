@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockConnectBackgroundReverb = vi.fn();
+
+vi.mock('./background-reverb-runtime', () => ({
+    connectBackgroundReverb: mockConnectBackgroundReverb,
+}));
+
 type BrowserTab = {
     id?: number;
     url?: string;
@@ -191,5 +197,127 @@ describe('background', () => {
                 },
             },
         });
+    });
+
+    it('fans out download progress events from a single background reverb connection', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([
+            { id: 1, url: 'https://example.com/a' },
+            { id: 2, url: 'https://example.com/b' },
+        ]);
+        const disconnect = vi.fn();
+        const unsubscribeEvent = vi.fn();
+        const unsubscribeState = vi.fn();
+        let eventHandler: ((event: 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated', payload: Record<string, unknown>) => void) | null = null;
+
+        mockConnectBackgroundReverb.mockResolvedValue({
+            kind: 'connected',
+            domain: 'https://atlas.wyxos.com',
+            endpoint: 'https://atlas.wyxos.com:443',
+            client: {
+                onEvent: (handler: typeof eventHandler) => {
+                    eventHandler = handler;
+                    return { unsubscribe: unsubscribeEvent };
+                },
+                onConnectionState: () => ({ unsubscribe: unsubscribeState }),
+                onConnectionError: () => ({ unsubscribe: vi.fn() }),
+                getConnectionState: () => 'connected',
+                getLastConnectionError: () => null,
+                disconnect,
+            },
+        });
+        vi.stubGlobal('chrome', chromeMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        expect(await sendRuntimeMessage(listener!, { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 1 } })).toEqual({ ok: true });
+        expect(await sendRuntimeMessage(listener!, { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 2 } })).toEqual({ ok: true });
+
+        await vi.waitFor(() => {
+            expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(1);
+        });
+        expect(eventHandler).not.toBeNull();
+
+        eventHandler?.('DownloadTransferQueued', {
+            file_id: 12,
+            downloadTransferId: 25,
+            original: 'https://cdn.example.com/video.mp4#frag',
+            referrer_url: 'https://example.com/page#top',
+            status: 'queued',
+            percent: 10,
+            reaction_type: 'funny',
+        });
+
+        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(2);
+        expect(chromeMock.tabs.sendMessage).toHaveBeenNthCalledWith(
+            1,
+            1,
+            {
+                type: 'ATLAS_DOWNLOAD_PROGRESS_EVENT',
+                event: {
+                    event: 'DownloadTransferQueued',
+                    fileId: 12,
+                    transferId: 25,
+                    sourceUrl: 'https://cdn.example.com/video.mp4#frag',
+                    referrerUrl: 'https://example.com/page#top',
+                    status: 'queued',
+                    percent: 10,
+                    reaction: 'funny',
+                    reactedAt: undefined,
+                    downloadedAt: undefined,
+                    blacklistedAt: undefined,
+                    payload: {
+                        file_id: 12,
+                        downloadTransferId: 25,
+                        original: 'https://cdn.example.com/video.mp4#frag',
+                        referrer_url: 'https://example.com/page#top',
+                        status: 'queued',
+                        percent: 10,
+                        reaction_type: 'funny',
+                    },
+                },
+            },
+            expect.any(Function),
+        );
+        expect(chromeMock.tabs.sendMessage).toHaveBeenNthCalledWith(
+            2,
+            2,
+            {
+                type: 'ATLAS_DOWNLOAD_PROGRESS_EVENT',
+                event: {
+                    event: 'DownloadTransferQueued',
+                    fileId: 12,
+                    transferId: 25,
+                    sourceUrl: 'https://cdn.example.com/video.mp4#frag',
+                    referrerUrl: 'https://example.com/page#top',
+                    status: 'queued',
+                    percent: 10,
+                    reaction: 'funny',
+                    reactedAt: undefined,
+                    downloadedAt: undefined,
+                    blacklistedAt: undefined,
+                    payload: {
+                        file_id: 12,
+                        downloadTransferId: 25,
+                        original: 'https://cdn.example.com/video.mp4#frag',
+                        referrer_url: 'https://example.com/page#top',
+                        status: 'queued',
+                        percent: 10,
+                        reaction_type: 'funny',
+                    },
+                },
+            },
+            expect.any(Function),
+        );
+
+        expect(await sendRuntimeMessage(listener!, { type: 'ATLAS_UNSUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 1 } })).toEqual({ ok: true });
+        expect(disconnect).not.toHaveBeenCalled();
+
+        expect(await sendRuntimeMessage(listener!, { type: 'ATLAS_UNSUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 2 } })).toEqual({ ok: true });
+        expect(unsubscribeEvent).toHaveBeenCalledTimes(1);
+        expect(unsubscribeState).toHaveBeenCalledTimes(1);
+        expect(disconnect).toHaveBeenCalledTimes(1);
     });
 });
