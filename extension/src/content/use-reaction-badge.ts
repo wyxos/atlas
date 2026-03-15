@@ -11,7 +11,8 @@ import {
 } from './media-utils';
 import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
-import { submitBadgeReaction } from './reaction-submit';
+import { createDownloadedReactionDialog } from './downloaded-reaction-dialog';
+import { submitBadgeReaction, type SubmitDownloadBehavior } from './reaction-submit';
 import { subscribeToDownloadProgress, type ProgressEvent } from './download-progress-bus';
 import type { BadgeTimestampDisplay } from './reaction-badge-view';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
@@ -43,6 +44,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     const isDeviantArtPage = DEVIANT_ART_HOST_PATTERN.test(pageHostname);
     const closeTabAfterQueuePreference = useCloseTabAfterQueuePreference(pageHostname);
     const reactAllItemsInPostPreference = useReactAllItemsInPostPreference(pageHostname);
+    const downloadedReactionDialog = createDownloadedReactionDialog();
 
     const isChecking = ref(true);
     const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
@@ -429,6 +431,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             mediaMutationObserver = null;
         }
         clearRelatedPostThumbnailRetry();
+        downloadedReactionDialog.destroy();
         if (unsubscribeProgress) {
             unsubscribeProgress();
             unsubscribeProgress = null;
@@ -468,7 +471,21 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
                 }
             }
 
-            const result = await submitBadgeReaction(props.media, type, { batchItems });
+            const usesBatchEndpoint = (batchItems?.length ?? 0) >= 2;
+            let downloadBehavior: SubmitDownloadBehavior | undefined;
+            if (!usesBatchEndpoint && type !== 'dislike' && matchResult.value.downloadedAt !== null) {
+                const choice = await downloadedReactionDialog.prompt();
+                if (choice === 'cancel') {
+                    return;
+                }
+
+                downloadBehavior = choice === 'redownload' ? 'force' : 'skip';
+            }
+
+            const result = await submitBadgeReaction(props.media, type, {
+                batchItems,
+                downloadBehavior,
+            });
             const closeTabAfterQueueMode = closeTabAfterQueuePreference.mode.value;
             const shouldAutoCloseCurrentTab = result.ok
                 && closeTabAfterQueueMode !== 'off'
