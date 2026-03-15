@@ -2,19 +2,13 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Ban, Download } from 'lucide-vue-next';
 import { formatMatchTimestamp } from './match-timestamp';
 import {
-    hasRelatedPostThumbnailsBelowMedia,
-    normalizeUrl,
-    resolveIdentifiedMediaResolution,
-    resolveMediaUrl,
-    resolveReactionTargetUrl,
-    type MediaElement,
+    hasRelatedPostThumbnailsBelowMedia, normalizeUrl, resolveIdentifiedMediaResolution,
+    resolveMediaUrl, resolveReactionTargetUrl, type MediaElement,
 } from './media-utils';
 import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
 import {
-    classifyCivitAiReactionPage,
-    collectCivitAiBatchReactionItems,
-    collectCivitAiListingMetadataOverrides,
-    hasCivitAiBatchReactionItems,
+    classifyCivitAiReactionPage, collectCivitAiBatchReactionItems,
+    collectCivitAiListingMetadataOverrides, hasCivitAiBatchReactionItems,
 } from './civitai-reaction-context';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { createDownloadedReactionDialog } from './downloaded-reaction-dialog';
@@ -27,24 +21,18 @@ import { resolveReactionBadgeProgressState } from './reaction-badge-progress';
 import { emptyMatchResult, isTerminalStatus } from './reaction-badge-utils';
 import { queueCloseCurrentTabAfterDownloadComplete } from './reaction-badge-auto-close';
 import {
-    getPersistedBadgeState,
-    persistBadgeCheckResult,
-    persistBadgeState,
-    persistDownloadProgressEvent,
-    type PersistedBadgeState,
+    getPersistedBadgeState, persistBadgeCheckResult, persistBadgeState,
+    persistDownloadProgressEvent, type PersistedBadgeState,
 } from './badge-state-cache';
 import { useCloseTabAfterQueuePreference } from './close-tab-after-queue-state';
 import { useReactAllItemsInPostPreference } from './react-all-items-in-post-state';
-
 type UseReactionBadgeProps = {
     media: MediaElement;
     onShortcutReady?: ((handler: ((type: BadgeReactionType) => void) | null) => void) | undefined;
 };
-
 const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
 const CIVITAI_HOST_PATTERN = /(^|\.)civitai\.com$/i;
 const RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS = [120, 400, 1000, 2200] as const;
-
 export function useReactionBadge(props: UseReactionBadgeProps) {
     ensureReactionBadgeRuntimeStyles();
     const pageHostname = window.location.hostname.trim().toLowerCase();
@@ -70,7 +58,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     const lastCheckedMediaUrl = ref<string | null>(null);
     const lastReactionMediaUrl = ref<string | null>(null);
     const trackedMediaUrls = ref<string[]>([]);
-
     let isActive = true;
     let unsubscribeProgress: (() => void) | null = null;
     let unsubscribeTabCount: (() => void) | null = null;
@@ -79,12 +66,8 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     let suppressMediaContextUpdates = false;
     let relatedPostThumbnailRetryTimer: number | null = null;
     let relatedPostThumbnailRetryIndex = 0;
-
-    const controlsDisabled = computed(() =>
-        isChecking.value
-        || submittingReactionType.value !== null
-        || isDownloadLocked.value
-        || reactAllItemsInPostPreference.saving.value);
+    const controlsDisabled = computed(() => isChecking.value
+        || submittingReactionType.value !== null || isDownloadLocked.value || reactAllItemsInPostPreference.saving.value);
     const activeReaction = computed(() => (matchResult.value.exists ? matchResult.value.reaction : null));
     const timestampText = computed<BadgeTimestampDisplay>(() => {
         const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
@@ -106,11 +89,8 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         return null;
     });
     const progressState = computed(() => resolveReactionBadgeProgressState({
-        progressPercent: progressPercent.value,
-        transferStatus: transferStatus.value,
-        downloadedAt: matchResult.value.downloadedAt,
+        progressPercent: progressPercent.value, transferStatus: transferStatus.value, downloadedAt: matchResult.value.downloadedAt,
     }));
-
     function resolveTrackedUrlsForCurrentMedia(): string[] {
         const pageUrl = normalizeUrl(window.location.href);
         const reactionTargetUrl = resolveReactionTargetUrl(props.media, pageUrl);
@@ -120,15 +100,12 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             mediaUrl,
             props.media instanceof HTMLVideoElement ? pageUrl : null,
         ].filter((url): url is string => url !== null);
-
         return Array.from(new Set(urls));
     }
-
     function syncTrackedUrlsForCurrentMedia(): void {
         trackedMediaUrls.value = resolveTrackedUrlsForCurrentMedia();
         lastReactionMediaUrl.value = trackedMediaUrls.value[0] ?? null;
     }
-
     function syncRelatedPostThumbnailContext(): void {
         const civitAiPageKind = classifyCivitAiReactionPage();
         const nextVisible = hasRelatedPostThumbnailsBelowMedia(props.media, pageHostname)
@@ -136,93 +113,75 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         if (!nextVisible && submittingReactionType.value !== null) {
             return;
         }
-
         showReactAllItemsInPost.value = nextVisible;
         if (nextVisible) {
             clearRelatedPostThumbnailRetry();
         }
     }
-
     function clearRelatedPostThumbnailRetry(): void {
         if (relatedPostThumbnailRetryTimer !== null) {
             window.clearTimeout(relatedPostThumbnailRetryTimer);
             relatedPostThumbnailRetryTimer = null;
         }
     }
-
     function scheduleRelatedPostThumbnailRetry(): void {
         if (!isActive || suppressMediaContextUpdates || !isDeviantArtPage || showReactAllItemsInPost.value || relatedPostThumbnailRetryTimer !== null) {
             return;
         }
-
         const nextDelay = RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS[relatedPostThumbnailRetryIndex];
         if (nextDelay === undefined) {
             return;
         }
-
         relatedPostThumbnailRetryIndex += 1;
         relatedPostThumbnailRetryTimer = window.setTimeout(() => {
             relatedPostThumbnailRetryTimer = null;
             if (!isActive || suppressMediaContextUpdates) {
                 return;
             }
-
             syncRelatedPostThumbnailContext();
             if (!showReactAllItemsInPost.value) {
                 scheduleRelatedPostThumbnailRetry();
             }
         }, nextDelay);
     }
-
     function restartRelatedPostThumbnailRetry(): void {
         clearRelatedPostThumbnailRetry();
         relatedPostThumbnailRetryIndex = 0;
         scheduleRelatedPostThumbnailRetry();
     }
-
     function resolvePersistenceUrl(): string | null {
         return lastReactionMediaUrl.value ?? trackedMediaUrls.value[0] ?? null;
     }
-
     function getLatestPersistedStateForTrackedUrls(): PersistedBadgeState | null {
         let latest: PersistedBadgeState | null = null;
-
         for (const url of trackedMediaUrls.value) {
             const snapshot = getPersistedBadgeState(url);
             if (snapshot === null) {
                 continue;
             }
-
             if (latest === null || snapshot.updatedAt > latest.updatedAt) {
                 latest = snapshot;
             }
         }
-
         return latest;
     }
-
     function matchingUrlFromProgressEvent(event: ProgressEvent): string | null {
         if (trackedMediaUrls.value.length === 0) {
             return null;
         }
-
         const candidate = normalizeUrl(event.sourceUrl);
         if (candidate !== null && trackedMediaUrls.value.includes(candidate)) {
             return candidate;
         }
-
         return null;
     }
-
     function syncResolution(): void {
         const resolved = resolveIdentifiedMediaResolution(props.media);
         mediaResolution.value = resolved ? `${resolved.width} x ${resolved.height}` : null;
     }
-
     async function refreshOpenTabCount(): Promise<void> {
         openTabCount.value = await requestTabCount();
     }
-
     function persistCurrentBadgeState(isLocked: boolean): void {
         persistBadgeState(resolvePersistenceUrl(), {
             exists: matchResult.value.exists,
@@ -237,19 +196,16 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             blacklistedAt: matchResult.value.blacklistedAt,
         });
     }
-
     function handleTerminalUnlock(): void {
         isDownloadLocked.value = false;
         submittingReactionType.value = null;
         hasSeenActiveTransfer.value = false;
         persistCurrentBadgeState(false);
     }
-
     function applyPersistedState(snapshot: PersistedBadgeState | null): void {
         if (snapshot === null) {
             return;
         }
-
         const hasReaction = snapshot.reaction !== null;
         matchResult.value = {
             ...matchResult.value,
@@ -266,7 +222,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         isDownloadLocked.value = snapshot.isDownloadLocked;
         hasSeenActiveTransfer.value = snapshot.status !== null && !isTerminalStatus(snapshot.status);
     }
-
     function resetStateForMediaContextChange(): void {
         isChecking.value = true;
         hoveredReaction.value = null;
@@ -279,25 +234,21 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         trackedTransferId.value = null;
         hasSeenActiveTransfer.value = false;
     }
-
     function ensureProgressSubscription(): void {
         if (unsubscribeProgress) {
             return;
         }
-
         unsubscribeProgress = subscribeToDownloadProgress((event) => {
             persistDownloadProgressEvent(event);
             if (!isActive) {
                 return;
             }
-
             const transferMatches = trackedTransferId.value !== null && event.transferId === trackedTransferId.value;
             const fileMatches = trackedFileId.value !== null && event.fileId === trackedFileId.value;
             const matchedUrl = matchingUrlFromProgressEvent(event);
             if (!transferMatches && !fileMatches && matchedUrl === null) {
                 return;
             }
-
             if (matchedUrl !== null) {
                 lastReactionMediaUrl.value = matchedUrl;
             }
@@ -307,7 +258,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             if (event.transferId !== null) {
                 trackedTransferId.value = event.transferId;
             }
-
             const priorReaction = matchResult.value.reaction;
             const priorExists = matchResult.value.exists;
             const persisted = getLatestPersistedStateForTrackedUrls();
@@ -321,7 +271,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
                     };
                 }
             }
-
             if (event.percent !== null) {
                 progressPercent.value = Math.max(0, Math.min(100, Math.round(event.percent)));
             }
@@ -334,7 +283,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             if (event.status !== null && isTerminalStatus(event.status)) {
                 handleTerminalUnlock();
             }
-
             persistCurrentBadgeState(isDownloadLocked.value);
         });
     }
@@ -502,7 +450,6 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             }
 
             const result = await submitBadgeReaction(props.media, type, {
-                downloadBehavior,
                 ...(batchItems !== null ? { batchItems } : {}),
                 ...(listingMetadataOverrides !== null ? { listingMetadataOverrides } : {}),
                 ...(downloadBehavior !== undefined ? { downloadBehavior } : {}),
