@@ -7,8 +7,7 @@ import {
 } from './media-utils';
 import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
 import {
-    classifyCivitAiReactionPage, collectCivitAiBatchReactionItems,
-    collectCivitAiListingMetadataOverrides, hasCivitAiBatchReactionItems,
+    collectCivitAiListingMetadataOverrides,
 } from './civitai-reaction-context';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { createDownloadedReactionDialog } from './downloaded-reaction-dialog';
@@ -107,9 +106,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         lastReactionMediaUrl.value = trackedMediaUrls.value[0] ?? null;
     }
     function syncRelatedPostThumbnailContext(): void {
-        const civitAiPageKind = classifyCivitAiReactionPage();
-        const nextVisible = hasRelatedPostThumbnailsBelowMedia(props.media, pageHostname)
-            || (civitAiPageKind === 'post-page' && hasCivitAiBatchReactionItems(props.media));
+        const nextVisible = hasRelatedPostThumbnailsBelowMedia(props.media, pageHostname);
         if (!nextVisible && submittingReactionType.value !== null) {
             return;
         }
@@ -422,13 +419,9 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             if (showReactAllItemsInPost.value && reactAllItemsInPostPreference.enabled.value) {
                 suppressMediaContextUpdates = true;
                 try {
-                    if (classifyCivitAiReactionPage() === 'post-page') {
-                        batchItems = await collectCivitAiBatchReactionItems(props.media);
-                    } else {
-                        batchItems = await collectDeviantArtBatchReactionItems(props.media, {
-                            hostname: pageHostname,
-                        });
-                    }
+                    batchItems = await collectDeviantArtBatchReactionItems(props.media, {
+                        hostname: pageHostname,
+                    });
                 } catch {
                     batchItems = null;
                 } finally {
