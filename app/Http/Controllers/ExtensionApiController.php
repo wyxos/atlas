@@ -8,6 +8,7 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use App\Services\BrowsePersister;
+use App\Services\CivitAiImages;
 use App\Services\Extension\ExtensionContainerMetadataService;
 use App\Services\Extension\ExtensionMediaMatchService;
 use App\Services\ExtensionApiKeyService;
@@ -444,7 +445,16 @@ class ExtensionApiController extends Controller
         array $listingMetadataOverrides = [],
     ): File {
         $downloadVia = $this->shouldUseYtDlp($url, $pageUrl, $tagName) ? 'yt-dlp' : null;
-        $canonicalUrl = $downloadVia === 'yt-dlp' && $pageUrl !== null ? $pageUrl : $url;
+        $rawCanonicalUrl = $downloadVia === 'yt-dlp' && $pageUrl !== null ? $pageUrl : $url;
+        $identity = $this->resolveExtensionFileIdentity(
+            $rawCanonicalUrl,
+            $source,
+            $referrerUrl,
+            $pageUrl,
+            $tagName
+        );
+        $canonicalUrl = $identity['url'];
+        $sourceId = $identity['source_id'];
         $urlHash = hash('sha256', $canonicalUrl);
         $listingMetadata = array_filter([
             'extension_channel' => $extensionChannel,
@@ -460,14 +470,12 @@ class ExtensionApiController extends Controller
             default => true,
         });
 
-        $file = File::query()
-            ->where('url_hash', $urlHash)
-            ->latest('updated_at')
-            ->first();
+        $file = $this->findExistingFileForExtensionIdentity($urlHash, $canonicalUrl, $source, $sourceId, $referrerUrl);
 
         if (! $file) {
             return File::query()->create([
                 'source' => $source,
+                'source_id' => $sourceId,
                 'url' => $canonicalUrl,
                 'referrer_url' => $referrerUrl,
                 'preview_url' => $previewUrl,
@@ -481,6 +489,21 @@ class ExtensionApiController extends Controller
         $currentSource = strtolower(trim((string) $file->source));
         if (($currentSource === '' || $currentSource === 'extension') && $file->source !== $source) {
             $updates['source'] = $source;
+        }
+        if ($sourceId !== null && trim((string) ($file->source_id ?? '')) === '') {
+            $updates['source_id'] = $sourceId;
+        }
+        if (
+            $file->url !== $canonicalUrl
+            && ! File::query()
+                ->where('id', '!=', $file->id)
+                ->where(function ($query) use ($canonicalUrl, $urlHash): void {
+                    $query->where('url_hash', $urlHash)
+                        ->orWhere('url', $canonicalUrl);
+                })
+                ->exists()
+        ) {
+            $updates['url'] = $canonicalUrl;
         }
         if ($referrerUrl !== null && $file->referrer_url !== $referrerUrl) {
             $updates['referrer_url'] = $referrerUrl;
@@ -517,6 +540,153 @@ class ExtensionApiController extends Controller
         }
 
         return $file;
+    }
+
+    private function resolveExtensionFileIdentity(
+        string $url,
+        string $source,
+        ?string $referrerUrl,
+        ?string $pageUrl,
+        ?string $tagName,
+    ): array {
+        if ($source !== CivitAiImages::SOURCE) {
+            return [
+                'url' => $url,
+                'source_id' => null,
+            ];
+        }
+
+        $sourceId = $this->extractCivitAiImageIdFromCandidateUrls([$referrerUrl, $pageUrl]);
+        if ($sourceId === null) {
+            return [
+                'url' => $url,
+                'source_id' => null,
+            ];
+        }
+
+        return [
+            'url' => $this->canonicalizeCivitAiMediaUrl($url, $sourceId, $tagName) ?? $url,
+            'source_id' => $sourceId,
+        ];
+    }
+
+    private function findExistingFileForExtensionIdentity(
+        string $urlHash,
+        string $canonicalUrl,
+        string $source,
+        ?string $sourceId,
+        ?string $referrerUrl,
+    ): ?File {
+        $file = File::query()
+            ->where('url_hash', $urlHash)
+            ->orWhere('url', $canonicalUrl)
+            ->latest('updated_at')
+            ->first();
+        if ($file) {
+            return $file;
+        }
+
+        if ($source !== CivitAiImages::SOURCE) {
+            return null;
+        }
+
+        if ($sourceId !== null) {
+            $file = File::query()
+                ->where('source', CivitAiImages::SOURCE)
+                ->where('source_id', $sourceId)
+                ->orderByDesc('downloaded')
+                ->latest('updated_at')
+                ->first();
+            if ($file) {
+                return $file;
+            }
+        }
+
+        if ($referrerUrl === null) {
+            return null;
+        }
+
+        return File::query()
+            ->where('source', CivitAiImages::SOURCE)
+            ->where('referrer_url_hash', hash('sha256', $referrerUrl))
+            ->orderByDesc('downloaded')
+            ->latest('updated_at')
+            ->first();
+    }
+
+    private function extractCivitAiImageIdFromCandidateUrls(array $candidateUrls): ?string
+    {
+        foreach ($candidateUrls as $candidateUrl) {
+            $imageId = $this->extractCivitAiImageIdFromUrl(is_string($candidateUrl) ? $candidateUrl : null);
+            if ($imageId !== null) {
+                return $imageId;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractCivitAiImageIdFromUrl(?string $url): ?string
+    {
+        if (! is_string($url) || trim($url) === '') {
+            return null;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! is_string($host) || ! is_string($path)) {
+            return null;
+        }
+
+        $normalizedHost = strtolower(trim($host));
+        if ($normalizedHost !== 'civitai.com' && $normalizedHost !== 'www.civitai.com') {
+            return null;
+        }
+
+        if (preg_match('#^/images/(\d+)(?:/|$)#i', $path, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1] ?? null;
+    }
+
+    private function canonicalizeCivitAiMediaUrl(string $url, string $imageId, ?string $tagName): ?string
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts)) {
+            return null;
+        }
+
+        $scheme = isset($parts['scheme']) && is_string($parts['scheme']) ? strtolower($parts['scheme']) : null;
+        $host = isset($parts['host']) && is_string($parts['host']) ? strtolower($parts['host']) : null;
+        $path = isset($parts['path']) && is_string($parts['path']) ? trim($parts['path'], '/') : null;
+        if ($scheme === null || ! in_array($scheme, ['http', 'https'], true) || $host !== 'image.civitai.com' || $path === null || $path === '') {
+            return null;
+        }
+
+        $segments = array_values(array_filter(explode('/', $path), static fn (string $segment): bool => $segment !== ''));
+        if (count($segments) < 4) {
+            return null;
+        }
+
+        $token = $segments[0] ?? '';
+        $guid = $segments[1] ?? '';
+        $filename = end($segments);
+        if (! is_string($filename) || $token === '' || $guid === '') {
+            return null;
+        }
+
+        $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+        if ($extension === '') {
+            return null;
+        }
+
+        $isVideo = in_array($tagName, ['video', 'iframe'], true)
+            || in_array($extension, ['mp4', 'm4v', 'mov', 'webm'], true);
+        $transform = $isVideo ? 'transcode=true,original=true,quality=90' : 'original=true';
+        $canonicalFilename = $isVideo ? "{$imageId}.{$extension}" : "{$guid}.{$extension}";
+
+        return "{$scheme}://{$host}/{$token}/{$guid}/{$transform}/{$canonicalFilename}";
     }
 
     private function findActiveTransfer(int $fileId): ?DownloadTransfer

@@ -372,6 +372,7 @@ test('single civitai image reactions persist civitai source and derived post use
 
     $user = User::factory()->create();
     setExtensionReactionApiKey('valid-api-key', $user->id);
+    $canonicalUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true/cf304569-f64a-4f90-aa1b-16bfb641f143.jpeg';
 
     $response = $this->withHeaders([
         'X-Atlas-Api-Key' => 'valid-api-key',
@@ -403,10 +404,13 @@ test('single civitai image reactions persist civitai source and derived post use
 
     $response->assertSuccessful();
 
-    $file = File::query()->where('url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg')->first();
+    $response->assertJsonPath('file.url', $canonicalUrl);
+
+    $file = File::query()->where('url', $canonicalUrl)->first();
 
     expect($file)->not->toBeNull();
     expect($file?->source)->toBe('CivitAI');
+    expect($file?->source_id)->toBe('76490204');
     expect($file?->referrer_url)->toBe('https://civitai.com/images/76490204');
     expect(data_get($file?->listing_metadata, 'postId'))->toBe(23377656);
     expect(data_get($file?->listing_metadata, 'username'))->toBe('shepretends');
@@ -442,6 +446,41 @@ test('single civitai image reactions persist civitai source and derived post use
     expect($file?->containers()->where('type', 'User')->exists())->toBeTrue();
     expect($file?->containers()->where('type', 'Checkpoint')->exists())->toBeTrue();
     expect($file?->containers()->where('type', 'LoRA')->exists())->toBeTrue();
+});
+
+test('extension reactions reuse the existing civitai browse row for the same image page', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $canonicalUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/51215cf6-0dd6-4643-9e7d-05e8c9f0849a/original=true/51215cf6-0dd6-4643-9e7d-05e8c9f0849a.jpeg';
+    $existing = File::factory()->create([
+        'source' => 'CivitAI',
+        'source_id' => '123751364',
+        'url' => $canonicalUrl,
+        'referrer_url' => 'https://civitai.com/images/123751364',
+        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/51215cf6-0dd6-4643-9e7d-05e8c9f0849a/anim=false,width=450,optimized=true/123751364.jpeg',
+        'filename' => 'existing-civitai',
+        'ext' => 'jpeg',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/51215cf6-0dd6-4643-9e7d-05e8c9f0849a/original=true,quality=90/2026-03-03-145847_1056106972632616_Upscale.jpeg',
+        'referrer_url_hash_aware' => 'https://civitai.com/images/123751364',
+        'page_url' => 'https://civitai.com/images/123751364',
+        'tag_name' => 'img',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.id', $existing->id);
+    $response->assertJsonPath('file.url', $canonicalUrl);
+
+    expect(File::query()->count())->toBe(1);
+    expect(Reaction::query()->where('user_id', $user->id)->where('file_id', $existing->id)->value('type'))->toBe('like');
 });
 
 test('extension batch reactions queue all submitted gallery items and return the selected primary item', function () {
@@ -607,6 +646,8 @@ test('extension batch reactions persist civitai shared containers with per-item 
 
     $user = User::factory()->create();
     setExtensionReactionApiKey('valid-api-key', $user->id);
+    $canonicalVideoUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/76477306.mp4';
+    $canonicalImageUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true/cf304569-f64a-4f90-aa1b-16bfb641f143.jpeg';
 
     $response = $this->withHeaders([
         'X-Atlas-Api-Key' => 'valid-api-key',
@@ -650,16 +691,18 @@ test('extension batch reactions persist civitai shared containers with per-item 
     ]);
 
     $response->assertSuccessful();
-    $response->assertJsonPath('file.url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg');
+    $response->assertJsonPath('file.url', $canonicalImageUrl);
     $response->assertJsonPath('file.referrer_url', 'https://civitai.com/images/76490204');
 
-    $videoFile = File::query()->where('url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/4MGM4VAVYH67B8TYY43NVH1780.mp4')->first();
-    $imageFile = File::query()->where('url', 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/cf304569-f64a-4f90-aa1b-16bfb641f143/original=true,quality=90/1341e338-9de2-4d1a-a6ff-6c86fb7ad759.jpeg')->first();
+    $videoFile = File::query()->where('url', $canonicalVideoUrl)->first();
+    $imageFile = File::query()->where('url', $canonicalImageUrl)->first();
 
     expect($videoFile)->not->toBeNull();
     expect($imageFile)->not->toBeNull();
     expect($videoFile?->source)->toBe('CivitAI');
     expect($imageFile?->source)->toBe('CivitAI');
+    expect($videoFile?->source_id)->toBe('76477306');
+    expect($imageFile?->source_id)->toBe('76490204');
     expect($videoFile?->referrer_url)->toBe('https://civitai.com/images/76477306');
     expect($imageFile?->referrer_url)->toBe('https://civitai.com/images/76490204');
     expect(data_get($videoFile?->listing_metadata, 'postId'))->toBe(16973563);
