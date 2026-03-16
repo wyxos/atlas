@@ -45,6 +45,38 @@ test('extension reactions endpoint requires a valid api key', function () {
     $response->assertUnauthorized();
 });
 
+test('extension reactions endpoint responds to extension cors preflight and actual requests', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $origin = 'chrome-extension://dhhmiflbhoaffjmlfpihmpioflgocekg';
+
+    $preflightResponse = $this->withHeaders([
+        'Origin' => $origin,
+        'Access-Control-Request-Method' => 'POST',
+        'Access-Control-Request-Headers' => 'content-type,x-atlas-api-key',
+    ])->options('/api/extension/reactions');
+
+    $preflightResponse->assertNoContent();
+    $preflightResponse->assertHeader('Access-Control-Allow-Origin', $origin);
+    $preflightResponse->assertHeader('Access-Control-Allow-Methods', 'POST');
+    $preflightResponse->assertHeader('Access-Control-Allow-Headers', 'content-type,x-atlas-api-key');
+
+    $response = $this->withHeaders([
+        'Origin' => $origin,
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://cdn.example.test/media/cors-check.jpg',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertHeader('Access-Control-Allow-Origin', $origin);
+    $response->assertJsonPath('reaction.type', 'like');
+});
+
 test('extension reactions endpoint creates file applies reaction and queues download', function () {
     Queue::fake();
 
