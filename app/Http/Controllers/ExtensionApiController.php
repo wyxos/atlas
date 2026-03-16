@@ -493,16 +493,13 @@ class ExtensionApiController extends Controller
         if ($sourceId !== null && trim((string) ($file->source_id ?? '')) === '') {
             $updates['source_id'] = $sourceId;
         }
-        if (
-            $file->url !== $canonicalUrl
-            && ! File::query()
+        $duplicateCanonicalUrlExists = $file->url !== $canonicalUrl
+            && File::query()
                 ->where('id', '!=', $file->id)
-                ->where(function ($query) use ($canonicalUrl, $urlHash): void {
-                    $query->where('url_hash', $urlHash)
-                        ->orWhere('url', $canonicalUrl);
-                })
-                ->exists()
-        ) {
+                ->where('url_hash', $urlHash)
+                ->exists();
+
+        if ($file->url !== $canonicalUrl && ! $duplicateCanonicalUrlExists) {
             $updates['url'] = $canonicalUrl;
         }
         if ($referrerUrl !== null && $file->referrer_url !== $referrerUrl) {
@@ -579,8 +576,6 @@ class ExtensionApiController extends Controller
     ): ?File {
         $file = File::query()
             ->where('url_hash', $urlHash)
-            ->orWhere('url', $canonicalUrl)
-            ->latest('updated_at')
             ->first();
         if ($file) {
             return $file;
