@@ -95,10 +95,28 @@ export function classifyCivitAiReactionPage(href: string = window.location.href)
     return null;
 }
 
-export function canonicalizeCivitAiBadgeCheckUrl(
+function resolveImageIdFromCandidateUrls(candidateUrls: Array<string | null | undefined>): number | null {
+    for (const candidateUrl of candidateUrls) {
+        const parsed = parseRelativeOrAbsoluteUrl(candidateUrl);
+        if (parsed === null) {
+            continue;
+        }
+
+        const imageId = parseIdFromPath(parsed, CIVITAI_IMAGE_PATH_PATTERN);
+        if (imageId !== null) {
+            return imageId;
+        }
+    }
+
+    return null;
+}
+
+export function canonicalizeCivitAiMediaUrl(
     mediaUrl: string | null | undefined,
-    media: MediaElement | null = null,
-    href: string = window.location.href,
+    options: {
+        media?: MediaElement | null;
+        candidatePageUrls?: Array<string | null | undefined>;
+    } | MediaElement | null = {},
 ): string | null {
     if (typeof mediaUrl !== 'string') {
         return null;
@@ -131,8 +149,19 @@ export function canonicalizeCivitAiBadgeCheckUrl(
         return trimmed;
     }
 
+    const normalizedOptions = options instanceof HTMLImageElement || options instanceof HTMLVideoElement
+        ? {
+            media: options,
+            candidatePageUrls: [window.location.href],
+        }
+        : options ?? {};
+    const media = normalizedOptions.media ?? null;
+    const candidatePageUrls = normalizedOptions.candidatePageUrls ?? [window.location.href];
     const isVideo = media instanceof HTMLVideoElement || CIVITAI_VIDEO_EXTENSIONS.has(extension);
-    const imageId = isVideo ? resolveImageIdForMedia(media, href) : null;
+    const imageId = isVideo
+        ? resolveImageIdForMedia(media, candidatePageUrls[0] ?? window.location.href)
+            ?? resolveImageIdFromCandidateUrls(candidatePageUrls)
+        : null;
     if (isVideo && imageId === null) {
         return trimmed;
     }
@@ -142,6 +171,8 @@ export function canonicalizeCivitAiBadgeCheckUrl(
 
     return `${parsed.protocol}//${parsed.host}/${token}/${guid}/${transform}/${canonicalFilename}`;
 }
+
+export const canonicalizeCivitAiBadgeCheckUrl = canonicalizeCivitAiMediaUrl;
 function resolveUsernameFromAnchor(anchor: HTMLAnchorElement | null): string | null {
     if (!(anchor instanceof HTMLAnchorElement)) {
         return null;

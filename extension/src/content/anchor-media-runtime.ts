@@ -1,6 +1,5 @@
 import type { UrlMatchRule } from '../match-rules';
-import type { ReferrerQueryParamsToStripByDomain } from '../referrer-cleanup';
-import { cleanupReferrerUrl } from '../referrer-cleanup';
+import { cleanupUrlQueryParams } from '../referrer-cleanup';
 import {
     isMediaElement,
     normalizeHashAwareUrl,
@@ -24,7 +23,7 @@ const ANCHOR_MEDIA_MATCH_ATTR = 'data-atlas-anchor-media-match';
 
 type AnchorMediaRuntimeOptions = {
     getRules: () => UrlMatchRule[];
-    getReferrerQueryParamsToStripByDomain: () => ReferrerQueryParamsToStripByDomain;
+    getReferrerCleanerQueryParams: () => string[];
     getPageHostname: () => string;
 };
 
@@ -148,8 +147,8 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         const rawHref = anchor.getAttribute('href');
         const absoluteHref = anchor.href;
         const normalizedAnchorHref = normalizeHashAwareUrl(absoluteHref);
-        const referrerQueryParamsToStripByDomain = options.getReferrerQueryParamsToStripByDomain();
-        const anchorHref = cleanupReferrerUrl(normalizedAnchorHref, referrerQueryParamsToStripByDomain);
+        const referrerCleanerQueryParams = options.getReferrerCleanerQueryParams();
+        const anchorHref = cleanupUrlQueryParams(normalizedAnchorHref, referrerCleanerQueryParams);
         const isValid = normalizedAnchorHref !== null
             && anchorHref !== null
             && !shouldExcludeAnchorHref(rawHref, absoluteHref)
@@ -164,7 +163,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         const referrerKey = anchorHref;
         anchorReferrerKeyByMedia.set(media, referrerKey);
         const isCacheOnly = optionsOverride?.referrerMatchFromCacheOnly === true;
-        const cachedResult = getCachedReferrerCheck(anchorHref, referrerQueryParamsToStripByDomain);
+        const cachedResult = getCachedReferrerCheck(anchorHref, referrerCleanerQueryParams);
         if (!isCacheOnly && cachedResult === null) {
             applyAnchorCheckingDecoration(media);
             media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
@@ -177,7 +176,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         }
         const referrerResultPromise = isCacheOnly || cachedResult !== null
             ? Promise.resolve(cachedResult)
-            : enqueueReferrerCheck(anchorHref, referrerQueryParamsToStripByDomain).then((result) => result);
+            : enqueueReferrerCheck(anchorHref, referrerCleanerQueryParams).then((result) => result);
 
         void referrerResultPromise.then((result) => {
             if (!media.isConnected || anchorReferrerKeyByMedia.get(media) !== referrerKey) {
@@ -296,8 +295,8 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         downloadedAt: string | null | undefined,
         blacklistedAt: string | null | undefined,
     ): void {
-        const referrerQueryParamsToStripByDomain = options.getReferrerQueryParamsToStripByDomain();
-        const normalizedReferrerUrl = cleanupReferrerUrl(referrerUrl, referrerQueryParamsToStripByDomain);
+        const referrerCleanerQueryParams = options.getReferrerCleanerQueryParams();
+        const normalizedReferrerUrl = cleanupUrlQueryParams(referrerUrl, referrerCleanerQueryParams);
         if (normalizedReferrerUrl === null) {
             return;
         }
@@ -314,7 +313,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
 
             const rawHref = anchor.getAttribute('href');
             const normalizedAnchorHref = normalizeHashAwareUrl(anchor.href);
-            const anchorHref = cleanupReferrerUrl(normalizedAnchorHref, referrerQueryParamsToStripByDomain);
+            const anchorHref = cleanupUrlQueryParams(normalizedAnchorHref, referrerCleanerQueryParams);
             const isEligibleAnchor = normalizedAnchorHref !== null
                 && anchorHref !== null
                 && !shouldExcludeAnchorHref(rawHref, anchor.href)
@@ -367,8 +366,8 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             return;
         }
 
-        const referrerQueryParamsToStripByDomain = options.getReferrerQueryParamsToStripByDomain();
-        const normalizedReferrer = normalizeUrl(cleanupReferrerUrl(event.referrerUrl, referrerQueryParamsToStripByDomain));
+        const referrerCleanerQueryParams = options.getReferrerCleanerQueryParams();
+        const normalizedReferrer = normalizeUrl(cleanupUrlQueryParams(event.referrerUrl, referrerCleanerQueryParams));
         if (!normalizedReferrer) {
             return;
         }
@@ -379,7 +378,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             reactedAt: event.reactedAt,
             downloadedAt: event.downloadedAt,
             blacklistedAt: event.blacklistedAt,
-        }, referrerQueryParamsToStripByDomain);
+        }, referrerCleanerQueryParams);
 
         applyReactionForReferrerUrl(normalizedReferrer, event.reaction ?? undefined, event.downloadedAt, event.blacklistedAt);
     }

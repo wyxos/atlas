@@ -1,6 +1,11 @@
 import { getStoredOptions } from './atlas-options';
-import { DEFAULT_MATCH_RULES, type UrlMatchRule } from './match-rules';
-import type { ReferrerQueryParamsToStripByDomain } from './referrer-cleanup';
+import type { UrlMatchRule } from './match-rules';
+import {
+    createCustomizationMatchRules,
+    resolveSiteCustomizationForHostname,
+    type SiteCustomization,
+} from './site-customizations';
+import { setActivePageSiteCustomization } from './page-customization-state';
 import {
     collectMediaFromNode,
     isMediaElement,
@@ -19,14 +24,15 @@ const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
 const MIN_WIDGET_MEDIA_WIDTH = 200;
 
-let currentRules: UrlMatchRule[] = [...DEFAULT_MATCH_RULES];
-let currentReferrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {};
+let currentSiteCustomization: SiteCustomization | null = null;
+let currentRules: UrlMatchRule[] = [];
+let currentReferrerCleanerQueryParams: string[] = [];
 let currentPageHostname = window.location.hostname;
 const overlayManager = new OverlayManager();
 const downloadEventSheet = createDownloadEventSheet();
 const anchorMediaRuntime = createAnchorMediaRuntime({
     getRules: () => currentRules,
-    getReferrerQueryParamsToStripByDomain: () => currentReferrerQueryParamsToStripByDomain,
+    getReferrerCleanerQueryParams: () => currentReferrerCleanerQueryParams,
     getPageHostname: () => currentPageHostname,
 });
 let duplicateAnchorTabGuard: ReturnType<typeof createDuplicateAnchorTabGuard> | null = null;
@@ -230,14 +236,18 @@ function installMediaDimensionListeners(): void {
 async function loadRulesAndProcess(): Promise<void> {
     try {
         const stored = await getStoredOptions();
-        currentRules = stored.matchRules;
-        currentReferrerQueryParamsToStripByDomain = stored.referrerQueryParamsToStripByDomain;
+        currentPageHostname = window.location.hostname;
+        currentSiteCustomization = resolveSiteCustomizationForHostname(stored.siteCustomizations, currentPageHostname);
+        currentRules = currentSiteCustomization ? createCustomizationMatchRules(currentSiteCustomization) : [];
+        currentReferrerCleanerQueryParams = currentSiteCustomization?.referrerCleaner.stripQueryParams ?? [];
     } catch {
-        currentRules = [...DEFAULT_MATCH_RULES];
-        currentReferrerQueryParamsToStripByDomain = {};
+        currentPageHostname = window.location.hostname;
+        currentSiteCustomization = null;
+        currentRules = [];
+        currentReferrerCleanerQueryParams = [];
     }
 
-    currentPageHostname = window.location.hostname;
+    setActivePageSiteCustomization(currentSiteCustomization);
     processAllCurrentMedia();
     anchorMediaRuntime.registerFromDocument();
 }

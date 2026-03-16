@@ -1,7 +1,10 @@
 import { getStoredOptions } from '../atlas-options';
+import { getActivePageSiteCustomization } from '../page-customization-state';
+import { resolveSiteCustomizationForHostname } from '../site-customizations';
 import { requestAtlasViaRuntime } from '../atlas-runtime-request';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
-import { normalizeUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
+import { normalizeUrl, shouldExcludeMediaOrAnchorUrl, type MediaElement } from './media-utils';
+import { applyMediaCleaner } from './media-cleaner';
 
 export type BadgeReactionType = 'love' | 'like' | 'dislike' | 'funny';
 
@@ -19,6 +22,11 @@ type MatchQueueItem = {
     mediaUrlHash: string;
     resolve: (result: BadgeMatchResult) => void;
     promise: Promise<BadgeMatchResult>;
+};
+
+type ReactionCheckContext = {
+    media?: MediaElement | null;
+    candidatePageUrls?: Array<string | null | undefined>;
 };
 
 type MatchResponseItem = {
@@ -211,8 +219,30 @@ function scheduleFlush(): void {
     }, BATCH_DELAY_MS);
 }
 
-export async function enqueueReactionCheck(mediaUrl: string | null): Promise<BadgeMatchResult> {
-    const normalizedMediaUrl = normalizeUrl(mediaUrl);
+export async function enqueueReactionCheck(
+    mediaUrl: string | null,
+    context: ReactionCheckContext = {},
+): Promise<BadgeMatchResult> {
+    let activeSiteCustomization = getActivePageSiteCustomization();
+    if (activeSiteCustomization === null) {
+        try {
+            const stored = await getStoredOptions();
+            activeSiteCustomization = resolveSiteCustomizationForHostname(stored.siteCustomizations, window.location.hostname);
+        } catch {
+            activeSiteCustomization = null;
+        }
+    }
+
+    const mediaCleaner = activeSiteCustomization?.mediaCleaner ?? {
+        stripQueryParams: [],
+        rewriteRules: [],
+        strategies: [],
+    };
+    const cleanedMediaUrl = applyMediaCleaner(mediaUrl, mediaCleaner, {
+        media: context.media ?? null,
+        candidatePageUrls: context.candidatePageUrls ?? [window.location.href],
+    }) ?? mediaUrl;
+    const normalizedMediaUrl = normalizeUrl(cleanedMediaUrl);
     if (normalizedMediaUrl === null || shouldExcludeMediaOrAnchorUrl(mediaUrl)) {
         return Promise.resolve(emptyResult());
     }

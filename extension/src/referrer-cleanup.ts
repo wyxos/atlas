@@ -106,24 +106,54 @@ export function cleanupReferrerUrl(
 
     try {
         const parsed = new URL(trimmed);
-        const queryParamsToStrip = new Set(
+        const queryParamsToStrip = Array.from(new Set(
             Object.entries(referrerQueryParamsToStripByDomain)
                 .filter(([domain]) => hostMatchesRuleDomain(parsed.hostname, domain))
                 .flatMap(([, queryParams]) => queryParams),
-        );
+        ));
 
-        if (queryParamsToStrip.size === 0) {
+        return cleanupUrlQueryParams(parsed.toString(), queryParamsToStrip);
+    } catch {
+        return trimmed;
+    }
+}
+
+export function cleanupUrlQueryParams(
+    value: string | null | undefined,
+    queryParamsToStrip: string[],
+): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    if (!/^https?:\/\//i.test(trimmed)) {
+        return null;
+    }
+
+    if (queryParamsToStrip.length === 0) {
+        return trimmed;
+    }
+
+    try {
+        const parsed = new URL(trimmed);
+        const normalizedQueryParams = new Set(normalizeReferrerQueryParams(queryParamsToStrip));
+        if (normalizedQueryParams.size === 0) {
             return trimmed;
         }
 
-        if (queryParamsToStrip.has(STRIP_ALL_QUERY_PARAMS)) {
+        if (normalizedQueryParams.has(STRIP_ALL_QUERY_PARAMS)) {
             parsed.search = '';
 
             return parsed.toString();
         }
 
         for (const key of Array.from(parsed.searchParams.keys())) {
-            if (queryParamsToStrip.has(key.toLowerCase())) {
+            if (normalizedQueryParams.has(key.toLowerCase())) {
                 parsed.searchParams.delete(key);
             }
         }

@@ -18,8 +18,7 @@ describe('submitBadgeReaction civitai overrides', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
 
         vi.stubGlobal('fetch', vi.fn());

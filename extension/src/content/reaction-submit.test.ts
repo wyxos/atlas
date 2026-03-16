@@ -18,8 +18,7 @@ describe('submitBadgeReaction', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
 
         const fetchMock = vi.fn();
@@ -130,8 +129,7 @@ describe('submitBadgeReaction', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
 
         const fetchMock = vi.fn().mockResolvedValue(
@@ -220,8 +218,7 @@ describe('submitBadgeReaction', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
 
         const fetchMock = vi.fn();
@@ -338,8 +335,7 @@ describe('submitBadgeReaction', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
 
         vi.stubGlobal('fetch', vi.fn());
@@ -446,8 +442,7 @@ describe('submitBadgeReaction', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
 
         vi.stubGlobal('fetch', vi.fn());

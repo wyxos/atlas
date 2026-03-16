@@ -26,8 +26,7 @@ describe('referrer-check-queue', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
         mockRequestAtlasViaRuntime.mockResolvedValue(null);
     });
@@ -88,9 +87,7 @@ describe('referrer-check-queue', () => {
         });
 
         const queue = await import('./referrer-check-queue');
-        await queue.enqueueReferrerCheck('https://domain.com/?id=123&tag=blue+sky', {
-            'domain.com': ['tag', 'tags'],
-        });
+        await queue.enqueueReferrerCheck('https://domain.com/?id=123&tag=blue+sky', ['tag', 'tags']);
 
         const [, , requestLogPayload, init] = mockAtlasLoggedFetch.mock.calls[0] as [
             string,

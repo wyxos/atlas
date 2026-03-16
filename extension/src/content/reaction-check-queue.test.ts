@@ -26,8 +26,7 @@ describe('reaction-check-queue', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
         mockRequestAtlasViaRuntime.mockResolvedValue(null);
     });
@@ -79,5 +78,75 @@ describe('reaction-check-queue', () => {
         });
         expect(mockAtlasLoggedFetch).not.toHaveBeenCalled();
         digestSpy.mockRestore();
+    });
+
+    it('applies the active page domain media cleaner before hashing lookup requests', async () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://civitai.com/images/123066308') as unknown as Location,
+        });
+        document.body.innerHTML = `
+            <a href="/images/123066308">
+                <img id="image" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
+            </a>
+        `;
+        mockGetStoredOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            siteCustomizations: [
+                {
+                    domain: 'civitai.com',
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: [],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: ['civitaiCanonical'],
+                    },
+                },
+            ],
+        });
+        mockAtlasLoggedFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                matches: [
+                    {
+                        request_id: 'req-0',
+                        exists: false,
+                        reaction: null,
+                    },
+                ],
+            }),
+        });
+
+        const image = document.getElementById('image');
+        if (!(image instanceof HTMLImageElement)) {
+            throw new Error('Expected image element.');
+        }
+
+        const queue = await import('./reaction-check-queue');
+        await queue.enqueueReactionCheck(image.src, {
+            media: image,
+            candidatePageUrls: [window.location.href],
+        });
+
+        const [, , , init] = mockAtlasLoggedFetch.mock.calls[0] as [
+            string,
+            string,
+            { items: Array<Record<string, unknown>> },
+            { body: string },
+        ];
+        const sentBody = JSON.parse(init.body) as { items: Array<{ url_hash: string }> };
+        const encoder = new TextEncoder();
+        const digest = await crypto.subtle.digest('SHA-256', encoder.encode(
+            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
+        ));
+        const expectedHash = Array.from(new Uint8Array(digest))
+            .map((byte) => byte.toString(16).padStart(2, '0'))
+            .join('');
+
+        expect(sentBody.items[0]?.url_hash).toBe(expectedHash);
     });
 });
