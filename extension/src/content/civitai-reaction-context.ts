@@ -4,11 +4,13 @@ import type { ListingMetadataOverrides, ListingMetadataResourceContainer } from 
 const CIVITAI_HOST_PATTERN = /(^|\.)civitai\.com$/i;
 const CIVITAI_POST_PATH_PATTERN = /^\/posts\/(\d+)(?:\/|$)/i;
 const CIVITAI_IMAGE_PATH_PATTERN = /^\/images\/(\d+)(?:\/|$)/i;
+const CIVITAI_MEDIA_HOST = 'image.civitai.com';
 const USER_LINK_SELECTOR = 'a[href^="/user/"], a[href*="://civitai.com/user/"]';
 const MODEL_LINK_SELECTOR = 'a[href^="/models/"], a[href*="://civitai.com/models/"]';
 const CREATOR_CARD_SELECTOR = '[class*="CreatorCard_profileDetailsContainer"], [class*="CreatorCard_profileDetails"]';
 const MENU_BUTTON_SELECTOR = 'button[aria-haspopup="menu"]';
 const MODEL_RESOURCE_TYPES = new Set<ListingMetadataResourceContainer['type']>(['Checkpoint', 'LoRA']);
+const CIVITAI_VIDEO_EXTENSIONS = new Set(['mp4', 'm4v', 'mov', 'webm']);
 
 export type CivitAiReactionPageKind = 'post-page' | 'image-page';
 
@@ -62,6 +64,20 @@ function resolveImageLinkForMedia(media: MediaElement): HTMLAnchorElement | null
     return anchor instanceof HTMLAnchorElement && isImagePageLink(anchor) ? anchor : null;
 }
 
+function resolveImageIdForMedia(media: MediaElement | null, href: string): number | null {
+    if (media !== null) {
+        const imageLink = resolveImageLinkForMedia(media);
+        const linkedImageId = parseImageIdFromHref(imageLink?.getAttribute('href') ?? imageLink?.href);
+        if (linkedImageId !== null) {
+            return linkedImageId;
+        }
+    }
+
+    const currentUrl = parseRelativeOrAbsoluteUrl(href);
+
+    return currentUrl === null ? null : parseIdFromPath(currentUrl, CIVITAI_IMAGE_PATH_PATTERN);
+}
+
 export function classifyCivitAiReactionPage(href: string = window.location.href): CivitAiReactionPageKind | null {
     const url = parseRelativeOrAbsoluteUrl(href);
     if (url === null || !CIVITAI_HOST_PATTERN.test(url.hostname)) {
@@ -77,6 +93,54 @@ export function classifyCivitAiReactionPage(href: string = window.location.href)
     }
 
     return null;
+}
+
+export function canonicalizeCivitAiBadgeCheckUrl(
+    mediaUrl: string | null | undefined,
+    media: MediaElement | null = null,
+    href: string = window.location.href,
+): string | null {
+    if (typeof mediaUrl !== 'string') {
+        return null;
+    }
+
+    const trimmed = mediaUrl.trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    const parsed = parseRelativeOrAbsoluteUrl(trimmed);
+    if (parsed === null || parsed.hostname.trim().toLowerCase() !== CIVITAI_MEDIA_HOST) {
+        return trimmed;
+    }
+
+    const segments = parsed.pathname.split('/').filter((segment) => segment !== '');
+    if (segments.length < 4) {
+        return trimmed;
+    }
+
+    const token = segments[0]?.trim() ?? '';
+    const guid = segments[1]?.trim() ?? '';
+    const filename = segments[segments.length - 1]?.trim() ?? '';
+    if (token === '' || guid === '' || filename === '' || !filename.includes('.')) {
+        return trimmed;
+    }
+
+    const extension = filename.split('.').pop()?.trim().toLowerCase() ?? '';
+    if (extension === '') {
+        return trimmed;
+    }
+
+    const isVideo = media instanceof HTMLVideoElement || CIVITAI_VIDEO_EXTENSIONS.has(extension);
+    const imageId = isVideo ? resolveImageIdForMedia(media, href) : null;
+    if (isVideo && imageId === null) {
+        return trimmed;
+    }
+
+    const transform = isVideo ? 'transcode=true,original=true,quality=90' : 'original=true';
+    const canonicalFilename = isVideo ? `${imageId}.${extension}` : `${guid}.${extension}`;
+
+    return `${parsed.protocol}//${parsed.host}/${token}/${guid}/${transform}/${canonicalFilename}`;
 }
 function resolveUsernameFromAnchor(anchor: HTMLAnchorElement | null): string | null {
     if (!(anchor instanceof HTMLAnchorElement)) {

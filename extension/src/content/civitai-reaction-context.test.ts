@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+    canonicalizeCivitAiBadgeCheckUrl,
     classifyCivitAiReactionPage,
     collectCivitAiListingMetadataOverrides,
 } from './civitai-reaction-context';
@@ -16,6 +17,48 @@ describe('classifyCivitAiReactionPage', () => {
         expect(classifyCivitAiReactionPage('https://civitai.com/posts/16973563')).toBe('post-page');
         expect(classifyCivitAiReactionPage('https://civitai.com/images/76477306')).toBe('image-page');
         expect(classifyCivitAiReactionPage('https://example.com/images/76477306')).toBeNull();
+    });
+});
+
+describe('canonicalizeCivitAiBadgeCheckUrl', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    it('canonicalizes civitai image variants to the stable original url', () => {
+        setWindowLocation('https://civitai.com/images/123066308');
+        document.body.innerHTML = `
+            <a href="/images/123066308">
+                <img id="image" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
+            </a>
+        `;
+
+        const image = document.getElementById('image');
+        if (!(image instanceof HTMLImageElement)) {
+            throw new Error('Expected image element.');
+        }
+
+        expect(canonicalizeCivitAiBadgeCheckUrl(image.src, image)).toBe(
+            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
+        );
+    });
+
+    it('uses the media image-page anchor to canonicalize civitai videos', () => {
+        setWindowLocation('https://civitai.com/posts/16973563');
+        document.body.innerHTML = `
+            <a href="/images/76477306">
+                <video id="video" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/4MGM4VAVYH67B8TYY43NVH1780.mp4"></video>
+            </a>
+        `;
+
+        const video = document.getElementById('video');
+        if (!(video instanceof HTMLVideoElement)) {
+            throw new Error('Expected video element.');
+        }
+
+        expect(canonicalizeCivitAiBadgeCheckUrl(video.src, video)).toBe(
+            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/76477306.mp4',
+        );
     });
 });
 
