@@ -37,6 +37,47 @@ class ExtensionApiController extends Controller
         ]);
     }
 
+    public function broadcastAuth(
+        Request $request,
+        ExtensionApiKeyService $extensionApiKey,
+    ): JsonResponse {
+        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if ($apiKey === '' || ! $user) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        $channelName = trim((string) $request->input('channel_name', ''));
+        $expectedChannel = 'private-extension-downloads.'.$this->extensionChannelHash($apiKey);
+        if ($channelName === '' || ! hash_equals($expectedChannel, $channelName)) {
+            return response()->json([
+                'message' => 'Invalid Reverb channel authorization request.',
+            ], 403);
+        }
+
+        $socketId = trim((string) $request->input('socket_id', ''));
+        if (preg_match('/^\d+\.\d+$/', $socketId) !== 1) {
+            return response()->json([
+                'message' => 'Invalid Reverb socket id.',
+            ], 403);
+        }
+
+        $reverb = config('broadcasting.connections.reverb');
+        $key = trim((string) data_get($reverb, 'key', ''));
+        $secret = trim((string) data_get($reverb, 'secret', ''));
+        if ($key === '' || $secret === '') {
+            return response()->json([
+                'message' => 'Reverb is not configured.',
+            ], 503);
+        }
+
+        return response()->json([
+            'auth' => $key.':'.hash_hmac('sha256', $socketId.':'.$channelName, $secret),
+        ]);
+    }
+
     public function matches(
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
@@ -837,7 +878,7 @@ class ExtensionApiController extends Controller
             'host' => $host,
             'port' => $port > 0 ? $port : 443,
             'scheme' => $scheme,
-            'channel' => 'extension-downloads.'.$extensionChannel,
+            'channel' => 'private-extension-downloads.'.$extensionChannel,
         ];
     }
 }

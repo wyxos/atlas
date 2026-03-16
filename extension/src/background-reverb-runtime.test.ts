@@ -34,7 +34,7 @@ describe('connectBackgroundReverb', () => {
                     host: 'atlas.wyxos.com',
                     port: 443,
                     scheme: 'https',
-                    channel: 'downloads',
+                    channel: 'private-extension-downloads.test-hash',
                 },
             }), { status: 200 }),
         );
@@ -59,7 +59,13 @@ describe('connectBackgroundReverb', () => {
             host: 'atlas.wyxos.com',
             port: 443,
             scheme: 'https',
-            channel: 'downloads',
+            channel: 'private-extension-downloads.test-hash',
+            auth: {
+                endpoint: 'https://atlas.wyxos.com/api/extension/broadcasting/auth',
+                headers: {
+                    'X-Atlas-Api-Key': 'test-api-token',
+                },
+            },
         });
         expect(result).toEqual({
             kind: 'connected',

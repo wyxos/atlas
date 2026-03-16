@@ -1,3 +1,8 @@
+type ReverbAuthConfig = {
+    endpoint: string;
+    headers: Record<string, string>;
+};
+
 type ReverbConfig = {
     enabled: boolean;
     key: string;
@@ -5,6 +10,7 @@ type ReverbConfig = {
     port: number;
     scheme: 'http' | 'https';
     channel: string;
+    auth: ReverbAuthConfig | null;
 };
 
 type ReverbEventName = 'DownloadTransferCreated' | 'DownloadTransferQueued' | 'DownloadTransferProgressUpdated';
@@ -27,6 +33,7 @@ type ReverbClient = {
 };
 
 export type {
+    ReverbAuthConfig,
     ReverbClient,
     ReverbConfig,
     ReverbConnectionState,

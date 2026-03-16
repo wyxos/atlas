@@ -1,4 +1,4 @@
-import type { ReverbConfig } from './reverb-types';
+import type { ReverbAuthConfig, ReverbConfig } from './reverb-types';
 
 function asString(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
@@ -42,6 +42,22 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
         port,
         scheme,
         channel,
+        auth: null,
+    };
+}
+
+function createExtensionReverbAuthConfig(atlasDomain: string, apiToken: string): ReverbAuthConfig | null {
+    const normalizedDomain = atlasDomain.trim().replace(/\/+$/, '');
+    const normalizedToken = apiToken.trim();
+    if (normalizedDomain === '' || normalizedToken === '') {
+        return null;
+    }
+
+    return {
+        endpoint: `${normalizedDomain}/api/extension/broadcasting/auth`,
+        headers: {
+            'X-Atlas-Api-Key': normalizedToken,
+        },
     };
 }
 
@@ -54,6 +70,7 @@ function formatReverbEndpoint(config: ReverbConfig | null): string | null {
 }
 
 export {
+    createExtensionReverbAuthConfig,
     formatReverbEndpoint,
     parseReverbConfig,
 };

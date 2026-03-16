@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { connectWorkerReverb, type WorkerWebSocketCtor } from './reverb-client-worker';
+import { connectWorkerReverb, type WorkerFetch, type WorkerWebSocketCtor } from './reverb-client-worker';
 
 type Listener = (event: unknown) => void;
 
@@ -52,7 +52,13 @@ const baseConfig = {
     host: 'atlas.wyxos.com',
     port: 443,
     scheme: 'https' as const,
-    channel: 'downloads',
+    channel: 'private-extension-downloads.test-hash',
+    auth: {
+        endpoint: 'https://atlas.wyxos.com/api/extension/broadcasting/auth',
+        headers: {
+            'X-Atlas-Api-Key': 'test-api-token',
+        },
+    },
 };
 
 function getLastSocket(): FakeWebSocket {
@@ -70,8 +76,19 @@ describe('connectWorkerReverb', () => {
         vi.useRealTimers();
     });
 
-    it('subscribes to the configured channel after websocket handshake', async () => {
-        const client = await connectWorkerReverb(baseConfig, FakeWebSocket as unknown as WorkerWebSocketCtor);
+    it('authenticates and subscribes to the configured private channel after websocket handshake', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                auth: 'atlas-key:test-signature',
+            }),
+        })) as unknown as WorkerFetch;
+        const client = await connectWorkerReverb(
+            baseConfig,
+            FakeWebSocket as unknown as WorkerWebSocketCtor,
+            fetchMock,
+        );
 
         expect(client).not.toBeNull();
         const socket = getLastSocket();
@@ -91,11 +108,26 @@ describe('connectWorkerReverb', () => {
             }),
         });
 
-        expect(states).toHaveBeenCalledWith('connected');
+        await vi.waitFor(() => {
+            expect(states).toHaveBeenCalledWith('connected');
+        });
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.wyxos.com/api/extension/broadcasting/auth', {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-Atlas-Api-Key': 'test-api-token',
+            },
+            body: JSON.stringify({
+                socket_id: '123.456',
+                channel_name: 'private-extension-downloads.test-hash',
+            }),
+        });
         expect(socket.sentMessages[0]).toBe(JSON.stringify({
             event: 'pusher:subscribe',
             data: {
-                channel: 'downloads',
+                channel: 'private-extension-downloads.test-hash',
+                auth: 'atlas-key:test-signature',
             },
         }));
 
@@ -103,7 +135,18 @@ describe('connectWorkerReverb', () => {
     });
 
     it('emits transfer events to subscribers', async () => {
-        const client = await connectWorkerReverb(baseConfig, FakeWebSocket as unknown as WorkerWebSocketCtor);
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                auth: 'atlas-key:test-signature',
+            }),
+        })) as unknown as WorkerFetch;
+        const client = await connectWorkerReverb(
+            baseConfig,
+            FakeWebSocket as unknown as WorkerWebSocketCtor,
+            fetchMock,
+        );
         const socket = getLastSocket();
         const onEvent = vi.fn();
 
@@ -131,7 +174,18 @@ describe('connectWorkerReverb', () => {
     });
 
     it('surfaces websocket errors through connection error callbacks', async () => {
-        const client = await connectWorkerReverb(baseConfig, FakeWebSocket as unknown as WorkerWebSocketCtor);
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                auth: 'atlas-key:test-signature',
+            }),
+        })) as unknown as WorkerFetch;
+        const client = await connectWorkerReverb(
+            baseConfig,
+            FakeWebSocket as unknown as WorkerWebSocketCtor,
+            fetchMock,
+        );
         const socket = getLastSocket();
         const onError = vi.fn();
 
@@ -151,6 +205,7 @@ describe('connectWorkerReverb', () => {
                 key: '',
             },
             FakeWebSocket as unknown as WorkerWebSocketCtor,
+            vi.fn() as unknown as WorkerFetch,
         );
 
         expect(client).toBeNull();

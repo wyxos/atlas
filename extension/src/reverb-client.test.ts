@@ -37,6 +37,7 @@ describe('connectReverb (browser)', () => {
             port: 443,
             scheme: 'https',
             channel: '',
+            auth: null,
         });
 
         expect(client).toBeNull();
@@ -51,7 +52,13 @@ describe('connectReverb (browser)', () => {
             host: 'atlas.wyxos.com',
             port: 443,
             scheme: 'https',
-            channel: 'downloads',
+            channel: 'private-extension-downloads.test-hash',
+            auth: {
+                endpoint: 'https://atlas.wyxos.com/api/extension/broadcasting/auth',
+                headers: {
+                    'X-Atlas-Api-Key': 'test-api-token',
+                },
+            },
         });
 
         expect(client).not.toBeNull();
@@ -60,6 +67,16 @@ describe('connectReverb (browser)', () => {
             wsPort: 443,
             forceTLS: true,
         }));
-        expect(subscribe).toHaveBeenCalledWith('downloads');
+        const options = pusherCtor.mock.calls[0]?.[1] as {
+            channelAuthorization?: {
+                endpoint: string;
+                headersProvider: () => Record<string, string>;
+            };
+        };
+        expect(options.channelAuthorization?.endpoint).toBe('https://atlas.wyxos.com/api/extension/broadcasting/auth');
+        expect(options.channelAuthorization?.headersProvider()).toEqual({
+            'X-Atlas-Api-Key': 'test-api-token',
+        });
+        expect(subscribe).toHaveBeenCalledWith('private-extension-downloads.test-hash');
     });
 });

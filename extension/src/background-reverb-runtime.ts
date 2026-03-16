@@ -1,6 +1,6 @@
 import { getStoredOptions } from './atlas-options';
 import { connectWorkerReverb, type ReverbClient } from './reverb-client-worker';
-import { formatReverbEndpoint, parseReverbConfig } from './reverb-config';
+import { createExtensionReverbAuthConfig, formatReverbEndpoint, parseReverbConfig } from './reverb-config';
 
 type BackgroundReverbStatus =
     | { kind: 'setup_required' }
@@ -46,7 +46,10 @@ export async function connectBackgroundReverb(): Promise<BackgroundReverbStatus>
         }
 
         try {
-            const client = await connectWorkerReverb(config);
+            const client = await connectWorkerReverb({
+                ...config,
+                auth: createExtensionReverbAuthConfig(stored.atlasDomain, stored.apiToken),
+            });
             if (!client) {
                 return {
                     kind: 'disconnected',
