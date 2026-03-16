@@ -13,6 +13,7 @@ import { createAnchorMediaRuntime } from './content/anchor-media-runtime';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { createDownloadEventSheet } from './content/download-event-sheet';
 import { createDuplicateAnchorTabGuard } from './content/duplicate-anchor-tab-guard';
+import { clearDeviantArtBackgroundImageStyle } from './content/deviantart-background-image-style';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
@@ -132,6 +133,7 @@ function installMutationObserver(): void {
         for (const mutation of mutations) {
             if (mutation.type === 'childList') {
                 for (const addedNode of mutation.addedNodes) {
+                    clearDeviantArtBackgroundImageStyle(addedNode);
                     processNodeAndDescendants(addedNode);
                     anchorMediaRuntime.registerFromNode(addedNode);
                 }
@@ -242,6 +244,7 @@ async function loadRulesAndProcess(): Promise<void> {
 
 function bootstrap(): void {
     duplicateAnchorTabGuard = createDuplicateAnchorTabGuard();
+    clearDeviantArtBackgroundImageStyle();
     installMutationObserver();
     installStorageListener();
     installRuntimeMessageListener();
