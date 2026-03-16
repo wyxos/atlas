@@ -157,7 +157,7 @@ describe('background', () => {
                     host: 'atlas.wyxos.com',
                     port: 443,
                     scheme: 'https',
-                    channel: 'downloads',
+                    channel: 'private-extension-downloads.test-hash',
                 },
             }), { status: 200 }),
         );
@@ -193,7 +193,7 @@ describe('background', () => {
                     host: 'atlas.wyxos.com',
                     port: 443,
                     scheme: 'https',
-                    channel: 'downloads',
+                    channel: 'private-extension-downloads.test-hash',
                 },
             },
         });

@@ -42,6 +42,8 @@ Route::post('/api/extension/reactions/batch', [\App\Http\Controllers\ExtensionAp
     ->name('api.extension.reactions.batch');
 Route::post('/api/extension/download-status', [\App\Http\Controllers\ExtensionApiController::class, 'downloadStatus'])
     ->name('api.extension.download-status');
+Route::post('/api/extension/broadcasting/auth', [\App\Http\Controllers\ExtensionApiController::class, 'broadcastAuth'])
+    ->name('api.extension.broadcast-auth');
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');

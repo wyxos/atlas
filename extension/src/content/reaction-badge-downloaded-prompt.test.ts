@@ -165,7 +165,6 @@ describe('createReactionBadgeHost downloaded prompt', () => {
 
         expect(mockDownloadedReactionPrompt).toHaveBeenCalledTimes(1);
         expect(mockSubmitBadgeReaction).toHaveBeenCalledWith(image, 'love', {
-            batchItems: null,
             downloadBehavior: 'skip',
         });
 

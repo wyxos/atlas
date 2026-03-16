@@ -1,7 +1,7 @@
 import { getStoredOptions } from './atlas-options';
 import { connectReverb, type ReverbClient, type ReverbConnectionState } from './reverb-client';
 import { requestAtlasViaRuntime } from './atlas-runtime-request';
-import { formatReverbEndpoint, parseReverbConfig } from './reverb-config';
+import { createExtensionReverbAuthConfig, formatReverbEndpoint, parseReverbConfig } from './reverb-config';
 
 type RuntimeReverbStatus =
     | { kind: 'setup_required' }
@@ -63,7 +63,10 @@ async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
         }
 
         try {
-            const client = await connectReverb(config);
+            const client = await connectReverb({
+                ...config,
+                auth: createExtensionReverbAuthConfig(stored.atlasDomain, stored.apiToken),
+            });
             if (!client) {
                 return {
                     kind: 'disconnected',

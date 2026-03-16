@@ -111,4 +111,5 @@ test('extension ping validates api key', function () {
 
     $authorized->assertSuccessful();
     $authorized->assertJsonPath('ok', true);
+    $authorized->assertJsonPath('reverb.channel', 'private-extension-downloads.'.hash('sha256', 'secret-key-123'));
 });

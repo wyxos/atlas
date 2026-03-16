@@ -51,6 +51,11 @@ function createReverbClient(config: ReverbConfig, pusherCtor: PusherCtor): Rever
         return null;
     }
 
+    const requiresChannelAuth = config.channel.startsWith('private-');
+    if (requiresChannelAuth && config.auth === null) {
+        return null;
+    }
+
     const pusher = new pusherCtor(config.key, {
         cluster: 'mt1',
         wsHost: config.host,
@@ -59,6 +64,13 @@ function createReverbClient(config: ReverbConfig, pusherCtor: PusherCtor): Rever
         forceTLS: config.scheme === 'https',
         enabledTransports: ['ws', 'wss'],
         disableStats: true,
+        ...(config.auth !== null ? {
+            channelAuthorization: {
+                endpoint: config.auth.endpoint,
+                transport: 'ajax',
+                headersProvider: () => ({ ...config.auth?.headers }),
+            },
+        } : {}),
     });
 
     const channel = pusher.subscribe(config.channel);

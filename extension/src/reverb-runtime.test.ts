@@ -41,6 +41,7 @@ describe('connectRuntimeReverb', () => {
                             port: 443,
                             scheme: 'https',
                             channel: '',
+                            auth: null,
                         },
                     },
                 });
@@ -91,6 +92,7 @@ describe('connectRuntimeReverb', () => {
                     port: 443,
                     scheme: 'https',
                     channel: '',
+                    auth: null,
                 },
             }), { status: 200 }),
         );
@@ -132,7 +134,8 @@ describe('connectRuntimeReverb', () => {
                     host: 'atlas.wyxos.com',
                     port: 443,
                     scheme: 'https',
-                    channel: 'downloads',
+                    channel: 'private-extension-downloads.test-hash',
+                    auth: null,
                 },
             }), { status: 200 }),
         );
@@ -166,7 +169,13 @@ describe('connectRuntimeReverb', () => {
             host: 'atlas.wyxos.com',
             port: 443,
             scheme: 'https',
-            channel: 'downloads',
+            channel: 'private-extension-downloads.test-hash',
+            auth: {
+                endpoint: 'https://atlas.wyxos.com/api/extension/broadcasting/auth',
+                headers: {
+                    'X-Atlas-Api-Key': 'test-api-token',
+                },
+            },
         });
         expect(result).toEqual({
             kind: 'connected',

@@ -132,6 +132,7 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
         port,
         scheme,
         channel,
+        auth: null,
     };
 }
 
