@@ -5,7 +5,6 @@ import type { BatchReactionItem, ListingMetadataOverrides } from './reaction-bat
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
-import { shouldUseKeepaliveRequest } from '../request-keepalive';
 import { getDownloadCloseTargets, type DownloadCloseTarget } from './reaction-submit-download-targets';
 
 export type SubmitReactionResult = {
@@ -438,7 +437,6 @@ export async function submitBadgeReaction(
                     'X-Atlas-Api-Key': stored.apiToken,
                 },
                 body: requestBodyJson,
-                keepalive: shouldUseKeepaliveRequest(requestBodyJson),
             });
 
             if (!response.ok) {

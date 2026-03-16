@@ -126,7 +126,7 @@ describe('submitBadgeReaction', () => {
         });
     });
 
-    it('falls back to page fetch with keepalive when runtime submit is unavailable', async () => {
+    it('falls back to page fetch when runtime submit is unavailable', async () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
@@ -190,7 +190,7 @@ describe('submitBadgeReaction', () => {
 
         const fetchCall = fetchMock.mock.calls[0] as [string, RequestInit];
         expect(fetchCall[0]).toBe('https://atlas.test/api/extension/reactions');
-        expect(fetchCall[1].keepalive).toBe(true);
+        expect(fetchCall[1].keepalive).toBeUndefined();
         const body = JSON.parse(String(fetchCall[1].body)) as Record<string, unknown>;
         expect(body.url).toBe(window.location.href);
         expect(body.page_url).toBe(window.location.href);

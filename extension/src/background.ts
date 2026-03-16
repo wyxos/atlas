@@ -6,7 +6,6 @@ import { collectCookiesForUrls } from './background-cookie-runtime';
 import { notifyTabsExtensionReloaded } from './background-reload-overlay';
 import { normalizeComparableUrls } from './background-url-utils';
 import { normalizeComparableOpenTabUrl } from './open-tab-url';
-import { shouldUseKeepaliveRequest } from './request-keepalive';
 
 type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
@@ -305,7 +304,6 @@ chrome.runtime.onMessage.addListener((
                 'X-Atlas-Api-Key': apiToken,
             },
             body: bodyJson,
-            keepalive: shouldUseKeepaliveRequest(bodyJson),
         })
             .then(async (response) => {
                 let responsePayload: unknown = null;
