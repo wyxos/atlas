@@ -585,25 +585,27 @@ class ExtensionApiController extends Controller
             return null;
         }
 
-        if ($sourceId !== null) {
+        if ($referrerUrl !== null) {
             $file = File::query()
                 ->where('source', CivitAiImages::SOURCE)
-                ->where('source_id', $sourceId)
+                ->where('referrer_url_hash', hash('sha256', $referrerUrl))
                 ->orderByDesc('downloaded')
                 ->latest('updated_at')
                 ->first();
             if ($file) {
                 return $file;
             }
+
+            return null;
         }
 
-        if ($referrerUrl === null) {
+        if ($sourceId === null) {
             return null;
         }
 
         return File::query()
             ->where('source', CivitAiImages::SOURCE)
-            ->where('referrer_url_hash', hash('sha256', $referrerUrl))
+            ->where('source_id', $sourceId)
             ->orderByDesc('downloaded')
             ->latest('updated_at')
             ->first();
