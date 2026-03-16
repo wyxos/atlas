@@ -8,7 +8,6 @@ import {
 } from './media-utils';
 import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
 import {
-    canonicalizeCivitAiBadgeCheckUrl,
     collectCivitAiListingMetadataOverrides,
 } from './civitai-reaction-context';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
@@ -255,9 +254,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
     async function refreshMatchForCurrentMedia(force = false): Promise<void> {
         syncTrackedUrlsForCurrentMedia();
-        const checkUrl = isCivitAiPage
-            ? canonicalizeCivitAiBadgeCheckUrl(trackedMediaUrls.value[0] ?? null, props.media)
-            : (trackedMediaUrls.value[0] ?? null);
+        const checkUrl = trackedMediaUrls.value[0] ?? null;
         if (!force && checkUrl === lastCheckedMediaUrl.value) {
             return;
         }
@@ -271,7 +268,10 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         }
 
         try {
-            const result = await enqueueReactionCheck(checkUrl);
+            const result = await enqueueReactionCheck(checkUrl, {
+                media: props.media,
+                candidatePageUrls: [window.location.href],
+            });
             if (!isActive || currentSequence !== checkSequence) {
                 return;
             }

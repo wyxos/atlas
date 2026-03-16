@@ -40,7 +40,7 @@ function installChromeStorageMock(): void {
     });
 }
 
-describe('atlas-options close-tab-after-queue preferences', () => {
+describe('atlas-options', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
@@ -53,8 +53,141 @@ describe('atlas-options close-tab-after-queue preferences', () => {
         installChromeStorageMock();
     });
 
-    it('stores and reads enabled preference per hostname', async () => {
-        const { STORAGE_KEYS, getCloseTabAfterQueuePreferenceForHostname, setCloseTabAfterQueuePreferenceForHostname } = await import('./atlas-options');
+    it('migrates legacy match rules and referrer cleanup into site customizations when the new key is absent', async () => {
+        const { STORAGE_KEYS, getStoredOptions } = await import('./atlas-options');
+
+        storageState[STORAGE_KEYS.matchRules] = [
+            {
+                domain: 'example.com',
+                regexes: ['.*\\/gallery\\/.*'],
+            },
+        ];
+        storageState[STORAGE_KEYS.referrerQueryParamsToStripByDomain] = {
+            'https://example.com/path': ['tag', 'tags'],
+            '.sub.example.com.': ['*', 'filter'],
+            'invalid.example.com': [],
+        };
+
+        await expect(getStoredOptions()).resolves.toMatchObject({
+            siteCustomizations: expect.arrayContaining([
+                {
+                    domain: 'civitai.com',
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: [],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: ['civitaiCanonical'],
+                    },
+                },
+                {
+                    domain: 'example.com',
+                    matchRules: ['.*\\/gallery\\/.*'],
+                    referrerCleaner: {
+                        stripQueryParams: ['tag', 'tags'],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: [],
+                    },
+                },
+                {
+                    domain: 'sub.example.com',
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: ['*'],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: [],
+                    },
+                },
+            ]),
+        });
+    });
+
+    it('stores and reads normalized site customizations under the new storage key', async () => {
+        const { STORAGE_KEYS, getStoredOptions, saveStoredOptions } = await import('./atlas-options');
+
+        await saveStoredOptions('https://atlas.test', 'token', [
+            {
+                domain: 'https://Example.com/path',
+                matchRules: [' .*\\/gallery\\/.* ', ''],
+                referrerCleaner: {
+                    stripQueryParams: ['Tag', 'tag'],
+                },
+                mediaCleaner: {
+                    stripQueryParams: ['Width', 'width'],
+                    rewriteRules: [
+                        {
+                            pattern: ' /foo/ ',
+                            replace: 'bar',
+                        },
+                        {
+                            pattern: ' /foo/ ',
+                            replace: 'bar',
+                        },
+                    ],
+                    strategies: ['civitaiCanonical', 'civitaiCanonical'],
+                },
+            },
+        ]);
+
+        expect(storageState[STORAGE_KEYS.siteCustomizations]).toEqual([
+            {
+                domain: 'example.com',
+                matchRules: ['.*\\/gallery\\/.*'],
+                referrerCleaner: {
+                    stripQueryParams: ['tag'],
+                },
+                mediaCleaner: {
+                    stripQueryParams: ['width'],
+                    rewriteRules: [
+                        {
+                            pattern: '/foo/',
+                            replace: 'bar',
+                        },
+                    ],
+                    strategies: ['civitaiCanonical'],
+                },
+            },
+        ]);
+
+        await expect(getStoredOptions()).resolves.toEqual({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            siteCustomizations: [
+                {
+                    domain: 'example.com',
+                    matchRules: ['.*\\/gallery\\/.*'],
+                    referrerCleaner: {
+                        stripQueryParams: ['tag'],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: ['width'],
+                        rewriteRules: [
+                            {
+                                pattern: '/foo/',
+                                replace: 'bar',
+                            },
+                        ],
+                        strategies: ['civitaiCanonical'],
+                    },
+                },
+            ],
+        });
+    });
+
+    it('stores and reads enabled close-tab preference per hostname', async () => {
+        const {
+            STORAGE_KEYS,
+            getCloseTabAfterQueuePreferenceForHostname,
+            setCloseTabAfterQueuePreferenceForHostname,
+        } = await import('./atlas-options');
 
         await setCloseTabAfterQueuePreferenceForHostname('WWW.Example.com', 'queued');
 
@@ -64,8 +197,12 @@ describe('atlas-options close-tab-after-queue preferences', () => {
         await expect(getCloseTabAfterQueuePreferenceForHostname('www.example.com')).resolves.toBe('queued');
     });
 
-    it('removes stored preference when disabling domain option', async () => {
-        const { STORAGE_KEYS, getCloseTabAfterQueuePreferenceForHostname, setCloseTabAfterQueuePreferenceForHostname } = await import('./atlas-options');
+    it('removes stored close-tab preference when disabling the hostname option', async () => {
+        const {
+            STORAGE_KEYS,
+            getCloseTabAfterQueuePreferenceForHostname,
+            setCloseTabAfterQueuePreferenceForHostname,
+        } = await import('./atlas-options');
 
         storageState[STORAGE_KEYS.closeTabAfterQueueByDomain] = {
             'example.com': 'queued',
@@ -80,7 +217,7 @@ describe('atlas-options close-tab-after-queue preferences', () => {
         await expect(getCloseTabAfterQueuePreferenceForHostname('example.com')).resolves.toBe('off');
     });
 
-    it('sanitizes stored per-domain map to valid host keys and supported mode values', async () => {
+    it('sanitizes stored close-tab preferences to valid host keys and supported modes', async () => {
         const { STORAGE_KEYS, getCloseTabAfterQueueByDomain } = await import('./atlas-options');
 
         storageState[STORAGE_KEYS.closeTabAfterQueueByDomain] = {
@@ -122,44 +259,5 @@ describe('atlas-options close-tab-after-queue preferences', () => {
 
         await expect(getReactAllItemsInPostPreferenceForHostname('deviantart.com')).resolves.toBe(true);
         await expect(getReactAllItemsInPostPreferenceForHostname('x.com')).resolves.toBe(false);
-    });
-
-    it('stores and reads referrer query params to strip by domain', async () => {
-        const { STORAGE_KEYS, getStoredOptions, saveStoredOptions } = await import('./atlas-options');
-
-        await saveStoredOptions('https://atlas.test', 'token', [], {
-            'https://www.example.com/path': ['tag', 'tags', 'tag'],
-            '.sub.example.com.': ['*', 'Filter'],
-            'empty.example.com': [],
-        });
-
-        expect(storageState[STORAGE_KEYS.referrerQueryParamsToStripByDomain]).toEqual({
-            'www.example.com': ['tag', 'tags'],
-            'sub.example.com': ['*'],
-        });
-
-        await expect(getStoredOptions()).resolves.toMatchObject({
-            referrerQueryParamsToStripByDomain: {
-                'www.example.com': ['tag', 'tags'],
-                'sub.example.com': ['*'],
-            },
-        });
-    });
-
-    it('sanitizes legacy stored referrer cleanup values', async () => {
-        const { STORAGE_KEYS, getStoredOptions } = await import('./atlas-options');
-
-        storageState[STORAGE_KEYS.referrerQueryParamsToStripByDomain] = {
-            'https://example.com/path': 'tag, tags',
-            'sub.example.com': ['tag', 123, 'filter'],
-            'invalid.example': [],
-        };
-
-        await expect(getStoredOptions()).resolves.toMatchObject({
-            referrerQueryParamsToStripByDomain: {
-                'example.com': ['tag', 'tags'],
-                'sub.example.com': ['tag', 'filter'],
-            },
-        });
     });
 });

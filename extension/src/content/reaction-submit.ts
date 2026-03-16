@@ -1,11 +1,14 @@
 import { getStoredOptions } from '../atlas-options';
-import { cleanupReferrerUrl } from '../referrer-cleanup';
+import { getActivePageSiteCustomization } from '../page-customization-state';
+import { cleanupUrlQueryParams } from '../referrer-cleanup';
 import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import type { BatchReactionItem, ListingMetadataOverrides } from './reaction-batch-types';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { ReverbConfig } from '../reverb-client';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
 import { getDownloadCloseTargets, type DownloadCloseTarget } from './reaction-submit-download-targets';
+import { applyMediaCleaner } from './media-cleaner';
+import { resolveSiteCustomizationForHostname } from '../site-customizations';
 
 export type SubmitReactionResult = {
     ok: boolean;
@@ -368,9 +371,22 @@ export async function submitBadgeReaction(
             : normalizeCookieUrls([reactionUrl, pageUrl]);
         const cookies = await getRuntimeCookies(cookieUrls);
         const userAgent = getSafeUserAgent();
-        const referrerQueryParamsToStripByDomain = stored.referrerQueryParamsToStripByDomain;
-        const cleanedPageReferrerUrl = cleanupReferrerUrl(window.location.href, referrerQueryParamsToStripByDomain)
+        const siteCustomization = getActivePageSiteCustomization()
+            ?? resolveSiteCustomizationForHostname(stored.siteCustomizations, window.location.hostname);
+        const referrerCleanerQueryParams = siteCustomization?.referrerCleaner.stripQueryParams ?? [];
+        const mediaCleaner = siteCustomization?.mediaCleaner ?? {
+            stripQueryParams: [],
+            rewriteRules: [],
+            strategies: [],
+        };
+        const cleanedPageReferrerUrl = cleanupUrlQueryParams(window.location.href, referrerCleanerQueryParams)
             ?? window.location.href;
+        const cleanedReactionUrl = usesBatchEndpoint
+            ? reactionUrl
+            : applyMediaCleaner(reactionUrl, mediaCleaner, {
+                media,
+                candidatePageUrls: [window.location.href],
+            }) ?? reactionUrl;
         const requestBody = usesBatchEndpoint
             ? {
                 type: reactionType,
@@ -378,8 +394,10 @@ export async function submitBadgeReaction(
                 primary_candidate_id: batchItems[0]?.candidateId ?? null,
                 items: batchItems.map((item) => ({
                     candidate_id: item.candidateId,
-                    url: item.url,
-                    referrer_url_hash_aware: cleanupReferrerUrl(item.referrerUrlHashAware, referrerQueryParamsToStripByDomain)
+                    url: applyMediaCleaner(item.url, mediaCleaner, {
+                        candidatePageUrls: [item.referrerUrlHashAware, item.pageUrl],
+                    }) ?? item.url,
+                    referrer_url_hash_aware: cleanupUrlQueryParams(item.referrerUrlHashAware, referrerCleanerQueryParams)
                         ?? item.referrerUrlHashAware,
                     page_url: item.pageUrl,
                     tag_name: item.tagName,
@@ -391,7 +409,7 @@ export async function submitBadgeReaction(
             : {
                 type: reactionType,
                 download_behavior: options.downloadBehavior,
-                url: reactionUrl,
+                url: cleanedReactionUrl,
                 referrer_url_hash_aware: cleanedPageReferrerUrl,
                 page_url: window.location.href,
                 tag_name: isVideo ? 'video' : 'img',

@@ -20,8 +20,7 @@ describe('connectRuntimeReverb', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.wyxos.com',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {},
+            siteCustomizations: [],
         });
     });
 

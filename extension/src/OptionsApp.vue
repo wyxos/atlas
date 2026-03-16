@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /* global chrome */
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
 import OptionsBackgroundRelayFeed from './OptionsBackgroundRelayFeed.vue';
 import OptionsReverbFeed from './OptionsReverbFeed.vue';
+import SiteCustomizationManager from './SiteCustomizationManager.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
 import {
     DEFAULT_ATLAS_DOMAIN,
@@ -12,31 +13,30 @@ import {
     saveStoredOptions,
     validateDomain,
 } from './atlas-options';
+import { validateDomainRule } from './match-rules';
+import { normalizeReferrerQueryParams } from './referrer-cleanup';
 import {
-    normalizeMatchRules,
-    type UrlMatchRule,
-    validateDomainRule,
-    validateRegexPattern,
-} from './match-rules';
+    type CustomizationTab,
+    type SiteCustomizationForm,
+} from './options-site-customization-form';
 import {
-    normalizeReferrerQueryParams,
-    validateReferrerQueryParam,
-    type ReferrerQueryParamsToStripByDomain,
-} from './referrer-cleanup';
-
-type ReferrerCleanupRuleForm = {
-    domain: string;
-    queryParamsText: string;
-};
+    createEmptySiteCustomization,
+    exportSiteCustomizationsPayload,
+    MEDIA_CLEANER_STRATEGIES,
+    parseSiteCustomizationsImportJson,
+    validateSiteCustomizations,
+    type MediaCleanerStrategy,
+    type SiteCustomization,
+} from './site-customizations';
 
 const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 const atlasDomain = ref(DEFAULT_ATLAS_DOMAIN);
 const apiToken = ref('');
 const showApiToken = ref(false);
-const matchRules = ref<UrlMatchRule[]>([]);
-const referrerCleanupRules = ref<ReferrerCleanupRuleForm[]>([]);
-const newRuleDomain = ref('');
-const newReferrerCleanupDomain = ref('');
+const siteCustomizationForms = ref<SiteCustomizationForm[]>([]);
+const selectedCustomizationIndex = ref(0);
+const activeCustomizationTab = ref<CustomizationTab>('matchRules');
+const newCustomizationDomain = ref('');
 const errorMessage = ref('');
 const isSaved = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
@@ -45,8 +45,61 @@ const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Ch
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
 
-function splitReferrerCleanupQueryParams(input: string): string[] {
+const selectedCustomization = computed<SiteCustomizationForm | null>(() =>
+    siteCustomizationForms.value[selectedCustomizationIndex.value] ?? null);
+
+function splitQueryParamsText(input: string): string[] {
     return input.split(/[,\n]+/);
+}
+
+function createCustomizationForm(customization: SiteCustomization): SiteCustomizationForm {
+    return {
+        domain: customization.domain,
+        matchRules: [...customization.matchRules],
+        referrerCleanerQueryParamsText: customization.referrerCleaner.stripQueryParams.join(', '),
+        mediaCleanerQueryParamsText: customization.mediaCleaner.stripQueryParams.join(', '),
+        mediaCleanerRewriteRules: customization.mediaCleaner.rewriteRules.map((rule) => ({ ...rule })),
+        mediaCleanerStrategies: [...customization.mediaCleaner.strategies],
+    };
+}
+
+function createCustomizationFormFromDomain(domain: string): SiteCustomizationForm {
+    return createCustomizationForm(createEmptySiteCustomization(domain));
+}
+
+function buildSiteCustomizationsFromForms(): SiteCustomization[] {
+    return siteCustomizationForms.value.map((form) => ({
+        domain: form.domain.trim().toLowerCase(),
+        matchRules: form.matchRules
+            .map((rule) => rule.trim())
+            .filter((rule) => rule !== ''),
+        referrerCleaner: {
+            stripQueryParams: normalizeReferrerQueryParams(splitQueryParamsText(form.referrerCleanerQueryParamsText)),
+        },
+        mediaCleaner: {
+            stripQueryParams: normalizeReferrerQueryParams(splitQueryParamsText(form.mediaCleanerQueryParamsText)),
+            rewriteRules: form.mediaCleanerRewriteRules
+                .map((rule) => ({
+                    pattern: rule.pattern.trim(),
+                    replace: rule.replace,
+                }))
+                .filter((rule) => rule.pattern !== '' || rule.replace !== ''),
+            strategies: Array.from(new Set(form.mediaCleanerStrategies)),
+        },
+    }));
+}
+
+function syncFormsFromSiteCustomizations(customizations: SiteCustomization[]): void {
+    siteCustomizationForms.value = customizations.map((customization) => createCustomizationForm(customization));
+    if (siteCustomizationForms.value.length === 0) {
+        selectedCustomizationIndex.value = 0;
+        return;
+    }
+
+    selectedCustomizationIndex.value = Math.max(
+        0,
+        Math.min(selectedCustomizationIndex.value, siteCustomizationForms.value.length - 1),
+    );
 }
 
 async function refreshApiConnectionStatus(): Promise<void> {
@@ -58,79 +111,38 @@ async function refreshApiConnectionStatus(): Promise<void> {
     reverbEndpoint.value = status.reverbEndpoint;
 }
 
+function validateCustomizationForms(): SiteCustomization[] | null {
+    const siteCustomizations = buildSiteCustomizationsFromForms();
+    const validationError = validateSiteCustomizations(siteCustomizations);
+    if (validationError !== null) {
+        errorMessage.value = validationError;
+        return null;
+    }
+
+    return siteCustomizations;
+}
+
 async function saveOptions(): Promise<void> {
     isSaved.value = false;
     errorMessage.value = '';
 
     const normalizedDomain = normalizeDomain(atlasDomain.value);
     const domainError = validateDomain(normalizedDomain);
-
     if (domainError !== null) {
         errorMessage.value = domainError;
         return;
     }
 
-    const normalizedRules = normalizeMatchRules(matchRules.value);
-    for (const rule of normalizedRules) {
-        const ruleDomainError = validateDomainRule(rule.domain);
-        if (ruleDomainError !== null) {
-            errorMessage.value = ruleDomainError;
-            return;
-        }
-
-        if (rule.regexes.length === 0) {
-            errorMessage.value = `Domain "${rule.domain}" must have at least one regex.`;
-            return;
-        }
-
-        for (const regex of rule.regexes) {
-            const regexError = validateRegexPattern(regex);
-            if (regexError !== null) {
-                errorMessage.value = regexError;
-                return;
-            }
-        }
-    }
-
-    const normalizedReferrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {};
-    for (const rule of referrerCleanupRules.value) {
-        const domain = rule.domain.trim().toLowerCase();
-        const ruleDomainError = validateDomainRule(domain);
-        if (ruleDomainError !== null) {
-            errorMessage.value = ruleDomainError;
-            return;
-        }
-
-        if (normalizedReferrerQueryParamsToStripByDomain[domain]) {
-            errorMessage.value = `Domain "${domain}" already has referrer cleanup rules.`;
-            return;
-        }
-
-        const queryParams = normalizeReferrerQueryParams(splitReferrerCleanupQueryParams(rule.queryParamsText));
-        if (queryParams.length === 0) {
-            errorMessage.value = `Domain "${domain}" must have at least one referrer query parameter or "*".`;
-            return;
-        }
-
-        for (const queryParam of queryParams) {
-            const queryParamError = validateReferrerQueryParam(queryParam);
-            if (queryParamError !== null) {
-                errorMessage.value = queryParamError;
-                return;
-            }
-        }
-
-        normalizedReferrerQueryParamsToStripByDomain[domain] = queryParams;
+    const siteCustomizations = validateCustomizationForms();
+    if (siteCustomizations === null) {
+        return;
     }
 
     atlasDomain.value = normalizedDomain;
+
     try {
-        await saveStoredOptions(
-            normalizedDomain,
-            apiToken.value,
-            normalizedRules,
-            normalizedReferrerQueryParamsToStripByDomain,
-        );
+        await saveStoredOptions(normalizedDomain, apiToken.value, siteCustomizations);
+        syncFormsFromSiteCustomizations(siteCustomizations);
         isSaved.value = true;
         await refreshApiConnectionStatus();
         setTimeout(() => {
@@ -142,20 +154,52 @@ async function saveOptions(): Promise<void> {
     }
 }
 
+async function exportCustomizations(): Promise<void> {
+    errorMessage.value = '';
+
+    const siteCustomizations = validateCustomizationForms();
+    if (siteCustomizations === null) {
+        return;
+    }
+
+    const payload = exportSiteCustomizationsPayload(siteCustomizations);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = 'atlas-site-customizations.json';
+    anchor.click();
+    URL.revokeObjectURL(downloadUrl);
+}
+
+async function handleImportCustomizations(event: Event): Promise<void> {
+    const target = event.target as HTMLInputElement | null;
+    const file = target?.files?.[0];
+    if (!file) {
+        return;
+    }
+
+    try {
+        const text = await file.text();
+        const importedSiteCustomizations = parseSiteCustomizationsImportJson(text);
+        syncFormsFromSiteCustomizations(importedSiteCustomizations);
+        activeCustomizationTab.value = 'matchRules';
+        errorMessage.value = '';
+    } catch (error) {
+        errorMessage.value = error instanceof Error ? error.message : 'Failed to import customization JSON.';
+    } finally {
+        if (target) {
+            target.value = '';
+        }
+    }
+}
+
 onMounted(() => {
     void getStoredOptions()
         .then((stored) => {
             atlasDomain.value = stored.atlasDomain;
             apiToken.value = stored.apiToken;
-            matchRules.value = stored.matchRules.map((rule) => ({
-                domain: rule.domain,
-                regexes: [...rule.regexes],
-            }));
-            referrerCleanupRules.value = Object.entries(stored.referrerQueryParamsToStripByDomain)
-                .map(([domain, queryParams]) => ({
-                    domain,
-                    queryParamsText: queryParams.join(', '),
-                }));
+            syncFormsFromSiteCustomizations(stored.siteCustomizations);
             void refreshApiConnectionStatus();
         })
         .catch((error) => {
@@ -163,62 +207,69 @@ onMounted(() => {
         });
 });
 
-function addRuleDomain(): void {
-    const domain = newRuleDomain.value.trim().toLowerCase();
+function addCustomizationDomain(): void {
+    const domain = newCustomizationDomain.value.trim().toLowerCase();
     const domainError = validateDomainRule(domain);
     if (domainError !== null) {
         errorMessage.value = domainError;
         return;
     }
 
-    if (matchRules.value.some((rule) => rule.domain === domain)) {
+    if (siteCustomizationForms.value.some((customization) => customization.domain === domain)) {
         errorMessage.value = `Domain "${domain}" already exists.`;
         return;
     }
 
-    matchRules.value.push({
-        domain,
-        regexes: [''],
-    });
-    newRuleDomain.value = '';
+    siteCustomizationForms.value.push(createCustomizationFormFromDomain(domain));
+    selectedCustomizationIndex.value = siteCustomizationForms.value.length - 1;
+    activeCustomizationTab.value = 'matchRules';
+    newCustomizationDomain.value = '';
     errorMessage.value = '';
 }
 
-function removeRuleDomain(index: number): void {
-    matchRules.value.splice(index, 1);
+function removeCustomization(index: number): void {
+    siteCustomizationForms.value.splice(index, 1);
+    if (siteCustomizationForms.value.length === 0) {
+        selectedCustomizationIndex.value = 0;
+        return;
+    }
+
+    if (selectedCustomizationIndex.value >= siteCustomizationForms.value.length) {
+        selectedCustomizationIndex.value = siteCustomizationForms.value.length - 1;
+    }
 }
 
-function addReferrerCleanupDomain(): void {
-    const domain = newReferrerCleanupDomain.value.trim().toLowerCase();
-    const domainError = validateDomainRule(domain);
-    if (domainError !== null) {
-        errorMessage.value = domainError;
-        return;
-    }
+function addMatchRule(): void {
+    selectedCustomization.value?.matchRules.push('');
+}
 
-    if (referrerCleanupRules.value.some((rule) => rule.domain === domain)) {
-        errorMessage.value = `Domain "${domain}" already exists.`;
-        return;
-    }
+function removeMatchRule(index: number): void {
+    selectedCustomization.value?.matchRules.splice(index, 1);
+}
 
-    referrerCleanupRules.value.push({
-        domain,
-        queryParamsText: '',
+function addMediaRewriteRule(): void {
+    selectedCustomization.value?.mediaCleanerRewriteRules.push({
+        pattern: '',
+        replace: '',
     });
-    newReferrerCleanupDomain.value = '';
-    errorMessage.value = '';
 }
 
-function removeReferrerCleanupDomain(index: number): void {
-    referrerCleanupRules.value.splice(index, 1);
+function removeMediaRewriteRule(index: number): void {
+    selectedCustomization.value?.mediaCleanerRewriteRules.splice(index, 1);
 }
 
-function addRegex(domainIndex: number): void {
-    matchRules.value[domainIndex].regexes.push('');
-}
+function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
+    const customization = selectedCustomization.value;
+    if (customization === null) {
+        return;
+    }
 
-function removeRegex(domainIndex: number, regexIndex: number): void {
-    matchRules.value[domainIndex].regexes.splice(regexIndex, 1);
+    if (customization.mediaCleanerStrategies.includes(strategy)) {
+        customization.mediaCleanerStrategies = customization.mediaCleanerStrategies.filter((value) => value !== strategy);
+        return;
+    }
+
+    customization.mediaCleanerStrategies = [...customization.mediaCleanerStrategies, strategy];
 }
 </script>
 
@@ -230,7 +281,7 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                     <h1 class="text-base font-semibold text-regal-navy-100">Atlas Extension Options</h1>
                     <Badge :variant="statusLabel === 'Ready' ? 'active' : 'inactive'">{{ statusLabel }}</Badge>
                 </div>
-                <p class="text-sm text-twilight-indigo-200">Configure your Atlas endpoint and API key.</p>
+                <p class="text-sm text-twilight-indigo-200">Configure your Atlas endpoint, API key, and per-site customizations.</p>
                 <p class="text-sm text-twilight-indigo-200">
                     Version
                     <span class="font-medium text-smart-blue-200">{{ extensionVersion }}</span>
@@ -253,164 +304,51 @@ function removeRegex(domainIndex: number, regexIndex: number): void {
                 </div>
 
                 <form class="space-y-4" @submit.prevent="saveOptions">
-                <label class="block space-y-1">
-                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">Atlas Domain</span>
-                    <input
-                        v-model="atlasDomain"
-                        type="url"
-                        placeholder="https://atlas.test"
-                        class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                    />
-                </label>
-
-                <label class="block space-y-1">
-                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">API Key</span>
-                    <div class="flex items-center gap-2">
+                    <label class="block space-y-1">
+                        <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">Atlas Domain</span>
                         <input
-                            v-model="apiToken"
-                            :type="showApiToken ? 'text' : 'password'"
-                            autocomplete="off"
+                            v-model="atlasDomain"
+                            type="url"
+                            placeholder="https://atlas.test"
                             class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
                         />
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
-                            @click="showApiToken = !showApiToken"
-                        >
-                            {{ showApiToken ? 'Hide' : 'Show' }}
-                        </button>
-                    </div>
-                </label>
+                    </label>
 
-                <div class="space-y-2">
-                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">URL Match Rules</span>
-                    <div class="flex items-center gap-2">
-                        <input
-                            v-model="newRuleDomain"
-                            type="text"
-                            placeholder="Add domain (e.g. deviantart.com)"
-                            class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                        />
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
-                            @click="addRuleDomain"
-                        >
-                            Add Domain
-                        </button>
-                    </div>
-
-                    <div class="space-y-3">
-                        <div
-                            v-for="(rule, domainIndex) in matchRules"
-                            :key="`${rule.domain}-${domainIndex}`"
-                            class="rounded-md border border-smart-blue-500/30 bg-prussian-blue-800/40 p-3 space-y-2"
-                        >
-                            <div class="flex items-center gap-2">
-                                <input
-                                    v-model="rule.domain"
-                                    type="text"
-                                    class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                                />
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center justify-center rounded-md border border-danger-500/60 bg-danger-500/20 px-2 py-1 text-xs font-medium text-danger-100 transition hover:bg-danger-500/30"
-                                    @click="removeRuleDomain(domainIndex)"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-
-                            <div class="space-y-2">
-                                <div
-                                    v-for="(_, regexIndex) in rule.regexes"
-                                    :key="`${rule.domain}-${regexIndex}`"
-                                    class="flex items-center gap-2"
-                                >
-                                    <input
-                                        v-model="rule.regexes[regexIndex]"
-                                        type="text"
-                                        placeholder="Regex pattern (e.g. .*\\/art\\/.*)"
-                                        class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="inline-flex items-center justify-center rounded-md border border-danger-500/60 bg-danger-500/20 px-2 py-1 text-xs font-medium text-danger-100 transition hover:bg-danger-500/30"
-                                        @click="removeRegex(domainIndex, regexIndex)"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-2 py-1 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
-                                    @click="addRegex(domainIndex)"
-                                >
-                                    Add Regex
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <p class="text-xs text-twilight-indigo-300">
-                        Subdomains are included. If this page host has rules, at least one regex must match. If this page host has
-                        no rule, all eligible media URLs are sent.
-                    </p>
-                </div>
-
-                <div class="space-y-2">
-                    <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">Referrer Query Params To Strip</span>
-                    <div class="flex items-center gap-2">
-                        <input
-                            v-model="newReferrerCleanupDomain"
-                            type="text"
-                            placeholder="Add domain (e.g. example.com)"
-                            class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                        />
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
-                            @click="addReferrerCleanupDomain"
-                        >
-                            Add Domain
-                        </button>
-                    </div>
-
-                    <div class="space-y-3">
-                        <div
-                            v-for="(rule, domainIndex) in referrerCleanupRules"
-                            :key="`${rule.domain}-${domainIndex}`"
-                            class="rounded-md border border-smart-blue-500/30 bg-prussian-blue-800/40 p-3 space-y-2"
-                        >
-                            <div class="flex items-center gap-2">
-                                <input
-                                    v-model="rule.domain"
-                                    type="text"
-                                    class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                                />
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center justify-center rounded-md border border-danger-500/60 bg-danger-500/20 px-2 py-1 text-xs font-medium text-danger-100 transition hover:bg-danger-500/30"
-                                    @click="removeReferrerCleanupDomain(domainIndex)"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-
-                            <textarea
-                                v-model="rule.queryParamsText"
-                                rows="2"
-                                placeholder='Comma-separated query params (e.g. tag, tags, or "*")'
-                                class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-2 py-1 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
+                    <label class="block space-y-1">
+                        <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">API Key</span>
+                        <div class="flex items-center gap-2">
+                            <input
+                                v-model="apiToken"
+                                :type="showApiToken ? 'text' : 'password'"
+                                autocomplete="off"
+                                class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
                             />
+                            <button
+                                type="button"
+                                class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
+                                @click="showApiToken = !showApiToken"
+                            >
+                                {{ showApiToken ? 'Hide' : 'Show' }}
+                            </button>
                         </div>
-                    </div>
+                    </label>
 
-                    <p class="text-xs text-twilight-indigo-300">
-                        Atlas strips these query parameter names from referrer URLs before anchor matching and reaction submit for
-                        matching domains. Use <span class="font-mono">*</span> to strip all query params for a domain.
-                    </p>
-                </div>
+                    <SiteCustomizationManager
+                        v-model:selected-customization-index="selectedCustomizationIndex"
+                        v-model:active-customization-tab="activeCustomizationTab"
+                        v-model:new-customization-domain="newCustomizationDomain"
+                        :customizations="siteCustomizationForms"
+                        :media-cleaner-strategies="MEDIA_CLEANER_STRATEGIES"
+                        @add-customization-domain="addCustomizationDomain"
+                        @remove-customization="removeCustomization"
+                        @add-match-rule="addMatchRule"
+                        @remove-match-rule="removeMatchRule"
+                        @add-media-rewrite-rule="addMediaRewriteRule"
+                        @remove-media-rewrite-rule="removeMediaRewriteRule"
+                        @toggle-media-cleaner-strategy="toggleMediaCleanerStrategy"
+                        @export-customizations="exportCustomizations"
+                        @import-customizations="handleImportCustomizations"
+                    />
 
                     <div class="flex items-center gap-3">
                         <button

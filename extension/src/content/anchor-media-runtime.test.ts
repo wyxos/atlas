@@ -73,7 +73,7 @@ describe('anchor-media-runtime', () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
             getRules: () => [],
-            getReferrerQueryParamsToStripByDomain: () => ({}),
+            getReferrerCleanerQueryParams: () => [],
             getPageHostname: () => 'example.com',
         });
 
@@ -124,7 +124,7 @@ describe('anchor-media-runtime', () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
             getRules: () => [],
-            getReferrerQueryParamsToStripByDomain: () => ({}),
+            getReferrerCleanerQueryParams: () => [],
             getPageHostname: () => 'example.com',
         });
 
@@ -157,9 +157,7 @@ describe('anchor-media-runtime', () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
             getRules: () => [],
-            getReferrerQueryParamsToStripByDomain: () => ({
-                'domain.com': ['tag', 'tags'],
-            }),
+            getReferrerCleanerQueryParams: () => ['tag', 'tags'],
             getPageHostname: () => 'domain.com',
         });
 
@@ -175,11 +173,7 @@ describe('anchor-media-runtime', () => {
         runtime.registerFromDocument();
         await flushPromises();
 
-        expect(mockGetCachedReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', {
-            'domain.com': ['tag', 'tags'],
-        });
-        expect(mockEnqueueReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', {
-            'domain.com': ['tag', 'tags'],
-        });
+        expect(mockGetCachedReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', ['tag', 'tags']);
+        expect(mockEnqueueReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', ['tag', 'tags']);
     });
 });

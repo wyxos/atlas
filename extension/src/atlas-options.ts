@@ -1,16 +1,17 @@
 /* global chrome */
-import { DEFAULT_MATCH_RULES, parseStoredMatchRules, type UrlMatchRule } from './match-rules';
+import type { SiteCustomization } from './site-customizations';
 import {
-    normalizeReferrerQueryParamsToStripByDomain,
-    parseStoredReferrerQueryParamsToStripByDomain,
-    type ReferrerQueryParamsToStripByDomain,
-} from './referrer-cleanup';
+    deriveSiteCustomizationsFromLegacyStorage,
+    normalizeSiteCustomizations,
+    parseStoredSiteCustomizations,
+} from './site-customizations';
 
 export const STORAGE_KEYS = {
     atlasDomain: 'atlasDomain',
     apiToken: 'apiToken',
     matchRules: 'matchRules',
     referrerQueryParamsToStripByDomain: 'referrerQueryParamsToStripByDomain',
+    siteCustomizations: 'siteCustomizations',
     closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
     reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
     reactAllItemsInPostByDomain: 'reactAllItemsInPostByDomain',
@@ -25,8 +26,7 @@ export type ReactAllItemsInPostByDomain = DomainBooleanPreferences;
 export type StoredOptions = {
     atlasDomain: string;
     apiToken: string;
-    matchRules: UrlMatchRule[];
-    referrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain;
+    siteCustomizations: SiteCustomization[];
 };
 
 export function normalizeDomain(input: string): string {
@@ -59,6 +59,7 @@ export function getStoredOptions(): Promise<StoredOptions> {
                 STORAGE_KEYS.apiToken,
                 STORAGE_KEYS.matchRules,
                 STORAGE_KEYS.referrerQueryParamsToStripByDomain,
+                STORAGE_KEYS.siteCustomizations,
             ],
             (stored: Record<string, unknown>) => {
                 if (chrome.runtime.lastError) {
@@ -69,16 +70,17 @@ export function getStoredOptions(): Promise<StoredOptions> {
                 const storedDomain = typeof stored.atlasDomain === 'string' ? normalizeDomain(stored.atlasDomain) : '';
                 const atlasDomain = storedDomain !== '' ? storedDomain : DEFAULT_ATLAS_DOMAIN;
                 const apiToken = typeof stored.apiToken === 'string' ? stored.apiToken.trim() : '';
-                const matchRules = parseStoredMatchRules(stored.matchRules);
-                const referrerQueryParamsToStripByDomain = parseStoredReferrerQueryParamsToStripByDomain(
-                    stored[STORAGE_KEYS.referrerQueryParamsToStripByDomain],
-                );
+                const siteCustomizations = stored[STORAGE_KEYS.siteCustomizations] !== undefined
+                    ? parseStoredSiteCustomizations(stored[STORAGE_KEYS.siteCustomizations])
+                    : deriveSiteCustomizationsFromLegacyStorage(
+                        stored[STORAGE_KEYS.matchRules],
+                        stored[STORAGE_KEYS.referrerQueryParamsToStripByDomain],
+                    );
 
                 resolve({
                     atlasDomain,
                     apiToken,
-                    matchRules: matchRules.length > 0 ? matchRules : DEFAULT_MATCH_RULES,
-                    referrerQueryParamsToStripByDomain,
+                    siteCustomizations,
                 });
             },
         );
@@ -88,17 +90,14 @@ export function getStoredOptions(): Promise<StoredOptions> {
 export function saveStoredOptions(
     atlasDomain: string,
     apiToken: string,
-    matchRules: UrlMatchRule[],
-    referrerQueryParamsToStripByDomain: ReferrerQueryParamsToStripByDomain = {},
+    siteCustomizations: SiteCustomization[] = [],
 ): Promise<void> {
     return new Promise((resolve, reject) => {
         chrome.storage.local.set(
             {
                 [STORAGE_KEYS.atlasDomain]: atlasDomain,
                 [STORAGE_KEYS.apiToken]: apiToken.trim(),
-                [STORAGE_KEYS.matchRules]: matchRules,
-                [STORAGE_KEYS.referrerQueryParamsToStripByDomain]:
-                    normalizeReferrerQueryParamsToStripByDomain(referrerQueryParamsToStripByDomain),
+                [STORAGE_KEYS.siteCustomizations]: normalizeSiteCustomizations(siteCustomizations),
             },
             () => {
                 if (chrome.runtime.lastError) {

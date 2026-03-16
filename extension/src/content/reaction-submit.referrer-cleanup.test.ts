@@ -20,10 +20,20 @@ describe('submitBadgeReaction referrer cleanup', () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
-            matchRules: [],
-            referrerQueryParamsToStripByDomain: {
-                [pageHostname]: ['tag', 'tags'],
-            },
+            siteCustomizations: [
+                {
+                    domain: pageHostname,
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: ['tag', 'tags'],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: [],
+                    },
+                },
+            ],
         });
 
         vi.stubGlobal('fetch', vi.fn());
