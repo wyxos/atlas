@@ -8,6 +8,7 @@ use App\Jobs\Downloads\RemoveDownloadTransfers;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Models\Reaction;
 use App\Models\User;
 use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferRemovalService;
@@ -351,15 +352,119 @@ it('removes a transfer and deletes the file from disk', function () {
     $response->assertSuccessful();
 
     expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
+    expect(File::query()->whereKey($file->id)->exists())->toBeFalse();
+
+    Storage::disk('atlas-app')->assertMissing('downloads/aa/bb/test.jpg');
+    Storage::disk('atlas-app')->assertMissing('thumbnails/aa/bb/test_thumb.jpg');
+});
+
+it('deletes the file record and cascaded transfers when removing a downloaded file from disk', function () {
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $reactionUser = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/cascade.jpg',
+        'filename' => 'cascade.jpg',
+        'downloaded' => true,
+        'path' => 'downloads/cascade.jpg',
+        'preview_path' => 'thumbnails/cascade.jpg',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'love',
+    ]);
+    Storage::disk('atlas-app')->put($file->path, 'file');
+    Storage::disk('atlas-app')->put($file->preview_path, 'thumb');
+
+    $firstTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+    ]);
+    $secondTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 40,
+        'last_broadcast_percent' => 40,
+        'failed_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$firstTransfer->id}/disk");
+
+    $response->assertSuccessful();
+
+    expect(collect($response->json('ids'))->sort()->values()->all())->toBe([
+        $firstTransfer->id,
+        $secondTransfer->id,
+    ]);
+    expect($response->json('count'))->toBe(2);
+    expect(DownloadTransfer::query()->whereKey($firstTransfer->id)->exists())->toBeFalse();
+    expect(DownloadTransfer::query()->whereKey($secondTransfer->id)->exists())->toBeFalse();
+    expect(File::query()->whereKey($file->id)->exists())->toBeFalse();
+    expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
+
+    Storage::disk('atlas-app')->assertMissing('downloads/cascade.jpg');
+    Storage::disk('atlas-app')->assertMissing('thumbnails/cascade.jpg');
+});
+
+it('removes reactions but keeps the file record when deleting a non-downloaded file from disk', function () {
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $reactionUser = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/pending.jpg',
+        'filename' => 'pending.jpg',
+        'downloaded' => false,
+        'path' => 'downloads/pending.jpg',
+        'preview_path' => 'thumbnails/pending.jpg',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'like',
+    ]);
+    Storage::disk('atlas-app')->put($file->path, 'file');
+    Storage::disk('atlas-app')->put($file->preview_path, 'thumb');
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 10,
+        'last_broadcast_percent' => 10,
+        'failed_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$transfer->id}/disk");
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'ids' => [$transfer->id],
+            'count' => 1,
+        ]);
+
+    expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
+    expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
 
     $file->refresh();
     expect($file->path)->toBeNull();
     expect($file->preview_path)->toBeNull();
     expect($file->downloaded)->toBeFalse();
-    expect($file->download_progress)->toBe(0);
 
-    Storage::disk('atlas-app')->assertMissing('downloads/aa/bb/test.jpg');
-    Storage::disk('atlas-app')->assertMissing('thumbnails/aa/bb/test_thumb.jpg');
+    Storage::disk('atlas-app')->assertMissing('downloads/pending.jpg');
+    Storage::disk('atlas-app')->assertMissing('thumbnails/pending.jpg');
 });
 
 it('removes completed transfers in one request without touching other statuses', function () {
@@ -449,12 +554,7 @@ it('removes completed transfers and deletes their files from disk when requested
         ]);
 
     expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
-
-    $file->refresh();
-    expect($file->path)->toBeNull();
-    expect($file->preview_path)->toBeNull();
-    expect($file->downloaded)->toBeFalse();
-    expect($file->download_progress)->toBe(0);
+    expect(File::query()->whereKey($file->id)->exists())->toBeFalse();
 
     Storage::disk('atlas-app')->assertMissing('downloads/completed-video.mp4');
     Storage::disk('atlas-app')->assertMissing('thumbnails/completed-video.jpg');
@@ -515,14 +615,8 @@ it('removes multiple transfers from disk in one bulk request', function () {
 
     expect(DownloadTransfer::query()->whereKey($firstTransfer->id)->exists())->toBeFalse();
     expect(DownloadTransfer::query()->whereKey($secondTransfer->id)->exists())->toBeFalse();
-
-    $firstFile->refresh();
-    $secondFile->refresh();
-
-    expect($firstFile->path)->toBeNull();
-    expect($secondFile->path)->toBeNull();
-    expect($firstFile->downloaded)->toBeFalse();
-    expect($secondFile->downloaded)->toBeFalse();
+    expect(File::query()->whereKey($firstFile->id)->exists())->toBeFalse();
+    expect(File::query()->whereKey($secondFile->id)->exists())->toBeFalse();
 
     Storage::disk('atlas-app')->assertMissing('downloads/first-video.mp4');
     Storage::disk('atlas-app')->assertMissing('thumbnails/first-video.jpg');

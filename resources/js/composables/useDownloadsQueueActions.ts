@@ -15,6 +15,10 @@ import {
 export function useDownloadsQueueActions(params: {
     selectedIds: Ref<Set<number>>;
     selectedIdsList: ComputedRef<number[]>;
+    selectedPausableIds: ComputedRef<number[]>;
+    selectedResumableIds: ComputedRef<number[]>;
+    selectedCancelableIds: ComputedRef<number[]>;
+    selectedRestartableIds: ComputedRef<number[]>;
     resumableFailedIds: ComputedRef<number[]>;
     restartableFailedIds: ComputedRef<number[]>;
     completedIds: ComputedRef<number[]>;
@@ -24,7 +28,9 @@ export function useDownloadsQueueActions(params: {
     const toast = useToast();
     const actionBusy = ref<Record<number, boolean>>({});
     const batchIsPausing = ref(false);
+    const batchIsResuming = ref(false);
     const batchIsCanceling = ref(false);
+    const batchIsRestarting = ref(false);
     const batchIsResumingFailed = ref(false);
     const batchIsRestartingFailed = ref(false);
     const removeDialogOpen = ref(false);
@@ -96,9 +102,11 @@ export function useDownloadsQueueActions(params: {
                 removeNow = data.queued !== true;
                 removedIds = data.ids ?? ids;
             } else if (ids.length === 1 && removeAlsoFromDisk.value) {
-                await window.axios.delete(downloadTransfers.destroyDisk.url(ids[0]));
+                const { data } = await window.axios.delete<RemoveResponse>(downloadTransfers.destroyDisk.url(ids[0]));
+                removedIds = data.ids ?? ids;
             } else if (ids.length === 1) {
-                await window.axios.delete(downloadTransfers.destroy.url(ids[0]));
+                const { data } = await window.axios.delete<RemoveResponse>(downloadTransfers.destroy.url(ids[0]));
+                removedIds = data.ids ?? ids;
             } else {
                 const { data } = await window.axios.post<RemoveResponse>(downloadTransfers.destroyBatch.url(), {
                     ids,
@@ -109,7 +117,7 @@ export function useDownloadsQueueActions(params: {
             }
 
             const nextSelection = new Set(params.selectedIds.value);
-            ids.forEach((id) => nextSelection.delete(id));
+            (removeNow ? removedIds : ids).forEach((id) => nextSelection.delete(id));
             params.setSelection(nextSelection);
 
             if (removeNow) {
@@ -124,12 +132,16 @@ export function useDownloadsQueueActions(params: {
         }
     }
 
+    async function postIndividually(ids: number[], makeRequest: (id: number) => Promise<unknown>): Promise<void> {
+        await Promise.allSettled(ids.map((id) => makeRequest(id)));
+    }
+
     async function pauseSelection(): Promise<void> {
         if (batchIsPausing.value) {
             return;
         }
 
-        const ids = params.selectedIdsList.value;
+        const ids = params.selectedPausableIds.value;
 
         if (!ids.length) {
             return;
@@ -144,12 +156,32 @@ export function useDownloadsQueueActions(params: {
         }
     }
 
+    async function resumeSelection(): Promise<void> {
+        if (batchIsResuming.value) {
+            return;
+        }
+
+        const ids = params.selectedResumableIds.value;
+
+        if (!ids.length) {
+            return;
+        }
+
+        batchIsResuming.value = true;
+
+        try {
+            await postIndividually(ids, (id) => window.axios.post(downloadTransfers.resume.url(id)));
+        } finally {
+            batchIsResuming.value = false;
+        }
+    }
+
     async function cancelSelection(): Promise<void> {
         if (batchIsCanceling.value) {
             return;
         }
 
-        const ids = params.selectedIdsList.value;
+        const ids = params.selectedCancelableIds.value;
 
         if (!ids.length) {
             return;
@@ -161,6 +193,26 @@ export function useDownloadsQueueActions(params: {
             await window.axios.post(downloadTransfers.cancelBatch.url(), { ids });
         } finally {
             batchIsCanceling.value = false;
+        }
+    }
+
+    async function restartSelection(): Promise<void> {
+        if (batchIsRestarting.value) {
+            return;
+        }
+
+        const ids = params.selectedRestartableIds.value;
+
+        if (!ids.length) {
+            return;
+        }
+
+        batchIsRestarting.value = true;
+
+        try {
+            await postIndividually(ids, (id) => window.axios.post(downloadTransfers.restart.url(id)));
+        } finally {
+            batchIsRestarting.value = false;
         }
     }
 
@@ -178,9 +230,7 @@ export function useDownloadsQueueActions(params: {
         batchIsResumingFailed.value = true;
 
         try {
-            await Promise.allSettled(
-                ids.map((id) => window.axios.post(downloadTransfers.resume.url(id))),
-            );
+            await postIndividually(ids, (id) => window.axios.post(downloadTransfers.resume.url(id)));
         } finally {
             batchIsResumingFailed.value = false;
         }
@@ -200,9 +250,7 @@ export function useDownloadsQueueActions(params: {
         batchIsRestartingFailed.value = true;
 
         try {
-            await Promise.allSettled(
-                ids.map((id) => window.axios.post(downloadTransfers.restart.url(id))),
-            );
+            await postIndividually(ids, (id) => window.axios.post(downloadTransfers.restart.url(id)));
         } finally {
             batchIsRestartingFailed.value = false;
         }
@@ -275,7 +323,9 @@ export function useDownloadsQueueActions(params: {
     return {
         actionBusy,
         batchIsPausing,
+        batchIsResuming,
         batchIsCanceling,
+        batchIsRestarting,
         batchIsResumingFailed,
         batchIsRestartingFailed,
         removeDialogOpen,
@@ -292,7 +342,9 @@ export function useDownloadsQueueActions(params: {
         clearRemoveDialog,
         confirmRemove,
         pauseSelection,
+        resumeSelection,
         cancelSelection,
+        restartSelection,
         resumeFailedDownloads,
         restartFailedDownloads,
         removeCompletedDownloads,

@@ -127,12 +127,9 @@ describe('createReactionBadgeHost delayed DeviantArt context', () => {
         expect(host.element.querySelector('input[type="checkbox"]')).toBeNull();
 
         hasRelatedThumbnails = true;
-        await new Promise((resolve) => {
-            setTimeout(resolve, 180);
+        await vi.waitFor(() => {
+            expect(host.element.querySelector('input[type="checkbox"]')).toBeTruthy();
         });
-        await flushPromises();
-
-        expect(host.element.querySelector('input[type="checkbox"]')).toBeTruthy();
 
         host.unmount();
     });

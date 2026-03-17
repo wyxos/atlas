@@ -5,7 +5,13 @@ import type {
     DownloadQueueSortDirection,
     DownloadQueueSortKey,
 } from '@/types/downloadQueue';
-import { compareDownloadQueueItems } from '@/utils/downloadQueue';
+import {
+    canCancelDownloadQueueItem,
+    canPauseDownloadQueueItem,
+    canRestartDownloadQueueItem,
+    canResumeDownloadQueueItem,
+    compareDownloadQueueItems,
+} from '@/utils/downloadQueue';
 import { DEFAULT_DOWNLOAD_QUEUE_SORT } from '@/types/downloadQueue';
 
 export function useDownloadsQueueTableState(params: {
@@ -46,8 +52,23 @@ export function useDownloadsQueueTableState(params: {
         filteredIds.value.filter((id) => selectedIds.value.has(id)).length,
     );
     const selectedIdsList = computed(() => Array.from(selectedIds.value));
+    const selectedItems = computed(() =>
+        params.downloads.value.filter((item) => selectedIds.value.has(item.id)),
+    );
     const lastSelectedId = computed(() =>
         lastSelectedIndex.value === null ? null : (sortedItems.value[lastSelectedIndex.value]?.id ?? null),
+    );
+    const selectedPausableIds = computed(() =>
+        selectedItems.value.filter((item) => canPauseDownloadQueueItem(item)).map((item) => item.id),
+    );
+    const selectedResumableIds = computed(() =>
+        selectedItems.value.filter((item) => canResumeDownloadQueueItem(item)).map((item) => item.id),
+    );
+    const selectedCancelableIds = computed(() =>
+        selectedItems.value.filter((item) => canCancelDownloadQueueItem(item)).map((item) => item.id),
+    );
+    const selectedRestartableIds = computed(() =>
+        selectedItems.value.filter((item) => canRestartDownloadQueueItem(item)).map((item) => item.id),
     );
     const resumableFailedIds = computed(() =>
         params.downloads.value
@@ -209,6 +230,10 @@ export function useDownloadsQueueTableState(params: {
         selectedCount,
         selectedInFilterCount,
         selectedIdsList,
+        selectedPausableIds,
+        selectedResumableIds,
+        selectedCancelableIds,
+        selectedRestartableIds,
         lastSelectedId,
         resumableFailedIds,
         restartableFailedIds,

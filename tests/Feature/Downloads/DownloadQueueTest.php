@@ -15,6 +15,7 @@ use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 
@@ -102,6 +103,41 @@ test('pumps respects global transfer cap across domains', function () {
     expect(DownloadTransfer::query()->where('domain', 'example.com')->where('status', DownloadTransferStatus::PENDING)->count())->toBe(5);
 
     Bus::assertDispatched(QueueDownloadTransfer::class, 15);
+});
+
+test('pumps staggers queued transfer starts per domain', function () {
+    Bus::fake();
+    Cache::flush();
+
+    config()->set('downloads.domain_start_gap_seconds', 10);
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/test.bin',
+        'filename' => 'test.bin',
+        'ext' => 'bin',
+        'downloaded' => false,
+    ]);
+
+    for ($i = 0; $i < 3; $i++) {
+        DownloadTransfer::query()->create([
+            'file_id' => $file->id,
+            'url' => 'https://example.com/test.bin',
+            'domain' => 'example.com',
+            'status' => DownloadTransferStatus::PENDING,
+            'bytes_total' => null,
+            'bytes_downloaded' => 0,
+            'last_broadcast_percent' => 0,
+        ]);
+    }
+
+    (new PumpDomainDownloads('example.com'))->handle();
+
+    $jobs = Bus::dispatched(QueueDownloadTransfer::class)->values();
+    $delays = $jobs
+        ->map(fn (QueueDownloadTransfer $job): int => (int) ($job->delay ?? 0))
+        ->all();
+
+    expect($delays)->toBe([0, 10, 20]);
 });
 
 test('progress broadcaster emits only at 5% boundaries and updates File.download_progress', function () {

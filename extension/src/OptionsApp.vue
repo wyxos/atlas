@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /* global chrome */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
+import PageHeader from '@/components/ui/PageHeader.vue';
 import OptionsBackgroundRelayFeed from './OptionsBackgroundRelayFeed.vue';
 import OptionsReverbFeed from './OptionsReverbFeed.vue';
 import SiteCustomizationManager from './SiteCustomizationManager.vue';
@@ -39,11 +40,13 @@ const activeCustomizationTab = ref<CustomizationTab>('matchRules');
 const newCustomizationDomain = ref('');
 const errorMessage = ref('');
 const isSaved = ref(false);
+const isCustomizationJsonCopied = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
 const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
+let customizationCopyTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const selectedCustomization = computed<SiteCustomizationForm | null>(() =>
     siteCustomizationForms.value[selectedCustomizationIndex.value] ?? null);
@@ -122,9 +125,28 @@ function validateCustomizationForms(): SiteCustomization[] | null {
     return siteCustomizations;
 }
 
+function resetCustomizationJsonCopied(): void {
+    if (customizationCopyTimeout !== null) {
+        clearTimeout(customizationCopyTimeout);
+        customizationCopyTimeout = null;
+    }
+
+    isCustomizationJsonCopied.value = false;
+}
+
+function markCustomizationJsonCopied(): void {
+    resetCustomizationJsonCopied();
+    isCustomizationJsonCopied.value = true;
+    customizationCopyTimeout = setTimeout(() => {
+        isCustomizationJsonCopied.value = false;
+        customizationCopyTimeout = null;
+    }, 2000);
+}
+
 async function saveOptions(): Promise<void> {
     isSaved.value = false;
     errorMessage.value = '';
+    resetCustomizationJsonCopied();
 
     const normalizedDomain = normalizeDomain(atlasDomain.value);
     const domainError = validateDomain(normalizedDomain);
@@ -156,6 +178,7 @@ async function saveOptions(): Promise<void> {
 
 async function exportCustomizations(): Promise<void> {
     errorMessage.value = '';
+    resetCustomizationJsonCopied();
 
     const siteCustomizations = validateCustomizationForms();
     if (siteCustomizations === null) {
@@ -172,7 +195,30 @@ async function exportCustomizations(): Promise<void> {
     URL.revokeObjectURL(downloadUrl);
 }
 
+async function copyCustomizationsToClipboard(): Promise<void> {
+    errorMessage.value = '';
+    resetCustomizationJsonCopied();
+
+    const siteCustomizations = validateCustomizationForms();
+    if (siteCustomizations === null) {
+        return;
+    }
+
+    if (!navigator.clipboard?.writeText) {
+        errorMessage.value = 'Clipboard access is unavailable in this browser context.';
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(JSON.stringify(exportSiteCustomizationsPayload(siteCustomizations), null, 2));
+        markCustomizationJsonCopied();
+    } catch (error) {
+        errorMessage.value = error instanceof Error ? error.message : 'Failed to copy customization JSON.';
+    }
+}
+
 async function handleImportCustomizations(event: Event): Promise<void> {
+    resetCustomizationJsonCopied();
     const target = event.target as HTMLInputElement | null;
     const file = target?.files?.[0];
     if (!file) {
@@ -205,6 +251,10 @@ onMounted(() => {
         .catch((error) => {
             errorMessage.value = error instanceof Error ? error.message : 'Failed to load extension options.';
         });
+});
+
+onBeforeUnmount(() => {
+    resetCustomizationJsonCopied();
 });
 
 function addCustomizationDomain(): void {
@@ -274,96 +324,164 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
 </script>
 
 <template>
-    <main class="min-h-screen p-4 app-gradient">
-        <section class="mx-auto max-w-6xl rounded-lg border border-smart-blue-500/30 bg-prussian-blue-700/60 p-4 space-y-4">
-            <header class="space-y-1">
-                <div class="flex items-center justify-between gap-3">
-                    <h1 class="text-base font-semibold text-regal-navy-100">Atlas Extension Options</h1>
-                    <Badge :variant="statusLabel === 'Ready' ? 'active' : 'inactive'">{{ statusLabel }}</Badge>
-                </div>
-                <p class="text-sm text-twilight-indigo-200">Configure your Atlas endpoint, API key, and per-site customizations.</p>
-                <p class="text-sm text-twilight-indigo-200">
-                    Version
-                    <span class="font-medium text-smart-blue-200">{{ extensionVersion }}</span>
-                </p>
-                <p class="text-sm text-twilight-indigo-200">{{ statusDetail }}</p>
-                <p class="text-sm text-twilight-indigo-200">
-                    Reverb:
-                    <span class="font-medium text-smart-blue-200">{{ reverbStatusLabel }}</span>
-                    · {{ reverbStatusDetail }}
-                </p>
-                <p v-if="reverbEndpoint" class="text-xs text-twilight-indigo-300">
-                    Reverb Endpoint: <span class="font-mono">{{ reverbEndpoint }}</span>
-                </p>
-            </header>
+    <main class="min-h-screen px-4 py-6 app-gradient">
+        <div class="mx-auto w-full max-w-[1920px] space-y-6">
+            <section class="rounded-[28px] border border-smart-blue-500/30 bg-prussian-blue-700/60 p-5 shadow-2xl shadow-prussian-blue-950/15">
+                <PageHeader
+                    title="Atlas Extension Options"
+                    subtitle="Configure the Atlas connection, keep an eye on live runtime status, and manage site-specific matching and cleanup rules."
+                />
 
-            <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-                <div class="space-y-4">
-                    <OptionsBackgroundRelayFeed />
-                    <OptionsReverbFeed />
-                </div>
-
-                <form class="space-y-4" @submit.prevent="saveOptions">
-                    <label class="block space-y-1">
-                        <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">Atlas Domain</span>
-                        <input
-                            v-model="atlasDomain"
-                            type="url"
-                            placeholder="https://atlas.test"
-                            class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                        />
-                    </label>
-
-                    <label class="block space-y-1">
-                        <span class="text-xs font-medium uppercase tracking-wide text-smart-blue-200">API Key</span>
-                        <div class="flex items-center gap-2">
-                            <input
-                                v-model="apiToken"
-                                :type="showApiToken ? 'text' : 'password'"
-                                autocomplete="off"
-                                class="w-full rounded-md border border-smart-blue-500/40 bg-prussian-blue-800/70 px-3 py-2 text-sm text-regal-navy-100 outline-none transition focus:border-smart-blue-300"
-                            />
-                            <button
-                                type="button"
-                                class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
-                                @click="showApiToken = !showApiToken"
-                            >
-                                {{ showApiToken ? 'Hide' : 'Show' }}
-                            </button>
+                <div class="grid gap-4 lg:grid-cols-3">
+                    <article class="rounded-2xl border border-smart-blue-500/25 bg-prussian-blue-900/30 p-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Atlas API</p>
+                                <h2 class="mt-2 text-lg font-semibold text-regal-navy-100">Connection Status</h2>
+                            </div>
+                            <Badge :variant="statusLabel === 'Ready' ? 'active' : 'inactive'">{{ statusLabel }}</Badge>
                         </div>
-                    </label>
+                        <p class="mt-3 text-sm text-blue-slate-300">{{ statusDetail }}</p>
+                    </article>
 
-                    <SiteCustomizationManager
-                        v-model:selected-customization-index="selectedCustomizationIndex"
-                        v-model:active-customization-tab="activeCustomizationTab"
-                        v-model:new-customization-domain="newCustomizationDomain"
-                        :customizations="siteCustomizationForms"
-                        :media-cleaner-strategies="MEDIA_CLEANER_STRATEGIES"
-                        @add-customization-domain="addCustomizationDomain"
-                        @remove-customization="removeCustomization"
-                        @add-match-rule="addMatchRule"
-                        @remove-match-rule="removeMatchRule"
-                        @add-media-rewrite-rule="addMediaRewriteRule"
-                        @remove-media-rewrite-rule="removeMediaRewriteRule"
-                        @toggle-media-cleaner-strategy="toggleMediaCleanerStrategy"
-                        @export-customizations="exportCustomizations"
-                        @import-customizations="handleImportCustomizations"
-                    />
+                    <article class="rounded-2xl border border-smart-blue-500/25 bg-prussian-blue-900/30 p-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Reverb</p>
+                                <h2 class="mt-2 text-lg font-semibold text-regal-navy-100">Realtime Channel</h2>
+                            </div>
+                            <Badge :variant="reverbStatusLabel === 'Connected' ? 'active' : 'inactive'">
+                                {{ reverbStatusLabel }}
+                            </Badge>
+                        </div>
+                        <p class="mt-3 text-sm text-blue-slate-300">{{ reverbStatusDetail }}</p>
+                        <p v-if="reverbEndpoint" class="mt-3 font-mono text-xs text-smart-blue-100">
+                            {{ reverbEndpoint }}
+                        </p>
+                    </article>
 
-                    <div class="flex items-center gap-3">
-                        <button
-                            type="submit"
-                            class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
-                        >
-                            Save
-                        </button>
+                    <article class="rounded-2xl border border-smart-blue-500/25 bg-prussian-blue-900/30 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Extension Build</p>
+                        <p class="mt-3 text-3xl font-semibold text-smart-blue-100">{{ extensionVersion }}</p>
+                        <p class="mt-3 text-sm text-blue-slate-300">
+                            Site customizations stay local to this browser profile. Use the JSON import and export actions to move them elsewhere.
+                        </p>
+                    </article>
+                </div>
+            </section>
 
-                        <p v-if="isSaved" class="text-sm text-emerald-300">Saved.</p>
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(380px,0.82fr)]">
+                <form
+                    class="space-y-6 rounded-[28px] border border-smart-blue-500/30 bg-prussian-blue-700/55 p-5 shadow-2xl shadow-prussian-blue-950/15"
+                    @submit.prevent="saveOptions"
+                >
+                    <section class="space-y-4">
+                        <div class="border-b border-smart-blue-500/20 pb-4">
+                            <h2 class="text-lg font-semibold text-regal-navy-100">Connection</h2>
+                            <p class="mt-1 text-sm text-blue-slate-300">
+                                Atlas domain and API key used by extension requests, auth checks, and Reverb discovery.
+                            </p>
+                        </div>
+
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <label class="block space-y-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Atlas Domain</span>
+                                <input
+                                    v-model="atlasDomain"
+                                    type="url"
+                                    placeholder="https://atlas.test"
+                                    class="w-full rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
+                                />
+                            </label>
+
+                            <label class="block space-y-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">API Key</span>
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        v-model="apiToken"
+                                        :type="showApiToken ? 'text' : 'password'"
+                                        autocomplete="off"
+                                        class="w-full rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-3 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
+                                        @click="showApiToken = !showApiToken"
+                                    >
+                                        {{ showApiToken ? 'Hide' : 'Show' }}
+                                    </button>
+                                </div>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="space-y-4 border-t border-smart-blue-500/20 pt-6">
+                        <div class="border-b border-smart-blue-500/20 pb-4">
+                            <h2 class="text-lg font-semibold text-regal-navy-100">Customizations</h2>
+                            <p class="mt-1 text-sm text-blue-slate-300">
+                                Build one site profile per page domain and keep matching, referrer cleanup, and media normalization together.
+                            </p>
+                        </div>
+
+                        <SiteCustomizationManager
+                            v-model:selected-customization-index="selectedCustomizationIndex"
+                            v-model:active-customization-tab="activeCustomizationTab"
+                            v-model:new-customization-domain="newCustomizationDomain"
+                            :customizations="siteCustomizationForms"
+                            :is-customization-json-copied="isCustomizationJsonCopied"
+                            :media-cleaner-strategies="MEDIA_CLEANER_STRATEGIES"
+                            @add-customization-domain="addCustomizationDomain"
+                            @remove-customization="removeCustomization"
+                            @add-match-rule="addMatchRule"
+                            @remove-match-rule="removeMatchRule"
+                            @add-media-rewrite-rule="addMediaRewriteRule"
+                            @remove-media-rewrite-rule="removeMediaRewriteRule"
+                            @toggle-media-cleaner-strategy="toggleMediaCleanerStrategy"
+                            @copy-customizations="copyCustomizationsToClipboard"
+                            @export-customizations="exportCustomizations"
+                            @import-customizations="handleImportCustomizations"
+                        />
+                    </section>
+
+                    <div
+                        v-if="errorMessage"
+                        class="rounded-2xl border border-danger-500/35 bg-danger-500/10 px-4 py-3 text-sm text-red-200"
+                    >
+                        {{ errorMessage }}
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-smart-blue-500/20 pt-4">
+                        <p class="text-sm text-twilight-indigo-300">
+                            Saving updates the Atlas connection and the current site profile registry for this browser profile.
+                        </p>
+
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="submit"
+                                class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-3 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
+                            >
+                                Save Changes
+                            </button>
+
+                            <p v-if="isSaved" class="text-sm text-emerald-300">Saved.</p>
+                        </div>
                     </div>
                 </form>
-            </div>
 
-            <p v-if="errorMessage" class="text-sm text-red-300">{{ errorMessage }}</p>
-        </section>
+                <section class="rounded-[28px] border border-smart-blue-500/30 bg-prussian-blue-700/55 p-5 shadow-2xl shadow-prussian-blue-950/15">
+                    <div class="border-b border-smart-blue-500/20 pb-4">
+                        <h2 class="text-lg font-semibold text-regal-navy-100">Runtime Diagnostics</h2>
+                        <p class="mt-1 text-sm text-blue-slate-300">
+                            Use these feeds to verify the background relay and direct Reverb connection without leaving the options page.
+                        </p>
+                    </div>
+
+                    <div class="mt-5 space-y-4">
+                        <OptionsBackgroundRelayFeed />
+                        <OptionsReverbFeed />
+                    </div>
+                </section>
+            </div>
+        </div>
     </main>
 </template>
