@@ -16,7 +16,7 @@ const dropdownMenuStubs = {
 };
 
 describe('DownloadsQueueToolbar', () => {
-    it('renders separate resume and restart failed actions', async () => {
+    it('groups non-selected batch actions into one menu', async () => {
         const wrapper = mount(DownloadsQueueToolbar, {
             props: {
                 filters: ['all'],
@@ -47,21 +47,30 @@ describe('DownloadsQueueToolbar', () => {
         });
 
         const buttons = wrapper.findAll('button');
+        const trigger = buttons.find((button) => button.text().includes('All actions'));
         const resumeButton = buttons.find((button) => button.text().includes('Resume failed (2)'));
         const restartButton = buttons.find((button) => button.text().includes('Restart failed (3)'));
+        const removeCompletedButton = buttons.find((button) => button.text().includes('Remove completed (1)'));
+        const removeFilteredButton = buttons.find((button) => button.text().includes('Remove filtered (6)'));
 
-        if (!resumeButton || !restartButton) {
-            throw new Error('Failed action buttons were not rendered.');
+        expect(trigger?.exists()).toBe(true);
+
+        if (!resumeButton || !restartButton || !removeCompletedButton || !removeFilteredButton) {
+            throw new Error('All-actions menu items were not rendered.');
         }
 
         await resumeButton.trigger('click');
         await restartButton.trigger('click');
+        await removeCompletedButton.trigger('click');
+        await removeFilteredButton.trigger('click');
 
         expect(wrapper.emitted('resumeFailed')).toHaveLength(1);
         expect(wrapper.emitted('restartFailed')).toHaveLength(1);
+        expect(wrapper.emitted('removeCompleted')).toHaveLength(1);
+        expect(wrapper.emitted('removeFiltered')).toHaveLength(1);
     });
 
-    it('groups selected-item actions into one menu', async () => {
+    it('renders separate all and selected menus when both scopes are available', async () => {
         const wrapper = mount(DownloadsQueueToolbar, {
             props: {
                 filters: ['all'],
@@ -92,14 +101,16 @@ describe('DownloadsQueueToolbar', () => {
         });
 
         const buttons = wrapper.findAll('button');
-        const trigger = buttons.find((button) => button.text().includes('Selected actions (3)'));
+        const allTrigger = buttons.find((button) => button.text().includes('All actions'));
+        const selectedTrigger = buttons.find((button) => button.text().includes('Selected actions (3)'));
         const pauseButton = buttons.find((button) => button.text().includes('Pause selected (2)'));
         const resumeButton = buttons.find((button) => button.text().includes('Resume selected (1)'));
         const cancelButton = buttons.find((button) => button.text().includes('Cancel selected (3)'));
         const restartButton = buttons.find((button) => button.text().includes('Restart selected (1)'));
         const removeButton = buttons.find((button) => button.text().includes('Remove selection'));
 
-        expect(trigger?.exists()).toBe(true);
+        expect(allTrigger?.exists()).toBe(true);
+        expect(selectedTrigger?.exists()).toBe(true);
 
         if (!pauseButton || !resumeButton || !cancelButton || !restartButton || !removeButton) {
             throw new Error('Selected-action menu items were not rendered.');

@@ -56,6 +56,35 @@ describe('tabContentBrowseBootstrap', () => {
         });
     });
 
+    it('restarts empty restored CivitAI tabs from the first page', () => {
+        const session = extractRestoredBrowseSession(createTab({
+            params: {
+                service: 'civit-ai-images',
+                page: '20|1773762966318',
+            },
+        }));
+
+        expect(session).toEqual({
+            items: [],
+            startPageToken: 1,
+        });
+    });
+
+    it('keeps the saved CivitAI cursor when restored items exist', () => {
+        const session = extractRestoredBrowseSession(createTab({
+            params: {
+                service: 'civit-ai-images',
+                page: '20|1773762966318',
+            },
+            items: [{ id: 1 }],
+        }));
+
+        expect(session).toEqual({
+            items: [{ id: 1 }],
+            startPageToken: '20|1773762966318',
+        });
+    });
+
     it('returns null when there is no saved tab state', () => {
         expect(extractRestoredBrowseSession(createTab())).toBeNull();
         expect(extractRestoredBrowseSession(null)).toBeNull();

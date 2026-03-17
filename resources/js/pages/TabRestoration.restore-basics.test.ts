@@ -223,6 +223,25 @@ beforeEach(() => {
 });
 
 describe('Browse - Tab Restoration', () => {
+    it('restarts empty restored CivitAI tabs from page 1 instead of a saved cursor', async () => {
+        const tabId = 1;
+        const staleCursor = '20|1773762966318';
+
+        const tabConfig = createMockTabConfig(tabId, {
+            params: { service: 'civit-ai-images', page: staleCursor },
+        });
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(mocks, tabConfig);
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        expect(masonry.props('page')).toBe(1);
+    });
+
     it('restores tab query params after refresh', async () => {
         const tabId = 1;
         const currentToken = 'cursor-next-456';
