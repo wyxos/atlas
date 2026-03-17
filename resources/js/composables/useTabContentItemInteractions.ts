@@ -19,7 +19,7 @@ type UseTabContentItemInteractionsOptions = {
     fileViewer: Ref<FileViewerRef | null>;
     itemPreview: {
         incrementPreviewCount: (fileId: number) => Promise<{ will_auto_dislike: boolean } | null>;
-        clearPreviewedItems: () => void;
+        clearPreviewedItems: (fileIds?: number[]) => void;
     };
     onReaction: (fileId: number, type: ReactionType) => void;
     clearHoveredContainer: () => void;
@@ -251,9 +251,10 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     }
 
     async function resetPreviewedState(): Promise<number> {
-        const fileIds = options.items.value
-            .map((item) => item.id)
-            .filter((itemId): itemId is number => typeof itemId === 'number');
+        const resettableItems = options.items.value.filter((item) => {
+            return typeof item.id === 'number' && !hasActiveReaction(item);
+        });
+        const fileIds = resettableItems.map((item) => item.id);
 
         if (fileIds.length === 0) {
             return 0;
@@ -264,9 +265,9 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         });
 
         autoDislikeQueue.clearAutoDislikeCountdowns();
-        options.itemPreview.clearPreviewedItems();
+        options.itemPreview.clearPreviewedItems(fileIds);
 
-        for (const item of options.items.value) {
+        for (const item of resettableItems) {
             item.previewed_count = 0;
             item.will_auto_dislike = false;
         }

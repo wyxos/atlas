@@ -71,8 +71,23 @@ export function useItemPreview(
     }
 
     // Clear previewed items (useful when switching tabs)
-    function clearPreviewedItems(): void {
-        previewedItems.value.clear();
+    function clearPreviewedItems(fileIds?: number[]): void {
+        if (fileIds === undefined) {
+            previewedItems.value = new Set();
+            return;
+        }
+
+        if (fileIds.length === 0) {
+            return;
+        }
+
+        const nextPreviewedItems = new Set(previewedItems.value);
+
+        for (const fileId of fileIds) {
+            nextPreviewedItems.delete(fileId);
+        }
+
+        previewedItems.value = nextPreviewedItems;
     }
 
     return {
@@ -81,4 +96,3 @@ export function useItemPreview(
         clearPreviewedItems,
     };
 }
-
