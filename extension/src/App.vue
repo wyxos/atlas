@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /* global chrome */
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
+import { formatTabCountSummary, summarizeTabCounts, type BrowserTabLike, type TabCountSummary } from './tab-counts';
 
 const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
 
@@ -10,17 +11,22 @@ const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
-const tabCount = ref<number | null>(null);
+const tabCountSummary = ref<TabCountSummary | null>(null);
 const isDiscardingTabs = ref(false);
 const discardTabsResult = ref<string | null>(null);
 let statusRefreshHandle: number | null = null;
 let isPopupActive = true;
+const tabCountLabel = computed(() => formatTabCountSummary(tabCountSummary.value));
 
 type DiscardInactiveTabsResponse = {
     ok?: unknown;
     discardedCount?: unknown;
     failedCount?: unknown;
     skippedCount?: unknown;
+};
+
+type BrowserTab = BrowserTabLike & {
+    active?: boolean;
 };
 
 function openOptionsPage(): void {
@@ -39,24 +45,43 @@ function pluralize(value: number, singular: string, plural: string): string {
     return value === 1 ? singular : plural;
 }
 
-function refreshTabCount(): void {
+function queryTabs(queryInfo: Record<string, unknown>): Promise<BrowserTab[] | null> {
     if (!chrome.tabs?.query) {
-        tabCount.value = null;
-        return;
+        return Promise.resolve(null);
     }
 
-    chrome.tabs.query({}, (tabs: unknown) => {
-        if (chrome.runtime.lastError || !Array.isArray(tabs)) {
-            tabCount.value = null;
-            return;
-        }
+    return new Promise((resolve) => {
+        chrome.tabs.query(queryInfo, (tabs: unknown) => {
+            if (chrome.runtime.lastError || !Array.isArray(tabs)) {
+                resolve(null);
+                return;
+            }
 
-        tabCount.value = tabs.length;
+            resolve(tabs as BrowserTab[]);
+        });
     });
 }
 
+async function refreshTabCount(): Promise<void> {
+    const [tabs, activeTabs] = await Promise.all([
+        queryTabs({}),
+        queryTabs({ active: true, currentWindow: true }),
+    ]);
+
+    if (!isPopupActive) {
+        return;
+    }
+
+    if (tabs === null) {
+        tabCountSummary.value = null;
+        return;
+    }
+
+    tabCountSummary.value = summarizeTabCounts(tabs, activeTabs?.[0]?.url ?? null);
+}
+
 function handleTabPresenceChanged(): void {
-    refreshTabCount();
+    void refreshTabCount();
 }
 
 async function refreshConnectionStatus(): Promise<void> {
@@ -144,10 +169,12 @@ async function discardInactiveTabs(): Promise<void> {
 
 onMounted(() => {
     isPopupActive = true;
-    refreshTabCount();
+    void refreshTabCount();
     scheduleConnectionStatusRefresh();
     chrome.tabs?.onCreated?.addListener(handleTabPresenceChanged);
     chrome.tabs?.onRemoved?.addListener(handleTabPresenceChanged);
+    chrome.tabs?.onUpdated?.addListener(handleTabPresenceChanged);
+    chrome.tabs?.onActivated?.addListener(handleTabPresenceChanged);
 });
 
 onUnmounted(() => {
@@ -159,6 +186,8 @@ onUnmounted(() => {
 
     chrome.tabs?.onCreated?.removeListener(handleTabPresenceChanged);
     chrome.tabs?.onRemoved?.removeListener(handleTabPresenceChanged);
+    chrome.tabs?.onUpdated?.removeListener(handleTabPresenceChanged);
+    chrome.tabs?.onActivated?.removeListener(handleTabPresenceChanged);
 });
 </script>
 
@@ -176,7 +205,7 @@ onUnmounted(() => {
             </p>
             <p class="text-sm text-twilight-indigo-200">
                 Tabs
-                <span class="font-medium text-smart-blue-200">{{ tabCount ?? '—' }}</span>
+                <span class="font-medium text-smart-blue-200">{{ tabCountLabel }}</span>
             </p>
             <p class="text-sm text-twilight-indigo-200">
                 {{ statusDetail }}

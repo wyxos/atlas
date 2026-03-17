@@ -1,10 +1,19 @@
-type TabCountChangedListener = (count: number) => void;
+export type TabCountSnapshot = {
+    similarDomainCount: number | null;
+    totalCount: number;
+};
+
+type TabCountChangedListener = (snapshot: TabCountSnapshot) => void;
 
 const tabCountChangedListeners = new Set<TabCountChangedListener>();
 let tabCountRuntimeBound = false;
 
 function toSafeCount(value: unknown): number {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
+
+function toSafeNullableCount(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
 }
 
 export function subscribeToTabCountChanged(listener: TabCountChangedListener): () => void {
@@ -16,14 +25,17 @@ export function subscribeToTabCountChanged(listener: TabCountChangedListener): (
                 return;
             }
 
-            const payload = message as { type?: unknown; count?: unknown };
+            const payload = message as { type?: unknown; count?: unknown; similarDomainCount?: unknown };
             if (payload.type !== 'ATLAS_TAB_COUNT_CHANGED') {
                 return;
             }
 
-            const count = toSafeCount(payload.count);
+            const snapshot: TabCountSnapshot = {
+                similarDomainCount: toSafeNullableCount(payload.similarDomainCount),
+                totalCount: toSafeCount(payload.count),
+            };
             tabCountChangedListeners.forEach((tabListener) => {
-                tabListener(count);
+                tabListener(snapshot);
             });
         });
         tabCountRuntimeBound = true;
@@ -34,7 +46,7 @@ export function subscribeToTabCountChanged(listener: TabCountChangedListener): (
     };
 }
 
-export async function requestTabCount(): Promise<number | null> {
+export async function requestTabCount(): Promise<TabCountSnapshot | null> {
     if (!chrome.runtime?.sendMessage) {
         return null;
     }
@@ -47,11 +59,17 @@ export async function requestTabCount(): Promise<number | null> {
             }
 
             if (typeof response !== 'object' || response === null) {
-                resolve(0);
+                resolve({
+                    similarDomainCount: null,
+                    totalCount: 0,
+                });
                 return;
             }
 
-            resolve(toSafeCount((response as { count?: unknown }).count));
+            resolve({
+                similarDomainCount: toSafeNullableCount((response as { similarDomainCount?: unknown }).similarDomainCount),
+                totalCount: toSafeCount((response as { count?: unknown }).count),
+            });
         });
     });
 }
