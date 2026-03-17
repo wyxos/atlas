@@ -7,8 +7,6 @@ return [
 
     'max_transfers_per_domain' => (int) env('DOWNLOADS_MAX_TRANSFERS_PER_DOMAIN', 5),
 
-    'domain_start_gap_seconds' => (int) env('DOWNLOADS_DOMAIN_START_GAP_SECONDS', 10),
-
     'chunk_count' => (int) env('DOWNLOADS_CHUNK_COUNT', 4),
 
     'min_bytes_for_chunking' => (int) env('DOWNLOADS_MIN_BYTES_FOR_CHUNKING', 10 * 1024 * 1024),
