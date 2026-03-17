@@ -136,3 +136,18 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($wallNsfw['label'])->toBe('Purity');
     expect($wallNsfw['type'])->toBe('radio');
 });
+
+test('browse services endpoint disables caching', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->getJson('/api/browse/services');
+
+    $response->assertOk();
+    $response->assertHeader('Pragma', 'no-cache');
+
+    $cacheControl = (string) $response->headers->get('Cache-Control', '');
+    expect($cacheControl)->toContain('no-store');
+    expect($cacheControl)->toContain('no-cache');
+    expect($cacheControl)->toContain('must-revalidate');
+    expect($cacheControl)->toContain('max-age=0');
+});

@@ -52,9 +52,16 @@ type BrowseSourcesResponse = {
     sources?: string[];
 };
 
+const NO_CACHE_REQUEST_CONFIG = {
+    headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+    },
+};
+
 export async function fetchBrowseServices(): Promise<{ services: ServiceOption[]; localService: ServiceOption | null }> {
     try {
-        const { data } = await window.axios.get<BrowseServicesResponse>(browseServices.url());
+        const { data } = await window.axios.get<BrowseServicesResponse>(browseServices.url(), NO_CACHE_REQUEST_CONFIG);
 
         return {
             services: data.services ?? [],

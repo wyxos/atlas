@@ -7,6 +7,7 @@ use App\Support\HttpRateLimiter;
 use App\Support\ServiceFilterSchema;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -30,48 +31,25 @@ class CivitAiImages extends BaseService
 
         $base = 'https://civitai.com/api/v1/images';
 
-        // Throttle requests to CivitAI domain
-        HttpRateLimiter::throttleDomain('civitai.com', 10, 60);
+        $query = $this->formatParams();
+        $json = $this->requestJson($base, $query);
 
-        // Make request with retry logic for 429 errors
-        $response = HttpRateLimiter::requestWithRetry(
-            fn () => Http::acceptJson(),
-            $base,
-            $this->formatParams(),
-            maxRetries: 3,
-            baseDelaySeconds: 2
-        );
+        if ($this->shouldRetryModelVersionAsModelId($query, $json)) {
+            $candidateId = (int) $query['modelVersionId'];
 
-        // Handle HTTP errors
-        if ($response->failed()) {
-            // Log 429 errors for debugging
-            if ($response->status() === 429) {
-                Log::warning('CivitAI API rate limited', [
-                    'status' => 429,
-                    'retry_after' => $response->header('Retry-After'),
-                    'url' => $base,
+            if ($this->shouldTreatModelVersionAsModelId($candidateId)) {
+                Log::info('CivitAI recovered modelVersionId filter as modelId', [
+                    'model_id' => $candidateId,
                 ]);
+
+                unset($query['modelVersionId']);
+                $query['modelId'] = $candidateId;
+
+                unset($this->params['modelVersionId']);
+                $this->params['modelId'] = $candidateId;
+
+                $json = $this->requestJson($base, $query);
             }
-
-            // Return empty structure that transform() can handle
-            return [
-                'items' => [],
-                'metadata' => [
-                    'nextCursor' => null,
-                ],
-            ];
-        }
-
-        $json = $response->json();
-
-        // Handle null or invalid JSON responses
-        if (! is_array($json)) {
-            return [
-                'items' => [],
-                'metadata' => [
-                    'nextCursor' => null,
-                ],
-            ];
         }
 
         return $json;
@@ -439,6 +417,84 @@ class CivitAiImages extends BaseService
         }
 
         return null;
+    }
+
+    private function requestJson(string $url, array $query = []): array
+    {
+        $response = $this->request($url, $query);
+
+        if ($response->failed()) {
+            return $this->emptyResponse();
+        }
+
+        $json = $response->json();
+
+        return is_array($json) ? $json : $this->emptyResponse();
+    }
+
+    private function request(string $url, array $query = []): Response
+    {
+        HttpRateLimiter::throttleDomain('civitai.com', 10, 60);
+
+        $response = HttpRateLimiter::requestWithRetry(
+            fn () => Http::acceptJson(),
+            $url,
+            $query,
+            maxRetries: 3,
+            baseDelaySeconds: 2
+        );
+
+        if ($response->status() === 429) {
+            Log::warning('CivitAI API rate limited', [
+                'status' => 429,
+                'retry_after' => $response->header('Retry-After'),
+                'url' => $url,
+            ]);
+        }
+
+        return $response;
+    }
+
+    private function shouldRetryModelVersionAsModelId(array $query, array $response): bool
+    {
+        if (isset($query['modelId']) || ! isset($query['modelVersionId'])) {
+            return false;
+        }
+
+        $items = $response['items'] ?? null;
+
+        return is_array($items) && $items === [];
+    }
+
+    private function shouldTreatModelVersionAsModelId(int $candidateId): bool
+    {
+        if ($candidateId <= 0) {
+            return false;
+        }
+
+        $modelVersionUrl = "https://civitai.com/api/v1/model-versions/{$candidateId}";
+        $modelVersionResponse = $this->request($modelVersionUrl);
+        if ($modelVersionResponse->successful()) {
+            return false;
+        }
+
+        if ($modelVersionResponse->status() !== 404) {
+            return false;
+        }
+
+        $modelUrl = "https://civitai.com/api/v1/models/{$candidateId}";
+
+        return $this->request($modelUrl)->successful();
+    }
+
+    private function emptyResponse(): array
+    {
+        return [
+            'items' => [],
+            'metadata' => [
+                'nextCursor' => null,
+            ],
+        ];
     }
 
     public function getBlacklistableContainerTypes(): array

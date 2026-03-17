@@ -9,6 +9,11 @@ use Illuminate\Http\JsonResponse;
 
 class BrowseController extends Controller
 {
+    private const array NO_STORE_HEADERS = [
+        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma' => 'no-cache',
+    ];
+
     /**
      * Get a page of browse items from the selected service (CivitAI, Wallhaven, etc.).
      */
@@ -66,151 +71,154 @@ class BrowseController extends Controller
             'value' => $source,
         ], $sourcesWithAll);
 
-        return response()->json([
-            'services' => $servicesMeta,
-            'local' => [
-                'key' => LocalService::key(),
-                'label' => LocalService::label(),
-                'defaults' => [
-                    'limit' => 20,
-                    'source' => 'all',
-                    'file_type' => ['all'],
-                    // Reaction filtering:
-                    // - any: ignore reactions entirely (show all files)
-                    // - reacted: positive reactions (love/like/funny), excludes dislikes
-                    // - unreacted: files you have not reacted to
-                    // - types: only selected reaction types
-                    'reaction_mode' => 'any',
-                    'reaction' => ['love', 'like', 'dislike', 'funny'],
-                    // Tri-state selects.
-                    'downloaded' => 'any',
-                    'blacklisted' => 'any',
-                    'blacklist_type' => 'any',
-                    'auto_disliked' => 'any',
-                    'sort' => 'downloaded_at',
-                    'seed' => null,
-                    'max_previewed_count' => null,
+        return response()->json(
+            [
+                'services' => $servicesMeta,
+                'local' => [
+                    'key' => LocalService::key(),
+                    'label' => LocalService::label(),
+                    'defaults' => [
+                        'limit' => 20,
+                        'source' => 'all',
+                        'file_type' => ['all'],
+                        // Reaction filtering:
+                        // - any: ignore reactions entirely (show all files)
+                        // - reacted: positive reactions (love/like/funny), excludes dislikes
+                        // - unreacted: files you have not reacted to
+                        // - types: only selected reaction types
+                        'reaction_mode' => 'any',
+                        'reaction' => ['love', 'like', 'dislike', 'funny'],
+                        // Tri-state selects.
+                        'downloaded' => 'any',
+                        'blacklisted' => 'any',
+                        'blacklist_type' => 'any',
+                        'auto_disliked' => 'any',
+                        'sort' => 'downloaded_at',
+                        'seed' => null,
+                        'max_previewed_count' => null,
+                    ],
+                    'schema' => $localSchema->fields([
+                        $localSchema->pageField([
+                            'type' => 'hidden',
+                            'description' => 'Pagination cursor (managed automatically).',
+                        ]),
+                        $localSchema->limitField([
+                            'type' => 'number',
+                        ]),
+                        $localSchema->field('source', [
+                            'type' => 'select',
+                            'description' => 'Filter by file source.',
+                            'options' => $sourceOptions,
+                            'default' => 'all',
+                        ]),
+                        $localSchema->field('file_type', [
+                            'type' => 'checkbox-group',
+                            'description' => 'Filter by file type.',
+                            'options' => [
+                                ['label' => 'All', 'value' => 'all'],
+                                ['label' => 'Images', 'value' => 'image'],
+                                ['label' => 'Videos', 'value' => 'video'],
+                                ['label' => 'Audio', 'value' => 'audio'],
+                                ['label' => 'Other', 'value' => 'other'],
+                            ],
+                            'default' => ['all'],
+                        ]),
+                        $localSchema->field('reaction_mode', [
+                            'type' => 'select',
+                            'description' => 'How to filter by your reactions.',
+                            'options' => [
+                                ['label' => 'Any (ignore reactions)', 'value' => 'any'],
+                                ['label' => 'Reacted (love/like/funny)', 'value' => 'reacted'],
+                                ['label' => 'Unreacted (no reactions)', 'value' => 'unreacted'],
+                                ['label' => 'Specific reaction types', 'value' => 'types'],
+                            ],
+                            'default' => 'any',
+                        ]),
+                        $localSchema->field('reaction', [
+                            'type' => 'checkbox-group',
+                            'description' => 'Reaction types (used when Reaction Mode is "Specific reaction types").',
+                            'options' => [
+                                ['label' => 'Favorite', 'value' => 'love'],
+                                ['label' => 'Like', 'value' => 'like'],
+                                ['label' => 'Dislike', 'value' => 'dislike'],
+                                ['label' => 'Funny', 'value' => 'funny'],
+                            ],
+                            'default' => ['love', 'like', 'dislike', 'funny'],
+                        ]),
+                        $localSchema->field('downloaded', [
+                            'type' => 'radio',
+                            'description' => 'Whether the file is downloaded.',
+                            'options' => [
+                                ['label' => 'Any', 'value' => 'any'],
+                                ['label' => 'Yes', 'value' => 'yes'],
+                                ['label' => 'No', 'value' => 'no'],
+                            ],
+                            'default' => 'any',
+                        ]),
+                        $localSchema->field('blacklisted', [
+                            'type' => 'radio',
+                            'description' => 'Whether the file is blacklisted.',
+                            'options' => [
+                                ['label' => 'Any', 'value' => 'any'],
+                                ['label' => 'Yes', 'value' => 'yes'],
+                                ['label' => 'No', 'value' => 'no'],
+                            ],
+                            'default' => 'any',
+                        ]),
+                        $localSchema->field('blacklist_type', [
+                            'type' => 'select',
+                            'description' => 'Filter blacklisted files by how they were blacklisted.',
+                            'options' => [
+                                ['label' => 'Any', 'value' => 'any'],
+                                ['label' => 'Manual', 'value' => 'manual'],
+                                ['label' => 'Auto', 'value' => 'auto'],
+                            ],
+                            'default' => 'any',
+                        ]),
+                        $localSchema->field('auto_disliked', [
+                            'type' => 'radio',
+                            'description' => 'Whether the file was auto-disliked.',
+                            'options' => [
+                                ['label' => 'Any', 'value' => 'any'],
+                                ['label' => 'Yes', 'value' => 'yes'],
+                                ['label' => 'No', 'value' => 'no'],
+                            ],
+                            'default' => 'any',
+                        ]),
+                        $localSchema->field('sort', [
+                            'type' => 'select',
+                            'description' => 'Sort local results.',
+                            'options' => [
+                                ['label' => 'Downloaded At', 'value' => 'downloaded_at'],
+                                ['label' => 'Downloaded At (Oldest)', 'value' => 'downloaded_at_asc'],
+                                ['label' => 'Created At', 'value' => 'created_at'],
+                                ['label' => 'Created At (Oldest)', 'value' => 'created_at_asc'],
+                                ['label' => 'Updated At', 'value' => 'updated_at'],
+                                ['label' => 'Updated At (Oldest)', 'value' => 'updated_at_asc'],
+                                ['label' => 'Blacklisted At', 'value' => 'blacklisted_at'],
+                                ['label' => 'Blacklisted At (Oldest)', 'value' => 'blacklisted_at_asc'],
+                                ['label' => 'Reaction Timestamp', 'value' => 'reaction_at'],
+                                ['label' => 'Reaction Timestamp (Oldest)', 'value' => 'reaction_at_asc'],
+                                ['label' => 'Random', 'value' => 'random'],
+                            ],
+                            'default' => 'downloaded_at',
+                        ]),
+                        $localSchema->field('seed', [
+                            'type' => 'number',
+                            'description' => 'Random seed (positive integer). Only used when sort is Random.',
+                            'default' => null,
+                        ]),
+                        $localSchema->field('max_previewed_count', [
+                            'type' => 'number',
+                            'description' => 'Hide files with previewed_count above this value. Leave blank to disable (typical: 2).',
+                            'min' => 0,
+                            'default' => null,
+                        ]),
+                    ]),
                 ],
-                'schema' => $localSchema->fields([
-                    $localSchema->pageField([
-                        'type' => 'hidden',
-                        'description' => 'Pagination cursor (managed automatically).',
-                    ]),
-                    $localSchema->limitField([
-                        'type' => 'number',
-                    ]),
-                    $localSchema->field('source', [
-                        'type' => 'select',
-                        'description' => 'Filter by file source.',
-                        'options' => $sourceOptions,
-                        'default' => 'all',
-                    ]),
-                    $localSchema->field('file_type', [
-                        'type' => 'checkbox-group',
-                        'description' => 'Filter by file type.',
-                        'options' => [
-                            ['label' => 'All', 'value' => 'all'],
-                            ['label' => 'Images', 'value' => 'image'],
-                            ['label' => 'Videos', 'value' => 'video'],
-                            ['label' => 'Audio', 'value' => 'audio'],
-                            ['label' => 'Other', 'value' => 'other'],
-                        ],
-                        'default' => ['all'],
-                    ]),
-                    $localSchema->field('reaction_mode', [
-                        'type' => 'select',
-                        'description' => 'How to filter by your reactions.',
-                        'options' => [
-                            ['label' => 'Any (ignore reactions)', 'value' => 'any'],
-                            ['label' => 'Reacted (love/like/funny)', 'value' => 'reacted'],
-                            ['label' => 'Unreacted (no reactions)', 'value' => 'unreacted'],
-                            ['label' => 'Specific reaction types', 'value' => 'types'],
-                        ],
-                        'default' => 'any',
-                    ]),
-                    $localSchema->field('reaction', [
-                        'type' => 'checkbox-group',
-                        'description' => 'Reaction types (used when Reaction Mode is "Specific reaction types").',
-                        'options' => [
-                            ['label' => 'Favorite', 'value' => 'love'],
-                            ['label' => 'Like', 'value' => 'like'],
-                            ['label' => 'Dislike', 'value' => 'dislike'],
-                            ['label' => 'Funny', 'value' => 'funny'],
-                        ],
-                        'default' => ['love', 'like', 'dislike', 'funny'],
-                    ]),
-                    $localSchema->field('downloaded', [
-                        'type' => 'radio',
-                        'description' => 'Whether the file is downloaded.',
-                        'options' => [
-                            ['label' => 'Any', 'value' => 'any'],
-                            ['label' => 'Yes', 'value' => 'yes'],
-                            ['label' => 'No', 'value' => 'no'],
-                        ],
-                        'default' => 'any',
-                    ]),
-                    $localSchema->field('blacklisted', [
-                        'type' => 'radio',
-                        'description' => 'Whether the file is blacklisted.',
-                        'options' => [
-                            ['label' => 'Any', 'value' => 'any'],
-                            ['label' => 'Yes', 'value' => 'yes'],
-                            ['label' => 'No', 'value' => 'no'],
-                        ],
-                        'default' => 'any',
-                    ]),
-                    $localSchema->field('blacklist_type', [
-                        'type' => 'select',
-                        'description' => 'Filter blacklisted files by how they were blacklisted.',
-                        'options' => [
-                            ['label' => 'Any', 'value' => 'any'],
-                            ['label' => 'Manual', 'value' => 'manual'],
-                            ['label' => 'Auto', 'value' => 'auto'],
-                        ],
-                        'default' => 'any',
-                    ]),
-                    $localSchema->field('auto_disliked', [
-                        'type' => 'radio',
-                        'description' => 'Whether the file was auto-disliked.',
-                        'options' => [
-                            ['label' => 'Any', 'value' => 'any'],
-                            ['label' => 'Yes', 'value' => 'yes'],
-                            ['label' => 'No', 'value' => 'no'],
-                        ],
-                        'default' => 'any',
-                    ]),
-                    $localSchema->field('sort', [
-                        'type' => 'select',
-                        'description' => 'Sort local results.',
-                        'options' => [
-                            ['label' => 'Downloaded At', 'value' => 'downloaded_at'],
-                            ['label' => 'Downloaded At (Oldest)', 'value' => 'downloaded_at_asc'],
-                            ['label' => 'Created At', 'value' => 'created_at'],
-                            ['label' => 'Created At (Oldest)', 'value' => 'created_at_asc'],
-                            ['label' => 'Updated At', 'value' => 'updated_at'],
-                            ['label' => 'Updated At (Oldest)', 'value' => 'updated_at_asc'],
-                            ['label' => 'Blacklisted At', 'value' => 'blacklisted_at'],
-                            ['label' => 'Blacklisted At (Oldest)', 'value' => 'blacklisted_at_asc'],
-                            ['label' => 'Reaction Timestamp', 'value' => 'reaction_at'],
-                            ['label' => 'Reaction Timestamp (Oldest)', 'value' => 'reaction_at_asc'],
-                            ['label' => 'Random', 'value' => 'random'],
-                        ],
-                        'default' => 'downloaded_at',
-                    ]),
-                    $localSchema->field('seed', [
-                        'type' => 'number',
-                        'description' => 'Random seed (positive integer). Only used when sort is Random.',
-                        'default' => null,
-                    ]),
-                    $localSchema->field('max_previewed_count', [
-                        'type' => 'number',
-                        'description' => 'Hide files with previewed_count above this value. Leave blank to disable (typical: 2).',
-                        'min' => 0,
-                        'default' => null,
-                    ]),
-                ]),
             ],
-        ]);
+            headers: self::NO_STORE_HEADERS,
+        );
     }
 
     /**
@@ -222,7 +230,7 @@ class BrowseController extends Controller
 
         return response()->json([
             'sources' => $sourcesWithAll,
-        ]);
+        ], headers: self::NO_STORE_HEADERS);
     }
 
     /**

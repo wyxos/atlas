@@ -57,7 +57,12 @@ describe('browseCatalog', () => {
 
         await catalog.actions.loadServices();
 
-        expect(mockAxios.get).toHaveBeenCalled();
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse/services', {
+            headers: {
+                'Cache-Control': 'no-cache',
+                Pragma: 'no-cache',
+            },
+        });
         expect(catalog.state.availableServices.value).toEqual(services);
         expect(catalog.state.localService.value).toEqual(localService);
     });
