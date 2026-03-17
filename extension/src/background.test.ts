@@ -147,6 +147,30 @@ describe('background', () => {
         expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
     });
 
+    it('returns similar-domain and total tab counts for the requesting tab', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([
+            { id: 1, url: 'https://www.civitai.com/models/1' },
+            { id: 2, url: 'https://images.civitai.com/image/2' },
+            { id: 3, url: 'https://example.com/post' },
+        ]);
+        vi.stubGlobal('chrome', chromeMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        const response = await sendRuntimeMessage(listener!, { type: 'ATLAS_GET_TAB_COUNT' }, { tab: { id: 1 } }) as {
+            count?: unknown;
+            similarDomainCount?: unknown;
+        };
+
+        expect(response).toEqual({
+            count: 3,
+            similarDomainCount: 2,
+        });
+    });
+
     it('proxies allowed Atlas API requests through the background worker', async () => {
         const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
         const fetchMock = vi.fn().mockResolvedValue(

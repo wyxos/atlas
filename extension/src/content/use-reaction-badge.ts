@@ -51,6 +51,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     const isChecking = ref(true);
     const matchResult = ref<BadgeMatchResult>(emptyMatchResult());
     const mediaResolution = ref<string | null>(null);
+    const similarDomainTabCount = ref<number | null>(null);
     const openTabCount = ref<number | null>(null);
     const hoveredReaction = ref<BadgeReactionType | null>(null);
     const submittingReactionType = ref<BadgeReactionType | null>(null);
@@ -334,11 +335,13 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         });
 
         ensureProgressSubscription();
-        unsubscribeTabCount = subscribeToTabCountChanged((count) => {
-            openTabCount.value = count;
+        unsubscribeTabCount = subscribeToTabCountChanged((snapshot) => {
+            similarDomainTabCount.value = snapshot.similarDomainCount;
+            openTabCount.value = snapshot.totalCount;
         });
-        void requestTabCount().then((count) => {
-            openTabCount.value = count;
+        void requestTabCount().then((snapshot) => {
+            similarDomainTabCount.value = snapshot?.similarDomainCount ?? null;
+            openTabCount.value = snapshot?.totalCount ?? null;
         });
         syncRelatedPostThumbnailContext();
         restartRelatedPostThumbnailRetry();
@@ -488,6 +491,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         isSavingCloseTabAfterQueuePreference: closeTabAfterQueuePreference.saving,
         mediaResolution,
         openTabCount,
+        similarDomainTabCount,
         progressState,
         reactAllItemsInPost: reactAllItemsInPostPreference.enabled,
         showReactAllItemsInPost,

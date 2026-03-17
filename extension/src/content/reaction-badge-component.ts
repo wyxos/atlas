@@ -32,6 +32,7 @@ export const AtlasReactionBadge = defineComponent({
                 closeTabAfterQueueSaving: badge.isSavingCloseTabAfterQueuePreference.value,
                 mediaResolution: badge.mediaResolution.value,
                 openTabCount: badge.openTabCount.value,
+                similarDomainTabCount: badge.similarDomainTabCount.value,
                 timestampText: badge.timestampText.value,
                 progressDisplayValue: badge.progressState.value.progressDisplayValue,
                 progressColor: badge.progressState.value.progressColor,

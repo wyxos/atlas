@@ -6,6 +6,7 @@ import { collectCookiesForUrls } from './background-cookie-runtime';
 import { notifyTabsExtensionReloaded } from './background-reload-overlay';
 import { normalizeComparableUrls } from './background-url-utils';
 import { normalizeComparableOpenTabUrl } from './open-tab-url';
+import { summarizeTabCounts } from './tab-counts';
 
 type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
@@ -16,6 +17,7 @@ type TabPresenceChangedMessage = {
 type TabCountChangedMessage = {
     type: 'ATLAS_TAB_COUNT_CHANGED';
     count: number;
+    similarDomainCount: number | null;
 };
 
 type RuntimeMessageSender = {
@@ -161,15 +163,18 @@ function broadcastTabPresenceChanged(urls: string[]): void {
 function broadcastTabCountChanged(): void {
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
         const count = Array.isArray(tabs) ? tabs.length : 0;
+        const safeTabs = Array.isArray(tabs) ? tabs : [];
 
-        tabs.forEach((tab) => {
+        safeTabs.forEach((tab) => {
             if (typeof tab.id !== 'number') {
                 return;
             }
 
+            const summary = summarizeTabCounts(safeTabs, tab.url ?? null);
             const message: TabCountChangedMessage = {
                 type: 'ATLAS_TAB_COUNT_CHANGED',
                 count,
+                similarDomainCount: summary.similarDomainCount,
             };
             chrome.tabs.sendMessage(tab.id, message, () => {
                 void chrome.runtime.lastError;
@@ -411,7 +416,15 @@ chrome.runtime.onMessage.addListener((
 
     if (payload.type === 'ATLAS_GET_TAB_COUNT') {
         chrome.tabs.query({}, (tabs: BrowserTab[]) => {
-            sendResponse({ count: Array.isArray(tabs) ? tabs.length : 0 });
+            const safeTabs = Array.isArray(tabs) ? tabs : [];
+            const senderTab = typeof sender.tab?.id === 'number'
+                ? (safeTabs.find((tab) => tab.id === sender.tab?.id) ?? null)
+                : null;
+            const summary = summarizeTabCounts(safeTabs, senderTab?.url ?? null);
+            sendResponse({
+                count: summary.totalCount,
+                similarDomainCount: summary.similarDomainCount,
+            });
         });
 
         return true;
@@ -478,6 +491,7 @@ chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string; st
         const comparableUrl = sourceUrl === null ? null : normalizeComparableOpenTabUrl(sourceUrl);
         const changedUrls = updateTrackedComparableTabUrl(tabId, comparableUrl);
         broadcastTabPresenceChanged(changedUrls);
+        broadcastTabCountChanged();
     }
 });
 

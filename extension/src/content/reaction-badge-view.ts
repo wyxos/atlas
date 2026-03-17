@@ -2,6 +2,7 @@ import { h, type VNode } from 'vue';
 import { Ban, Download, Heart, Loader2, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { CloseTabAfterQueueMode } from '../atlas-options';
+import { formatTabCountSummary } from '../tab-counts';
 
 export type BadgeTimestampDisplay = {
     icon: typeof Ban | typeof Download;
@@ -17,6 +18,7 @@ type BadgeViewModel = {
     closeTabAfterQueueMode: CloseTabAfterQueueMode;
     closeTabAfterQueueSaving: boolean;
     mediaResolution: string | null;
+    similarDomainTabCount: number | null;
     openTabCount: number | null;
     timestampText: BadgeTimestampDisplay;
     progressDisplayValue: number;
@@ -269,7 +271,15 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                                 animation: 'atlas-badge-pulse 1.4s ease-in-out infinite',
                             },
                         }),
-                    h('span', model.openTabCount === null ? 'Tabs -' : `Tabs ${model.openTabCount}`),
+                    h(
+                        'span',
+                        `Tabs ${formatTabCountSummary(model.openTabCount === null
+                            ? null
+                            : {
+                                similarDomainCount: model.similarDomainTabCount,
+                                totalCount: model.openTabCount,
+                            })}`,
+                    ),
                     model.timestampText === null
                         ? null
                         : h(
