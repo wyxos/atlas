@@ -143,7 +143,7 @@ beforeEach(() => {
 });
 
 describe('Browse - Reset Previewed', () => {
-    it('resets preview counts for loaded tab items and clears queued auto dislikes', async () => {
+    it('resets preview counts only for unreacted loaded tab items and clears queued auto dislikes', async () => {
         const items = [
             {
                 id: 1,
@@ -156,6 +156,7 @@ describe('Browse - Reset Previewed', () => {
                 notFound: false,
                 previewed_count: 3,
                 will_auto_dislike: true,
+                reaction: { type: 'like' },
             },
             {
                 id: 2,
@@ -181,7 +182,6 @@ describe('Browse - Reset Previewed', () => {
                     data: {
                         message: 'Preview counts reset.',
                         results: [
-                            { id: 1, previewed_count: 0 },
                             { id: 2, previewed_count: 0 },
                         ],
                     },
@@ -210,13 +210,13 @@ describe('Browse - Reset Previewed', () => {
         await wrapper.vm.$nextTick();
 
         expect(mocks.mockAxios.post).toHaveBeenCalledWith('/api/files/preview/reset/batch', {
-            file_ids: [1, 2],
+            file_ids: [2],
         });
         expect(mockClearAutoDislikeCountdowns).toHaveBeenCalledTimes(1);
 
         const updatedItems = tabContentVm.items as Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>;
-        expect(updatedItems[0]?.previewed_count).toBe(0);
-        expect(updatedItems[0]?.will_auto_dislike).toBe(false);
+        expect(updatedItems[0]?.previewed_count).toBe(3);
+        expect(updatedItems[0]?.will_auto_dislike).toBe(true);
         expect(updatedItems[1]?.previewed_count).toBe(0);
         expect(updatedItems[1]?.will_auto_dislike).toBe(false);
     });
