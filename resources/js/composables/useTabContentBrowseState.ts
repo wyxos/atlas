@@ -172,6 +172,7 @@ function createTabContentBootstrap(args: {
         args.state.shouldShowForm.value = false;
         args.options.data.items.value = restoredSession.items;
         args.options.view.resetPreloadedItems();
+        args.options.form.data.page = restoredSession.startPageToken;
         args.state.startPageToken.value = restoredSession.startPageToken;
         args.state.masonryRenderKey.value += 1;
 

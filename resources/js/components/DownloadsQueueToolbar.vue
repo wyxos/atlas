@@ -86,30 +86,52 @@ defineEmits<{
                 v-if="selectedCount || filteredCount || resumableFailedCount || restartableFailedCount || completedCount"
                 class="flex items-center gap-2"
             >
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="batchIsResumingFailed || resumableFailedCount === 0"
-                    @click="$emit('resumeFailed')"
-                >
-                    {{ batchIsResumingFailed ? 'Resuming failed...' : `Resume failed (${resumableFailedCount})` }}
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="batchIsRestartingFailed || restartableFailedCount === 0"
-                    @click="$emit('restartFailed')"
-                >
-                    {{ batchIsRestartingFailed ? 'Restarting failed...' : `Restart failed (${restartableFailedCount})` }}
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="removeIsDeleting || completedCount === 0"
-                    @click="$emit('removeCompleted')"
-                >
-                    {{ `Remove completed (${completedCount})` }}
-                </Button>
+                <DropdownMenu v-if="filteredCount || resumableFailedCount || restartableFailedCount || completedCount">
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" size="sm" class="gap-2">
+                            <span>All actions</span>
+                            <ChevronDown :size="14" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="end"
+                        class="w-60 border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100"
+                    >
+                        <DropdownMenuLabel class="text-smart-blue-100">
+                            Queue and filter actions
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator class="bg-twilight-indigo-500" />
+                        <DropdownMenuItem
+                            :disabled="batchIsResumingFailed || resumableFailedCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('resumeFailed')"
+                        >
+                            {{ batchIsResumingFailed ? 'Resuming failed...' : `Resume failed (${resumableFailedCount})` }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :disabled="batchIsRestartingFailed || restartableFailedCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('restartFailed')"
+                        >
+                            {{ batchIsRestartingFailed ? 'Restarting failed...' : `Restart failed (${restartableFailedCount})` }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :disabled="removeIsDeleting || completedCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('removeCompleted')"
+                        >
+                            {{ `Remove completed (${completedCount})` }}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator class="bg-twilight-indigo-500" />
+                        <DropdownMenuItem
+                            :disabled="removeIsDeleting || filteredCount === 0"
+                            class="cursor-pointer text-danger-200 focus:bg-danger-600/20 focus:text-danger-100"
+                            @select="$emit('removeFiltered')"
+                        >
+                            {{ `Remove filtered (${filteredCount})` }}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <DropdownMenu v-if="selectedCount">
                     <DropdownMenuTrigger as-child>
                         <Button variant="outline" size="sm" class="gap-2">
@@ -163,15 +185,6 @@ defineEmits<{
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                <Button
-                    v-if="filteredCount"
-                    variant="outline"
-                    size="sm"
-                    :disabled="removeIsDeleting"
-                    @click="$emit('removeFiltered')"
-                >
-                    Remove all
-                </Button>
             </div>
         </div>
     </div>

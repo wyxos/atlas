@@ -12,6 +12,21 @@ export type RestoredBrowseSession = {
     startPageToken: PageToken;
 };
 
+function resolveRestoredStartPageToken(params: Record<string, unknown>, items: FeedItem[]): PageToken {
+    const page = (params.page ?? 1) as PageToken;
+    const feed = params.feed === 'local' ? 'local' : 'online';
+    const service = typeof params.service === 'string' ? params.service : null;
+    const usesCursorToken = typeof page === 'string' && page.includes('|');
+
+    // CivitAI stores some next cursors in `page` as `offset|timestamp`. If we do not also
+    // have restored items, reusing that token can reopen into an empty result set after filters change.
+    if (feed === 'online' && service === 'civit-ai-images' && items.length === 0 && usesCursorToken) {
+        return 1;
+    }
+
+    return page;
+}
+
 export function extractRestoredBrowseSession(tab?: RestorableTabData | null): RestoredBrowseSession | null {
     if (!tab) {
         return null;
@@ -26,7 +41,7 @@ export function extractRestoredBrowseSession(tab?: RestorableTabData | null): Re
 
     return {
         items,
-        startPageToken: (params.page ?? 1) as PageToken,
+        startPageToken: resolveRestoredStartPageToken(params, items),
     };
 }
 
