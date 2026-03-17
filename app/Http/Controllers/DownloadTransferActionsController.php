@@ -40,6 +40,7 @@ class DownloadTransferActionsController extends Controller
         ]);
 
         $this->broadcastState($downloadTransfer);
+        $this->dispatchPumpIfReady($downloadTransfer);
 
         return response()->json([
             'message' => 'Download paused.',
@@ -91,6 +92,7 @@ class DownloadTransferActionsController extends Controller
 
         $this->resetFileProgress($downloadTransfer);
         $this->broadcastState($downloadTransfer);
+        $this->dispatchPumpIfReady($downloadTransfer);
 
         return response()->json([
             'message' => 'Download canceled.',
@@ -123,6 +125,7 @@ class DownloadTransferActionsController extends Controller
                 'status' => DownloadTransferStatus::PAUSED,
             ]);
             $this->broadcastState($transfer);
+            $this->dispatchPumpIfReady($transfer);
             $pausedIds[] = $transfer->id;
         }
 
@@ -161,6 +164,7 @@ class DownloadTransferActionsController extends Controller
             ]);
             $this->resetFileProgress($transfer);
             $this->broadcastState($transfer);
+            $this->dispatchPumpIfReady($transfer);
             $canceledIds[] = $transfer->id;
         }
 
@@ -198,26 +202,26 @@ class DownloadTransferActionsController extends Controller
 
     public function destroy(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        $this->transferRemovalService->remove($downloadTransfer);
-        $this->broadcastRemoved([$downloadTransfer->id]);
+        $removedIds = $this->transferRemovalService->remove($downloadTransfer);
+        $this->broadcastRemoved($removedIds);
 
         return response()->json([
             'message' => 'Download removed.',
-            'ids' => [$downloadTransfer->id],
-            'count' => 1,
+            'ids' => $removedIds,
+            'count' => count($removedIds),
             'queued' => false,
         ]);
     }
 
     public function destroyWithDisk(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        $this->transferRemovalService->remove($downloadTransfer, true);
-        $this->broadcastRemoved([$downloadTransfer->id]);
+        $removedIds = $this->transferRemovalService->remove($downloadTransfer, true);
+        $this->broadcastRemoved($removedIds);
 
         return response()->json([
             'message' => 'Download removed and file deleted from disk.',
-            'ids' => [$downloadTransfer->id],
-            'count' => 1,
+            'ids' => $removedIds,
+            'count' => count($removedIds),
             'queued' => false,
         ]);
     }
@@ -468,6 +472,8 @@ class DownloadTransferActionsController extends Controller
 
     private function dispatchPumpIfReady(DownloadTransfer $downloadTransfer): void
     {
+        $downloadTransfer->loadMissing('file');
+
         if ($this->shouldDeferYtDlpTempCleanup($downloadTransfer)) {
             return;
         }

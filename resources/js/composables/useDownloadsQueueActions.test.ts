@@ -40,6 +40,10 @@ describe('useDownloadsQueueActions', () => {
         const actions = useDownloadsQueueActions({
             selectedIds,
             selectedIdsList: computed(() => [1, 2]),
+            selectedPausableIds: computed(() => []),
+            selectedResumableIds: computed(() => []),
+            selectedCancelableIds: computed(() => []),
+            selectedRestartableIds: computed(() => []),
             resumableFailedIds: computed(() => []),
             restartableFailedIds: computed(() => []),
             completedIds: computed(() => []),
@@ -76,6 +80,10 @@ describe('useDownloadsQueueActions', () => {
         const actions = useDownloadsQueueActions({
             selectedIds,
             selectedIdsList: computed(() => [1, 2]),
+            selectedPausableIds: computed(() => []),
+            selectedResumableIds: computed(() => []),
+            selectedCancelableIds: computed(() => []),
+            selectedRestartableIds: computed(() => []),
             resumableFailedIds: computed(() => []),
             restartableFailedIds: computed(() => []),
             completedIds: computed(() => []),
@@ -92,5 +100,41 @@ describe('useDownloadsQueueActions', () => {
             'Removing downloads in the background. Items will disappear as cleanup completes.',
             { id: 'downloads-removal-queued' },
         );
+    });
+
+    it('uses server-returned ids for single delete-from-disk responses', async () => {
+        window.axios.delete = vi.fn().mockResolvedValue({
+            data: {
+                ids: [1, 2],
+                count: 2,
+                queued: false,
+            },
+        });
+
+        const selectedIds = ref(new Set<number>([1, 2]));
+        const removeDownloads = vi.fn();
+        const setSelection = vi.fn();
+        const actions = useDownloadsQueueActions({
+            selectedIds,
+            selectedIdsList: computed(() => [1, 2]),
+            selectedPausableIds: computed(() => []),
+            selectedResumableIds: computed(() => []),
+            selectedCancelableIds: computed(() => []),
+            selectedRestartableIds: computed(() => []),
+            resumableFailedIds: computed(() => []),
+            restartableFailedIds: computed(() => []),
+            completedIds: computed(() => []),
+            removeDownloads,
+            setSelection,
+        });
+
+        actions.openRemoveDialog('single', [1]);
+        actions.removeAlsoFromDisk.value = true;
+
+        await actions.confirmRemove();
+
+        expect(window.axios.delete).toHaveBeenCalledWith('/api/download-transfers/1/disk');
+        expect(removeDownloads).toHaveBeenCalledWith([1, 2]);
+        expect(setSelection).toHaveBeenCalledWith(new Set<number>());
     });
 });

@@ -1,19 +1,23 @@
 <?php
 
+use App\Enums\DownloadTransferStatus;
 use App\Jobs\DownloadFile;
 use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Storage::fake('atlas-app');
+    Cache::flush();
 });
 
 test('queues a download transfer for the file URL (DownloadFile is an orchestrator)', function () {
@@ -123,6 +127,116 @@ test('creates a transfer even if the URL may not be reachable (download happens 
     expect($file->downloaded)->toBeFalse();
     expect(DownloadTransfer::query()->where('file_id', $file->id)->exists())->toBeTrue();
     Bus::assertDispatched(PumpDomainDownloads::class);
+});
+
+test('refreshes runtime context for queued transfers using the latest submission', function () {
+    Bus::fake();
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/protected-image.jpg',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::QUEUED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 0,
+        'queued_at' => now(),
+    ]);
+
+    app(DownloadTransferRuntimeStore::class)->putForTransfer($transfer->id, [
+        'cookies' => [[
+            'name' => 'auth',
+            'value' => 'old-token',
+            'domain' => 'example.com',
+            'path' => '/',
+            'secure' => true,
+            'http_only' => true,
+            'host_only' => false,
+            'expires_at' => time() + 3600,
+        ]],
+        'user_agent' => 'AtlasExtensionRuntime/1.0',
+    ]);
+
+    (new DownloadFile($file->id, false, [
+        'cookies' => [[
+            'name' => 'auth',
+            'value' => 'new-token',
+            'domain' => 'example.com',
+            'path' => '/',
+            'secure' => true,
+            'http_only' => true,
+            'host_only' => false,
+            'expires_at' => time() + 3600,
+        ]],
+        'user_agent' => 'AtlasExtensionRuntime/2.0',
+    ]))->handle();
+
+    $runtimeContext = app(DownloadTransferRuntimeStore::class)->getForTransfer($transfer->id);
+
+    expect(data_get($runtimeContext, 'cookies.0.value'))->toBe('new-token');
+    expect($runtimeContext['user_agent'] ?? null)->toBe('AtlasExtensionRuntime/2.0');
+    expect(DownloadTransfer::query()->where('file_id', $file->id)->count())->toBe(1);
+});
+
+test('preserves runtime context for started transfers', function () {
+    Bus::fake();
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/protected-video.mp4',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 10,
+        'last_broadcast_percent' => 10,
+        'started_at' => now(),
+    ]);
+
+    app(DownloadTransferRuntimeStore::class)->putForTransfer($transfer->id, [
+        'cookies' => [[
+            'name' => 'auth',
+            'value' => 'original-token',
+            'domain' => 'example.com',
+            'path' => '/',
+            'secure' => true,
+            'http_only' => true,
+            'host_only' => false,
+            'expires_at' => time() + 3600,
+        ]],
+        'user_agent' => 'AtlasExtensionRuntime/1.0',
+    ]);
+
+    (new DownloadFile($file->id, false, [
+        'cookies' => [[
+            'name' => 'auth',
+            'value' => 'replacement-token',
+            'domain' => 'example.com',
+            'path' => '/',
+            'secure' => true,
+            'http_only' => true,
+            'host_only' => false,
+            'expires_at' => time() + 3600,
+        ]],
+        'user_agent' => 'AtlasExtensionRuntime/2.0',
+    ]))->handle();
+
+    $runtimeContext = app(DownloadTransferRuntimeStore::class)->getForTransfer($transfer->id);
+
+    expect(data_get($runtimeContext, 'cookies.0.value'))->toBe('original-token');
+    expect($runtimeContext['user_agent'] ?? null)->toBe('AtlasExtensionRuntime/1.0');
+    expect(DownloadTransfer::query()->where('file_id', $file->id)->count())->toBe(1);
 });
 
 test('clears blacklist flags when finalizing a downloaded file', function () {

@@ -45,6 +45,10 @@ const {
     selectedCount,
     selectedInFilterCount,
     selectedIdsList,
+    selectedPausableIds,
+    selectedResumableIds,
+    selectedCancelableIds,
+    selectedRestartableIds,
     lastSelectedId,
     resumableFailedIds,
     restartableFailedIds,
@@ -61,6 +65,10 @@ const {
 const actionState = useDownloadsQueueActions({
     selectedIds,
     selectedIdsList,
+    selectedPausableIds,
+    selectedResumableIds,
+    selectedCancelableIds,
+    selectedRestartableIds,
     resumableFailedIds,
     restartableFailedIds,
     completedIds,
@@ -70,7 +78,9 @@ const actionState = useDownloadsQueueActions({
 const {
     actionBusy,
     batchIsPausing,
+    batchIsResuming,
     batchIsCanceling,
+    batchIsRestarting,
     batchIsResumingFailed,
     batchIsRestartingFailed,
     removeDialogOpen,
@@ -81,7 +91,9 @@ const {
     openRemoveDialog,
     confirmRemove,
     pauseSelection,
+    resumeSelection,
     cancelSelection,
+    restartSelection,
     resumeFailedDownloads,
     restartFailedDownloads,
     removeCompletedDownloads,
@@ -158,11 +170,17 @@ watch([sortKey, sortDirection], () => {
                 :status-counts="statusCounts"
                 :selected-count="selectedCount"
                 :selected-in-filter-count="selectedInFilterCount"
+                :selected-pausable-count="selectedPausableIds.length"
+                :selected-resumable-count="selectedResumableIds.length"
+                :selected-cancelable-count="selectedCancelableIds.length"
+                :selected-restartable-count="selectedRestartableIds.length"
                 :resumable-failed-count="resumableFailedIds.length"
                 :restartable-failed-count="restartableFailedIds.length"
                 :completed-count="completedIds.length"
                 :batch-is-pausing="batchIsPausing"
+                :batch-is-resuming="batchIsResuming"
                 :batch-is-canceling="batchIsCanceling"
+                :batch-is-restarting="batchIsRestarting"
                 :batch-is-resuming-failed="batchIsResumingFailed"
                 :batch-is-restarting-failed="batchIsRestartingFailed"
                 :remove-is-deleting="removeIsDeleting"
@@ -171,7 +189,9 @@ watch([sortKey, sortDirection], () => {
                 @restart-failed="restartFailedDownloads"
                 @remove-completed="removeCompletedDownloads"
                 @pause-selection="pauseSelection"
+                @resume-selection="resumeSelection"
                 @cancel-selection="cancelSelection"
+                @restart-selection="restartSelection"
                 @remove-selection="handleRemoveSelection"
                 @remove-filtered="handleRemoveFiltered"
             />

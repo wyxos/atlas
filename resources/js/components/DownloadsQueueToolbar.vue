@@ -1,5 +1,14 @@
 <script setup lang="ts">
+import { ChevronDown } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { DownloadQueueFilterStatus } from '@/types/downloadQueue';
 import { getDownloadQueueFilterLabel } from '@/utils/downloadQueue';
 
@@ -11,11 +20,17 @@ interface Props {
     statusCounts: Record<string, number>;
     selectedCount: number;
     selectedInFilterCount: number;
+    selectedPausableCount: number;
+    selectedResumableCount: number;
+    selectedCancelableCount: number;
+    selectedRestartableCount: number;
     resumableFailedCount: number;
     restartableFailedCount: number;
     completedCount: number;
     batchIsPausing: boolean;
+    batchIsResuming: boolean;
     batchIsCanceling: boolean;
+    batchIsRestarting: boolean;
     batchIsResumingFailed: boolean;
     batchIsRestartingFailed: boolean;
     removeIsDeleting: boolean;
@@ -29,7 +44,9 @@ defineEmits<{
     restartFailed: [];
     removeCompleted: [];
     pauseSelection: [];
+    resumeSelection: [];
     cancelSelection: [];
+    restartSelection: [];
     removeSelection: [];
     removeFiltered: [];
 }>();
@@ -93,33 +110,59 @@ defineEmits<{
                 >
                     {{ `Remove completed (${completedCount})` }}
                 </Button>
-                <Button
-                    v-if="selectedCount"
-                    variant="outline"
-                    size="sm"
-                    :disabled="batchIsPausing"
-                    @click="$emit('pauseSelection')"
-                >
-                    {{ batchIsPausing ? 'Pausing...' : 'Pause selection' }}
-                </Button>
-                <Button
-                    v-if="selectedCount"
-                    variant="outline"
-                    size="sm"
-                    :disabled="batchIsCanceling"
-                    @click="$emit('cancelSelection')"
-                >
-                    {{ batchIsCanceling ? 'Canceling...' : 'Cancel selection' }}
-                </Button>
-                <Button
-                    v-if="selectedCount"
-                    variant="outline"
-                    size="sm"
-                    :disabled="removeIsDeleting"
-                    @click="$emit('removeSelection')"
-                >
-                    Remove selection
-                </Button>
+                <DropdownMenu v-if="selectedCount">
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" size="sm" class="gap-2">
+                            <span>{{ `Selected actions (${selectedCount})` }}</span>
+                            <ChevronDown :size="14" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="end"
+                        class="w-60 border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100"
+                    >
+                        <DropdownMenuLabel class="text-smart-blue-100">
+                            {{ `Selected downloads (${selectedCount})` }}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator class="bg-twilight-indigo-500" />
+                        <DropdownMenuItem
+                            :disabled="batchIsPausing || selectedPausableCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('pauseSelection')"
+                        >
+                            {{ batchIsPausing ? 'Pausing selected...' : `Pause selected (${selectedPausableCount})` }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :disabled="batchIsResuming || selectedResumableCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('resumeSelection')"
+                        >
+                            {{ batchIsResuming ? 'Resuming selected...' : `Resume selected (${selectedResumableCount})` }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :disabled="batchIsCanceling || selectedCancelableCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('cancelSelection')"
+                        >
+                            {{ batchIsCanceling ? 'Canceling selected...' : `Cancel selected (${selectedCancelableCount})` }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :disabled="batchIsRestarting || selectedRestartableCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('restartSelection')"
+                        >
+                            {{ batchIsRestarting ? 'Restarting selected...' : `Restart selected (${selectedRestartableCount})` }}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator class="bg-twilight-indigo-500" />
+                        <DropdownMenuItem
+                            :disabled="removeIsDeleting"
+                            class="cursor-pointer text-danger-200 focus:bg-danger-600/20 focus:text-danger-100"
+                            @select="$emit('removeSelection')"
+                        >
+                            Remove selection
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                     v-if="filteredCount"
                     variant="outline"

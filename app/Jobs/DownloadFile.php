@@ -96,7 +96,7 @@ class DownloadFile implements ShouldQueue
 
             $this->storeRuntimeContext($runtimeStore, $transfer->id);
         } else {
-            $this->storeRuntimeContext($runtimeStore, $existing->id);
+            $this->maybeRefreshRuntimeContext($runtimeStore, $existing);
         }
 
         PumpDomainDownloads::dispatch($domain);
@@ -109,6 +109,25 @@ class DownloadFile implements ShouldQueue
         }
 
         $runtimeStore->putForTransfer($transferId, $this->runtimeContext);
+    }
+
+    private function maybeRefreshRuntimeContext(DownloadTransferRuntimeStore $runtimeStore, DownloadTransfer $transfer): void
+    {
+        if ($this->runtimeContext === []) {
+            return;
+        }
+
+        if ($this->shouldReplaceRuntimeContext($transfer) || $runtimeStore->getForTransfer($transfer->id) === []) {
+            $runtimeStore->putForTransfer($transfer->id, $this->runtimeContext);
+        }
+    }
+
+    private function shouldReplaceRuntimeContext(DownloadTransfer $transfer): bool
+    {
+        return in_array($transfer->status, [
+            DownloadTransferStatus::PENDING,
+            DownloadTransferStatus::QUEUED,
+        ], true);
     }
 
     private function isInvalidDownloadedFile(File $file): bool

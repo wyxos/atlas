@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockResolveApiConnectionStatus = vi.fn();
 const mockGetStoredOptions = vi.fn();
 const mockSaveStoredOptions = vi.fn();
+const mockClipboardWriteText = vi.fn();
 
 vi.mock('./atlas-api', () => ({
     resolveApiConnectionStatus: mockResolveApiConnectionStatus,
@@ -93,6 +94,12 @@ describe('OptionsApp', () => {
                 }),
             },
         });
+        Object.defineProperty(window.navigator, 'clipboard', {
+            configurable: true,
+            value: {
+                writeText: mockClipboardWriteText,
+            },
+        });
         vi.stubGlobal('Blob', class MockBlob {
             parts: unknown[];
             type: string;
@@ -111,6 +118,8 @@ describe('OptionsApp', () => {
             configurable: true,
             value: vi.fn(),
         });
+
+        mockClipboardWriteText.mockResolvedValue(undefined);
     });
 
     it('renders one domain list and switches tabs for the selected domain', async () => {
@@ -220,5 +229,25 @@ describe('OptionsApp', () => {
             'civitai.com',
             'example.com',
         ]);
+    });
+
+    it('copies the current customization set to the clipboard as versioned json', async () => {
+        const wrapper = await mountOptionsApp();
+        await flushPromises();
+
+        await wrapper.get('[data-test-copy-customizations]').trigger('click');
+        await flushPromises();
+
+        expect(mockClipboardWriteText).toHaveBeenCalledTimes(1);
+        const copiedPayload = JSON.parse(String(mockClipboardWriteText.mock.calls[0]?.[0])) as {
+            version: number;
+            siteCustomizations: Array<{ domain: string }>;
+        };
+        expect(copiedPayload.version).toBe(1);
+        expect(copiedPayload.siteCustomizations.map((customization) => customization.domain)).toEqual([
+            'civitai.com',
+            'example.com',
+        ]);
+        expect(wrapper.text()).toContain('Copied to clipboard.');
     });
 });

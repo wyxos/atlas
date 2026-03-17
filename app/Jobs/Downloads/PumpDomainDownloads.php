@@ -6,6 +6,7 @@ use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferQueued;
 use App\Models\DownloadTransfer;
 use App\Services\Downloads\DownloadTransferPayload;
+use App\Services\Downloads\DownloadTransferStartScheduler;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -28,8 +29,10 @@ class PumpDomainDownloads implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(?DownloadTransferStartScheduler $startScheduler = null): void
     {
+        $startScheduler ??= app(DownloadTransferStartScheduler::class);
+
         $maxPerDomain = (int) config('downloads.max_transfers_per_domain');
         $maxTotal = (int) config('downloads.max_transfers_total');
 
@@ -99,7 +102,12 @@ class PumpDomainDownloads implements ShouldQueue
             ->keyBy('id');
 
         foreach ($transferIds as $transferId) {
-            QueueDownloadTransfer::dispatch($transferId);
+            $dispatch = QueueDownloadTransfer::dispatch($transferId);
+            $delay = $startScheduler->reserveDelay($this->domain);
+            if ($delay > 0) {
+                $dispatch->delay($delay);
+            }
+
             try {
                 $transfer = $transfers->get($transferId);
                 if ($transfer) {
