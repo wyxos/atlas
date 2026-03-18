@@ -241,6 +241,10 @@ describe('TabFilter', () => {
 
         await nextTick();
 
+        expect(wrapper.text()).toContain('Common');
+        expect(wrapper.text()).toContain('Favorite (Random)');
+        expect(wrapper.text()).toContain('Favorite (Latest)');
+        expect(wrapper.text()).toContain('Funny (Random)');
         expect(wrapper.text()).toContain('Disliked (Any)');
     });
 });
