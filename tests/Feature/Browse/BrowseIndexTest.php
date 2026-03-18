@@ -460,6 +460,39 @@ test('browse persists local limit and preset params for tab restore', function (
     expect((string) ($tab->params['reaction_mode'] ?? ''))->toBe('unreacted');
 });
 
+test('browse persists unreacted random preset params for tab restore', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create([
+        'params' => [
+            'feed' => 'local',
+        ],
+    ]);
+
+    \App\Models\File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDay(),
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'source' => 'CivitAI',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&page=3&local_preset=unreacted_random&reaction_mode=unreacted&sort=random&seed=12345&blacklisted=no&auto_disliked=no");
+
+    $response->assertSuccessful();
+
+    $tab->refresh();
+    expect((string) ($tab->params['service'] ?? ''))->toBe('local');
+    expect((string) $tab->params['feed'])->toBe('local');
+    expect((string) $tab->params['page'])->toBe('3');
+    expect((string) $tab->params['limit'])->toBe('20');
+    expect((string) ($tab->params['local_preset'] ?? ''))->toBe('unreacted_random');
+    expect((string) ($tab->params['reaction_mode'] ?? ''))->toBe('unreacted');
+    expect((string) ($tab->params['sort'] ?? ''))->toBe('random');
+    expect((string) ($tab->params['seed'] ?? ''))->toBe('12345');
+    expect((string) ($tab->params['blacklisted'] ?? ''))->toBe('no');
+    expect((string) ($tab->params['auto_disliked'] ?? ''))->toBe('no');
+});
+
 test('local reaction_at dislike browse does not require total count and keeps reaction order', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([

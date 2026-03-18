@@ -24,7 +24,7 @@
     "backend:lint": "php vendor/bin/pint --dirty",
     "backend:test": "php artisan test --compact",
     "generate-favicons": "tsx scripts/generate-favicons.ts",
-    "release": "npm run guard:files-table-migrations && npx @wyxos/zephyr@latest"
+    "release": "npm run guard:files-table-migrations && npx @wyxos/zephyr@latest --skip-git-hooks"
   },
   "devDependencies": {
     "@laravel/echo-vue": "^2.2.7",
