@@ -114,7 +114,7 @@ describe('TabFilter', () => {
                 source: 'all',
                 page: 50,
                 limit: 100,
-                local_preset: 'reacted_random',
+                local_preset: 'inbox_newest',
             } as any,
         };
 
@@ -171,8 +171,8 @@ describe('TabFilter', () => {
 
         await nextTick();
 
-        expect(wrapper.text()).toContain('Reacted (Random)');
-        expect(form.data.serviceFilters.local_preset).toBe('reacted_random');
+        expect(wrapper.text()).toContain('Unreacted (Newest)');
+        expect(form.data.serviceFilters.local_preset).toBe('inbox_newest');
     });
 
     it('includes disliked any preset option', async () => {
@@ -242,6 +242,10 @@ describe('TabFilter', () => {
         await nextTick();
 
         expect(wrapper.text()).toContain('Common');
+        expect(wrapper.text()).toContain('Unreacted');
+        expect(wrapper.text()).toContain('Unreacted (Random)');
+        expect(wrapper.text()).toContain('Unreacted (Newest)');
+        expect(wrapper.text()).toContain('Unreacted (Oldest)');
         expect(wrapper.text()).toContain('Favorite (Random)');
         expect(wrapper.text()).toContain('Favorite (Latest)');
         expect(wrapper.text()).toContain('Funny (Random)');

@@ -62,6 +62,20 @@ describe('browseTabLabel', () => {
         })).toBe('Local - Favorite (Random) - 7');
     });
 
+    it('restores renamed unreacted preset labels for existing local tabs', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'inbox_oldest',
+                },
+            }),
+            pageToken: 9,
+            availableServices: [],
+            localService: { key: 'local', label: 'Local' },
+        })).toBe('Local - Unreacted (Oldest) - 9');
+    });
+
     it('returns null when online browse has no selected service yet', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData(),

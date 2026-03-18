@@ -101,10 +101,22 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
         ],
     },
     {
-        label: 'Inbox',
+        label: 'Unreacted',
         presets: [
             {
-                label: 'Inbox (Newest)',
+                label: 'Unreacted (Random)',
+                value: 'unreacted_random',
+                filters: {
+                    downloaded: 'any',
+                    reaction_mode: 'unreacted',
+                    blacklisted: 'no',
+                    auto_disliked: 'no',
+                    max_previewed_count: null,
+                    sort: 'random',
+                },
+            },
+            {
+                label: 'Unreacted (Newest)',
                 value: 'inbox_newest',
                 filters: {
                     downloaded: 'any',
@@ -116,7 +128,7 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
                 },
             },
             {
-                label: 'Inbox (Oldest)',
+                label: 'Unreacted (Oldest)',
                 value: 'inbox_oldest',
                 filters: {
                     downloaded: 'any',
