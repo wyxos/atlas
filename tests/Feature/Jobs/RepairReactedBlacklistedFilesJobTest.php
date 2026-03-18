@@ -277,3 +277,49 @@ test('repair reacted blacklisted files respects the max-files limit', function (
     Bus::assertNotDispatched(DownloadFile::class, fn (DownloadFile $downloadJob): bool => $downloadJob->fileId === $second->id);
     Bus::assertNotDispatched(RepairReactedBlacklistedFiles::class, fn (RepairReactedBlacklistedFiles $nextJob): bool => $nextJob->afterId > 0);
 });
+
+test('repair reacted blacklisted files still clears blacklist when the canonical target already exists', function () {
+    $user = User::factory()->create();
+    $existingUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/original=true/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg';
+
+    File::factory()->create([
+        'source' => 'CivitAI',
+        'source_id' => '89456574',
+        'url' => $existingUrl,
+        'listing_metadata' => ['url' => $existingUrl],
+    ]);
+
+    $widthFile = File::factory()->create([
+        'source' => 'CivitAI',
+        'source_id' => '89456574',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg',
+        'listing_metadata' => ['url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg'],
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'collision',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $widthFile->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+
+    Http::fake([
+        'https://civitai.com/api/v1/images*' => Http::response([
+            'items' => [[
+                'url' => $existingUrl,
+            ]],
+        ], 200),
+    ]);
+
+    $job = new RepairReactedBlacklistedFiles(afterId: 0, chunk: 20, queueName: 'processing', remaining: 0, dryRun: false);
+    app()->call([$job, 'handle']);
+
+    $widthFile->refresh();
+
+    expect($widthFile->blacklisted_at)->toBeNull()
+        ->and($widthFile->blacklist_reason)->toBeNull()
+        ->and($widthFile->url)->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg');
+
+    Bus::assertDispatched(DownloadFile::class, fn (DownloadFile $downloadJob): bool => $downloadJob->fileId === $widthFile->id);
+});

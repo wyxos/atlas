@@ -49,6 +49,10 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
         foreach ($files as $file) {
             $oldUrl = trim((string) $file->url);
             $resolvedUrl = $this->resolvedUrlForFile($file, $oldUrl);
+            $canRewriteUrl = $resolvedUrl !== null
+                && $resolvedUrl !== ''
+                && $resolvedUrl !== $oldUrl
+                && ! $this->targetUrlOwnedByAnotherFile((int) $file->id, $resolvedUrl);
 
             $updates = [
                 'blacklisted_at' => null,
@@ -56,7 +60,7 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
                 'updated_at' => $updatedAt,
             ];
 
-            if ($resolvedUrl !== null && $resolvedUrl !== '' && $resolvedUrl !== $oldUrl) {
+            if ($canRewriteUrl) {
                 $updates['url'] = $resolvedUrl;
                 $updates['url_hash'] = hash('sha256', $resolvedUrl);
 
@@ -178,6 +182,14 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
         $url = trim($url);
 
         return $url !== '' ? $url : null;
+    }
+
+    private function targetUrlOwnedByAnotherFile(int $fileId, string $url): bool
+    {
+        return DB::table('files')
+            ->where('id', '!=', $fileId)
+            ->where('url_hash', hash('sha256', $url))
+            ->exists();
     }
 
     private function updatedListingMetadata(mixed $listingMetadata, string $oldUrl, string $newUrl): ?string

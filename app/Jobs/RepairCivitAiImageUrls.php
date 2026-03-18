@@ -51,6 +51,10 @@ class RepairCivitAiImageUrls implements ShouldQueue
                 continue;
             }
 
+            if ($this->targetUrlOwnedByAnotherFile((int) $file->id, $newUrl)) {
+                continue;
+            }
+
             $updates = [
                 'url' => $newUrl,
                 'url_hash' => hash('sha256', $newUrl),
@@ -132,6 +136,14 @@ class RepairCivitAiImageUrls implements ShouldQueue
         $encoded = json_encode($listingMetadata, JSON_UNESCAPED_SLASHES);
 
         return is_string($encoded) ? $encoded : null;
+    }
+
+    private function targetUrlOwnedByAnotherFile(int $fileId, string $url): bool
+    {
+        return DB::table('files')
+            ->where('id', '!=', $fileId)
+            ->where('url_hash', hash('sha256', $url))
+            ->exists();
     }
 
     /**
