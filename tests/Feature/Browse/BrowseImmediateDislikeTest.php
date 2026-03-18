@@ -379,7 +379,7 @@ test('civitai browse excludes items from blacklisted user containers resolved fr
         ->and($returnedFileIds)->toContain($visibleFile->id);
 });
 
-test('civitai browse excludes later page items after blacklisting a user container between requests', function () {
+test('civitai browse excludes later page items after blacklisting a user container between requests using the same persisted user container fields', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -396,7 +396,7 @@ test('civitai browse excludes later page items after blacklisting a user contain
                         [
                             'id' => 123,
                             'url' => 'https://image.civitai.com/xmpq/file1.jpg',
-                            'username' => 'user123',
+                            'username' => 'baraisgreat',
                             'meta' => [
                                 'prompt' => 'first page blocked user image',
                             ],
@@ -429,7 +429,7 @@ test('civitai browse excludes later page items after blacklisting a user contain
                     [
                         'id' => 789,
                         'url' => 'https://image.civitai.com/xmpq/file3.jpg',
-                        'username' => 'user123',
+                        'username' => 'baraisgreat',
                         'meta' => [
                             'prompt' => 'second page blocked user image',
                         ],
@@ -473,10 +473,13 @@ test('civitai browse excludes later page items after blacklisting a user contain
     $container = Container::query()
         ->where('type', 'User')
         ->where('source', 'CivitAI')
-        ->where('source_id', 'user123')
+        ->where('source_id', 'baraisgreat')
         ->first();
 
-    expect($container)->not->toBeNull();
+    expect($container)->not->toBeNull()
+        ->and($container->referrer)->toBe('https://civitai.com/user/baraisgreat')
+        ->and($container->action_type)->toBeNull()
+        ->and($container->blacklisted_at)->toBeNull();
 
     $this->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
@@ -493,6 +496,14 @@ test('civitai browse excludes later page items after blacklisting a user contain
     expect($blockedFile)->not->toBeNull()
         ->and($visibleFile)->not->toBeNull()
         ->and($blockedFile->fresh()->blacklisted_at)->not->toBeNull()
+        ->and($blockedFile->fresh()->containers()->pluck('containers.id')->all())->toContain($container->id)
+        ->and(
+            Container::query()
+                ->where('type', 'User')
+                ->where('source', 'CivitAI')
+                ->where('source_id', 'baraisgreat')
+                ->count()
+        )->toBe(1)
         ->and($returnedFileIds)->not->toContain($blockedFile->id)
         ->and($returnedFileIds)->toContain($visibleFile->id);
 });

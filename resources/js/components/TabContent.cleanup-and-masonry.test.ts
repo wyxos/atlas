@@ -372,4 +372,115 @@ describe('TabContent - Container blacklist updates', () => {
         expect(result.items).toHaveLength(1);
         expect(result.items[0].id).toBe(11);
     });
+
+    it('re-filters items appended from masonry backfill after a newly blacklisted container is active', async () => {
+        const tab = {
+            id: 890,
+            label: 'Browse 1',
+            params: {
+                feed: 'online',
+                service: 'test-service',
+                page: 1,
+            },
+            items: [
+                {
+                    id: 21,
+                    width: 500,
+                    height: 500,
+                    page: 1,
+                    key: '1-21',
+                    index: 0,
+                    src: 'https://example.com/preview21.jpg',
+                    preview: 'https://example.com/preview21.jpg',
+                    original: 'https://example.com/original21.jpg',
+                    type: 'image',
+                    notFound: false,
+                    containers: [
+                        { id: 501, type: 'User', source: 'CivitAI', source_id: 'allowed-user' },
+                    ],
+                },
+            ],
+            position: 0,
+            isActive: true,
+        };
+
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab,
+            },
+        });
+
+        const wrapper = mount(TabContent, {
+            props: {
+                tabId: tab.id,
+                availableServices: [{ key: 'test-service', label: 'Test Service' }],
+                onReaction: vi.fn(),
+                updateActiveTab: vi.fn(),
+            },
+        });
+
+        await flushPromises();
+        await nextTick();
+
+        const manager = wrapper.findComponent({ name: 'ContainerBlacklistManager' });
+        expect(manager.exists()).toBe(true);
+
+        manager.vm.$emit('blacklists-changed', {
+            action: 'created',
+            blacklist: {
+                id: 303,
+                type: 'User',
+                source: 'CivitAI',
+                source_id: 'baraisgreat',
+                referrer: 'https://civitai.com/user/baraisgreat',
+                action_type: 'blacklist',
+                blacklisted_at: '2026-03-18T01:54:00Z',
+            },
+        });
+
+        await nextTick();
+
+        const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+        expect(masonry.exists()).toBe(true);
+
+        masonry.vm.$emit('update:items', [
+            ...tab.items,
+            {
+                id: 22,
+                width: 500,
+                height: 500,
+                page: 'cursor-2',
+                key: 'cursor-2-22',
+                index: 1,
+                src: 'https://example.com/preview22.jpg',
+                preview: 'https://example.com/preview22.jpg',
+                original: 'https://example.com/original22.jpg',
+                type: 'image',
+                notFound: false,
+                containers: [
+                    { id: 303, type: 'User', source: 'CivitAI', source_id: 'baraisgreat' },
+                ],
+            },
+            {
+                id: 23,
+                width: 500,
+                height: 500,
+                page: 'cursor-2',
+                key: 'cursor-2-23',
+                index: 2,
+                src: 'https://example.com/preview23.jpg',
+                preview: 'https://example.com/preview23.jpg',
+                original: 'https://example.com/original23.jpg',
+                type: 'image',
+                notFound: false,
+                containers: [
+                    { id: 601, type: 'User', source: 'CivitAI', source_id: 'allowed-later-user' },
+                ],
+            },
+        ] satisfies FeedItem[]);
+
+        await nextTick();
+
+        expect((masonry.props('items') as FeedItem[]).map((item) => item.id)).toEqual([21, 23]);
+    });
 });
