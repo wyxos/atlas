@@ -333,10 +333,29 @@ function filterItemsByActiveContainerBlacklists(candidateItems: FeedItem[]): Fee
     });
 }
 
+function applyActiveContainerBlacklistFilter(): void {
+    if (activeContainerBlacklists.value.length === 0) {
+        return;
+    }
+
+    const filteredItems = filterItemsByActiveContainerBlacklists(items.value);
+    if (filteredItems.length !== items.value.length) {
+        items.value = filteredItems;
+    }
+}
+
+watch(
+    () => items.value,
+    () => {
+        applyActiveContainerBlacklistFilter();
+    },
+    { deep: false },
+);
+
 function handleContainerBlacklistChange(change: ContainerBlacklistChange): void {
     if (change.action === 'created' && change.blacklist.action_type === 'blacklist') {
         upsertActiveContainerBlacklist(change.blacklist);
-        items.value = filterItemsByActiveContainerBlacklists(items.value);
+        applyActiveContainerBlacklistFilter();
 
         return;
     }
