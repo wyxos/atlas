@@ -48,6 +48,20 @@ describe('browseTabLabel', () => {
         })).toBe('Local - Inbox (Fresh) - 3');
     });
 
+    it('uses the configured label for new favorite presets in local tab labels', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'favorite_random',
+                },
+            }),
+            pageToken: 7,
+            availableServices: [],
+            localService: { key: 'local', label: 'Local' },
+        })).toBe('Local - Favorite (Random) - 7');
+    });
+
     it('returns null when online browse has no selected service yet', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData(),

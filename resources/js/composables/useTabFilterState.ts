@@ -2,6 +2,7 @@ import { computed, watch, type Ref } from 'vue';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 import type { ServiceFilterField, ServiceOption } from '@/lib/browseCatalog';
 import {
+    LOCAL_TAB_FILTER_PRESET_GROUPS,
     LOCAL_TAB_FILTER_PRESETS,
     getLocalSourceField,
     getVisibleTabFilterFields,
@@ -44,6 +45,7 @@ export function useTabFilterState(options: UseTabFilterStateOptions) {
         form.data.feed === 'local' ? getLocalSourceField(activeSchema.value) : null,
     );
     const localPresets = computed(() => (form.data.feed === 'local' ? LOCAL_TAB_FILTER_PRESETS : []));
+    const localPresetGroups = computed(() => (form.data.feed === 'local' ? LOCAL_TAB_FILTER_PRESET_GROUPS : []));
     const isLocalFeed = computed(() => form.data.feed === 'local');
     const isOnlineFeed = computed(() => form.data.feed === 'online');
 
@@ -176,6 +178,7 @@ export function useTabFilterState(options: UseTabFilterStateOptions) {
             visibleServiceFields,
             localSourceField,
             localPresets,
+            localPresetGroups,
             selectedLocalPreset,
             selectedLocalPresetLabel,
         },

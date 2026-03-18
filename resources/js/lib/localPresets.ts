@@ -1,16 +1,8 @@
-export const LOCAL_PRESET_LABEL_BY_VALUE: Record<string, string> = {
-  reacted_random: "Reacted (Random)",
-  inbox_fresh: "Inbox (Fresh)",
-  inbox_newest: "Inbox (Newest)",
-  inbox_oldest: "Inbox (Oldest)",
-  disliked_any: "Disliked (Any)",
-  disliked_manual: "Disliked (Manual)",
-  disliked_auto: "Disliked (Auto)",
-  blacklisted_any: "Blacklisted (Any)",
-  blacklisted_manual: "Blacklisted (Manual)",
-  blacklisted_auto: "Blacklisted (Auto)",
-  disliked_blacklisted_auto: "Disliked + Blacklisted (Auto)",
-}
+import { LOCAL_TAB_FILTER_PRESETS } from '@/utils/tabFilter';
+
+export const LOCAL_PRESET_LABEL_BY_VALUE: Record<string, string> = Object.fromEntries(
+  LOCAL_TAB_FILTER_PRESETS.map((preset) => [preset.value, preset.label])
+);
 
 export function getLocalPresetLabel(value: unknown): string | null {
   if (typeof value !== "string" || value.trim() === "") {

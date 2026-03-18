@@ -48,7 +48,7 @@ const activeSchema = filter.derived.activeSchema;
 const selectedServiceDef = filter.derived.selectedServiceDef;
 const visibleServiceFields = filter.derived.visibleServiceFields;
 const localSourceField = filter.derived.localSourceField;
-const localPresets = filter.derived.localPresets;
+const localPresetGroups = filter.derived.localPresetGroups;
 const selectedLocalPreset = filter.derived.selectedLocalPreset;
 const selectedLocalPresetLabel = filter.derived.selectedLocalPresetLabel;
 const localPageInput = filter.models.localPageInput;
@@ -113,9 +113,14 @@ function handleFieldUpdate(field: TabFilterFieldUpdate): void {
                                 </span>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem v-for="preset in localPresets" :key="preset.value" :value="preset.value">
-                                    {{ preset.label }}
-                                </SelectItem>
+                                <template v-for="group in localPresetGroups" :key="group.label">
+                                    <div class="px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-twilight-indigo-400/80">
+                                        {{ group.label }}
+                                    </div>
+                                    <SelectItem v-for="preset in group.presets" :key="preset.value" :value="preset.value">
+                                        {{ preset.label }}
+                                    </SelectItem>
+                                </template>
                             </SelectContent>
                         </Select>
                         <p class="form-help">
