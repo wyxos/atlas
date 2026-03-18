@@ -129,3 +129,29 @@ test('repair civitai image urls respects the max-files limit', function () {
         return $nextJob->afterId > 0;
     });
 });
+
+test('repair civitai image urls skips rows whose canonical target already exists', function () {
+    $existingUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/original=true/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg';
+
+    File::factory()->create([
+        'source' => 'CivitAI',
+        'source_id' => '89456574',
+        'url' => $existingUrl,
+        'listing_metadata' => ['url' => $existingUrl],
+    ]);
+
+    $widthFile = File::factory()->create([
+        'source' => 'CivitAI',
+        'source_id' => '89456574',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg',
+        'listing_metadata' => ['url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg'],
+    ]);
+
+    $job = new RepairCivitAiImageUrls(afterId: 0, chunk: 20, queueName: 'processing', remaining: 0, dryRun: false);
+    app()->call([$job, 'handle']);
+
+    $widthFile->refresh();
+
+    expect($widthFile->url)->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg')
+        ->and(data_get($widthFile->listing_metadata, 'url'))->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg');
+});
