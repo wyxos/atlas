@@ -37,6 +37,7 @@ type UseTabContentContainerInteractionsOptions = {
     tab: Ref<TabData | null>;
     form: BrowseFormInstance;
     masonry: Ref<MasonryInstance | null>;
+    matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     onReaction: (fileId: number, type: ReactionType) => void;
     onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;
 };
@@ -102,6 +103,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         masonry: options.masonry,
         tabId: computed(() => options.tab.value?.id),
         isLocal: options.form.isLocal,
+        matchesActiveLocalFilters: options.matchesActiveLocalFilters,
         onReaction: options.onReaction,
         onOpenContainerTab: handleContainerNavigation,
     });

@@ -17,6 +17,7 @@ type UseTabContentItemInteractionsOptions = {
     form: BrowseFormInstance;
     masonry: Ref<MasonryInstance | null>;
     fileViewer: Ref<FileViewerRef | null>;
+    matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     itemPreview: {
         incrementPreviewCount: (fileId: number) => Promise<{ will_auto_dislike: boolean } | null>;
         clearPreviewedItems: (fileIds?: number[]) => void;
@@ -89,6 +90,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         masonry: options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
         tab: computed(() => options.tab.value ?? undefined),
         isLocal: options.form.isLocal,
+        matchesActiveLocalFilters: options.matchesActiveLocalFilters,
         onReaction: options.onReaction,
     });
 

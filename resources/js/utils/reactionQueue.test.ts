@@ -153,6 +153,19 @@ describe('reactionQueue', () => {
             expect(mockToast.dismiss).toHaveBeenCalledWith('like-123');
         });
 
+        it('restores queued state when execution fails', async () => {
+            const restoreCallback = vi.fn().mockResolvedValue(undefined);
+            mockReactionCallback.mockRejectedValueOnce(new Error('API Error'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            queueReaction(123, 'like', undefined, restoreCallback);
+
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(restoreCallback).toHaveBeenCalledTimes(1);
+        });
+
         it('stores metadata correctly', () => {
             const thumbnail = 'https://example.com/thumb.jpg';
             const restoreCallback = vi.fn();
@@ -366,6 +379,19 @@ describe('reactionQueue', () => {
                 })
             );
             expect(mockToast.dismiss).toHaveBeenCalledWith(queueId);
+        });
+
+        it('restores queued batch state when execution fails', async () => {
+            const restoreCallback = vi.fn().mockResolvedValue(undefined);
+            mockReactionCallback.mockRejectedValueOnce(new Error('API Error'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            queueBatchReaction([123, 456], 'like', [], restoreCallback);
+
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(restoreCallback).toHaveBeenCalledTimes(1);
         });
 
         it('stores metadata correctly', () => {

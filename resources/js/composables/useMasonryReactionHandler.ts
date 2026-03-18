@@ -1,14 +1,19 @@
-import { type Ref } from 'vue';
+import { triggerRef, type Ref } from 'vue';
 import type { FeedItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import { Masonry } from '@wyxos/vibe';
+import {
+    applyOptimisticLocalReactionState,
+    restoreOptimisticLocalReactionState,
+} from '@/utils/localReactionState';
 
 type UseMasonryReactionHandlerOptions = {
     items: Ref<FeedItem[]>;
     masonry: Ref<InstanceType<typeof Masonry> | null>;
     tab: Ref<TabData | undefined>;
     isLocal: Readonly<Ref<boolean>>;
+    matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     onReaction: (fileId: number, type: ReactionType) => void;
 };
 
@@ -20,7 +25,7 @@ export function useMasonryReactionHandler(
 ) {
     /**
      * Handle reaction - conditionally removes item from masonry based on feed mode and queues reaction.
-     * In local mode: items are NOT removed (visual treatment only).
+     * In local mode: items are removed only when the optimistic state no longer matches the active filters.
      * In online mode: items are removed immediately.
      */
     async function handleMasonryReaction(
@@ -31,24 +36,57 @@ export function useMasonryReactionHandler(
         const fileId = item.id;
         const tabId = options.tab.value?.id;
 
-        // Only remove from masonry in online mode (not in local mode)
-        // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
-        if (!options.isLocal.value) {
+        let restoreCallback: (() => Promise<void> | void) | undefined;
+
+        if (options.isLocal.value) {
+            const snapshot = applyOptimisticLocalReactionState(item, type);
+            const shouldRemoveFromView = options.matchesActiveLocalFilters
+                ? !options.matchesActiveLocalFilters(item)
+                : false;
+
+            if (shouldRemoveFromView) {
+                if (options.masonry.value) {
+                    await options.masonry.value.remove(item);
+                } else {
+                    options.items.value = options.items.value.filter((candidate) => candidate.id !== item.id);
+                }
+            } else {
+                triggerRef(options.items);
+            }
+
+            restoreCallback = async () => {
+                restoreOptimisticLocalReactionState(item, snapshot);
+                triggerRef(options.items);
+
+                if (!shouldRemoveFromView) {
+                    return;
+                }
+
+                if (options.masonry.value) {
+                    await options.masonry.value.restore(item);
+                    return;
+                }
+
+                options.items.value = [...options.items.value, item];
+            };
+        } else {
+            // Only remove from masonry in online mode (not in local mode)
+            // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
             options.masonry.value?.remove(item);
+
+            // Create restore callback for undo functionality (only in online mode where items are removed)
+            restoreCallback = tabId !== undefined
+                ? async () => {
+                    await options.masonry.value?.restore(item);
+                }
+                : undefined;
         }
 
-        // Create restore callback for undo functionality (only in online mode where items are removed)
-        const restoreCallback = !options.isLocal.value && item && tabId !== undefined
-            ? async () => {
-                await options.masonry.value?.restore(item);
-            }
-            : undefined;
-
-        // Queue reaction with countdown toast (pass thumbnail, restore callback, and items for local mode updates)
+        // Queue reaction with countdown toast (pass thumbnail and restore callback for undo/error recovery)
         const thumbnail = item.preview;
         queueReaction(fileId, type, thumbnail, restoreCallback, options.items, {
             allowRedownloadPrompt: options.isLocal.value,
-            updateLocalState: options.isLocal.value,
+            updateLocalState: false,
         });
 
         // Emit to parent (reaction is queued, not executed yet)

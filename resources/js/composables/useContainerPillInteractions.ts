@@ -1,8 +1,13 @@
-import { ref, computed, type Ref, type ComputedRef } from 'vue';
+import { ref, computed, triggerRef, type Ref, type ComputedRef } from 'vue';
 import type { FeedItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import { Masonry } from '@wyxos/vibe';
+import {
+    applyOptimisticLocalReactionState,
+    restoreOptimisticLocalReactionState,
+    type LocalReactionSnapshot,
+} from '@/utils/localReactionState';
 
 type Container = {
     id: number;
@@ -41,6 +46,7 @@ type UseContainerPillInteractionsOptions = {
     masonry: Ref<InstanceType<typeof Masonry> | null>;
     tabId: number | undefined | ComputedRef<number | undefined>;
     isLocal: Readonly<Ref<boolean>>;
+    matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     onReaction: (fileId: number, type: ReactionType) => void;
     onOpenContainerTab?: OpenContainerTabHandler;
 };
@@ -112,19 +118,65 @@ export function useContainerPillInteractions(
             return;
         }
 
-        // Only remove from masonry in online mode (not in local mode)
-        // Vibe tracks removals and restores internally; restoring does not require indices.
-        if (!options.isLocal.value) {
-            await options.masonry.value?.remove(siblings);
-        }
-
-        // Create batch restore callback (only in online mode)
         const currentTabId = tabIdValue.value;
-        const batchRestoreCallback = !options.isLocal.value && currentTabId !== undefined
-            ? async () => {
-                await options.masonry.value?.restore(siblings);
+        const matchesActiveLocalFilters = options.matchesActiveLocalFilters;
+        let batchRestoreCallback: (() => Promise<void> | void) | undefined;
+
+        if (options.isLocal.value) {
+            const snapshots = new Map<number, LocalReactionSnapshot>();
+
+            for (const sibling of siblings) {
+                snapshots.set(sibling.id, applyOptimisticLocalReactionState(sibling, reactionType));
             }
-            : undefined;
+
+            const itemsToTemporarilyRemove = matchesActiveLocalFilters
+                ? siblings.filter((sibling) => !matchesActiveLocalFilters(sibling))
+                : [];
+
+            if (itemsToTemporarilyRemove.length > 0) {
+                if (options.masonry.value) {
+                    await options.masonry.value.remove(itemsToTemporarilyRemove);
+                } else {
+                    const hiddenIds = new Set(itemsToTemporarilyRemove.map((item) => item.id));
+                    options.items.value = options.items.value.filter((item) => !hiddenIds.has(item.id));
+                }
+            } else {
+                triggerRef(options.items);
+            }
+
+            batchRestoreCallback = async () => {
+                for (const sibling of siblings) {
+                    const snapshot = snapshots.get(sibling.id);
+
+                    if (snapshot) {
+                        restoreOptimisticLocalReactionState(sibling, snapshot);
+                    }
+                }
+
+                triggerRef(options.items);
+
+                if (itemsToTemporarilyRemove.length === 0) {
+                    return;
+                }
+
+                if (options.masonry.value) {
+                    await options.masonry.value.restore(itemsToTemporarilyRemove);
+                    return;
+                }
+
+                options.items.value = [...options.items.value, ...itemsToTemporarilyRemove];
+            };
+        } else {
+            // Only remove from masonry in online mode (not in local mode)
+            // Vibe tracks removals and restores internally; restoring does not require indices.
+            await options.masonry.value?.remove(siblings);
+
+            batchRestoreCallback = currentTabId !== undefined
+                ? async () => {
+                    await options.masonry.value?.restore(siblings);
+                }
+                : undefined;
+        }
 
         // Prepare previews and file IDs for the batch reaction queue
         const fileIds = siblings.map((item) => item.id);
@@ -133,9 +185,9 @@ export function useContainerPillInteractions(
             thumbnail: item.thumbnail || item.src,
         }));
 
-        // Queue batch reaction with countdown toast (pass items for local mode updates)
+        // Queue batch reaction with countdown toast (pass restore callback for undo/error recovery)
         queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback, options.items, {
-            updateLocalState: options.isLocal.value,
+            updateLocalState: false,
         });
 
         // Call onReaction once for the batch (not per item)
