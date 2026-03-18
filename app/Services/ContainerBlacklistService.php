@@ -9,6 +9,8 @@ use App\Models\File;
 
 class ContainerBlacklistService
 {
+    private const array POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
+
     /**
      * Immediately apply a blacklist container action to files already attached to the container.
      *
@@ -23,6 +25,7 @@ class ContainerBlacklistService
         $files = $container->files()
             ->select(['files.id', 'files.path', 'files.blacklisted_at'])
             ->whereNull('files.blacklisted_at')
+            ->whereDoesntHave('reactions', fn ($query) => $query->whereIn('type', self::POSITIVE_REACTION_TYPES))
             ->get();
 
         $fileIds = $files
