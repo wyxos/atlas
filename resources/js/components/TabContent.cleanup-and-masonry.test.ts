@@ -11,6 +11,7 @@ const {
     mockAxios,
     mockClearAutoDislikeCountdowns,
     mockLoadNext,
+    mockRemove,
 } = setup;
 
 describe('TabContent - Auto-dislike cleanup', () => {
@@ -266,6 +267,10 @@ describe('TabContent - Container blacklist updates', () => {
         await nextTick();
 
         const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+        expect(mockRemove).toHaveBeenCalledTimes(1);
+        expect(mockRemove).toHaveBeenCalledWith([
+            expect.objectContaining({ id: 1 }),
+        ]);
         expect(masonry.props('items')).toHaveLength(1);
         expect((masonry.props('items') as FeedItem[])[0].id).toBe(2);
     });

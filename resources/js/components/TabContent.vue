@@ -321,27 +321,45 @@ function removeActiveContainerBlacklist(blacklist: ContainerBlacklist): void {
     );
 }
 
-function filterItemsByActiveContainerBlacklists(candidateItems: FeedItem[]): FeedItem[] {
+function getItemsInBlacklistedContainers(candidateItems: FeedItem[]): FeedItem[] {
     if (activeContainerBlacklists.value.length === 0) {
-        return candidateItems;
+        return [];
     }
 
     return candidateItems.filter((item) => {
-        return !activeContainerBlacklists.value.some((blacklist) => {
+        return activeContainerBlacklists.value.some((blacklist) => {
             return itemMatchesBlacklistedContainer(item, blacklist);
         });
     });
 }
 
+function filterItemsByActiveContainerBlacklists(candidateItems: FeedItem[]): FeedItem[] {
+    const itemsInBlacklistedContainers = getItemsInBlacklistedContainers(candidateItems);
+    if (itemsInBlacklistedContainers.length === 0) {
+        return candidateItems;
+    }
+
+    const blacklistedItemIds = new Set(itemsInBlacklistedContainers.map((item) => item.id));
+
+    return candidateItems.filter((item) => {
+        return !blacklistedItemIds.has(item.id);
+    });
+}
+
 function applyActiveContainerBlacklistFilter(): void {
-    if (activeContainerBlacklists.value.length === 0) {
+    const itemsInBlacklistedContainers = getItemsInBlacklistedContainers(items.value);
+    if (itemsInBlacklistedContainers.length === 0) {
         return;
     }
 
-    const filteredItems = filterItemsByActiveContainerBlacklists(items.value);
-    if (filteredItems.length !== items.value.length) {
-        items.value = filteredItems;
+    if (masonry.value) {
+        void masonry.value.remove(itemsInBlacklistedContainers).catch((error) => {
+            console.error('Failed to remove blacklisted container items from masonry:', error);
+        });
+        return;
     }
+
+    items.value = filterItemsByActiveContainerBlacklists(items.value);
 }
 
 watch(

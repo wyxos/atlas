@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { vi, beforeEach } from 'vitest';
 import { mount as baseMount, flushPromises } from '@vue/test-utils';
-import { cloneVNode, defineComponent, h, nextTick, ref } from 'vue';
+import { cloneVNode, defineComponent, getCurrentInstance, h, nextTick, ref, watch } from 'vue';
 
 const mount = baseMount;
 
@@ -175,14 +175,51 @@ vi.mock('@wyxos/vibe', () => {
             let nextPage: number | string | null = null;
             let hasReachedEnd = false;
             let paginationHistory: Array<number | string> = [];
+            const renderedItems = ref<any[]>([]);
+            const instance = getCurrentInstance();
 
-            const remove = (itemToRemove: any) => {
-                mockRemove(itemToRemove);
-                const currentItems = props.items ?? [];
-                const nextItems = currentItems.filter((item: any) => item?.id !== itemToRemove?.id);
+            function syncRenderedItems(nextItems: any[] | undefined): void {
+                renderedItems.value = Array.isArray(nextItems) ? [...nextItems] : [];
+            }
+
+            watch(
+                () => props.items,
+                (nextItems) => {
+                    syncRenderedItems(nextItems);
+                },
+                { immediate: true, deep: false }
+            );
+
+            if (instance) {
+                const originalEmit = instance.emit;
+                instance.emit = ((event: string, ...args: any[]) => {
+                    if (event === 'update:items') {
+                        syncRenderedItems(args[0]);
+                    }
+
+                    return originalEmit(event, ...args);
+                }) as typeof instance.emit;
+            }
+
+            const remove = async (itemsOrIds: any) => {
+                mockRemove(itemsOrIds);
+                const currentItems = renderedItems.value;
+                const removals = Array.isArray(itemsOrIds) ? itemsOrIds : [itemsOrIds];
+                const itemIdsToRemove = new Set(
+                    removals
+                        .map((itemOrId: any) => typeof itemOrId === 'string' ? itemOrId : itemOrId?.id)
+                        .filter((itemOrId: any) => itemOrId !== undefined && itemOrId !== null)
+                        .map(String)
+                );
+                const nextItems = currentItems.filter((item: any) => !itemIdsToRemove.has(String(item?.id)));
                 if (nextItems.length !== currentItems.length) {
                     emit('update:items', nextItems);
                 }
+            };
+
+            const removeMany = async (itemsToRemove: any[]) => {
+                mockRemoveMany(itemsToRemove);
+                await remove(itemsToRemove);
             };
 
             const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
@@ -214,7 +251,7 @@ vi.mock('@wyxos/vibe', () => {
                 currentPage = pageToLoad;
                 const result = await getContent(pageToLoad);
                 const newItems = result?.items ?? [];
-                const nextItems = [...(props.items ?? []), ...newItems];
+                const nextItems = [...renderedItems.value, ...newItems];
                 emit('update:items', nextItems);
                 nextPage = result?.nextPage ?? null;
                 paginationHistory = nextPage === null ? [] : [nextPage];
@@ -233,7 +270,7 @@ vi.mock('@wyxos/vibe', () => {
                 cancel,
                 destroy: mockDestroy,
                 remove,
-                removeMany: mockRemoveMany,
+                removeMany,
                 loadNext: loadNextPage,
                 loadNextPage,
                 reset,
@@ -259,10 +296,11 @@ vi.mock('@wyxos/vibe', () => {
 
             return () => {
                 const definition = slots.default?.()?.[0];
-                const children = (props.items ?? []).map((item: any, index: number) => {
-                    if (!definition) {
-                        return null;
-                    }
+                if (!definition) {
+                    return h('div', { class: 'masonry-mock', 'data-test': 'masonry-component' });
+                }
+
+                const children = renderedItems.value.map((item: any, index: number) => {
                     return cloneVNode(definition, {
                         key: item?.id ?? index,
                         item,
@@ -271,7 +309,7 @@ vi.mock('@wyxos/vibe', () => {
                     });
                 });
 
-                return h('div', { class: 'masonry-mock', 'data-test': 'masonry-component' }, children);
+                return h('div', { class: 'masonry-mock', 'data-test': 'masonry-component' }, children as any);
             };
         },
     });
