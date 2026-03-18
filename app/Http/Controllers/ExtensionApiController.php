@@ -13,6 +13,7 @@ use App\Services\Extension\ExtensionContainerMetadataService;
 use App\Services\Extension\ExtensionMediaMatchService;
 use App\Services\ExtensionApiKeyService;
 use App\Services\FileReactionService;
+use App\Support\CivitAiMediaUrl;
 use App\Support\FileTypeDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -680,10 +681,11 @@ class ExtensionApiController extends Controller
 
         $isVideo = in_array($tagName, ['video', 'iframe'], true)
             || in_array($extension, ['mp4', 'm4v', 'mov', 'webm'], true);
-        $transform = $isVideo ? 'transcode=true,original=true,quality=90' : 'original=true';
-        $canonicalFilename = $isVideo ? "{$imageId}.{$extension}" : "{$guid}.{$extension}";
+        if (! $isVideo) {
+            return CivitAiMediaUrl::normalizeImageUrl($url);
+        }
 
-        return "{$scheme}://{$host}/{$token}/{$guid}/{$transform}/{$canonicalFilename}";
+        return "{$scheme}://{$host}/{$token}/{$guid}/transcode=true,original=true,quality=90/{$imageId}.{$extension}";
     }
 
     private function findActiveTransfer(int $fileId): ?DownloadTransfer

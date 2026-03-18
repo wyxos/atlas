@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\CivitAiMediaUrl;
 use App\Support\FileTypeDetector;
 use App\Support\HttpRateLimiter;
 use App\Support\ServiceFilterSchema;
@@ -329,7 +330,8 @@ class CivitAiImages extends BaseService
     {
         $now = Carbon::now();
         $id = $row['id'];
-        $url = $row['url']; // Keep original URL as-is
+        $rawUrl = is_string($row['url'] ?? null) ? $row['url'] : '';
+        $url = CivitAiMediaUrl::normalizeImageUrl($rawUrl) ?? $rawUrl;
         $referrer = "https://civitai.com/images/{$id}";
 
         // Build thumbnail from scratch based on token/guid and row id (CivitAI new URL scheme)
