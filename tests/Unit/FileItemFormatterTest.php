@@ -2,6 +2,7 @@
 
 use App\Models\Container;
 use App\Models\File;
+use App\Models\FileMetadata;
 use App\Services\FileItemFormatter;
 use App\Support\FileApiPath;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -157,5 +158,28 @@ it('includes backend-owned browse payloads for supported containers', function (
             'sort' => 'Newest',
             'username' => 'atlasUser',
         ],
+    ]);
+});
+
+it('extracts prompt text from nested metadata payloads', function () {
+    $file = formatterFile([
+        'id' => 106,
+        'mime_type' => 'image/jpeg',
+        'url' => 'https://image.civitai.com/example/nested.jpeg',
+        'preview_url' => 'https://image.civitai.com/example/nested-preview.jpeg',
+    ]);
+
+    $file->setRelation('metadata', new FileMetadata([
+        'payload' => [
+            'meta' => [
+                'prompt' => 'nested prompt',
+            ],
+        ],
+    ]));
+
+    $items = FileItemFormatter::format([$file], 1);
+
+    expect($items[0]['metadata'])->toBe([
+        'prompt' => 'nested prompt',
     ]);
 });

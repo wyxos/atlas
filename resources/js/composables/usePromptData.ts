@@ -9,7 +9,28 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
     const promptDataCache = ref<Map<number, string>>(new Map());
     const promptDialogOpen = ref<boolean>(false);
     const promptDialogItemId = ref<number | null>(null);
-    type ItemMetadata = { prompt?: unknown };
+    type ItemMetadata = {
+        prompt?: unknown;
+        meta?: {
+            prompt?: unknown;
+        } | null;
+    };
+
+    function extractPrompt(metadata?: ItemMetadata | null): string | null {
+        if (!metadata || typeof metadata !== 'object') {
+            return null;
+        }
+
+        if (typeof metadata.prompt === 'string' && metadata.prompt !== '') {
+            return metadata.prompt;
+        }
+
+        if (metadata.meta && typeof metadata.meta === 'object' && typeof metadata.meta.prompt === 'string' && metadata.meta.prompt !== '') {
+            return metadata.meta.prompt;
+        }
+
+        return null;
+    }
 
     // Load prompt data for an item (from metadata or API)
     async function loadPromptData(item: FeedItem): Promise<string | null> {
@@ -20,11 +41,10 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
 
         // Check if prompt is already in metadata
         const metadata = item.metadata as ItemMetadata | undefined;
-        const cachedPrompt = metadata?.prompt;
+        const cachedPrompt = extractPrompt(metadata);
         if (cachedPrompt) {
-            const prompt = String(cachedPrompt);
-            promptDataCache.value.set(item.id, prompt);
-            return prompt;
+            promptDataCache.value.set(item.id, cachedPrompt);
+            return cachedPrompt;
         }
 
         // Load from API if not in metadata
@@ -38,9 +58,9 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
             const file = data?.file;
             // Check metadata payload (JSON) or detail_metadata
             const metadataPayload = file?.metadata?.payload as ItemMetadata | undefined;
-            const prompt = (metadataPayload && typeof metadataPayload === 'object' && metadataPayload.prompt)
-                ? String(metadataPayload.prompt)
-                : (file?.detail_metadata?.prompt ? String(file.detail_metadata.prompt) : null);
+            const prompt = extractPrompt(metadataPayload)
+                ?? extractPrompt(file?.detail_metadata as ItemMetadata | undefined)
+                ?? extractPrompt(file?.listing_metadata as ItemMetadata | undefined);
             if (prompt) {
                 promptDataCache.value.set(item.id, prompt);
                 return prompt;
@@ -57,7 +77,7 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
     // Get prompt data for display (from cache or metadata)
     function getPromptData(item: FeedItem): string | null {
         const metadata = item.metadata as ItemMetadata | undefined;
-        return promptDataCache.value.get(item.id) || (metadata?.prompt ? String(metadata.prompt) : null);
+        return promptDataCache.value.get(item.id) || extractPrompt(metadata);
     }
 
     // Get current prompt dialog item

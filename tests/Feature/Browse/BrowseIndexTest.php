@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -620,4 +621,39 @@ test('civitai browse keeps real modelVersionId filters when the version exists',
 
     expect((string) ($tab->params['modelVersionId'] ?? ''))->toBe('1692152');
     expect(array_key_exists('modelId', $tab->params))->toBeFalse();
+});
+
+test('civitai browse surfaces prompts from nested model metadata responses', function () {
+    $user = User::factory()->create();
+
+    Http::fake([
+        'https://civitai.com/api/v1/images*' => Http::response([
+            'items' => [[
+                'id' => 124538995,
+                'url' => 'https://image.civitai.com/example/image.jpeg',
+                'width' => 1024,
+                'height' => 1024,
+                'meta' => [
+                    'id' => 124538995,
+                    'meta' => [
+                        'prompt' => 'nested civitai prompt',
+                        'sampler' => 'Euler a',
+                    ],
+                ],
+            ]],
+            'metadata' => [
+                'nextCursor' => null,
+            ],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/browse?service=civit-ai-images&modelId=257749');
+
+    $response->assertSuccessful();
+    expect($response->json('items.0.metadata.prompt'))->toBe('nested civitai prompt');
+
+    $file = File::query()->with('metadata')->sole();
+
+    expect($file->metadata)->not->toBeNull()
+        ->and($file->metadata->payload['prompt'] ?? null)->toBe('nested civitai prompt');
 });

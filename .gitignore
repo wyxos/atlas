@@ -34,3 +34,4 @@ test-results/
 package-lock.json
 .zephyr/
 /tasks
+/tests/Browser/Screenshots

@@ -93,8 +93,14 @@ class FileItemFormatter
             $width = (int) ($metadata['width'] ?? ($listing['width'] ?? 500));
             $height = (int) ($metadata['height'] ?? ($listing['height'] ?? 500));
 
-            // Extract prompt if available (used by usePromptData, but will fallback to API if missing)
-            $prompt = $metadata['prompt'] ?? null;
+            // Support both the normalized payload and older nested CivitAI payloads.
+            $prompt = data_get($metadata, 'prompt')
+                ?? data_get($metadata, 'meta.prompt')
+                ?? data_get($listing, 'meta.prompt')
+                ?? data_get($listing, 'meta.meta.prompt');
+            if (! is_string($prompt) || trim($prompt) === '') {
+                $prompt = null;
+            }
 
             // Ensure containers relation is loaded (even if empty)
             if (! $file->relationLoaded('containers')) {

@@ -361,7 +361,7 @@ class CivitAiImages extends BaseService
             'updated_at' => $now,
         ];
 
-        $meta = $row['meta'] ?? [];
+        $meta = $this->normalizeMetadataPayload($row['meta'] ?? []);
         $metadata = [
             'file_referrer_url' => $referrer,
             'payload' => json_encode(array_merge($meta, [
@@ -376,6 +376,22 @@ class CivitAiImages extends BaseService
             'file' => $file,
             'metadata' => $metadata,
         ];
+    }
+
+    private function normalizeMetadataPayload(mixed $meta): array
+    {
+        if (! is_array($meta)) {
+            return [];
+        }
+
+        $nestedMeta = $meta['meta'] ?? null;
+        if (! is_array($nestedMeta)) {
+            return $meta;
+        }
+
+        unset($meta['meta']);
+
+        return array_merge($nestedMeta, $meta);
     }
 
     protected function resolveType(mixed $value): ?string
