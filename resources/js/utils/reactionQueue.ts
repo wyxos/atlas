@@ -73,6 +73,21 @@ function getLatestQueuedReactionMetadata():
     return null;
 }
 
+async function runRestoreCallback(
+    restoreCallback: (() => Promise<void> | void) | undefined,
+    errorMessage: string,
+): Promise<void> {
+    if (!restoreCallback) {
+        return;
+    }
+
+    try {
+        await restoreCallback();
+    } catch (error) {
+        console.error(errorMessage, error);
+    }
+}
+
 /**
  * Queue a reaction with countdown toast.
  * Shows toast immediately with countdown, executes reaction on expiration.
@@ -127,6 +142,7 @@ export function queueReaction(
                 toast.dismiss(queueId);
             } catch (error) {
                 console.error('Failed to execute queued reaction:', error);
+                await runRestoreCallback(restoreCallback, 'Failed to restore queued reaction state:');
                 // Show error toast
                 toast.error('Failed to save reaction', {
                     id: `${queueId}-error`,
@@ -210,6 +226,7 @@ export function queueBatchReaction(
                 }
             } catch (error) {
                 console.error('Failed to execute queued batch reaction:', error);
+                await runRestoreCallback(restoreCallback, 'Failed to restore queued batch reaction state:');
                 // Show error toast
                 toast.error('Failed to save batch reaction', {
                     id: `${queueId}-error`,
@@ -253,22 +270,15 @@ export function queueBatchReaction(
 export async function cancelQueuedReaction(fileId: number, reactionType: ReactionType): Promise<void> {
     const queueId = `${reactionType}-${fileId}`;
     const item = queueCollection.getAll().find((item) => item.id === queueId);
-    
-    // Get restore callback from metadata before removing
-    const restoreCallback = (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback;
-    
+
     // Remove from queue
     queueCollection.remove(queueId);
     toast.dismiss(queueId);
-    
-    // Restore to masonry if callback exists
-    if (restoreCallback) {
-        try {
-            await restoreCallback();
-        } catch (error) {
-            console.error('Failed to restore item to masonry:', error);
-        }
-    }
+
+    await runRestoreCallback(
+        (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback,
+        'Failed to restore item to masonry:',
+    );
 }
 
 /**
@@ -276,22 +286,15 @@ export async function cancelQueuedReaction(fileId: number, reactionType: Reactio
  */
 export async function cancelBatchQueuedReaction(queueId: string): Promise<void> {
     const item = queueCollection.getAll().find((item) => item.id === queueId);
-    
-    // Get restore callback from metadata before removing
-    const restoreCallback = (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback;
-    
+
     // Remove from queue
     queueCollection.remove(queueId);
     toast.dismiss(queueId);
-    
-    // Restore to masonry if callback exists
-    if (restoreCallback) {
-        try {
-            await restoreCallback();
-        } catch (error) {
-            console.error('Failed to restore batch items to masonry:', error);
-        }
-    }
+
+    await runRestoreCallback(
+        (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback,
+        'Failed to restore batch items to masonry:',
+    );
 }
 
 export function undoLatestQueuedReaction(): boolean {

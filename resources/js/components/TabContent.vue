@@ -27,6 +27,7 @@ import { useToast } from 'vue-toastification';
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
 import type { ContainerBlacklist } from '@/types/container-blacklist';
+import { matchesLocalViewFilters } from '@/utils/localReactionState';
 
 interface Props {
     tabId: number | null;
@@ -96,6 +97,14 @@ const localService = browseCatalogState.localService;
 const promptDialog = useTabContentPromptDialog(items);
 const isResettingPreviewed = ref(false);
 
+function matchesActiveLocalFilters(item: FeedItem): boolean {
+    if (!form.isLocal.value) {
+        return true;
+    }
+
+    return matchesLocalViewFilters(item, form.data.serviceFilters);
+}
+
 function resetItemPreloads(): void {
     itemInteractions.preload.reset();
 }
@@ -137,6 +146,7 @@ const containerInteractions = useTabContentContainerInteractions({
     tab,
     form,
     masonry,
+    matchesActiveLocalFilters,
     onReaction: props.onReaction,
     onOpenContainerTab: props.onOpenContainerTab,
 });
@@ -146,6 +156,7 @@ const itemInteractions = useTabContentItemInteractions({
     form,
     masonry,
     fileViewer,
+    matchesActiveLocalFilters,
     itemPreview,
     onReaction: props.onReaction,
     clearHoveredContainer: containerInteractions.clearHoveredContainer,
