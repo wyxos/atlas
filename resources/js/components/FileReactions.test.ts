@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import FileReactions from './FileReactions.vue';
 
@@ -107,13 +107,11 @@ describe('FileReactions', () => {
     });
 
 
-    it('calls removeItem and emits reaction event when removeItem prop is provided', async () => {
-        const removeItem = vi.fn();
+    it('emits reaction events directly without removing the item first', async () => {
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
                 reaction: null,
-                removeItem,
             },
         });
 
@@ -121,30 +119,8 @@ describe('FileReactions', () => {
         await favoriteButton.trigger('click');
         await wrapper.vm.$nextTick();
 
-        // Verify removeItem was called immediately
-        expect(removeItem).toHaveBeenCalled();
-
-        // Verify reaction event was emitted
         expect(wrapper.emitted('reaction')).toBeTruthy();
         expect(wrapper.emitted('reaction')?.[0]).toEqual(['love']);
-    });
-
-    it('emits reaction event when removeItem prop is not provided', async () => {
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-                reaction: null,
-                // No removeItem prop
-            },
-        });
-
-        const likeButton = wrapper.find('button[aria-label="Like"]');
-        await likeButton.trigger('click');
-        await wrapper.vm.$nextTick();
-
-        // Verify reaction event was emitted (parent will handle API call)
-        expect(wrapper.emitted('reaction')).toBeTruthy();
-        expect(wrapper.emitted('reaction')?.[0]).toEqual(['like']);
     });
 
     it('does not emit reaction when fileId is not provided', async () => {
@@ -195,4 +171,3 @@ describe('FileReactions', () => {
         // by ensuring clicks on FileReactions don't trigger parent handlers
     });
 });
-

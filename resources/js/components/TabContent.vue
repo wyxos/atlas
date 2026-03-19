@@ -14,7 +14,9 @@ import { createBrowseCatalog, type ServiceOption } from '@/lib/browseCatalog';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
+import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
+import DownloadedReactionDialog from './DownloadedReactionDialog.vue';
 import TabContentPromptDialog from './TabContentPromptDialog.vue';
 import TabContentStartForm from './TabContentStartForm.vue';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
@@ -94,6 +96,7 @@ const availableServices = computed(() => {
 const availableSources = browseCatalogState.availableSources;
 const localService = browseCatalogState.localService;
 
+const downloadedReactionPrompt = useDownloadedReactionPrompt();
 const promptDialog = useTabContentPromptDialog(items);
 const isResettingPreviewed = ref(false);
 
@@ -159,6 +162,7 @@ const itemInteractions = useTabContentItemInteractions({
     matchesActiveLocalFilters,
     itemPreview,
     onReaction: props.onReaction,
+    promptDownloadedReaction: downloadedReactionPrompt.prompt,
     clearHoveredContainer: containerInteractions.clearHoveredContainer,
 });
 
@@ -473,9 +477,9 @@ defineExpose({
                             <p class="text-center text-xs font-medium text-danger-100">Failed to load {{ error }}</p>
                         </template>
 
-                        <template #overlay="{ item, remove }">
+                        <template #overlay="{ item }">
                             <TabContentMasonryItemOverlay :item="item as FeedItem" :items-length="items.length"
-                                :remove-item="remove" :containers="containerInteractions"
+                                :containers="containerInteractions"
                                 :item-interactions="itemInteractions" :prompt-dialog="promptDialog" />
                         </template>
                     </MasonryItem>
@@ -499,6 +503,11 @@ defineExpose({
             :prompt="promptDialog.data.currentPromptData.value" :update-open="promptDialog.setOpen"
             :copy-prompt="promptDialog.copy" :test-prompt="promptDialog.openTestPage"
             :close-prompt="promptDialog.close" />
+
+        <DownloadedReactionDialog :open="downloadedReactionPrompt.data.open.value"
+            :update-open="downloadedReactionPrompt.setOpen" :choose-react="downloadedReactionPrompt.chooseReact"
+            :choose-redownload="downloadedReactionPrompt.chooseRedownload"
+            :close-dialog="downloadedReactionPrompt.close" />
 
     </div>
     <div v-else class="flex items-center justify-center h-full" data-test="no-tab-message">

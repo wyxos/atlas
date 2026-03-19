@@ -28,7 +28,7 @@ type BatchReactionQueueMetadata = ReactionQueueMetadata & {
     reactionType: ReactionType;
 };
 type QueueReactionOptions = {
-    allowRedownloadPrompt?: boolean;
+    forceDownload?: boolean;
     updateLocalState?: boolean;
 };
 type QueueBatchReactionOptions = {
@@ -120,22 +120,14 @@ export function queueReaction(
         onComplete: async () => {
             try {
                 // Execute the reaction
-                const result = await reactionCallback(fileId, reactionType);
+                await reactionCallback(
+                    fileId,
+                    reactionType,
+                    options?.forceDownload === true ? { forceDownload: true } : undefined,
+                );
                 
                 if (options?.updateLocalState === true && items) {
                     updateReactionState(items, fileId, reactionType);
-                }
-
-                // Local-mode affordance: if the file is already downloaded, offer to force re-download it.
-                if (options?.allowRedownloadPrompt === true && result?.should_prompt_redownload === true) {
-                    const shouldForce = typeof window.confirm === 'function'
-                        ? window.confirm('This file is already downloaded. Re-download it?')
-                        : false;
-
-                    if (shouldForce) {
-                        await reactionCallback(fileId, reactionType, { forceDownload: true });
-                        toast.success('Queued re-download', { id: `${queueId}-redownload` });
-                    }
                 }
                 
                 // Dismiss toast on success

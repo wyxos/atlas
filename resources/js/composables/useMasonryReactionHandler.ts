@@ -1,4 +1,5 @@
 import { triggerRef, type Ref } from 'vue';
+import type { DownloadedReactionChoice } from './useDownloadedReactionPrompt';
 import type { FeedItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
@@ -15,7 +16,12 @@ type UseMasonryReactionHandlerOptions = {
     isLocal: Readonly<Ref<boolean>>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     onReaction: (fileId: number, type: ReactionType) => void;
+    promptDownloadedReaction?: () => Promise<DownloadedReactionChoice>;
 };
+
+function hasDownloadSource(item: FeedItem): boolean {
+    return typeof item.url === 'string' && item.url.trim() !== '';
+}
 
 /**
  * Composable for handling masonry item reactions with restore functionality.
@@ -23,6 +29,29 @@ type UseMasonryReactionHandlerOptions = {
 export function useMasonryReactionHandler(
     options: UseMasonryReactionHandlerOptions,
 ) {
+    function shouldPromptDownloadedReaction(item: FeedItem, type: ReactionType): boolean {
+        return options.isLocal.value
+            && options.promptDownloadedReaction !== undefined
+            && type !== 'dislike'
+            && item.downloaded === true
+            && hasDownloadSource(item)
+            && typeof item.reaction?.type === 'string'
+            && item.reaction.type !== type;
+    }
+
+    async function resolveForceDownload(item: FeedItem, type: ReactionType): Promise<boolean | null> {
+        if (!shouldPromptDownloadedReaction(item, type)) {
+            return false;
+        }
+
+        const choice = await options.promptDownloadedReaction?.();
+        if (choice === 'cancel') {
+            return null;
+        }
+
+        return choice === 'redownload';
+    }
+
     /**
      * Handle reaction - conditionally removes item from masonry based on feed mode and queues reaction.
      * In local mode: items are removed only when the optimistic state no longer matches the active filters.
@@ -35,6 +64,11 @@ export function useMasonryReactionHandler(
     ): Promise<void> {
         const fileId = item.id;
         const tabId = options.tab.value?.id;
+        const forceDownload = await resolveForceDownload(item, type);
+
+        if (forceDownload === null) {
+            return;
+        }
 
         let restoreCallback: (() => Promise<void> | void) | undefined;
 
@@ -85,7 +119,7 @@ export function useMasonryReactionHandler(
         // Queue reaction with countdown toast (pass thumbnail and restore callback for undo/error recovery)
         const thumbnail = item.preview;
         queueReaction(fileId, type, thumbnail, restoreCallback, options.items, {
-            allowRedownloadPrompt: options.isLocal.value,
+            forceDownload,
             updateLocalState: false,
         });
 
