@@ -14,7 +14,7 @@ class RepairReactedBlacklistedFiles extends Command
         {--max-files=0 : Max number of files to process (0 = no limit)}
         {--dry-run : Scan matching files without mutating records}';
 
-    protected $description = 'Queue a backfill that restores positively reacted blacklisted files and re-verifies downloads';
+    protected $description = 'Queue a backfill that restores auto-blacklisted reacted files and re-verifies downloads';
 
     public function handle(): int
     {

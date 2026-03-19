@@ -5,9 +5,11 @@ use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationRule;
+use App\Models\Reaction;
 use App\Models\User;
 use App\Services\BrowseModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
@@ -89,6 +91,43 @@ test('filters out blacklisted files from returned files', function () {
     expect($file1->fresh()->blacklisted_at)->not->toBeNull()
         ->and($result['files'])->not->toContain($file1)
         ->and($result['files'])->toContain($file2);
+});
+
+test('keeps reacted files from blacklisted containers in returned files', function () {
+    Bus::fake();
+
+    $reactionUser = User::factory()->create();
+    $container = Container::factory()->create([
+        'blacklisted_at' => now(),
+        'action_type' => ActionType::BLACKLIST,
+    ]);
+
+    $reactedFile = File::factory()->create([
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/reacted-container-browse.jpg',
+    ]);
+    $reactedFile->containers()->attach($container->id);
+    Reaction::create([
+        'file_id' => $reactedFile->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'dislike',
+    ]);
+    $reactedFile->load('containers');
+
+    $neutralFile = File::factory()->create([
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/neutral-container-browse.jpg',
+    ]);
+    $neutralFile->containers()->attach($container->id);
+    $neutralFile->load('containers');
+
+    $result = $this->service->process([$reactedFile, $neutralFile]);
+
+    expect(collect($result['files'])->pluck('id')->all())->toBe([$reactedFile->id]);
+    expect($reactedFile->fresh()->blacklisted_at)->toBeNull();
+    expect($neutralFile->fresh()->blacklisted_at)->not->toBeNull();
 });
 
 test('filters out already blacklisted files', function () {

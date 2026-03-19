@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreTabRequest;
 use App\Http\Requests\UpdateTabRequest;
 use App\Models\Tab;
+use App\Services\BrowseModerationService;
 use Illuminate\Http\JsonResponse;
 
 class TabController extends Controller
@@ -140,29 +141,16 @@ class TabController extends Controller
                     // Load the payload column from metadata (longtext, needed for dimensions and prompt)
                     $query->select('id', 'file_id', 'payload');
                 },
-                'containers',
             ])
             ->orderByPivot('position')
             ->get();
 
-        // Re-run moderation on files to catch files that should now be auto-disliked
-        // (e.g., if moderation rules were added/activated after files were added to tab)
-        $fileModerationService = app(\App\Services\FileModerationService::class);
-        $moderationResult = $fileModerationService->moderate($files);
-        $processedIds = $moderationResult['processedIds'];
-
-        // Filter out files that were just auto-disliked or blacklisted by moderation
-        // Also filter out files that are already marked as auto-disliked or blacklisted
-        $files = $files->reject(function ($file) use ($processedIds) {
-            $hasBlacklistedContainer = $file->containers->contains(
-                fn ($container) => $container->blacklisted_at !== null
-            );
-
-            return in_array($file->id, $processedIds, true)
-                || $file->auto_disliked
-                || $file->blacklisted_at !== null
-                || $hasBlacklistedContainer;
-        });
+        // Re-run the browse moderation pipeline so restored tabs follow the same blacklist behavior
+        // as live browse results, including spared reacted files from blacklisted containers.
+        $moderationResult = app(BrowseModerationService::class)->process($files, [
+            'filterBlacklisted' => true,
+        ]);
+        $files = collect($moderationResult['files']);
 
         $items = [];
 

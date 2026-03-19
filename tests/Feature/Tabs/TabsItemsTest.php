@@ -3,6 +3,7 @@
 use App\Models\Container;
 use App\Models\File;
 use App\Models\ModerationRule;
+use App\Models\Reaction;
 use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -199,7 +200,7 @@ test('tab show batches current-user reaction lookup during moderation', function
     expect($batchedReactionQueries)->toHaveCount(1);
 });
 
-test('tab show excludes blacklisted files and files from blacklisted containers', function () {
+test('tab show excludes blacklisted files and unreacted files from blacklisted containers', function () {
     $user = User::factory()->create();
     $directlyBlacklisted = File::factory()->create([
         'referrer_url' => 'https://example.com/blacklisted.jpg',
@@ -232,4 +233,45 @@ test('tab show excludes blacklisted files and files from blacklisted containers'
     $response->assertSuccessful();
 
     expect(collect($response->json('tab.items'))->pluck('id')->all())->toBe([$visible->id]);
+    expect($containerBlacklisted->fresh()->blacklisted_at)->not->toBeNull();
+});
+
+test('tab show keeps reacted files from blacklisted containers when the file itself is not blacklisted', function () {
+    $user = User::factory()->create();
+    $reactionUser = User::factory()->create();
+
+    $reactedContainerFile = File::factory()->create([
+        'referrer_url' => 'https://example.com/reacted-container.jpg',
+        'blacklisted_at' => null,
+    ]);
+    $visible = File::factory()->create([
+        'referrer_url' => 'https://example.com/visible.jpg',
+        'blacklisted_at' => null,
+    ]);
+
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+        'blacklisted_at' => now(),
+        'action_type' => 'blacklist',
+    ]);
+    $reactedContainerFile->containers()->attach($container->id);
+
+    Reaction::create([
+        'file_id' => $reactedContainerFile->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'dislike',
+    ]);
+
+    $tab = Tab::factory()
+        ->for($user)
+        ->withFiles([$reactedContainerFile->id, $visible->id])
+        ->create();
+
+    $response = $this->actingAs($user)->getJson(route('api.tabs.show', ['tab' => $tab->id]));
+
+    $response->assertSuccessful();
+
+    expect(collect($response->json('tab.items'))->pluck('id')->all())->toBe([$reactedContainerFile->id, $visible->id]);
+    expect($reactedContainerFile->fresh()->blacklisted_at)->toBeNull();
 });

@@ -312,6 +312,50 @@ test('batch flagging works correctly for multiple files', function () {
     }
 });
 
+test('auto-dislike still skips only the current users reacted files', function () {
+    ModerationRule::factory()->any(['spam'])->create([
+        'active' => true,
+        'action_type' => ActionType::DISLIKE,
+    ]);
+
+    $currentUserReactedFile = File::factory()->create([
+        'referrer_url' => 'https://example.com/current-user-reacted.jpg',
+        'auto_disliked' => false,
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $currentUserReactedFile->id,
+        'payload' => ['prompt' => 'This is spam content'],
+    ]);
+    Reaction::create([
+        'file_id' => $currentUserReactedFile->id,
+        'user_id' => $this->user->id,
+        'type' => 'like',
+    ]);
+
+    $otherUser = User::factory()->create();
+    $otherUserReactedFile = File::factory()->create([
+        'referrer_url' => 'https://example.com/other-user-reacted.jpg',
+        'auto_disliked' => false,
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $otherUserReactedFile->id,
+        'payload' => ['prompt' => 'This is spam content'],
+    ]);
+    Reaction::create([
+        'file_id' => $otherUserReactedFile->id,
+        'user_id' => $otherUser->id,
+        'type' => 'love',
+    ]);
+
+    $result = $this->service->moderate(collect([
+        $currentUserReactedFile->fresh()->load('metadata'),
+        $otherUserReactedFile->fresh()->load('metadata'),
+    ]));
+
+    expect($result['flaggedIds'])->not->toContain($currentUserReactedFile->id)
+        ->and($result['flaggedIds'])->toContain($otherUserReactedFile->id);
+});
+
 test('empty file collection returns empty results', function () {
     ModerationRule::factory()->any(['spam'])->create([
         'active' => true,
@@ -374,6 +418,46 @@ test('immediate blacklist updates file', function () {
 
     // Verify delete job was dispatched
     Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
+});
+
+test('auto-blacklist skips files that already have any reaction', function () {
+    Bus::fake();
+
+    ModerationRule::factory()->any(['spam'])->create([
+        'name' => 'Spam rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+    ]);
+
+    $reactionUser = User::factory()->create();
+    $file = File::factory()->create([
+        'referrer_url' => 'https://example.com/reacted-blacklist-skip.jpg',
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/reacted-blacklist-skip.jpg',
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This is spam content'],
+    ]);
+    Reaction::create([
+        'file_id' => $file->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'dislike',
+    ]);
+
+    $result = $this->service->moderate(collect([$file->fresh()->load('metadata')]));
+
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->toBeEmpty()
+        ->and($file->fresh()->blacklisted_at)->toBeNull();
+
+    $this->assertDatabaseMissing('file_moderation_actions', [
+        'file_id' => $file->id,
+        'action_type' => ActionType::BLACKLIST,
+    ]);
+
+    Bus::assertNothingDispatched();
 });
 
 test('persist the moderation rule that auto-blacklisted a file (no inference)', function () {
