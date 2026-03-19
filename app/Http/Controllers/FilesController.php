@@ -6,6 +6,7 @@ use App\Jobs\GenerateFilePreviewAssets;
 use App\Listings\FileListing;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\DownloadedFileClearService;
 use App\Services\MetricsService;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
@@ -239,7 +240,7 @@ SVG;
         $alsoDeleteRecord = (bool) ($validated['also_delete_record'] ?? false);
 
         if ($alsoFromDisk) {
-            $this->deleteStoredAssets($file);
+            app(DownloadedFileClearService::class)->clear($file);
         }
 
         if (! $alsoFromDisk || $alsoDeleteRecord) {
@@ -423,34 +424,6 @@ SVG;
         }
 
         GenerateFilePreviewAssets::dispatch($file->id);
-    }
-
-    private function deleteStoredAssets(File $file): void
-    {
-        $wasDownloaded = (bool) $file->downloaded;
-        $disk = Storage::disk(config('downloads.disk'));
-
-        foreach ([$file->path, $file->preview_path, $file->poster_path] as $path) {
-            if (! is_string($path) || $path === '' || ! $disk->exists($path)) {
-                continue;
-            }
-
-            $disk->delete($path);
-        }
-
-        app(MetricsService::class)->applyDownloadClear($file, $wasDownloaded);
-
-        $file->forceFill([
-            'path' => null,
-            'preview_path' => null,
-            'poster_path' => null,
-            'downloaded' => false,
-            'downloaded_at' => null,
-            'download_progress' => 0,
-            'updated_at' => now(),
-        ])->save();
-
-        $file->searchable();
     }
 
     /**

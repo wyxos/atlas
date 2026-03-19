@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Models\File;
-use Illuminate\Support\Facades\Storage;
 
 class DownloadedFileResetService
 {
+    public function __construct(
+        private DownloadedFileClearService $downloadedFileClearService,
+    ) {}
+
     /**
      * Prepare a downloaded file for a fresh download attempt.
      *
@@ -15,34 +18,13 @@ class DownloadedFileResetService
      */
     public function reset(File $file, bool $clearDerivedMetadata = true): void
     {
-        if (! $file->downloaded) {
+        if (! $this->downloadedFileClearService->hasStoredAssets($file)) {
             return;
         }
 
-        $disk = Storage::disk(config('downloads.disk'));
-
-        foreach (['path', 'preview_path', 'poster_path'] as $field) {
-            $path = $file->{$field};
-            if (! is_string($path) || $path === '') {
-                continue;
-            }
-
-            try {
-                if ($disk->exists($path)) {
-                    $disk->delete($path);
-                }
-            } catch (\Throwable) {
-                // Cleanup failures should not prevent a retry.
-            }
-        }
+        $this->downloadedFileClearService->clear($file, syncSearch: false);
 
         $updates = [
-            'downloaded' => false,
-            'downloaded_at' => null,
-            'download_progress' => 0,
-            'path' => null,
-            'preview_path' => null,
-            'poster_path' => null,
             'not_found' => false,
         ];
 

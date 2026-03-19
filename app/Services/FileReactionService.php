@@ -10,6 +10,10 @@ use App\Models\User;
 
 class FileReactionService
 {
+    public function __construct(
+        private DownloadedFileClearService $downloadedFileClearService,
+    ) {}
+
     /**
      * Set a reaction for a file (idempotent).
      *
@@ -51,6 +55,10 @@ class FileReactionService
             ->first();
 
         if ($existingReaction && $existingReaction->type === $type) {
+            if ($type === 'dislike') {
+                $this->clearDownloadedAssetsForDislike($file, $deferHeavySideEffects);
+            }
+
             // No-op: keep the existing reaction.
             if ($type !== 'dislike' && $queueDownload) {
                 $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
@@ -101,6 +109,10 @@ class FileReactionService
         $isBlacklisted = $wasBlacklisted;
 
         if ($existingReaction && $existingReaction->type === $type) {
+            if ($type === 'dislike' && $this->clearDownloadedAssetsForDislike($file)) {
+                return ['reaction' => ['type' => $existingReaction->type]];
+            }
+
             $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
             $existingReaction->delete();
             // Reactions are indexed into Typesense via File::toSearchableArray(), but toggling a
@@ -164,18 +176,26 @@ class FileReactionService
             $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
         }
 
-        app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
-
-        // Ensure the search index reflects the new reaction arrays.
-        if ($deferHeavySideEffects) {
-            SyncFileSearchIndex::dispatch($file->id)
-                ->onConnection($this->asyncQueueConnection())
-                ->onQueue('processing');
-        } else {
-            $file->searchable();
+        if ($type === 'dislike') {
+            $this->downloadedFileClearService->clear($file, syncSearch: false);
         }
 
+        app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+
+        $this->syncSearch($file, $deferHeavySideEffects);
+
         return $reaction;
+    }
+
+    private function clearDownloadedAssetsForDislike(File $file, bool $deferHeavySideEffects = false): bool
+    {
+        if (! $this->downloadedFileClearService->clear($file, syncSearch: false)) {
+            return false;
+        }
+
+        $this->syncSearch($file, $deferHeavySideEffects);
+
+        return true;
     }
 
     /**
@@ -210,5 +230,18 @@ class FileReactionService
         }
 
         return $connection;
+    }
+
+    private function syncSearch(File $file, bool $deferHeavySideEffects): void
+    {
+        if ($deferHeavySideEffects) {
+            SyncFileSearchIndex::dispatch($file->id)
+                ->onConnection($this->asyncQueueConnection())
+                ->onQueue('processing');
+
+            return;
+        }
+
+        $file->searchable();
     }
 }
