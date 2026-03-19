@@ -3,12 +3,29 @@ import { ref } from 'vue';
 import type { FeedItem } from './useTabs';
 import { useMasonryReactionHandler } from './useMasonryReactionHandler';
 
-const { mockQueueReaction } = vi.hoisted(() => ({
+const { mockQueueReaction, mockReactionCallback, mockToast } = vi.hoisted(() => ({
     mockQueueReaction: vi.fn(),
+    mockReactionCallback: vi.fn(),
+    mockToast: Object.assign(vi.fn(), {
+        dismiss: vi.fn(),
+        error: vi.fn(),
+        success: vi.fn(),
+        info: vi.fn(),
+        warning: vi.fn(),
+    }),
 }));
 
 vi.mock('@/utils/reactionQueue', () => ({
     queueReaction: mockQueueReaction,
+}));
+
+vi.mock('@/utils/reactions', () => ({
+    createReactionCallback: () => mockReactionCallback,
+}));
+
+vi.mock('vue-toastification', () => ({
+    useToast: () => mockToast,
+    default: {},
 }));
 
 function createItem(overrides: Partial<FeedItem> = {}): FeedItem {
@@ -32,6 +49,13 @@ function createItem(overrides: Partial<FeedItem> = {}): FeedItem {
 describe('useMasonryReactionHandler', () => {
     beforeEach(() => {
         mockQueueReaction.mockReset();
+        mockReactionCallback.mockReset();
+        mockReactionCallback.mockResolvedValue({
+            reaction: { type: 'love' },
+            should_prompt_redownload: false,
+        });
+        mockToast.mockClear();
+        mockToast.error.mockClear();
     });
 
     it('optimistically removes local items that stop matching the active filters and restores them on rollback', async () => {
@@ -49,6 +73,7 @@ describe('useMasonryReactionHandler', () => {
             tab: ref({ id: 5 } as any),
             isLocal: ref(true),
             matchesActiveLocalFilters: () => false,
+            isPositiveOnlyLocalView: () => false,
             onReaction,
         });
 
@@ -82,7 +107,7 @@ describe('useMasonryReactionHandler', () => {
         expect(masonry.value.restore).toHaveBeenCalledWith(item);
     });
 
-    it('prompts before queueing a new positive reaction for an already-downloaded file', async () => {
+    it('prompts before queueing a new positive reaction for an already-downloaded file outside positive-only local views', async () => {
         const item = createItem({
             downloaded: true,
             reaction: { type: 'like' },
@@ -96,6 +121,7 @@ describe('useMasonryReactionHandler', () => {
             masonry: ref(null),
             tab: ref({ id: 5 } as any),
             isLocal: ref(true),
+            isPositiveOnlyLocalView: () => false,
             onReaction: vi.fn(),
             promptDownloadedReaction,
         });
@@ -116,6 +142,138 @@ describe('useMasonryReactionHandler', () => {
         );
     });
 
+    it('saves positive-to-positive reactions immediately in positive-only local views', async () => {
+        const item = createItem({
+            reaction: { type: 'like' },
+            downloaded: true,
+            url: 'https://example.com/original.jpg',
+        });
+        const items = ref([item]);
+        const promptDownloadedReaction = vi.fn().mockResolvedValue('redownload');
+        const onReaction = vi.fn();
+
+        mockReactionCallback
+            .mockResolvedValueOnce({
+                reaction: { type: 'love' },
+                should_prompt_redownload: true,
+            })
+            .mockResolvedValueOnce({
+                reaction: { type: 'love' },
+                should_prompt_redownload: false,
+            });
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry: ref(null),
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            matchesActiveLocalFilters: () => true,
+            isPositiveOnlyLocalView: () => true,
+            onReaction,
+            promptDownloadedReaction,
+        });
+
+        await handleMasonryReaction(item, 'love');
+
+        expect(item.reaction).toEqual({ type: 'love' });
+        expect(mockQueueReaction).not.toHaveBeenCalled();
+        expect(mockReactionCallback).toHaveBeenNthCalledWith(1, 1, 'love');
+        expect(mockReactionCallback).toHaveBeenNthCalledWith(2, 1, 'love', { forceDownload: true });
+        expect(promptDownloadedReaction).toHaveBeenCalledTimes(1);
+        expect(mockReactionCallback.mock.invocationCallOrder[0]).toBeLessThan(promptDownloadedReaction.mock.invocationCallOrder[0]);
+        expect(onReaction).toHaveBeenCalledWith(1, 'love');
+    });
+
+    it('removes immediately-saved positive reactions from masonry before the request when they no longer match local filters', async () => {
+        const item = createItem({
+            reaction: { type: 'like' },
+        });
+        const items = ref([item]);
+        const masonry = ref({
+            remove: vi.fn().mockResolvedValue(undefined),
+            restore: vi.fn().mockResolvedValue(undefined),
+        } as any);
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry,
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            matchesActiveLocalFilters: () => false,
+            isPositiveOnlyLocalView: () => true,
+            onReaction: vi.fn(),
+        });
+
+        await handleMasonryReaction(item, 'funny');
+
+        expect(masonry.value.remove).toHaveBeenCalledWith(item);
+        expect(masonry.value.remove.mock.invocationCallOrder[0]).toBeLessThan(mockReactionCallback.mock.invocationCallOrder[0]);
+        expect(mockQueueReaction).not.toHaveBeenCalled();
+    });
+
+    it('restores immediate positive reactions when the save fails', async () => {
+        const item = createItem({
+            reaction: { type: 'like' },
+        });
+        const items = ref([item]);
+        const masonry = ref({
+            remove: vi.fn().mockResolvedValue(undefined),
+            restore: vi.fn().mockResolvedValue(undefined),
+        } as any);
+
+        mockReactionCallback.mockRejectedValueOnce(new Error('API Error'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry,
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            matchesActiveLocalFilters: () => false,
+            isPositiveOnlyLocalView: () => true,
+            onReaction: vi.fn(),
+        });
+
+        await handleMasonryReaction(item, 'love');
+
+        expect(item.reaction).toEqual({ type: 'like' });
+        expect(masonry.value.remove).toHaveBeenCalledWith(item);
+        expect(masonry.value.restore).toHaveBeenCalledWith(item);
+        expect(mockToast.error).toHaveBeenCalledWith(
+            'Failed to save reaction',
+            expect.objectContaining({
+                id: 'reaction-1-error',
+            }),
+        );
+    });
+
+    it('removes items from masonry before queueing a dislike that falls out of a positive-only local view', async () => {
+        const item = createItem({
+            reaction: { type: 'like' },
+        });
+        const items = ref([item]);
+        const masonry = ref({
+            remove: vi.fn().mockResolvedValue(undefined),
+            restore: vi.fn().mockResolvedValue(undefined),
+        } as any);
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry,
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            matchesActiveLocalFilters: () => false,
+            isPositiveOnlyLocalView: () => true,
+            onReaction: vi.fn(),
+        });
+
+        await handleMasonryReaction(item, 'dislike');
+
+        expect(masonry.value.remove).toHaveBeenCalledWith(item);
+        expect(mockQueueReaction).toHaveBeenCalledTimes(1);
+        expect(masonry.value.remove.mock.invocationCallOrder[0]).toBeLessThan(mockQueueReaction.mock.invocationCallOrder[0]);
+    });
+
     it('does not queue or mutate local state when the downloaded-file prompt is canceled', async () => {
         const item = createItem({
             downloaded: true,
@@ -130,6 +288,7 @@ describe('useMasonryReactionHandler', () => {
             masonry: ref(null),
             tab: ref({ id: 5 } as any),
             isLocal: ref(true),
+            isPositiveOnlyLocalView: () => false,
             onReaction: vi.fn(),
             promptDownloadedReaction,
         });

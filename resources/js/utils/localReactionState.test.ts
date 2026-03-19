@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FeedItem } from '@/composables/useTabs';
 import {
     applyOptimisticLocalReactionState,
+    isPositiveOnlyLocalView,
     matchesLocalViewFilters,
     restoreOptimisticLocalReactionState,
 } from './localReactionState';
@@ -84,5 +85,23 @@ describe('localReactionState', () => {
         expect(matchesLocalViewFilters(createItem({
             reaction: { type: 'like' },
         }), favoriteFilters)).toBe(false);
+    });
+
+    it('treats reacted mode as a positive-only local view', () => {
+        expect(isPositiveOnlyLocalView({
+            reaction_mode: 'reacted',
+        })).toBe(true);
+    });
+
+    it('treats types mode as positive-only only when every selected reaction is positive', () => {
+        expect(isPositiveOnlyLocalView({
+            reaction_mode: 'types',
+            reaction: ['love', 'funny'],
+        })).toBe(true);
+
+        expect(isPositiveOnlyLocalView({
+            reaction_mode: 'types',
+            reaction: ['love', 'dislike'],
+        })).toBe(false);
     });
 });

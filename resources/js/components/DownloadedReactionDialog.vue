@@ -26,19 +26,19 @@ defineProps<Props>();
             <DialogHeader>
                 <DialogTitle class="text-twilight-indigo-100">Already saved in Atlas</DialogTitle>
                 <DialogDescription class="text-sm text-twilight-indigo-300">
-                    This file is already downloaded. Update the reaction, pull down a fresh copy, or leave everything as-is.
+                    This file already exists in Atlas. You can keep this reaction change only, or queue a fresh local copy as well.
                 </DialogDescription>
             </DialogHeader>
 
             <DialogFooter class="gap-2 sm:justify-end">
                 <Button variant="outline" @click="closeDialog">
-                    Leave it as-is
+                    Cancel
                 </Button>
                 <Button variant="outline" @click="chooseReact">
-                    Update reaction
+                    Keep reaction
                 </Button>
                 <Button @click="chooseRedownload">
-                    Update and download again
+                    Download again
                 </Button>
             </DialogFooter>
         </DialogContent>

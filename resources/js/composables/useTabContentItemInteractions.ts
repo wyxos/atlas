@@ -19,6 +19,7 @@ type UseTabContentItemInteractionsOptions = {
     masonry: Ref<MasonryInstance | null>;
     fileViewer: Ref<FileViewerRef | null>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
+    isPositiveOnlyLocalView?: () => boolean;
     itemPreview: {
         incrementPreviewCount: (fileId: number) => Promise<{ will_auto_dislike: boolean } | null>;
         clearPreviewedItems: (fileIds?: number[]) => void;
@@ -93,6 +94,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         tab: computed(() => options.tab.value ?? undefined),
         isLocal: options.form.isLocal,
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
+        isPositiveOnlyLocalView: options.isPositiveOnlyLocalView,
         onReaction: options.onReaction,
         promptDownloadedReaction: options.promptDownloadedReaction,
     });

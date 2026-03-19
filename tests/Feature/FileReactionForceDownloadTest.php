@@ -87,3 +87,32 @@ test('reaction store force_download resets downloaded file and does not toggle o
 
     Queue::assertPushed(DownloadFile::class, fn (DownloadFile $job) => $job->fileId === $file->id);
 });
+
+test('reaction store skips the redownload prompt when the downloaded file is missing locally', function () {
+    Queue::fake();
+    Storage::fake(config('downloads.disk'));
+
+    $user = User::factory()->admin()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/test.jpg',
+        'downloaded' => true,
+        'downloaded_at' => now(),
+        'path' => 'downloads/missing.jpg',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/files/{$file->id}/reaction", [
+        'type' => 'love',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('reaction.type', 'love');
+    $response->assertJsonPath('should_prompt_redownload', false);
+
+    Queue::assertPushed(DownloadFile::class, fn (DownloadFile $job) => $job->fileId === $file->id);
+});
