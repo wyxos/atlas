@@ -84,6 +84,54 @@ test('local browse can sort by reaction timestamp', function () {
     expect($ids)->toContain($older->id);
 });
 
+test('local reaction timestamp browse still honors file type filters', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $video = File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDays(2),
+        'source' => 'CivitAI',
+        'mime_type' => 'video/mp4',
+    ]);
+    $image = File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDay(),
+        'source' => 'CivitAI',
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    $videoReaction = Reaction::create([
+        'file_id' => $video->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+    Reaction::whereKey($videoReaction->id)->update([
+        'created_at' => now()->subHours(2),
+        'updated_at' => now()->subHours(2),
+    ]);
+
+    $imageReaction = Reaction::create([
+        'file_id' => $image->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+    Reaction::whereKey($imageReaction->id)->update([
+        'created_at' => now()->subMinutes(10),
+        'updated_at' => now()->subMinutes(10),
+    ]);
+
+    $response = $this->actingAs($user)->getJson(
+        "/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&reaction_mode=reacted&sort=reaction_at&file_type[]=video"
+    );
+    $response->assertSuccessful();
+
+    $ids = collect($response->json('items'))->pluck('id')->values()->all();
+    expect($ids)->toBe([$video->id]);
+});
+
 test('local browse can filter blacklisted files by manual or auto type', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create([

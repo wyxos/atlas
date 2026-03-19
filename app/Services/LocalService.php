@@ -61,6 +61,7 @@ class LocalService extends BaseService
                     blacklisted: $blacklisted,
                     blacklistType: $blacklistType,
                     maxPreviewed: $maxPreviewed,
+                    fileTypes: $fileTypes,
                     autoDisliked: $autoDisliked,
                     reactionMode: $reactionMode,
                     reactionTypes: $reactionTypes,
@@ -131,6 +132,7 @@ class LocalService extends BaseService
                 blacklisted: $blacklisted,
                 blacklistType: $blacklistType,
                 maxPreviewed: $maxPreviewed,
+                fileTypes: $fileTypes,
                 autoDisliked: $autoDisliked,
                 reactionMode: $reactionMode,
                 reactionTypes: $reactionTypes,
@@ -149,6 +151,7 @@ class LocalService extends BaseService
                 blacklisted: $blacklisted,
                 blacklistType: $blacklistType,
                 maxPreviewed: $maxPreviewed,
+                fileTypes: $fileTypes,
                 autoDisliked: $autoDisliked,
                 reactionMode: $reactionMode,
                 reactionTypes: $reactionTypes,
@@ -695,6 +698,7 @@ class LocalService extends BaseService
         string $blacklisted,
         string $blacklistType,
         ?int $maxPreviewed,
+        array $fileTypes,
         string $autoDisliked,
         string $reactionMode,
         ?array $reactionTypes,
@@ -766,6 +770,40 @@ class LocalService extends BaseService
                 }
             })
             ->when(is_int($maxPreviewed) && $maxPreviewed >= 0, fn ($q) => $q->where('files.previewed_count', '<=', $maxPreviewed))
+            ->when(! in_array('all', $fileTypes, true), function ($q) use ($fileTypes) {
+                $q->where(function ($qq) use ($fileTypes) {
+                    $hasClause = false;
+
+                    if (in_array('image', $fileTypes, true)) {
+                        $qq->orWhere('files.mime_type', 'like', 'image/%');
+                        $hasClause = true;
+                    }
+                    if (in_array('video', $fileTypes, true)) {
+                        $qq->orWhere('files.mime_type', 'like', 'video/%');
+                        $hasClause = true;
+                    }
+                    if (in_array('audio', $fileTypes, true)) {
+                        $qq->orWhere('files.mime_type', 'like', 'audio/%');
+                        $hasClause = true;
+                    }
+                    if (in_array('other', $fileTypes, true)) {
+                        $qq->orWhere(function ($qqq) {
+                            $qqq->whereNull('files.mime_type')
+                                ->orWhere('files.mime_type', '=', '')
+                                ->orWhere(function ($qqqq) {
+                                    $qqqq->where('files.mime_type', 'not like', 'image/%')
+                                        ->where('files.mime_type', 'not like', 'video/%')
+                                        ->where('files.mime_type', 'not like', 'audio/%');
+                                });
+                        });
+                        $hasClause = true;
+                    }
+
+                    if (! $hasClause) {
+                        $qq->orWhereRaw('1=1');
+                    }
+                });
+            })
             ->select('reactions.file_id')
             ->when($sort === 'reaction_at_asc', fn ($q) => $q->orderBy('reactions.created_at', 'asc'), fn ($q) => $q->orderByDesc('reactions.created_at'));
 
