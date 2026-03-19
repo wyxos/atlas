@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class MetricsService
 {
+    private const int CONTAINER_UPDATE_BATCH_SIZE = 1000;
+
     public const string KEY_FILES_TOTAL = 'files_total';
 
     public const string KEY_FILES_DOWNLOADED = 'files_downloaded';
@@ -130,37 +132,39 @@ class MetricsService
         if (empty($countsByContainer)) {
             return;
         }
-
-        $cases = [];
-        $containerIds = [];
-
-        foreach ($countsByContainer as $containerId => $count) {
-            $count = (int) $count;
-            if ($count === 0) {
-                continue;
-            }
-
-            $containerId = (int) $containerId;
-            $containerIds[] = $containerId;
-            $cases[] = "WHEN {$containerId} THEN {$count}";
-        }
-
-        if ($cases === []) {
-            return;
-        }
-
         $grammar = DB::query()->getGrammar();
         $wrappedId = $grammar->wrap('id');
         $wrappedColumn = $grammar->wrap($column);
-        $deltaCaseExpression = 'CASE '.$wrappedId.' '.implode(' ', $cases).' ELSE 0 END';
-        $updateExpression = "CASE WHEN {$wrappedColumn} + ({$deltaCaseExpression}) < 0 THEN 0 ELSE {$wrappedColumn} + ({$deltaCaseExpression}) END";
 
-        DB::table('containers')
-            ->whereIn('id', $containerIds)
-            ->update([
-                $column => DB::raw($updateExpression),
-                'updated_at' => now(),
-            ]);
+        foreach (array_chunk($countsByContainer, self::CONTAINER_UPDATE_BATCH_SIZE, true) as $batch) {
+            $cases = [];
+            $containerIds = [];
+
+            foreach ($batch as $containerId => $count) {
+                $count = (int) $count;
+                if ($count === 0) {
+                    continue;
+                }
+
+                $containerId = (int) $containerId;
+                $containerIds[] = $containerId;
+                $cases[] = "WHEN {$containerId} THEN {$count}";
+            }
+
+            if ($cases === []) {
+                continue;
+            }
+
+            $deltaCaseExpression = 'CASE '.$wrappedId.' '.implode(' ', $cases).' ELSE 0 END';
+            $updateExpression = "CASE WHEN {$wrappedColumn} + ({$deltaCaseExpression}) < 0 THEN 0 ELSE {$wrappedColumn} + ({$deltaCaseExpression}) END";
+
+            DB::table('containers')
+                ->whereIn('id', $containerIds)
+                ->update([
+                    $column => DB::raw($updateExpression),
+                    'updated_at' => now(),
+                ]);
+        }
     }
 
     /**
@@ -479,23 +483,27 @@ class MetricsService
         $grammar = DB::query()->getGrammar();
         $wrappedId = $grammar->wrap('id');
 
-        $totalContainerIds = [];
-        $totalCases = [];
-        $downloadedCases = [];
-        $blacklistedCases = [];
+        $wrappedTotal = $grammar->wrap('files_total');
+        $wrappedDownloaded = $grammar->wrap('files_downloaded');
+        $wrappedBlacklisted = $grammar->wrap('files_blacklisted');
 
-        foreach ($totals as $row) {
-            $containerId = (int) $row->container_id;
-            $totalContainerIds[] = $containerId;
-            $totalCases[] = "WHEN {$containerId} THEN ".(int) $row->files_total;
-            $downloadedCases[] = "WHEN {$containerId} THEN ".(int) $row->files_downloaded;
-            $blacklistedCases[] = "WHEN {$containerId} THEN ".(int) $row->files_blacklisted;
-        }
+        foreach ($totals->chunk(self::CONTAINER_UPDATE_BATCH_SIZE) as $batch) {
+            $totalContainerIds = [];
+            $totalCases = [];
+            $downloadedCases = [];
+            $blacklistedCases = [];
 
-        if ($totalContainerIds !== []) {
-            $wrappedTotal = $grammar->wrap('files_total');
-            $wrappedDownloaded = $grammar->wrap('files_downloaded');
-            $wrappedBlacklisted = $grammar->wrap('files_blacklisted');
+            foreach ($batch as $row) {
+                $containerId = (int) $row->container_id;
+                $totalContainerIds[] = $containerId;
+                $totalCases[] = "WHEN {$containerId} THEN ".(int) $row->files_total;
+                $downloadedCases[] = "WHEN {$containerId} THEN ".(int) $row->files_downloaded;
+                $blacklistedCases[] = "WHEN {$containerId} THEN ".(int) $row->files_blacklisted;
+            }
+
+            if ($totalContainerIds === []) {
+                continue;
+            }
 
             DB::table('containers')
                 ->whereIn('id', $totalContainerIds)
@@ -517,17 +525,21 @@ class MetricsService
             ->groupBy('container_file.container_id')
             ->get();
 
-        $favoriteContainerIds = [];
-        $favoriteCases = [];
+        $wrappedFavorited = $grammar->wrap('files_favorited');
 
-        foreach ($favorites as $row) {
-            $containerId = (int) $row->container_id;
-            $favoriteContainerIds[] = $containerId;
-            $favoriteCases[] = "WHEN {$containerId} THEN ".(int) $row->files_favorited;
-        }
+        foreach ($favorites->chunk(self::CONTAINER_UPDATE_BATCH_SIZE) as $batch) {
+            $favoriteContainerIds = [];
+            $favoriteCases = [];
 
-        if ($favoriteContainerIds !== []) {
-            $wrappedFavorited = $grammar->wrap('files_favorited');
+            foreach ($batch as $row) {
+                $containerId = (int) $row->container_id;
+                $favoriteContainerIds[] = $containerId;
+                $favoriteCases[] = "WHEN {$containerId} THEN ".(int) $row->files_favorited;
+            }
+
+            if ($favoriteContainerIds === []) {
+                continue;
+            }
 
             DB::table('containers')
                 ->whereIn('id', $favoriteContainerIds)
