@@ -1,4 +1,4 @@
-import { computed, nextTick, ref, triggerRef, type Ref, type ShallowRef } from 'vue';
+import { computed, ref, type Ref, type ShallowRef } from 'vue';
 import type { MasonryInstance } from '@wyxos/vibe';
 import type { FeedItem } from '@/composables/useTabs';
 
@@ -7,7 +7,6 @@ type UseLocalFileDeletionOptions = {
     masonry: Ref<MasonryInstance | null>;
     isLocal: Ref<boolean>;
     totalAvailable: Ref<number | null>;
-    matchesActiveLocalFilters: (item: FeedItem) => boolean;
     clearHover: () => void;
 };
 
@@ -37,7 +36,6 @@ function getDeleteErrorMessage(error: unknown): string {
 
 export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
     const dialogOpen = ref(false);
-    const deleteRecord = ref(false);
     const deleteError = ref<string | null>(null);
     const deleting = ref(false);
     const pendingItemId = ref<number | null>(null);
@@ -60,7 +58,6 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
         }
 
         pendingItemId.value = item.id;
-        deleteRecord.value = false;
         deleteError.value = null;
         dialogOpen.value = true;
     }
@@ -72,7 +69,6 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
 
         dialogOpen.value = false;
         deleteError.value = null;
-        deleteRecord.value = false;
         pendingItemId.value = null;
     }
 
@@ -99,37 +95,6 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
         options.items.value = options.items.value.filter((candidate) => candidate.id !== item.id);
     }
 
-    function canStayVisible(item: FeedItem): boolean {
-        if (deleteRecord.value) {
-            return false;
-        }
-
-        if (item.type === 'image' || item.type === 'video') {
-            return typeof item.url === 'string' && item.url.length > 0;
-        }
-
-        return true;
-    }
-
-    async function updateKeptRecordState(item: FeedItem): Promise<void> {
-        item.downloaded = false;
-        item.will_auto_dislike = false;
-
-        if (typeof item.url === 'string' && item.url.length > 0) {
-            item.original = item.url;
-            item.originalUrl = item.url;
-
-            if (item.type === 'image' || item.type === 'video') {
-                item.src = item.url;
-                item.preview = item.url;
-                item.thumbnail = item.url;
-            }
-        }
-
-        triggerRef(options.items);
-        await nextTick();
-    }
-
     async function confirm(): Promise<void> {
         const item = itemToDelete.value;
         if (!item || deleting.value) {
@@ -138,41 +103,33 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
 
         deleting.value = true;
         deleteError.value = null;
+        let shouldClose = false;
 
         try {
             await window.axios.delete(`/api/files/${item.id}`, {
                 data: {
                     also_from_disk: true,
-                    also_delete_record: deleteRecord.value,
+                    also_delete_record: true,
                 },
             });
 
-            const postDeleteItem = {
-                ...item,
-                downloaded: false,
-            } as FeedItem;
-            const shouldRemainVisible = canStayVisible(postDeleteItem)
-                && options.matchesActiveLocalFilters(postDeleteItem);
-
-            if (deleteRecord.value || !shouldRemainVisible) {
-                decrementVisibleTotal();
-                await removeFromCurrentView(item);
-            } else {
-                await updateKeptRecordState(item);
-            }
-
-            close();
+            decrementVisibleTotal();
+            await removeFromCurrentView(item);
+            shouldClose = true;
         } catch (error) {
             deleteError.value = getDeleteErrorMessage(error);
         } finally {
             deleting.value = false;
+
+            if (shouldClose) {
+                close();
+            }
         }
     }
 
     return {
         state: {
             dialogOpen,
-            deleteRecord,
             deleteError,
             deleting,
             itemToDelete,

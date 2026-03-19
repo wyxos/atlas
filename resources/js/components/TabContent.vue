@@ -166,7 +166,6 @@ const localFileDeletion = useLocalFileDeletion({
     masonry,
     isLocal: form.isLocal,
     totalAvailable: browse.state.totalAvailable,
-    matchesActiveLocalFilters,
     clearHover: itemInteractions.state.clearHover,
 });
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
@@ -506,11 +505,9 @@ defineExpose({
         <LocalFileDeleteDialog
             :open="localFileDeletion.state.dialogOpen.value"
             :filename="localFileDeletion.state.itemToDelete.value?.filename ?? null"
-            :delete-record="localFileDeletion.state.deleteRecord.value"
             :deleting="localFileDeletion.state.deleting.value"
             :delete-error="localFileDeletion.state.deleteError.value"
             @update:open="(value) => { if (!value) localFileDeletion.actions.close(); }"
-            @update:delete-record="(value) => localFileDeletion.state.deleteRecord.value = value"
             @cancel="localFileDeletion.actions.close"
             @confirm="localFileDeletion.actions.confirm"
         />

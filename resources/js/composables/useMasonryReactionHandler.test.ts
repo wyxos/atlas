@@ -299,4 +299,57 @@ describe('useMasonryReactionHandler', () => {
         expect(mockQueueReaction).not.toHaveBeenCalled();
         expect(item.reaction).toEqual({ type: 'like' });
     });
+
+    it('keeps the dislike while clearing downloaded local state when a downloaded disliked item is disliked again', async () => {
+        const item = createItem({
+            downloaded: true,
+            type: 'image',
+            url: 'https://example.com/original.jpg',
+            src: '/api/files/1/preview',
+            preview: '/api/files/1/preview',
+            thumbnail: '/api/files/1/preview',
+            original: '/api/files/1/downloaded',
+            originalUrl: '/api/files/1/downloaded',
+        });
+        const items = ref([item]);
+        const masonry = ref({
+            remove: vi.fn().mockResolvedValue(undefined),
+            restore: vi.fn().mockResolvedValue(undefined),
+        } as any);
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry,
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            matchesActiveLocalFilters: (candidate) => candidate.downloaded === true,
+            isPositiveOnlyLocalView: () => false,
+            onReaction: vi.fn(),
+        });
+
+        await handleMasonryReaction(item, 'dislike');
+
+        expect(item.reaction).toEqual({ type: 'dislike' });
+        expect(item.downloaded).toBe(false);
+        expect(item.src).toBe('https://example.com/original.jpg');
+        expect(item.preview).toBe('https://example.com/original.jpg');
+        expect(item.thumbnail).toBe('https://example.com/original.jpg');
+        expect(item.original).toBe('https://example.com/original.jpg');
+        expect(item.originalUrl).toBe('https://example.com/original.jpg');
+        expect(masonry.value.remove).toHaveBeenCalledWith(item);
+
+        const restoreCallback = mockQueueReaction.mock.calls.at(-1)?.[3] as (() => Promise<void>) | undefined;
+        expect(restoreCallback).toBeTypeOf('function');
+
+        await restoreCallback?.();
+
+        expect(item.reaction).toEqual({ type: 'dislike' });
+        expect(item.downloaded).toBe(true);
+        expect(item.src).toBe('/api/files/1/preview');
+        expect(item.preview).toBe('/api/files/1/preview');
+        expect(item.thumbnail).toBe('/api/files/1/preview');
+        expect(item.original).toBe('/api/files/1/downloaded');
+        expect(item.originalUrl).toBe('/api/files/1/downloaded');
+        expect(masonry.value.restore).toHaveBeenCalledWith(item);
+    });
 });
