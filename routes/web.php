@@ -89,6 +89,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/files/{file}/preview', [\App\Http\Controllers\FilesController::class, 'incrementPreview'])->name('api.files.preview.increment');
     Route::post('/api/files/preview/batch', [\App\Http\Controllers\FilesController::class, 'batchIncrementPreview'])->name('api.files.preview.batch');
     Route::post('/api/files/preview/reset/batch', [\App\Http\Controllers\FilesController::class, 'batchResetPreview'])->name('api.files.preview.reset-batch');
+    Route::post('/api/files/blacklist/batch', [\App\Http\Controllers\FilesController::class, 'batchBlacklist'])->name('api.files.blacklist.batch');
     Route::post('/api/files/auto-dislike/batch', [\App\Http\Controllers\FilesController::class, 'batchPerformAutoDislike'])->name('api.files.auto-dislike.batch');
     Route::post('/api/files/{file}/seen', [\App\Http\Controllers\FilesController::class, 'incrementSeen'])->name('api.files.seen');
     Route::get('/api/browse', [\App\Http\Controllers\BrowseController::class, 'index'])->name('api.browse.index');

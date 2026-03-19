@@ -137,6 +137,39 @@ vi.mock('@/composables/useAutoDislikeQueue', () => ({
     }),
 }));
 
+vi.mock('@/components/ui/dropdown-menu', () => ({
+    DropdownMenu: {
+        name: 'DropdownMenu',
+        template: '<div class="dropdown-menu-mock"><slot></slot></div>',
+    },
+    DropdownMenuTrigger: {
+        name: 'DropdownMenuTrigger',
+        template: '<div class="dropdown-menu-trigger-mock"><slot></slot></div>',
+        props: ['asChild'],
+    },
+    DropdownMenuContent: {
+        name: 'DropdownMenuContent',
+        template: '<div class="dropdown-menu-content-mock"><slot></slot></div>',
+        props: ['align', 'class'],
+    },
+    DropdownMenuLabel: {
+        name: 'DropdownMenuLabel',
+        template: '<div class="dropdown-menu-label-mock"><slot></slot></div>',
+        props: ['class'],
+    },
+    DropdownMenuSeparator: {
+        name: 'DropdownMenuSeparator',
+        template: '<div class="dropdown-menu-separator-mock"></div>',
+        props: ['class'],
+    },
+    DropdownMenuItem: {
+        name: 'DropdownMenuItem',
+        template: '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'select\')"><slot></slot></button>',
+        props: ['disabled', 'class'],
+        emits: ['select'],
+    },
+}));
+
 beforeEach(() => {
     setupBrowseTestMocks(mocks);
     mockClearAutoDislikeCountdowns.mockClear();
@@ -205,7 +238,7 @@ describe('Browse - Reset Previewed', () => {
             return;
         }
 
-        await wrapper.get('[data-test="reset-previewed-button"]').trigger('click');
+        await wrapper.get('[data-test="loaded-items-reset-previewed"]').trigger('click');
         await flushPromises();
         await wrapper.vm.$nextTick();
 

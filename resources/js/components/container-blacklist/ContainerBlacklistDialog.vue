@@ -35,7 +35,7 @@ const emit = defineEmits<{
 
 const { blacklists, fetchBlacklists, deleteBlacklist, isContainerBlacklisted } = useContainerBlacklists();
 
-const actionType = ref<ContainerBlacklistActionType>('dislike');
+const actionType = ref<ContainerBlacklistActionType>('blacklist');
 const isSaving = ref(false);
 const isDeleting = ref(false);
 
@@ -48,7 +48,7 @@ const isOpen = computed({
 function resetState(): void {
     isSaving.value = false;
     isDeleting.value = false;
-    actionType.value = 'dislike';
+    actionType.value = 'blacklist';
 }
 
 // Expose method to initialize state (called by parent when opening)
@@ -117,7 +117,7 @@ async function handleWhitelist(): Promise<void> {
 
 function handleCancel(): void {
     isOpen.value = false;
-    actionType.value = 'dislike';
+    actionType.value = 'blacklist';
     isSaving.value = false;
 }
 </script>
@@ -224,13 +224,12 @@ function handleCancel(): void {
                     <Button variant="outline" @click="handleCancel" :disabled="isSaving || isDeleting">
                         Cancel
                     </Button>
-                    <Button @click="handleConfirm" :disabled="isSaving || isDeleting || !container">
+                    <Button variant="destructive" @click="handleConfirm" :disabled="isSaving || isDeleting || !container">
                         <Loader2 v-if="isSaving" :size="14" class="mr-2 animate-spin" />
-                        {{ isAlreadyBlacklisted ? 'Update Blacklist' : 'Confirm Blacklist' }}
+                        Confirm
                     </Button>
                 </div>
             </DialogFooter>
         </DialogContent>
     </Dialog>
 </template>
-

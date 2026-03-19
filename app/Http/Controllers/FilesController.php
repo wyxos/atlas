@@ -469,16 +469,16 @@ SVG;
         $request->validate([
             'file_ids' => 'required|array',
             'file_ids.*' => 'required|integer|exists:files,id',
+            'increments' => 'nullable|integer|min:1|max:50',
         ]);
 
         $fileIds = $request->input('file_ids');
-        $user = Auth::user();
-
+        $increments = (int) $request->input('increments', 1);
         // Load files and authorize
         $files = File::whereIn('id', $fileIds)->get();
 
         // Batch increment preview counts
-        File::whereIn('id', $fileIds)->increment('previewed_count');
+        File::whereIn('id', $fileIds)->increment('previewed_count', $increments);
         File::whereIn('id', $fileIds)->update(['previewed_at' => now()]);
 
         // Refresh files to get updated counts
@@ -520,6 +520,75 @@ SVG;
         return response()->json([
             'message' => 'Preview counts incremented.',
             'results' => $results,
+        ]);
+    }
+
+    /**
+     * Batch manually blacklist multiple files.
+     */
+    public function batchBlacklist(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $request->validate([
+            'file_ids' => 'required|array',
+            'file_ids.*' => 'required|integer|exists:files,id',
+        ]);
+
+        $fileIds = collect($request->input('file_ids'))
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->unique()
+            ->values()
+            ->all();
+        $files = File::query()
+            ->whereIn('id', $fileIds)
+            ->with(['metadata', 'reactions'])
+            ->get()
+            ->keyBy('id');
+        $eligibleIds = $files
+            ->filter(fn (File $file): bool => $file->blacklisted_at === null)
+            ->keys()
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->values()
+            ->all();
+
+        if ($eligibleIds === []) {
+            return response()->json([
+                'message' => 'No files were blacklisted.',
+                'results' => [],
+            ]);
+        }
+
+        app(MetricsService::class)->applyBlacklistAdd($eligibleIds, true);
+
+        $blacklistedAt = now();
+        File::query()
+            ->whereIn('id', $eligibleIds)
+            ->update([
+                'blacklisted_at' => $blacklistedAt,
+                'blacklist_reason' => 'Manual blacklist',
+            ]);
+
+        $user = Auth::user();
+        if ($user) {
+            app(TabFileService::class)->detachFilesFromUserTabs($user->id, $eligibleIds);
+        }
+
+        // blacklisted_at/blacklist_reason are Typesense-filterable; ensure the index stays in sync.
+        File::query()
+            ->whereIn('id', $eligibleIds)
+            ->with(['metadata', 'reactions'])
+            ->get()
+            ->searchable();
+
+        return response()->json([
+            'message' => 'Files blacklisted successfully.',
+            'results' => array_map(
+                static fn (int $fileId): array => [
+                    'id' => $fileId,
+                    'blacklisted_at' => $blacklistedAt->toIso8601String(),
+                    'blacklist_reason' => 'Manual blacklist',
+                ],
+                $eligibleIds
+            ),
         ]);
     }
 

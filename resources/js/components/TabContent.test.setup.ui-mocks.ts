@@ -78,8 +78,41 @@ vi.mock('./FileReactions.vue', () => ({
 vi.mock('./ui/button', () => ({
     Button: {
         name: 'Button',
-        template: '<button><slot></slot></button>',
+        template: '<button v-bind="$attrs" :disabled="disabled"><slot></slot></button>',
         props: ['variant', 'size', 'disabled', 'color', 'loading'],
+    },
+}));
+
+vi.mock('@/components/ui/dropdown-menu', () => ({
+    DropdownMenu: {
+        name: 'DropdownMenu',
+        template: '<div class="dropdown-menu-mock"><slot></slot></div>',
+    },
+    DropdownMenuTrigger: {
+        name: 'DropdownMenuTrigger',
+        template: '<div class="dropdown-menu-trigger-mock"><slot></slot></div>',
+        props: ['asChild'],
+    },
+    DropdownMenuContent: {
+        name: 'DropdownMenuContent',
+        template: '<div class="dropdown-menu-content-mock"><slot></slot></div>',
+        props: ['align', 'class'],
+    },
+    DropdownMenuLabel: {
+        name: 'DropdownMenuLabel',
+        template: '<div class="dropdown-menu-label-mock"><slot></slot></div>',
+        props: ['class'],
+    },
+    DropdownMenuSeparator: {
+        name: 'DropdownMenuSeparator',
+        template: '<div class="dropdown-menu-separator-mock"></div>',
+        props: ['class'],
+    },
+    DropdownMenuItem: {
+        name: 'DropdownMenuItem',
+        template: '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'select\')"><slot></slot></button>',
+        props: ['disabled', 'class'],
+        emits: ['select'],
     },
 }));
 

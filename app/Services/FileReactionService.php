@@ -57,17 +57,44 @@ class FileReactionService
         if ($existingReaction && $existingReaction->type === $type) {
             if ($type === 'dislike') {
                 $this->clearDownloadedAssetsForDislike($file, $deferHeavySideEffects);
+
+                return [
+                    'reaction' => ['type' => $existingReaction->type],
+                    'reacted_at' => $existingReaction->created_at?->toIso8601String(),
+                    'changed' => false,
+                ];
             }
 
-            // No-op: keep the existing reaction.
-            if ($type !== 'dislike' && $queueDownload) {
-                $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
+            $shouldNormalizePositiveState = in_array($type, ['love', 'like', 'funny'], true)
+                && ($file->auto_disliked || $file->blacklisted_at !== null);
+
+            if (! $shouldNormalizePositiveState) {
+                if ($queueDownload) {
+                    $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
+                }
+
+                return [
+                    'reaction' => ['type' => $existingReaction->type],
+                    'reacted_at' => $existingReaction->created_at?->toIso8601String(),
+                    'changed' => false,
+                ];
             }
+
+            $reaction = $this->applyReactionChange(
+                $file,
+                $user,
+                $existingReaction,
+                $type,
+                $deferHeavySideEffects,
+                $queueDownload,
+                $forceDownload,
+                $downloadRuntimeContext,
+            );
 
             return [
-                'reaction' => ['type' => $existingReaction->type],
-                'reacted_at' => $existingReaction->created_at?->toIso8601String(),
-                'changed' => false,
+                'reaction' => ['type' => $reaction->type],
+                'reacted_at' => $reaction->created_at?->toIso8601String(),
+                'changed' => true,
             ];
         }
 

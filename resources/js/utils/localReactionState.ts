@@ -148,6 +148,26 @@ export function applyOptimisticLocalReactionState(
     return snapshot;
 }
 
+export function applyExactLocalReactionState(
+    item: FeedItem,
+    reactionType: ReactionType,
+): void {
+    item.reaction = { type: reactionType };
+
+    if (reactionType === 'dislike') {
+        applyOptimisticDownloadedCleanup(item);
+
+        return;
+    }
+
+    item.auto_disliked = false;
+    item.auto_dislike_rule = null;
+    item.blacklisted_at = null;
+    item.blacklist_reason = null;
+    item.blacklist_type = null;
+    item.blacklist_rule = null;
+}
+
 export function restoreOptimisticLocalReactionState(
     item: FeedItem,
     snapshot: LocalReactionSnapshot,

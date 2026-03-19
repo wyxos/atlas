@@ -76,7 +76,7 @@ test('batch store removes existing reactions before creating new ones', function
     ]);
 });
 
-test('batch store toggles reaction off if same type is sent again', function () {
+test('batch store keeps same reaction when same type is sent again', function () {
     $file = File::factory()->create();
 
     // Create existing reaction
@@ -94,11 +94,37 @@ test('batch store toggles reaction off if same type is sent again', function () 
 
     $response->assertSuccessful();
 
-    // Verify reaction was removed (toggled off)
-    $this->assertDatabaseMissing('reactions', [
+    $this->assertDatabaseHas('reactions', [
         'file_id' => $file->id,
         'user_id' => $this->user->id,
+        'type' => 'like',
     ]);
+});
+
+test('batch store clears blacklist when the same positive reaction is re-applied', function () {
+    $file = File::factory()->create([
+        'blacklisted_at' => now()->subMinute(),
+        'blacklist_reason' => 'Manual blacklist',
+    ]);
+
+    Reaction::create([
+        'file_id' => $file->id,
+        'user_id' => $this->user->id,
+        'type' => 'love',
+    ]);
+
+    $response = $this->postJson('/api/files/reactions/batch/store', [
+        'reactions' => [
+            ['file_id' => $file->id, 'type' => 'love'],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+
+    $file->refresh();
+
+    expect($file->blacklisted_at)->toBeNull()
+        ->and($file->blacklist_reason)->toBeNull();
 });
 
 test('batch store removes auto_disliked flag for positive reactions', function () {
