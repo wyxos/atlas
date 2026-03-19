@@ -95,6 +95,36 @@ test('blacklists files for blacklist action type', function () {
     });
 });
 
+test('skips auto-blacklisting files from blacklisted containers when any reaction already exists', function () {
+    Bus::fake();
+
+    $reactionUser = User::factory()->create();
+    $container = Container::factory()->create([
+        'blacklisted_at' => now(),
+        'action_type' => 'blacklist',
+    ]);
+    $file = File::factory()->create([
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/reacted-container.jpg',
+    ]);
+    $file->containers()->attach($container->id);
+
+    Reaction::create([
+        'file_id' => $file->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'dislike',
+    ]);
+
+    $result = $this->service->moderate(collect([$file]));
+
+    expect($result['flaggedIds'])->toBeEmpty();
+    expect($result['processedIds'])->toBeEmpty();
+    expect($file->fresh()->blacklisted_at)->toBeNull();
+
+    Bus::assertNothingDispatched();
+});
+
 test('skips files already auto-disliked', function () {
     $container = Container::factory()->create([
         'blacklisted_at' => now(),

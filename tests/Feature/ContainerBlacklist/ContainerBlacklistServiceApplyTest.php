@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
-it('skips positively reacted files when applying a container blacklist', function () {
+it('skips reacted files when applying a container blacklist', function () {
     Queue::fake();
     Config::set('scout.driver', 'collection');
     Config::set('scout.queue', null);
@@ -80,19 +80,19 @@ it('skips positively reacted files when applying a container blacklist', functio
     $appliedIds = app(ContainerBlacklistService::class)->apply($container->fresh());
     sort($appliedIds);
 
-    expect($appliedIds)->toBe([(int) $dislikedFile->id, (int) $neutralFile->id]);
+    expect($appliedIds)->toBe([(int) $neutralFile->id]);
     expect($likedFile->fresh()->blacklisted_at)->toBeNull();
     expect($lovedFile->fresh()->blacklisted_at)->toBeNull();
     expect($funnyFile->fresh()->blacklisted_at)->toBeNull();
-    expect($dislikedFile->fresh()->blacklisted_at)->not->toBeNull();
+    expect($dislikedFile->fresh()->blacklisted_at)->toBeNull();
     expect($neutralFile->fresh()->blacklisted_at)->not->toBeNull();
 
-    Queue::assertPushed(DeleteAutoDislikedFileJob::class, 2);
-    Queue::assertPushed(DeleteAutoDislikedFileJob::class, fn (DeleteAutoDislikedFileJob $job) => $job->filePath === 'downloads/disliked-file.jpg');
+    Queue::assertPushed(DeleteAutoDislikedFileJob::class, 1);
     Queue::assertPushed(DeleteAutoDislikedFileJob::class, fn (DeleteAutoDislikedFileJob $job) => $job->filePath === 'downloads/neutral-file.jpg');
     Queue::assertNotPushed(DeleteAutoDislikedFileJob::class, fn (DeleteAutoDislikedFileJob $job) => in_array($job->filePath, [
         'downloads/liked-file.jpg',
         'downloads/loved-file.jpg',
         'downloads/funny-file.jpg',
+        'downloads/disliked-file.jpg',
     ], true));
 });

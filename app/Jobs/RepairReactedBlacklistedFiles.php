@@ -18,8 +18,6 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    private const array POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
-
     public function __construct(
         public int $afterId = 0,
         public int $chunk = 100,
@@ -94,11 +92,14 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
             ->select(['id', 'source', 'source_id', 'url', 'listing_metadata'])
             ->where('id', '>', $this->afterId)
             ->whereNotNull('blacklisted_at')
+            ->where(function ($query) {
+                $query->whereNull('blacklist_reason')
+                    ->orWhere('blacklist_reason', '');
+            })
             ->whereExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('reactions')
-                    ->whereColumn('reactions.file_id', 'files.id')
-                    ->whereIn('reactions.type', self::POSITIVE_REACTION_TYPES);
+                    ->whereColumn('reactions.file_id', 'files.id');
             })
             ->orderBy('id')
             ->limit($limit)

@@ -27,7 +27,7 @@ test('repair reacted blacklisted files dry-run does not mutate files or dispatch
             'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/13f5163c-a27e-4d39-95ec-bd2af736a08b/width=1032/13f5163c-a27e-4d39-95ec-bd2af736a08b.jpeg',
         ],
         'blacklisted_at' => now(),
-        'blacklist_reason' => 'dry-run',
+        'blacklist_reason' => null,
     ]);
 
     Reaction::query()->create([
@@ -50,7 +50,7 @@ test('repair reacted blacklisted files dry-run does not mutate files or dispatch
     $file->refresh();
 
     expect($file->blacklisted_at)->not->toBeNull()
-        ->and($file->blacklist_reason)->toBe('dry-run')
+        ->and($file->blacklist_reason)->toBeNull()
         ->and($file->url)->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/13f5163c-a27e-4d39-95ec-bd2af736a08b/width=1032/13f5163c-a27e-4d39-95ec-bd2af736a08b.jpeg')
         ->and(data_get($file->listing_metadata, 'url'))->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/13f5163c-a27e-4d39-95ec-bd2af736a08b/width=1032/13f5163c-a27e-4d39-95ec-bd2af736a08b.jpeg');
 
@@ -67,7 +67,7 @@ test('repair reacted blacklisted files prefers the live civitai url, clears blac
             'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/13f5163c-a27e-4d39-95ec-bd2af736a08b/width=1032/13f5163c-a27e-4d39-95ec-bd2af736a08b.jpeg',
         ],
         'blacklisted_at' => now(),
-        'blacklist_reason' => 'live-api',
+        'blacklist_reason' => null,
     ]);
 
     Reaction::query()->create([
@@ -111,7 +111,7 @@ test('repair reacted blacklisted files falls back to the helper when the live ap
             'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/13f5163c-a27e-4d39-95ec-bd2af736a08b/width=1032/13f5163c-a27e-4d39-95ec-bd2af736a08b.jpeg',
         ],
         'blacklisted_at' => now(),
-        'blacklist_reason' => 'fallback',
+        'blacklist_reason' => null,
     ]);
 
     Reaction::query()->create([
@@ -147,13 +147,13 @@ test('repair reacted blacklisted files falls back to the helper when the live ap
     Bus::assertNotDispatched(DownloadFile::class);
 });
 
-test('repair reacted blacklisted files ignores dislike-only rows', function () {
+test('repair reacted blacklisted files repairs auto-blacklisted dislike-reacted rows', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
         'source' => 'CivitAI',
         'source_id' => '92632989',
         'blacklisted_at' => now(),
-        'blacklist_reason' => 'dislike-only',
+        'blacklist_reason' => null,
     ]);
 
     Reaction::query()->create([
@@ -169,8 +169,36 @@ test('repair reacted blacklisted files ignores dislike-only rows', function () {
 
     $file->refresh();
 
+    expect($file->blacklisted_at)->toBeNull()
+        ->and($file->blacklist_reason)->toBeNull();
+
+    Bus::assertDispatched(DownloadFile::class, fn (DownloadFile $downloadJob): bool => $downloadJob->fileId === $file->id);
+});
+
+test('repair reacted blacklisted files ignores manually blacklisted reacted rows', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'source_id' => '92632989',
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'manual review',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+
+    Http::fake();
+
+    $job = new RepairReactedBlacklistedFiles(afterId: 0, chunk: 20, queueName: 'processing', remaining: 0, dryRun: false);
+    app()->call([$job, 'handle']);
+
+    $file->refresh();
+
     expect($file->blacklisted_at)->not->toBeNull()
-        ->and($file->blacklist_reason)->toBe('dislike-only');
+        ->and($file->blacklist_reason)->toBe('manual review');
 
     Bus::assertNotDispatched(DownloadFile::class);
 });
@@ -295,7 +323,7 @@ test('repair reacted blacklisted files still clears blacklist when the canonical
         'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg',
         'listing_metadata' => ['url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2/width=832/d65e7aed-6cce-4afa-8f0c-fbd11cf527e2.jpeg'],
         'blacklisted_at' => now(),
-        'blacklist_reason' => 'collision',
+        'blacklist_reason' => null,
     ]);
 
     Reaction::query()->create([
