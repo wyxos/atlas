@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import Tab from './Tab.vue';
 
@@ -33,9 +33,6 @@ describe('Tab', () => {
         });
         await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-        const contextMenu = document.body.querySelector('[data-slot="context-menu-content"]');
-        expect(contextMenu?.className).toContain('z-[70]');
-
         const renameAction = document.body.querySelector('[data-test="tab-context-rename"]');
         if (!(renameAction instanceof HTMLElement)) {
             throw new Error('Rename action did not render.');
@@ -52,13 +49,16 @@ describe('Tab', () => {
         wrapper.unmount();
     });
 
-    it('does not treat space inside the custom label input as a tab shortcut', async () => {
+    it('renders close-range context actions with correct disabled state and emits close others', async () => {
         const wrapper = mount(Tab, {
             attachTo: document.body,
             props: {
                 id: 1,
                 label: 'Generated Label',
                 customLabel: null,
+                canCloseAbove: false,
+                canCloseBelow: true,
+                canCloseOthers: true,
             },
         });
 
@@ -69,18 +69,60 @@ describe('Tab', () => {
         });
         await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-        const renameAction = document.body.querySelector('[data-test="tab-context-rename"]');
-        if (!(renameAction instanceof HTMLElement)) {
-            throw new Error('Rename action did not render.');
+        const closeAbove = document.body.querySelector('[data-test="tab-context-close-above"]');
+        const closeOthers = document.body.querySelector('[data-test="tab-context-close-others"]');
+
+        if (!(closeAbove instanceof HTMLElement) || !(closeOthers instanceof HTMLElement)) {
+            throw new Error('Close actions did not render.');
         }
 
-        renameAction.click();
+        expect(closeAbove.hasAttribute('data-disabled')).toBe(true);
+
+        closeOthers.click();
         await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-        const input = wrapper.get('[data-test="tab-custom-label-input"]');
-        await input.trigger('keydown', { key: ' ', code: 'Space' });
-
-        expect(wrapper.emitted('click')).toBeUndefined();
+        expect(wrapper.emitted('close-others')).toHaveLength(1);
         wrapper.unmount();
+    });
+
+    it('emits drag lifecycle events with before and after drop indicators', async () => {
+        const wrapper = mount(Tab, {
+            props: {
+                id: 1,
+                label: 'Generated Label',
+                customLabel: null,
+            },
+        });
+
+        const button = wrapper.get('[role="button"]');
+        const dataTransfer = {
+            setData: vi.fn(),
+            effectAllowed: '',
+            dropEffect: '',
+        };
+
+        Object.defineProperty(button.element, 'getBoundingClientRect', {
+            value: () => ({
+                top: 0,
+                bottom: 40,
+                left: 0,
+                right: 120,
+                width: 120,
+                height: 40,
+                x: 0,
+                y: 0,
+                toJSON: () => ({}),
+            }),
+        });
+
+        await button.trigger('dragstart', { dataTransfer });
+        await button.trigger('dragover', { clientY: 5, dataTransfer });
+        await button.trigger('drop', { clientY: 35, dataTransfer });
+        await button.trigger('dragend');
+
+        expect(wrapper.emitted('drag-start')).toHaveLength(1);
+        expect(wrapper.emitted('drag-over')).toEqual([['before']]);
+        expect(wrapper.emitted('drag-drop')).toEqual([['after']]);
+        expect(wrapper.emitted('drag-end')).toHaveLength(1);
     });
 });

@@ -1,6 +1,15 @@
 import { ref } from 'vue';
-import { index as tabsIndex, store as tabsStore, update as tabsUpdate, destroy as tabsDestroy, show as tabsShow, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
-
+import { useToast } from 'vue-toastification';
+import StatusToast from '@/components/toasts/StatusToast.vue';
+import {
+    destroyBatch as tabsDestroyBatch,
+    index as tabsIndex,
+    reorder as tabsReorder,
+    setActive as tabsSetActive,
+    show as tabsShow,
+    store as tabsStore,
+    update as tabsUpdate,
+} from '@/actions/App/Http/Controllers/TabController';
 
 export type FeedItem = {
     id: number; // Database file ID
@@ -37,10 +46,11 @@ export type TabData = {
     id: number;
     label: string;
     customLabel?: string | null;
-    params: Record<string, string | number | boolean | null | Array<unknown>>; // Contains 'page' and 'next' keys (service handles format)
+    params: Record<string, string | number | boolean | null | Array<unknown>>;
     position: number;
     isActive: boolean;
-    feed?: 'online' | 'local'; // Defaults to 'online' if not set
+    feed?: 'online' | 'local';
+    updatedAt: string | null;
 };
 
 export type OnTabSwitchCallback = (tabId: number) => Promise<void> | void;
@@ -52,42 +62,248 @@ type CreateTabOptions = {
     activate?: boolean;
 };
 
+type CloseTabsOptions = {
+    preferredTabId?: number | null;
+};
+
+type ApiTabData = {
+    id: number;
+    label: string;
+    custom_label?: string | null;
+    params?: Record<string, string | number | boolean | null | Array<unknown>>;
+    position?: number;
+    is_active?: boolean;
+    updated_at?: string | null;
+};
+
+type TabsSnapshot = {
+    tabs: TabData[];
+    activeTabId: number | null;
+    recentTabIds: number[];
+};
+
 export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
+    const toast = useToast();
     const tabs = ref<TabData[]>([]);
     const activeTabId = ref<number | null>(null);
     const isLoadingTabs = ref(false);
     const saveTabDebounceTimer = ref<number | null>(null);
+    const recentTabIds = ref<number[]>([]);
+
+    function cloneParams(params: TabData['params']): TabData['params'] {
+        return Object.fromEntries(
+            Object.entries(params).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+        ) as TabData['params'];
+    }
+
+    function cloneTab(tab: TabData): TabData {
+        return {
+            ...tab,
+            params: cloneParams(tab.params),
+        };
+    }
+
+    function getUpdatedAtTimestamp(updatedAt: string | null | undefined): number {
+        if (!updatedAt) {
+            return 0;
+        }
+
+        const timestamp = Date.parse(updatedAt);
+
+        return Number.isNaN(timestamp) ? 0 : timestamp;
+    }
+
+    function sortTabsByPosition(): void {
+        tabs.value.sort((left, right) => left.position - right.position);
+    }
+
+    function syncActiveState(tabId: number | null): void {
+        activeTabId.value = tabId;
+        tabs.value.forEach(tab => {
+            tab.isActive = tabId !== null && tab.id === tabId;
+        });
+    }
+
+    function pruneRecentTabIds(): void {
+        const currentIds = new Set(tabs.value.map(tab => tab.id));
+        recentTabIds.value = recentTabIds.value.filter(id => currentIds.has(id));
+    }
+
+    function recordTabFocus(tabId: number): void {
+        if (!tabs.value.some(tab => tab.id === tabId)) {
+            return;
+        }
+
+        recentTabIds.value = recentTabIds.value.filter(id => id !== tabId);
+        recentTabIds.value.push(tabId);
+    }
+
+    function seedRecentTabIds(): void {
+        recentTabIds.value = [...tabs.value]
+            .sort((left, right) => {
+                const timestampDiff = getUpdatedAtTimestamp(left.updatedAt) - getUpdatedAtTimestamp(right.updatedAt);
+                if (timestampDiff !== 0) {
+                    return timestampDiff;
+                }
+
+                return left.position - right.position;
+            })
+            .map(tab => tab.id);
+
+        if (activeTabId.value !== null) {
+            recordTabFocus(activeTabId.value);
+        }
+    }
+
+    function showTabsError(title: string, description: string): void {
+        const toastId = `tabs-${Date.now()}`;
+
+        toast(
+            {
+                component: StatusToast,
+                props: {
+                    toastId,
+                    variant: 'error',
+                    title,
+                    description,
+                },
+            },
+            {
+                id: toastId,
+                closeButton: false,
+                closeOnClick: false,
+            },
+        );
+    }
+
+    function createSnapshot(): TabsSnapshot {
+        return {
+            tabs: tabs.value.map(cloneTab),
+            activeTabId: activeTabId.value,
+            recentTabIds: [...recentTabIds.value],
+        };
+    }
+
+    function restoreSnapshot(snapshot: TabsSnapshot): void {
+        tabs.value = snapshot.tabs.map(cloneTab);
+        activeTabId.value = snapshot.activeTabId;
+        recentTabIds.value = [...snapshot.recentTabIds];
+    }
+
+    function mapTabData(tab: ApiTabData): TabData {
+        const params = tab.params || {};
+
+        return {
+            id: tab.id,
+            label: tab.label,
+            customLabel: tab.custom_label ?? null,
+            params,
+            position: tab.position ?? 0,
+            isActive: tab.is_active ?? false,
+            feed: (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local',
+            updatedAt: tab.updated_at ?? null,
+        };
+    }
+
+    function hasTabPayload(tabData: ApiTabData | null | undefined): tabData is ApiTabData {
+        return typeof tabData?.id === 'number' && typeof tabData.label === 'string';
+    }
+
+    function updateTabFromApi(tabId: number, tabData: ApiTabData | null | undefined): void {
+        if (!hasTabPayload(tabData)) {
+            return;
+        }
+
+        const tabIndex = tabs.value.findIndex(tab => tab.id === tabId);
+        if (tabIndex === -1) {
+            return;
+        }
+
+        const mappedTab = mapTabData(tabData);
+        const currentTab = tabs.value[tabIndex];
+        tabs.value[tabIndex] = {
+            ...currentTab,
+            ...mappedTab,
+            params: cloneParams(mappedTab.params),
+        };
+        sortTabsByPosition();
+    }
+
+    function resolveAdjacentTabId(closingIds: Set<number>, survivingTabs: TabData[]): number | null {
+        if (activeTabId.value !== null) {
+            const currentActiveIndex = tabs.value.findIndex(tab => tab.id === activeTabId.value);
+
+            if (currentActiveIndex !== -1) {
+                for (let index = currentActiveIndex + 1; index < tabs.value.length; index += 1) {
+                    const candidate = tabs.value[index];
+                    if (!closingIds.has(candidate.id)) {
+                        return candidate.id;
+                    }
+                }
+
+                for (let index = currentActiveIndex - 1; index >= 0; index -= 1) {
+                    const candidate = tabs.value[index];
+                    if (!closingIds.has(candidate.id)) {
+                        return candidate.id;
+                    }
+                }
+            }
+        }
+
+        return survivingTabs[0]?.id ?? null;
+    }
+
+    function resolveNextActiveTab(closingIds: number[], preferredTabId: number | null = null): number | null {
+        const closingIdSet = new Set(closingIds);
+        const survivingTabs = tabs.value.filter(tab => !closingIdSet.has(tab.id));
+
+        if (survivingTabs.length === 0) {
+            return null;
+        }
+
+        if (activeTabId.value !== null && !closingIdSet.has(activeTabId.value)) {
+            return activeTabId.value;
+        }
+
+        if (preferredTabId !== null && survivingTabs.some(tab => tab.id === preferredTabId)) {
+            return preferredTabId;
+        }
+
+        for (let index = recentTabIds.value.length - 1; index >= 0; index -= 1) {
+            const recentTabId = recentTabIds.value[index];
+            if (!closingIdSet.has(recentTabId) && survivingTabs.some(tab => tab.id === recentTabId)) {
+                return recentTabId;
+            }
+        }
+
+        return resolveAdjacentTabId(closingIdSet, survivingTabs);
+    }
+
+    function applyOrderedIds(orderedIds: number[]): void {
+        const tabMap = new Map(tabs.value.map(tab => [tab.id, cloneTab(tab)]));
+        tabs.value = orderedIds.map((tabId, index) => {
+            const tab = tabMap.get(tabId);
+            if (!tab) {
+                throw new Error(`Missing tab ${tabId} during reorder.`);
+            }
+
+            return {
+                ...tab,
+                position: index,
+            };
+        });
+    }
 
     async function loadTabs(): Promise<void> {
         isLoadingTabs.value = true;
         try {
             const { data } = await window.axios.get(tabsIndex.url());
-            tabs.value = data.map((tab: {
-                id: number;
-                label: string;
-                custom_label?: string | null;
-                params?: Record<string, string | number | boolean | null | Array<unknown>>;
-                items?: FeedItem[]; // Not included in initial load, loaded lazily when restoring a tab
-                position?: number;
-                is_active?: boolean;
-            }) => {
-                const params = tab.params || {};
-                return {
-                    id: tab.id,
-                    label: tab.label,
-                    customLabel: tab.custom_label ?? null,
-                    params: params,
-                    position: tab.position || 0,
-                    isActive: tab.is_active ?? false,
-                    feed: (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local',
-                };
-            });
-
-            // Sort by position
-            tabs.value.sort((a, b) => a.position - b.position);
+            tabs.value = data.map((tab: ApiTabData) => mapTabData(tab));
+            sortTabsByPosition();
+            syncActiveState(tabs.value.find(tab => tab.isActive)?.id ?? null);
+            seedRecentTabIds();
         } catch (error) {
             console.error('Failed to load tabs:', error);
-            // Re-throw to allow caller to handle
             throw error;
         } finally {
             isLoadingTabs.value = false;
@@ -97,24 +313,24 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     async function createTab(options: CreateTabOptions = {}): Promise<TabData> {
         const { label, customLabel, params, activate = true } = options;
         const maxPosition = tabs.value.length > 0
-            ? Math.max(...tabs.value.map(t => t.position))
+            ? Math.max(...tabs.value.map(tab => tab.position))
             : -1;
 
         const normalizedParams = params
             ? Object.fromEntries(
-                Object.entries(params).filter(([, value]) => value !== undefined)
+                Object.entries(params).filter(([, value]) => value !== undefined),
             ) as Record<string, string | number | boolean | null | Array<unknown>>
             : undefined;
 
         const newTab: TabData = {
-            id: 0, // Temporary ID, will be set from response
+            id: 0,
             label: label ?? `Browse ${tabs.value.length + 1}`,
             customLabel: customLabel ?? null,
-            params: normalizedParams ?? {
-                // Don't set page or service - user must select service first
-            },
+            params: normalizedParams ?? {},
             position: maxPosition + 1,
             isActive: false,
+            feed: normalizedParams?.feed === 'local' ? 'local' : 'online',
+            updatedAt: null,
         };
 
         try {
@@ -125,26 +341,27 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 position: newTab.position,
             });
 
-            newTab.id = data.id;
-            newTab.isActive = data.is_active ?? false;
-            newTab.customLabel = data.custom_label ?? null;
-            const params = data.params || {};
-            newTab.params = params;
-            newTab.feed = (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local';
-            tabs.value.push(newTab);
+            const createdTab = mapTabData(data);
+            tabs.value.push(createdTab);
+            sortTabsByPosition();
+
             if (activate) {
-                activeTabId.value = newTab.id;
+                const previousActiveTabId = activeTabId.value;
 
-                // Set this tab as active
-                await setActiveTab(newTab.id);
-
-                // Call callback if provided to handle UI switching
-                if (onTabSwitch) {
-                    await onTabSwitch(newTab.id);
+                try {
+                    if (onTabSwitch) {
+                        await onTabSwitch(createdTab.id);
+                    } else {
+                        syncActiveState(createdTab.id);
+                        await setActiveTab(createdTab.id);
+                    }
+                } catch (error) {
+                    syncActiveState(previousActiveTabId);
+                    throw error;
                 }
             }
 
-            return newTab;
+            return tabs.value.find(tab => tab.id === createdTab.id) ?? createdTab;
         } catch (error) {
             console.error('Failed to create tab:', error);
             throw error;
@@ -152,32 +369,44 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     }
 
     async function closeTab(tabId: number): Promise<void> {
+        await closeTabs([tabId]);
+    }
+
+    async function closeTabs(tabIds: number[], options: CloseTabsOptions = {}): Promise<number[]> {
+        const ids = [...new Set(tabIds)].filter(tabId => tabs.value.some(tab => tab.id === tabId));
+        if (ids.length === 0) {
+            return [];
+        }
+
+        const snapshot = createSnapshot();
+        const nextActiveTabId = resolveNextActiveTab(ids, options.preferredTabId ?? null);
+        const requestNextActiveTabId = activeTabId.value !== null && !ids.includes(activeTabId.value)
+            ? null
+            : nextActiveTabId;
+
+        tabs.value = tabs.value
+            .filter(tab => !ids.includes(tab.id))
+            .map(cloneTab);
+        pruneRecentTabIds();
+        syncActiveState(nextActiveTabId);
+
         try {
-            await window.axios.delete(tabsDestroy.url(tabId));
+            const { data } = await window.axios.post(tabsDestroyBatch.url(), {
+                ids,
+                next_active_id: requestNextActiveTabId,
+            });
 
-            const index = tabs.value.findIndex(t => t.id === tabId);
-            if (index !== -1) {
-                tabs.value.splice(index, 1);
+            syncActiveState(typeof data.active_tab_id === 'number' ? data.active_tab_id : null);
+
+            if (tabs.value.length === 0) {
+                await createTab();
             }
 
-            // Handle tab switching after close
-            const wasActiveTab = activeTabId.value === tabId;
-            if (wasActiveTab) {
-                if (tabs.value.length > 0) {
-                    // Switch to first remaining tab and set it as active
-                    const nextTab = tabs.value[0];
-                    activeTabId.value = nextTab.id;
-                    await setActiveTab(nextTab.id);
-                    if (onTabSwitch) {
-                        await onTabSwitch(nextTab.id);
-                    }
-                } else {
-                    // No tabs left, create a new one (which will be set as active automatically)
-                    await createTab();
-                }
-            }
+            return ids;
         } catch (error) {
-            console.error('Failed to close tab:', error);
+            restoreSnapshot(snapshot);
+            showTabsError('Failed to close tabs.', 'Your tab layout was restored.');
+            console.error('Failed to close tabs:', error);
             throw error;
         }
     }
@@ -186,36 +415,27 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         if (!activeTabId.value) {
             return undefined;
         }
-        return tabs.value.find(t => t.id === activeTabId.value);
+
+        return tabs.value.find(tab => tab.id === activeTabId.value);
     }
 
-    function updateActiveTab(
-        items: FeedItem[]
-    ): void {
+    function updateActiveTab(items: FeedItem[]): void {
         const activeTab = getActiveTab();
         if (!activeTab) {
             return;
         }
 
-        // Note: items are managed in component state, not in tab
-        // Tab persistence is handled by backend based on params
-        // If we just loaded the first page of items, persist immediately so a quick refresh
-        // still restores the tab content (debounced persistence can be canceled by reload).
         if (items.length > 0) {
             void saveTab(activeTab);
             return;
         }
-        // Note: params are updated by the backend (Browser.php) when browse requests are made.
+
         saveTabDebounced(activeTab);
     }
 
     function updateTabLabel(tabId: number, label: string): void {
-        const tab = tabs.value.find(t => t.id === tabId);
-        if (!tab) {
-            return;
-        }
-
-        if (tab.label === label) {
+        const tab = tabs.value.find(currentTab => currentTab.id === tabId);
+        if (!tab || tab.label === label) {
             return;
         }
 
@@ -224,17 +444,38 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     }
 
     function updateTabCustomLabel(tabId: number, customLabel: string | null): void {
-        const tab = tabs.value.find(t => t.id === tabId);
-        if (!tab) {
-            return;
-        }
-
-        if ((tab.customLabel ?? null) === customLabel) {
+        const tab = tabs.value.find(currentTab => currentTab.id === tabId);
+        if (!tab || (tab.customLabel ?? null) === customLabel) {
             return;
         }
 
         tab.customLabel = customLabel;
         void saveTab(tab);
+    }
+
+    async function reorderTabs(orderedIds: number[]): Promise<void> {
+        const currentIds = tabs.value.map(tab => tab.id);
+        if (orderedIds.length !== currentIds.length) {
+            return;
+        }
+
+        if (orderedIds.every((tabId, index) => tabId === currentIds[index])) {
+            return;
+        }
+
+        const snapshot = createSnapshot();
+
+        try {
+            applyOrderedIds(orderedIds);
+            await window.axios.post(tabsReorder.url(), {
+                ordered_ids: orderedIds,
+            });
+        } catch (error) {
+            restoreSnapshot(snapshot);
+            showTabsError('Failed to reorder tabs.', 'Your tab order was restored.');
+            console.error('Failed to reorder tabs:', error);
+            throw error;
+        }
     }
 
     function saveTabDebounced(tab: TabData): void {
@@ -243,37 +484,28 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
 
         saveTabDebounceTimer.value = window.setTimeout(() => {
-            saveTab(tab);
-        }, 500); // Debounce for 500ms
+            void saveTab(tab);
+        }, 500);
     }
 
     async function saveTab(tab: TabData): Promise<void> {
         try {
-            // Save UI-managed fields (label, position).
-            // params are managed by the backend (Browser.php) and should not be updated from frontend.
-            // The backend updates params when browse requests are made with tab_id.
-            // Files are managed via the tab_file relationship, not through file_ids.
-            await window.axios.put(tabsUpdate.url(tab.id), {
+            const response = await window.axios.put<ApiTabData | undefined>(tabsUpdate.url(tab.id), {
                 label: tab.label,
                 custom_label: tab.customLabel ?? null,
                 position: tab.position,
-                // Do not send params - backend manages them.
             });
+            updateTabFromApi(tab.id, response?.data);
         } catch (error) {
             console.error('Failed to save tab:', error);
             throw error;
         }
     }
 
-    /**
-     * Load items for a specific tab.
-     * This is called lazily when restoring a tab to avoid loading items for all tabs.
-     */
     async function loadTabItems(tabId: number): Promise<FeedItem[]> {
         try {
             const { data } = await window.axios.get(tabsShow.url(tabId));
 
-            // Return items from API response (backend returns items under tab)
             return data.tab?.items || [];
         } catch (error) {
             console.error('Failed to load tab items:', error);
@@ -281,18 +513,12 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
-    /**
-     * Set a tab as active.
-     * This will update the backend and sync the frontend state.
-     */
     async function setActiveTab(tabId: number): Promise<void> {
         try {
-            await window.axios.patch(tabsSetActive.url(tabId));
-
-            // Update local state: deactivate all tabs, then activate the specified one
-            tabs.value.forEach(tab => {
-                tab.isActive = tab.id === tabId;
-            });
+            const response = await window.axios.patch<ApiTabData | undefined>(tabsSetActive.url(tabId));
+            updateTabFromApi(tabId, response?.data);
+            syncActiveState(tabId);
+            recordTabFocus(tabId);
         } catch (error) {
             console.error('Failed to set active tab:', error);
             throw error;
@@ -306,11 +532,13 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         loadTabs,
         createTab,
         closeTab,
+        closeTabs,
         getActiveTab,
         updateActiveTab,
         updateTabLabel,
         updateTabCustomLabel,
         loadTabItems,
+        reorderTabs,
         setActiveTab,
     };
 }

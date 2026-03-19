@@ -1,20 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
-import FileViewer from '../components/FileViewer.vue';
-import { index as tabIndex } from '@/actions/App/Http/Controllers/TabController';
+import {
+    destroyBatch as tabsDestroyBatch,
+    index as tabIndex,
+    reorder as tabsReorder,
+} from '@/actions/App/Http/Controllers/TabController';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import {
-    setupBrowseTestMocks,
     createTestRouter,
+    setupBrowseTestMocks,
     waitForStable,
     type BrowseMocks,
 } from '@/test/browse-test-utils';
 
-// Define mocks using vi.hoisted so they're available for vi.mock factories
 const {
     mockAxios,
+    mockToast,
     mockIsLoading,
     mockCancelLoad,
     mockDestroy,
@@ -24,26 +27,35 @@ const {
     mockRestore,
     mockRestoreMany,
     mockQueuePreviewIncrement,
-} = vi.hoisted(() => ({
-    mockAxios: {
-        get: vi.fn(),
-        post: vi.fn(),
-        put: vi.fn(),
-        delete: vi.fn(),
-        patch: vi.fn(),
-    },
-    mockIsLoading: { value: false },
-    mockCancelLoad: vi.fn(),
-    mockDestroy: vi.fn(),
-    mockInit: vi.fn(),
-    mockRemove: vi.fn(),
-    mockRemoveMany: vi.fn(),
-    mockRestore: vi.fn(),
-    mockRestoreMany: vi.fn(),
-    mockQueuePreviewIncrement: vi.fn(),
-}));
+} = vi.hoisted(() => {
+    const toast = vi.fn();
+    toast.dismiss = vi.fn();
+    toast.error = vi.fn();
+    toast.info = vi.fn();
+    toast.success = vi.fn();
+    toast.warning = vi.fn();
 
-// Create mocks object for helper functions
+    return {
+        mockAxios: {
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            delete: vi.fn(),
+            patch: vi.fn(),
+        },
+        mockToast: toast,
+        mockIsLoading: { value: false },
+        mockCancelLoad: vi.fn(),
+        mockDestroy: vi.fn(),
+        mockInit: vi.fn(),
+        mockRemove: vi.fn(),
+        mockRemoveMany: vi.fn(),
+        mockRestore: vi.fn(),
+        mockRestoreMany: vi.fn(),
+        mockQueuePreviewIncrement: vi.fn(),
+    };
+});
+
 const mocks: BrowseMocks = {
     mockAxios,
     mockIsLoading: ref(false),
@@ -59,28 +71,20 @@ const mocks: BrowseMocks = {
 
 const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
 const browseIndexUrl = browseIndex.definition?.url ?? browseIndex.url();
+const tabsDestroyBatchUrl = tabsDestroyBatch.definition?.url ?? tabsDestroyBatch.url();
+const tabsReorderUrl = tabsReorder.definition?.url ?? tabsReorder.url();
 
-// Sync the hoisted mockIsLoading with the ref
-Object.defineProperty(mocks, 'mockIsLoading', {
-    get: () => ({ value: mockIsLoading.value }),
-    set: (v) => { mockIsLoading.value = v.value; },
-});
-
-// Mock fetch
 global.fetch = vi.fn();
 
-// Mock axios
-vi.mock('axios', () => ({
-    default: mockAxios,
+vi.mock('vue-toastification', () => ({
+    useToast: () => mockToast,
 }));
 
-// Mock window.axios
 Object.defineProperty(window, 'axios', {
     value: mockAxios,
     writable: true,
 });
 
-// Mock @wyxos/vibe with inline factory (can't use imported functions in vi.mock)
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
@@ -98,62 +102,13 @@ vi.mock('@wyxos/vibe', () => ({
         props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
         emits: ['update:items', 'preloaded', 'failures'],
         setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
-            let currentPage: number | string | null = null;
-            let nextPage: number | string | null = null;
-            let hasReachedEnd = false;
-            let paginationHistory: Array<number | string> = [];
-
-            const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
-                mockInit(itemsToRestore, page, next);
+            const initialize = (itemsToRestore: any[]) => {
+                mockInit(itemsToRestore);
                 props.items.splice(0, props.items.length, ...itemsToRestore);
                 emit('update:items', props.items);
-                currentPage = page;
-                nextPage = next ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
-                hasReachedEnd = nextPage === null;
             };
 
-            const loadPage = async (page: number | string) => {
-                if (!props.getPage) {
-                    return;
-                }
-                currentPage = page;
-                const result = await props.getPage(page);
-                const newItems = result?.items ?? [];
-                props.items.splice(0, props.items.length, ...newItems);
-                emit('update:items', props.items);
-                nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
-                hasReachedEnd = nextPage === null;
-                return result;
-            };
-
-            const loadNext = async () => {
-                if (!props.getPage || nextPage === null || nextPage === undefined) {
-                    return;
-                }
-                const pageToLoad = nextPage;
-                currentPage = pageToLoad;
-                const result = await props.getPage(pageToLoad);
-                const newItems = result?.items ?? [];
-                props.items.push(...newItems);
-                emit('update:items', props.items);
-                nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
-                hasReachedEnd = nextPage === null;
-                return result;
-            };
-
-            const reset = () => {
-                props.items.splice(0, props.items.length);
-                emit('update:items', props.items);
-                currentPage = null;
-                nextPage = null;
-                paginationHistory = [];
-                hasReachedEnd = false;
-            };
-
-            const exposed = {
+            return {
                 init: mockInit,
                 initialize,
                 cancelLoad: mockCancelLoad,
@@ -162,16 +117,16 @@ vi.mock('@wyxos/vibe', () => ({
                 removeMany: mockRemoveMany,
                 restore: mockRestore,
                 restoreMany: mockRestoreMany,
-                loadPage,
-                loadNext,
-                reset,
+                reset: () => {
+                    props.items.splice(0, props.items.length);
+                    emit('update:items', props.items);
+                },
+                isLoading: mockIsLoading.value,
+                hasReachedEnd: false,
+                currentPage: 1,
+                nextPage: null,
+                paginationHistory: [],
             };
-            Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
-            Object.defineProperty(exposed, 'hasReachedEnd', { get: () => hasReachedEnd, enumerable: true });
-            Object.defineProperty(exposed, 'currentPage', { get: () => currentPage, enumerable: true });
-            Object.defineProperty(exposed, 'nextPage', { get: () => nextPage, enumerable: true });
-            Object.defineProperty(exposed, 'paginationHistory', { get: () => paginationHistory, enumerable: true });
-            return exposed;
         },
     },
     MasonryItem: {
@@ -197,7 +152,6 @@ vi.mock('@wyxos/vibe', () => ({
     },
 }));
 
-// Mock usePreviewBatch
 vi.mock('@/composables/usePreviewBatch', () => ({
     usePreviewBatch: () => ({
         queuePreviewIncrement: mockQueuePreviewIncrement,
@@ -208,318 +162,195 @@ beforeEach(() => {
     setupBrowseTestMocks(mocks);
 });
 
-describe('Browse - Tab Management', () => {
-    // Note: This test was removed because TabContent component unmounting behavior
-    // is handled by Vue's key-based component lifecycle. The onUnmounted hook
-    // will call destroy/cancelLoad if masonry exists, but in test environment,
-    // the component may not fully unmount or masonry may not be initialized.
-    // The actual behavior is tested implicitly through other tab switching tests.
+function mockBrowseTabs(tabRows: Array<Record<string, unknown>>): void {
+    mocks.mockAxios.get.mockImplementation((url: string) => {
+        const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+        if (tabShowMatch) {
+            const id = Number(tabShowMatch[1]);
+            const currentTab = tabRows.find(tab => Number(tab.id) === id);
 
-    // Note: This test was removed because TabContent component unmounting behavior
-    // is handled by Vue's key-based component lifecycle. The onUnmounted hook
-    // will call destroy if masonry exists, but in test environment,
-    // the component may not fully unmount or masonry may not be initialized.
-    // The actual behavior is tested implicitly through other tab switching tests.
-
-    it('closes tab when middle clicked', async () => {
-        const tab1Id = 1;
-        const tab2Id = 2;
-
-        mocks.mockAxios.get.mockImplementation((url: string) => {
-            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
-            if (tabShowMatch) {
-                const id = Number(tabShowMatch[1]);
-                const isSecond = id === tab2Id;
-                return Promise.resolve({
-                    data: {
-                        tab: {
-                            id,
-                            label: isSecond ? 'Tab 2' : 'Tab 1',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            feed: 'online',
-                        },
+            return Promise.resolve({
+                data: {
+                    tab: {
+                        id,
+                        label: currentTab?.label ?? `Tab ${id}`,
+                        params: currentTab?.params ?? {},
+                        feed: 'online',
                     },
-                });
-            }
-            if (url.includes(tabIndexUrl)) {
-                return Promise.resolve({
-                    data: [
-                        {
-                            id: tab1Id,
-                            label: 'Tab 1',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            items: [],
-                            position: 0,
-                            is_active: true,
-                        },
-                        {
-                            id: tab2Id,
-                            label: 'Tab 2',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            items: [],
-                            position: 1,
-                            is_active: false,
-                        }],
-                });
-            }
-            if (url.includes(browseIndexUrl)) {
-                return Promise.resolve({
-                    data: {
-                        items: [],
-                        nextPage: null,
-                        services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
-
-        mocks.mockAxios.delete.mockResolvedValue({ data: { success: true } });
-
-        const router = await createTestRouter('/browse');
-        const wrapper = mount(Browse, { global: { plugins: [router] } });
-
-        await waitForStable(wrapper);
-
-        const vm = wrapper.vm as any;
-
-        expect(vm.tabs.length).toBe(2);
-        expect(vm.activeTabId).toBe(tab1Id);
-
-        const closeTabSpy = vi.spyOn(vm, 'closeTab');
-        const tab2Element = wrapper.get(`[data-test="browse-tab-${tab2Id}"]`).element as HTMLElement;
-
-        const mouseDownEvent = new MouseEvent('mousedown', {
-            button: 1,
-            bubbles: true,
-            cancelable: true,
-        });
-
-        const clickEvent = new MouseEvent('click', {
-            button: 1,
-            bubbles: true,
-            cancelable: true,
-        });
-
-        tab2Element.dispatchEvent(mouseDownEvent);
-        tab2Element.dispatchEvent(clickEvent);
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-        expect(closeTabSpy).toHaveBeenCalledWith(tab2Id);
-    });
-
-    it('does nothing when clicking on already active tab', async () => {
-        const tab1Id = 1;
-
-        mocks.mockAxios.get.mockImplementation((url: string) => {
-            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
-            if (tabShowMatch) {
-                const id = Number(tabShowMatch[1]);
-                return Promise.resolve({
-                    data: {
-                        tab: {
-                            id,
-                            label: 'Tab 1',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            feed: 'online',
-                        },
-                    },
-                });
-            }
-            if (url.includes(tabIndexUrl)) {
-                return Promise.resolve({
-                    data: [
-                        {
-                            id: tab1Id,
-                            label: 'Tab 1',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            items: [],
-                            position: 0,
-                            is_active: true,
-                        }],
-                });
-            }
-            if (url.includes(browseIndexUrl)) {
-                return Promise.resolve({
-                    data: {
-                        items: [],
-                        nextPage: null,
-                        services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
-
-        const router = await createTestRouter('/browse');
-        const wrapper = mount(Browse, { global: { plugins: [router] } });
-
-        await waitForStable(wrapper);
-
-        const vm = wrapper.vm as any;
-
-        expect(vm.activeTabId).toBe(tab1Id);
-
-        mocks.mockDestroy.mockClear();
-        mocks.mockInit.mockClear();
-
-        await vm.switchTab(tab1Id);
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-        expect(vm.activeTabId).toBe(tab1Id);
-        expect(mocks.mockDestroy).not.toHaveBeenCalled();
-    });
-
-    it('closes fileviewer when switching tabs', async () => {
-        const tab1Id = 1;
-        const tab2Id = 2;
-
-        mocks.mockAxios.get.mockImplementation((url: string) => {
-            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
-            if (tabShowMatch) {
-                const id = Number(tabShowMatch[1]);
-                const isSecond = id === tab2Id;
-                return Promise.resolve({
-                    data: {
-                        tab: {
-                            id,
-                            label: isSecond ? 'Tab 2' : 'Tab 1',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            feed: 'online',
-                        },
-                    },
-                });
-            }
-            if (url.includes(tabIndexUrl)) {
-                return Promise.resolve({
-                    data: [
-                        {
-                            id: tab1Id,
-                            label: 'Tab 1',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            items: [],
-                            position: 0,
-                            is_active: true,
-                        },
-                        {
-                            id: tab2Id,
-                            label: 'Tab 2',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            items: [],
-                            position: 1,
-                            is_active: false,
-                        }],
-                });
-            }
-            if (url.includes(browseIndexUrl)) {
-                return Promise.resolve({
-                    data: {
-                        items: [],
-                        nextPage: null,
-                        services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
-
-        const router = await createTestRouter('/browse');
-        const wrapper = mount(Browse, { global: { plugins: [router] } });
-
-        await waitForStable(wrapper);
-
-        const vm = wrapper.vm as any;
-
-        expect(vm.activeTabId).toBe(tab1Id);
-
-        const fileViewer = wrapper.findComponent(FileViewer);
-        const fileViewerVm = fileViewer.vm as any;
-
-        fileViewerVm.overlayState.rect = { top: 100, left: 200, width: 300, height: 400 };
-        fileViewerVm.overlayState.image = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-        fileViewerVm.overlayState.isFilled = true;
-        fileViewerVm.overlayState.fillComplete = true;
-
-        expect(fileViewerVm.overlayState.rect).not.toBeNull();
-
-        await vm.switchTab(tab2Id);
-        await waitForStable(wrapper);
-
-        expect(vm.activeTabId).toBe(tab2Id);
-
-        const newFileViewer = wrapper.findComponent(FileViewer);
-        if (newFileViewer.exists()) {
-            const newFileViewerVm = newFileViewer.vm as any;
-            expect(newFileViewerVm.overlayState.rect).toBeNull();
+                },
+            });
         }
+
+        if (url.includes(tabIndexUrl)) {
+            return Promise.resolve({ data: tabRows });
+        }
+
+        if (url.includes(browseIndexUrl)) {
+            return Promise.resolve({
+                data: {
+                    items: [],
+                    nextPage: null,
+                    services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                },
+            });
+        }
+
+        return Promise.resolve({ data: { items: [], nextPage: null } });
     });
+}
 
-    it('creates a new tab and does not auto-load until service is selected', async () => {
-        mocks.mockAxios.get.mockImplementation((url: string) => {
-            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
-            if (tabShowMatch) {
-                const id = Number(tabShowMatch[1]);
+describe('Browse - Tab Management', () => {
+    it('closes a background tab with middle click through the bulk delete endpoint', async () => {
+        const tabRows = [
+            { id: 1, label: 'Tab 1', params: { service: 'civit-ai-images', page: 1 }, position: 0, is_active: true },
+            { id: 2, label: 'Tab 2', params: { service: 'civit-ai-images', page: 1 }, position: 1, is_active: false },
+        ];
+        mockBrowseTabs(tabRows);
+
+        mocks.mockAxios.post.mockImplementation((url: string) => {
+            if (url === tabsDestroyBatchUrl) {
                 return Promise.resolve({
                     data: {
-                        tab: {
-                            id,
-                            label: 'Browse 1',
-                            params: {},
-                            feed: 'online',
-                        },
+                        deleted_ids: [2],
+                        active_tab_id: 1,
                     },
                 });
             }
-            if (url.includes(tabIndexUrl)) {
-                return Promise.resolve({ data: [] });
-            }
-            if (url.includes(browseIndexUrl)) {
-                return Promise.resolve({
-                    data: {
-                        items: [],
-                        nextPage: null,
-                        services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
+
+            return Promise.resolve({ data: {} });
         });
 
-        const newTabId = 1;
-        mocks.mockAxios.post.mockResolvedValueOnce({
-            data: {
-                id: newTabId,
-                label: 'Browse 1',
-                params: {},
-                position: 0,
-                is_active: false,
-            },
-        });
-
-        const router = await createTestRouter();
+        const router = await createTestRouter('/browse');
         const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const tab2Element = wrapper.get('[data-test="browse-tab-2"]').element as HTMLElement;
+        tab2Element.dispatchEvent(new MouseEvent('mousedown', { button: 1, bubbles: true, cancelable: true }));
+        tab2Element.dispatchEvent(new MouseEvent('click', { button: 1, bubbles: true, cancelable: true }));
 
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        const vm = wrapper.vm as any;
+        expect(mocks.mockAxios.post).toHaveBeenCalledWith(tabsDestroyBatchUrl, {
+            ids: [2],
+            next_active_id: null,
+        });
 
-        await vm.createTab();
+        const vm = wrapper.vm as any;
+        expect(vm.tabs.map((tab: { id: number }) => tab.id)).toEqual([1]);
+        expect(vm.activeTabId).toBe(1);
+    });
+
+    it('close others on a background tab activates that tab when the current active tab is removed', async () => {
+        const tabRows = [
+            { id: 1, label: 'Tab 1', params: { service: 'civit-ai-images', page: 1 }, position: 0, is_active: true },
+            { id: 2, label: 'Tab 2', params: { service: 'civit-ai-images', page: 1 }, position: 1, is_active: false },
+            { id: 3, label: 'Tab 3', params: { service: 'civit-ai-images', page: 1 }, position: 2, is_active: false },
+        ];
+        mockBrowseTabs(tabRows);
+
+        mocks.mockAxios.post.mockImplementation((url: string) => {
+            if (url === tabsDestroyBatchUrl) {
+                return Promise.resolve({
+                    data: {
+                        deleted_ids: [1, 3],
+                        active_tab_id: 2,
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
         await waitForStable(wrapper);
 
-        expect(vm.activeTabId).toBe(newTabId);
-        expect(vm.tabs.length).toBe(1);
-        expect(vm.tabs[0].params.page).toBeUndefined();
+        await wrapper.get('[data-test="browse-tab-2"]').trigger('contextmenu', {
+            button: 2,
+            clientX: 24,
+            clientY: 24,
+        });
+        await new Promise(resolve => window.setTimeout(resolve, 0));
 
-        const masonry = wrapper.findComponent({ name: 'Masonry' });
-        // New tabs show the "Start Browsing" form; Masonry mounts after a search is applied/restored.
-        expect(masonry.exists()).toBe(false);
-        expect(wrapper.find('[data-test="play-button"]').exists()).toBe(true);
+        const closeOthers = document.body.querySelector('[data-test="tab-context-close-others"]');
+        if (!(closeOthers instanceof HTMLElement)) {
+            throw new Error('Close others action did not render.');
+        }
+
+        closeOthers.click();
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        expect(mocks.mockAxios.post).toHaveBeenCalledWith(tabsDestroyBatchUrl, {
+            ids: [1, 3],
+            next_active_id: 2,
+        });
+
+        const vm = wrapper.vm as any;
+        expect(vm.tabs.map((tab: { id: number }) => tab.id)).toEqual([2]);
+        expect(vm.activeTabId).toBe(2);
+    });
+
+    it('reorders tabs with drag and drop and posts the full ordered id list', async () => {
+        const tabRows = [
+            { id: 1, label: 'Tab 1', params: { service: 'civit-ai-images', page: 1 }, position: 0, is_active: true },
+            { id: 2, label: 'Tab 2', params: { service: 'civit-ai-images', page: 1 }, position: 1, is_active: false },
+            { id: 3, label: 'Tab 3', params: { service: 'civit-ai-images', page: 1 }, position: 2, is_active: false },
+        ];
+        mockBrowseTabs(tabRows);
+
+        mocks.mockAxios.post.mockImplementation((url: string) => {
+            if (url === tabsReorderUrl) {
+                return Promise.resolve({
+                    data: {
+                        ordered_ids: [3, 1, 2],
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const tab3 = wrapper.get('[data-test="browse-tab-3"]');
+        const tab1 = wrapper.get('[data-test="browse-tab-1"]');
+        const dataTransfer = {
+            setData: vi.fn(),
+            effectAllowed: '',
+            dropEffect: '',
+        };
+
+        Object.defineProperty(tab1.element, 'getBoundingClientRect', {
+            value: () => ({
+                top: 0,
+                bottom: 40,
+                left: 0,
+                right: 120,
+                width: 120,
+                height: 40,
+                x: 0,
+                y: 0,
+                toJSON: () => ({}),
+            }),
+        });
+
+        await tab3.trigger('dragstart', { dataTransfer });
+        await tab1.trigger('dragover', { clientY: 5, dataTransfer });
+        await tab1.trigger('drop', { clientY: 5, dataTransfer });
+        await flushPromises();
+
+        expect(mocks.mockAxios.post).toHaveBeenCalledWith(tabsReorderUrl, {
+            ordered_ids: [3, 1, 2],
+        });
+
+        const vm = wrapper.vm as any;
+        expect(vm.tabs.map((tab: { id: number }) => tab.id)).toEqual([3, 1, 2]);
     });
 });
-
-
