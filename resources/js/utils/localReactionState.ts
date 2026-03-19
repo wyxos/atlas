@@ -14,7 +14,7 @@ export type LocalReactionSnapshot = {
     blacklist_rule: FeedItem['blacklist_rule'];
 };
 
-function normalizeReactionType(value: unknown): ReactionType | null {
+export function normalizeReactionType(value: unknown): ReactionType | null {
     if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
         return value;
     }
@@ -22,8 +22,18 @@ function normalizeReactionType(value: unknown): ReactionType | null {
     return null;
 }
 
-function isPositiveReactionType(type: ReactionType | null): boolean {
+export function isPositiveReactionType(type: ReactionType | null): boolean {
     return type !== null && POSITIVE_REACTION_TYPES.includes(type);
+}
+
+function getSelectedReactionTypes(filters: Record<string, unknown>): ReactionType[] {
+    if (!Array.isArray(filters.reaction)) {
+        return [];
+    }
+
+    return filters.reaction
+        .map((value) => normalizeReactionType(value))
+        .filter((value): value is ReactionType => value !== null);
 }
 
 function getBlacklistType(item: FeedItem): 'manual' | 'auto' | null {
@@ -158,9 +168,7 @@ function matchesReactionFilter(item: FeedItem, filters: Record<string, unknown>)
         return true;
     }
 
-    const selectedTypes = Array.isArray(filters.reaction)
-        ? filters.reaction.map((value) => normalizeReactionType(value)).filter((value): value is ReactionType => value !== null)
-        : [];
+    const selectedTypes = getSelectedReactionTypes(filters);
 
     if (selectedTypes.length === 0) {
         return false;
@@ -178,6 +186,22 @@ function matchesModerationUnion(item: FeedItem, value: unknown): boolean {
     const isAutoBlacklisted = getBlacklistType(item) === 'auto';
 
     return (item.auto_disliked === true && reactionType === 'dislike') || isAutoBlacklisted;
+}
+
+export function isPositiveOnlyLocalView(filters: Record<string, unknown>): boolean {
+    const reactionMode = filters.reaction_mode;
+
+    if (reactionMode === 'reacted') {
+        return true;
+    }
+
+    if (reactionMode !== 'types') {
+        return false;
+    }
+
+    const selectedTypes = getSelectedReactionTypes(filters);
+
+    return selectedTypes.length > 0 && selectedTypes.every((type) => isPositiveReactionType(type));
 }
 
 export function matchesLocalViewFilters(

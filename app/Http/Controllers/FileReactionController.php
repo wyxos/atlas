@@ -9,6 +9,7 @@ use App\Services\FileReactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class FileReactionController extends Controller
 {
@@ -28,6 +29,10 @@ class FileReactionController extends Controller
         $type = $validated['type'];
         $forceDownload = (bool) ($validated['force_download'] ?? false);
         $wasDownloaded = (bool) $file->downloaded;
+        $hasDownloadedFile = $wasDownloaded
+            && is_string($file->path)
+            && $file->path !== ''
+            && Storage::disk(config('downloads.disk'))->exists($file->path);
         $hasUrl = is_string($file->url) && $file->url !== '';
         $hadReactionBefore = Reaction::query()
             ->where('user_id', $user->id)
@@ -47,7 +52,7 @@ class FileReactionController extends Controller
             'reaction' => $result['reaction'],
             'should_prompt_redownload' => ! $forceDownload
                 && $type !== 'dislike'
-                && $wasDownloaded
+                && $hasDownloadedFile
                 && $hasUrl
                 && $hadReactionBefore
                 && $result['reaction'] !== null,
