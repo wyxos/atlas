@@ -151,3 +151,14 @@ test('tabs include params in index response', function () {
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
 });
+
+test('tabs include updated_at in index response for mru seeding', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create();
+
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
+
+    $response->assertSuccessful();
+    $tabData = collect($response->json())->firstWhere('id', $tab->id);
+    expect($tabData['updated_at'] ?? null)->not->toBeNull();
+});

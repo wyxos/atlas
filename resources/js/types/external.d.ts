@@ -23,11 +23,13 @@ declare module '@/actions/App/Http/Controllers/BrowseController' {
 
 declare module '@/actions/App/Http/Controllers/TabController' {
     export const index: ActionHandler;
-    export const items: ActionHandler;
     export const show: ActionHandler;
     export const store: ActionHandler;
     export const update: ActionHandler;
     export const destroy: ActionHandler;
+    export const reorder: ActionHandler;
+    export const destroyBatch: ActionHandler;
+    export const updatePosition: ActionHandler;
     export const setActive: ActionHandler;
     export const deleteAll: ActionHandler;
 }

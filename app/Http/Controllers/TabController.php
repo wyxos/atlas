@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BulkDeleteTabsRequest;
+use App\Http\Requests\ReorderTabsRequest;
 use App\Http\Requests\StoreTabRequest;
 use App\Http\Requests\UpdateTabRequest;
 use App\Models\Tab;
 use App\Services\BrowseModerationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TabController extends Controller
 {
@@ -100,6 +104,114 @@ class TabController extends Controller
         $tab->delete();
 
         return response()->json(['message' => 'Tab deleted successfully']);
+    }
+
+    public function reorder(ReorderTabsRequest $request): JsonResponse
+    {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
+        $orderedIds = array_map('intval', $request->validated('ordered_ids'));
+        $currentIds = Tab::forUser($userId)
+            ->ordered()
+            ->pluck('id')
+            ->map(static fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $sortedOrderedIds = $orderedIds;
+        $sortedCurrentIds = $currentIds;
+        sort($sortedOrderedIds);
+        sort($sortedCurrentIds);
+
+        if ($sortedOrderedIds !== $sortedCurrentIds) {
+            throw ValidationException::withMessages([
+                'ordered_ids' => ['The ordered tab list is stale. Reload tabs and try again.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($userId, $orderedIds) {
+            foreach ($orderedIds as $position => $tabId) {
+                Tab::forUser($userId)
+                    ->where('id', $tabId)
+                    ->update(['position' => $position]);
+            }
+        });
+
+        return response()->json([
+            'ordered_ids' => $orderedIds,
+        ]);
+    }
+
+    public function destroyBatch(BulkDeleteTabsRequest $request): JsonResponse
+    {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
+        $ids = array_map('intval', $request->validated('ids'));
+        $ownedIds = Tab::forUser($userId)
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->map(static fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $sortedIds = $ids;
+        $sortedOwnedIds = $ownedIds;
+        sort($sortedIds);
+        sort($sortedOwnedIds);
+
+        if ($sortedIds !== $sortedOwnedIds) {
+            throw ValidationException::withMessages([
+                'ids' => ['One or more tabs could not be found for this user.'],
+            ]);
+        }
+
+        $nextActiveId = $request->filled('next_active_id')
+            ? $request->integer('next_active_id')
+            : null;
+
+        if ($nextActiveId !== null && in_array($nextActiveId, $ids, true)) {
+            throw ValidationException::withMessages([
+                'next_active_id' => ['The next active tab cannot also be deleted.'],
+            ]);
+        }
+
+        if ($nextActiveId !== null) {
+            $nextActiveOwned = Tab::forUser($userId)
+                ->where('id', $nextActiveId)
+                ->exists();
+
+            if (! $nextActiveOwned) {
+                throw ValidationException::withMessages([
+                    'next_active_id' => ['The next active tab is invalid.'],
+                ]);
+            }
+        }
+
+        $activeTabId = DB::transaction(function () use ($userId, $ids, $nextActiveId) {
+            Tab::forUser($userId)
+                ->whereIn('id', $ids)
+                ->delete();
+
+            if ($nextActiveId !== null) {
+                Tab::forUser($userId)->update(['is_active' => false]);
+
+                Tab::forUser($userId)
+                    ->where('id', $nextActiveId)
+                    ->update(['is_active' => true]);
+            }
+
+            return Tab::forUser($userId)
+                ->where('is_active', true)
+                ->value('id');
+        });
+
+        return response()->json([
+            'deleted_ids' => $ids,
+            'active_tab_id' => $activeTabId ? (int) $activeTabId : null,
+        ]);
     }
 
     /**
