@@ -14,7 +14,6 @@ import type { TabContentPromptDialog } from '@/composables/useTabContentPromptDi
 interface Props {
     item: FeedItem;
     itemsLength: number;
-    removeItem: (item: FeedItem) => void;
     containers: TabContentContainerInteractions;
     itemInteractions: TabContentItemInteractions;
     promptDialog: TabContentPromptDialog;
@@ -93,7 +92,7 @@ function handleReaction(type: ReactionType): void {
             <div v-if="showReactions" class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
                 <FileReactions :file-id="item.id" :reaction="item.reaction as ({ type: string } | null | undefined)"
                     :previewed-count="item.previewed_count" :viewed-count="item.seen_count" :current-index="currentIndex"
-                    :total-items="itemsLength" variant="small" :remove-item="removeItem" @reaction="handleReaction" />
+                    :total-items="itemsLength" variant="small" @reaction="handleReaction" />
             </div>
         </Transition>
 

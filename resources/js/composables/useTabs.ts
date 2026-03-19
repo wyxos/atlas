@@ -15,6 +15,7 @@ export type FeedItem = {
     timeoutSeconds?: number; // Vibe loader timeout override (seconds)
     originalUrl?: string; // Original full-size URL
     thumbnail?: string; // Thumbnail URL (may be same as src)
+    url?: string | null;
     type?: 'image' | 'video';
     media_kind?: 'image' | 'video' | 'audio' | 'file';
     notFound?: boolean;

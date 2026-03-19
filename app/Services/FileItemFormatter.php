@@ -177,6 +177,7 @@ class FileItemFormatter
                 'timeoutSeconds' => 30,
                 'originalUrl' => $originalUrl, // Needed for FileViewer to show original images
                 'thumbnail' => $thumbnailUrl,
+                'url' => $file->url,
                 'type' => $vibeType,
                 'media_kind' => $mediaKind,
                 'mime_type' => $file->mime_type,
@@ -188,6 +189,7 @@ class FileItemFormatter
                 'notFound' => false,
                 'previewed_count' => $file->previewed_count ?? 0,
                 'seen_count' => $file->seen_count ?? 0,
+                'downloaded' => (bool) $file->downloaded,
                 'auto_disliked' => $file->auto_disliked ?? false,
                 'will_auto_dislike' => in_array($file->id, $willAutoDislikeIds, true),
                 'reaction' => $reaction, // Current user's reaction for this file

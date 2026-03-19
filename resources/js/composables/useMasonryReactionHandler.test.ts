@@ -35,7 +35,7 @@ describe('useMasonryReactionHandler', () => {
     });
 
     it('optimistically removes local items that stop matching the active filters and restores them on rollback', async () => {
-        const item = createItem();
+        const item = createItem({ downloaded: false });
         const items = ref([item]);
         const masonry = ref({
             remove: vi.fn().mockResolvedValue(undefined),
@@ -65,7 +65,7 @@ describe('useMasonryReactionHandler', () => {
             expect.any(Function),
             items,
             expect.objectContaining({
-                allowRedownloadPrompt: true,
+                forceDownload: false,
                 updateLocalState: false,
             }),
         );
@@ -80,5 +80,64 @@ describe('useMasonryReactionHandler', () => {
         expect(item.auto_disliked).toBe(true);
         expect(item.blacklisted_at).toBe('2026-03-19T00:00:00Z');
         expect(masonry.value.restore).toHaveBeenCalledWith(item);
+    });
+
+    it('prompts before queueing a new positive reaction for an already-downloaded file', async () => {
+        const item = createItem({
+            downloaded: true,
+            reaction: { type: 'like' },
+            url: 'https://example.com/original.jpg',
+        });
+        const items = ref([item]);
+        const promptDownloadedReaction = vi.fn().mockResolvedValue('redownload');
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry: ref(null),
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            onReaction: vi.fn(),
+            promptDownloadedReaction,
+        });
+
+        await handleMasonryReaction(item, 'love');
+
+        expect(promptDownloadedReaction).toHaveBeenCalledTimes(1);
+        expect(mockQueueReaction).toHaveBeenCalledWith(
+            1,
+            'love',
+            'https://example.com/preview.jpg',
+            expect.any(Function),
+            items,
+            expect.objectContaining({
+                forceDownload: true,
+                updateLocalState: false,
+            }),
+        );
+    });
+
+    it('does not queue or mutate local state when the downloaded-file prompt is canceled', async () => {
+        const item = createItem({
+            downloaded: true,
+            reaction: { type: 'like' },
+            url: 'https://example.com/original.jpg',
+        });
+        const items = ref([item]);
+        const promptDownloadedReaction = vi.fn().mockResolvedValue('cancel');
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry: ref(null),
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            onReaction: vi.fn(),
+            promptDownloadedReaction,
+        });
+
+        await handleMasonryReaction(item, 'love');
+
+        expect(promptDownloadedReaction).toHaveBeenCalledTimes(1);
+        expect(mockQueueReaction).not.toHaveBeenCalled();
+        expect(item.reaction).toEqual({ type: 'like' });
     });
 });

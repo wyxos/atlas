@@ -1,6 +1,7 @@
 import { computed, nextTick, onUnmounted, ref, triggerRef, type Ref, type ShallowRef } from 'vue';
 import type { MasonryInstance } from '@wyxos/vibe';
 import { createMasonryInteractions } from '@/utils/masonryInteractions';
+import type { DownloadedReactionChoice } from './useDownloadedReactionPrompt';
 import { useMasonryReactionHandler } from './useMasonryReactionHandler';
 import { useAutoDislikeQueue } from './useAutoDislikeQueue';
 import type { BrowseFormInstance } from './useBrowseForm';
@@ -23,6 +24,7 @@ type UseTabContentItemInteractionsOptions = {
         clearPreviewedItems: (fileIds?: number[]) => void;
     };
     onReaction: (fileId: number, type: ReactionType) => void;
+    promptDownloadedReaction: () => Promise<DownloadedReactionChoice>;
     clearHoveredContainer: () => void;
 };
 
@@ -92,6 +94,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         isLocal: options.form.isLocal,
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
         onReaction: options.onReaction,
+        promptDownloadedReaction: options.promptDownloadedReaction,
     });
 
     const masonryInteractions = createMasonryInteractions(

@@ -12,7 +12,6 @@ interface Props {
     totalItems?: number;
     variant?: 'default' | 'small';
     mode?: 'default' | 'reaction-only';
-    removeItem?: () => void;
     hideDislike?: boolean;
 }
 
@@ -25,7 +24,6 @@ const props = withDefaults(defineProps<Props>(), {
     totalItems: undefined,
     variant: 'default',
     mode: 'default',
-    removeItem: undefined,
     hideDislike: false,
 });
 
@@ -43,11 +41,6 @@ const funny = computed(() => props.reaction?.type === 'funny');
 function handleReactionClick(type: ReactionType): void {
     if (!props.fileId) {
         return;
-    }
-
-    // If removeItem is provided, call it immediately (for masonry removal)
-    if (props.removeItem) {
-        props.removeItem();
     }
 
     // Emit reaction event (parent will handle queueing and API call)

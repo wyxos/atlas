@@ -120,7 +120,16 @@ describe('reactionQueue', () => {
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
-            expect(mockReactionCallback).toHaveBeenCalledWith(123, 'like');
+            expect(mockReactionCallback).toHaveBeenCalledWith(123, 'like', undefined);
+        });
+
+        it('forwards force-download requests when queued upfront', async () => {
+            queueReaction(123, 'like', undefined, undefined, undefined, { forceDownload: true });
+
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(mockReactionCallback).toHaveBeenCalledWith(123, 'like', { forceDownload: true });
         });
 
         it('dismisses toast after successful execution', async () => {
