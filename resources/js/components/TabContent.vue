@@ -14,6 +14,7 @@ import { createBrowseCatalog, type ServiceOption } from '@/lib/browseCatalog';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
+import { useTabContentLoadedItemsActions } from '@/composables/useTabContentLoadedItemsActions';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useLocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
@@ -25,7 +26,6 @@ import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentMasonryItemOverlay from './TabContentMasonryItemOverlay.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
-import StatusToast from './toasts/StatusToast.vue';
 import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
@@ -85,7 +85,6 @@ const localService = browseCatalogState.localService;
 
 const downloadedReactionPrompt = useDownloadedReactionPrompt();
 const promptDialog = useTabContentPromptDialog(items);
-const isResettingPreviewed = ref(false);
 
 function matchesActiveLocalFilters(item: FeedItem): boolean {
     if (!form.isLocal.value) {
@@ -168,6 +167,8 @@ const localFileDeletion = useLocalFileDeletion({
     totalAvailable: browse.state.totalAvailable,
     clearHover: itemInteractions.state.clearHover,
 });
+const loadedItemsActions = useTabContentLoadedItemsActions(itemInteractions);
+const activeLoadedItemsAction = loadedItemsActions.state.activeLoadedItemsAction;
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
 const activeContainerBlacklists = ref<ContainerBlacklist[]>([]);
 type ContainerBlacklistChange = {
@@ -176,7 +177,6 @@ type ContainerBlacklistChange = {
 };
 
 const toast = useToast();
-const resetPreviewedToastId = 'reset-previewed-toast';
 
 /**
  * Show moderation toast with accumulated moderated files.
@@ -213,56 +213,6 @@ function showModerationToast(moderatedFiles: Array<{ id: number; action_type: st
             bodyClassName: 'moderation-toast-body',
         }
     );
-}
-
-function showResetPreviewedToast(
-    variant: 'success' | 'info' | 'error',
-    title: string,
-    description?: string,
-): void {
-    toast.dismiss(resetPreviewedToastId);
-    toast(
-        {
-            component: StatusToast,
-            props: {
-                toastId: resetPreviewedToastId,
-                variant,
-                title,
-                description,
-            },
-        },
-        {
-            id: resetPreviewedToastId,
-            closeButton: false,
-            closeOnClick: false,
-        }
-    );
-}
-
-async function handleResetPreviewedCounts(): Promise<void> {
-    if (isResettingPreviewed.value) {
-        return;
-    }
-
-    isResettingPreviewed.value = true;
-
-    try {
-        const resetCount = await itemInteractions.resetPreviewedState();
-        if (resetCount === 0) {
-            showResetPreviewedToast('info', 'No loaded items to reset.');
-            return;
-        }
-
-        showResetPreviewedToast(
-            'success',
-            `Reset previewed counts for ${resetCount} item${resetCount === 1 ? '' : 's'}.`,
-        );
-    } catch (error) {
-        console.error('Failed to reset previewed counts:', error);
-        showResetPreviewedToast('error', 'Failed to reset previewed counts.');
-    } finally {
-        isResettingPreviewed.value = false;
-    }
 }
 
 function onLoadingStop(): void {
@@ -435,7 +385,9 @@ defineExpose({
             :update-feed="(value) => form.data.feed = value" :update-service="browseActions.updateService"
             :update-source="(value) => form.data.source = value" :apply-service="browseActions.applyService"
             :apply-filters="browseActions.applyFilters" :reset-filters="form.reset"
-            :on-reset-previewed="handleResetPreviewedCounts" :is-resetting-previewed="isResettingPreviewed"
+            :loaded-items-count="items.length"
+            :active-loaded-items-action="activeLoadedItemsAction"
+            :on-run-loaded-items-action="loadedItemsActions.actions.runLoadedItemsAction"
             :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
             :load-next-page="itemInteractions.masonry.loadNextPage">
             <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"

@@ -126,12 +126,32 @@ class FileReactionController extends Controller
 
         $user = Auth::user();
         $results = [];
-
+        $fileIds = collect($validated['reactions'])
+            ->pluck('file_id')
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->unique()
+            ->values()
+            ->all();
+        $files = File::query()
+            ->whereIn('id', $fileIds)
+            ->get()
+            ->keyBy('id');
+        $existingReactions = Reaction::query()
+            ->where('user_id', $user->id)
+            ->whereIn('file_id', $fileIds)
+            ->get()
+            ->keyBy('file_id');
         $service = app(FileReactionService::class);
 
         foreach ($validated['reactions'] as $reactionData) {
-            $file = File::findOrFail($reactionData['file_id']);
-            $result = $service->toggle($file, $user, $reactionData['type']);
+            $fileId = (int) $reactionData['file_id'];
+            /** @var File $file */
+            $file = $files->get($fileId) ?? File::findOrFail($fileId);
+            $existingReaction = $existingReactions->get($fileId);
+            $queueDownload = ! ($existingReaction && $existingReaction->type === $reactionData['type']);
+            $result = $service->set($file, $user, $reactionData['type'], [
+                'queueDownload' => $queueDownload,
+            ]);
 
             $results[] = [
                 'file_id' => $file->id,

@@ -34,6 +34,25 @@ test('batch increments preview count for multiple files', function () {
     expect($file3->previewed_count)->toBe(3);
 });
 
+test('batch increments preview count by a custom amount', function () {
+    $admin = User::factory()->admin()->create();
+    $file1 = File::factory()->create(['previewed_count' => 0]);
+    $file2 = File::factory()->create(['previewed_count' => 2]);
+
+    $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
+        'file_ids' => [$file1->id, $file2->id],
+        'increments' => 4,
+    ]);
+
+    $response->assertSuccessful();
+
+    $file1->refresh();
+    $file2->refresh();
+
+    expect($file1->previewed_count)->toBe(4);
+    expect($file2->previewed_count)->toBe(6);
+});
+
 test('batch returns will_auto_dislike flag for files reaching threshold', function () {
     $admin = User::factory()->admin()->create();
     $file1 = File::factory()->create([
@@ -163,6 +182,18 @@ test('batch validates file_ids exist', function () {
 
     $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
         'file_ids' => [99999, 99998],
+    ]);
+
+    $response->assertUnprocessable();
+});
+
+test('batch validates increments when provided', function () {
+    $admin = User::factory()->admin()->create();
+    $file = File::factory()->create();
+
+    $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
+        'file_ids' => [$file->id],
+        'increments' => 0,
     ]);
 
     $response->assertUnprocessable();
