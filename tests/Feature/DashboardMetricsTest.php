@@ -145,6 +145,22 @@ test('incrementContainersByCounts applies batched deltas and clamps at zero', fu
     expect($second->fresh()->files_downloaded)->toBe(3);
 });
 
+test('incrementContainersByCounts chunks large container batches', function () {
+    $containers = Container::factory()->count(1001)->create([
+        'files_downloaded' => 0,
+    ]);
+
+    $counts = [];
+    foreach ($containers as $index => $container) {
+        $counts[$container->id] = $index === 0 ? 2 : 1;
+    }
+
+    app(MetricsService::class)->incrementContainersByCounts('files_downloaded', $counts);
+
+    expect($containers->first()->fresh()->files_downloaded)->toBe(2);
+    expect($containers->last()->fresh()->files_downloaded)->toBe(1);
+});
+
 test('dashboard metrics include browse payloads for supported containers', function () {
     $user = User::factory()->create();
 
@@ -191,4 +207,47 @@ test('dashboard metrics include browse payloads for supported containers', funct
         ],
     ]);
     expect(collect($topDownloads)->firstWhere('source', 'Booru')['browse_tab'])->toBeNull();
+});
+
+test('syncAll recomputes container counters across chunked batches', function () {
+    $containers = Container::factory()->count(1001)->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+    ]);
+
+    $files = File::factory()->count(1001)->create([
+        'downloaded' => true,
+        'blacklisted_at' => null,
+    ]);
+
+    $user = User::factory()->create();
+
+    foreach ($containers as $index => $container) {
+        $file = $files[$index];
+        $container->files()->attach($file->id);
+
+        if ($index % 2 === 0) {
+            $file->update(['blacklisted_at' => now()]);
+        }
+
+        if ($index % 3 === 0) {
+            Reaction::create([
+                'file_id' => $file->id,
+                'user_id' => $user->id,
+                'type' => 'love',
+            ]);
+        }
+    }
+
+    app(MetricsService::class)->syncAll();
+
+    expect($containers->first()->fresh()->files_total)->toBe(1);
+    expect($containers->first()->fresh()->files_downloaded)->toBe(1);
+    expect($containers->first()->fresh()->files_blacklisted)->toBe(1);
+    expect($containers->first()->fresh()->files_favorited)->toBe(1);
+
+    expect($containers->last()->fresh()->files_total)->toBe(1);
+    expect($containers->last()->fresh()->files_downloaded)->toBe(1);
+    expect($containers->last()->fresh()->files_blacklisted)->toBe(1);
+    expect($containers->last()->fresh()->files_favorited)->toBe(0);
 });
