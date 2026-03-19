@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Info } from 'lucide-vue-next';
+import { Info, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import Pill from './ui/Pill.vue';
 import FileReactions from './FileReactions.vue';
 import DislikeProgressBar from './DislikeProgressBar.vue';
 import type { FeedItem } from '@/composables/useTabs';
+import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { ReactionType } from '@/types/reaction';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
@@ -17,6 +18,7 @@ interface Props {
     containers: TabContentContainerInteractions;
     itemInteractions: TabContentItemInteractions;
     promptDialog: TabContentPromptDialog;
+    localFileDeletion: LocalFileDeletion;
 }
 
 const props = defineProps<Props>();
@@ -26,6 +28,9 @@ const isPreloaded = computed(() => props.itemInteractions.preload.isItemPreloade
 const itemContainers = computed(() => props.containers.badges.getContainersForItem(props.item));
 const showContainers = computed(() => isHovered.value && isPreloaded.value && itemContainers.value.length > 0);
 const showPromptButton = computed(() => isHovered.value && isPreloaded.value);
+const showDeleteButton = computed(() => isHovered.value
+    && isPreloaded.value
+    && props.localFileDeletion.actions.canDelete(props.item));
 const showReactions = computed(() => (
     (isHovered.value || props.itemInteractions.reactions.hasActiveReaction(props.item))
     && isPreloaded.value
@@ -80,10 +85,21 @@ function handleReaction(type: ReactionType): void {
         </Transition>
 
         <Transition name="fade">
-            <div v-if="showPromptButton" class="absolute top-2 right-2 z-50 pointer-events-auto">
+            <div v-if="showPromptButton || showDeleteButton" class="absolute top-2 right-2 z-50 pointer-events-auto flex items-center gap-2">
                 <Button variant="ghost" size="sm" class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
                     @click.stop="promptDialog.open(item)" aria-label="Show prompt">
                     <Info :size="14" />
+                </Button>
+                <Button
+                    v-if="showDeleteButton"
+                    variant="ghost"
+                    size="sm"
+                    class="h-7 w-7 p-0 bg-danger-700/80 hover:bg-danger-600 text-white"
+                    aria-label="Delete local file"
+                    data-test="local-file-delete-trigger"
+                    @click.stop="localFileDeletion.actions.open(item)"
+                >
+                    <Trash2 :size="14" />
                 </Button>
             </div>
         </Transition>

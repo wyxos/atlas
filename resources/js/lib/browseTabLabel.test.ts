@@ -62,6 +62,20 @@ describe('browseTabLabel', () => {
         })).toBe('Local - Favorite (Random) - 7');
     });
 
+    it('uses the configured label for saved moderation presets in local tab labels', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'saved_dislikes_manual',
+                },
+            }),
+            pageToken: 5,
+            availableServices: [],
+            localService: { key: 'local', label: 'Local' },
+        })).toBe('Local - Saved Dislikes (Manual) - 5');
+    });
+
     it('restores renamed unreacted preset labels for existing local tabs', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({

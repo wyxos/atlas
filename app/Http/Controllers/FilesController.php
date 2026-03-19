@@ -228,12 +228,35 @@ SVG;
     /**
      * Remove the specified file from storage.
      */
-    public function destroy(File $file): JsonResponse
+    public function destroy(\Illuminate\Http\Request $request, File $file): JsonResponse
     {
-        $file->delete();
+        $validated = $request->validate([
+            'also_from_disk' => ['sometimes', 'boolean'],
+            'also_delete_record' => ['sometimes', 'boolean'],
+        ]);
+
+        $alsoFromDisk = (bool) ($validated['also_from_disk'] ?? false);
+        $alsoDeleteRecord = (bool) ($validated['also_delete_record'] ?? false);
+
+        if ($alsoFromDisk) {
+            $this->deleteStoredAssets($file);
+        }
+
+        if (! $alsoFromDisk || $alsoDeleteRecord) {
+            $file->delete();
+
+            return response()->json([
+                'message' => $alsoFromDisk
+                    ? 'File deleted from disk and record deleted.'
+                    : 'File deleted successfully.',
+            ]);
+        }
+
+        $file->load(['metadata', 'autoDislikeModerationAction', 'autoBlacklistModerationAction']);
 
         return response()->json([
-            'message' => 'File deleted successfully.',
+            'message' => 'File deleted from disk. Record kept.',
+            'file' => new \App\Http\Resources\FileResource($file),
         ]);
     }
 
@@ -400,6 +423,34 @@ SVG;
         }
 
         GenerateFilePreviewAssets::dispatch($file->id);
+    }
+
+    private function deleteStoredAssets(File $file): void
+    {
+        $wasDownloaded = (bool) $file->downloaded;
+        $disk = Storage::disk(config('downloads.disk'));
+
+        foreach ([$file->path, $file->preview_path, $file->poster_path] as $path) {
+            if (! is_string($path) || $path === '' || ! $disk->exists($path)) {
+                continue;
+            }
+
+            $disk->delete($path);
+        }
+
+        app(MetricsService::class)->applyDownloadClear($file, $wasDownloaded);
+
+        $file->forceFill([
+            'path' => null,
+            'preview_path' => null,
+            'poster_path' => null,
+            'downloaded' => false,
+            'downloaded_at' => null,
+            'download_progress' => 0,
+            'updated_at' => now(),
+        ])->save();
+
+        $file->searchable();
     }
 
     /**

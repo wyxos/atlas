@@ -172,6 +172,19 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         loadNextPage,
     };
 
+    function clearHoverState(): void {
+        const itemId = hoveredItemId.value;
+        const wasHoveringCountdown = itemId !== null && autoDislikeQueue.hasActiveCountdown(itemId);
+
+        hoveredItemIndex.value = null;
+        hoveredItemId.value = null;
+        options.clearHoveredContainer();
+
+        if (wasHoveringCountdown) {
+            autoDislikeQueue.unfreezeAll();
+        }
+    }
+
     const itemHandlers = {
         onClick(event: MouseEvent, item: FeedItem): void {
             if (event.altKey) {
@@ -216,16 +229,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             }
         },
         onMouseLeave(event: MouseEvent, item: FeedItem): void {
-            const itemId = hoveredItemId.value;
-            const wasHoveringCountdown = itemId !== null && autoDislikeQueue.hasActiveCountdown(itemId);
-
-            hoveredItemIndex.value = null;
-            hoveredItemId.value = null;
-            options.clearHoveredContainer();
-
-            if (wasHoveringCountdown) {
-                autoDislikeQueue.unfreezeAll();
-            }
+            clearHoverState();
 
             if (item.type === 'video') {
                 const video = findNearestVideoElement(event.currentTarget);
@@ -336,6 +340,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             hoveredItemId,
             hoveredItemIndex,
             getItemIndex,
+            clearHover: clearHoverState,
         },
         masonry: masonryHandlers,
         item: itemHandlers,
