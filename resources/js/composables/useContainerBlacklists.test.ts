@@ -173,6 +173,11 @@ describe('useContainerBlacklists', () => {
             blacklisted: true,
             blacklisted_at: '2024-01-15T10:00:00Z',
             action_type: 'dislike',
+            file_stats: {
+                unreacted: 12,
+                blacklisted: 8,
+                positive: 3,
+            },
         };
 
         mockAxios.get.mockResolvedValue({ data: mockStatus });
@@ -220,4 +225,3 @@ describe('useContainerBlacklists', () => {
         expect(isContainerBlacklisted(999)).toBe(false);
     });
 });
-

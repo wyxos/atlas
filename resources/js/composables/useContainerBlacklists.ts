@@ -1,5 +1,9 @@
 import { ref } from 'vue';
-import type { ContainerBlacklist, CreateContainerBlacklistPayload } from '@/types/container-blacklist';
+import type {
+    ContainerBlacklist,
+    ContainerBlacklistStatus,
+    CreateContainerBlacklistPayload,
+} from '@/types/container-blacklist';
 
 const blacklists = ref<ContainerBlacklist[]>([]);
 const isLoading = ref(false);
@@ -100,9 +104,9 @@ export function useContainerBlacklists() {
     /**
      * Check if a container is blacklisted.
      */
-    async function checkBlacklist(containerId: number): Promise<{ blacklisted: boolean; blacklisted_at: string | null; action_type: string | null } | null> {
+    async function checkBlacklist(containerId: number): Promise<ContainerBlacklistStatus | null> {
         try {
-            const { data } = await window.axios.get<{ blacklisted: boolean; blacklisted_at: string | null; action_type: string | null }>(
+            const { data } = await window.axios.get<ContainerBlacklistStatus>(
                 `/api/container-blacklists/${containerId}/check`
             );
             return data;
@@ -131,4 +135,3 @@ export function useContainerBlacklists() {
         isContainerBlacklisted,
     };
 }
-

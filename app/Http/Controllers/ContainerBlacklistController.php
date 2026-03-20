@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 
 class ContainerBlacklistController extends Controller
 {
+    private const POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
+
     /**
      * Get all blacklisted containers.
      */
@@ -69,10 +71,25 @@ class ContainerBlacklistController extends Controller
      */
     public function check(Container $container): JsonResponse
     {
+        $userId = auth()->id();
+
+        $container->loadCount([
+            'files as unreacted_files_count' => fn ($query) => $query->whereDoesntHave('reactions', fn ($reactionQuery) => $reactionQuery->where('user_id', $userId)),
+            'files as blacklisted_files_count' => fn ($query) => $query->whereNotNull('files.blacklisted_at'),
+            'files as positive_files_count' => fn ($query) => $query->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
+                ->where('user_id', $userId)
+                ->whereIn('type', self::POSITIVE_REACTION_TYPES)),
+        ]);
+
         return response()->json([
             'blacklisted' => $container->blacklisted_at !== null,
             'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
             'action_type' => $container->action_type,
+            'file_stats' => [
+                'unreacted' => (int) ($container->unreacted_files_count ?? 0),
+                'blacklisted' => (int) ($container->blacklisted_files_count ?? 0),
+                'positive' => (int) ($container->positive_files_count ?? 0),
+            ],
         ]);
     }
 
