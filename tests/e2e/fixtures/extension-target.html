@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atlas Extension Smoke Fixture</title>
+    <style>
+        body {
+            background: #0b132b;
+            color: #edf2f7;
+            font-family: Georgia, serif;
+            margin: 0;
+            padding: 32px;
+        }
+
+        main {
+            display: grid;
+            gap: 24px;
+            margin: 0 auto;
+            max-width: 720px;
+        }
+
+        figure {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(96, 165, 250, 0.35);
+            border-radius: 20px;
+            margin: 0;
+            padding: 20px;
+        }
+
+        img {
+            display: block;
+            height: auto;
+            max-width: 100%;
+        }
+
+        figcaption {
+            color: #cbd5f5;
+            font-size: 14px;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Atlas extension smoke fixture</h1>
+
+        <figure>
+            <img
+                id="standalone-media"
+                src="/standalone-media.svg"
+                width="320"
+                height="240"
+                alt="Standalone media target"
+            />
+            <figcaption>Standalone image target for the Atlas overlay widget.</figcaption>
+        </figure>
+
+        <figure>
+            <a href="/post/linked-media">
+                <img
+                    id="linked-media"
+                    src="/linked-media.svg"
+                    width="320"
+                    height="240"
+                    alt="Linked media target"
+                />
+            </a>
+            <figcaption>Linked image target that should avoid the standalone overlay.</figcaption>
+        </figure>
+    </main>
+</body>
+</html>

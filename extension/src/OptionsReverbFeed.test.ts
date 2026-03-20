@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockConnectRuntimeReverb = vi.fn();
 
@@ -14,6 +14,16 @@ type CapturedReverbRuntime = {
     emitConnectionError: (message: string) => void;
     emitEvent: (eventName: 'DownloadTransferQueued', payload: Record<string, unknown>) => void;
     emitState: (state: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'failed') => void;
+    response: {
+        kind: 'connected';
+        endpoint: string;
+        client: {
+            disconnect: ReturnType<typeof vi.fn>;
+        };
+    };
+    unsubscribeError: ReturnType<typeof vi.fn>;
+    unsubscribeEvent: ReturnType<typeof vi.fn>;
+    unsubscribeState: ReturnType<typeof vi.fn>;
 };
 
 function createConnectedRuntime(): CapturedReverbRuntime {
@@ -22,29 +32,26 @@ function createConnectedRuntime(): CapturedReverbRuntime {
         | ((state: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'failed') => void)
         | null = null;
     let connectionErrorHandler: ((message: string) => void) | null = null;
+    const unsubscribeError = vi.fn();
+    const unsubscribeEvent = vi.fn();
+    const unsubscribeState = vi.fn();
 
     const client = {
         disconnect: vi.fn(),
         getLastConnectionError: vi.fn(() => null),
         onConnectionError: vi.fn((handler: (message: string) => void) => {
             connectionErrorHandler = handler;
-            return { unsubscribe: vi.fn() };
+            return { unsubscribe: unsubscribeError };
         }),
         onConnectionState: vi.fn((handler: (state: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'failed') => void) => {
             connectionStateHandler = handler;
-            return { unsubscribe: vi.fn() };
+            return { unsubscribe: unsubscribeState };
         }),
         onEvent: vi.fn((handler: (eventName: 'DownloadTransferQueued', payload: Record<string, unknown>) => void) => {
             eventHandler = handler;
-            return { unsubscribe: vi.fn() };
+            return { unsubscribe: unsubscribeEvent };
         }),
     };
-
-    mockConnectRuntimeReverb.mockResolvedValue({
-        kind: 'connected',
-        endpoint: 'wss://atlas.test/reverb',
-        client,
-    });
 
     return {
         client,
@@ -57,6 +64,14 @@ function createConnectedRuntime(): CapturedReverbRuntime {
         emitState: (state: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'failed') => {
             connectionStateHandler?.(state);
         },
+        response: {
+            kind: 'connected',
+            endpoint: 'wss://atlas.test/reverb',
+            client,
+        },
+        unsubscribeError,
+        unsubscribeEvent,
+        unsubscribeState,
     };
 }
 
@@ -90,8 +105,13 @@ describe('OptionsReverbFeed', () => {
         vi.unstubAllGlobals();
     });
 
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('renders a connected reverb session, logs events, and clears them', async () => {
         const runtime = createConnectedRuntime();
+        mockConnectRuntimeReverb.mockResolvedValueOnce(runtime.response);
         const wrapper = await mountComponent();
         await flushPromises();
         runtime.emitState('connected');
@@ -125,9 +145,68 @@ describe('OptionsReverbFeed', () => {
         expect(runtime.client.disconnect).not.toHaveBeenCalled();
     });
 
+    it.each([
+        [{ kind: 'setup_required' }, 'Unavailable', 'Requires API key first.', null],
+        [{ kind: 'auth_failed' }, 'Unavailable', 'Cannot test Reverb until API auth succeeds.', null],
+        [{ kind: 'offline' }, 'Disconnected', 'Unable to reach Atlas.', null],
+        [{ kind: 'reverb_unavailable', endpoint: 'wss://atlas.test/reverb' }, 'Unavailable', 'Reverb is not configured on Atlas.', 'wss://atlas.test/reverb'],
+        [{ kind: 'disconnected', endpoint: 'wss://atlas.test/reverb', detail: 'socket closed' }, 'Disconnected', 'socket closed', 'wss://atlas.test/reverb'],
+    ])('renders the %j startup status', async (runtimeResponse, expectedLabel, expectedDetail, expectedEndpoint) => {
+        mockConnectRuntimeReverb.mockResolvedValueOnce(runtimeResponse);
+
+        const wrapper = await mountComponent();
+        await flushPromises();
+
+        expect(wrapper.text()).toContain(expectedLabel);
+        expect(wrapper.text()).toContain(expectedDetail);
+        if (expectedEndpoint === null) {
+            expect(wrapper.text()).not.toContain('Reverb Endpoint:');
+            return;
+        }
+
+        expect(wrapper.text()).toContain(expectedEndpoint);
+    });
+
+    it('reconnects from the button and tears down the active client before reconnecting', async () => {
+        const runtime = createConnectedRuntime();
+        mockConnectRuntimeReverb
+            .mockResolvedValueOnce(runtime.response)
+            .mockResolvedValueOnce({
+                kind: 'disconnected',
+                endpoint: 'wss://atlas.test/reverb',
+                detail: 'socket closed',
+            });
+
+        const wrapper = await mountComponent();
+        await flushPromises();
+        runtime.emitState('connected');
+        await flushPromises();
+
+        const reconnectButton = wrapper.findAll('button')
+            .find((button) => button.text() === 'Reconnect Reverb');
+        expect(reconnectButton).toBeTruthy();
+
+        await reconnectButton!.trigger('click');
+        await flushPromises();
+
+        expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(2);
+        expect(runtime.unsubscribeEvent).toHaveBeenCalledTimes(1);
+        expect(runtime.unsubscribeError).toHaveBeenCalledTimes(1);
+        expect(runtime.unsubscribeState).toHaveBeenCalledTimes(1);
+        expect(runtime.client.disconnect).toHaveBeenCalledTimes(1);
+        expect(wrapper.text()).toContain('socket closed');
+    });
+
     it('refreshes when storage changes and reports disconnected connection errors', async () => {
         const runtime = createConnectedRuntime();
         let storageListener: (() => void) | null = null;
+        mockConnectRuntimeReverb
+            .mockResolvedValueOnce(runtime.response)
+            .mockResolvedValueOnce({
+                kind: 'disconnected',
+                endpoint: 'wss://atlas.test/reverb',
+                detail: 'socket closed',
+            });
 
         const wrapper = await mountComponent(
             vi.fn((listener: () => void) => {
@@ -147,5 +226,27 @@ describe('OptionsReverbFeed', () => {
         await flushPromises();
 
         expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(2);
+        expect(wrapper.text()).toContain('socket closed');
+    });
+
+    it('removes the storage listener and disconnects the active monitor on unmount', async () => {
+        const runtime = createConnectedRuntime();
+        const storageAddListener = vi.fn();
+        const storageRemoveListener = vi.fn();
+        mockConnectRuntimeReverb.mockResolvedValueOnce(runtime.response);
+
+        const wrapper = await mountComponent(storageAddListener, storageRemoveListener);
+        await flushPromises();
+        runtime.emitState('connected');
+        await flushPromises();
+
+        wrapper.unmount();
+
+        expect(storageAddListener).toHaveBeenCalledTimes(1);
+        expect(storageRemoveListener).toHaveBeenCalledTimes(1);
+        expect(runtime.unsubscribeEvent).toHaveBeenCalledTimes(1);
+        expect(runtime.unsubscribeError).toHaveBeenCalledTimes(1);
+        expect(runtime.unsubscribeState).toHaveBeenCalledTimes(1);
+        expect(runtime.client.disconnect).toHaveBeenCalledTimes(1);
     });
 });

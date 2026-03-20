@@ -276,6 +276,17 @@ describe('OptionsApp', () => {
         expect(toggleButton!.text()).toBe('Hide');
     });
 
+    it('shows duplicate-profile validation errors from the site profile editor', async () => {
+        const wrapper = await mountOptionsApp();
+        await flushPromises();
+
+        await wrapper.get('[data-test-new-customization-domain]').setValue('example.com');
+        await wrapper.get('[data-test-add-customization-domain]').trigger('click');
+
+        expect(wrapper.text()).toContain('Domain "example.com" already exists.');
+        expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
+    });
+
     it('saves normalized connection settings and refreshes the status cards', async () => {
         vi.useFakeTimers();
 

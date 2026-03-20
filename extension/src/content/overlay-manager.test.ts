@@ -2,13 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const triggerReaction = vi.fn();
 const unmount = vi.fn();
+const triggerReactionByMedia = new WeakMap<Element, ReturnType<typeof vi.fn>>();
+const unmountByMedia = new WeakMap<Element, ReturnType<typeof vi.fn>>();
 
 vi.mock('./reaction-badge-app', () => ({
-    createReactionBadgeHost: () => ({
-        element: document.createElement('div'),
-        triggerReaction,
-        unmount,
-    }),
+    createReactionBadgeHost: (media: Element) => {
+        const mediaTriggerReaction = vi.fn();
+        const mediaUnmount = vi.fn();
+        triggerReactionByMedia.set(media, mediaTriggerReaction);
+        unmountByMedia.set(media, mediaUnmount);
+
+        return {
+            element: document.createElement('div'),
+            triggerReaction: (type: string) => {
+                triggerReaction(type);
+                mediaTriggerReaction(type);
+            },
+            unmount: () => {
+                unmount();
+                mediaUnmount();
+            },
+        };
+    },
 }));
 
 function createRect(left: number, top: number, width: number, height: number): DOMRect {
@@ -25,19 +40,31 @@ function createRect(left: number, top: number, width: number, height: number): D
     } as DOMRect;
 }
 
-function appendTrackedImage(): { image: HTMLImageElement; wrapper: HTMLDivElement } {
+function appendTrackedImage(options?: {
+    parentRect?: DOMRect;
+    imageRect?: DOMRect;
+    insideDialog?: boolean;
+}): { image: HTMLImageElement; wrapper: HTMLDivElement } {
+    const root = options?.insideDialog ? document.createElement('div') : document.body;
+    if (options?.insideDialog) {
+        root.setAttribute('role', 'dialog');
+    }
+
     const wrapper = document.createElement('div');
     const image = document.createElement('img');
     wrapper.appendChild(image);
-    document.body.appendChild(wrapper);
+    root.appendChild(wrapper);
+    if (root !== document.body) {
+        document.body.appendChild(root);
+    }
 
     Object.defineProperty(wrapper, 'getBoundingClientRect', {
         configurable: true,
-        value: () => createRect(0, 0, 320, 240),
+        value: () => options?.parentRect ?? createRect(0, 0, 320, 240),
     });
     Object.defineProperty(image, 'getBoundingClientRect', {
         configurable: true,
-        value: () => createRect(40, 50, 180, 120),
+        value: () => options?.imageRect ?? createRect(40, 50, 180, 120),
     });
 
     return { image, wrapper };
@@ -87,5 +114,91 @@ describe('OverlayManager', () => {
         expect(triggerReaction).toHaveBeenCalledWith('like');
 
         manager.remove(image);
+    });
+
+    it('keeps Alt+contextmenu and Alt+middle-click reactions working', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const { image } = appendTrackedImage();
+
+        manager.apply(image);
+
+        const contextmenuEvent = new MouseEvent('contextmenu', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            clientX: 90,
+            clientY: 100,
+        });
+        image.dispatchEvent(contextmenuEvent);
+
+        const middleClickEvent = new MouseEvent('mousedown', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            button: 1,
+            clientX: 90,
+            clientY: 100,
+        });
+        image.dispatchEvent(middleClickEvent);
+
+        expect(contextmenuEvent.defaultPrevented).toBe(true);
+        expect(middleClickEvent.defaultPrevented).toBe(true);
+        expect(triggerReaction).toHaveBeenNthCalledWith(1, 'dislike');
+        expect(triggerReaction).toHaveBeenNthCalledWith(2, 'love');
+
+        manager.remove(image);
+    });
+
+    it('prefers dialog media when multiple active media overlap at the pointer', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const regularImage = appendTrackedImage({
+            parentRect: createRect(0, 0, 320, 240),
+            imageRect: createRect(80, 80, 160, 120),
+        }).image;
+        const dialogImage = appendTrackedImage({
+            insideDialog: true,
+            parentRect: createRect(0, 0, 320, 240),
+            imageRect: createRect(70, 70, 180, 140),
+        }).image;
+
+        manager.apply(regularImage);
+        manager.apply(dialogImage);
+
+        dialogImage.dispatchEvent(new MouseEvent('click', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: 120,
+            clientY: 120,
+        }));
+
+        expect(triggerReactionByMedia.get(dialogImage)).toHaveBeenCalledWith('like');
+        expect(triggerReactionByMedia.get(regularImage)).not.toHaveBeenCalled();
+
+        manager.remove(regularImage);
+        manager.remove(dialogImage);
+    });
+
+    it('pins the badge to the viewport when the media parent is collapsed', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const { image } = appendTrackedImage({
+            parentRect: createRect(0, 0, 0, 0),
+            imageRect: createRect(40, 50, 180, 120),
+        });
+
+        manager.apply(image);
+
+        const badge = document.querySelector('[data-atlas-media-red-badge="1"]');
+        expect(badge).toBeInstanceOf(HTMLDivElement);
+        expect(badge?.parentElement).toBe(document.body);
+        expect((badge as HTMLDivElement).style.position).toBe('fixed');
+        expect((badge as HTMLDivElement).style.display).toBe('block');
+
+        manager.remove(image);
+        expect(unmountByMedia.get(image)).toHaveBeenCalledTimes(1);
     });
 });

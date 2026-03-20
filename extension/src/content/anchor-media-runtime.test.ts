@@ -176,4 +176,83 @@ describe('anchor-media-runtime', () => {
         expect(mockGetCachedReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', ['tag', 'tags']);
         expect(mockEnqueueReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', ['tag', 'tags']);
     });
+
+    it('marks changed anchors as already open elsewhere when tab presence changes', async () => {
+        mockIsUrlOpenInAnotherTab.mockResolvedValue(true);
+
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post#image-2';
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.handleTabPresenceChanged([anchor.href]);
+        await flushPromises();
+
+        expect(mockInvalidateOpenTabCheckCache).toHaveBeenCalledWith([anchor.href]);
+        expect(mockIsUrlOpenInAnotherTab).toHaveBeenCalledWith(anchor.href);
+        expect(image.getAttribute('data-atlas-anchor-opened-elsewhere')).toBe('1');
+        expect(image.getAttribute('data-atlas-anchor-media-red-border')).toBe('1');
+        expect(image.getAttribute('data-atlas-anchor-media-match')).toBe('0');
+    });
+
+    it('updates matching anchors when download progress events carry reaction metadata', async () => {
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post';
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.handleDownloadProgressEvent({
+            event: 'DownloadTransferQueued',
+            transferId: 55,
+            fileId: 12,
+            referrerUrl: anchor.href,
+            status: 'queued',
+            percent: 10,
+            reaction: 'funny',
+            downloadedAt: '2026-03-21T00:00:00Z',
+            blacklistedAt: null,
+            payload: {
+                file_id: 12,
+            },
+        });
+
+        expect(mockUpsertReferrerCheckCache).toHaveBeenCalledWith(
+            'https://example.com/post',
+            {
+                exists: true,
+                reaction: 'funny',
+                reactedAt: undefined,
+                downloadedAt: '2026-03-21T00:00:00Z',
+                blacklistedAt: null,
+            },
+            [],
+        );
+        expect(image.getAttribute('data-atlas-anchor-media-red-border')).toBe('1');
+        expect(image.getAttribute('data-atlas-anchor-media-match')).toBe('1');
+        expect(image.getAttribute('data-atlas-anchor-reaction')).toBe('funny');
+        expect(image.getAttribute('data-atlas-anchor-downloaded-at')).toBe('2026-03-21T00:00:00Z');
+        expect(image.getAttribute('data-atlas-anchor-blacklisted-at')).toBeNull();
+    });
 });
