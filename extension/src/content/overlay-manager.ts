@@ -184,6 +184,16 @@ export class OverlayManager {
         badge.style.display = 'block';
     }
 
+    private findActiveMediaAtPoint(x: number, y: number): MediaElement | null {
+        const directMedia = document.elementsFromPoint(x, y)
+            .find((element) => this.isActiveConnectedMedia(element));
+        if (directMedia && (directMedia instanceof HTMLImageElement || directMedia instanceof HTMLVideoElement)) {
+            return directMedia;
+        }
+
+        return null;
+    }
+
     private findActiveMediaCandidatesAtPoint(x: number, y: number): MediaElement[] {
         return Array.from(this.activeMedia)
             .filter((media) => this.isActiveConnectedMedia(media))
