@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockResolveApiConnectionStatus = vi.fn();
 const mockGetStoredOptions = vi.fn();
@@ -120,6 +120,10 @@ describe('OptionsApp', () => {
         });
 
         mockClipboardWriteText.mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('renders one domain list and switches tabs for the selected domain', async () => {
@@ -249,5 +253,93 @@ describe('OptionsApp', () => {
             'example.com',
         ]);
         expect(wrapper.text()).toContain('Copied to clipboard.');
+    });
+
+    it('toggles API key visibility and renders the live connection endpoint', async () => {
+        const wrapper = await mountOptionsApp();
+        await flushPromises();
+
+        const apiKeyInput = wrapper.findAll('input')
+            .find((input) => input.attributes('autocomplete') === 'off');
+        expect(apiKeyInput).toBeTruthy();
+        expect(apiKeyInput!.attributes('type')).toBe('password');
+        expect(wrapper.text()).toContain('Connected.');
+        expect(wrapper.text()).toContain('wss://atlas.test/reverb');
+
+        const toggleButton = wrapper.findAll('button')
+            .find((button) => button.text() === 'Show');
+        expect(toggleButton).toBeTruthy();
+
+        await toggleButton!.trigger('click');
+
+        expect(apiKeyInput!.attributes('type')).toBe('text');
+        expect(toggleButton!.text()).toBe('Hide');
+    });
+
+    it('saves normalized connection settings and refreshes the status cards', async () => {
+        vi.useFakeTimers();
+
+        mockResolveApiConnectionStatus.mockReset();
+        mockResolveApiConnectionStatus
+            .mockResolvedValueOnce({
+                label: 'Ready',
+                detail: 'Connected.',
+                reverbLabel: 'Connected',
+                reverbDetail: 'Listening.',
+                reverbEndpoint: 'wss://atlas.test/reverb',
+            })
+            .mockResolvedValueOnce({
+                label: 'Auth failed',
+                detail: 'API key or domain is invalid. Update extension options.',
+                reverbLabel: 'Unavailable',
+                reverbDetail: 'Cannot test Reverb until API auth succeeds.',
+                reverbEndpoint: null,
+            });
+
+        const wrapper = await mountOptionsApp();
+        await flushPromises();
+
+        await wrapper.get('input[type="url"]').setValue('https://atlas.example.com///');
+        const apiKeyInput = wrapper.findAll('input')
+            .find((input) => input.attributes('autocomplete') === 'off');
+        expect(apiKeyInput).toBeTruthy();
+        await apiKeyInput!.setValue(' next-token ');
+
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(mockSaveStoredOptions).toHaveBeenCalledWith(
+            'https://atlas.example.com',
+            ' next-token ',
+            [
+                {
+                    domain: 'civitai.com',
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: [],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: ['civitaiCanonical'],
+                    },
+                },
+                {
+                    domain: 'example.com',
+                    matchRules: ['.*\\/gallery\\/.*'],
+                    referrerCleaner: {
+                        stripQueryParams: ['tag'],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: [],
+                    },
+                },
+            ],
+        );
+        expect(wrapper.text()).toContain('Saved.');
+        expect(wrapper.text()).toContain('API key or domain is invalid. Update extension options.');
+        expect(wrapper.text()).toContain('Cannot test Reverb until API auth succeeds.');
     });
 });
