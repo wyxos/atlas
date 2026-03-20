@@ -16,8 +16,20 @@ export interface ContainerBlacklist {
     updated_at?: string;
 }
 
+export interface ContainerBlacklistFileStats {
+    unreacted: number;
+    blacklisted: number;
+    positive: number;
+}
+
+export interface ContainerBlacklistStatus {
+    blacklisted: boolean;
+    blacklisted_at: string | null;
+    action_type: ContainerBlacklistActionType | null;
+    file_stats: ContainerBlacklistFileStats;
+}
+
 export interface CreateContainerBlacklistPayload {
     container_id: number;
     action_type: ContainerBlacklistActionType;
 }
-
