@@ -13,12 +13,32 @@ type BrowserTab = {
     active?: boolean;
 };
 
+type TabEventName = 'onActivated' | 'onCreated' | 'onRemoved' | 'onUpdated';
+type TabListener = () => void;
+
 type ChromeMockOptions = {
     discardResponse?: unknown;
     openOptionsFallback?: boolean;
 };
 
 function createChromeMock(tabs: BrowserTab[], options: ChromeMockOptions = {}) {
+    const tabListeners: Record<TabEventName, TabListener[]> = {
+        onActivated: [],
+        onCreated: [],
+        onRemoved: [],
+        onUpdated: [],
+    };
+    const createTabEvent = (eventName: TabEventName) => ({
+        addListener: vi.fn((listener: TabListener) => {
+            tabListeners[eventName].push(listener);
+        }),
+        removeListener: vi.fn((listener: TabListener) => {
+            const index = tabListeners[eventName].indexOf(listener);
+            if (index !== -1) {
+                tabListeners[eventName].splice(index, 1);
+            }
+        }),
+    });
     const runtime = {
         getManifest: () => ({
             version: '1.2.3',
@@ -55,23 +75,12 @@ function createChromeMock(tabs: BrowserTab[], options: ChromeMockOptions = {}) {
                 callback(tabs);
             }),
             create: vi.fn(),
-            onActivated: {
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-            },
-            onCreated: {
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-            },
-            onRemoved: {
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-            },
-            onUpdated: {
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-            },
+            onActivated: createTabEvent('onActivated'),
+            onCreated: createTabEvent('onCreated'),
+            onRemoved: createTabEvent('onRemoved'),
+            onUpdated: createTabEvent('onUpdated'),
         },
+        getTabListeners: (eventName: TabEventName) => [...tabListeners[eventName]],
     };
 }
 
@@ -124,6 +133,19 @@ describe('App', () => {
         await flushPromises();
 
         expect(wrapper.text()).toContain('Tabs 2/3');
+    });
+
+    it('renders the current connection status and reverb endpoint', async () => {
+        const { wrapper } = await mountApp([]);
+
+        await vi.runAllTimersAsync();
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Ready');
+        expect(wrapper.text()).toContain('Connected.');
+        expect(wrapper.text()).toContain('Reverb: Connected');
+        expect(wrapper.text()).toContain('Listening.');
+        expect(wrapper.text()).toContain('wss://atlas.test/reverb');
     });
 
     it('opens the options page from the popup', async () => {
@@ -183,6 +205,25 @@ describe('App', () => {
         expect(wrapper.text()).toContain('Discarded 2 tabs, skipped 3 already discarded, failed 1.');
     });
 
+    it('shows a no-op message when there are no inactive tabs to discard', async () => {
+        const { wrapper } = await mountApp([], {
+            discardResponse: {
+                ok: true,
+                discardedCount: 0,
+                failedCount: 0,
+                skippedCount: 0,
+            },
+        });
+
+        await vi.runAllTimersAsync();
+        await flushPromises();
+
+        await wrapper.get('[data-test="discard-inactive-tabs"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('No inactive tabs to discard.');
+    });
+
     it('shows a failure message when discarding inactive tabs does not return a valid response', async () => {
         const { wrapper } = await mountApp([], {
             discardResponse: null,
@@ -195,5 +236,32 @@ describe('App', () => {
         await flushPromises();
 
         expect(wrapper.text()).toContain('Failed to discard inactive tabs.');
+    });
+
+    it('refreshes tab counts from tab listeners and unregisters them on unmount', async () => {
+        const tabs: BrowserTab[] = [
+            { id: 1, url: 'https://example.com/post-1', active: true },
+        ];
+        const { chromeMock, wrapper } = await mountApp(tabs);
+
+        await vi.runAllTimersAsync();
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Tabs 1/1');
+
+        tabs.push({ id: 2, url: 'https://example.com/post-2' });
+        chromeMock.getTabListeners('onUpdated')[0]?.();
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Tabs 2/2');
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(4);
+
+        wrapper.unmount();
+
+        expect(chromeMock.tabs.onCreated.removeListener).toHaveBeenCalledTimes(1);
+        expect(chromeMock.tabs.onRemoved.removeListener).toHaveBeenCalledTimes(1);
+        expect(chromeMock.tabs.onUpdated.removeListener).toHaveBeenCalledTimes(1);
+        expect(chromeMock.tabs.onActivated.removeListener).toHaveBeenCalledTimes(1);
+        expect(chromeMock.getTabListeners('onUpdated')).toHaveLength(0);
     });
 });

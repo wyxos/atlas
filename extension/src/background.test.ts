@@ -40,8 +40,24 @@ function createChromeMock(initialTabs: BrowserTab[]) {
                 callback([...tabs]);
             }),
             sendMessage: vi.fn(),
-            remove: vi.fn(),
-            discard: vi.fn(),
+            remove: vi.fn((tabId: number, callback?: () => void) => {
+                const index = tabs.findIndex((tab) => tab.id === tabId);
+                if (index >= 0) {
+                    tabs.splice(index, 1);
+                }
+
+                callback?.();
+            }),
+            discard: vi.fn((tabId: number, callback?: (tab?: BrowserTab) => void) => {
+                const tab = tabs.find((item) => item.id === tabId);
+                if (!tab) {
+                    callback?.(undefined);
+                    return;
+                }
+
+                tab.discarded = true;
+                callback?.({ ...tab });
+            }),
             onCreated: {
                 addListener: vi.fn(),
             },
