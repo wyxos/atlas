@@ -107,6 +107,7 @@ describe('OptionsReverbFeed', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        vi.restoreAllMocks();
     });
 
     it('renders a connected reverb session, logs events, and clears them', async () => {
@@ -199,7 +200,7 @@ describe('OptionsReverbFeed', () => {
 
     it('refreshes when storage changes and reports disconnected connection errors', async () => {
         const runtime = createConnectedRuntime();
-        let storageListener: (() => void) | null = null;
+        let storageListener: ((changes: Record<string, unknown>) => void) | null = null;
         mockConnectRuntimeReverb
             .mockResolvedValueOnce(runtime.response)
             .mockResolvedValueOnce({
@@ -209,7 +210,7 @@ describe('OptionsReverbFeed', () => {
             });
 
         const wrapper = await mountComponent(
-            vi.fn((listener: () => void) => {
+            vi.fn((listener: (changes: Record<string, unknown>) => void) => {
                 storageListener = listener;
             }),
         );
@@ -222,7 +223,57 @@ describe('OptionsReverbFeed', () => {
         expect(wrapper.text()).toContain('Disconnected');
         expect(wrapper.text()).toContain('Reverb websocket error. socket refused');
 
-        storageListener?.();
+        storageListener?.({
+            apiToken: {
+                oldValue: 'old',
+                newValue: 'new',
+            },
+        });
+        await flushPromises();
+
+        expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(2);
+        expect(wrapper.text()).toContain('socket closed');
+    });
+
+    it('ignores unrelated storage changes and only refreshes for atlas settings', async () => {
+        const runtime = createConnectedRuntime();
+        let storageListener: ((changes: Record<string, unknown>) => void) | null = null;
+        mockConnectRuntimeReverb
+            .mockResolvedValueOnce(runtime.response)
+            .mockResolvedValueOnce({
+                kind: 'disconnected',
+                endpoint: 'wss://atlas.test/reverb',
+                detail: 'socket closed',
+            });
+
+        const wrapper = await mountComponent(
+            vi.fn((listener: (changes: Record<string, unknown>) => void) => {
+                storageListener = listener;
+            }),
+        );
+        await flushPromises();
+
+        runtime.emitState('connected');
+        await flushPromises();
+
+        expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(1);
+
+        storageListener?.({
+            unrelatedKey: {
+                oldValue: 'old',
+                newValue: 'new',
+            },
+        });
+        await flushPromises();
+
+        expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(1);
+
+        storageListener?.({
+            apiToken: {
+                oldValue: 'old',
+                newValue: 'new',
+            },
+        });
         await flushPromises();
 
         expect(mockConnectRuntimeReverb).toHaveBeenCalledTimes(2);
