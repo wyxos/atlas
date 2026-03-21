@@ -19,9 +19,16 @@ type RuntimeMessageListener = (
     sendResponse: (response?: unknown) => void,
 ) => boolean | void;
 
+type TabCreatedListener = (tab: BrowserTab) => void;
+type TabRemovedListener = (tabId: number) => void;
+type TabUpdatedListener = (tabId: number, changeInfo: { url?: string; status?: string }, tab: BrowserTab) => void;
+
 function createChromeMock(initialTabs: BrowserTab[]) {
     const tabs = [...initialTabs];
     let runtimeMessageListener: RuntimeMessageListener | null = null;
+    let tabCreatedListener: TabCreatedListener | null = null;
+    let tabRemovedListener: TabRemovedListener | null = null;
+    let tabUpdatedListener: TabUpdatedListener | null = null;
 
     const chromeMock = {
         runtime: {
@@ -59,13 +66,19 @@ function createChromeMock(initialTabs: BrowserTab[]) {
                 callback?.({ ...tab });
             }),
             onCreated: {
-                addListener: vi.fn(),
+                addListener: vi.fn((listener: TabCreatedListener) => {
+                    tabCreatedListener = listener;
+                }),
             },
             onRemoved: {
-                addListener: vi.fn(),
+                addListener: vi.fn((listener: TabRemovedListener) => {
+                    tabRemovedListener = listener;
+                }),
             },
             onUpdated: {
-                addListener: vi.fn(),
+                addListener: vi.fn((listener: TabUpdatedListener) => {
+                    tabUpdatedListener = listener;
+                }),
             },
         },
     };
@@ -73,6 +86,29 @@ function createChromeMock(initialTabs: BrowserTab[]) {
     return {
         chromeMock,
         getRuntimeMessageListener: () => runtimeMessageListener,
+        triggerTabCreated: (tab: BrowserTab) => {
+            if (typeof tab.id === 'number') {
+                tabs.push({ ...tab });
+            }
+
+            tabCreatedListener?.(tab);
+        },
+        triggerTabRemoved: (tabId: number) => {
+            const index = tabs.findIndex((tab) => tab.id === tabId);
+            if (index >= 0) {
+                tabs.splice(index, 1);
+            }
+
+            tabRemovedListener?.(tabId);
+        },
+        triggerTabUpdated: (tabId: number, changeInfo: { url?: string; status?: string }, nextTab: BrowserTab) => {
+            const index = tabs.findIndex((tab) => tab.id === tabId);
+            if (index >= 0) {
+                tabs[index] = { ...tabs[index], ...nextTab };
+            }
+
+            tabUpdatedListener?.(tabId, changeInfo, nextTab);
+        },
     };
 }
 
@@ -185,6 +221,67 @@ describe('background', () => {
             count: 3,
             similarDomainCount: 2,
         });
+    });
+
+    it('broadcasts tab counts using precomputed domain groups', async () => {
+        const { chromeMock, getRuntimeMessageListener, triggerTabCreated } = createChromeMock([
+            { id: 1, url: 'https://www.civitai.com/models/1' },
+            { id: 2, url: 'https://images.civitai.com/image/2' },
+            { id: 3, url: 'https://example.com/post' },
+        ]);
+        vi.stubGlobal('chrome', chromeMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(1);
+
+        triggerTabCreated({ id: 4, url: 'https://images.civitai.com/image/4' });
+
+        const countMessages = chromeMock.tabs.sendMessage.mock.calls.filter((call) => {
+            const payload = call[1] as { type?: string } | undefined;
+            return payload?.type === 'ATLAS_TAB_COUNT_CHANGED';
+        });
+
+        expect(countMessages).toEqual([
+            [
+                1,
+                {
+                    type: 'ATLAS_TAB_COUNT_CHANGED',
+                    count: 4,
+                    similarDomainCount: 3,
+                },
+                expect.any(Function),
+            ],
+            [
+                2,
+                {
+                    type: 'ATLAS_TAB_COUNT_CHANGED',
+                    count: 4,
+                    similarDomainCount: 3,
+                },
+                expect.any(Function),
+            ],
+            [
+                3,
+                {
+                    type: 'ATLAS_TAB_COUNT_CHANGED',
+                    count: 4,
+                    similarDomainCount: 1,
+                },
+                expect.any(Function),
+            ],
+            [
+                4,
+                {
+                    type: 'ATLAS_TAB_COUNT_CHANGED',
+                    count: 4,
+                    similarDomainCount: 3,
+                },
+                expect.any(Function),
+            ],
+        ]);
     });
 
     it('proxies allowed Atlas API requests through the background worker', async () => {

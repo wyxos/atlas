@@ -6,7 +6,7 @@ import { collectCookiesForUrls } from './background-cookie-runtime';
 import { notifyTabsExtensionReloaded } from './background-reload-overlay';
 import { normalizeComparableUrls } from './background-url-utils';
 import { normalizeComparableOpenTabUrl } from './open-tab-url';
-import { summarizeTabCounts } from './tab-counts';
+import { resolveTabDomainGroupKey, summarizeTabCounts } from './tab-counts';
 
 type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
@@ -162,24 +162,39 @@ function broadcastTabPresenceChanged(urls: string[]): void {
 
 function broadcastTabCountChanged(): void {
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
-        const count = Array.isArray(tabs) ? tabs.length : 0;
         const safeTabs = Array.isArray(tabs) ? tabs : [];
+        const count = safeTabs.length;
+        const domainCounts = new Map<string, number>();
+        const tabRows: Array<{ tabId: number; similarDomainKey: string | null }> = [];
 
-        safeTabs.forEach((tab) => {
+        for (const tab of safeTabs) {
             if (typeof tab.id !== 'number') {
-                return;
+                continue;
             }
 
-            const summary = summarizeTabCounts(safeTabs, tab.url ?? null);
+            const similarDomainKey = resolveTabDomainGroupKey(tab.url ?? null);
+            tabRows.push({
+                tabId: tab.id,
+                similarDomainKey,
+            });
+
+            if (similarDomainKey !== null) {
+                domainCounts.set(similarDomainKey, (domainCounts.get(similarDomainKey) ?? 0) + 1);
+            }
+        }
+
+        for (const row of tabRows) {
             const message: TabCountChangedMessage = {
                 type: 'ATLAS_TAB_COUNT_CHANGED',
                 count,
-                similarDomainCount: summary.similarDomainCount,
+                similarDomainCount: row.similarDomainKey === null
+                    ? null
+                    : (domainCounts.get(row.similarDomainKey) ?? 0),
             };
-            chrome.tabs.sendMessage(tab.id, message, () => {
+            chrome.tabs.sendMessage(row.tabId, message, () => {
                 void chrome.runtime.lastError;
             });
-        });
+        }
     });
 }
 
