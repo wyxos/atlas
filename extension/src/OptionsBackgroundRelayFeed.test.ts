@@ -47,6 +47,7 @@ describe('OptionsBackgroundRelayFeed', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        vi.restoreAllMocks();
     });
 
     it('renders the background relay snapshot and clears logged events', async () => {
@@ -195,4 +196,5 @@ describe('OptionsBackgroundRelayFeed', () => {
         await flushPromises();
         expect(sendMessage).toHaveBeenCalledTimes(3);
     });
+
 });

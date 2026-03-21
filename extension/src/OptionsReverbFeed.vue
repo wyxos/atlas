@@ -18,6 +18,8 @@ const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
 const reverbEvents = ref<ReverbEventLogEntry[]>([]);
 
+const RELEVANT_STORAGE_KEYS = new Set(['atlasDomain', 'apiToken']);
+
 let activeReverbClient: ReverbClient | null = null;
 let activeReverbStateSubscription: ReverbSubscription | null = null;
 let activeReverbErrorSubscription: ReverbSubscription | null = null;
@@ -89,6 +91,32 @@ function pushReverbEvent(event: ProgressEvent): void {
     ].slice(0, MAX_REVERB_EVENT_LOG_ROWS);
 }
 
+function isDocumentHidden(): boolean {
+    const override = (globalThis as typeof globalThis & {
+        __atlasDiagnosticsHiddenOverride?: boolean | null;
+    }).__atlasDiagnosticsHiddenOverride;
+
+    if (override !== undefined && override !== null) {
+        return override;
+    }
+
+    return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+function hasRelevantStorageChanges(changes?: Record<string, unknown> | null): boolean {
+    if (!changes) {
+        return false;
+    }
+
+    for (const key of Object.keys(changes)) {
+        if (RELEVANT_STORAGE_KEYS.has(key)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 async function refreshReverbMonitor(): Promise<void> {
     const currentSequence = ++reverbMonitorSequence;
     disconnectActiveReverbMonitor();
@@ -157,7 +185,19 @@ async function refreshReverbMonitor(): Promise<void> {
     }
 }
 
-function handleStorageChanged(): void {
+function handleStorageChanged(changes?: Record<string, unknown> | null): void {
+    if (isDocumentHidden() || !hasRelevantStorageChanges(changes)) {
+        return;
+    }
+
+    void refreshReverbMonitor();
+}
+
+function handleVisibilityChange(): void {
+    if (isDocumentHidden()) {
+        return;
+    }
+
     void refreshReverbMonitor();
 }
 
@@ -166,7 +206,11 @@ onMounted(() => {
         chrome.storage.onChanged.addListener(handleStorageChanged);
     }
 
-    void refreshReverbMonitor();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    if (!isDocumentHidden()) {
+        void refreshReverbMonitor();
+    }
 });
 
 onBeforeUnmount(() => {
@@ -174,6 +218,7 @@ onBeforeUnmount(() => {
     if (chrome.storage?.onChanged) {
         chrome.storage.onChanged.removeListener(handleStorageChanged);
     }
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
     disconnectActiveReverbMonitor();
 });
 </script>
