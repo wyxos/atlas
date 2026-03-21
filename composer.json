@@ -19,7 +19,8 @@
         "pusher/pusher-php-server": "*",
         "sentry/sentry-laravel": "^4.20",
         "typesense/typesense-php": "^5.2",
-        "wyxos/harmonie": "1.6.13"
+        "wyxos/harmonie": "1.6.13",
+        "wyxos/shift-php": "^1.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

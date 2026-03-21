@@ -139,6 +139,7 @@ describe('App', () => {
         const { wrapper } = await mountApp([]);
 
         await vi.runAllTimersAsync();
+        await vi.dynamicImportSettled();
         await flushPromises();
 
         expect(wrapper.text()).toContain('Ready');
