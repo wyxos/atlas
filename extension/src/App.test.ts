@@ -251,6 +251,7 @@ describe('App', () => {
 
         tabs.push({ id: 2, url: 'https://example.com/post-2' });
         chromeMock.getTabListeners('onUpdated')[0]?.();
+        await vi.runOnlyPendingTimersAsync();
         await flushPromises();
 
         expect(wrapper.text()).toContain('Tabs 2/2');
@@ -263,5 +264,33 @@ describe('App', () => {
         expect(chromeMock.tabs.onUpdated.removeListener).toHaveBeenCalledTimes(1);
         expect(chromeMock.tabs.onActivated.removeListener).toHaveBeenCalledTimes(1);
         expect(chromeMock.getTabListeners('onUpdated')).toHaveLength(0);
+    });
+
+    it('coalesces bursts of tab events into a single tab-count refresh', async () => {
+        const tabs: BrowserTab[] = [
+            { id: 1, url: 'https://www.civitai.com/models/1', active: true },
+            { id: 2, url: 'https://images.civitai.com/image/2' },
+            { id: 3, url: 'https://example.com/post' },
+        ];
+        const { chromeMock, wrapper } = await mountApp(tabs);
+
+        await vi.runAllTimersAsync();
+        await flushPromises();
+
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(2);
+
+        chromeMock.getTabListeners('onUpdated')[0]?.();
+        chromeMock.getTabListeners('onCreated')[0]?.();
+        chromeMock.getTabListeners('onActivated')[0]?.();
+
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(2);
+
+        await vi.runOnlyPendingTimersAsync();
+        await flushPromises();
+
+        expect(chromeMock.tabs.query).toHaveBeenCalledTimes(4);
+        expect(wrapper.text()).toContain('Tabs 2/3');
+
+        wrapper.unmount();
     });
 });

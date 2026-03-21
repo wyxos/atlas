@@ -15,6 +15,7 @@ const tabCountSummary = ref<TabCountSummary | null>(null);
 const isDiscardingTabs = ref(false);
 const discardTabsResult = ref<string | null>(null);
 let statusRefreshHandle: number | null = null;
+let tabCountRefreshHandle: number | null = null;
 let isPopupActive = true;
 const tabCountLabel = computed(() => formatTabCountSummary(tabCountSummary.value));
 
@@ -81,7 +82,14 @@ async function refreshTabCount(): Promise<void> {
 }
 
 function handleTabPresenceChanged(): void {
-    void refreshTabCount();
+    if (tabCountRefreshHandle !== null) {
+        return;
+    }
+
+    tabCountRefreshHandle = window.setTimeout(() => {
+        tabCountRefreshHandle = null;
+        void refreshTabCount();
+    }, 0);
 }
 
 async function refreshConnectionStatus(): Promise<void> {
@@ -182,6 +190,10 @@ onUnmounted(() => {
     if (statusRefreshHandle !== null) {
         window.clearTimeout(statusRefreshHandle);
         statusRefreshHandle = null;
+    }
+    if (tabCountRefreshHandle !== null) {
+        window.clearTimeout(tabCountRefreshHandle);
+        tabCountRefreshHandle = null;
     }
 
     chrome.tabs?.onCreated?.removeListener(handleTabPresenceChanged);
