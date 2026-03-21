@@ -39,15 +39,20 @@ async function mountComponent(sendMessage: (message: unknown, callback: (respons
 }
 
 describe('OptionsBackgroundRelayFeed', () => {
+    let documentHiddenSpy: ReturnType<typeof vi.spyOn> | null = null;
+
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
         vi.unstubAllGlobals();
+        documentHiddenSpy = vi.spyOn(document, 'hidden', 'get');
+        documentHiddenSpy.mockReturnValue(false);
     });
 
     afterEach(() => {
         vi.useRealTimers();
         vi.restoreAllMocks();
+        documentHiddenSpy = null;
     });
 
     it('renders the background relay snapshot and clears logged events', async () => {
@@ -195,6 +200,46 @@ describe('OptionsBackgroundRelayFeed', () => {
         await vi.advanceTimersByTimeAsync(4_000);
         await flushPromises();
         expect(sendMessage).toHaveBeenCalledTimes(3);
+    });
+
+    it('pauses polling while hidden and resumes when visible', async () => {
+        vi.useFakeTimers();
+
+        const sendMessage = vi.fn((message: { type?: string }, callback: (response: unknown) => void) => {
+            if (message.type !== 'ATLAS_GET_DOWNLOAD_PROGRESS_DEBUG_STATE') {
+                callback({ ok: true });
+                return;
+            }
+
+            callback({
+                ok: true,
+                snapshot: createSnapshot('connected', {
+                    subscriberTabCount: sendMessage.mock.calls
+                        .filter(([payload]) => (payload as { type?: string }).type === 'ATLAS_GET_DOWNLOAD_PROGRESS_DEBUG_STATE')
+                        .length,
+                }),
+            });
+        });
+
+        const wrapper = await mountComponent(sendMessage);
+        await flushPromises();
+
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+
+        documentHiddenSpy?.mockReturnValue(true);
+
+        await vi.advanceTimersByTimeAsync(2_000);
+        await flushPromises();
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+
+        documentHiddenSpy?.mockReturnValue(false);
+
+        await vi.advanceTimersByTimeAsync(2_000);
+        await flushPromises();
+        expect(sendMessage).toHaveBeenCalledTimes(2);
+        expect(wrapper.text()).toContain('2');
+
+        wrapper.unmount();
     });
 
 });

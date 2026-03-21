@@ -16,7 +16,6 @@ const isLoading = ref(true);
 const hasError = ref(false);
 
 let pollTimer: number | null = null;
-let visibilityChangeListenerBound = false;
 
 const statusLabel = computed(() => {
     if (snapshot.value === null) {
@@ -118,6 +117,10 @@ function startPolling(): void {
     }
 
     pollTimer = window.setInterval(() => {
+        if (document.hidden) {
+            return;
+        }
+
         void refreshSnapshot();
     }, POLL_INTERVAL_MS);
 }
@@ -129,28 +132,6 @@ function stopPolling(): void {
 
     window.clearInterval(pollTimer);
     pollTimer = null;
-}
-
-function isDocumentHidden(): boolean {
-    const override = (globalThis as typeof globalThis & {
-        __atlasDiagnosticsHiddenOverride?: boolean | null;
-    }).__atlasDiagnosticsHiddenOverride;
-
-    if (override !== undefined && override !== null) {
-        return override;
-    }
-
-    return typeof document !== 'undefined' && document.visibilityState === 'hidden';
-}
-
-function handleVisibilityChange(): void {
-    if (isDocumentHidden()) {
-        stopPolling();
-        return;
-    }
-
-    void refreshSnapshot();
-    startPolling();
 }
 
 async function clearEvents(): Promise<void> {
@@ -168,25 +149,12 @@ async function clearEvents(): Promise<void> {
 }
 
 onMounted(() => {
-    if (!visibilityChangeListenerBound) {
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        visibilityChangeListenerBound = true;
-    }
-
-    if (isDocumentHidden()) {
-        return;
-    }
-
     void refreshSnapshot();
     startPolling();
 });
 
 onBeforeUnmount(() => {
     stopPolling();
-    if (visibilityChangeListenerBound) {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        visibilityChangeListenerBound = false;
-    }
 });
 </script>
 
