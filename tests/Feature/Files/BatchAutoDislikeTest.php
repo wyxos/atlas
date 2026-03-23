@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\Tab;
@@ -122,15 +123,6 @@ test('batch auto-dislike skips files that do not meet conditions', function () {
         'previewed_count' => 5,
     ]);
 
-    // File with path - should be skipped
-    $fileWithPath = File::factory()->create([
-        'source' => 'civit-ai',
-        'path' => '/some/path.jpg',
-        'blacklisted_at' => null,
-        'auto_disliked' => false,
-        'previewed_count' => 5,
-    ]);
-
     // Blacklisted file - should be skipped
     $blacklistedFile = File::factory()->create([
         'source' => 'civit-ai',
@@ -153,7 +145,6 @@ test('batch auto-dislike skips files that do not meet conditions', function () {
         'file_ids' => [
             $fileWithReaction->id,
             $localFile->id,
-            $fileWithPath->id,
             $blacklistedFile->id,
             $alreadyAutoDislikedFile->id,
         ],
@@ -167,9 +158,72 @@ test('batch auto-dislike skips files that do not meet conditions', function () {
 
     expect($fileWithReaction->fresh()->auto_disliked)->toBeFalse()
         ->and($localFile->fresh()->auto_disliked)->toBeFalse()
-        ->and($fileWithPath->fresh()->auto_disliked)->toBeFalse()
         ->and($blacklistedFile->fresh()->auto_disliked)->toBeFalse()
         ->and($alreadyAutoDislikedFile->fresh()->auto_disliked)->toBeTrue(); // Still true (wasn't changed)
+});
+
+test('batch auto-dislike clears downloaded assets and detaches the auth user tabs', function () {
+    Bus::fake();
+
+    $file = File::factory()->create([
+        'source' => 'civit-ai',
+        'path' => 'downloads/auto-disliked.jpg',
+        'preview_path' => 'thumbnails/auto-disliked.jpg',
+        'poster_path' => 'posters/auto-disliked.jpg',
+        'downloaded' => true,
+        'downloaded_at' => now(),
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'previewed_count' => 5,
+    ]);
+
+    $currentTab = Tab::factory()->for($this->user)->create();
+    $otherUserTab = Tab::factory()->for($this->user)->create();
+    $otherUser = User::factory()->create();
+    $foreignTab = Tab::factory()->for($otherUser)->create();
+
+    $currentTab->files()->attach($file->id, ['position' => 0]);
+    $otherUserTab->files()->attach($file->id, ['position' => 0]);
+    $foreignTab->files()->attach($file->id, ['position' => 0]);
+
+    $response = $this->postJson('/api/files/auto-dislike/batch', [
+        'file_ids' => [$file->id],
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'auto_disliked_count' => 1,
+            'file_ids' => [$file->id],
+        ]);
+
+    expect($file->fresh()->auto_disliked)->toBeTrue()
+        ->and($file->fresh()->path)->toBeNull()
+        ->and($file->fresh()->preview_path)->toBeNull()
+        ->and($file->fresh()->poster_path)->toBeNull()
+        ->and($file->fresh()->downloaded)->toBeFalse()
+        ->and($currentTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeFalse()
+        ->and($otherUserTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeFalse()
+        ->and($foreignTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeTrue();
+
+    expect(Reaction::query()
+        ->where('file_id', $file->id)
+        ->where('user_id', $this->user->id)
+        ->value('type'))->toBe('dislike');
+
+    Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function (DeleteAutoDislikedFileJob $job) {
+        if (! is_array($job->filePath)) {
+            return false;
+        }
+
+        $paths = $job->filePath;
+        sort($paths);
+
+        return $paths === [
+            'downloads/auto-disliked.jpg',
+            'posters/auto-disliked.jpg',
+            'thumbnails/auto-disliked.jpg',
+        ];
+    });
 });
 
 test('batch auto-dislike skips files with reactions from a different user', function () {

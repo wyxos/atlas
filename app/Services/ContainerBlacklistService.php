@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\ActionType;
-use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\Container;
 use App\Models\File;
 
@@ -14,14 +13,23 @@ class ContainerBlacklistService
      *
      * @return array<int>
      */
-    public function apply(Container $container): array
+    public function apply(Container $container, ?int $userId = null): array
     {
         if ($container->blacklisted_at === null || $container->action_type !== ActionType::BLACKLIST) {
             return [];
         }
 
         $files = $container->files()
-            ->select(['files.id', 'files.path', 'files.blacklisted_at'])
+            ->select([
+                'files.id',
+                'files.path',
+                'files.preview_path',
+                'files.poster_path',
+                'files.downloaded',
+                'files.downloaded_at',
+                'files.download_progress',
+                'files.blacklisted_at',
+            ])
             ->whereNull('files.blacklisted_at')
             ->whereDoesntHave('reactions')
             ->get();
@@ -41,9 +49,11 @@ class ContainerBlacklistService
             ->whereIn('id', $fileIds)
             ->update(['blacklisted_at' => now()]);
 
-        foreach ($files->pluck('path')->filter()->all() as $path) {
-            DeleteAutoDislikedFileJob::dispatch($path);
+        if (is_int($userId)) {
+            app(TabFileService::class)->detachFilesFromUserTabs($userId, $fileIds);
         }
+
+        app(DownloadedFileClearService::class)->clearMany($files, syncSearch: false, queueDelete: true);
 
         $this->syncSearch($fileIds);
 

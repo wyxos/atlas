@@ -25,6 +25,7 @@ test('authenticated user can check if container is blacklisted', function () {
     expect($data['file_stats'])->toBe([
         'unreacted' => 0,
         'blacklisted' => 0,
+        'disliked' => 0,
         'positive' => 0,
     ]);
 });
@@ -46,6 +47,7 @@ test('check returns false for non-blacklisted container', function () {
     expect($data['file_stats'])->toBe([
         'unreacted' => 0,
         'blacklisted' => 0,
+        'disliked' => 0,
         'positive' => 0,
     ]);
 });
@@ -109,6 +111,7 @@ test('check returns container file stats scoped to the current user', function (
     expect($response->json('file_stats'))->toBe([
         'unreacted' => 3,
         'blacklisted' => 1,
+        'disliked' => 1,
         'positive' => 1,
     ]);
 });

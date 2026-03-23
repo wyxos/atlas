@@ -650,11 +650,11 @@ SVG;
         // may not have been previewed 3 times yet
         $candidates = $files->filter(static function (File $file): bool {
             return $file->source !== 'local'
-                && empty($file->path)
                 && $file->blacklisted_at === null
                 && ! $file->auto_disliked;
         });
         $candidateFileIds = $candidates->pluck('id')->all();
+        $candidateFilesById = $candidates->keyBy('id');
 
         $validFileIds = [];
         if ($candidateFileIds !== []) {
@@ -678,7 +678,12 @@ SVG;
             ]);
         }
 
-        DB::transaction(function () use ($user, $validFileIds): void {
+        $validFiles = collect($validFileIds)
+            ->map(fn (int $fileId): ?File => $candidateFilesById->get($fileId))
+            ->filter(fn (mixed $file): bool => $file instanceof File)
+            ->values();
+
+        DB::transaction(function () use ($user, $validFileIds, $validFiles): void {
             // Batch update files with auto_disliked = true
             File::query()->whereIn('id', $validFileIds)->update(['auto_disliked' => true]);
 
@@ -717,6 +722,8 @@ SVG;
 
             // Detach files from all tabs belonging to this user
             app(TabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
+
+            app(DownloadedFileClearService::class)->clearMany($validFiles, syncSearch: false, queueDelete: true);
         });
 
         // Keep Typesense in sync (auto_disliked + dislike reaction arrays).

@@ -67,6 +67,10 @@ test('blacklists files for blacklist action type', function () {
         'auto_disliked' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/ab/cd/test.jpg',
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'downloaded_at' => null,
     ]);
     $file->containers()->attach($container->id);
 
@@ -149,6 +153,10 @@ test('does not dispatch delete job when file has no path', function () {
         'auto_disliked' => false,
         'blacklisted_at' => null,
         'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'downloaded_at' => null,
     ]);
     $file->containers()->attach($container->id);
 

@@ -34,8 +34,8 @@ class DeleteAutoDislikedFileJob implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public string $filePath,
-        public array $diskNames = ['atlas-app', 'atlas']
+        public string|array $filePath,
+        public array $diskNames = []
     ) {}
 
     /**
@@ -43,20 +43,32 @@ class DeleteAutoDislikedFileJob implements ShouldQueue
      */
     public function handle(): void
     {
-        if (empty($this->filePath)) {
+        $paths = is_array($this->filePath) ? $this->filePath : [$this->filePath];
+        $paths = array_values(array_unique(array_filter($paths, static fn (mixed $path): bool => is_string($path) && $path !== '')));
+
+        if ($paths === []) {
             return;
         }
 
-        foreach ($this->diskNames as $diskName) {
-            try {
-                $disk = Storage::disk($diskName);
-                if ($disk->exists($this->filePath)) {
-                    $disk->delete($this->filePath);
+        $diskNames = $this->diskNames !== []
+            ? $this->diskNames
+            : array_values(array_unique(array_filter([
+                (string) config('downloads.disk'),
+                'atlas',
+            ], static fn (mixed $diskName): bool => is_string($diskName) && $diskName !== '')));
+
+        foreach ($diskNames as $diskName) {
+            foreach ($paths as $path) {
+                try {
+                    $disk = Storage::disk($diskName);
+                    if ($disk->exists($path)) {
+                        $disk->delete($path);
+                    }
+                } catch (\Throwable $e) {
+                    // Log but don't fail the job - file might already be deleted
+                    // or disk might not be configured
+                    \Illuminate\Support\Facades\Log::debug("DeleteAutoDislikedFileJob: Could not delete file on disk {$diskName}: {$e->getMessage()}");
                 }
-            } catch (\Throwable $e) {
-                // Log but don't fail the job - file might already be deleted
-                // or disk might not be configured
-                \Illuminate\Support\Facades\Log::debug("DeleteAutoDislikedFileJob: Could not delete file on disk {$diskName}: {$e->getMessage()}");
             }
         }
     }
