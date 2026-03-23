@@ -1,11 +1,13 @@
 <?php
 
 use App\Enums\ActionType;
+use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationRule;
 use App\Models\Reaction;
+use App\Models\Tab;
 use App\Models\User;
 use App\Services\BrowseModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -91,6 +93,66 @@ test('filters out blacklisted files from returned files', function () {
     expect($file1->fresh()->blacklisted_at)->not->toBeNull()
         ->and($result['files'])->not->toContain($file1)
         ->and($result['files'])->toContain($file2);
+});
+
+test('blacklisting from moderation detaches the auth user tabs and clears stored assets', function () {
+    Bus::fake();
+
+    ModerationRule::factory()->any(['spam'])->create([
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+    ]);
+
+    $file = File::factory()->create([
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/moderated.jpg',
+        'preview_path' => 'thumbnails/moderated.jpg',
+        'poster_path' => 'posters/moderated.jpg',
+        'downloaded' => true,
+        'downloaded_at' => now(),
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This is spam content'],
+    ]);
+    $file->load('metadata');
+
+    $currentTab = Tab::factory()->for($this->user)->create();
+    $otherUserTab = Tab::factory()->for($this->user)->create();
+    $otherUser = User::factory()->create();
+    $foreignTab = Tab::factory()->for($otherUser)->create();
+
+    $currentTab->files()->attach($file->id, ['position' => 0]);
+    $otherUserTab->files()->attach($file->id, ['position' => 0]);
+    $foreignTab->files()->attach($file->id, ['position' => 0]);
+
+    $result = $this->service->process([$file]);
+
+    expect($result['files'])->not->toContain($file)
+        ->and($file->fresh()->blacklisted_at)->not->toBeNull()
+        ->and($file->fresh()->path)->toBeNull()
+        ->and($file->fresh()->preview_path)->toBeNull()
+        ->and($file->fresh()->poster_path)->toBeNull()
+        ->and($file->fresh()->downloaded)->toBeFalse()
+        ->and($currentTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeFalse()
+        ->and($otherUserTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeFalse()
+        ->and($foreignTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeTrue();
+
+    Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function (DeleteAutoDislikedFileJob $job) {
+        if (! is_array($job->filePath)) {
+            return false;
+        }
+
+        $paths = $job->filePath;
+        sort($paths);
+
+        return $paths === [
+            'downloads/moderated.jpg',
+            'posters/moderated.jpg',
+            'thumbnails/moderated.jpg',
+        ];
+    });
 });
 
 test('keeps reacted files from blacklisted containers in returned files', function () {

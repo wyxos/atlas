@@ -4,6 +4,7 @@ use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Models\Tab;
 use App\Models\User;
 use App\Services\ContainerModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,14 +71,32 @@ test('blacklists files for blacklist action type', function () {
         'auto_disliked' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/ab/cd/test.jpg',
+        'preview_path' => 'thumbnails/ab/cd/test.jpg',
+        'poster_path' => 'posters/ab/cd/test.jpg',
+        'downloaded' => true,
+        'downloaded_at' => now(),
     ]);
     $file->containers()->attach($container->id);
+    $currentTab = Tab::factory()->for($user)->create();
+    $otherUserTab = Tab::factory()->for($user)->create();
+    $otherUser = User::factory()->create();
+    $foreignTab = Tab::factory()->for($otherUser)->create();
+    $currentTab->files()->attach($file->id, ['position' => 0]);
+    $otherUserTab->files()->attach($file->id, ['position' => 0]);
+    $foreignTab->files()->attach($file->id, ['position' => 0]);
 
     $result = $this->service->moderate(collect([$file]));
 
     expect($result['flaggedIds'])->toBeEmpty();
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
+    expect($file->fresh()->path)->toBeNull();
+    expect($file->fresh()->preview_path)->toBeNull();
+    expect($file->fresh()->poster_path)->toBeNull();
+    expect($file->fresh()->downloaded)->toBeFalse();
+    expect($currentTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeFalse();
+    expect($otherUserTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeFalse();
+    expect($foreignTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeTrue();
 
     // Verify NO dislike reaction was created (blacklist does not create reactions)
     $reaction = Reaction::where('file_id', $file->id)
@@ -86,8 +105,19 @@ test('blacklists files for blacklist action type', function () {
         ->first();
     expect($reaction)->toBeNull();
 
-    Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function ($job) use ($file) {
-        return $job->filePath === $file->path;
+    Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function (DeleteAutoDislikedFileJob $job) {
+        if (! is_array($job->filePath)) {
+            return false;
+        }
+
+        $paths = $job->filePath;
+        sort($paths);
+
+        return $paths === [
+            'downloads/ab/cd/test.jpg',
+            'posters/ab/cd/test.jpg',
+            'thumbnails/ab/cd/test.jpg',
+        ];
     });
 
     Bus::assertDispatched(MakeSearchable::class, function (MakeSearchable $job) use ($file) {
@@ -186,6 +216,10 @@ test('does not dispatch delete job when file has no path', function () {
         'auto_disliked' => false,
         'blacklisted_at' => null,
         'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'downloaded_at' => null,
     ]);
     $file->containers()->attach($container->id);
 

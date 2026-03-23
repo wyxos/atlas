@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ActionType;
-use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\File;
 use App\Models\Reaction;
 use Illuminate\Support\Collection;
@@ -35,11 +34,11 @@ abstract class BaseModerationService
     protected array $blacklistFileIds = [];
 
     /**
-     * File paths that need delete jobs.
+     * Files whose downloaded assets should be cleared.
      *
-     * @var array<string>
+     * @var array<int, File>
      */
-    protected array $filesToDelete = [];
+    protected array $filesToClear = [];
 
     /**
      * Immediate actions (auto_dislike/blacklist) tracked for toast notification.
@@ -132,7 +131,7 @@ abstract class BaseModerationService
         $this->flaggedIds = [];
         $this->autoDislikeFileIds = [];
         $this->blacklistFileIds = [];
-        $this->filesToDelete = [];
+        $this->filesToClear = [];
         $this->immediateActions = [];
     }
 
@@ -145,8 +144,13 @@ abstract class BaseModerationService
             $this->flaggedIds[] = $file->id;
         } elseif ($actionType === ActionType::BLACKLIST) {
             $this->blacklistFileIds[] = $file->id;
-            if (! empty($file->path)) {
-                $this->filesToDelete[] = $file->path;
+            if (
+                (bool) $file->downloaded
+                || is_string($file->path) && $file->path !== ''
+                || is_string($file->preview_path) && $file->preview_path !== ''
+                || is_string($file->poster_path) && $file->poster_path !== ''
+            ) {
+                $this->filesToClear[(int) $file->id] = $file;
             }
         }
     }
@@ -222,13 +226,21 @@ abstract class BaseModerationService
             app(MetricsService::class)->applyBlacklistAdd($this->blacklistFileIds, false);
             File::whereIn('id', $this->blacklistFileIds)->update(['blacklisted_at' => now()]);
 
+            $userId = Auth::id();
+            if (is_int($userId)) {
+                app(TabFileService::class)->detachFilesFromUserTabs($userId, $this->blacklistFileIds);
+            }
+
+            $filesToClear = collect($this->filesToClear)
+                ->only($this->blacklistFileIds)
+                ->values();
+
+            if ($filesToClear->isNotEmpty()) {
+                app(DownloadedFileClearService::class)->clearMany($filesToClear, syncSearch: false, queueDelete: true);
+            }
+
             // Keep Typesense in sync (blacklisted flags).
             $syncSearch($this->blacklistFileIds);
-        }
-
-        // Dispatch delete jobs for files with paths
-        foreach ($this->filesToDelete as $path) {
-            DeleteAutoDislikedFileJob::dispatch($path);
         }
 
         return array_merge($this->autoDislikeFileIds, $this->blacklistFileIds);

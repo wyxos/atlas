@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 
 class ContainerBlacklistController extends Controller
 {
+    private const DISLIKE_REACTION_TYPES = ['dislike'];
+
     private const POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
 
     /**
@@ -57,7 +59,8 @@ class ContainerBlacklistController extends Controller
             'blacklisted_at' => now(),
         ]);
 
-        app(ContainerBlacklistService::class)->apply($container);
+        $userId = auth()->id();
+        app(ContainerBlacklistService::class)->apply($container, is_int($userId) ? $userId : null);
 
         if (! $wasBlacklisted) {
             app(MetricsService::class)->incrementMetric(MetricsService::KEY_CONTAINERS_BLACKLISTED, 1);
@@ -76,6 +79,9 @@ class ContainerBlacklistController extends Controller
         $container->loadCount([
             'files as unreacted_files_count' => fn ($query) => $query->whereDoesntHave('reactions', fn ($reactionQuery) => $reactionQuery->where('user_id', $userId)),
             'files as blacklisted_files_count' => fn ($query) => $query->whereNotNull('files.blacklisted_at'),
+            'files as disliked_files_count' => fn ($query) => $query->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
+                ->where('user_id', $userId)
+                ->whereIn('type', self::DISLIKE_REACTION_TYPES)),
             'files as positive_files_count' => fn ($query) => $query->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
                 ->where('user_id', $userId)
                 ->whereIn('type', self::POSITIVE_REACTION_TYPES)),
@@ -88,6 +94,7 @@ class ContainerBlacklistController extends Controller
             'file_stats' => [
                 'unreacted' => (int) ($container->unreacted_files_count ?? 0),
                 'blacklisted' => (int) ($container->blacklisted_files_count ?? 0),
+                'disliked' => (int) ($container->disliked_files_count ?? 0),
                 'positive' => (int) ($container->positive_files_count ?? 0),
             ],
         ]);

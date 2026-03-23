@@ -202,7 +202,7 @@ function handleCancel(): void {
                         <Loader2 :size="16" class="animate-spin" />
                         Loading container stats...
                     </div>
-                    <div v-else-if="fileStats" class="grid gap-2 sm:grid-cols-3">
+                    <div v-else-if="fileStats" class="grid gap-2 sm:grid-cols-4">
                         <div
                             data-test="container-stat-unreacted"
                             class="rounded-lg border border-twilight-indigo-500/40 bg-twilight-indigo-500/10 p-3"
@@ -216,6 +216,13 @@ function handleCancel(): void {
                         >
                             <p class="text-[11px] font-medium uppercase tracking-wider text-danger-300">Blacklisted (Any)</p>
                             <p class="mt-1 text-xl font-semibold text-danger-200">{{ fileStats.blacklisted }}</p>
+                        </div>
+                        <div
+                            data-test="container-stat-disliked"
+                            class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"
+                        >
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-amber-300">Disliked</p>
+                            <p class="mt-1 text-xl font-semibold text-amber-200">{{ fileStats.disliked }}</p>
                         </div>
                         <div
                             data-test="container-stat-positive"

@@ -176,6 +176,7 @@ describe('useContainerBlacklists', () => {
             file_stats: {
                 unreacted: 12,
                 blacklisted: 8,
+                disliked: 5,
                 positive: 3,
             },
         };
