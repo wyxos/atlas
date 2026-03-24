@@ -1,7 +1,7 @@
 import { getStoredOptions } from '../atlas-options';
-import { requestAtlasViaRuntime } from '../atlas-runtime-request';
+import { requestQueuedReferrerCheckViaRuntime } from '../atlas-runtime-request';
 import { cleanupUrlQueryParams } from '../referrer-cleanup';
-import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
+import { atlasLoggedRuntimeRequest } from './atlas-request-log';
 import { normalizeHashAwareUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
 
 export type ReferrerMatchResult = {
@@ -12,30 +12,17 @@ export type ReferrerMatchResult = {
     blacklistedAt: string | null;
 };
 
-type QueueItem = {
-    key: string;
-    referrerUrlHash: string;
-    resolve: (result: ReferrerMatchResult) => void;
-    promise: Promise<ReferrerMatchResult>;
+type ReferrerCheckCacheUpdate = {
+    exists?: boolean;
+    reaction?: string | null;
+    reactedAt?: string | null;
+    downloadedAt?: string | null;
+    blacklistedAt?: string | null;
 };
 
-type MatchResponseItem = {
-    request_id?: unknown;
-    exists?: unknown;
-    reaction?: unknown;
-    reacted_at?: unknown;
-    downloaded_at?: unknown;
-    blacklisted_at?: unknown;
-};
-
-const BATCH_DELAY_MS = 12;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-const pendingByKey = new Map<string, QueueItem>();
-const inFlightByKey = new Map<string, Promise<ReferrerMatchResult>>();
 const resultCacheByKey = new Map<string, { result: ReferrerMatchResult; cachedAt: number }>();
-const hashByUrl = new Map<string, string>();
-let flushTimer: number | null = null;
 
 function emptyResult(): ReferrerMatchResult {
     return {
@@ -51,166 +38,19 @@ function stringOrNull(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
-type ReferrerCheckCacheUpdate = {
-    exists?: boolean;
-    reaction?: string | null;
-    reactedAt?: string | null;
-    downloadedAt?: string | null;
-    blacklistedAt?: string | null;
-};
-
-async function sha256Hex(input: string): Promise<string> {
-    const cached = hashByUrl.get(input);
-    if (cached) {
-        return cached;
+function parseMatchResult(value: unknown): ReferrerMatchResult {
+    if (!value || typeof value !== 'object') {
+        return emptyResult();
     }
 
-    const bytes = new TextEncoder().encode(input);
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    const hash = Array.from(new Uint8Array(digest))
-        .map((byte) => byte.toString(16).padStart(2, '0'))
-        .join('');
-
-    hashByUrl.set(input, hash);
-    return hash;
-}
-
-async function requestBatch(batch: QueueItem[]): Promise<Map<string, ReferrerMatchResult>> {
-    const keyByRequestId = new Map<string, string>();
-
-    try {
-        const stored = await getStoredOptions();
-        if (stored.apiToken === '') {
-            return new Map();
-        }
-
-        const items: Array<{ request_id: string; referrer_hash: string }> = [];
-        batch.forEach((entry, index) => {
-            const requestId = `ref-${index}`;
-            keyByRequestId.set(requestId, entry.key);
-            items.push({
-                request_id: requestId,
-                referrer_hash: entry.referrerUrlHash,
-            });
-        });
-
-        const endpoint = `${stored.atlasDomain}/api/extension/referrer-checks`;
-        const requestPayload = { items };
-        const requestLogPayload = {
-            items: items.map((item) => ({
-                ...item,
-                referrer_url: keyByRequestId.get(item.request_id) ?? null,
-            })),
-        };
-        let payload: { matches?: unknown } | null = null;
-        const runtimeResponse = await atlasLoggedRuntimeRequest(
-            endpoint,
-            'POST',
-            requestLogPayload,
-            () => requestAtlasViaRuntime({
-                endpoint,
-                atlasDomain: stored.atlasDomain,
-                apiToken: stored.apiToken,
-                method: 'POST',
-                body: requestPayload,
-            }),
-        );
-        if (runtimeResponse !== null) {
-            if (!runtimeResponse.ok) {
-                return new Map();
-            }
-
-            payload = runtimeResponse.payload as { matches?: unknown };
-        } else {
-            const response = await atlasLoggedFetch(endpoint, 'POST', requestLogPayload, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Atlas-Api-Key': stored.apiToken,
-                },
-                body: JSON.stringify(requestPayload),
-            });
-
-            if (!response.ok) {
-                return new Map();
-            }
-
-            payload = await response.json() as { matches?: unknown };
-        }
-
-        if (!Array.isArray(payload.matches)) {
-            return new Map();
-        }
-
-        const output = new Map<string, ReferrerMatchResult>();
-        for (const row of payload.matches as MatchResponseItem[]) {
-            const requestId = stringOrNull(row.request_id);
-            if (requestId === null) {
-                continue;
-            }
-
-            const key = keyByRequestId.get(requestId);
-            if (!key) {
-                continue;
-            }
-
-            output.set(key, {
-                exists: row.exists === true,
-                reaction: stringOrNull(row.reaction),
-                reactedAt: stringOrNull(row.reacted_at),
-                downloadedAt: stringOrNull(row.downloaded_at),
-                blacklistedAt: stringOrNull(row.blacklisted_at),
-            });
-        }
-
-        return output;
-    } catch {
-        return new Map();
-    }
-}
-
-async function flushQueue(): Promise<void> {
-    const batch = Array.from(pendingByKey.values());
-    pendingByKey.clear();
-
-    if (batch.length === 0) {
-        return;
-    }
-
-    const responsePromise = requestBatch(batch);
-    for (const entry of batch) {
-        const promise = responsePromise
-            .then((results) => results.get(entry.key) ?? emptyResult())
-            .then((result) => {
-                resultCacheByKey.set(entry.key, {
-                    result,
-                    cachedAt: Date.now(),
-                });
-
-                return result;
-            })
-            .finally(() => {
-                inFlightByKey.delete(entry.key);
-            });
-
-        inFlightByKey.set(entry.key, promise);
-        void promise.then((result) => {
-            entry.resolve(result);
-        });
-    }
-
-    await Promise.allSettled(batch.map((entry) => inFlightByKey.get(entry.key) ?? Promise.resolve(emptyResult())));
-}
-
-function scheduleFlush(): void {
-    if (flushTimer !== null) {
-        return;
-    }
-
-    flushTimer = window.setTimeout(() => {
-        flushTimer = null;
-        void flushQueue();
-    }, BATCH_DELAY_MS);
+    const row = value as Record<string, unknown>;
+    return {
+        exists: row.exists === true,
+        reaction: stringOrNull(row.reaction),
+        reactedAt: stringOrNull(row.reactedAt),
+        downloadedAt: stringOrNull(row.downloadedAt),
+        blacklistedAt: stringOrNull(row.blacklistedAt),
+    };
 }
 
 export async function enqueueReferrerCheck(
@@ -219,40 +59,46 @@ export async function enqueueReferrerCheck(
 ): Promise<ReferrerMatchResult> {
     const normalizedReferrerUrl = normalizeHashAwareUrl(cleanupUrlQueryParams(referrerUrl, referrerCleanerQueryParams));
     if (normalizedReferrerUrl === null || shouldExcludeMediaOrAnchorUrl(referrerUrl)) {
-        return Promise.resolve(emptyResult());
+        return emptyResult();
     }
 
-    const key = normalizedReferrerUrl;
-    const cached = resultCacheByKey.get(key);
+    const cached = resultCacheByKey.get(normalizedReferrerUrl);
     if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
-        return Promise.resolve(cached.result);
+        return cached.result;
     }
 
-    const queued = pendingByKey.get(key);
-    if (queued) {
-        return queued.promise;
+    try {
+        const stored = await getStoredOptions();
+        if (stored.apiToken === '') {
+            return emptyResult();
+        }
+
+        const endpoint = `${stored.atlasDomain}/api/extension/referrer-checks`;
+        const runtimeResponse = await atlasLoggedRuntimeRequest(
+            endpoint,
+            'POST',
+            { referrer_url: normalizedReferrerUrl },
+            () => requestQueuedReferrerCheckViaRuntime({
+                atlasDomain: stored.atlasDomain,
+                apiToken: stored.apiToken,
+                normalizedReferrerUrl,
+            }),
+        );
+
+        if (runtimeResponse === null || !runtimeResponse.ok) {
+            return emptyResult();
+        }
+
+        const result = parseMatchResult(runtimeResponse.payload);
+        resultCacheByKey.set(normalizedReferrerUrl, {
+            result,
+            cachedAt: Date.now(),
+        });
+
+        return result;
+    } catch {
+        return emptyResult();
     }
-
-    const inFlight = inFlightByKey.get(key);
-    if (inFlight) {
-        return inFlight;
-    }
-
-    const referrerUrlHash = await sha256Hex(normalizedReferrerUrl);
-    let resolver: (result: ReferrerMatchResult) => void = () => {};
-    const promise = new Promise<ReferrerMatchResult>((resolve) => {
-        resolver = resolve;
-    });
-
-    pendingByKey.set(key, {
-        key,
-        referrerUrlHash,
-        resolve: resolver,
-        promise,
-    });
-
-    scheduleFlush();
-    return promise;
 }
 
 export function upsertReferrerCheckCache(
@@ -265,8 +111,7 @@ export function upsertReferrerCheckCache(
         return;
     }
 
-    const key = normalizedReferrerUrl;
-    const cached = resultCacheByKey.get(key)?.result ?? emptyResult();
+    const cached = resultCacheByKey.get(normalizedReferrerUrl)?.result ?? emptyResult();
     const nextReaction = update.reaction !== undefined ? stringOrNull(update.reaction) : cached.reaction;
     const nextReactedAt = update.reactedAt !== undefined ? stringOrNull(update.reactedAt) : cached.reactedAt;
     const nextDownloadedAt = update.downloadedAt !== undefined ? stringOrNull(update.downloadedAt) : cached.downloadedAt;
@@ -276,24 +121,16 @@ export function upsertReferrerCheckCache(
         || nextBlacklistedAt !== null;
     const nextExists = update.exists ?? (cached.exists || hasState);
 
-    const next: ReferrerMatchResult = {
-        exists: nextExists,
-        reaction: nextReaction,
-        reactedAt: nextReactedAt,
-        downloadedAt: nextDownloadedAt,
-        blacklistedAt: nextBlacklistedAt,
-    };
-
-    resultCacheByKey.set(key, {
-        result: next,
+    resultCacheByKey.set(normalizedReferrerUrl, {
+        result: {
+            exists: nextExists,
+            reaction: nextReaction,
+            reactedAt: nextReactedAt,
+            downloadedAt: nextDownloadedAt,
+            blacklistedAt: nextBlacklistedAt,
+        },
         cachedAt: Date.now(),
     });
-
-    const pending = pendingByKey.get(key);
-    if (pending) {
-        pendingByKey.delete(key);
-        pending.resolve(next);
-    }
 }
 
 export function getCachedReferrerCheck(

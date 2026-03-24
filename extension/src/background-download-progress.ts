@@ -1,4 +1,5 @@
 import { connectBackgroundReverb } from './background-reverb-runtime';
+import { primeGlobalReferrerCheckCacheFromProgressEvent } from './background-referrer-check-cache';
 import { createProgressEvent, type ProgressEvent } from './download-progress-event';
 import type { ReverbClient, ReverbConnectionState, ReverbSubscription } from './reverb-client';
 
@@ -247,7 +248,11 @@ async function ensureDownloadProgressConnected(): Promise<void> {
         downloadProgressEventSubscription = runtime.client.onEvent((event, payload) => {
             const progressEvent = createProgressEvent(event, payload);
             pushDownloadProgressDebugEvent(progressEvent);
-            broadcastDownloadProgressEvent(progressEvent);
+            void primeGlobalReferrerCheckCacheFromProgressEvent(progressEvent)
+                .catch(() => undefined)
+                .finally(() => {
+                    broadcastDownloadProgressEvent(progressEvent);
+                });
         });
         downloadProgressStateSubscription = runtime.client.onConnectionState((state) => {
             applyReverbConnectionState(state, runtime.client.getLastConnectionError());

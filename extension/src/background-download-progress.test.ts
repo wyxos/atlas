@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockConnectBackgroundReverb = vi.fn();
+const mockPrimeGlobalReferrerCheckCacheFromProgressEvent = vi.fn();
 
 vi.mock('./background-reverb-runtime', () => ({
     connectBackgroundReverb: mockConnectBackgroundReverb,
+}));
+
+vi.mock('./background-referrer-check-cache', () => ({
+    primeGlobalReferrerCheckCacheFromProgressEvent: mockPrimeGlobalReferrerCheckCacheFromProgressEvent,
 }));
 
 type RuntimeMessageSender = {
@@ -91,6 +96,7 @@ describe('background-download-progress', () => {
         vi.clearAllMocks();
         vi.unstubAllGlobals();
         vi.useRealTimers();
+        mockPrimeGlobalReferrerCheckCacheFromProgressEvent.mockResolvedValue(undefined);
 
         vi.stubGlobal('chrome', {
             runtime: {
@@ -130,6 +136,7 @@ describe('background-download-progress', () => {
             status: 'queued',
             percent: 10,
         });
+        await Promise.resolve();
 
         const debugState = dispatchRuntimeMessage(
             module,
@@ -154,6 +161,26 @@ describe('background-download-progress', () => {
                         },
                     },
                 ],
+            },
+        });
+        expect(mockPrimeGlobalReferrerCheckCacheFromProgressEvent).toHaveBeenCalledWith({
+            event: 'DownloadTransferQueued',
+            fileId: 12,
+            transferId: 55,
+            sourceUrl: 'https://cdn.example.com/video.mp4',
+            referrerUrl: null,
+            status: 'queued',
+            percent: 10,
+            reaction: null,
+            reactedAt: undefined,
+            downloadedAt: undefined,
+            blacklistedAt: undefined,
+            payload: {
+                file_id: 12,
+                id: 55,
+                original: 'https://cdn.example.com/video.mp4',
+                status: 'queued',
+                percent: 10,
             },
         });
 

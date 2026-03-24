@@ -1,154 +1,96 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetStoredOptions = vi.fn();
-const mockAtlasLoggedFetch = vi.fn();
-const mockRequestAtlasViaRuntime = vi.fn();
+const mockRequestQueuedReferrerCheckViaRuntime = vi.fn();
 
 vi.mock('../atlas-options', () => ({
     getStoredOptions: mockGetStoredOptions,
 }));
 
 vi.mock('./atlas-request-log', () => ({
-    atlasLoggedFetch: mockAtlasLoggedFetch,
     atlasLoggedRuntimeRequest: vi.fn((_: string, __: string, ___: unknown, run: () => Promise<unknown>) => run()),
 }));
 
 vi.mock('../atlas-runtime-request', () => ({
-    requestAtlasViaRuntime: mockRequestAtlasViaRuntime,
+    requestQueuedReferrerCheckViaRuntime: mockRequestQueuedReferrerCheckViaRuntime,
 }));
 
 describe('referrer-check-queue', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
-        vi.useRealTimers();
 
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
             siteCustomizations: [],
         });
-        mockRequestAtlasViaRuntime.mockResolvedValue(null);
+        mockRequestQueuedReferrerCheckViaRuntime.mockResolvedValue({
+            ok: true,
+            status: 200,
+            payload: {
+                exists: true,
+                reaction: 'like',
+            },
+        });
     });
 
-    it('logs original referrer url while sending hash-only payload to backend', async () => {
-        mockAtlasLoggedFetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                matches: [
-                    {
-                        request_id: 'ref-0',
-                        exists: true,
-                        reaction: 'like',
-                    },
-                ],
-            }),
-        });
-
-        const queue = await import('./referrer-check-queue');
-        await queue.enqueueReferrerCheck('https://example.com/gallery?tab=1#section');
-
-        expect(mockAtlasLoggedFetch).toHaveBeenCalledTimes(1);
-
-        const [endpoint, method, requestLogPayload, init] = mockAtlasLoggedFetch.mock.calls[0] as [
-            string,
-            string,
-            { items: Array<Record<string, unknown>> },
-            { body: string },
-        ];
-
-        expect(endpoint).toBe('https://atlas.test/api/extension/referrer-checks');
-        expect(method).toBe('POST');
-        expect(requestLogPayload.items[0]).toMatchObject({
-            request_id: 'ref-0',
-            referrer_url: 'https://example.com/gallery?tab=1#section',
-        });
-
-        const sentBody = JSON.parse(init.body) as { items: Array<Record<string, unknown>> };
-        expect(sentBody.items[0]).toMatchObject({
-            request_id: 'ref-0',
-        });
-        expect(sentBody.items[0].referrer_hash).toEqual(expect.any(String));
-        expect(sentBody.items[0].referrer_url).toBeUndefined();
-    });
-
-    it('hashes the cleaned referrer url when query params are configured to be stripped', async () => {
-        mockAtlasLoggedFetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                matches: [
-                    {
-                        request_id: 'ref-0',
-                        exists: true,
-                        reaction: 'like',
-                    },
-                ],
-            }),
-        });
-
+    it('strips configured query params before delegating referrer checks to the background queue', async () => {
         const queue = await import('./referrer-check-queue');
         await queue.enqueueReferrerCheck('https://domain.com/?id=123&tag=blue+sky', ['tag', 'tags']);
 
-        const [, , requestLogPayload, init] = mockAtlasLoggedFetch.mock.calls[0] as [
-            string,
-            string,
-            { items: Array<Record<string, unknown>> },
-            { body: string },
-        ];
-
-        expect(requestLogPayload.items[0].referrer_url).toBe('https://domain.com/?id=123');
-
-        const sentBody = JSON.parse(init.body) as { items: Array<Record<string, unknown>> };
-        const encoder = new TextEncoder();
-        const digest = await crypto.subtle.digest('SHA-256', encoder.encode('https://domain.com/?id=123'));
-        const expectedHash = Array.from(new Uint8Array(digest))
-            .map((byte) => byte.toString(16).padStart(2, '0'))
-            .join('');
-        expect(sentBody.items[0].referrer_hash).toBe(expectedHash);
+        expect(mockRequestQueuedReferrerCheckViaRuntime).toHaveBeenCalledWith({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedReferrerUrl: 'https://domain.com/?id=123',
+        });
     });
 
-    it('treats different hash fragments as distinct referrer checks', async () => {
-        mockAtlasLoggedFetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                matches: [
-                    {
-                        request_id: 'ref-0',
-                        exists: true,
-                        reaction: 'like',
-                    },
-                    {
-                        request_id: 'ref-1',
-                        exists: true,
-                        reaction: 'like',
-                    },
-                ],
-            }),
+    it('stores successful runtime responses in the local synchronous mirror cache', async () => {
+        const queue = await import('./referrer-check-queue');
+        const result = await queue.enqueueReferrerCheck('https://example.com/gallery?tab=1#section');
+
+        expect(result).toEqual({
+            exists: true,
+            reaction: 'like',
+            reactedAt: null,
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
+        expect(queue.getCachedReferrerCheck('https://example.com/gallery?tab=1#section')).toEqual(result);
+    });
+
+    it('supports optimistic local cache updates for synchronous anchor lookups', async () => {
+        const queue = await import('./referrer-check-queue');
+
+        queue.upsertReferrerCheckCache('https://example.com/gallery?tab=1#section', {
+            exists: true,
+            reaction: 'funny',
+            downloadedAt: '2026-03-21T00:00:00Z',
         });
 
+        expect(queue.getCachedReferrerCheck('https://example.com/gallery?tab=1#section')).toEqual({
+            exists: true,
+            reaction: 'funny',
+            reactedAt: null,
+            downloadedAt: '2026-03-21T00:00:00Z',
+            blacklistedAt: null,
+        });
+    });
+
+    it('does not poison the local mirror cache when the background runtime queue is unavailable', async () => {
+        mockRequestQueuedReferrerCheckViaRuntime.mockResolvedValue(null);
+
         const queue = await import('./referrer-check-queue');
-        await Promise.all([
-            queue.enqueueReferrerCheck('https://example.com/gallery?tab=1#section-a'),
-            queue.enqueueReferrerCheck('https://example.com/gallery?tab=1#section-b'),
-        ]);
+        const result = await queue.enqueueReferrerCheck('https://example.com/offline#section');
 
-        expect(mockAtlasLoggedFetch).toHaveBeenCalledTimes(1);
-
-        const [, , requestLogPayload, init] = mockAtlasLoggedFetch.mock.calls[0] as [
-            string,
-            string,
-            { items: Array<Record<string, unknown>> },
-            { body: string },
-        ];
-
-        expect(requestLogPayload.items).toHaveLength(2);
-        expect(requestLogPayload.items.map((item) => item.referrer_url)).toEqual([
-            'https://example.com/gallery?tab=1#section-a',
-            'https://example.com/gallery?tab=1#section-b',
-        ]);
-
-        const sentBody = JSON.parse(init.body) as { items: Array<Record<string, unknown>> };
-        expect(sentBody.items).toHaveLength(2);
-        expect(sentBody.items[0].referrer_hash).not.toBe(sentBody.items[1].referrer_hash);
+        expect(result).toEqual({
+            exists: false,
+            reaction: null,
+            reactedAt: null,
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
+        expect(queue.getCachedReferrerCheck('https://example.com/offline#section')).toBeNull();
     });
 });
