@@ -3,29 +3,31 @@ import {
     removeDownloadProgressSubscriber,
 } from './background-download-progress';
 import { collectCookiesForUrls } from './background-cookie-runtime';
+import {
+    emptyBadgeCheckResult,
+    emptyReferrerCheckResult,
+    enqueueGlobalBadgeCheck,
+    enqueueGlobalReferrerCheck,
+} from './background-atlas-check-queue';
 import { notifyTabsExtensionReloaded } from './background-reload-overlay';
 import { normalizeComparableUrls } from './background-url-utils';
 import { normalizeComparableOpenTabUrl } from './open-tab-url';
 import { resolveTabDomainGroupKey, summarizeTabCounts } from './tab-counts';
-
 type TabPresenceChangedMessage = {
     type: 'ATLAS_TAB_PRESENCE_CHANGED';
     urls: string[];
     counts: Record<string, number>;
 };
-
 type TabCountChangedMessage = {
     type: 'ATLAS_TAB_COUNT_CHANGED';
     count: number;
     similarDomainCount: number | null;
 };
-
 type RuntimeMessageSender = {
     tab?: {
         id?: number;
     };
 };
-
 type SubmitReactionPayload = {
     type: 'ATLAS_SUBMIT_REACTION';
     atlasDomain: string;
@@ -33,7 +35,6 @@ type SubmitReactionPayload = {
     endpoint: string;
     body: Record<string, unknown>;
 };
-
 type AtlasApiRequestPayload = {
     type: 'ATLAS_API_REQUEST';
     atlasDomain: string;
@@ -42,18 +43,17 @@ type AtlasApiRequestPayload = {
     method: 'GET' | 'POST';
     body?: Record<string, unknown> | null;
 };
-
+type QueueBadgeCheckPayload = { type: 'ATLAS_QUEUE_BADGE_CHECK'; atlasDomain: string; apiToken: string; normalizedMediaUrl: string };
+type QueueReferrerCheckPayload = { type: 'ATLAS_QUEUE_REFERRER_CHECK'; atlasDomain: string; apiToken: string; normalizedReferrerUrl: string };
 type BrowserTab = {
     id?: number;
     url?: string;
     active?: boolean;
     discarded?: boolean;
 };
-
 const openComparableUrlByTabId = new Map<number, string>();
 const openComparableUrlCountByUrl = new Map<string, number>();
 let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
-
 function parseJsonResponse(response: Response): Promise<unknown> {
     return response.text()
         .then((bodyText) => {
@@ -80,12 +80,7 @@ function isAllowedAtlasApiEndpoint(
         return false;
     }
 
-    if (method === 'GET') {
-        return endpoint === `${atlasDomain}/api/extension/ping`;
-    }
-
-    return endpoint === `${atlasDomain}/api/extension/badges/checks`
-        || endpoint === `${atlasDomain}/api/extension/referrer-checks`;
+    return method === 'GET' && endpoint === `${atlasDomain}/api/extension/ping`;
 }
 
 function updateTrackedComparableTabUrl(tabId: number, nextComparableUrl: string | null): string[] {
@@ -341,6 +336,62 @@ chrome.runtime.onMessage.addListener((
             })
             .catch(() => {
                 sendResponse({ ok: false, status: 0, payload: null });
+            });
+
+        return true;
+    }
+
+    if (payload.type === 'ATLAS_QUEUE_BADGE_CHECK') {
+        const queuePayload = message as QueueBadgeCheckPayload;
+        const atlasDomain = typeof queuePayload.atlasDomain === 'string' ? queuePayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+        const apiToken = typeof queuePayload.apiToken === 'string' ? queuePayload.apiToken.trim() : '';
+        const normalizedMediaUrl = typeof queuePayload.normalizedMediaUrl === 'string'
+            ? queuePayload.normalizedMediaUrl.trim()
+            : '';
+
+        if (atlasDomain === '' || apiToken === '' || normalizedMediaUrl === '') {
+            sendResponse({ ok: false, status: 0, payload: emptyBadgeCheckResult() });
+            return false;
+        }
+
+        void enqueueGlobalBadgeCheck({
+            atlasDomain,
+            apiToken,
+            normalizedMediaUrl,
+        })
+            .then((response) => {
+                sendResponse(response);
+            })
+            .catch(() => {
+                sendResponse({ ok: false, status: 0, payload: emptyBadgeCheckResult() });
+            });
+
+        return true;
+    }
+
+    if (payload.type === 'ATLAS_QUEUE_REFERRER_CHECK') {
+        const queuePayload = message as QueueReferrerCheckPayload;
+        const atlasDomain = typeof queuePayload.atlasDomain === 'string' ? queuePayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+        const apiToken = typeof queuePayload.apiToken === 'string' ? queuePayload.apiToken.trim() : '';
+        const normalizedReferrerUrl = typeof queuePayload.normalizedReferrerUrl === 'string'
+            ? queuePayload.normalizedReferrerUrl.trim()
+            : '';
+
+        if (atlasDomain === '' || apiToken === '' || normalizedReferrerUrl === '') {
+            sendResponse({ ok: false, status: 0, payload: emptyReferrerCheckResult() });
+            return false;
+        }
+
+        void enqueueGlobalReferrerCheck({
+            atlasDomain,
+            apiToken,
+            normalizedReferrerUrl,
+        })
+            .then((response) => {
+                sendResponse(response);
+            })
+            .catch(() => {
+                sendResponse({ ok: false, status: 0, payload: emptyReferrerCheckResult() });
             });
 
         return true;

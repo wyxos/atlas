@@ -127,6 +127,7 @@ describe('background', () => {
         vi.resetModules();
         vi.clearAllMocks();
         vi.unstubAllGlobals();
+        vi.useRealTimers();
     });
 
     it('returns cached comparable open-tab urls and counts, preserving hashes and excluding plain roots', async () => {
@@ -387,7 +388,10 @@ describe('background', () => {
             reaction_type: 'funny',
         });
 
-        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(2);
+        await vi.waitFor(() => {
+            expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(2);
+        });
+
         expect(chromeMock.tabs.sendMessage).toHaveBeenNthCalledWith(
             1,
             1,
@@ -505,7 +509,10 @@ describe('background', () => {
         eventHandler?.('DownloadTransferQueued', { id: 25, file_id: 12, status: 'queued', percent: 10 });
         eventHandler?.('DownloadTransferProgressUpdated', { id: 25, file_id: 12, status: 'downloading', percent: 55 });
 
-        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(2);
+        await vi.waitFor(() => {
+            expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(2);
+        });
+
         expect(disconnect).not.toHaveBeenCalled();
     });
 
@@ -555,6 +562,9 @@ describe('background', () => {
         eventHandler?.('DownloadTransferQueued', { id: 25, file_id: 12, status: 'queued', percent: 10 });
         eventHandler?.('DownloadTransferProgressUpdated', { id: 25, file_id: 12, status: 'downloading', percent: 55 });
 
-        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
+        await vi.waitFor(() => {
+            expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
+        });
+
     });
 });

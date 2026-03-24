@@ -1,86 +1,60 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetStoredOptions = vi.fn();
-const mockAtlasLoggedFetch = vi.fn();
-const mockRequestAtlasViaRuntime = vi.fn();
+const mockRequestQueuedBadgeCheckViaRuntime = vi.fn();
 
 vi.mock('../atlas-options', () => ({
     getStoredOptions: mockGetStoredOptions,
 }));
 
 vi.mock('./atlas-request-log', () => ({
-    atlasLoggedFetch: mockAtlasLoggedFetch,
     atlasLoggedRuntimeRequest: vi.fn((_: string, __: string, ___: unknown, run: () => Promise<unknown>) => run()),
 }));
 
 vi.mock('../atlas-runtime-request', () => ({
-    requestAtlasViaRuntime: mockRequestAtlasViaRuntime,
+    requestQueuedBadgeCheckViaRuntime: mockRequestQueuedBadgeCheckViaRuntime,
 }));
 
 describe('reaction-check-queue', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
-        vi.useRealTimers();
 
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
             siteCustomizations: [],
         });
-        mockRequestAtlasViaRuntime.mockResolvedValue(null);
+        mockRequestQueuedBadgeCheckViaRuntime.mockResolvedValue({
+            ok: true,
+            status: 200,
+            payload: {
+                exists: true,
+                reaction: 'like',
+            },
+        });
     });
 
-    it('coalesces concurrent checks for the same url and resolves both promises', async () => {
-        mockAtlasLoggedFetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                matches: [
-                    {
-                        request_id: 'req-0',
-                        exists: true,
-                        reaction: 'like',
-                    },
-                ],
-            }),
-        });
-
+    it('delegates normalized badge checks to the background runtime queue', async () => {
         const queue = await import('./reaction-check-queue');
 
-        const first = queue.enqueueReactionCheck('https://cdn.example.com/video.mp4');
-        const second = queue.enqueueReactionCheck('https://cdn.example.com/video.mp4');
+        const result = await queue.enqueueReactionCheck('https://cdn.example.com/video.mp4?size=large#viewer');
 
-        const [firstResult, secondResult] = await Promise.all([first, second]);
-
-        expect(firstResult).toEqual({
+        expect(mockRequestQueuedBadgeCheckViaRuntime).toHaveBeenCalledWith({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedMediaUrl: 'https://cdn.example.com/video.mp4?size=large',
+        });
+        expect(result).toEqual({
             exists: true,
             reaction: 'like',
             reactedAt: null,
             downloadedAt: null,
             blacklistedAt: null,
         });
-        expect(secondResult).toEqual(firstResult);
-        expect(mockAtlasLoggedFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('returns an empty result if hashing fails', async () => {
-        const digestSpy = vi.spyOn(crypto.subtle, 'digest').mockRejectedValue(new Error('digest failed'));
-        const queue = await import('./reaction-check-queue');
-
-        const result = await queue.enqueueReactionCheck('https://cdn.example.com/fail.mp4');
-
-        expect(result).toEqual({
-            exists: false,
-            reaction: null,
-            reactedAt: null,
-            downloadedAt: null,
-            blacklistedAt: null,
-        });
-        expect(mockAtlasLoggedFetch).not.toHaveBeenCalled();
-        digestSpy.mockRestore();
-    });
-
-    it('applies the active page domain media cleaner before hashing lookup requests', async () => {
+    it('applies the active page domain media cleaner before dispatching background checks', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
             value: new URL('https://civitai.com/images/123066308') as unknown as Location,
@@ -108,18 +82,6 @@ describe('reaction-check-queue', () => {
                 },
             ],
         });
-        mockAtlasLoggedFetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                matches: [
-                    {
-                        request_id: 'req-0',
-                        exists: false,
-                        reaction: null,
-                    },
-                ],
-            }),
-        });
 
         const image = document.getElementById('image');
         if (!(image instanceof HTMLImageElement)) {
@@ -132,21 +94,25 @@ describe('reaction-check-queue', () => {
             candidatePageUrls: [window.location.href],
         });
 
-        const [, , , init] = mockAtlasLoggedFetch.mock.calls[0] as [
-            string,
-            string,
-            { items: Array<Record<string, unknown>> },
-            { body: string },
-        ];
-        const sentBody = JSON.parse(init.body) as { items: Array<{ url_hash: string }> };
-        const encoder = new TextEncoder();
-        const digest = await crypto.subtle.digest('SHA-256', encoder.encode(
-            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
-        ));
-        const expectedHash = Array.from(new Uint8Array(digest))
-            .map((byte) => byte.toString(16).padStart(2, '0'))
-            .join('');
+        expect(mockRequestQueuedBadgeCheckViaRuntime).toHaveBeenCalledWith({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedMediaUrl: 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
+        });
+    });
 
-        expect(sentBody.items[0]?.url_hash).toBe(expectedHash);
+    it('returns an empty result when the background runtime queue is unavailable', async () => {
+        mockRequestQueuedBadgeCheckViaRuntime.mockResolvedValue(null);
+
+        const queue = await import('./reaction-check-queue');
+        const result = await queue.enqueueReactionCheck('https://cdn.example.com/offline.jpg');
+
+        expect(result).toEqual({
+            exists: false,
+            reaction: null,
+            reactedAt: null,
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
     });
 });
