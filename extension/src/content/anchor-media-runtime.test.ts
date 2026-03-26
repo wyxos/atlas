@@ -206,6 +206,58 @@ describe('anchor-media-runtime', () => {
         expect(image.getAttribute('data-atlas-anchor-media-match')).toBe('0');
     });
 
+    it('shows pending referrer sync state, then applies the settled reaction immediately', async () => {
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post#image-2';
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.handleReferrerReactionSync({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'pending',
+            urls: [anchor.href],
+        });
+
+        expect(image.getAttribute('data-atlas-anchor-checking')).toBe('1');
+        expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')?.getAttribute('data-atlas-anchor-badge-kind')).toBe('checking');
+
+        runtime.handleReferrerReactionSync({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'settled',
+            urls: [anchor.href],
+            reaction: 'love',
+            reactedAt: '2026-03-26T12:00:00Z',
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
+
+        expect(mockUpsertReferrerCheckCache).toHaveBeenCalledWith(
+            'https://example.com/post#image-2',
+            {
+                exists: true,
+                reaction: 'love',
+                reactedAt: '2026-03-26T12:00:00Z',
+                downloadedAt: null,
+                blacklistedAt: null,
+            },
+            [],
+        );
+        expect(image.getAttribute('data-atlas-anchor-checking')).toBeNull();
+        expect(image.getAttribute('data-atlas-anchor-reaction')).toBe('love');
+        expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')?.getAttribute('data-atlas-anchor-badge-kind')).toBe('reaction');
+    });
+
     it('updates matching anchors when download progress events carry reaction metadata', async () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
