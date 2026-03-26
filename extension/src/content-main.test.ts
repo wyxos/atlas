@@ -11,6 +11,7 @@ const mockOverlayRemove = vi.fn();
 const mockOverlayScheduleReposition = vi.fn();
 const mockAnchorRuntime = {
     handleDownloadProgressEvent: vi.fn(),
+    handleReferrerReactionSync: vi.fn(),
     handleTabPresenceChanged: vi.fn(),
     registerFromDocument: vi.fn(),
     registerFromNode: vi.fn(),
@@ -212,6 +213,18 @@ describe('content-main', () => {
         expect(mockAnchorRuntime.handleTabPresenceChanged).toHaveBeenCalledWith(['https://example.com/post#image-1']);
         expect(mockDuplicateAnchorTabGuard.handleTabPresenceChanged).toHaveBeenCalledWith({
             type: 'ATLAS_TAB_PRESENCE_CHANGED',
+            urls: ['https://example.com/post#image-1'],
+        });
+
+        runtimeMessageListener?.({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'pending',
+            urls: ['https://example.com/post#image-1'],
+        });
+
+        expect(mockAnchorRuntime.handleReferrerReactionSync).toHaveBeenCalledWith({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'pending',
             urls: ['https://example.com/post#image-1'],
         });
 

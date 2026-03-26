@@ -56,6 +56,10 @@ function parseKnownReaction(value: string | null): 'love' | 'like' | 'dislike' |
         : null;
 }
 
+function stringOrNull(value: unknown): string | null {
+    return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
 export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
     const observedAnchorMedia = new WeakSet<MediaElement>();
     const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
@@ -132,6 +136,52 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         media.removeAttribute('data-atlas-anchor-blacklisted-at');
     }
 
+    function resolveEligibleAnchorReferrerUrl(
+        anchor: HTMLAnchorElement,
+        referrerCleanerQueryParams: string[],
+    ): string | null {
+        const rawHref = anchor.getAttribute('href');
+        const normalizedAnchorHref = normalizeHashAwareUrl(anchor.href);
+        const anchorHref = cleanupUrlQueryParams(normalizedAnchorHref, referrerCleanerQueryParams);
+        const isEligibleAnchor = normalizedAnchorHref !== null
+            && anchorHref !== null
+            && !shouldExcludeAnchorHref(rawHref, anchor.href)
+            && urlMatchesAnyRule(normalizedAnchorHref, options.getRules(), options.getPageHostname());
+
+        return isEligibleAnchor ? anchorHref : null;
+    }
+
+    function forEachMatchingReferrerMedia(
+        referrerUrls: string[],
+        callback: (mediaElement: MediaElement) => void,
+    ): void {
+        const dedupedReferrerUrls = Array.from(new Set(referrerUrls));
+        if (dedupedReferrerUrls.length === 0) {
+            return;
+        }
+
+        const referrerCleanerQueryParams = options.getReferrerCleanerQueryParams();
+        const referrerUrlSet = new Set(dedupedReferrerUrls);
+
+        for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
+            if (!isMediaElement(mediaElement)) {
+                continue;
+            }
+
+            const anchor = mediaElement.closest('a[href]');
+            if (!(anchor instanceof HTMLAnchorElement)) {
+                continue;
+            }
+
+            const anchorHref = resolveEligibleAnchorReferrerUrl(anchor, referrerCleanerQueryParams);
+            if (anchorHref === null || !referrerUrlSet.has(anchorHref)) {
+                continue;
+            }
+
+            callback(mediaElement);
+        }
+    }
+
     function applyAnchorMediaBorder(
         media: MediaElement,
         optionsOverride?: { referrerMatchFromCacheOnly?: boolean },
@@ -144,16 +194,10 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             return;
         }
 
-        const rawHref = anchor.getAttribute('href');
         const absoluteHref = anchor.href;
-        const normalizedAnchorHref = normalizeHashAwareUrl(absoluteHref);
         const referrerCleanerQueryParams = options.getReferrerCleanerQueryParams();
-        const anchorHref = cleanupUrlQueryParams(normalizedAnchorHref, referrerCleanerQueryParams);
-        const isValid = normalizedAnchorHref !== null
-            && anchorHref !== null
-            && !shouldExcludeAnchorHref(rawHref, absoluteHref)
-            && urlMatchesAnyRule(normalizedAnchorHref, options.getRules(), options.getPageHostname());
-        if (!isValid) {
+        const anchorHref = resolveEligibleAnchorReferrerUrl(anchor, referrerCleanerQueryParams);
+        if (anchorHref === null) {
             anchorReferrerKeyByMedia.delete(media);
             clearAnchorMatchDecoration(media);
             clearAnchorMediaAttributes(media);
@@ -301,27 +345,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             return;
         }
 
-        for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
-            if (!isMediaElement(mediaElement)) {
-                continue;
-            }
-
-            const anchor = mediaElement.closest('a[href]');
-            if (!(anchor instanceof HTMLAnchorElement)) {
-                continue;
-            }
-
-            const rawHref = anchor.getAttribute('href');
-            const normalizedAnchorHref = normalizeHashAwareUrl(anchor.href);
-            const anchorHref = cleanupUrlQueryParams(normalizedAnchorHref, referrerCleanerQueryParams);
-            const isEligibleAnchor = normalizedAnchorHref !== null
-                && anchorHref !== null
-                && !shouldExcludeAnchorHref(rawHref, anchor.href)
-                && urlMatchesAnyRule(normalizedAnchorHref, options.getRules(), options.getPageHostname());
-            if (!isEligibleAnchor || anchorHref !== normalizedReferrerUrl) {
-                continue;
-            }
-
+        forEachMatchingReferrerMedia([normalizedReferrerUrl], (mediaElement) => {
             const reactionForDecoration = reaction === undefined
                 ? parseKnownReaction(mediaElement.getAttribute('data-atlas-anchor-reaction'))
                 : reaction;
@@ -329,6 +353,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             applyAnchorMatchDecoration(mediaElement, reactionForDecoration);
             mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
             mediaElement.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
+            mediaElement.removeAttribute('data-atlas-anchor-checking');
             mediaElement.removeAttribute('data-atlas-anchor-opened-elsewhere');
 
             if (reaction !== undefined) {
@@ -354,7 +379,26 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
                     mediaElement.removeAttribute('data-atlas-anchor-blacklisted-at');
                 }
             }
-        }
+        });
+    }
+
+    function applyPendingForReferrerUrls(referrerUrls: string[]): void {
+        forEachMatchingReferrerMedia(referrerUrls, (mediaElement) => {
+            applyAnchorCheckingDecoration(mediaElement);
+            mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
+            mediaElement.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
+            mediaElement.setAttribute('data-atlas-anchor-checking', '1');
+            mediaElement.removeAttribute('data-atlas-anchor-opened-elsewhere');
+            mediaElement.removeAttribute('data-atlas-anchor-reaction');
+            mediaElement.removeAttribute('data-atlas-anchor-downloaded-at');
+            mediaElement.removeAttribute('data-atlas-anchor-blacklisted-at');
+        });
+    }
+
+    function refreshReferrerUrlsFromCache(referrerUrls: string[]): void {
+        forEachMatchingReferrerMedia(referrerUrls, (mediaElement) => {
+            applyAnchorMediaBorder(mediaElement, { referrerMatchFromCacheOnly: true });
+        });
     }
 
     function handleDownloadProgressEvent(event: ProgressEvent): void {
@@ -398,8 +442,64 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         refreshVisibleForUrls(changedUrls);
     }
 
+    function handleReferrerReactionSync(message: unknown): void {
+        if (!message || typeof message !== 'object') {
+            return;
+        }
+
+        const payload = message as {
+            phase?: unknown;
+            urls?: unknown;
+            reaction?: unknown;
+            reactedAt?: unknown;
+            downloadedAt?: unknown;
+            blacklistedAt?: unknown;
+        };
+        const phase = payload.phase;
+        if (phase !== 'pending' && phase !== 'settled' && phase !== 'failed') {
+            return;
+        }
+
+        const referrerCleanerQueryParams = options.getReferrerCleanerQueryParams();
+        const referrerUrls = Array.isArray(payload.urls)
+            ? payload.urls
+                .map((url) => cleanupUrlQueryParams(stringOrNull(url), referrerCleanerQueryParams))
+                .filter((url): url is string => url !== null)
+            : [];
+        if (referrerUrls.length === 0) {
+            return;
+        }
+
+        if (phase === 'pending') {
+            applyPendingForReferrerUrls(referrerUrls);
+            return;
+        }
+
+        if (phase === 'failed') {
+            refreshReferrerUrlsFromCache(referrerUrls);
+            return;
+        }
+
+        const reaction = parseKnownReaction(stringOrNull(payload.reaction));
+        const reactedAt = stringOrNull(payload.reactedAt);
+        const downloadedAt = stringOrNull(payload.downloadedAt);
+        const blacklistedAt = stringOrNull(payload.blacklistedAt);
+
+        referrerUrls.forEach((referrerUrl) => {
+            upsertReferrerCheckCache(referrerUrl, {
+                exists: true,
+                reaction,
+                reactedAt,
+                downloadedAt,
+                blacklistedAt,
+            }, referrerCleanerQueryParams);
+            applyReactionForReferrerUrl(referrerUrl, reaction, downloadedAt, blacklistedAt);
+        });
+    }
+
     return {
         handleDownloadProgressEvent,
+        handleReferrerReactionSync,
         handleTabPresenceChanged,
         registerFromDocument,
         registerFromNode,
