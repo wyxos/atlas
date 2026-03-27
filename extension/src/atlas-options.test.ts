@@ -71,6 +71,7 @@ describe('atlas-options', () => {
         await expect(getStoredOptions()).resolves.toMatchObject({
             siteCustomizations: expect.arrayContaining([
                 {
+                    enabled: true,
                     domain: 'civitai.com',
                     matchRules: [],
                     referrerCleaner: {
@@ -83,6 +84,7 @@ describe('atlas-options', () => {
                     },
                 },
                 {
+                    enabled: true,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
                     referrerCleaner: {
@@ -95,6 +97,7 @@ describe('atlas-options', () => {
                     },
                 },
                 {
+                    enabled: true,
                     domain: 'sub.example.com',
                     matchRules: [],
                     referrerCleaner: {
@@ -115,6 +118,7 @@ describe('atlas-options', () => {
 
         await saveStoredOptions('https://atlas.test', 'token', [
             {
+                enabled: false,
                 domain: 'https://Example.com/path',
                 matchRules: [' .*\\/gallery\\/.* ', ''],
                 referrerCleaner: {
@@ -139,6 +143,7 @@ describe('atlas-options', () => {
 
         expect(storageState[STORAGE_KEYS.siteCustomizations]).toEqual([
             {
+                enabled: false,
                 domain: 'example.com',
                 matchRules: ['.*\\/gallery\\/.*'],
                 referrerCleaner: {
@@ -162,6 +167,7 @@ describe('atlas-options', () => {
             apiToken: 'token',
             siteCustomizations: [
                 {
+                    enabled: false,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
                     referrerCleaner: {
@@ -180,6 +186,33 @@ describe('atlas-options', () => {
                 },
             ],
         });
+    });
+
+    it('creates or updates a stored site customization when toggling a domain from the popup', async () => {
+        const {
+            STORAGE_KEYS,
+            setSiteCustomizationEnabledForDomain,
+        } = await import('./atlas-options');
+
+        storageState[STORAGE_KEYS.siteCustomizations] = [];
+        await setSiteCustomizationEnabledForDomain('www.example.com', true);
+        await setSiteCustomizationEnabledForDomain('www.example.com', false);
+
+        expect(storageState[STORAGE_KEYS.siteCustomizations]).toEqual([
+            {
+                enabled: false,
+                domain: 'www.example.com',
+                matchRules: [],
+                referrerCleaner: {
+                    stripQueryParams: [],
+                },
+                mediaCleaner: {
+                    stripQueryParams: [],
+                    rewriteRules: [],
+                    strategies: [],
+                },
+            },
+        ]);
     });
 
     it('stores and reads enabled close-tab preference per hostname', async () => {

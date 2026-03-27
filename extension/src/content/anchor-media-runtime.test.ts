@@ -72,6 +72,7 @@ describe('anchor-media-runtime', () => {
 
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
             getRules: () => [],
             getReferrerCleanerQueryParams: () => [],
             getPageHostname: () => 'example.com',
@@ -123,6 +124,7 @@ describe('anchor-media-runtime', () => {
 
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
             getRules: () => [],
             getReferrerCleanerQueryParams: () => [],
             getPageHostname: () => 'example.com',
@@ -156,6 +158,7 @@ describe('anchor-media-runtime', () => {
 
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
             getRules: () => [],
             getReferrerCleanerQueryParams: () => ['tag', 'tags'],
             getPageHostname: () => 'domain.com',
@@ -182,6 +185,7 @@ describe('anchor-media-runtime', () => {
 
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
             getRules: () => [],
             getReferrerCleanerQueryParams: () => [],
             getPageHostname: () => 'example.com',
@@ -209,6 +213,7 @@ describe('anchor-media-runtime', () => {
     it('shows pending referrer sync state, then applies the settled reaction immediately', async () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
             getRules: () => [],
             getReferrerCleanerQueryParams: () => [],
             getPageHostname: () => 'example.com',
@@ -261,6 +266,7 @@ describe('anchor-media-runtime', () => {
     it('updates matching anchors when download progress events carry reaction metadata', async () => {
         const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
         const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
             getRules: () => [],
             getReferrerCleanerQueryParams: () => [],
             getPageHostname: () => 'example.com',

@@ -44,6 +44,8 @@ const selectedCustomization = computed<SiteCustomizationForm | null>(() =>
 const activeTabMeta = computed(() => CUSTOMIZATION_TAB_META[props.activeCustomizationTab]);
 const selectedCustomizationSummary = computed(() =>
     selectedCustomization.value === null ? [] : describeCustomization(selectedCustomization.value));
+const enabledCustomizationCount = computed(() => props.customizations.filter((customization) => customization.enabled).length);
+const disabledCustomizationCount = computed(() => props.customizations.length - enabledCustomizationCount.value);
 
 function triggerImportCustomizations(): void {
     importFileInput.value?.click();
@@ -60,7 +62,7 @@ function handleImportCustomizations(event: Event): void {
             <div class="space-y-1">
                 <h2 class="text-lg font-semibold text-regal-navy-100">Site profiles</h2>
                 <p class="text-sm text-blue-slate-300">
-                    Keep one profile per page domain, then switch tabs to control widget matching,
+                    Keep one profile per page domain, then decide whether Atlas is active there before tuning matching,
                     referrer cleanup, and media URL normalization for that site.
                 </p>
             </div>
@@ -139,7 +141,7 @@ function handleImportCustomizations(event: Event): void {
                 <div class="border-b border-smart-blue-500/20 pb-3">
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-smart-blue-200">Profiles</h3>
                     <p class="mt-1 text-xs text-twilight-indigo-300">
-                        {{ customizations.length }} configured
+                        {{ enabledCustomizationCount }} enabled · {{ disabledCustomizationCount }} disabled
                     </p>
                 </div>
 
@@ -177,11 +179,15 @@ function handleImportCustomizations(event: Event): void {
                                 </div>
                                 <span
                                     class="mt-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                    :class="index === selectedCustomizationIndex
-                                        ? 'border-smart-blue-300/70 text-smart-blue-100'
-                                        : 'border-smart-blue-500/25 text-twilight-indigo-300'"
+                                    :class="customization.enabled
+                                        ? index === selectedCustomizationIndex
+                                            ? 'border-emerald-300/70 text-emerald-100'
+                                            : 'border-emerald-400/30 text-emerald-200'
+                                        : index === selectedCustomizationIndex
+                                            ? 'border-danger-300/70 text-danger-100'
+                                            : 'border-danger-500/25 text-red-200'"
                                 >
-                                    {{ index === selectedCustomizationIndex ? 'Active' : 'Profile' }}
+                                    {{ customization.enabled ? 'Enabled' : 'Disabled' }}
                                 </span>
                             </div>
                         </button>
@@ -213,6 +219,17 @@ function handleImportCustomizations(event: Event): void {
                     </label>
 
                     <div class="flex flex-col gap-3 xl:items-end">
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-medium transition"
+                            :class="selectedCustomization.enabled
+                                ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/22'
+                                : 'border-danger-500/55 bg-danger-500/12 text-danger-100 hover:bg-danger-500/20'"
+                            data-test-toggle-customization-enabled
+                            @click="selectedCustomization.enabled = !selectedCustomization.enabled"
+                        >
+                            {{ selectedCustomization.enabled ? 'Disable Profile' : 'Enable Profile' }}
+                        </button>
                         <div class="flex flex-wrap justify-end gap-1.5">
                             <span
                                 v-for="summary in selectedCustomizationSummary"
@@ -222,6 +239,9 @@ function handleImportCustomizations(event: Event): void {
                                 {{ summary }}
                             </span>
                         </div>
+                        <p class="text-right text-xs text-twilight-indigo-300">
+                            Disabled profiles stay saved, but Atlas ignores them until you turn them back on.
+                        </p>
                         <button
                             type="button"
                             class="inline-flex size-11 items-center justify-center rounded-xl border border-danger-500/55 bg-danger-500/15 text-danger-100 transition hover:bg-danger-500/25"

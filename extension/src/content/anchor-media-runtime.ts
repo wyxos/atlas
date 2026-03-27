@@ -22,6 +22,7 @@ const ANCHOR_MEDIA_BORDER_ATTR = 'data-atlas-anchor-media-red-border';
 const ANCHOR_MEDIA_MATCH_ATTR = 'data-atlas-anchor-media-match';
 
 type AnchorMediaRuntimeOptions = {
+    getIsEnabled: () => boolean;
     getRules: () => UrlMatchRule[];
     getReferrerCleanerQueryParams: () => string[];
     getPageHostname: () => string;
@@ -140,6 +141,10 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         anchor: HTMLAnchorElement,
         referrerCleanerQueryParams: string[],
     ): string | null {
+        if (!options.getIsEnabled()) {
+            return null;
+        }
+
         const rawHref = anchor.getAttribute('href');
         const normalizedAnchorHref = normalizeHashAwareUrl(anchor.href);
         const anchorHref = cleanupUrlQueryParams(normalizedAnchorHref, referrerCleanerQueryParams);

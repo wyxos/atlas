@@ -57,6 +57,7 @@ function splitQueryParamsText(input: string): string[] {
 
 function createCustomizationForm(customization: SiteCustomization): SiteCustomizationForm {
     return {
+        enabled: customization.enabled,
         domain: customization.domain,
         matchRules: [...customization.matchRules],
         referrerCleanerQueryParamsText: customization.referrerCleaner.stripQueryParams.join(', '),
@@ -72,6 +73,7 @@ function createCustomizationFormFromDomain(domain: string): SiteCustomizationFor
 
 function buildSiteCustomizationsFromForms(): SiteCustomization[] {
     return siteCustomizationForms.value.map((form) => ({
+        enabled: form.enabled,
         domain: form.domain.trim().toLowerCase(),
         matchRules: form.matchRules
             .map((rule) => rule.trim())
@@ -364,7 +366,7 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
                         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Extension Build</p>
                         <p class="mt-3 text-3xl font-semibold text-smart-blue-100">{{ extensionVersion }}</p>
                         <p class="mt-3 text-sm text-blue-slate-300">
-                            Site customizations stay local to this browser profile. Use the JSON import and export actions to move them elsewhere.
+                            Site customizations stay local to this browser profile. Enabled and disabled domains both carry over in the JSON import/export payload.
                         </p>
                     </article>
                 </div>
@@ -419,7 +421,7 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
                         <div class="border-b border-smart-blue-500/20 pb-4">
                             <h2 class="text-lg font-semibold text-regal-navy-100">Customizations</h2>
                             <p class="mt-1 text-sm text-blue-slate-300">
-                                Build one site profile per page domain and keep matching, referrer cleanup, and media normalization together.
+                                Build one site profile per page domain, then decide whether Atlas is enabled there before editing matching, referrer cleanup, and media normalization.
                             </p>
                         </div>
 
@@ -452,7 +454,7 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
 
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-smart-blue-500/20 pt-4">
                         <p class="text-sm text-twilight-indigo-300">
-                            Saving updates the Atlas connection and the current site profile registry for this browser profile.
+                            Saving updates the Atlas connection plus the enabled or disabled site profile registry for this browser profile.
                         </p>
 
                         <div class="flex items-center gap-3">

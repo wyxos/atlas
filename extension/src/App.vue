@@ -2,6 +2,8 @@
 /* global chrome */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
+import { getStoredOptions, setSiteCustomizationEnabledForDomain } from './atlas-options';
+import { resolveStoredSiteCustomizationForHostname } from './site-customizations';
 import { formatTabCountSummary, summarizeTabCounts, type BrowserTabLike, type TabCountSummary } from './tab-counts';
 
 const extensionVersion = chrome.runtime.getManifest().version || __ATLAS_EXTENSION_VERSION__;
@@ -12,12 +14,38 @@ const reverbStatusLabel = ref('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
 const tabCountSummary = ref<TabCountSummary | null>(null);
+const currentSiteHostname = ref<string | null>(null);
+const currentSiteProfileDomain = ref<string | null>(null);
+const currentSiteEnabled = ref<boolean | null>(null);
+const currentSiteError = ref<string | null>(null);
 const isDiscardingTabs = ref(false);
+const isUpdatingCurrentSite = ref(false);
 const discardTabsResult = ref<string | null>(null);
 let statusRefreshHandle: number | null = null;
 let tabCountRefreshHandle: number | null = null;
 let isPopupActive = true;
 const tabCountLabel = computed(() => formatTabCountSummary(tabCountSummary.value));
+const currentSiteStatusLabel = computed(() => {
+    if (currentSiteHostname.value === null) {
+        return 'Unavailable';
+    }
+
+    return currentSiteEnabled.value === true ? 'Enabled' : 'Disabled';
+});
+const currentSiteDetail = computed(() => {
+    if (currentSiteHostname.value === null) {
+        return 'Open a regular http or https page to manage Atlas site access.';
+    }
+
+    if (currentSiteProfileDomain.value !== null && currentSiteProfileDomain.value !== currentSiteHostname.value) {
+        return `Using the ${currentSiteProfileDomain.value} profile for ${currentSiteHostname.value}.`;
+    }
+
+    return `Manage Atlas access for ${currentSiteHostname.value}.`;
+});
+const currentSiteToggleLabel = computed(() => currentSiteEnabled.value === true
+    ? 'Disable on This Site'
+    : 'Enable on This Site');
 
 type DiscardInactiveTabsResponse = {
     ok?: unknown;
@@ -46,6 +74,23 @@ function pluralize(value: number, singular: string, plural: string): string {
     return value === 1 ? singular : plural;
 }
 
+function resolveManageableHostname(url: string | undefined): string | null {
+    if (typeof url !== 'string' || url.trim() === '') {
+        return null;
+    }
+
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return null;
+        }
+
+        return parsed.hostname.toLowerCase();
+    } catch {
+        return null;
+    }
+}
+
 function queryTabs(queryInfo: Record<string, unknown>): Promise<BrowserTab[] | null> {
     if (!chrome.tabs?.query) {
         return Promise.resolve(null);
@@ -63,6 +108,35 @@ function queryTabs(queryInfo: Record<string, unknown>): Promise<BrowserTab[] | n
     });
 }
 
+async function refreshCurrentSiteState(activeTabUrl: string | undefined): Promise<void> {
+    const hostname = resolveManageableHostname(activeTabUrl);
+    if (hostname === null) {
+        currentSiteHostname.value = null;
+        currentSiteProfileDomain.value = null;
+        currentSiteEnabled.value = null;
+        currentSiteError.value = null;
+        return;
+    }
+
+    try {
+        const stored = await getStoredOptions();
+        if (!isPopupActive) {
+            return;
+        }
+
+        const customization = resolveStoredSiteCustomizationForHostname(stored.siteCustomizations, hostname);
+        currentSiteHostname.value = hostname;
+        currentSiteProfileDomain.value = customization?.domain ?? hostname;
+        currentSiteEnabled.value = customization?.enabled === true;
+        currentSiteError.value = null;
+    } catch (error) {
+        currentSiteHostname.value = hostname;
+        currentSiteProfileDomain.value = hostname;
+        currentSiteEnabled.value = false;
+        currentSiteError.value = error instanceof Error ? error.message : 'Failed to load the current site profile.';
+    }
+}
+
 async function refreshTabCount(): Promise<void> {
     const [tabs, activeTabs] = await Promise.all([
         queryTabs({}),
@@ -75,10 +149,12 @@ async function refreshTabCount(): Promise<void> {
 
     if (tabs === null) {
         tabCountSummary.value = null;
+        await refreshCurrentSiteState(activeTabs?.[0]?.url);
         return;
     }
 
     tabCountSummary.value = summarizeTabCounts(tabs, activeTabs?.[0]?.url ?? null);
+    await refreshCurrentSiteState(activeTabs?.[0]?.url);
 }
 
 function handleTabPresenceChanged(): void {
@@ -115,6 +191,30 @@ function scheduleConnectionStatusRefresh(): void {
         statusRefreshHandle = null;
         void refreshConnectionStatus();
     }, 0);
+}
+
+async function toggleCurrentSite(): Promise<void> {
+    const targetDomain = currentSiteProfileDomain.value ?? currentSiteHostname.value;
+    if (targetDomain === null) {
+        return;
+    }
+
+    isUpdatingCurrentSite.value = true;
+    currentSiteError.value = null;
+
+    try {
+        await setSiteCustomizationEnabledForDomain(targetDomain, currentSiteEnabled.value !== true);
+        const activeTabs = await queryTabs({ active: true, currentWindow: true });
+        if (!isPopupActive) {
+            return;
+        }
+
+        await refreshCurrentSiteState(activeTabs?.[0]?.url);
+    } catch (error) {
+        currentSiteError.value = error instanceof Error ? error.message : 'Failed to update the current site profile.';
+    } finally {
+        isUpdatingCurrentSite.value = false;
+    }
 }
 
 async function discardInactiveTabs(): Promise<void> {
@@ -220,6 +320,10 @@ onUnmounted(() => {
                 <span class="font-medium text-smart-blue-200">{{ tabCountLabel }}</span>
             </p>
             <p class="text-sm text-twilight-indigo-200">
+                This Site
+                <span class="font-medium text-smart-blue-200">{{ currentSiteStatusLabel }}</span>
+            </p>
+            <p class="text-sm text-twilight-indigo-200">
                 {{ statusDetail }}
             </p>
             <p class="text-sm text-twilight-indigo-200">
@@ -230,8 +334,26 @@ onUnmounted(() => {
             <p v-if="reverbEndpoint" class="text-xs text-twilight-indigo-300">
                 Reverb Endpoint: <span class="font-mono">{{ reverbEndpoint }}</span>
             </p>
+            <p class="text-xs text-twilight-indigo-300">
+                {{ currentSiteDetail }}
+            </p>
+            <p v-if="currentSiteError" class="text-xs text-red-200">
+                {{ currentSiteError }}
+            </p>
 
             <div class="flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+                    :class="currentSiteEnabled === true
+                        ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25'
+                        : 'border-smart-blue-400/60 bg-smart-blue-500/20 text-smart-blue-100 hover:bg-smart-blue-500/30'"
+                    data-test="toggle-current-site"
+                    :disabled="currentSiteHostname === null || isUpdatingCurrentSite"
+                    @click="toggleCurrentSite"
+                >
+                    {{ isUpdatingCurrentSite ? 'Saving…' : currentSiteToggleLabel }}
+                </button>
                 <button
                     type="button"
                     class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"

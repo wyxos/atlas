@@ -1,9 +1,11 @@
 /* global chrome */
 import type { SiteCustomization } from './site-customizations';
 import {
+    createEmptySiteCustomization,
     deriveSiteCustomizationsFromLegacyStorage,
     normalizeSiteCustomizations,
     parseStoredSiteCustomizations,
+    resolveStoredSiteCustomizationForHostname,
 } from './site-customizations';
 
 export const STORAGE_KEYS = {
@@ -111,6 +113,24 @@ export function saveStoredOptions(
     });
 }
 
+function saveStoredSiteCustomizations(siteCustomizations: SiteCustomization[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.set(
+            {
+                [STORAGE_KEYS.siteCustomizations]: normalizeSiteCustomizations(siteCustomizations),
+            },
+            () => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+
+                resolve();
+            },
+        );
+    });
+}
+
 function normalizePreferenceDomainKey(input: string): string {
     const trimmed = input.trim().toLowerCase();
     if (trimmed === '') {
@@ -126,6 +146,29 @@ function normalizePreferenceDomainKey(input: string): string {
     }
 
     return trimmed.replace(/^\.+/, '').replace(/\.+$/, '');
+}
+
+export async function setSiteCustomizationEnabledForDomain(domain: string, enabled: boolean): Promise<void> {
+    const normalizedDomain = normalizePreferenceDomainKey(domain);
+    if (normalizedDomain === '') {
+        return;
+    }
+
+    const { siteCustomizations } = await getStoredOptions();
+    const existingCustomization = resolveStoredSiteCustomizationForHostname(siteCustomizations, normalizedDomain);
+    const nextSiteCustomizations = existingCustomization === null
+        ? [...siteCustomizations, {
+            ...createEmptySiteCustomization(normalizedDomain),
+            enabled,
+        }]
+        : siteCustomizations.map((customization) => customization.domain === existingCustomization.domain
+            ? {
+                ...customization,
+                enabled,
+            }
+            : customization);
+
+    await saveStoredSiteCustomizations(nextSiteCustomizations);
 }
 
 function parseStoredDomainBooleanPreferences(value: unknown): DomainBooleanPreferences {
