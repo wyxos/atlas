@@ -28,9 +28,11 @@ let currentSiteCustomization: SiteCustomization | null = null;
 let currentRules: UrlMatchRule[] = [];
 let currentReferrerCleanerQueryParams: string[] = [];
 let currentPageHostname = window.location.hostname;
+let isCurrentSiteEnabled = false;
 const overlayManager = new OverlayManager();
 const downloadEventSheet = createDownloadEventSheet();
 const anchorMediaRuntime = createAnchorMediaRuntime({
+    getIsEnabled: () => isCurrentSiteEnabled,
     getRules: () => currentRules,
     getReferrerCleanerQueryParams: () => currentReferrerCleanerQueryParams,
     getPageHostname: () => currentPageHostname,
@@ -38,6 +40,10 @@ const anchorMediaRuntime = createAnchorMediaRuntime({
 let duplicateAnchorTabGuard: ReturnType<typeof createDuplicateAnchorTabGuard> | null = null;
 
 function mediaMatchesRules(element: MediaElement): boolean {
+    if (!isCurrentSiteEnabled) {
+        return false;
+    }
+
     return mediaMatchesRulesForPage(element, window.location.href, currentRules, currentPageHostname);
 }
 
@@ -122,6 +128,10 @@ function resolveMediaCandidateFromInteraction(event: MouseEvent): MediaElement |
 }
 
 function tryApplyMediaWidgetFromInteraction(event: MouseEvent): void {
+    if (!isCurrentSiteEnabled) {
+        return;
+    }
+
     const mediaCandidate = resolveMediaCandidateFromInteraction(event);
     if (!mediaCandidate || mediaCandidate.closest('a[href]') !== null) {
         return;
@@ -243,11 +253,13 @@ async function loadRulesAndProcess(): Promise<void> {
         const stored = await getStoredOptions();
         currentPageHostname = window.location.hostname;
         currentSiteCustomization = resolveSiteCustomizationForHostname(stored.siteCustomizations, currentPageHostname);
+        isCurrentSiteEnabled = currentSiteCustomization !== null;
         currentRules = currentSiteCustomization ? createCustomizationMatchRules(currentSiteCustomization) : [];
         currentReferrerCleanerQueryParams = currentSiteCustomization?.referrerCleaner.stripQueryParams ?? [];
     } catch {
         currentPageHostname = window.location.hostname;
         currentSiteCustomization = null;
+        isCurrentSiteEnabled = false;
         currentRules = [];
         currentReferrerCleanerQueryParams = [];
     }

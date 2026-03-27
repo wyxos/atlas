@@ -34,6 +34,7 @@ export type MediaCleanerConfig = {
 };
 
 export type SiteCustomization = {
+    enabled: boolean;
     domain: string;
     matchRules: string[];
     referrerCleaner: ReferrerCleanerConfig;
@@ -46,6 +47,7 @@ export type SiteCustomizationsExport = {
 };
 
 type ParsedSiteCustomizationEntry = Partial<{
+    enabled: unknown;
     domain: unknown;
     matchRules: unknown;
     referrerCleaner: unknown;
@@ -54,6 +56,7 @@ type ParsedSiteCustomizationEntry = Partial<{
 
 const BUILT_IN_SITE_CUSTOMIZATIONS: SiteCustomization[] = [
     {
+        enabled: true,
         domain: 'deviantart.com',
         matchRules: DEFAULT_MATCH_RULES[0]?.regexes ?? [],
         referrerCleaner: {
@@ -66,6 +69,7 @@ const BUILT_IN_SITE_CUSTOMIZATIONS: SiteCustomization[] = [
         },
     },
     {
+        enabled: true,
         domain: 'civitai.com',
         matchRules: [],
         referrerCleaner: {
@@ -132,8 +136,13 @@ function normalizeMediaCleanerStrategies(values: MediaCleanerStrategy[]): MediaC
     return strategies;
 }
 
+function normalizeSiteCustomizationEnabled(value: boolean | undefined): boolean {
+    return value !== false;
+}
+
 function normalizeSiteCustomization(customization: SiteCustomization): SiteCustomization {
     return {
+        enabled: normalizeSiteCustomizationEnabled(customization.enabled),
         domain: normalizeSiteCustomizationDomain(customization.domain),
         matchRules: normalizeMatchRules([{
             domain: customization.domain,
@@ -242,6 +251,9 @@ function parseSiteCustomizationImportEntry(entry: unknown, index: number): SiteC
     if (typeof row.domain !== 'string') {
         throw new Error(`Customization at index ${index} must include a domain string.`);
     }
+    if (row.enabled !== undefined && typeof row.enabled !== 'boolean') {
+        throw new Error(`Domain "${row.domain}" enabled must be a boolean.`);
+    }
 
     const domain = normalizeSiteCustomizationDomain(row.domain);
     const referrerCleaner = row.referrerCleaner;
@@ -255,6 +267,7 @@ function parseSiteCustomizationImportEntry(entry: unknown, index: number): SiteC
     }
 
     const parsed = normalizeSiteCustomization({
+        enabled: row.enabled !== false,
         domain,
         matchRules: parseImportStringArray(row.matchRules, `Domain "${row.domain}" matchRules`),
         referrerCleaner: {
@@ -288,6 +301,7 @@ function parseSiteCustomizationImportEntry(entry: unknown, index: number): SiteC
 
 export function createEmptySiteCustomization(domain: string = ''): SiteCustomization {
     return {
+        enabled: true,
         domain: normalizeSiteCustomizationDomain(domain),
         matchRules: [],
         referrerCleaner: {
@@ -303,6 +317,7 @@ export function createEmptySiteCustomization(domain: string = ''): SiteCustomiza
 
 export function getDefaultSiteCustomizations(): SiteCustomization[] {
     return BUILT_IN_SITE_CUSTOMIZATIONS.map((customization) => ({
+        enabled: customization.enabled,
         domain: customization.domain,
         matchRules: [...customization.matchRules],
         referrerCleaner: {
@@ -348,6 +363,7 @@ function parseStoredSiteCustomization(entry: ParsedSiteCustomizationEntry): Site
         : {};
 
     return {
+        enabled: normalizeSiteCustomizationEnabled(entry.enabled === false ? false : true),
         domain,
         matchRules,
         referrerCleaner: {
@@ -389,6 +405,7 @@ export function deriveSiteCustomizationsFromLegacyStorage(
         const existing = merged.get(rule.domain) ?? createEmptySiteCustomization(rule.domain);
         merged.set(rule.domain, {
             ...existing,
+            enabled: existing.enabled,
             domain: rule.domain,
             matchRules: [...rule.regexes],
         });
@@ -400,6 +417,7 @@ export function deriveSiteCustomizationsFromLegacyStorage(
         const existing = merged.get(domain) ?? createEmptySiteCustomization(domain);
         merged.set(domain, {
             ...existing,
+            enabled: existing.enabled,
             domain,
             referrerCleaner: {
                 stripQueryParams: [...stripQueryParams],
@@ -410,7 +428,7 @@ export function deriveSiteCustomizationsFromLegacyStorage(
     return normalizeSiteCustomizations(Array.from(merged.values()));
 }
 
-export function resolveSiteCustomizationForHostname(
+export function resolveStoredSiteCustomizationForHostname(
     customizations: SiteCustomization[],
     hostname: string,
 ): SiteCustomization | null {
@@ -424,6 +442,18 @@ export function resolveSiteCustomizationForHostname(
         .sort((left, right) => right.domain.length - left.domain.length || left.domain.localeCompare(right.domain));
 
     return matches[0] ?? null;
+}
+
+export function resolveSiteCustomizationForHostname(
+    customizations: SiteCustomization[],
+    hostname: string,
+): SiteCustomization | null {
+    const customization = resolveStoredSiteCustomizationForHostname(customizations, hostname);
+    if (customization === null || customization.enabled === false) {
+        return null;
+    }
+
+    return customization;
 }
 
 export function exportSiteCustomizationsPayload(siteCustomizations: SiteCustomization[]): SiteCustomizationsExport {

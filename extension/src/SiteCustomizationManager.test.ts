@@ -4,6 +4,7 @@ import type { SiteCustomizationForm } from './options-site-customization-form';
 
 function createCustomization(overrides: Partial<SiteCustomizationForm> = {}): SiteCustomizationForm {
     return {
+        enabled: overrides.enabled ?? true,
         domain: overrides.domain ?? 'example.com',
         matchRules: overrides.matchRules ?? [],
         referrerCleanerQueryParamsText: overrides.referrerCleanerQueryParamsText ?? '',
@@ -54,6 +55,7 @@ describe('SiteCustomizationManager', () => {
 
         expect(wrapper.text()).toContain('Add a domain to start building a site profile.');
         expect(wrapper.text()).toContain('Copied to clipboard.');
+        expect(wrapper.text()).toContain('0 enabled');
 
         const fileInput = wrapper.get('[data-test-import-file-input]');
         const clickSpy = vi.fn();
@@ -100,12 +102,14 @@ describe('SiteCustomizationManager', () => {
         await domainButtons[1]!.trigger('click');
         await wrapper.get('[data-test-customization-tab="referrerCleaner"]').trigger('click');
         await wrapper.get('[data-test-add-match-rule]').trigger('click');
+        await wrapper.get('[data-test-toggle-customization-enabled]').trigger('click');
         await wrapper.get('[data-test-remove-customization-domain="example.com"]').trigger('click');
 
         expect(wrapper.emitted('update:selectedCustomizationIndex')?.at(-1)).toEqual([1]);
         expect(wrapper.emitted('update:activeCustomizationTab')?.at(-1)).toEqual(['referrerCleaner']);
         expect(wrapper.emitted('add-match-rule')).toHaveLength(1);
         expect(wrapper.emitted('remove-customization')?.at(-1)).toEqual([0]);
+        expect(wrapper.text()).toContain('Disabled profiles stay saved');
     });
 
     it('shows the media cleaner editor states and emits rewrite-rule actions', async () => {

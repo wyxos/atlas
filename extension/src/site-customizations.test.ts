@@ -9,6 +9,7 @@ describe('site-customizations', () => {
     it('resolves the most specific customization for the active page hostname', () => {
         const customization = resolveSiteCustomizationForHostname([
             {
+                enabled: true,
                 domain: 'example.com',
                 matchRules: [],
                 referrerCleaner: {
@@ -21,6 +22,7 @@ describe('site-customizations', () => {
                 },
             },
             {
+                enabled: true,
                 domain: 'sub.example.com',
                 matchRules: ['.*\\/gallery\\/.*'],
                 referrerCleaner: {
@@ -35,6 +37,7 @@ describe('site-customizations', () => {
         ], 'deep.sub.example.com');
 
         expect(customization).toEqual({
+            enabled: true,
             domain: 'sub.example.com',
             matchRules: ['.*\\/gallery\\/.*'],
             referrerCleaner: {
@@ -48,9 +51,30 @@ describe('site-customizations', () => {
         });
     });
 
+    it('ignores disabled customizations when resolving the active page hostname', () => {
+        const customization = resolveSiteCustomizationForHostname([
+            {
+                enabled: false,
+                domain: 'example.com',
+                matchRules: [],
+                referrerCleaner: {
+                    stripQueryParams: [],
+                },
+                mediaCleaner: {
+                    stripQueryParams: [],
+                    rewriteRules: [],
+                    strategies: [],
+                },
+            },
+        ], 'example.com');
+
+        expect(customization).toBeNull();
+    });
+
     it('exports and re-imports site customizations without unrelated settings', () => {
         const exported = exportSiteCustomizationsPayload([
             {
+                enabled: false,
                 domain: 'Example.com',
                 matchRules: ['.*\\/gallery\\/.*'],
                 referrerCleaner: {
@@ -73,6 +97,7 @@ describe('site-customizations', () => {
             version: 1,
             siteCustomizations: [
                 {
+                    enabled: false,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
                     referrerCleaner: {
@@ -101,6 +126,7 @@ describe('site-customizations', () => {
             version: 1,
             siteCustomizations: [
                 {
+                    enabled: true,
                     domain: 'example.com',
                     mediaCleaner: {
                         rewriteRules: [
@@ -120,6 +146,7 @@ describe('site-customizations', () => {
             version: 1,
             siteCustomizations: [
                 {
+                    enabled: true,
                     domain: 'Example.com',
                     matchRules: [],
                     referrerCleaner: {
@@ -132,6 +159,7 @@ describe('site-customizations', () => {
                     },
                 },
                 {
+                    enabled: true,
                     domain: 'https://example.com/path',
                     matchRules: [],
                     referrerCleaner: {

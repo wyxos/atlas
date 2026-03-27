@@ -24,6 +24,7 @@ function createStoredOptions() {
         apiToken: 'test-token',
         siteCustomizations: [
             {
+                enabled: true,
                 domain: 'civitai.com',
                 matchRules: [],
                 referrerCleaner: {
@@ -36,6 +37,7 @@ function createStoredOptions() {
                 },
             },
             {
+                enabled: true,
                 domain: 'example.com',
                 matchRules: ['.*\\/gallery\\/.*'],
                 referrerCleaner: {
@@ -315,6 +317,7 @@ describe('OptionsApp', () => {
             .find((input) => input.attributes('autocomplete') === 'off');
         expect(apiKeyInput).toBeTruthy();
         await apiKeyInput!.setValue(' next-token ');
+        await wrapper.get('[data-test-toggle-customization-enabled]').trigger('click');
 
         await wrapper.get('form').trigger('submit');
         await flushPromises();
@@ -324,6 +327,7 @@ describe('OptionsApp', () => {
             ' next-token ',
             [
                 {
+                    enabled: false,
                     domain: 'civitai.com',
                     matchRules: [],
                     referrerCleaner: {
@@ -336,6 +340,7 @@ describe('OptionsApp', () => {
                     },
                 },
                 {
+                    enabled: true,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
                     referrerCleaner: {

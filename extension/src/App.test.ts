@@ -2,9 +2,16 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockResolveApiConnectionStatus = vi.fn();
+const mockGetStoredOptions = vi.fn();
+const mockSetSiteCustomizationEnabledForDomain = vi.fn();
 
 vi.mock('./atlas-api', () => ({
     resolveApiConnectionStatus: mockResolveApiConnectionStatus,
+}));
+
+vi.mock('./atlas-options', () => ({
+    getStoredOptions: mockGetStoredOptions,
+    setSiteCustomizationEnabledForDomain: mockSetSiteCustomizationEnabledForDomain,
 }));
 
 type BrowserTab = {
@@ -103,6 +110,24 @@ async function mountApp(tabs: BrowserTab[], options: ChromeMockOptions = {}) {
 }
 
 describe('App', () => {
+    let storedOptions: {
+        atlasDomain: string;
+        apiToken: string;
+        siteCustomizations: Array<{
+            enabled: boolean;
+            domain: string;
+            matchRules: string[];
+            referrerCleaner: {
+                stripQueryParams: string[];
+            };
+            mediaCleaner: {
+                stripQueryParams: string[];
+                rewriteRules: Array<{ pattern: string; replace: string }>;
+                strategies: string[];
+            };
+        }>;
+    };
+
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
@@ -115,6 +140,47 @@ describe('App', () => {
             reverbLabel: 'Connected',
             reverbDetail: 'Listening.',
             reverbEndpoint: 'wss://atlas.test/reverb',
+        });
+        storedOptions = {
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            siteCustomizations: [
+                {
+                    enabled: true,
+                    domain: 'civitai.com',
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: [],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: ['civitaiCanonical'],
+                    },
+                },
+            ],
+        };
+        mockGetStoredOptions.mockImplementation(async () => structuredClone(storedOptions));
+        mockSetSiteCustomizationEnabledForDomain.mockImplementation(async (domain: string, enabled: boolean) => {
+            const existing = storedOptions.siteCustomizations.find((customization) => customization.domain === domain);
+            if (existing) {
+                existing.enabled = enabled;
+                return;
+            }
+
+            storedOptions.siteCustomizations.push({
+                enabled,
+                domain,
+                matchRules: [],
+                referrerCleaner: {
+                    stripQueryParams: [],
+                },
+                mediaCleaner: {
+                    stripQueryParams: [],
+                    rewriteRules: [],
+                    strategies: [],
+                },
+            });
         });
     });
 
@@ -133,6 +199,24 @@ describe('App', () => {
         await flushPromises();
 
         expect(wrapper.text()).toContain('Tabs 2/3');
+    });
+
+    it('shows the current site state and toggles the effective profile domain from the popup', async () => {
+        const { wrapper } = await mountApp([
+            { id: 1, url: 'https://www.civitai.com/models/1', active: true },
+        ]);
+
+        await vi.runAllTimersAsync();
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('This Site Enabled');
+        expect(wrapper.text()).toContain('Using the civitai.com profile for www.civitai.com.');
+
+        await wrapper.get('[data-test="toggle-current-site"]').trigger('click');
+        await flushPromises();
+
+        expect(mockSetSiteCustomizationEnabledForDomain).toHaveBeenCalledWith('civitai.com', false);
+        expect(wrapper.text()).toContain('This Site Disabled');
     });
 
     it('renders the current connection status and reverb endpoint', async () => {

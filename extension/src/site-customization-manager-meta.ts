@@ -39,6 +39,7 @@ function formatCount(count: number, singular: string, plural: string = `${singul
 
 export function describeCustomization(customization: SiteCustomizationForm): string[] {
     const summary = [
+        customization.enabled ? 'Enabled' : 'Disabled',
         customization.matchRules.length === 0
             ? 'Permissive matching'
             : formatCount(customization.matchRules.length, 'match rule'),

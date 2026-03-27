@@ -3,6 +3,7 @@ import type { MediaCleanerStrategy, MediaRewriteRule } from './site-customizatio
 export type CustomizationTab = 'matchRules' | 'referrerCleaner' | 'mediaCleaner';
 
 export type SiteCustomizationForm = {
+    enabled: boolean;
     domain: string;
     matchRules: string[];
     referrerCleanerQueryParamsText: string;
