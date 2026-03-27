@@ -29,8 +29,8 @@ const { mockToast, mockReactionCallback, mockBatchReactionCallback, mockUpdateRe
     };
 });
 
-// Mock vue-toastification
-vi.mock('vue-toastification', () => ({
+// Mock toast helper
+vi.mock('@/components/ui/toast/use-toast', () => ({
     useToast: () => mockToast,
     default: {},
 }));

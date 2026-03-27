@@ -1,5 +1,5 @@
 import { triggerRef, type Ref } from 'vue';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 import type { DownloadedReactionChoice } from './useDownloadedReactionPrompt';
 import type { FeedItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';

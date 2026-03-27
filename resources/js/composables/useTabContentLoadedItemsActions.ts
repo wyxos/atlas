@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 import StatusToast from '@/components/toasts/StatusToast.vue';
 import type { LoadedItemsBulkAction, TabContentItemInteractions } from './useTabContentItemInteractions';
 

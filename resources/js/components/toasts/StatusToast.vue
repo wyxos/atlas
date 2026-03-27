@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { CircleCheckBig, Info, TriangleAlert } from 'lucide-vue-next';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 
 type StatusToastVariant = 'success' | 'info' | 'error';
 

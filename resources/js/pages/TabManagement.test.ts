@@ -76,7 +76,7 @@ const tabsReorderUrl = tabsReorder.definition?.url ?? tabsReorder.url();
 
 global.fetch = vi.fn();
 
-vi.mock('vue-toastification', () => ({
+vi.mock('@/components/ui/toast/use-toast', () => ({
     useToast: () => mockToast,
 }));
 

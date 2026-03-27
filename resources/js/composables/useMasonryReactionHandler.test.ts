@@ -23,7 +23,7 @@ vi.mock('@/utils/reactions', () => ({
     createReactionCallback: () => mockReactionCallback,
 }));
 
-vi.mock('vue-toastification', () => ({
+vi.mock('@/components/ui/toast/use-toast', () => ({
     useToast: () => mockToast,
     default: {},
 }));

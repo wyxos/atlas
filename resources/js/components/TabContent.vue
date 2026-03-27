@@ -26,7 +26,7 @@ import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentMasonryItemOverlay from './TabContentMasonryItemOverlay.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
