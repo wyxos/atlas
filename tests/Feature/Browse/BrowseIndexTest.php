@@ -226,6 +226,41 @@ test('browse returns empty items array when service fails', function () {
     expect($data['items'])->toBeEmpty();
 });
 
+test('browse excludes files already marked as not found', function () {
+    $user = User::factory()->create();
+
+    File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/not-found-guid/original=true/not-found-guid.jpeg',
+        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/not-found-guid/width=1216/not-found-guid.jpeg',
+        'not_found' => true,
+        'path' => null,
+        'preview_path' => null,
+        'downloaded' => false,
+    ]);
+
+    Http::fake([
+        'https://civitai.com/api/v1/images*' => Http::response([
+            'items' => [[
+                'id' => 999,
+                'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/not-found-guid/original=true/not-found-guid.jpeg',
+                'thumbnailUrl' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/not-found-guid/width=1216/not-found-guid.jpeg',
+                'width' => 512,
+                'height' => 768,
+                'mimeType' => 'image/jpeg',
+            ]],
+            'metadata' => [
+                'nextCursor' => null,
+            ],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/browse?service=civit-ai-images');
+
+    $response->assertSuccessful();
+    expect($response->json('items'))->toBe([]);
+});
+
 test('browse uses LocalService when feed is local', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([

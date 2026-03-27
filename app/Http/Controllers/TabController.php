@@ -247,6 +247,7 @@ class TabController extends Controller
                 'files.previewed_count',
                 'files.seen_count',
                 'files.auto_disliked',
+                'files.not_found',
             ])
             ->with([
                 'metadata' => function ($query) {

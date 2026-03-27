@@ -4,6 +4,11 @@ namespace App\Support;
 
 final class CivitAiMediaUrl
 {
+    public static function isMediaUrl(?string $url): bool
+    {
+        return self::parseMediaUrl($url) !== null;
+    }
+
     /**
      * Normalize a CivitAI image URL to the stable original=true GUID form.
      */

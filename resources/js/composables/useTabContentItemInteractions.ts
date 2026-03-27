@@ -8,6 +8,7 @@ import type { BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
 import { applyExactLocalReactionState } from '@/utils/localReactionState';
+import { useTabContentNotFoundReconciliation } from './useTabContentNotFoundReconciliation';
 
 export type LoadedItemsBulkAction =
     | 'love'
@@ -162,6 +163,15 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         items: options.items,
         masonry: options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
         isLocal: options.form.isLocal,
+    });
+
+    const notFoundReconciliation = useTabContentNotFoundReconciliation({
+        items: options.items,
+        tab: options.tab,
+        masonry: options.masonry,
+        hoveredItemId,
+        cancelAutoDislikeCountdown: autoDislikeQueue.cancelAutoDislikeCountdown,
+        clearHover: clearHoverState,
     });
 
     function findNearestVideoElement(from: EventTarget | null): HTMLVideoElement | null {
@@ -507,7 +517,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             }
         },
         onBatchFailures(payloads: Array<{ item: FeedItem; error: unknown }>): void {
-            void payloads;
+            notFoundReconciliation.onBatchFailures(payloads);
         },
     };
 

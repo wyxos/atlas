@@ -142,6 +142,7 @@ class BrowsePersister
             return ($file->downloaded === false || $file->downloaded === null)
                 && ! $file->previewed_at
                 && ! $file->blacklisted_at
+                && ! $file->not_found
                 && ! $file->auto_disliked;
         })->values()->all();
     }

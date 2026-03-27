@@ -421,8 +421,18 @@ defineExpose({
                             </div>
                         </template>
 
-                        <template #error="{ error }">
-                            <p class="text-center text-xs font-medium text-danger-100">Failed to load {{ error }}</p>
+                        <template #error="{ item }">
+                            <div class="flex h-full w-full items-center justify-center bg-black/60 px-4 text-center">
+                                <div v-if="item.notFound" class="flex flex-col items-center gap-1 text-danger-50">
+                                    <p class="text-4xl font-black tracking-[0.28em]">404</p>
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-danger-100/85">
+                                        Removing from tab
+                                    </p>
+                                </div>
+                                <p v-else class="text-xs font-medium text-danger-100">
+                                    Failed to load preview.
+                                </p>
+                            </div>
                         </template>
 
                         <template #overlay="{ item }">

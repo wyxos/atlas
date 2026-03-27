@@ -186,7 +186,7 @@ class FileItemFormatter
                 'page' => $page,
                 'key' => "{$page}-{$file->id}",
                 'index' => $index,
-                'notFound' => false,
+                'notFound' => (bool) $file->not_found,
                 'previewed_count' => $file->previewed_count ?? 0,
                 'seen_count' => $file->seen_count ?? 0,
                 'downloaded' => (bool) $file->downloaded,
