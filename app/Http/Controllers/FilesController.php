@@ -7,6 +7,7 @@ use App\Listings\FileListing;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\DownloadedFileClearService;
+use App\Services\FileNotFoundService;
 use App\Services\MetricsService;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
@@ -738,6 +739,16 @@ SVG;
             'auto_disliked_count' => count($validFileIds),
             'file_ids' => $validFileIds,
         ]);
+    }
+
+    /**
+     * Report that a remote preview failed to load in the masonry grid.
+     */
+    public function reportPreviewFailure(File $file)
+    {
+        app(FileNotFoundService::class)->reconcilePreviewFailure($file);
+
+        return response()->noContent();
     }
 
     /**

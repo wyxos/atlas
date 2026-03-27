@@ -129,6 +129,7 @@ vi.mock('@/composables/useItemPreview', async () => {
 });
 
 const mockClearAutoDislikeCountdowns = vi.fn();
+const mockCancelAutoDislikeCountdown = vi.fn();
 const mockStartAutoDislikeCountdown = vi.fn();
 const mockHasActiveCountdown = vi.fn(() => false);
 vi.mock('@/composables/useAutoDislikeQueue', async () => {
@@ -136,7 +137,7 @@ vi.mock('@/composables/useAutoDislikeQueue', async () => {
     return {
         useAutoDislikeQueue: vi.fn(() => ({
             startAutoDislikeCountdown: mockStartAutoDislikeCountdown,
-            cancelAutoDislikeCountdown: vi.fn(),
+            cancelAutoDislikeCountdown: mockCancelAutoDislikeCountdown,
             getCountdownRemainingTime: vi.fn(() => 0),
             getCountdownProgress: vi.fn(() => 0),
             hasActiveCountdown: mockHasActiveCountdown,
@@ -367,7 +368,10 @@ vi.mock('@/utils/reactions', () => ({
 
 vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
     incrementPreview: {
-        url: (id: number) => `/api/files/${id}/increment-preview`,
+        url: (args: number | { file: number }) => `/api/files/${typeof args === 'number' ? args : args.file}/increment-preview`,
+    },
+    reportPreviewFailure: {
+        url: (args: number | { file: number }) => `/api/files/${typeof args === 'number' ? args : args.file}/preview-failure`,
     },
 }));
 
@@ -375,6 +379,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     capturedOpenContainerTab = null;
     mockClearAutoDislikeCountdowns.mockClear();
+    mockCancelAutoDislikeCountdown.mockClear();
     mockIsLoading.value = false;
     mockCancelLoad.mockClear();
     mockDestroy.mockClear();
@@ -392,6 +397,7 @@ beforeEach(() => {
     mockAxios.put.mockResolvedValue({ data: {} });
     mockAxios.delete.mockResolvedValue({ data: {} });
     mockAxios.patch.mockResolvedValue({ data: {} });
+    (window as typeof window & { Echo?: unknown }).Echo = undefined;
 });
 
 
@@ -405,6 +411,7 @@ export {
     mockHandlePillClick,
     mockHandlePillAuxClick,
     mockClearAutoDislikeCountdowns,
+    mockCancelAutoDislikeCountdown,
     mockStartAutoDislikeCountdown,
     mockHasActiveCountdown,
     mockIsLoading,

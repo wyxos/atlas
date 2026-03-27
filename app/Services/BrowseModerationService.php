@@ -68,14 +68,21 @@ class BrowseModerationService
             );
         }
 
-        // Filter out only blacklisted files from response (auto-disliked files should be shown)
-        // This includes files that were blacklisted in this request (via immediateActions)
-        // and files that were already blacklisted (queried in one batch).
-        $filteredFiles = $filterBlacklisted
-            ? $files->reject(function ($file) use ($blacklistedIdSet) {
+        // Filter out permanently unavailable files and blacklisted files from browse/tab responses.
+        $filteredFiles = $files
+            ->reject(function ($file) use ($blacklistedIdSet, $filterBlacklisted) {
+                if ((bool) ($file->not_found ?? false)) {
+                    return true;
+                }
+
+                if (! $filterBlacklisted) {
+                    return false;
+                }
+
                 return isset($blacklistedIdSet[(int) $file->id]);
-            })->values()->all()
-            : $files->values()->all();
+            })
+            ->values()
+            ->all();
 
         // Format immediately processed files (auto-disliked/blacklisted) for frontend toast notifications
         // These are files that were immediately processed (before they were filtered out)

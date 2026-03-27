@@ -87,6 +87,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/files/reactions/batch/store', [\App\Http\Controllers\FileReactionController::class, 'batchStore'])->name('api.files.reactions.batch.store');
     Route::post('/api/files/{file}/reaction', [\App\Http\Controllers\FileReactionController::class, 'store'])->name('api.files.reaction.store');
     Route::post('/api/files/{file}/preview', [\App\Http\Controllers\FilesController::class, 'incrementPreview'])->name('api.files.preview.increment');
+    Route::post('/api/files/{file}/preview-failure', [\App\Http\Controllers\FilesController::class, 'reportPreviewFailure'])->name('api.files.preview.report-failure');
     Route::post('/api/files/preview/batch', [\App\Http\Controllers\FilesController::class, 'batchIncrementPreview'])->name('api.files.preview.batch');
     Route::post('/api/files/preview/reset/batch', [\App\Http\Controllers\FilesController::class, 'batchResetPreview'])->name('api.files.preview.reset-batch');
     Route::post('/api/files/blacklist/batch', [\App\Http\Controllers\FilesController::class, 'batchBlacklist'])->name('api.files.blacklist.batch');
