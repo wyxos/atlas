@@ -573,4 +573,5 @@ describe('createReactionBadgeHost', () => {
 
         host.unmount();
     });
+
 });

@@ -10,7 +10,7 @@ const mockToast = {
     dismiss: vi.fn(),
 };
 
-vi.mock('vue-toastification', () => ({
+vi.mock('@/components/ui/toast/use-toast', () => ({
     useToast: () => mockToast,
 }));
 

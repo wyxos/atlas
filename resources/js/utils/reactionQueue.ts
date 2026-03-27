@@ -1,4 +1,4 @@
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 import { queueManager } from '@/composables/useQueue';
 import { createReactionCallback, createBatchReactionCallback } from './reactions';
 import updateReactionState from '@/utils/reactionStateUpdater';

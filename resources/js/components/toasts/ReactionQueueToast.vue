@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 import { queueManager } from '@/composables/useQueue';
 import { cancelQueuedReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';

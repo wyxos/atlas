@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 import downloadTransfers from '@/routes/api/download-transfers/index';
 import type {
     DownloadQueueItem,

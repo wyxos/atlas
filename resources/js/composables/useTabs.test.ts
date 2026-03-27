@@ -20,7 +20,7 @@ const { mockAxios, mockToast } = vi.hoisted(() => {
     };
 });
 
-vi.mock('vue-toastification', () => ({
+vi.mock('@/components/ui/toast/use-toast', () => ({
     useToast: () => mockToast,
 }));
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/components/ui/toast/use-toast';
 import { queueManager } from '@/composables/useQueue';
 import { Shield, Eye } from 'lucide-vue-next';
 import ModerationReviewModal from '@/components/moderation/ModerationReviewModal.vue';

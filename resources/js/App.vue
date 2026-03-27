@@ -3,6 +3,7 @@ import { computed, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import DashboardLayout from './layouts/DashboardLayout.vue';
 import PublicLayout from './layouts/PublicLayout.vue';
+import Toaster from '@/components/ui/toast/Toaster.vue';
 import packageInfo from '../../package.json';
 
 const route = useRoute();
@@ -46,6 +47,7 @@ function handleLogout() {
         <component :is="layout" :user-name="userName" :app-name="appName" :app-version="appVersion" @logout="handleLogout">
             <router-view />
         </component>
+        <Toaster />
     </div>
 </template>
 

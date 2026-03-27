@@ -20,10 +20,6 @@ vi.mock('vue-router', () => ({
 vi.mock('@oruga-ui/oruga-next', () => ({
     default: vi.fn(),
 }));
-vi.mock('vue-toastification', () => ({
-    default: vi.fn(),
-    POSITION: { BOTTOM_RIGHT: 'bottom-right' },
-}));
 vi.mock('@fortawesome/fontawesome-svg-core', () => ({
     library: { add: vi.fn() },
 }));

@@ -4,7 +4,6 @@
 /*@import '@wyxos/vibe/vibe.css';*/
 @import './masonry.css';
 @import './listing.css';
-@import './toast-overrides.css';
 
 /* Oruga Component Overrides */
 @import './oruga/table.css';
@@ -426,22 +425,6 @@
             radial-gradient(800px circle at 92% 0%, rgba(3, 83, 164, 0.25), transparent 60%),
             linear-gradient(180deg, var(--color-prussian-blue-900) 0%, var(--color-prussian-blue-800) 45%, var(--color-prussian-blue-700) 100%);
     }
-}
-
-/* Remove default blue background from vue-toastification globally */
-.Vue-Toastification__toast {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.Vue-Toastification__toast--default,
-.Vue-Toastification__toast--success,
-.Vue-Toastification__toast--error,
-.Vue-Toastification__toast--warning,
-.Vue-Toastification__toast--info {
-    background: transparent !important;
-    border: none !important;
 }
 
 /* File viewer video controls */
