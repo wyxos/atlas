@@ -3,6 +3,7 @@
 use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -94,6 +95,41 @@ test('batch store keeps same reaction when same type is sent again', function ()
 
     $response->assertSuccessful();
 
+    $this->assertDatabaseHas('reactions', [
+        'file_id' => $file->id,
+        'user_id' => $this->user->id,
+        'type' => 'like',
+    ]);
+});
+
+test('batch store detaches same-reaction files from the current user tabs', function () {
+    $file = File::factory()->create();
+    $currentUserTab = Tab::factory()->for($this->user)->withFiles([$file->id])->create();
+    $otherUser = User::factory()->admin()->create();
+    $otherUserTab = Tab::factory()->for($otherUser)->withFiles([$file->id])->create();
+
+    Reaction::create([
+        'file_id' => $file->id,
+        'user_id' => $this->user->id,
+        'type' => 'like',
+    ]);
+
+    $response = $this->postJson('/api/files/reactions/batch/store', [
+        'reactions' => [
+            ['file_id' => $file->id, 'type' => 'like'],
+        ],
+    ]);
+
+    $response->assertSuccessful();
+
+    $this->assertDatabaseMissing('tab_file', [
+        'tab_id' => $currentUserTab->id,
+        'file_id' => $file->id,
+    ]);
+    $this->assertDatabaseHas('tab_file', [
+        'tab_id' => $otherUserTab->id,
+        'file_id' => $file->id,
+    ]);
     $this->assertDatabaseHas('reactions', [
         'file_id' => $file->id,
         'user_id' => $this->user->id,

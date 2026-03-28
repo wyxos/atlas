@@ -150,6 +150,7 @@ class FileReactionController extends Controller
             $existingReaction = $existingReactions->get($fileId);
             $queueDownload = ! ($existingReaction && $existingReaction->type === $reactionData['type']);
             $result = $service->set($file, $user, $reactionData['type'], [
+                'detachFromTabsOnNoop' => true,
                 'queueDownload' => $queueDownload,
             ]);
 
