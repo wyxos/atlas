@@ -208,11 +208,10 @@ vi.mock('@wyxos/vibe', () => {
                 const removals = Array.isArray(itemsOrIds) ? itemsOrIds : [itemsOrIds];
                 const itemIdsToRemove = new Set(
                     removals
-                        .map((itemOrId: any) => typeof itemOrId === 'string' ? itemOrId : itemOrId?.id)
+                        .map((itemOrId: any) => typeof itemOrId === 'object' ? itemOrId?.id : itemOrId)
                         .filter((itemOrId: any) => itemOrId !== undefined && itemOrId !== null)
-                        .map(String)
                 );
-                const nextItems = currentItems.filter((item: any) => !itemIdsToRemove.has(String(item?.id)));
+                const nextItems = currentItems.filter((item: any) => !itemIdsToRemove.has(item?.id));
                 if (nextItems.length !== currentItems.length) {
                     emit('update:items', nextItems);
                 }
