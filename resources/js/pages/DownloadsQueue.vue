@@ -88,6 +88,7 @@ const {
     removeTitle,
     removeDescription,
     removeAlsoFromDisk,
+    removeAlsoDeleteRecord,
     openRemoveDialog,
     confirmRemove,
     pauseSelection,
@@ -228,8 +229,10 @@ watch([sortKey, sortDirection], () => {
             :description="removeDescription"
             :is-deleting="removeIsDeleting"
             :also-from-disk="removeAlsoFromDisk"
+            :also-delete-record="removeAlsoDeleteRecord"
             @update:open="removeDialogOpen = $event"
             @update:also-from-disk="removeAlsoFromDisk = $event"
+            @update:also-delete-record="removeAlsoDeleteRecord = $event"
             @confirm="confirmRemove"
         />
     </PageLayout>

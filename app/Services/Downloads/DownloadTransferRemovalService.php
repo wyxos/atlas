@@ -6,17 +6,15 @@ use App\Enums\DownloadTransferStatus;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
-use App\Models\Reaction;
-use App\Services\MetricsService;
+use App\Services\DownloadedFileClearService;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Storage;
 
 final class DownloadTransferRemovalService
 {
     public function __construct(
         private readonly DownloadTransferExecutionLock $executionLock,
         private readonly DownloadTransferTempDirectory $tempDirectory,
-        private readonly MetricsService $metricsService,
+        private readonly DownloadedFileClearService $downloadedFileClearService,
     ) {}
 
     public function bulkRemovalSyncLimit(): int
@@ -32,23 +30,29 @@ final class DownloadTransferRemovalService
     /**
      * @return list<int>
      */
-    public function remove(DownloadTransfer $downloadTransfer, bool $alsoFromDisk = false): array
-    {
+    public function remove(
+        DownloadTransfer $downloadTransfer,
+        bool $alsoFromDisk = false,
+        bool $alsoDeleteRecord = false,
+    ): array {
         $downloadTransfer->loadMissing('file');
 
         $removedIds = [$downloadTransfer->id];
-        $deletesFileRecord = $alsoFromDisk && $this->shouldDeleteFileRecord($downloadTransfer->file);
+        $deletesFileRecord = $alsoFromDisk && $alsoDeleteRecord && $downloadTransfer->file !== null;
 
         if ($deletesFileRecord) {
             $removedIds = $this->transferIdsForFile($downloadTransfer->file);
+            $this->prepareTransfersForFileRemoval($downloadTransfer->file);
+        } else {
+            $this->prepareForRemoval($downloadTransfer);
         }
 
-        $this->prepareForRemoval($downloadTransfer);
-
         if ($alsoFromDisk) {
-            $this->deleteFileFromDisk($downloadTransfer);
+            $this->clearFileFromDisk($downloadTransfer->file, syncSearch: ! $deletesFileRecord);
 
             if ($deletesFileRecord) {
+                $downloadTransfer->file?->delete();
+
                 return $removedIds === [] ? [$downloadTransfer->id] : $removedIds;
             }
         }
@@ -62,8 +66,12 @@ final class DownloadTransferRemovalService
      * @param  list<int>  $ids
      * @param  callable(list<int>): void|null  $afterChunk
      */
-    public function removeByIds(array $ids, bool $alsoFromDisk = false, ?callable $afterChunk = null): int
-    {
+    public function removeByIds(
+        array $ids,
+        bool $alsoFromDisk = false,
+        bool $alsoDeleteRecord = false,
+        ?callable $afterChunk = null,
+    ): int {
         $removedCount = 0;
         $handledIds = [];
 
@@ -84,7 +92,7 @@ final class DownloadTransferRemovalService
                     continue;
                 }
 
-                $removedIds = $this->remove($transfer, $alsoFromDisk);
+                $removedIds = $this->remove($transfer, $alsoFromDisk, $alsoDeleteRecord);
 
                 foreach ($removedIds as $removedId) {
                     $handledIds[$removedId] = true;
@@ -107,8 +115,11 @@ final class DownloadTransferRemovalService
     /**
      * @param  callable(list<int>): void|null  $afterChunk
      */
-    public function removeCompleted(bool $alsoFromDisk = false, ?callable $afterChunk = null): int
-    {
+    public function removeCompleted(
+        bool $alsoFromDisk = false,
+        bool $alsoDeleteRecord = false,
+        ?callable $afterChunk = null,
+    ): int {
         $removedCount = 0;
         $handledIds = [];
 
@@ -116,7 +127,7 @@ final class DownloadTransferRemovalService
             ->with('file')
             ->where('status', DownloadTransferStatus::COMPLETED)
             ->orderBy('id')
-            ->chunkById($this->bulkRemovalChunkSize(), function ($transfers) use ($alsoFromDisk, $afterChunk, &$removedCount, &$handledIds): void {
+            ->chunkById($this->bulkRemovalChunkSize(), function ($transfers) use ($alsoFromDisk, $alsoDeleteRecord, $afterChunk, &$removedCount, &$handledIds): void {
                 $chunkRemovedIds = [];
 
                 foreach ($transfers as $transfer) {
@@ -124,7 +135,7 @@ final class DownloadTransferRemovalService
                         continue;
                     }
 
-                    $removedIds = $this->remove($transfer, $alsoFromDisk);
+                    $removedIds = $this->remove($transfer, $alsoFromDisk, $alsoDeleteRecord);
 
                     foreach ($removedIds as $removedId) {
                         $handledIds[$removedId] = true;
@@ -174,49 +185,13 @@ final class DownloadTransferRemovalService
         $this->resetFileProgress($downloadTransfer);
     }
 
-    public function deleteFileFromDisk(DownloadTransfer $downloadTransfer): void
+    public function clearFileFromDisk(?File $file, bool $syncSearch = true): void
     {
-        $downloadTransfer->loadMissing('file');
-
-        if (! $downloadTransfer->file) {
+        if (! $file) {
             return;
         }
 
-        $file = $downloadTransfer->file;
-        $wasDownloaded = (bool) $file->downloaded;
-        $disk = Storage::disk(config('downloads.disk'));
-
-        if ($file->path && $disk->exists($file->path)) {
-            $disk->delete($file->path);
-        }
-
-        if ($file->preview_path && $disk->exists($file->preview_path)) {
-            $disk->delete($file->preview_path);
-        }
-
-        if ($file->poster_path && $disk->exists($file->poster_path)) {
-            $disk->delete($file->poster_path);
-        }
-
-        $this->metricsService->applyDownloadClear($file, $wasDownloaded);
-
-        if ($wasDownloaded) {
-            $file->delete();
-
-            return;
-        }
-
-        Reaction::query()->where('file_id', $file->id)->delete();
-
-        $file->forceFill([
-            'path' => null,
-            'preview_path' => null,
-            'poster_path' => null,
-            'downloaded' => false,
-            'downloaded_at' => null,
-            'download_progress' => 0,
-            'updated_at' => now(),
-        ])->save();
+        $this->downloadedFileClearService->clear($file, syncSearch: $syncSearch);
     }
 
     private function cleanupTransferParts(DownloadTransfer $downloadTransfer): void
@@ -247,9 +222,17 @@ final class DownloadTransferRemovalService
         ]);
     }
 
-    private function shouldDeleteFileRecord(?File $file): bool
+    private function prepareTransfersForFileRemoval(?File $file): void
     {
-        return $file !== null && (bool) $file->downloaded;
+        if (! $file) {
+            return;
+        }
+
+        DownloadTransfer::query()
+            ->where('file_id', $file->id)
+            ->orderBy('id')
+            ->get()
+            ->each(fn (DownloadTransfer $transfer) => $this->prepareForRemoval($transfer));
     }
 
     /**

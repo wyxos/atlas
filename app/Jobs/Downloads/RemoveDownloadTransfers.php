@@ -24,6 +24,7 @@ class RemoveDownloadTransfers implements ShouldQueue
     public function __construct(
         public ?array $ids = null,
         public bool $alsoFromDisk = false,
+        public bool $alsoDeleteRecord = false,
         public bool $completedOnly = false,
     ) {
         $this->onQueue('downloads');
@@ -40,7 +41,7 @@ class RemoveDownloadTransfers implements ShouldQueue
         };
 
         if ($this->completedOnly) {
-            $removalService->removeCompleted($this->alsoFromDisk, $broadcastRemoved);
+            $removalService->removeCompleted($this->alsoFromDisk, $this->alsoDeleteRecord, $broadcastRemoved);
 
             return;
         }
@@ -49,6 +50,6 @@ class RemoveDownloadTransfers implements ShouldQueue
             return;
         }
 
-        $removalService->removeByIds($this->ids, $this->alsoFromDisk, $broadcastRemoved);
+        $removalService->removeByIds($this->ids, $this->alsoFromDisk, $this->alsoDeleteRecord, $broadcastRemoved);
     }
 }

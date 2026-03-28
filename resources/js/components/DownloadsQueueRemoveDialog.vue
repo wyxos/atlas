@@ -16,6 +16,7 @@ interface Props {
     description: string;
     isDeleting: boolean;
     alsoFromDisk: boolean;
+    alsoDeleteRecord: boolean;
 }
 
 defineProps<Props>();
@@ -23,6 +24,7 @@ defineProps<Props>();
 defineEmits<{
     'update:open': [value: boolean];
     'update:alsoFromDisk': [value: boolean];
+    'update:alsoDeleteRecord': [value: boolean];
     confirm: [];
 }>();
 </script>
@@ -45,6 +47,19 @@ defineEmits<{
                     @change="$emit('update:alsoFromDisk', ($event.target as HTMLInputElement).checked)"
                 />
                 Also delete file(s) from disk
+            </label>
+
+            <label
+                v-if="alsoFromDisk"
+                class="flex items-center gap-2 mt-1 text-sm text-twilight-indigo-100 cursor-pointer select-none"
+            >
+                <input
+                    type="checkbox"
+                    :checked="alsoDeleteRecord"
+                    class="h-4 w-4 rounded border border-twilight-indigo-500 bg-prussian-blue-700 text-danger-400"
+                    @change="$emit('update:alsoDeleteRecord', ($event.target as HTMLInputElement).checked)"
+                />
+                Also delete Atlas file record and reactions
             </label>
 
             <DialogFooter>
