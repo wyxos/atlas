@@ -37,7 +37,17 @@ export function useDownloadsQueueActions(params: {
     const removeTargetIds = ref<number[]>([]);
     const removeIsDeleting = ref(false);
     const removeMode = ref<DownloadQueueRemoveMode>(null);
-    const removeAlsoFromDisk = ref(false);
+    const removeAlsoFromDiskValue = ref(false);
+    const removeAlsoDeleteRecord = ref(false);
+    const removeAlsoFromDisk = computed({
+        get: () => removeAlsoFromDiskValue.value,
+        set: (value: boolean) => {
+            removeAlsoFromDiskValue.value = value;
+            if (!value) {
+                removeAlsoDeleteRecord.value = false;
+            }
+        },
+    });
 
     const removeCount = computed(() => removeTargetIds.value.length);
     const removeTitle = computed(() => (removeMode.value === 'single' ? 'Remove download' : 'Remove downloads'));
@@ -72,6 +82,7 @@ export function useDownloadsQueueActions(params: {
         removeMode.value = mode;
         removeTargetIds.value = ids;
         removeAlsoFromDisk.value = false;
+        removeAlsoDeleteRecord.value = false;
         removeDialogOpen.value = true;
     }
 
@@ -81,6 +92,7 @@ export function useDownloadsQueueActions(params: {
         removeTargetIds.value = [];
         removeMode.value = null;
         removeAlsoFromDisk.value = false;
+        removeAlsoDeleteRecord.value = false;
     }
 
     async function confirmRemove(): Promise<void> {
@@ -98,11 +110,16 @@ export function useDownloadsQueueActions(params: {
             if (removeMode.value === 'completed') {
                 const { data } = await window.axios.post<RemoveResponse>(downloadTransfers.destroyCompleted.url(), {
                     also_from_disk: removeAlsoFromDisk.value,
+                    also_delete_record: removeAlsoFromDisk.value && removeAlsoDeleteRecord.value,
                 });
                 removeNow = data.queued !== true;
                 removedIds = data.ids ?? ids;
             } else if (ids.length === 1 && removeAlsoFromDisk.value) {
-                const { data } = await window.axios.delete<RemoveResponse>(downloadTransfers.destroyDisk.url(ids[0]));
+                const { data } = await window.axios.delete<RemoveResponse>(downloadTransfers.destroyDisk.url(ids[0]), {
+                    data: {
+                        also_delete_record: removeAlsoDeleteRecord.value,
+                    },
+                });
                 removedIds = data.ids ?? ids;
             } else if (ids.length === 1) {
                 const { data } = await window.axios.delete<RemoveResponse>(downloadTransfers.destroy.url(ids[0]));
@@ -111,6 +128,7 @@ export function useDownloadsQueueActions(params: {
                 const { data } = await window.axios.post<RemoveResponse>(downloadTransfers.destroyBatch.url(), {
                     ids,
                     also_from_disk: removeAlsoFromDisk.value,
+                    also_delete_record: removeAlsoFromDisk.value && removeAlsoDeleteRecord.value,
                 });
                 removeNow = data.queued !== true;
                 removedIds = data.ids ?? ids;
@@ -333,6 +351,7 @@ export function useDownloadsQueueActions(params: {
         removeIsDeleting,
         removeMode,
         removeAlsoFromDisk,
+        removeAlsoDeleteRecord,
         removeCount,
         removeTitle,
         removeLabel,

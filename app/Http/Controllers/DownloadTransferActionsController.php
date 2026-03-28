@@ -215,11 +215,18 @@ class DownloadTransferActionsController extends Controller
 
     public function destroyWithDisk(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        $removedIds = $this->transferRemovalService->remove($downloadTransfer, true);
+        $validated = request()->validate([
+            'also_delete_record' => 'sometimes|boolean',
+        ]);
+
+        $alsoDeleteRecord = (bool) ($validated['also_delete_record'] ?? false);
+        $removedIds = $this->transferRemovalService->remove($downloadTransfer, true, $alsoDeleteRecord);
         $this->broadcastRemoved($removedIds);
 
         return response()->json([
-            'message' => 'Download removed and file deleted from disk.',
+            'message' => $alsoDeleteRecord
+                ? 'Download removed, file deleted from disk, and Atlas record deleted.'
+                : 'Download removed and file deleted from disk.',
             'ids' => $removedIds,
             'count' => count($removedIds),
             'queued' => false,
@@ -232,13 +239,19 @@ class DownloadTransferActionsController extends Controller
             'ids' => 'required|array|min:1',
             'ids.*' => 'required|integer|exists:download_transfers,id',
             'also_from_disk' => 'sometimes|boolean',
+            'also_delete_record' => 'sometimes|boolean',
         ]);
 
         $ids = $validated['ids'];
         $alsoFromDisk = (bool) ($validated['also_from_disk'] ?? false);
+        $alsoDeleteRecord = $alsoFromDisk && (bool) ($validated['also_delete_record'] ?? false);
 
         if ($this->shouldQueueBulkRemoval(count($ids))) {
-            RemoveDownloadTransfers::dispatch(ids: $ids, alsoFromDisk: $alsoFromDisk);
+            RemoveDownloadTransfers::dispatch(
+                ids: $ids,
+                alsoFromDisk: $alsoFromDisk,
+                alsoDeleteRecord: $alsoDeleteRecord,
+            );
 
             return response()->json([
                 'message' => 'Download removal queued.',
@@ -248,7 +261,7 @@ class DownloadTransferActionsController extends Controller
         }
 
         $removedIds = [];
-        $this->transferRemovalService->removeByIds($ids, $alsoFromDisk, function (array $chunkIds) use (&$removedIds): void {
+        $this->transferRemovalService->removeByIds($ids, $alsoFromDisk, $alsoDeleteRecord, function (array $chunkIds) use (&$removedIds): void {
             $removedIds = [...$removedIds, ...$chunkIds];
         });
         $this->broadcastRemoved($removedIds);
@@ -265,9 +278,11 @@ class DownloadTransferActionsController extends Controller
     {
         $validated = $request->validate([
             'also_from_disk' => 'sometimes|boolean',
+            'also_delete_record' => 'sometimes|boolean',
         ]);
 
         $alsoFromDisk = (bool) ($validated['also_from_disk'] ?? false);
+        $alsoDeleteRecord = $alsoFromDisk && (bool) ($validated['also_delete_record'] ?? false);
         $completedCount = $this->transferRemovalService->completedCount();
 
         if ($completedCount === 0) {
@@ -280,7 +295,11 @@ class DownloadTransferActionsController extends Controller
         }
 
         if ($this->shouldQueueBulkRemoval($completedCount)) {
-            RemoveDownloadTransfers::dispatch(alsoFromDisk: $alsoFromDisk, completedOnly: true);
+            RemoveDownloadTransfers::dispatch(
+                alsoFromDisk: $alsoFromDisk,
+                alsoDeleteRecord: $alsoDeleteRecord,
+                completedOnly: true,
+            );
 
             return response()->json([
                 'message' => 'Completed download removal queued.',
@@ -290,7 +309,7 @@ class DownloadTransferActionsController extends Controller
         }
 
         $removedIds = [];
-        $removedCount = $this->transferRemovalService->removeCompleted($alsoFromDisk, function (array $chunkIds) use (&$removedIds): void {
+        $removedCount = $this->transferRemovalService->removeCompleted($alsoFromDisk, $alsoDeleteRecord, function (array $chunkIds) use (&$removedIds): void {
             $removedIds = [...$removedIds, ...$chunkIds];
         });
         $this->broadcastRemoved($removedIds);

@@ -322,7 +322,7 @@ it('defers restarting yt-dlp until the superseded process releases the transfer 
     $lock?->release();
 });
 
-it('removes a transfer and deletes the file from disk', function () {
+it('removes a transfer and deletes the file from disk while keeping the Atlas file record by default', function () {
     Storage::fake('atlas-app');
 
     $user = User::factory()->create();
@@ -352,13 +352,18 @@ it('removes a transfer and deletes the file from disk', function () {
     $response->assertSuccessful();
 
     expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
-    expect(File::query()->whereKey($file->id)->exists())->toBeFalse();
+    expect(File::query()->whereKey($file->id)->exists())->toBeTrue();
+
+    $file->refresh();
+    expect($file->path)->toBeNull();
+    expect($file->preview_path)->toBeNull();
+    expect($file->downloaded)->toBeFalse();
 
     Storage::disk('atlas-app')->assertMissing('downloads/aa/bb/test.jpg');
     Storage::disk('atlas-app')->assertMissing('thumbnails/aa/bb/test_thumb.jpg');
 });
 
-it('deletes the file record and cascaded transfers when removing a downloaded file from disk', function () {
+it('deletes the file record and cascaded transfers when requested while removing a downloaded file from disk', function () {
     Storage::fake('atlas-app');
 
     $user = User::factory()->create();
@@ -398,7 +403,9 @@ it('deletes the file record and cascaded transfers when removing a downloaded fi
         'failed_at' => now(),
     ]);
 
-    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$firstTransfer->id}/disk");
+    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$firstTransfer->id}/disk", [
+        'also_delete_record' => true,
+    ]);
 
     $response->assertSuccessful();
 
@@ -416,7 +423,7 @@ it('deletes the file record and cascaded transfers when removing a downloaded fi
     Storage::disk('atlas-app')->assertMissing('thumbnails/cascade.jpg');
 });
 
-it('removes reactions but keeps the file record when deleting a non-downloaded file from disk', function () {
+it('keeps reactions and the file record when deleting a non-downloaded file from disk by default', function () {
     Storage::fake('atlas-app');
 
     $user = User::factory()->create();
@@ -456,7 +463,7 @@ it('removes reactions but keeps the file record when deleting a non-downloaded f
         ]);
 
     expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
-    expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
+    expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeTrue();
 
     $file->refresh();
     expect($file->path)->toBeNull();
@@ -520,16 +527,22 @@ it('removes completed transfers in one request without touching other statuses',
     expect(DownloadTransfer::query()->whereKey($failedTransfer->id)->exists())->toBeTrue();
 });
 
-it('removes completed transfers and deletes their files from disk when requested', function () {
+it('removes completed transfers and deletes their files from disk while keeping Atlas file records by default', function () {
     Storage::fake('atlas-app');
 
     $user = User::factory()->create();
+    $reactionUser = User::factory()->create();
     $file = File::factory()->create([
         'url' => 'https://example.com/completed-video.mp4',
         'filename' => 'completed-video.mp4',
         'downloaded' => true,
         'path' => 'downloads/completed-video.mp4',
         'preview_path' => 'thumbnails/completed-video.jpg',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'like',
     ]);
     Storage::disk('atlas-app')->put($file->path, 'video');
     Storage::disk('atlas-app')->put($file->preview_path, 'preview');
@@ -554,13 +567,19 @@ it('removes completed transfers and deletes their files from disk when requested
         ]);
 
     expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
-    expect(File::query()->whereKey($file->id)->exists())->toBeFalse();
+    expect(File::query()->whereKey($file->id)->exists())->toBeTrue();
+
+    $file->refresh();
+    expect($file->path)->toBeNull();
+    expect($file->preview_path)->toBeNull();
+    expect($file->downloaded)->toBeFalse();
+    expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeTrue();
 
     Storage::disk('atlas-app')->assertMissing('downloads/completed-video.mp4');
     Storage::disk('atlas-app')->assertMissing('thumbnails/completed-video.jpg');
 });
 
-it('removes multiple transfers from disk in one bulk request', function () {
+it('removes multiple transfers from disk in one bulk request while keeping Atlas file records by default', function () {
     Storage::fake('atlas-app');
 
     $user = User::factory()->create();
@@ -615,13 +634,78 @@ it('removes multiple transfers from disk in one bulk request', function () {
 
     expect(DownloadTransfer::query()->whereKey($firstTransfer->id)->exists())->toBeFalse();
     expect(DownloadTransfer::query()->whereKey($secondTransfer->id)->exists())->toBeFalse();
-    expect(File::query()->whereKey($firstFile->id)->exists())->toBeFalse();
-    expect(File::query()->whereKey($secondFile->id)->exists())->toBeFalse();
+    expect(File::query()->whereKey($firstFile->id)->exists())->toBeTrue();
+    expect(File::query()->whereKey($secondFile->id)->exists())->toBeTrue();
+
+    $firstFile->refresh();
+    $secondFile->refresh();
+    expect($firstFile->path)->toBeNull();
+    expect($secondFile->path)->toBeNull();
+    expect($firstFile->downloaded)->toBeFalse();
+    expect($secondFile->downloaded)->toBeFalse();
 
     Storage::disk('atlas-app')->assertMissing('downloads/first-video.mp4');
     Storage::disk('atlas-app')->assertMissing('thumbnails/first-video.jpg');
     Storage::disk('atlas-app')->assertMissing('downloads/second-video.mp4');
     Storage::disk('atlas-app')->assertMissing('thumbnails/second-video.jpg');
+});
+
+it('can delete Atlas file records and reactions during bulk delete from disk when requested', function () {
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $reactionUser = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/bulk-record-delete.mp4',
+        'filename' => 'bulk-record-delete.mp4',
+        'downloaded' => true,
+        'path' => 'downloads/bulk-record-delete.mp4',
+        'preview_path' => 'thumbnails/bulk-record-delete.jpg',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $reactionUser->id,
+        'type' => 'funny',
+    ]);
+    Storage::disk('atlas-app')->put($file->path, 'video');
+    Storage::disk('atlas-app')->put($file->preview_path, 'preview');
+
+    $firstTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+    ]);
+    $secondTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 10,
+        'last_broadcast_percent' => 10,
+        'failed_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/api/download-transfers/bulk-delete', [
+        'ids' => [$firstTransfer->id],
+        'also_from_disk' => true,
+        'also_delete_record' => true,
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'count' => 2,
+            'queued' => false,
+        ]);
+
+    expect(File::query()->whereKey($file->id)->exists())->toBeFalse();
+    expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
+    expect(DownloadTransfer::query()->whereKey($firstTransfer->id)->exists())->toBeFalse();
+    expect(DownloadTransfer::query()->whereKey($secondTransfer->id)->exists())->toBeFalse();
 });
 
 it('queues large bulk transfer removal requests', function () {
