@@ -25,9 +25,6 @@ class DatabaseSeeder extends Seeder
 
         $this->resetAppIfStorageNotEmpty();
 
-        // Flush scout
-        File::removeAllFromSearch();
-
         // Demo user (admin)
         User::create([
             'name' => 'Demo User',
