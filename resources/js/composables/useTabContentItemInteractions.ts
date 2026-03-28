@@ -55,6 +55,8 @@ type BatchBlacklistResponse = {
     }>;
 };
 
+type MasonryRemoveTarget = Parameters<MasonryInstance['remove']>[0];
+
 function safelyPlayVideoPreview(video: HTMLVideoElement): void {
     try {
         const playback = video.play();
@@ -246,7 +248,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
         if (options.masonry.value) {
             for (const item of itemsToRemove) {
-                await options.masonry.value.remove(String(item.id));
+                await options.masonry.value.remove(item as unknown as MasonryRemoveTarget);
             }
 
             return;

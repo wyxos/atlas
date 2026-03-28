@@ -94,8 +94,8 @@ describe('TabContent - Loaded items actions', () => {
             ],
         });
         expect(mockRemove).toHaveBeenCalledTimes(2);
-        expect(mockRemove).toHaveBeenNthCalledWith(1, '101');
-        expect(mockRemove).toHaveBeenNthCalledWith(2, '102');
+        expect(mockRemove).toHaveBeenNthCalledWith(1, expect.objectContaining({ id: 101 }));
+        expect(mockRemove).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: 102 }));
     });
 
     it('increments preview counts for all loaded items by four', async () => {

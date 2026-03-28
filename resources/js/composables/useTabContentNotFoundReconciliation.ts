@@ -25,6 +25,8 @@ type UseTabContentNotFoundReconciliationOptions = {
     clearHover: () => void;
 };
 
+type MasonryRemoveTarget = Parameters<MasonryInstance['remove']>[0];
+
 const NOT_FOUND_REMOVAL_DELAY_MS = 5000;
 
 export function useTabContentNotFoundReconciliation(options: UseTabContentNotFoundReconciliationOptions) {
@@ -90,11 +92,14 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
             }
 
             if (options.masonry.value) {
-                void Promise.resolve(options.masonry.value.remove(String(item.id))).catch(() => {});
-                return;
+                void Promise.resolve(
+                    options.masonry.value.remove(item as unknown as MasonryRemoveTarget)
+                ).catch(() => {
+                    options.items.value = options.items.value.filter((candidate) => candidate.id !== fileId);
+                });
+            } else {
+                options.items.value = options.items.value.filter((candidate) => candidate.id !== fileId);
             }
-
-            options.items.value = options.items.value.filter((candidate) => candidate.id !== fileId);
         }, NOT_FOUND_REMOVAL_DELAY_MS);
 
         notFoundRemovalTimers.set(fileId, timerId);

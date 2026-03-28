@@ -151,7 +151,7 @@ describe('TabContent - Preview failure reconciliation', () => {
             await vi.advanceTimersByTimeAsync(5000);
             await nextTick();
 
-            expect(mockRemove).toHaveBeenCalledWith('103');
+            expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 103 }));
             expect(masonry.props('items')).toHaveLength(0);
 
             wrapper.unmount();
@@ -231,7 +231,7 @@ describe('TabContent - Preview failure reconciliation', () => {
             await vi.advanceTimersByTimeAsync(5000);
             await nextTick();
 
-            expect(mockRemove).toHaveBeenCalledWith('104');
+            expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 104 }));
             expect(masonry.props('items')).toHaveLength(0);
 
             wrapper.unmount();
@@ -327,7 +327,7 @@ describe('TabContent - Preview failure reconciliation', () => {
             await vi.advanceTimersByTimeAsync(5000);
             await nextTick();
 
-            expect(mockRemove).toHaveBeenCalledWith('102');
+            expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 102 }));
             expect(masonry.props('items')).toHaveLength(0);
 
             wrapper.unmount();
