@@ -13,7 +13,6 @@ const toast = useToast();
 const queue = queueManager;
 const queueCollection = queue.collection;
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
-const BATCH_REACTION_THRESHOLD = 25;
 const REACTION_TYPES: ReactionType[] = ['love', 'like', 'dislike', 'funny'];
 type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
@@ -192,8 +191,6 @@ export function queueBatchReaction(
 
     const queueId = `batch-${reactionType}-${fileIds.join('-')}-${Date.now()}`;
 
-    // Create reaction callbacks
-    const reactionCallback = createReactionCallback();
     const batchReactionCallback = createBatchReactionCallback();
 
     // Add to queue
@@ -204,12 +201,7 @@ export function queueBatchReaction(
             // Dismiss the countdown toast as soon as the timer expires.
             toast.dismiss(queueId);
             try {
-                // Execute all reactions in the batch
-                if (fileIds.length >= BATCH_REACTION_THRESHOLD) {
-                    await batchReactionCallback(fileIds, reactionType);
-                } else {
-                    await Promise.all(fileIds.map((fileId) => reactionCallback(fileId, reactionType)));
-                }
+                await batchReactionCallback(fileIds, reactionType);
                 
                 if (options?.updateLocalState === true && items) {
                     fileIds.forEach((fileId) => {

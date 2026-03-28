@@ -298,7 +298,7 @@ describe('reactionQueue', () => {
             expect(toastCall[0].props.reactionType).toBe('dislike');
         });
 
-        it('executes all reaction callbacks when countdown expires', async () => {
+        it('uses the batch callback when countdown expires for small batches too', async () => {
             const fileIds = [123, 456, 789];
             queueBatchReaction(fileIds, 'like', []);
 
@@ -306,10 +306,8 @@ describe('reactionQueue', () => {
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
-            expect(mockReactionCallback).toHaveBeenCalledTimes(3);
-            expect(mockReactionCallback).toHaveBeenCalledWith(123, 'like');
-            expect(mockReactionCallback).toHaveBeenCalledWith(456, 'like');
-            expect(mockReactionCallback).toHaveBeenCalledWith(789, 'like');
+            expect(mockBatchReactionCallback).toHaveBeenCalledWith(fileIds, 'like');
+            expect(mockReactionCallback).not.toHaveBeenCalled();
         });
 
         it('uses batch callback for large reactions', async () => {
@@ -366,7 +364,7 @@ describe('reactionQueue', () => {
 
         it('shows error toast on batch execution failure', async () => {
             const error = new Error('API Error');
-            mockReactionCallback.mockRejectedValueOnce(error);
+            mockBatchReactionCallback.mockRejectedValueOnce(error);
             vi.spyOn(console, 'error').mockImplementation(() => {});
 
             const fileIds = [123, 456];
@@ -392,7 +390,7 @@ describe('reactionQueue', () => {
 
         it('restores queued batch state when execution fails', async () => {
             const restoreCallback = vi.fn().mockResolvedValue(undefined);
-            mockReactionCallback.mockRejectedValueOnce(new Error('API Error'));
+            mockBatchReactionCallback.mockRejectedValueOnce(new Error('API Error'));
             vi.spyOn(console, 'error').mockImplementation(() => {});
 
             queueBatchReaction([123, 456], 'like', [], restoreCallback);
