@@ -1,0 +1,22 @@
+- main [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Welcome Back" [level=1] [ref=e21]
+      - paragraph [ref=e22]: Sign in to your account
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]: Email Address
+        - textbox "Email Address" [active] [ref=e26]:
+          - /placeholder: you@example.com
+      - generic [ref=e27]:
+        - generic [ref=e28]: Password
+        - textbox "Password" [ref=e29]:
+          - /placeholder: ••••••••
+      - generic [ref=e31]:
+        - checkbox "Remember me" [ref=e32]
+        - generic [ref=e33]: Remember me
+      - button "Sign In" [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: Sign In
+    - link "← Back to Home" [ref=e38] [cursor=pointer]:
+      - /url: https://atlas.test
