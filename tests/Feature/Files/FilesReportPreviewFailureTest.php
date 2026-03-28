@@ -40,7 +40,12 @@ test('preview failure marks civitai files as not found, detaches them from all t
 
     $response = $this->actingAs($requester)->postJson("/api/files/{$file->id}/preview-failure");
 
-    $response->assertNoContent();
+    $response->assertSuccessful()
+        ->assertJson([
+            'fileId' => $file->id,
+            'notFound' => true,
+            'tabIds' => [$requesterTab->id],
+        ]);
 
     $file->refresh();
     $requesterTab->refresh();
@@ -94,7 +99,12 @@ test('preview failure does not mark file when only one civitai url returns 404',
 
     $response = $this->actingAs($user)->postJson("/api/files/{$file->id}/preview-failure");
 
-    $response->assertNoContent();
+    $response->assertSuccessful()
+        ->assertJson([
+            'fileId' => $file->id,
+            'notFound' => false,
+            'tabIds' => [],
+        ]);
 
     $file->refresh();
     $tab->refresh();
@@ -125,7 +135,12 @@ test('preview failure ignores non civitai files', function () {
 
     $response = $this->actingAs($user)->postJson("/api/files/{$file->id}/preview-failure");
 
-    $response->assertNoContent();
+    $response->assertSuccessful()
+        ->assertJson([
+            'fileId' => $file->id,
+            'notFound' => false,
+            'tabIds' => [],
+        ]);
 
     $file->refresh();
     $tab->refresh();

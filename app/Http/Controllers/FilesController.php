@@ -744,11 +744,18 @@ SVG;
     /**
      * Report that a remote preview failed to load in the masonry grid.
      */
-    public function reportPreviewFailure(File $file)
+    public function reportPreviewFailure(File $file): JsonResponse
     {
-        app(FileNotFoundService::class)->reconcilePreviewFailure($file);
+        $result = app(FileNotFoundService::class)->reconcilePreviewFailure($file);
+        $currentUserId = (int) Auth::id();
+        $currentUserTabIds = collect($result['affected_tabs_by_user'] ?? [])
+            ->firstWhere('user_id', $currentUserId)['tab_ids'] ?? [];
 
-        return response()->noContent();
+        return response()->json([
+            'fileId' => (int) ($result['file_id'] ?? $file->id),
+            'notFound' => (bool) ($result['not_found'] ?? false),
+            'tabIds' => array_values(array_map('intval', $currentUserTabIds)),
+        ]);
     }
 
     /**
