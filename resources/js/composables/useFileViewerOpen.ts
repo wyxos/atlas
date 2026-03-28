@@ -47,6 +47,7 @@ export function useFileViewerOpen(params: {
     handleItemSeen: (fileId: number) => Promise<void>;
     closeOverlay: () => void;
     emitOpen: () => void;
+    emitPreviewFailure: (item: FeedItem) => void;
 }) {
     const { overflow, overscroll } = toRefs(params.container);
     const {
@@ -241,6 +242,7 @@ export function useFileViewerOpen(params: {
             }
         } catch (error) {
             console.warn('Failed to preload full-size image, using original:', error);
+            params.emitPreviewFailure(masonryItem);
             fullSizeImage.value = target.previewSrc;
             isLoading.value = false;
             try {

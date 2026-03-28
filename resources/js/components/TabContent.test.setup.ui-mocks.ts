@@ -5,7 +5,7 @@ vi.mock('./FileViewer.vue', () => ({
         name: 'FileViewer',
         template: '<div class="file-viewer-mock"></div>',
         props: ['containerRef', 'masonryContainerRef', 'items', 'hasMore', 'isLoading', 'onLoadMore', 'onReaction', 'masonry', 'tabId'],
-        emits: ['close'],
+        emits: ['close', 'preview-failure'],
         methods: {
             openFromClick: vi.fn(),
             close: vi.fn(),

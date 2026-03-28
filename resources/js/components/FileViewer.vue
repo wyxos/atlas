@@ -33,6 +33,7 @@ const emit = defineEmits<{
     close: [];
     open: [];
     reaction: [fileId: number, type: ReactionType];
+    previewFailure: [item: FeedItem];
 }>();
 
 const items = toRef(props, 'items');
@@ -148,6 +149,7 @@ const opener = useFileViewerOpen({
     handleItemSeen: viewerData.handleItemSeen,
     closeOverlay: overlayLifecycle.closeOverlay,
     emitOpen: () => emit('open'),
+    emitPreviewFailure: (item) => emit('previewFailure', item),
 });
 
 const paging = useFileViewerPaging({
@@ -158,6 +160,7 @@ const paging = useFileViewerPaging({
     navigation: navigationState,
     handleItemSeen: viewerData.handleItemSeen,
     ensureMoreItems,
+    emitPreviewFailure: (item) => emit('previewFailure', item),
 });
 
 const reactionFlow = useFileViewerReactionFlow({

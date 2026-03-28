@@ -3,6 +3,7 @@ import { flushPromises } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import * as setup from './TabContent.test.setup';
 import TabContent from './TabContent.vue';
+import FileViewer from './FileViewer.vue';
 import type { FeedItem } from '@/composables/useTabs';
 
 const {
@@ -151,6 +152,86 @@ describe('TabContent - Preview failure reconciliation', () => {
             await nextTick();
 
             expect(mockRemove).toHaveBeenCalledWith('103');
+            expect(masonry.props('items')).toHaveLength(0);
+
+            wrapper.unmount();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('reports viewer full-size preload failures through the same not-found flow', async () => {
+        vi.useFakeTimers();
+
+        const tab = {
+            id: 904,
+            label: 'Browse 1',
+            params: {
+                feed: 'online',
+                service: 'civit-ai-images',
+                page: 1,
+            },
+            items: [
+                {
+                    id: 104,
+                    width: 500,
+                    height: 500,
+                    page: 1,
+                    key: '1-104',
+                    index: 0,
+                    src: 'https://image.civitai.com/token/guid-4/width=1216/guid-4.jpeg',
+                    preview: 'https://image.civitai.com/token/guid-4/width=1216/guid-4.jpeg',
+                    original: 'https://image.civitai.com/token/guid-4/original=true/guid-4.jpeg',
+                    type: 'image',
+                    notFound: false,
+                    previewed_count: 0,
+                    seen_count: 0,
+                },
+            ],
+            position: 0,
+            isActive: true,
+        };
+
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab,
+            },
+        });
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                fileId: 104,
+                notFound: true,
+                tabIds: [tab.id],
+            },
+        });
+
+        try {
+            const wrapper = mount(TabContent, {
+                props: {
+                    tabId: tab.id,
+                    availableServices: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            wrapper.findComponent(FileViewer).vm.$emit('preview-failure', tab.items[0]);
+
+            await flushPromises();
+            await nextTick();
+
+            const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+            const itemsAfterResponse = masonry.props('items') as FeedItem[];
+            expect(mockAxios.post).toHaveBeenCalledWith('/api/files/104/preview-failure');
+            expect(itemsAfterResponse[0]?.notFound).toBe(true);
+
+            await vi.advanceTimersByTimeAsync(5000);
+            await nextTick();
+
+            expect(mockRemove).toHaveBeenCalledWith('104');
             expect(masonry.props('items')).toHaveLength(0);
 
             wrapper.unmount();

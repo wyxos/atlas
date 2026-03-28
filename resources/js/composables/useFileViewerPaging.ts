@@ -43,6 +43,7 @@ export function useFileViewerPaging(params: {
     };
     handleItemSeen: (fileId: number) => Promise<void>;
     ensureMoreItems: () => Promise<boolean>;
+    emitPreviewFailure: (item: FeedItem) => void;
 }) {
     const {
         rect,
@@ -243,6 +244,7 @@ export function useFileViewerPaging(params: {
         error: unknown,
     ): Promise<void> {
         console.warn('Failed to preload next image:', error);
+        params.emitPreviewFailure(item);
         fullSizeImage.value = target.previewSrc;
         isLoading.value = false;
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick, reactive } from 'vue';
 import FileViewer from './FileViewer.vue';
@@ -14,6 +14,11 @@ containerRef.getBoundingClientRect = () => ({
     x: 0,
     y: 0,
     toJSON: () => ({}),
+});
+
+afterEach(() => {
+    containerRef.replaceChildren();
+    vi.useRealTimers();
 });
 
 function clearLocalStorage(): void {
@@ -40,6 +45,95 @@ beforeEach(() => {
 });
 
 describe('FileViewer reactions', () => {
+    it('emits preview-failure when a civitai full-size image fails during open', async () => {
+        vi.useFakeTimers();
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const originalImage = window.Image;
+        class MockImage {
+            onload: null | (() => void) = null;
+            onerror: null | (() => void) = null;
+            naturalWidth = 0;
+            naturalHeight = 0;
+
+            set src(_value: string) {
+                queueMicrotask(() => {
+                    this.onerror?.();
+                });
+            }
+        }
+        Object.defineProperty(window, 'Image', {
+            value: MockImage,
+            configurable: true,
+            writable: true,
+        });
+
+        const itemCard = document.createElement('article');
+        itemCard.setAttribute('data-testid', 'item-card');
+        itemCard.getBoundingClientRect = () => ({
+            top: 20,
+            left: 30,
+            width: 200,
+            height: 240,
+            bottom: 260,
+            right: 230,
+            x: 30,
+            y: 20,
+            toJSON: () => ({}),
+        });
+
+        const trigger = document.createElement('button');
+        trigger.setAttribute('data-file-id', '1');
+        const image = document.createElement('img');
+        image.setAttribute('src', 'https://image.civitai.com/token/guid/width=1024/guid.jpeg');
+        trigger.appendChild(image);
+        itemCard.appendChild(trigger);
+        containerRef.appendChild(itemCard);
+
+        const items = reactive([
+            {
+                id: 1,
+                width: 300,
+                height: 400,
+                src: 'https://image.civitai.com/token/guid/width=1024/guid.jpeg',
+                preview: 'https://image.civitai.com/token/guid/width=1024/guid.jpeg',
+                original: 'https://image.civitai.com/token/guid/original=true/guid.jpeg',
+                type: 'image' as const,
+                page: 1,
+                index: 0,
+                notFound: false,
+            },
+        ]);
+
+        try {
+            const wrapper = mount(FileViewer, {
+                props: {
+                    containerRef,
+                    masonryContainerRef: containerRef,
+                    items,
+                    masonry: null,
+                },
+            });
+
+            const openPromise = (wrapper.vm as any).openFromClick({
+                target: image,
+                button: 0,
+            } as MouseEvent);
+
+            await vi.runAllTimersAsync();
+            await openPromise;
+
+            expect(wrapper.emitted('previewFailure')?.[0]).toEqual([items[0]]);
+        } finally {
+            warnSpy.mockRestore();
+            Object.defineProperty(window, 'Image', {
+                value: originalImage,
+                configurable: true,
+                writable: true,
+            });
+        }
+    });
+
     it('navigates to the next item after reacting when the current item is removed', async () => {
         const items = reactive([
             { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },

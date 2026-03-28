@@ -544,6 +544,9 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             autoDislikeQueue.unfreezeAutoDislikeOnly();
         },
         onReaction: reactionHandlers.onFileViewerReaction,
+        onPreviewFailure(item: FeedItem): void {
+            notFoundReconciliation.reportItem(item);
+        },
     };
 
     onUnmounted(() => {
