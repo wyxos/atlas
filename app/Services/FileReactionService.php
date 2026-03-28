@@ -23,6 +23,7 @@ class FileReactionService
      *     deferHeavySideEffects?: bool,
      *     queueDownload?: bool,
      *     forceDownload?: bool,
+     *     detachFromTabsOnNoop?: bool,
      *     downloadRuntimeContext?: array{
      *         cookies?: list<array{
      *             name: string,
@@ -48,6 +49,7 @@ class FileReactionService
         $deferHeavySideEffects = $options['deferHeavySideEffects'] ?? false;
         $queueDownload = $options['queueDownload'] ?? true;
         $forceDownload = $options['forceDownload'] ?? false;
+        $detachFromTabsOnNoop = $options['detachFromTabsOnNoop'] ?? false;
         $downloadRuntimeContext = $options['downloadRuntimeContext'] ?? [];
         $existingReaction = Reaction::query()
             ->where('user_id', $user->id)
@@ -57,6 +59,9 @@ class FileReactionService
         if ($existingReaction && $existingReaction->type === $type) {
             if ($type === 'dislike') {
                 $this->clearDownloadedAssetsForDislike($file, $deferHeavySideEffects);
+                if ($detachFromTabsOnNoop) {
+                    app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+                }
 
                 return [
                     'reaction' => ['type' => $existingReaction->type],
@@ -71,6 +76,9 @@ class FileReactionService
             if (! $shouldNormalizePositiveState) {
                 if ($queueDownload) {
                     $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
+                }
+                if ($detachFromTabsOnNoop) {
+                    app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
                 }
 
                 return [
