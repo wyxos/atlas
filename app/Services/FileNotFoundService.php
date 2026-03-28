@@ -55,8 +55,6 @@ class FileNotFoundService
 
                 if (! $wasMarkedNotFound) {
                     $file->refresh();
-                    $file->loadMissing(['metadata', 'reactions']);
-                    $file->searchable();
                 }
 
                 foreach ($affectedTabsByUser as $affectedTabs) {

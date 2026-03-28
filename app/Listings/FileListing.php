@@ -4,58 +4,30 @@ namespace App\Listings;
 
 use App\Http\Resources\FileResource;
 use App\Models\File;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Wyxos\Harmonie\Listing\ListingBase;
 
 class FileListing extends ListingBase
 {
-    public function baseQuery(): Builder|ScoutBuilder
+    public function baseQuery(): Builder
     {
-        if (app()->environment('testing') && config('scout.driver') !== 'typesense') {
-            return File::query();
-        }
-
-        $this->assertTypesenseDriver();
-
-        $search = $this->has('search') && $this->string('search')->isNotEmpty()
-            ? $this->string('search')->toString()
-            : (config('scout.driver') === 'typesense' ? '*' : '');
-
-        if ($search === '') {
-            $search = config('scout.driver') === 'typesense' ? '*' : '';
-        }
-
-        return File::search($search);
+        return File::query();
     }
 
     public function filters(Builder|ScoutBuilder $base): void
     {
-        if ($base instanceof ScoutBuilder) {
-            $this->applyScoutDateRangeFilter($base);
-        } else {
-            if ($this->has('search') && $this->string('search')->isNotEmpty()) {
-                $search = $this->string('search')->toString();
-                $base->where(function ($q) use ($search) {
-                    $q->where('filename', 'like', "%{$search}%")
-                        ->orWhere('title', 'like', "%{$search}%")
-                        ->orWhere('source', 'like', "%{$search}%");
-                });
+        if ($this->has('date_from')) {
+            $dateFrom = $this->string('date_from')->toString();
+            if ($dateFrom !== '') {
+                $base->whereDate('created_at', '>=', $dateFrom);
             }
+        }
 
-            if ($this->has('date_from')) {
-                $dateFrom = $this->string('date_from')->toString();
-                if ($dateFrom !== '') {
-                    $base->whereDate('created_at', '>=', $dateFrom);
-                }
-            }
-
-            if ($this->has('date_to')) {
-                $dateTo = $this->string('date_to')->toString();
-                if ($dateTo !== '') {
-                    $base->whereDate('created_at', '<=', $dateTo);
-                }
+        if ($this->has('date_to')) {
+            $dateTo = $this->string('date_to')->toString();
+            if ($dateTo !== '') {
+                $base->whereDate('created_at', '<=', $dateTo);
             }
         }
 
@@ -71,11 +43,7 @@ class FileListing extends ListingBase
         if ($this->has('mime_type')) {
             $mimeType = $this->string('mime_type')->toString();
             if ($mimeType !== 'all' && $mimeType !== '') {
-                if ($base instanceof ScoutBuilder) {
-                    $base->where('mime_group', $mimeType);
-                } else {
-                    $base->where('mime_type', 'like', "{$mimeType}%");
-                }
+                $base->where('mime_type', 'like', "{$mimeType}%");
             }
         }
 
@@ -90,7 +58,7 @@ class FileListing extends ListingBase
         }
 
         // Order by updated_at descending (latest first)
-        $base->orderBy('updated_at', 'desc');
+        $base->orderBy('updated_at', 'desc')->orderBy('id', 'desc');
     }
 
     public function perPage(): int
@@ -101,7 +69,6 @@ class FileListing extends ListingBase
     public function filterLabels(): array
     {
         return [
-            'search' => 'Search',
             'date_from' => 'Created From',
             'date_to' => 'Created To',
             'source' => 'Source',
@@ -136,45 +103,6 @@ class FileListing extends ListingBase
         return new FileResource($item);
     }
 
-    private function parseDateBoundary(string $date, bool $isStart): ?int
-    {
-        if ($date === '') {
-            return null;
-        }
-
-        try {
-            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $date);
-
-            return ($isStart ? $parsed->startOfDay() : $parsed->endOfDay())->timestamp;
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    private function applyScoutDateRangeFilter(ScoutBuilder $base): void
-    {
-        $dateFrom = $this->has('date_from') ? $this->string('date_from')->toString() : '';
-        $dateTo = $this->has('date_to') ? $this->string('date_to')->toString() : '';
-        $timestampFrom = $this->parseDateBoundary($dateFrom, true);
-        $timestampTo = $this->parseDateBoundary($dateTo, false);
-
-        if ($timestampFrom !== null && $timestampTo !== null) {
-            $base->where('created_at', [
-                '>=', $timestampFrom, ' && created_at:<=', $timestampTo,
-            ]);
-
-            return;
-        }
-
-        if ($timestampFrom !== null) {
-            $base->where('created_at', ['>=', $timestampFrom]);
-        }
-
-        if ($timestampTo !== null) {
-            $base->where('created_at', ['<=', $timestampTo]);
-        }
-    }
-
     public function handle(): array
     {
         $page = $this->offsetGet('page') ?: 1;
@@ -182,12 +110,7 @@ class FileListing extends ListingBase
         $this->filters($base);
 
         $perPage = $this->perPage() ?? $this->offsetGet('perPage');
-
-        if ($base instanceof ScoutBuilder) {
-            $pagination = $base->paginate($perPage, 'page', $page);
-        } else {
-            $pagination = $base->paginate($perPage, ['*'], null, $page);
-        }
+        $pagination = $base->paginate($perPage, ['*'], null, $page);
 
         $this->load($pagination);
         $items = collect($pagination->items())->map(fn ($item) => $this->append($item));
@@ -219,16 +142,5 @@ class FileListing extends ListingBase
             ...$this->customData($items),
             'filters' => $filter,
         ];
-    }
-
-    private function assertTypesenseDriver(): void
-    {
-        if (app()->environment('testing')) {
-            return;
-        }
-
-        if (config('scout.driver') !== 'typesense') {
-            throw new \RuntimeException('FileListing requires SCOUT_DRIVER=typesense.');
-        }
     }
 }

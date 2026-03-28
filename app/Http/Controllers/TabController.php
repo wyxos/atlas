@@ -258,10 +258,28 @@ class TabController extends Controller
             ->orderByPivot('position')
             ->get();
 
+        if ($userId !== null && $files->isNotEmpty()) {
+            $userReactions = \App\Models\Reaction::query()
+                ->where('user_id', $userId)
+                ->whereIn('file_id', $files->pluck('id')->all())
+                ->get()
+                ->keyBy('file_id');
+
+            foreach ($files as $file) {
+                $file->setRelation('reaction', $userReactions->get($file->id));
+            }
+        }
+
+        $isLocalMode = (($tab->params['feed'] ?? null) === 'local');
+        $localBlacklistFilter = $isLocalMode ? (string) ($tab->params['blacklisted'] ?? 'any') : 'no';
+        $shouldFilterBlacklisted = ! $isLocalMode || $localBlacklistFilter === 'no';
+
         // Re-run the browse moderation pipeline so restored tabs follow the same blacklist behavior
         // as live browse results, including spared reacted files from blacklisted containers.
         $moderationResult = app(BrowseModerationService::class)->process($files, [
-            'filterBlacklisted' => true,
+            'filterBlacklisted' => $shouldFilterBlacklisted,
+            'filterAutoDisliked' => ! $isLocalMode,
+            'filterCurrentUserReacted' => ! $isLocalMode,
         ]);
         $files = collect($moderationResult['files']);
 

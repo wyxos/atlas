@@ -21,8 +21,7 @@ class FilesController extends Controller
     /**
      * Display a listing of the files.
      *
-     * NOTE: Do NOT use Eloquent queries for any Files listing returned to the UI.
-     * The dataset is massive; always use Scout/Typesense-backed listings.
+     * Files listing reads are DB-backed so filter behavior matches the primary data store.
      */
     public function index(FileListing $listing): JsonResponse
     {
@@ -436,9 +435,6 @@ SVG;
         $file->touch('previewed_at');
         $file->refresh();
 
-        // previewed_count/previewed_at are Typesense-filterable; ensure the index stays in sync.
-        $file->searchable();
-
         $willAutoDislike = false;
 
         // Check if we should auto-dislike: previewed_count >= 3, no reactions exist,
@@ -484,9 +480,6 @@ SVG;
 
         // Refresh files to get updated counts
         $files->each->refresh();
-
-        // previewed_count/previewed_at are Typesense-filterable; ensure the index stays in sync.
-        $files->load(['metadata', 'reactions'])->searchable();
 
         // Check for will-auto-dislike candidates (previewed_count >= 3, no reactions, etc.)
         $willAutoDislikeFileIds = [];
@@ -573,13 +566,6 @@ SVG;
             app(TabFileService::class)->detachFilesFromUserTabs($user->id, $eligibleIds);
         }
 
-        // blacklisted_at/blacklist_reason are Typesense-filterable; ensure the index stays in sync.
-        File::query()
-            ->whereIn('id', $eligibleIds)
-            ->with(['metadata', 'reactions'])
-            ->get()
-            ->searchable();
-
         return response()->json([
             'message' => 'Files blacklisted successfully.',
             'results' => array_map(
@@ -614,9 +600,6 @@ SVG;
             ->whereIn('id', $fileIds)
             ->with(['metadata', 'reactions'])
             ->get();
-
-        // previewed_count/previewed_at are Typesense-filterable; ensure the index stays in sync.
-        $files->searchable();
 
         return response()->json([
             'message' => 'Preview counts reset.',
@@ -724,15 +707,8 @@ SVG;
             // Detach files from all tabs belonging to this user
             app(TabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
 
-            app(DownloadedFileClearService::class)->clearMany($validFiles, syncSearch: false, queueDelete: true);
+            app(DownloadedFileClearService::class)->clearMany($validFiles, queueDelete: true);
         });
-
-        // Keep Typesense in sync (auto_disliked + dislike reaction arrays).
-        File::query()
-            ->whereIn('id', $validFileIds)
-            ->with(['metadata', 'reactions'])
-            ->get()
-            ->searchable();
 
         return response()->json([
             'message' => 'Files auto-disliked successfully.',
@@ -766,9 +742,6 @@ SVG;
         $file->increment('seen_count');
         $file->touch('seen_at');
         $file->refresh();
-
-        // seen_count/seen_at are Typesense-filterable; ensure the index stays in sync.
-        $file->searchable();
 
         return response()->json([
             'message' => 'Seen count incremented.',

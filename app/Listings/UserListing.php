@@ -93,11 +93,7 @@ class UserListing extends ListingBase
 
         $perPage = $this->perPage() ?? $this->offsetGet('perPage');
 
-        if ($base instanceof ScoutBuilder) {
-            $pagination = $base->paginate($perPage);
-        } else {
-            $pagination = $base->paginate($perPage, ['*'], null, $page);
-        }
+        $pagination = $base->paginate($perPage, ['*'], null, $page);
 
         $this->load($pagination);
         $items = collect($pagination->items())->map(fn ($item) => $this->append($item));

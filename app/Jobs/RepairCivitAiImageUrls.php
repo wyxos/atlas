@@ -41,8 +41,6 @@ class RepairCivitAiImageUrls implements ShouldQueue
         }
 
         $updatedAt = now();
-        $changedIds = [];
-
         foreach ($files as $file) {
             $oldUrl = trim((string) $file->url);
             $newUrl = CivitAiMediaUrl::normalizeImageUrl($oldUrl);
@@ -71,12 +69,6 @@ class RepairCivitAiImageUrls implements ShouldQueue
                     ->where('id', $file->id)
                     ->update($updates);
             }
-
-            $changedIds[] = (int) $file->id;
-        }
-
-        if (! $this->dryRun) {
-            $this->syncSearch($changedIds);
         }
 
         $this->dispatchNextChunk($files, $limit);
@@ -144,26 +136,5 @@ class RepairCivitAiImageUrls implements ShouldQueue
             ->where('id', '!=', $fileId)
             ->where('url_hash', hash('sha256', $url))
             ->exists();
-    }
-
-    /**
-     * @param  array<int>  $fileIds
-     */
-    private function syncSearch(array $fileIds): void
-    {
-        $fileIds = array_values(array_unique(array_map(static fn ($id): int => (int) $id, $fileIds)));
-        $fileIds = array_values(array_filter($fileIds, static fn (int $id): bool => $id > 0));
-
-        if ($fileIds === []) {
-            return;
-        }
-
-        foreach (array_chunk($fileIds, 500) as $chunk) {
-            File::query()
-                ->whereIn('id', $chunk)
-                ->with(['metadata', 'reactions'])
-                ->get()
-                ->searchable();
-        }
     }
 }

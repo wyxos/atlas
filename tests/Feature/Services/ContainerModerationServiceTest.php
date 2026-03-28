@@ -7,10 +7,9 @@ use App\Models\Reaction;
 use App\Models\Tab;
 use App\Models\User;
 use App\Services\ContainerModerationService;
+use App\Services\LocalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Config;
-use Laravel\Scout\Jobs\MakeSearchable;
 
 uses(RefreshDatabase::class);
 
@@ -59,7 +58,6 @@ test('flags files for dislike action type', function () {
 
 test('blacklists files for blacklist action type', function () {
     Bus::fake();
-    Config::set('scout.queue', ['queue' => 'scout']);
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -120,9 +118,11 @@ test('blacklists files for blacklist action type', function () {
         ];
     });
 
-    Bus::assertDispatched(MakeSearchable::class, function (MakeSearchable $job) use ($file) {
-        return (int) ($job->models->first()?->id ?? 0) === (int) $file->id;
-    });
+    $localBrowse = app(LocalService::class)->fetch([
+        'blacklisted' => 'yes',
+    ]);
+
+    expect(collect($localBrowse['files'])->pluck('id'))->toContain($file->id);
 });
 
 test('skips auto-blacklisting files from blacklisted containers when any reaction already exists', function () {
@@ -231,8 +231,6 @@ test('does not dispatch delete job when file has no path', function () {
     // Assert DeleteAutoDislikedFileJob was not dispatched
     Bus::assertNotDispatched(DeleteAutoDislikedFileJob::class);
 
-    // Scout's MakeSearchable job may be dispatched when files are updated
-    // This is expected behavior - we only care that DeleteAutoDislikedFileJob wasn't dispatched
 });
 
 test('handles multiple files with different action types', function () {

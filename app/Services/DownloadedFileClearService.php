@@ -19,16 +19,16 @@ class DownloadedFileClearService
         return (bool) $file->downloaded || $this->storedPaths($file) !== [];
     }
 
-    public function clear(File $file, bool $syncSearch = true): bool
+    public function clear(File $file): bool
     {
-        return $this->clearMany([$file], syncSearch: $syncSearch) !== [];
+        return $this->clearMany([$file]) !== [];
     }
 
     /**
      * @param  iterable<int, File>  $files
      * @return array<int>
      */
-    public function clearMany(iterable $files, bool $syncSearch = true, bool $queueDelete = false): array
+    public function clearMany(iterable $files, bool $queueDelete = false): array
     {
         $files = collect($files)
             ->filter(fn (mixed $file): bool => $file instanceof File)
@@ -68,10 +68,6 @@ class DownloadedFileClearService
             $this->dispatchDeleteJobs($paths);
         } else {
             $this->deletePaths($paths);
-        }
-
-        if ($syncSearch) {
-            $this->syncSearch($fileIds);
         }
 
         return $fileIds;
@@ -145,23 +141,5 @@ class DownloadedFileClearService
                 'download_progress' => 0,
                 'updated_at' => now(),
             ]);
-    }
-
-    /**
-     * @param  array<int>  $fileIds
-     */
-    private function syncSearch(array $fileIds): void
-    {
-        if ($fileIds === []) {
-            return;
-        }
-
-        foreach (array_chunk($fileIds, 500) as $chunk) {
-            File::query()
-                ->whereIn('id', $chunk)
-                ->with(['metadata', 'reactions'])
-                ->get()
-                ->searchable();
-        }
     }
 }

@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\File;
 use App\Models\Reaction;
+use App\Services\Local\LocalBrowseQueryBuilder;
 use App\Services\Local\LocalFetchParams;
-use App\Services\Local\LocalScoutSearchBuilder;
 use Illuminate\Support\Facades\Cache;
 
 class LocalService extends BaseService
@@ -18,18 +17,11 @@ class LocalService extends BaseService
 
     public const string MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO = 'auto_disliked_or_blacklisted_auto';
 
-    /**
-     * Fetch local files from search index.
-     *
-     * Do not use Eloquent queries here. The database has over 1 million file records,
-     * and direct queries are too slow for browse operations.
-     */
     public function fetch(array $params = []): array
     {
-        $this->assertTypesenseDriver();
-
         $context = LocalFetchParams::normalize($params);
         $this->params = $context['params'];
+
         if ($context['shouldReturnEmpty']) {
             return LocalFetchParams::emptyResponse();
         }
@@ -51,79 +43,12 @@ class LocalService extends BaseService
         $includeTotal = $context['includeTotal'];
         $allTypes = $context['allTypes'];
 
-        if (app()->environment('testing') && config('scout.driver') !== 'typesense') {
-            if ($sort === 'reaction_at' || $sort === 'reaction_at_asc') {
-                return $this->fetchByReactionTimestamp(
-                    page: $page,
-                    limit: $limit,
-                    source: $source,
-                    downloaded: $downloaded,
-                    blacklisted: $blacklisted,
-                    blacklistType: $blacklistType,
-                    maxPreviewed: $maxPreviewed,
-                    fileTypes: $fileTypes,
-                    autoDisliked: $autoDisliked,
-                    reactionMode: $reactionMode,
-                    reactionTypes: $reactionTypes,
-                    allTypes: $allTypes,
-                    sort: $sort,
-                    includeTotal: $includeTotal,
-                );
-            }
-
-            if ($moderationUnion === self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO) {
-                return $this->fetchAutoDislikedOrAutoBlacklistedUsingDatabase(
-                    page: $page,
-                    limit: $limit,
-                    source: $source,
-                    downloaded: $downloaded,
-                    sort: $sort,
-                    seed: $seed,
-                    maxPreviewed: $maxPreviewed,
-                    fileTypes: $fileTypes,
-                );
-            }
-
-            return $this->fetchUsingDatabase(
-                page: $page,
-                limit: $limit,
-                source: $source,
-                downloaded: $downloaded,
-                blacklisted: $blacklisted,
-                blacklistType: $blacklistType,
-                autoDisliked: $autoDisliked,
-                sort: $sort,
-                seed: $seed,
-                maxPreviewed: $maxPreviewed,
-                fileTypes: $fileTypes,
-                reactionMode: $reactionMode,
-                reactionTypes: $reactionTypes,
-                allTypes: $allTypes,
-            );
-        }
-
-        if ($moderationUnion === self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO) {
-            return $this->fetchAutoDislikedOrAutoBlacklisted(
-                page: $page,
-                limit: $limit,
-                source: $source,
-                downloaded: $downloaded,
-                sort: $sort,
-                seed: $seed,
-                maxPreviewed: $maxPreviewed,
-                fileTypes: $fileTypes,
-            );
-        }
-
-        // Stabilize random sort by generating a seed once and letting Browser persist it into the tab params.
         if ($sort === 'random' && (! is_int($seed) || $seed < 1)) {
             $seed = time();
             $this->params['seed'] = $seed;
         }
 
-        // Reaction timestamp sorting is inherently per-user and requires DB ordering.
-        // This stays fast because it is scoped to the current user's reactions.
-        if ($sort === 'reaction_at') {
+        if ($sort === 'reaction_at' || $sort === 'reaction_at_asc') {
             return $this->fetchByReactionTimestamp(
                 page: $page,
                 limit: $limit,
@@ -142,228 +67,38 @@ class LocalService extends BaseService
             );
         }
 
-        if ($sort === 'reaction_at_asc') {
-            return $this->fetchByReactionTimestamp(
+        if ($moderationUnion === self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO) {
+            return $this->fetchAutoDislikedOrAutoBlacklistedUsingDatabase(
                 page: $page,
                 limit: $limit,
                 source: $source,
                 downloaded: $downloaded,
-                blacklisted: $blacklisted,
-                blacklistType: $blacklistType,
+                sort: $sort,
+                seed: $seed,
                 maxPreviewed: $maxPreviewed,
                 fileTypes: $fileTypes,
-                autoDisliked: $autoDisliked,
-                reactionMode: $reactionMode,
-                reactionTypes: $reactionTypes,
-                allTypes: $allTypes,
-                sort: $sort,
-                includeTotal: $includeTotal,
             );
         }
 
-        $buildSearch = fn () => LocalScoutSearchBuilder::build(
-            params: $this->params,
+        return $this->fetchUsingDatabase(
+            page: $page,
+            limit: $limit,
             source: $source,
             downloaded: $downloaded,
             blacklisted: $blacklisted,
             blacklistType: $blacklistType,
+            autoDisliked: $autoDisliked,
             sort: $sort,
             seed: $seed,
             maxPreviewed: $maxPreviewed,
             fileTypes: $fileTypes,
+            reactionMode: $reactionMode,
+            reactionTypes: $reactionTypes,
+            allTypes: $allTypes,
         );
-
-        // Unreacted: files you have not reacted to. This is per-user and depends on reacted_user_ids.
-        if ($reactionMode === 'unreacted') {
-            $userId = auth()->id();
-            if (! $userId) {
-                return [
-                    'files' => [],
-                    'metadata' => [
-                        'nextCursor' => null,
-                        'total' => 0,
-                    ],
-                ];
-            }
-
-            $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
-                ->whereNotIn('reacted_user_ids', [(string) $userId])
-                ->paginate($limit, 'page', $page);
-
-            return [
-                'files' => collect($pagination->items())->all(),
-                'metadata' => [
-                    'nextCursor' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
-                    'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
-                ],
-            ];
-        }
-
-        // Reacted: positive only (love/like/funny). This is per-user and depends on positive_reacted_user_ids.
-        if ($reactionMode === 'reacted') {
-            $userId = auth()->id();
-            if (! $userId) {
-                return [
-                    'files' => [],
-                    'metadata' => [
-                        'nextCursor' => null,
-                        'total' => 0,
-                    ],
-                ];
-            }
-
-            $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
-                ->where('reacted_user_ids', (string) $userId)
-                // Reacted excludes dislikes by definition.
-                ->whereNotIn('dislike_user_ids', [(string) $userId])
-                ->paginate($limit, 'page', $page);
-
-            return [
-                'files' => collect($pagination->items())->all(),
-                'metadata' => [
-                    'nextCursor' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
-                    'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
-                ],
-            ];
-        }
-
-        if ($reactionMode === 'types' && $reactionTypes !== null) {
-            $userId = auth()->id();
-            if (! $userId) {
-                return [
-                    'files' => [],
-                    'metadata' => [
-                        'nextCursor' => null,
-                        'total' => 0,
-                    ],
-                ];
-            }
-
-            if (count($reactionTypes) === 1) {
-                $reactionField = "{$reactionTypes[0]}_user_ids";
-                $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
-                    ->where($reactionField, (string) $userId)
-                    ->paginate($limit, 'page', $page);
-
-                $files = collect($pagination->items());
-                $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
-
-                $filesList = $files->all();
-
-                return [
-                    'files' => $filesList,
-                    'metadata' => [
-                        'nextCursor' => $nextCursor,
-                        'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
-                    ],
-                ];
-            }
-
-            $targetLimit = $page * $limit;
-            $results = collect();
-            $total = 0;
-
-            foreach ($reactionTypes as $type) {
-                $reactionField = "{$type}_user_ids";
-                $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
-                    ->where($reactionField, (string) $userId)
-                    ->paginate($targetLimit, 'page', 1);
-
-                $results = $results->merge($pagination->items());
-                $total += $pagination->total();
-            }
-
-            $files = $results
-                ->unique('id')
-                ->when($sort === 'random', function ($c) use ($seed) {
-                    $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-
-                    return $c->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)));
-                }, function ($c) use ($sort) {
-                    if ($sort === 'created_at_asc') {
-                        return $c->sortBy(fn (File $f) => $f->created_at?->timestamp ?? 0);
-                    }
-                    if ($sort === 'created_at') {
-                        return $c->sortByDesc(fn (File $f) => $f->created_at?->timestamp ?? 0);
-                    }
-                    if ($sort === 'updated_at') {
-                        return $c->sortByDesc(fn (File $f) => $f->updated_at?->timestamp ?? 0);
-                    }
-                    if ($sort === 'updated_at_asc') {
-                        return $c->sortBy(fn (File $f) => $f->updated_at?->timestamp ?? 0);
-                    }
-
-                    if ($sort === 'blacklisted_at') {
-                        return $c->sortByDesc(fn (File $f) => $f->blacklisted_at?->timestamp ?? 0)
-                            ->sortByDesc(fn (File $f) => $f->updated_at?->timestamp ?? 0);
-                    }
-                    if ($sort === 'blacklisted_at_asc') {
-                        return $c->sortBy(fn (File $f) => $f->blacklisted_at?->timestamp ?? 0)
-                            ->sortBy(fn (File $f) => $f->updated_at?->timestamp ?? 0);
-                    }
-                    if ($sort === 'downloaded_at_asc') {
-                        return $c->sort(function (File $a, File $b) {
-                            $aDownloaded = $a->downloaded_at?->timestamp ?? 0;
-                            $bDownloaded = $b->downloaded_at?->timestamp ?? 0;
-                            if ($aDownloaded !== $bDownloaded) {
-                                return $aDownloaded <=> $bDownloaded;
-                            }
-
-                            $aUpdated = $a->updated_at?->timestamp ?? 0;
-                            $bUpdated = $b->updated_at?->timestamp ?? 0;
-
-                            return $aUpdated <=> $bUpdated;
-                        });
-                    }
-
-                    return $c->sort(function (File $a, File $b) {
-                        $aDownloaded = $a->downloaded_at?->timestamp ?? 0;
-                        $bDownloaded = $b->downloaded_at?->timestamp ?? 0;
-                        if ($aDownloaded !== $bDownloaded) {
-                            return $bDownloaded <=> $aDownloaded;
-                        }
-
-                        $aUpdated = $a->updated_at?->timestamp ?? 0;
-                        $bUpdated = $b->updated_at?->timestamp ?? 0;
-
-                        return $bUpdated <=> $aUpdated;
-                    });
-                })
-                ->values();
-
-            $totalPages = (int) ceil($total / $limit);
-            $filesPage = $files->slice(($page - 1) * $limit, $limit)->values();
-            $nextCursor = $page < $totalPages ? $page + 1 : null;
-
-            return [
-                'files' => $filesPage->all(),
-                'metadata' => [
-                    'nextCursor' => $nextCursor,
-                    'total' => $total,
-                ],
-            ];
-        }
-
-        $pagination = LocalScoutSearchBuilder::applyAutoDislikedFilter($buildSearch(), $autoDisliked)
-            ->paginate($limit, 'page', $page);
-        $files = collect($pagination->items());
-        $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
-
-        $filesList = $files->all();
-
-        // Return files directly - Browser.php will use FileItemFormatter
-        return [
-            'files' => $filesList, // Return File models directly
-            'metadata' => [
-                'nextCursor' => $nextCursor,
-                'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
-            ],
-        ];
     }
 
     /**
-     * Testing-only fallback for non-Typesense drivers.
-     *
      * @param  array<int, string>|null  $reactionTypes
      * @param  array<int, string>  $allTypes
      */
@@ -385,89 +120,20 @@ class LocalService extends BaseService
     ): array {
         $page = max(1, $page);
         $limit = max(1, $limit);
+        $userId = auth()->id();
 
-        $query = File::query()->with('metadata');
+        $query = LocalBrowseQueryBuilder::buildBaseQuery(
+            source: $source,
+            downloaded: $downloaded,
+            blacklisted: $blacklisted,
+            blacklistType: $blacklistType,
+            maxPreviewed: $maxPreviewed,
+            fileTypes: $fileTypes,
+        );
 
-        if ($source && $source !== 'all') {
-            $query->where('source', $source);
-        }
-
-        if ($downloaded === 'yes') {
-            $query->where('downloaded', true);
-        } elseif ($downloaded === 'no') {
-            $query->where('downloaded', false);
-        }
-
-        if ($blacklisted === 'yes') {
-            $query->whereNotNull('blacklisted_at');
-        } elseif ($blacklisted === 'no') {
-            $query->whereNull('blacklisted_at');
-        }
-
-        if (in_array($blacklistType, ['manual', 'auto'], true)) {
-            $query->whereNotNull('blacklisted_at');
-
-            if ($blacklistType === 'manual') {
-                $query->whereNotNull('blacklist_reason')->where('blacklist_reason', '!=', '');
-            } else {
-                $query->where(function ($q) {
-                    $q->whereNull('blacklist_reason')->orWhere('blacklist_reason', '=', '');
-                });
-            }
-        }
-
-        if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
-            $query->where('previewed_count', '<=', $maxPreviewed);
-        }
-
-        if (! in_array('all', $fileTypes, true)) {
-            $query->where(function ($q) use ($fileTypes) {
-                $hasClause = false;
-
-                if (in_array('image', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'image/%');
-                    $hasClause = true;
-                }
-                if (in_array('video', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'video/%');
-                    $hasClause = true;
-                }
-                if (in_array('audio', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'audio/%');
-                    $hasClause = true;
-                }
-                if (in_array('other', $fileTypes, true)) {
-                    $q->orWhere(function ($qq) {
-                        $qq->whereNull('mime_type')
-                            ->orWhere('mime_type', '=', '')
-                            ->orWhere(function ($qqq) {
-                                $qqq->where('mime_type', 'not like', 'image/%')
-                                    ->where('mime_type', 'not like', 'video/%')
-                                    ->where('mime_type', 'not like', 'audio/%');
-                            });
-                    });
-                    $hasClause = true;
-                }
-
-                if (! $hasClause) {
-                    $q->orWhereRaw('1=1');
-                }
-            });
-        }
-
-        if ($autoDisliked === 'yes') {
-            $query->where('auto_disliked', true);
-        } elseif ($autoDisliked === 'no') {
-            $query->where('auto_disliked', false);
-        }
-
-        if ($reactionMode === 'reacted') {
-            $reactionMode = 'types';
-            $reactionTypes = ['love', 'like', 'funny'];
-        }
+        LocalBrowseQueryBuilder::applyAutoDislikedFilter($query, $autoDisliked);
 
         if ($reactionMode === 'types') {
-            $userId = auth()->id();
             if (! $userId) {
                 return [
                     'files' => [],
@@ -478,7 +144,10 @@ class LocalService extends BaseService
                 ];
             }
 
-            $reactionTypes = is_array($reactionTypes) ? array_values(array_filter($reactionTypes, fn ($t) => in_array($t, $allTypes, true))) : null;
+            $reactionTypes = is_array($reactionTypes)
+                ? array_values(array_filter($reactionTypes, fn ($type) => in_array($type, $allTypes, true)))
+                : null;
+
             if (! $reactionTypes || count($reactionTypes) === 0) {
                 return [
                     'files' => [],
@@ -489,11 +158,11 @@ class LocalService extends BaseService
                 ];
             }
 
-            $query->whereHas('reactions', function ($q) use ($userId, $reactionTypes) {
-                $q->where('user_id', $userId)->whereIn('type', $reactionTypes);
+            $query->whereHas('reactions', function ($builder) use ($userId, $reactionTypes): void {
+                $builder->where('user_id', $userId)
+                    ->whereIn('type', $reactionTypes);
             });
         } elseif ($reactionMode === 'unreacted') {
-            $userId = auth()->id();
             if (! $userId) {
                 return [
                     'files' => [],
@@ -504,48 +173,38 @@ class LocalService extends BaseService
                 ];
             }
 
-            $query->whereDoesntHave('reactions', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
+            $query->whereDoesntHave('reactions', function ($builder) use ($userId): void {
+                $builder->where('user_id', $userId);
+            });
+        } elseif ($reactionMode === 'reacted') {
+            if (! $userId) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                        'total' => 0,
+                    ],
+                ];
+            }
+
+            $query->whereHas('reactions', function ($builder) use ($userId): void {
+                $builder->where('user_id', $userId)
+                    ->whereIn('type', ['love', 'like', 'funny']);
             });
         }
 
         if ($sort === 'random') {
-            $query->inRandomOrder();
-        } elseif ($sort === 'created_at') {
-            $query->orderBy('created_at', 'desc');
-        } elseif ($sort === 'created_at_asc') {
-            $query->orderBy('created_at', 'asc');
-        } elseif ($sort === 'updated_at') {
-            $query->orderBy('updated_at', 'desc');
-        } elseif ($sort === 'updated_at_asc') {
-            $query->orderBy('updated_at', 'asc');
-        } elseif ($sort === 'blacklisted_at') {
-            $query->orderBy('blacklisted_at', 'desc')->orderBy('updated_at', 'desc');
-        } elseif ($sort === 'blacklisted_at_asc') {
-            $query->orderBy('blacklisted_at', 'asc')->orderBy('updated_at', 'asc');
-        } elseif ($sort === 'downloaded_at_asc') {
-            $query->orderBy('downloaded_at', 'asc')->orderBy('updated_at', 'asc');
+            $pagination = LocalBrowseQueryBuilder::paginateRandomIds($query, $page, $limit, $seed ?? time());
         } else {
-            $query->orderBy('downloaded_at', 'desc')->orderBy('updated_at', 'desc');
-        }
-
-        $pagination = $query->paginate($limit, ['*'], 'page', $page);
-        $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
-
-        $filesList = collect($pagination->items())->all();
-        if ($sort === 'random') {
-            $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-            $filesList = collect($filesList)
-                ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
-                ->values()
-                ->all();
+            LocalBrowseQueryBuilder::applyStandardSort($query, $sort);
+            $pagination = LocalBrowseQueryBuilder::paginateIds($query, $page, $limit);
         }
 
         return [
-            'files' => $filesList,
+            'files' => LocalBrowseQueryBuilder::hydrateFiles($pagination['ids']),
             'metadata' => [
-                'nextCursor' => $nextCursor,
-                'total' => (int) $pagination->total(),
+                'nextCursor' => $pagination['nextCursor'],
+                'total' => $pagination['total'],
             ],
         ];
     }
@@ -576,116 +235,49 @@ class LocalService extends BaseService
 
         $effectiveSort = in_array($sort, ['reaction_at', 'reaction_at_asc'], true) ? 'blacklisted_at' : $sort;
 
-        $query = File::query()->with('metadata');
+        $query = LocalBrowseQueryBuilder::buildBaseQuery(
+            source: $source,
+            downloaded: $downloaded,
+            blacklisted: 'any',
+            blacklistType: 'any',
+            maxPreviewed: $maxPreviewed,
+            fileTypes: $fileTypes,
+        );
 
-        if ($source && $source !== 'all') {
-            $query->where('source', $source);
-        }
-
-        if ($downloaded === 'yes') {
-            $query->where('downloaded', true);
-        } elseif ($downloaded === 'no') {
-            $query->where('downloaded', false);
-        }
-
-        if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
-            $query->where('previewed_count', '<=', $maxPreviewed);
-        }
-
-        if (! in_array('all', $fileTypes, true)) {
-            $query->where(function ($q) use ($fileTypes) {
-                $hasClause = false;
-
-                if (in_array('image', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'image/%');
-                    $hasClause = true;
-                }
-                if (in_array('video', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'video/%');
-                    $hasClause = true;
-                }
-                if (in_array('audio', $fileTypes, true)) {
-                    $q->orWhere('mime_type', 'like', 'audio/%');
-                    $hasClause = true;
-                }
-                if (in_array('other', $fileTypes, true)) {
-                    $q->orWhere(function ($qq) {
-                        $qq->whereNull('mime_type')
-                            ->orWhere('mime_type', '=', '')
-                            ->orWhere(function ($qqq) {
-                                $qqq->where('mime_type', 'not like', 'image/%')
-                                    ->where('mime_type', 'not like', 'video/%')
-                                    ->where('mime_type', 'not like', 'audio/%');
-                            });
+        $query->where(function ($builder) use ($userId): void {
+            $builder->where(function ($autoDislikedQuery) use ($userId): void {
+                $autoDislikedQuery->where('auto_disliked', true)
+                    ->whereHas('reactions', function ($reactionQuery) use ($userId): void {
+                        $reactionQuery->where('user_id', $userId)
+                            ->where('type', 'dislike');
                     });
-                    $hasClause = true;
-                }
-
-                if (! $hasClause) {
-                    $q->orWhereRaw('1=1');
-                }
-            });
-        }
-
-        $query->where(function ($q) use ($userId) {
-            $q->where(function ($qq) use ($userId) {
-                $qq->where('auto_disliked', true)
-                    ->whereHas('reactions', function ($rq) use ($userId) {
-                        $rq->where('user_id', $userId)->where('type', 'dislike');
-                    });
-            })->orWhere(function ($qq) {
-                $qq->whereNotNull('blacklisted_at')
-                    ->where(function ($qqq) {
-                        $qqq->whereNull('blacklist_reason')->orWhere('blacklist_reason', '=', '');
+            })->orWhere(function ($blacklistedQuery): void {
+                $blacklistedQuery->whereNotNull('blacklisted_at')
+                    ->where(function ($blacklistTypeQuery): void {
+                        $blacklistTypeQuery->whereNull('blacklist_reason')
+                            ->orWhere('blacklist_reason', '=', '');
                     });
             });
         });
 
         if ($effectiveSort === 'random') {
-            $query->inRandomOrder();
-        } elseif ($effectiveSort === 'created_at') {
-            $query->orderBy('created_at', 'desc');
-        } elseif ($effectiveSort === 'created_at_asc') {
-            $query->orderBy('created_at', 'asc');
-        } elseif ($effectiveSort === 'updated_at') {
-            $query->orderBy('updated_at', 'desc');
-        } elseif ($effectiveSort === 'updated_at_asc') {
-            $query->orderBy('updated_at', 'asc');
-        } elseif ($effectiveSort === 'blacklisted_at') {
-            $query->orderBy('blacklisted_at', 'desc')->orderBy('updated_at', 'desc');
-        } elseif ($effectiveSort === 'blacklisted_at_asc') {
-            $query->orderBy('blacklisted_at', 'asc')->orderBy('updated_at', 'asc');
-        } elseif ($effectiveSort === 'downloaded_at_asc') {
-            $query->orderBy('downloaded_at', 'asc')->orderBy('updated_at', 'asc');
+            $pagination = LocalBrowseQueryBuilder::paginateRandomIds($query, $page, $limit, $seed ?? time());
         } else {
-            $query->orderBy('downloaded_at', 'desc')->orderBy('updated_at', 'desc');
-        }
-
-        $pagination = $query->paginate($limit, ['*'], 'page', $page);
-        $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
-
-        $filesList = collect($pagination->items())->all();
-        if ($effectiveSort === 'random') {
-            $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-            $filesList = collect($filesList)
-                ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
-                ->values()
-                ->all();
+            LocalBrowseQueryBuilder::applyStandardSort($query, $effectiveSort);
+            $pagination = LocalBrowseQueryBuilder::paginateIds($query, $page, $limit);
         }
 
         return [
-            'files' => $filesList,
+            'files' => LocalBrowseQueryBuilder::hydrateFiles($pagination['ids']),
             'metadata' => [
-                'nextCursor' => $nextCursor,
-                'total' => (int) $pagination->total(),
+                'nextCursor' => $pagination['nextCursor'],
+                'total' => $pagination['total'],
             ],
         ];
     }
 
     /**
      * Fetch files ordered by the current user's reaction timestamp.
-     *
-     * This is intentionally DB-backed (Typesense does not have per-user reaction timestamps).
      *
      * @param  array<int, string>|null  $reactionTypes
      * @param  array<int, string>  $allTypes
@@ -721,13 +313,14 @@ class LocalService extends BaseService
         }
 
         if ($reactionMode !== 'reacted' && $reactionMode !== 'types') {
-            // Sorting by reaction timestamp without a reaction scope doesn't make sense.
-            // Treat as "reacted".
             $reactionMode = 'reacted';
         }
 
         if ($reactionMode === 'types') {
-            $reactionTypes = is_array($reactionTypes) ? array_values(array_filter($reactionTypes, fn ($t) => in_array($t, $allTypes, true))) : null;
+            $reactionTypes = is_array($reactionTypes)
+                ? array_values(array_filter($reactionTypes, fn ($type) => in_array($type, $allTypes, true)))
+                : null;
+
             if (! $reactionTypes || count($reactionTypes) === 0) {
                 return [
                     'files' => [],
@@ -737,12 +330,12 @@ class LocalService extends BaseService
                     ],
                 ];
             }
+
             if (count($reactionTypes) === count($allTypes)) {
                 $reactionMode = 'reacted';
             }
         }
 
-        // Reacted == positive only.
         if ($reactionMode === 'reacted') {
             $reactionMode = 'types';
             $reactionTypes = ['love', 'like', 'funny'];
@@ -751,47 +344,54 @@ class LocalService extends BaseService
         $idQuery = Reaction::query()
             ->join('files', 'files.id', '=', 'reactions.file_id')
             ->where('reactions.user_id', $userId)
-            ->when($reactionMode === 'types', fn ($q) => $q->whereIn('reactions.type', $reactionTypes ?? []))
-            ->when($source && $source !== 'all', fn ($q) => $q->where('files.source', $source))
-            ->when($downloaded === 'yes', fn ($q) => $q->where('files.downloaded', true))
-            ->when($downloaded === 'no', fn ($q) => $q->where('files.downloaded', false))
-            ->when($blacklisted === 'yes', fn ($q) => $q->whereNotNull('files.blacklisted_at'))
-            ->when($blacklisted === 'no', fn ($q) => $q->whereNull('files.blacklisted_at'))
-            ->when($autoDisliked === 'yes', fn ($q) => $q->where('files.auto_disliked', true))
-            ->when($autoDisliked === 'no', fn ($q) => $q->where('files.auto_disliked', false))
-            ->when(in_array($blacklistType, ['manual', 'auto'], true), function ($q) use ($blacklistType) {
-                $q->whereNotNull('files.blacklisted_at');
+            ->when($reactionMode === 'types', fn ($builder) => $builder->whereIn('reactions.type', $reactionTypes ?? []))
+            ->when($source && $source !== 'all', fn ($builder) => $builder->where('files.source', $source))
+            ->when($downloaded === 'yes', fn ($builder) => $builder->where('files.downloaded', true))
+            ->when($downloaded === 'no', fn ($builder) => $builder->where('files.downloaded', false))
+            ->when($blacklisted === 'yes', fn ($builder) => $builder->whereNotNull('files.blacklisted_at'))
+            ->when($blacklisted === 'no', fn ($builder) => $builder->whereNull('files.blacklisted_at'))
+            ->when($autoDisliked === 'yes', fn ($builder) => $builder->where('files.auto_disliked', true))
+            ->when($autoDisliked === 'no', fn ($builder) => $builder->where('files.auto_disliked', false))
+            ->when(in_array($blacklistType, ['manual', 'auto'], true), function ($builder) use ($blacklistType): void {
+                $builder->whereNotNull('files.blacklisted_at');
+
                 if ($blacklistType === 'manual') {
-                    $q->whereNotNull('files.blacklist_reason')->where('files.blacklist_reason', '!=', '');
-                } else {
-                    $q->where(function ($qq) {
-                        $qq->whereNull('files.blacklist_reason')->orWhere('files.blacklist_reason', '=', '');
-                    });
+                    $builder->whereNotNull('files.blacklist_reason')->where('files.blacklist_reason', '!=', '');
+
+                    return;
                 }
+
+                $builder->where(function ($blacklistBuilder): void {
+                    $blacklistBuilder->whereNull('files.blacklist_reason')
+                        ->orWhere('files.blacklist_reason', '=', '');
+                });
             })
-            ->when(is_int($maxPreviewed) && $maxPreviewed >= 0, fn ($q) => $q->where('files.previewed_count', '<=', $maxPreviewed))
-            ->when(! in_array('all', $fileTypes, true), function ($q) use ($fileTypes) {
-                $q->where(function ($qq) use ($fileTypes) {
+            ->when(is_int($maxPreviewed) && $maxPreviewed >= 0, fn ($builder) => $builder->where('files.previewed_count', '<=', $maxPreviewed))
+            ->when(! in_array('all', $fileTypes, true), function ($builder) use ($fileTypes): void {
+                $builder->where(function ($mimeBuilder) use ($fileTypes): void {
                     $hasClause = false;
 
                     if (in_array('image', $fileTypes, true)) {
-                        $qq->orWhere('files.mime_type', 'like', 'image/%');
+                        $mimeBuilder->orWhere('files.mime_type', 'like', 'image/%');
                         $hasClause = true;
                     }
+
                     if (in_array('video', $fileTypes, true)) {
-                        $qq->orWhere('files.mime_type', 'like', 'video/%');
+                        $mimeBuilder->orWhere('files.mime_type', 'like', 'video/%');
                         $hasClause = true;
                     }
+
                     if (in_array('audio', $fileTypes, true)) {
-                        $qq->orWhere('files.mime_type', 'like', 'audio/%');
+                        $mimeBuilder->orWhere('files.mime_type', 'like', 'audio/%');
                         $hasClause = true;
                     }
+
                     if (in_array('other', $fileTypes, true)) {
-                        $qq->orWhere(function ($qqq) {
-                            $qqq->whereNull('files.mime_type')
+                        $mimeBuilder->orWhere(function ($otherBuilder): void {
+                            $otherBuilder->whereNull('files.mime_type')
                                 ->orWhere('files.mime_type', '=', '')
-                                ->orWhere(function ($qqqq) {
-                                    $qqqq->where('files.mime_type', 'not like', 'image/%')
+                                ->orWhere(function ($nonMediaBuilder): void {
+                                    $nonMediaBuilder->where('files.mime_type', 'not like', 'image/%')
                                         ->where('files.mime_type', 'not like', 'video/%')
                                         ->where('files.mime_type', 'not like', 'audio/%');
                                 });
@@ -800,12 +400,16 @@ class LocalService extends BaseService
                     }
 
                     if (! $hasClause) {
-                        $qq->orWhereRaw('1=1');
+                        $mimeBuilder->orWhereRaw('1=1');
                     }
                 });
             })
             ->select('reactions.file_id')
-            ->when($sort === 'reaction_at_asc', fn ($q) => $q->orderBy('reactions.created_at', 'asc'), fn ($q) => $q->orderByDesc('reactions.created_at'));
+            ->when(
+                $sort === 'reaction_at_asc',
+                fn ($builder) => $builder->orderBy('reactions.created_at', 'asc'),
+                fn ($builder) => $builder->orderByDesc('reactions.created_at')
+            );
 
         $total = null;
         if ($includeTotal) {
@@ -819,24 +423,23 @@ class LocalService extends BaseService
                 'blacklist_type' => $blacklistType,
                 'auto_disliked' => $autoDisliked,
                 'max_previewed' => $maxPreviewed,
+                'file_types' => $fileTypes,
             ]));
 
             $cacheKey = "local:reaction_at_total:{$hash}";
             $total = Cache::remember($cacheKey, now()->addMinutes(5), fn () => (int) (clone $idQuery)->reorder()->count());
         }
 
-        // Avoid running COUNT(*) on large reaction history queries.
-        // We only need page-wise navigation here.
         $pagination = $idQuery->simplePaginate($limit, ['reactions.file_id'], 'page', $page);
         $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
 
         $ids = collect($pagination->items())
             ->pluck('file_id')
-            ->map(fn ($v) => (int) $v)
+            ->map(static fn (mixed $id): int => (int) $id)
             ->values()
             ->all();
 
-        if (empty($ids)) {
+        if ($ids === []) {
             return [
                 'files' => [],
                 'metadata' => [
@@ -846,20 +449,8 @@ class LocalService extends BaseService
             ];
         }
 
-        $filesById = File::query()
-            ->with('metadata')
-            ->whereIn('id', $ids)
-            ->get()
-            ->keyBy('id');
-
-        $orderedFiles = collect($ids)
-            ->map(fn (int $id) => $filesById->get($id))
-            ->filter()
-            ->values()
-            ->all();
-
         return [
-            'files' => $orderedFiles,
+            'files' => LocalBrowseQueryBuilder::hydrateFiles($ids),
             'metadata' => [
                 'nextCursor' => $nextCursor,
                 'total' => $total,
@@ -867,113 +458,6 @@ class LocalService extends BaseService
         ];
     }
 
-    /**
-     * Fetch files that match:
-     * - auto-disliked by current user, OR
-     * - auto-blacklisted.
-     */
-    protected function fetchAutoDislikedOrAutoBlacklisted(
-        int $page,
-        int $limit,
-        ?string $source,
-        string $downloaded,
-        string $sort,
-        ?int $seed,
-        ?int $maxPreviewed,
-        array $fileTypes,
-    ): array {
-        $page = max(1, $page);
-        $limit = max(1, $limit);
-
-        $userId = auth()->id();
-        if (! $userId) {
-            return [
-                'files' => [],
-                'metadata' => [
-                    'nextCursor' => null,
-                    'total' => 0,
-                ],
-            ];
-        }
-
-        // This view mixes non-reacted blacklisted rows, so reaction_at ordering is not meaningful.
-        $effectiveSort = in_array($sort, ['reaction_at', 'reaction_at_asc'], true) ? 'blacklisted_at' : $sort;
-
-        $searchQuery = $this->params['search'] ?? '';
-        if ($searchQuery === '') {
-            $searchQuery = config('scout.driver') === 'typesense' ? '*' : '';
-        }
-
-        $builder = File::search((string) $searchQuery);
-
-        $filters = [];
-        if ($source && $source !== 'all') {
-            $filters[] = "source:={$source}";
-        }
-
-        if ($downloaded === 'yes') {
-            $filters[] = 'downloaded:=true';
-        } elseif ($downloaded === 'no') {
-            $filters[] = 'downloaded:=false';
-        }
-
-        if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
-            $filters[] = "previewed_count:<={$maxPreviewed}";
-        }
-
-        if (! in_array('all', $fileTypes, true)) {
-            if (count($fileTypes) === 1) {
-                $filters[] = "mime_group:={$fileTypes[0]}";
-            } else {
-                $filters[] = 'mime_group:=['.implode(',', $fileTypes).']';
-            }
-        }
-
-        $filters[] = "((auto_disliked:=true && dislike_user_ids:={$userId}) || (blacklisted:=true && blacklist_type:=auto))";
-        $builder->options([
-            'filter_by' => implode(' && ', $filters),
-        ]);
-
-        if ($effectiveSort === 'random') {
-            $rand = $seed && $seed > 0 ? "_rand({$seed})" : '_rand()';
-            $builder->orderBy($rand, 'desc');
-        } elseif ($effectiveSort === 'created_at_asc') {
-            $builder->orderBy('created_at', 'asc');
-        } elseif ($effectiveSort === 'created_at') {
-            $builder->orderBy('created_at', 'desc');
-        } elseif ($effectiveSort === 'updated_at') {
-            $builder->orderBy('updated_at', 'desc');
-        } elseif ($effectiveSort === 'updated_at_asc') {
-            $builder->orderBy('updated_at', 'asc');
-        } elseif ($effectiveSort === 'blacklisted_at') {
-            $builder->orderBy('blacklisted_at', 'desc')
-                ->orderBy('updated_at', 'desc');
-        } elseif ($effectiveSort === 'blacklisted_at_asc') {
-            $builder->orderBy('blacklisted_at', 'asc')
-                ->orderBy('updated_at', 'asc');
-        } elseif ($effectiveSort === 'downloaded_at_asc') {
-            $builder->orderBy('downloaded_at', 'asc')
-                ->orderBy('updated_at', 'asc');
-        } else {
-            $builder->orderBy('downloaded_at', 'desc')
-                ->orderBy('updated_at', 'desc');
-        }
-
-        $pagination = $builder->paginate($limit, 'page', $page);
-
-        return [
-            'files' => collect($pagination->items())->all(),
-            'metadata' => [
-                'nextCursor' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
-                'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
-            ],
-        ];
-    }
-
-    /**
-     * Return a normalized structure with files and next cursor.
-     * For local mode, we return File models directly (no transformation needed).
-     */
     public function transform(array $response, array $params = []): array
     {
         $files = $response['files'] ?? [];
@@ -981,8 +465,6 @@ class LocalService extends BaseService
         $total = $response['metadata']['total'] ?? null;
         $total = is_numeric($total) ? (int) $total : null;
 
-        // For local mode, files are already File models, so return them directly
-        // Browser.php will handle formatting with FileItemFormatter
         return [
             'files' => $files,
             'filter' => [
@@ -995,44 +477,11 @@ class LocalService extends BaseService
         ];
     }
 
-    /**
-     * Transform item to file format expected by Browser.
-     * For local mode, we return File models directly (not transformed format).
-     */
-    protected function transformItemToFileFormat(array $item): File
-    {
-        $fileId = $item['id'] ?? null;
-        $file = $fileId
-            ? File::search('*')
-                ->where('id', (string) $fileId)
-                ->query(fn ($query) => $query->with('metadata'))
-                ->get()
-                ->first()
-            : null;
-
-        if (! $file) {
-            throw new \RuntimeException("File with ID {$fileId} not found");
-        }
-
-        return $file;
-    }
-
     public function defaultParams(): array
     {
         return [
             'limit' => 20,
-            'source' => 'all', // Default to all sources
+            'source' => 'all',
         ];
-    }
-
-    protected function assertTypesenseDriver(): void
-    {
-        if (app()->environment('testing')) {
-            return;
-        }
-
-        if (config('scout.driver') !== 'typesense') {
-            throw new \RuntimeException('LocalService requires SCOUT_DRIVER=typesense.');
-        }
     }
 }

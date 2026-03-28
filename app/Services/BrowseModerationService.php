@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\File;
+use App\Models\Reaction;
 use Illuminate\Support\Collection;
 
 class BrowseModerationService
@@ -68,18 +69,32 @@ class BrowseModerationService
             );
         }
 
+        $filterAutoDisliked = (bool) ($context['filterAutoDisliked'] ?? false);
+        $filterCurrentUserReacted = (bool) ($context['filterCurrentUserReacted'] ?? false);
+        $currentUserReactedIdSet = $filterCurrentUserReacted
+            ? $this->resolveCurrentUserReactedFileIds($files)
+            : [];
+
         // Filter out permanently unavailable files and blacklisted files from browse/tab responses.
         $filteredFiles = $files
-            ->reject(function ($file) use ($blacklistedIdSet, $filterBlacklisted) {
+            ->reject(function ($file) use ($blacklistedIdSet, $currentUserReactedIdSet, $filterAutoDisliked, $filterBlacklisted, $filterCurrentUserReacted) {
                 if ((bool) ($file->not_found ?? false)) {
                     return true;
                 }
 
-                if (! $filterBlacklisted) {
-                    return false;
+                if ($filterBlacklisted && isset($blacklistedIdSet[(int) $file->id])) {
+                    return true;
                 }
 
-                return isset($blacklistedIdSet[(int) $file->id]);
+                if ($filterAutoDisliked && (bool) ($file->auto_disliked ?? false)) {
+                    return true;
+                }
+
+                if ($filterCurrentUserReacted && isset($currentUserReactedIdSet[(int) $file->id])) {
+                    return true;
+                }
+
+                return false;
             })
             ->values()
             ->all();
@@ -109,5 +124,50 @@ class BrowseModerationService
             'flaggedIds' => $flaggedIds,
             'immediateActions' => $immediatelyProcessedFiles,
         ];
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private function resolveCurrentUserReactedFileIds(Collection $files): array
+    {
+        $userId = auth()->id();
+        if (! is_int($userId)) {
+            return [];
+        }
+
+        $reactedFileIds = [];
+        $fileIdsToQuery = [];
+
+        foreach ($files as $file) {
+            if (! ($file instanceof File)) {
+                continue;
+            }
+
+            if ($file->relationLoaded('reaction')) {
+                if ($file->getRelation('reaction')) {
+                    $reactedFileIds[(int) $file->id] = true;
+                }
+
+                continue;
+            }
+
+            $fileIdsToQuery[] = (int) $file->id;
+        }
+
+        if ($fileIdsToQuery === []) {
+            return $reactedFileIds;
+        }
+
+        $queriedIds = Reaction::query()
+            ->where('user_id', $userId)
+            ->whereIn('file_id', array_values(array_unique($fileIdsToQuery)))
+            ->pluck('file_id');
+
+        foreach ($queriedIds as $fileId) {
+            $reactedFileIds[(int) $fileId] = true;
+        }
+
+        return $reactedFileIds;
     }
 }

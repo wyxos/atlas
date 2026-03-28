@@ -62,31 +62,8 @@ class ContainerBlacklistService
             ->whereIn('id', $newlyBlacklistedIds)
             ->update(['blacklisted_at' => now()]);
 
-        app(DownloadedFileClearService::class)->clearMany($newlyBlacklistedFiles, syncSearch: false, queueDelete: true);
-
-        $this->syncSearch($newlyBlacklistedIds);
+        app(DownloadedFileClearService::class)->clearMany($newlyBlacklistedFiles, queueDelete: true);
 
         return $newlyBlacklistedIds;
-    }
-
-    /**
-     * @param  array<int>  $fileIds
-     */
-    private function syncSearch(array $fileIds): void
-    {
-        $fileIds = array_values(array_unique(array_map(fn ($id) => (int) $id, $fileIds)));
-        $fileIds = array_values(array_filter($fileIds, fn ($id) => $id > 0));
-
-        if ($fileIds === []) {
-            return;
-        }
-
-        foreach (array_chunk($fileIds, 500) as $chunk) {
-            File::query()
-                ->whereIn('id', $chunk)
-                ->with(['metadata', 'reactions'])
-                ->get()
-                ->searchable();
-        }
     }
 }

@@ -235,7 +235,6 @@ test('reaction service set keeps the same dislike while clearing downloaded asse
     ]);
 
     $result = app(FileReactionService::class)->set($file, $user, 'dislike', [
-        'deferHeavySideEffects' => true,
         'queueDownload' => false,
     ]);
 
