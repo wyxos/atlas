@@ -24,6 +24,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /.playwright-mcp
+/.playwright-cli
 test-results/
 .cursor/commands
 /resources/js/wayfinder
