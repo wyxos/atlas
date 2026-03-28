@@ -13,6 +13,7 @@ type FileMarkedNotFoundPayload = {
 
 type PreviewFailureResponse = {
     fileId?: number;
+    notFound?: boolean;
     tabIds?: unknown;
 };
 
@@ -116,6 +117,11 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
     }
 
     function reconcileCurrentTabNotFound(fileId: number, tabIds: number[]): void {
+        const item = options.items.value.find((candidate) => candidate.id === fileId);
+        if (!item) {
+            return;
+        }
+
         const currentTabId = options.tab.value?.id ?? null;
 
         if (
@@ -125,16 +131,15 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
             return;
         }
 
-        const item = options.items.value.find((candidate) => candidate.id === fileId);
-        if (!item) {
-            return;
-        }
+        markItemNotFound(item);
+    }
 
-        options.cancelAutoDislikeCountdown(fileId);
+    function markItemNotFound(item: FeedItem): void {
+        options.cancelAutoDislikeCountdown(item.id);
         item.notFound = true;
         item.will_auto_dislike = false;
         triggerRef(options.items);
-        scheduleNotFoundRemoval(fileId);
+        scheduleNotFoundRemoval(item.id);
     }
 
     function handleFileMarkedNotFound(payload: unknown): void {
@@ -155,8 +160,17 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
             return;
         }
 
-        const { fileId, tabIds } = payload as PreviewFailureResponse;
+        const { fileId, notFound, tabIds } = payload as PreviewFailureResponse;
         if (typeof fileId !== 'number') {
+            return;
+        }
+
+        if (notFound === true) {
+            const item = options.items.value.find((candidate) => candidate.id === fileId);
+            if (item) {
+                markItemNotFound(item);
+            }
+
             return;
         }
 

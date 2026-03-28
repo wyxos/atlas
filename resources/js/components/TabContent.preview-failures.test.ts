@@ -160,6 +160,91 @@ describe('TabContent - Preview failure reconciliation', () => {
         }
     });
 
+    it('reconciles stale visible items when the preview-failure response says not found but has no tab ids', async () => {
+        vi.useFakeTimers();
+
+        const tab = {
+            id: 905,
+            label: 'Browse 1',
+            params: {
+                feed: 'online',
+                service: 'civit-ai-images',
+                page: 1,
+            },
+            items: [
+                {
+                    id: 105,
+                    width: 500,
+                    height: 500,
+                    page: 1,
+                    key: '1-105',
+                    index: 0,
+                    src: 'https://image.civitai.com/token/guid-5/width=1216/guid-5.jpeg',
+                    preview: 'https://image.civitai.com/token/guid-5/width=1216/guid-5.jpeg',
+                    original: 'https://image.civitai.com/token/guid-5/original=true/guid-5.jpeg',
+                    type: 'image',
+                    notFound: false,
+                    previewed_count: 0,
+                    seen_count: 0,
+                },
+            ],
+            position: 0,
+            isActive: true,
+        };
+
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab,
+            },
+        });
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                fileId: 105,
+                notFound: true,
+                tabIds: [],
+            },
+        });
+
+        try {
+            const wrapper = mount(TabContent, {
+                props: {
+                    tabId: tab.id,
+                    availableServices: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+            masonry.vm.$emit('failures', [
+                {
+                    item: tab.items[0],
+                    error: new Event('error'),
+                },
+            ]);
+
+            await flushPromises();
+            await nextTick();
+
+            const itemsAfterResponse = masonry.props('items') as FeedItem[];
+            expect(itemsAfterResponse[0]?.notFound).toBe(true);
+            expect(mockCancelAutoDislikeCountdown).toHaveBeenCalledWith(105);
+
+            await vi.advanceTimersByTimeAsync(5000);
+            await nextTick();
+
+            expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 105 }));
+            expect(masonry.props('items')).toHaveLength(0);
+
+            wrapper.unmount();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('reports viewer full-size preload failures through the same not-found flow', async () => {
         vi.useFakeTimers();
 
