@@ -448,7 +448,8 @@ defineExpose({
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :masonry="masonry"
             @open="itemInteractions.viewer.onOpen" @close="itemInteractions.viewer.onClose"
-            @reaction="itemInteractions.viewer.onReaction" />
+            @reaction="itemInteractions.viewer.onReaction"
+            @preview-failure="itemInteractions.viewer.onPreviewFailure" />
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
             :visible="tab !== null && tab !== undefined && !browseState.shouldShowForm" :total="browseState.totalAvailable"
             @first-page="browseActions.goToFirstPage" />

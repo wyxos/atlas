@@ -158,6 +158,23 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
         reconcileCurrentTabNotFound(fileId, normalizeTabIds(tabIds));
     }
 
+    function reportItem(item: FeedItem): void {
+        if (!shouldReportPreviewFailure(item) || previewFailureReportInFlightIds.has(item.id)) {
+            return;
+        }
+
+        previewFailureReportInFlightIds.add(item.id);
+
+        void window.axios.post(`/api/files/${item.id}/preview-failure`)
+            .then(({ data }) => {
+                handlePreviewFailureResponse(data);
+            })
+            .catch(() => {})
+            .finally(() => {
+                previewFailureReportInFlightIds.delete(item.id);
+            });
+    }
+
     function startEchoListeners(): void {
         const userId = resolveCurrentUserId();
         const echo = window.Echo as undefined | {
@@ -189,27 +206,8 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
     }
 
     function onBatchFailures(payloads: Array<{ item: FeedItem; error: unknown }>): void {
-        const fileIdsToReport = new Set<number>();
-
         for (const { item } of payloads) {
-            if (!shouldReportPreviewFailure(item) || previewFailureReportInFlightIds.has(item.id)) {
-                continue;
-            }
-
-            fileIdsToReport.add(item.id);
-        }
-
-        for (const fileId of fileIdsToReport) {
-            previewFailureReportInFlightIds.add(fileId);
-
-            void window.axios.post(`/api/files/${fileId}/preview-failure`)
-                .then(({ data }) => {
-                    handlePreviewFailureResponse(data);
-                })
-                .catch(() => {})
-                .finally(() => {
-                    previewFailureReportInFlightIds.delete(fileId);
-                });
+            reportItem(item);
         }
     }
 
@@ -224,5 +222,6 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
 
     return {
         onBatchFailures,
+        reportItem,
     };
 }
