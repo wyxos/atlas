@@ -11,6 +11,11 @@ type FileMarkedNotFoundPayload = {
     tabIds?: unknown;
 };
 
+type PreviewFailureResponse = {
+    fileId?: number;
+    tabIds?: unknown;
+};
+
 type UseTabContentNotFoundReconciliationOptions = {
     items: ShallowRef<FeedItem[]>;
     tab: Ref<TabData | null>;
@@ -105,19 +110,12 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
             .filter((tabId) => Number.isInteger(tabId) && tabId > 0);
     }
 
-    function handleFileMarkedNotFound(payload: unknown): void {
-        if (!payload || typeof payload !== 'object') {
-            return;
-        }
-
-        const { fileId, tabIds } = payload as FileMarkedNotFoundPayload;
+    function reconcileCurrentTabNotFound(fileId: number, tabIds: number[]): void {
         const currentTabId = options.tab.value?.id ?? null;
-        const normalizedTabIds = normalizeTabIds(tabIds);
 
         if (
-            typeof fileId !== 'number'
-            || currentTabId === null
-            || !normalizedTabIds.includes(currentTabId)
+            currentTabId === null
+            || !tabIds.includes(currentTabId)
         ) {
             return;
         }
@@ -132,6 +130,32 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
         item.will_auto_dislike = false;
         triggerRef(options.items);
         scheduleNotFoundRemoval(fileId);
+    }
+
+    function handleFileMarkedNotFound(payload: unknown): void {
+        if (!payload || typeof payload !== 'object') {
+            return;
+        }
+
+        const { fileId, tabIds } = payload as FileMarkedNotFoundPayload;
+        if (typeof fileId !== 'number') {
+            return;
+        }
+
+        reconcileCurrentTabNotFound(fileId, normalizeTabIds(tabIds));
+    }
+
+    function handlePreviewFailureResponse(payload: unknown): void {
+        if (!payload || typeof payload !== 'object') {
+            return;
+        }
+
+        const { fileId, tabIds } = payload as PreviewFailureResponse;
+        if (typeof fileId !== 'number') {
+            return;
+        }
+
+        reconcileCurrentTabNotFound(fileId, normalizeTabIds(tabIds));
     }
 
     function startEchoListeners(): void {
@@ -179,6 +203,9 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
             previewFailureReportInFlightIds.add(fileId);
 
             void window.axios.post(`/api/files/${fileId}/preview-failure`)
+                .then(({ data }) => {
+                    handlePreviewFailureResponse(data);
+                })
                 .catch(() => {})
                 .finally(() => {
                     previewFailureReportInFlightIds.delete(fileId);

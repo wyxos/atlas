@@ -74,6 +74,91 @@ describe('TabContent - Preview failure reconciliation', () => {
         expect(mockAxios.post).toHaveBeenCalledWith('/api/files/101/preview-failure');
     });
 
+    it('marks current-tab items as 404 from the preview-failure response and removes them after the delay', async () => {
+        vi.useFakeTimers();
+
+        const tab = {
+            id: 903,
+            label: 'Browse 1',
+            params: {
+                feed: 'online',
+                service: 'civit-ai-images',
+                page: 1,
+            },
+            items: [
+                {
+                    id: 103,
+                    width: 500,
+                    height: 500,
+                    page: 1,
+                    key: '1-103',
+                    index: 0,
+                    src: 'https://image.civitai.com/token/guid-3/width=1216/guid-3.jpeg',
+                    preview: 'https://image.civitai.com/token/guid-3/width=1216/guid-3.jpeg',
+                    original: 'https://image.civitai.com/token/guid-3/original=true/guid-3.jpeg',
+                    type: 'image',
+                    notFound: false,
+                    previewed_count: 0,
+                    seen_count: 0,
+                },
+            ],
+            position: 0,
+            isActive: true,
+        };
+
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab,
+            },
+        });
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                fileId: 103,
+                notFound: true,
+                tabIds: [tab.id],
+            },
+        });
+
+        try {
+            const wrapper = mount(TabContent, {
+                props: {
+                    tabId: tab.id,
+                    availableServices: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+            masonry.vm.$emit('failures', [
+                {
+                    item: tab.items[0],
+                    error: new Event('error'),
+                },
+            ]);
+
+            await flushPromises();
+            await nextTick();
+
+            const itemsAfterResponse = masonry.props('items') as FeedItem[];
+            expect(itemsAfterResponse[0]?.notFound).toBe(true);
+            expect(mockCancelAutoDislikeCountdown).toHaveBeenCalledWith(103);
+
+            await vi.advanceTimersByTimeAsync(5000);
+            await nextTick();
+
+            expect(mockRemove).toHaveBeenCalledWith('103');
+            expect(masonry.props('items')).toHaveLength(0);
+
+            wrapper.unmount();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('marks current-tab items as 404 and removes them after the broadcast delay', async () => {
         vi.useFakeTimers();
 

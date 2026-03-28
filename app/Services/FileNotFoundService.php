@@ -17,25 +17,24 @@ class FileNotFoundService
 
     private const int REQUEST_TIMEOUT_SECONDS = 10;
 
-    /**
-     * Reconcile a client-reported preview load failure with authoritative backend checks.
-     */
-    public function reconcilePreviewFailure(File $file): void
+    public function reconcilePreviewFailure(File $file): array
     {
+        $fileId = $file->id;
+
         if (! $this->supportsRemoteNotFoundCheck($file)) {
-            return;
+            return $this->result($fileId, (bool) $file->not_found);
         }
 
-        Cache::lock("file-not-found:{$file->id}", self::CHECK_LOCK_TTL_SECONDS)
-            ->get(function () use ($file): void {
+        $result = Cache::lock("file-not-found:{$fileId}", self::CHECK_LOCK_TTL_SECONDS)
+            ->get(function () use ($file, $fileId): array {
                 $file = File::query()->find($file->id);
 
                 if (! $file || ! $this->supportsRemoteNotFoundCheck($file)) {
-                    return;
+                    return $this->result($fileId, false);
                 }
 
                 if (! $this->bothRemoteUrlsReturnNotFound($file)) {
-                    return;
+                    return $this->result($file->id, (bool) $file->not_found);
                 }
 
                 $wasMarkedNotFound = (bool) $file->not_found;
@@ -67,7 +66,13 @@ class FileNotFoundService
                         tabIds: $affectedTabs['tab_ids'],
                     ));
                 }
+
+                return $this->result($file->id, true, $affectedTabsByUser);
             });
+
+        return is_array($result)
+            ? $result
+            : $this->result($fileId, (bool) $file->not_found);
     }
 
     private function supportsRemoteNotFoundCheck(File $file): bool
@@ -120,5 +125,14 @@ class FileNotFoundService
                 'allow_redirects' => true,
             ])
             ->send($method, $url);
+    }
+
+    private function result(int $fileId, bool $notFound, array $affectedTabsByUser = []): array
+    {
+        return [
+            'file_id' => $fileId,
+            'not_found' => $notFound,
+            'affected_tabs_by_user' => $affectedTabsByUser,
+        ];
     }
 }
