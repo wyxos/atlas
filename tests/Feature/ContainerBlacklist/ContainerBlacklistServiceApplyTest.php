@@ -53,6 +53,10 @@ it('skips reacted files when applying a container blacklist', function () {
         'downloaded' => true,
         'downloaded_at' => now(),
     ]);
+    $alreadyBlacklistedFile = File::factory()->create([
+        'blacklisted_at' => now()->subDay(),
+        'path' => 'downloads/already-blacklisted-file.jpg',
+    ]);
 
     $container->files()->attach([
         $likedFile->id,
@@ -60,6 +64,7 @@ it('skips reacted files when applying a container blacklist', function () {
         $funnyFile->id,
         $dislikedFile->id,
         $neutralFile->id,
+        $alreadyBlacklistedFile->id,
     ]);
 
     Reaction::query()->create([
@@ -88,8 +93,11 @@ it('skips reacted files when applying a container blacklist', function () {
     $otherUser = User::factory()->create();
     $foreignTab = Tab::factory()->for($otherUser)->create();
     $currentTab->files()->attach($neutralFile->id, ['position' => 0]);
+    $currentTab->files()->attach($alreadyBlacklistedFile->id, ['position' => 1]);
     $otherUserTab->files()->attach($neutralFile->id, ['position' => 0]);
+    $otherUserTab->files()->attach($alreadyBlacklistedFile->id, ['position' => 1]);
     $foreignTab->files()->attach($neutralFile->id, ['position' => 0]);
+    $foreignTab->files()->attach($alreadyBlacklistedFile->id, ['position' => 1]);
 
     $appliedIds = app(ContainerBlacklistService::class)->apply($container->fresh(), $actingUser->id);
     sort($appliedIds);
@@ -102,13 +110,19 @@ it('skips reacted files when applying a container blacklist', function () {
     expect($neutralFile->fresh()->blacklisted_at)->not->toBeNull();
     expect($neutralFile->fresh()->path)->toBeNull();
     expect($neutralFile->fresh()->downloaded)->toBeFalse();
+    expect($alreadyBlacklistedFile->fresh()->blacklisted_at)->not->toBeNull();
+    expect($alreadyBlacklistedFile->fresh()->path)->toBe('downloads/already-blacklisted-file.jpg');
     expect($currentTab->fresh()->files()->where('file_id', $neutralFile->id)->exists())->toBeFalse();
+    expect($currentTab->fresh()->files()->where('file_id', $alreadyBlacklistedFile->id)->exists())->toBeFalse();
     expect($otherUserTab->fresh()->files()->where('file_id', $neutralFile->id)->exists())->toBeFalse();
+    expect($otherUserTab->fresh()->files()->where('file_id', $alreadyBlacklistedFile->id)->exists())->toBeFalse();
     expect($foreignTab->fresh()->files()->where('file_id', $neutralFile->id)->exists())->toBeTrue();
+    expect($foreignTab->fresh()->files()->where('file_id', $alreadyBlacklistedFile->id)->exists())->toBeTrue();
 
     Queue::assertPushed(DeleteAutoDislikedFileJob::class, 1);
     Queue::assertPushed(DeleteAutoDislikedFileJob::class, fn (DeleteAutoDislikedFileJob $job) => $job->filePath === 'downloads/neutral-file.jpg');
     Queue::assertNotPushed(DeleteAutoDislikedFileJob::class, fn (DeleteAutoDislikedFileJob $job) => in_array($job->filePath, [
+        'downloads/already-blacklisted-file.jpg',
         'downloads/liked-file.jpg',
         'downloads/loved-file.jpg',
         'downloads/funny-file.jpg',

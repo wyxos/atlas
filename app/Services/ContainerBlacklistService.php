@@ -30,7 +30,6 @@ class ContainerBlacklistService
                 'files.download_progress',
                 'files.blacklisted_at',
             ])
-            ->whereNull('files.blacklisted_at')
             ->whereDoesntHave('reactions')
             ->get();
 
@@ -43,21 +42,31 @@ class ContainerBlacklistService
             return [];
         }
 
-        app(MetricsService::class)->applyBlacklistAdd($fileIds, false);
-
-        File::query()
-            ->whereIn('id', $fileIds)
-            ->update(['blacklisted_at' => now()]);
-
         if (is_int($userId)) {
             app(TabFileService::class)->detachFilesFromUserTabs($userId, $fileIds);
         }
 
-        app(DownloadedFileClearService::class)->clearMany($files, syncSearch: false, queueDelete: true);
+        $newlyBlacklistedFiles = $files->whereNull('blacklisted_at')->values();
+        $newlyBlacklistedIds = $newlyBlacklistedFiles
+            ->pluck('id')
+            ->map(fn ($value) => (int) $value)
+            ->all();
 
-        $this->syncSearch($fileIds);
+        if ($newlyBlacklistedIds === []) {
+            return [];
+        }
 
-        return $fileIds;
+        app(MetricsService::class)->applyBlacklistAdd($newlyBlacklistedIds, false);
+
+        File::query()
+            ->whereIn('id', $newlyBlacklistedIds)
+            ->update(['blacklisted_at' => now()]);
+
+        app(DownloadedFileClearService::class)->clearMany($newlyBlacklistedFiles, syncSearch: false, queueDelete: true);
+
+        $this->syncSearch($newlyBlacklistedIds);
+
+        return $newlyBlacklistedIds;
     }
 
     /**
