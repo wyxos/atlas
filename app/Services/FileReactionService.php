@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Jobs\DownloadFile;
-use App\Jobs\SyncFileSearchIndex;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -20,7 +19,6 @@ class FileReactionService
      * Unlike the UI controller, this does NOT toggle off if the same reaction is set again.
      *
      * @param  array{
-     *     deferHeavySideEffects?: bool,
      *     queueDownload?: bool,
      *     forceDownload?: bool,
      *     detachFromTabsOnNoop?: bool,
@@ -46,7 +44,6 @@ class FileReactionService
         string $type,
         array $options = [],
     ): array {
-        $deferHeavySideEffects = $options['deferHeavySideEffects'] ?? false;
         $queueDownload = $options['queueDownload'] ?? true;
         $forceDownload = $options['forceDownload'] ?? false;
         $detachFromTabsOnNoop = $options['detachFromTabsOnNoop'] ?? false;
@@ -58,7 +55,7 @@ class FileReactionService
 
         if ($existingReaction && $existingReaction->type === $type) {
             if ($type === 'dislike') {
-                $this->clearDownloadedAssetsForDislike($file, $deferHeavySideEffects);
+                $this->clearDownloadedAssetsForDislike($file);
                 if ($detachFromTabsOnNoop) {
                     app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
                 }
@@ -93,7 +90,6 @@ class FileReactionService
                 $user,
                 $existingReaction,
                 $type,
-                $deferHeavySideEffects,
                 $queueDownload,
                 $forceDownload,
                 $downloadRuntimeContext,
@@ -111,7 +107,6 @@ class FileReactionService
             $user,
             $existingReaction,
             $type,
-            $deferHeavySideEffects,
             $queueDownload,
             $forceDownload,
             $downloadRuntimeContext,
@@ -150,10 +145,6 @@ class FileReactionService
 
             $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
             $existingReaction->delete();
-            // Reactions are indexed into Typesense via File::toSearchableArray(), but toggling a
-            // reaction does not mutate the File model. Force a reindex so local browse filters
-            // (reaction_mode, reacted_user_ids, etc.) stay in sync.
-            $file->searchable();
 
             return ['reaction' => null];
         }
@@ -170,7 +161,6 @@ class FileReactionService
         User $user,
         ?Reaction $existingReaction,
         string $type,
-        bool $deferHeavySideEffects = false,
         bool $queueDownload = true,
         bool $forceDownload = false,
         array $downloadRuntimeContext = [],
@@ -212,23 +202,19 @@ class FileReactionService
         }
 
         if ($type === 'dislike') {
-            $this->downloadedFileClearService->clear($file, syncSearch: false);
+            $this->downloadedFileClearService->clear($file);
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
 
-        $this->syncSearch($file, $deferHeavySideEffects);
-
         return $reaction;
     }
 
-    private function clearDownloadedAssetsForDislike(File $file, bool $deferHeavySideEffects = false): bool
+    private function clearDownloadedAssetsForDislike(File $file): bool
     {
-        if (! $this->downloadedFileClearService->clear($file, syncSearch: false)) {
+        if (! $this->downloadedFileClearService->clear($file)) {
             return false;
         }
-
-        $this->syncSearch($file, $deferHeavySideEffects);
 
         return true;
     }
@@ -265,18 +251,5 @@ class FileReactionService
         }
 
         return $connection;
-    }
-
-    private function syncSearch(File $file, bool $deferHeavySideEffects): void
-    {
-        if ($deferHeavySideEffects) {
-            SyncFileSearchIndex::dispatch($file->id)
-                ->onConnection($this->asyncQueueConnection())
-                ->onQueue('processing');
-
-            return;
-        }
-
-        $file->searchable();
     }
 }

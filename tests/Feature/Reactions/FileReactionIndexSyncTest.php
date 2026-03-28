@@ -3,44 +3,47 @@
 use App\Models\File;
 use App\Models\User;
 use App\Services\FileReactionService;
+use App\Services\LocalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Queue;
-use Laravel\Scout\Jobs\MakeSearchable;
 
 uses(RefreshDatabase::class);
 
-it('queues a scout reindex when a reaction is toggled on', function () {
-    Queue::fake();
-    Config::set('scout.driver', 'collection');
-    Config::set('scout.queue', ['queue' => 'scout']);
-
+it('shows a newly reacted file in local reacted browse immediately', function () {
     $user = User::factory()->create();
-    $file = File::factory()->create();
+    $file = File::factory()->create([
+        'downloaded' => true,
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+    ]);
 
-    app(FileReactionService::class)->toggle($file, $user, 'dislike');
+    $this->actingAs($user);
 
-    Queue::assertPushed(MakeSearchable::class, function (MakeSearchable $job) use ($file) {
-        return (int) ($job->models->first()?->id ?? 0) === (int) $file->id;
-    });
+    app(FileReactionService::class)->toggle($file, $user, 'like');
+
+    $result = app(LocalService::class)->fetch([
+        'reaction_mode' => 'reacted',
+    ]);
+
+    expect(collect($result['files'])->pluck('id')->all())->toBe([$file->id]);
 });
 
-it('queues a scout reindex when a reaction is toggled off', function () {
-    Queue::fake();
-    Config::set('scout.driver', 'collection');
-    Config::set('scout.queue', ['queue' => 'scout']);
-
+it('removes a toggled off reaction from local reacted browse immediately', function () {
     $user = User::factory()->create();
-    $file = File::factory()->create();
+    $file = File::factory()->create([
+        'downloaded' => true,
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+    ]);
 
-    $svc = app(FileReactionService::class);
+    $this->actingAs($user);
 
-    // First toggle adds dislike.
-    $svc->toggle($file, $user, 'dislike');
-    // Second toggle removes dislike.
-    $svc->toggle($file, $user, 'dislike');
+    $service = app(FileReactionService::class);
+    $service->toggle($file, $user, 'like');
+    $service->toggle($file, $user, 'like');
 
-    Queue::assertPushed(MakeSearchable::class, function (MakeSearchable $job) use ($file) {
-        return (int) ($job->models->first()?->id ?? 0) === (int) $file->id;
-    });
+    $result = app(LocalService::class)->fetch([
+        'reaction_mode' => 'reacted',
+    ]);
+
+    expect($result['files'])->toBe([]);
 });

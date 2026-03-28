@@ -7,11 +7,13 @@ interface Props {
     search: string;
     dateFrom: string;
     dateTo: string;
+    showSearch?: boolean;
     searchPlaceholder?: string;
     dateRangeLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
+    showSearch: true,
     searchPlaceholder: 'Search...',
     dateRangeLabel: 'Created Date Range',
 });
@@ -41,8 +43,8 @@ const dateToModel = computed({
 
 <template>
     <form @submit.prevent="$emit('submit')" class="space-y-6">
-        <!-- Search Field -->
         <FormInput
+            v-if="showSearch"
             v-model="searchModel"
             :placeholder="searchPlaceholder"
         >

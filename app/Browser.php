@@ -195,6 +195,8 @@ class Browser
 
         $moderationResult = app(BrowseModerationService::class)->process($persisted, [
             'filterBlacklisted' => $shouldFilterBlacklisted,
+            'filterAutoDisliked' => ! $isLocalMode,
+            'filterCurrentUserReacted' => ! $isLocalMode,
         ]);
         $persisted = $moderationResult['files'];
         $flaggedIds = $moderationResult['flaggedIds'];

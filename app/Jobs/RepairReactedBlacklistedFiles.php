@@ -42,8 +42,6 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
         }
 
         $updatedAt = now();
-        $changedIds = [];
-
         foreach ($files as $file) {
             $oldUrl = trim((string) $file->url);
             $resolvedUrl = $this->resolvedUrlForFile($file, $oldUrl);
@@ -75,12 +73,6 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
 
                 DownloadFile::dispatch((int) $file->id, false);
             }
-
-            $changedIds[] = (int) $file->id;
-        }
-
-        if (! $this->dryRun) {
-            $this->syncSearch($changedIds);
         }
 
         $this->dispatchNextChunk($files, $limit);
@@ -203,26 +195,5 @@ class RepairReactedBlacklistedFiles implements ShouldQueue
         $encoded = json_encode($listingMetadata, JSON_UNESCAPED_SLASHES);
 
         return is_string($encoded) ? $encoded : null;
-    }
-
-    /**
-     * @param  array<int>  $fileIds
-     */
-    private function syncSearch(array $fileIds): void
-    {
-        $fileIds = array_values(array_unique(array_map(static fn ($id): int => (int) $id, $fileIds)));
-        $fileIds = array_values(array_filter($fileIds, static fn (int $id): bool => $id > 0));
-
-        if ($fileIds === []) {
-            return;
-        }
-
-        foreach (array_chunk($fileIds, 500) as $chunk) {
-            File::query()
-                ->whereIn('id', $chunk)
-                ->with(['metadata', 'reactions'])
-                ->get()
-                ->searchable();
-        }
     }
 }

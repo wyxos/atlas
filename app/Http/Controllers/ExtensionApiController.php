@@ -755,7 +755,6 @@ class ExtensionApiController extends Controller
             $user,
             $reactionType,
             [
-                'deferHeavySideEffects' => true,
                 'queueDownload' => $queueDownload,
                 'forceDownload' => $forceDownload,
                 'downloadRuntimeContext' => $runtimeContext,

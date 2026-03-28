@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\Storage;
 class FileReactionController extends Controller
 {
     /**
-     * Toggle a reaction on a file.
-     * Only one reaction can be active at a time - setting a new reaction removes the previous one.
+     * Set a reaction on a file.
+     * Only one reaction can be active at a time, and reapplying the same reaction keeps it in place.
      */
     public function store(Request $request, File $file): JsonResponse
     {
@@ -42,20 +42,18 @@ class FileReactionController extends Controller
         if ($forceDownload && $type !== 'dislike') {
             app(DownloadedFileResetService::class)->reset($file);
             $file = $file->refresh();
-            $result = app(FileReactionService::class)->set($file, $user, $type);
-        } else {
-            $result = app(FileReactionService::class)->toggle($file, $user, $type);
         }
 
+        $result = app(FileReactionService::class)->set($file, $user, $type);
+
         return response()->json([
-            'message' => $result['reaction'] ? 'Reaction updated.' : 'Reaction removed.',
+            'message' => 'Reaction updated.',
             'reaction' => $result['reaction'],
             'should_prompt_redownload' => ! $forceDownload
                 && $type !== 'dislike'
                 && $hasDownloadedFile
                 && $hasUrl
-                && $hadReactionBefore
-                && $result['reaction'] !== null,
+                && $hadReactionBefore,
         ]);
     }
 

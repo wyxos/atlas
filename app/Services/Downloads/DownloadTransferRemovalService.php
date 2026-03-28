@@ -48,7 +48,7 @@ final class DownloadTransferRemovalService
         }
 
         if ($alsoFromDisk) {
-            $this->clearFileFromDisk($downloadTransfer->file, syncSearch: ! $deletesFileRecord);
+            $this->clearFileFromDisk($downloadTransfer->file);
 
             if ($deletesFileRecord) {
                 $downloadTransfer->file?->delete();
@@ -185,13 +185,13 @@ final class DownloadTransferRemovalService
         $this->resetFileProgress($downloadTransfer);
     }
 
-    public function clearFileFromDisk(?File $file, bool $syncSearch = true): void
+    public function clearFileFromDisk(?File $file): void
     {
         if (! $file) {
             return;
         }
 
-        $this->downloadedFileClearService->clear($file, syncSearch: $syncSearch);
+        $this->downloadedFileClearService->clear($file);
     }
 
     private function cleanupTransferParts(DownloadTransfer $downloadTransfer): void

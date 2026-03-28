@@ -22,7 +22,7 @@ class DownloadedFileResetService
             return;
         }
 
-        $this->downloadedFileClearService->clear($file, syncSearch: false);
+        $this->downloadedFileClearService->clear($file);
 
         $updates = [
             'not_found' => false,

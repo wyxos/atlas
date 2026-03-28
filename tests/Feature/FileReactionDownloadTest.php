@@ -74,7 +74,7 @@ test('does not dispatch download job when user reacts with dislike', function ()
     Queue::assertNotPushed(DownloadFile::class);
 });
 
-test('does not dispatch download job when removing reaction', function () {
+test('dispatches download job when reapplying the same positive reaction', function () {
     Queue::fake();
 
     $admin = User::factory()->admin()->create();
@@ -88,17 +88,19 @@ test('does not dispatch download job when removing reaction', function () {
     // Clear any jobs from the first request
     Queue::fake();
 
-    // Then remove it by clicking the same reaction again
+    // Re-apply the same reaction again
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
         'type' => 'like',
     ]);
 
     $response->assertSuccessful();
+    $response->assertJsonPath('reaction.type', 'like');
+    $response->assertJsonPath('message', 'Reaction updated.');
 
-    // Wait a moment for afterResponse jobs to be dispatched (if any)
-    // Since the method returns early when removing, no job should be dispatched
-    sleep(1);
+    expect($file->fresh()->reactions()->where('user_id', $admin->id)->count())->toBe(1);
+    expect($file->fresh()->reactions()->where('user_id', $admin->id)->value('type'))->toBe('like');
 
-    // No job should be dispatched when removing a reaction
-    Queue::assertNotPushed(DownloadFile::class);
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
+        return $job->fileId === $file->id;
+    });
 });

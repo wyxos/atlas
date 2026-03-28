@@ -33,7 +33,6 @@ const router = useRouter();
  
 const listing = Listing.create<File>({
     filters: {
-        search: '',
         date_from: '',
         date_to: '',
         source: 'all',
@@ -286,9 +285,8 @@ onMounted(async () => {
                 @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()" title="Filter Files"
                 :is-filtering="listing.isFiltering" :is-resetting="listing.isResetting"
                 @apply="() => listing.applyFilters()" @reset="() => listing.resetFilters()">
-                <ListingFilterForm :search="listing.search" :date-from="listing.date_from" :date-to="listing.date_to"
-                    search-placeholder="Search by filename, title, or source..."
-                    @update:search="(value) => listing.search = value"
+                <ListingFilterForm :search="''" :date-from="listing.date_from" :date-to="listing.date_to"
+                    :show-search="false"
                     @update:date-from="(value) => listing.date_from = value"
                     @update:date-to="(value) => listing.date_to = value" @submit="() => listing.applyFilters()">
                     <!-- Source Filter -->

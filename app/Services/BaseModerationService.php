@@ -160,27 +160,6 @@ abstract class BaseModerationService
      */
     protected function processFiles(): array
     {
-        $syncSearch = function (array $fileIds): void {
-            if ($fileIds === []) {
-                return;
-            }
-
-            $ids = array_values(array_unique(array_map(fn ($id) => (int) $id, $fileIds)));
-            $ids = array_values(array_filter($ids, fn ($id) => $id > 0));
-            if ($ids === []) {
-                return;
-            }
-
-            foreach (array_chunk($ids, 500) as $chunk) {
-                // Ensure toSearchableArray() doesn't cause N+1 queries.
-                File::query()
-                    ->whereIn('id', $chunk)
-                    ->with(['metadata', 'reactions'])
-                    ->get()
-                    ->searchable();
-            }
-        };
-
         // Batch update auto-disliked files
         if (! empty($this->autoDislikeFileIds)) {
             File::whereIn('id', $this->autoDislikeFileIds)->update(['auto_disliked' => true]);
@@ -217,8 +196,6 @@ abstract class BaseModerationService
                 }
             }
 
-            // Keep Typesense in sync (auto_disliked + dislike reaction arrays).
-            $syncSearch($this->autoDislikeFileIds);
         }
 
         // Batch update blacklisted files
@@ -236,11 +213,9 @@ abstract class BaseModerationService
                 ->values();
 
             if ($filesToClear->isNotEmpty()) {
-                app(DownloadedFileClearService::class)->clearMany($filesToClear, syncSearch: false, queueDelete: true);
+                app(DownloadedFileClearService::class)->clearMany($filesToClear, queueDelete: true);
             }
 
-            // Keep Typesense in sync (blacklisted flags).
-            $syncSearch($this->blacklistFileIds);
         }
 
         return array_merge($this->autoDislikeFileIds, $this->blacklistFileIds);

@@ -261,6 +261,99 @@ test('browse excludes files already marked as not found', function () {
     expect($response->json('items'))->toBe([]);
 });
 
+test('online browse excludes auto disliked files and current user reacted files', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $autoDisliked = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/auto-disliked-guid/original=true/auto-disliked-guid.jpeg',
+        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/auto-disliked-guid/width=1216/auto-disliked-guid.jpeg',
+        'auto_disliked' => true,
+        'downloaded' => false,
+    ]);
+    $currentUserReacted = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/current-user-reacted-guid/original=true/current-user-reacted-guid.jpeg',
+        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/current-user-reacted-guid/width=1216/current-user-reacted-guid.jpeg',
+        'auto_disliked' => false,
+        'downloaded' => false,
+    ]);
+    $otherUserReacted = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/other-user-reacted-guid/original=true/other-user-reacted-guid.jpeg',
+        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/other-user-reacted-guid/width=1216/other-user-reacted-guid.jpeg',
+        'auto_disliked' => false,
+        'downloaded' => false,
+    ]);
+    $visible = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/visible-guid/original=true/visible-guid.jpeg',
+        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/visible-guid/width=1216/visible-guid.jpeg',
+        'auto_disliked' => false,
+        'downloaded' => false,
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $currentUserReacted->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $otherUserReacted->id,
+        'user_id' => $otherUser->id,
+        'type' => 'like',
+    ]);
+
+    Http::fake([
+        'https://civitai.com/api/v1/images*' => Http::response([
+            'items' => [
+                [
+                    'id' => 1001,
+                    'url' => $autoDisliked->url,
+                    'thumbnailUrl' => $autoDisliked->preview_url,
+                    'width' => 512,
+                    'height' => 768,
+                    'mimeType' => 'image/jpeg',
+                ],
+                [
+                    'id' => 1002,
+                    'url' => $currentUserReacted->url,
+                    'thumbnailUrl' => $currentUserReacted->preview_url,
+                    'width' => 512,
+                    'height' => 768,
+                    'mimeType' => 'image/jpeg',
+                ],
+                [
+                    'id' => 1003,
+                    'url' => $otherUserReacted->url,
+                    'thumbnailUrl' => $otherUserReacted->preview_url,
+                    'width' => 512,
+                    'height' => 768,
+                    'mimeType' => 'image/jpeg',
+                ],
+                [
+                    'id' => 1004,
+                    'url' => $visible->url,
+                    'thumbnailUrl' => $visible->preview_url,
+                    'width' => 512,
+                    'height' => 768,
+                    'mimeType' => 'image/jpeg',
+                ],
+            ],
+            'metadata' => [
+                'nextCursor' => null,
+            ],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/browse?service=civit-ai-images');
+
+    $response->assertSuccessful();
+    expect(collect($response->json('items'))->pluck('id')->all())
+        ->toBe([$otherUserReacted->id, $visible->id]);
+});
+
 test('browse uses LocalService when feed is local', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
@@ -349,8 +442,6 @@ test('local browse can return blacklisted files when blacklisted filter is yes',
         'auto_disliked' => false,
         'source' => 'Wallhaven',
     ]);
-
-    \App\Models\File::makeAllSearchable();
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&blacklisted=yes");
 

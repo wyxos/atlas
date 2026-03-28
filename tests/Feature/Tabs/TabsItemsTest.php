@@ -275,3 +275,54 @@ test('tab show keeps reacted files from blacklisted containers when the file its
     expect(collect($response->json('tab.items'))->pluck('id')->all())->toBe([$reactedContainerFile->id, $visible->id]);
     expect($reactedContainerFile->fresh()->blacklisted_at)->toBeNull();
 });
+
+test('tab show excludes auto disliked files and current user reacted files from online tabs', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $currentUserReacted = File::factory()->create([
+        'referrer_url' => 'https://example.com/current-user-reacted.jpg',
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+    ]);
+    $autoDisliked = File::factory()->create([
+        'referrer_url' => 'https://example.com/auto-disliked.jpg',
+        'auto_disliked' => true,
+        'blacklisted_at' => null,
+    ]);
+    $otherUserReacted = File::factory()->create([
+        'referrer_url' => 'https://example.com/other-user-reacted.jpg',
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+    ]);
+    $visible = File::factory()->create([
+        'referrer_url' => 'https://example.com/visible.jpg',
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+    ]);
+
+    Reaction::create([
+        'file_id' => $currentUserReacted->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+    Reaction::create([
+        'file_id' => $otherUserReacted->id,
+        'user_id' => $otherUser->id,
+        'type' => 'like',
+    ]);
+
+    $tab = Tab::factory()
+        ->for($user)
+        ->withFiles([$currentUserReacted->id, $autoDisliked->id, $otherUserReacted->id, $visible->id])
+        ->create([
+            'params' => ['service' => 'civit-ai-images'],
+        ]);
+
+    $response = $this->actingAs($user)->getJson(route('api.tabs.show', ['tab' => $tab->id]));
+
+    $response->assertSuccessful();
+
+    expect(collect($response->json('tab.items'))->pluck('id')->all())
+        ->toBe([$otherUserReacted->id, $visible->id]);
+});

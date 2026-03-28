@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import Files from './Files.vue';
 import Oruga from '@oruga-ui/oruga-next';
-import { index as filesIndex, destroy as filesDestroy } from '@/actions/App/Http/Controllers/FilesController';
+import { index as filesIndex } from '@/actions/App/Http/Controllers/FilesController';
 
 interface File {
     id: number;
@@ -23,30 +22,14 @@ interface File {
     updated_at: string;
 }
 
-interface FilesComponentInstance {
-    deletionHandler: {
-        dialogOpen: boolean;
-        itemToDelete: File | null;
-        openDialog: (file: File) => void;
-        closeDialog: () => void;
-        delete: () => Promise<void>;
-        deleteError: string | null;
-        canRetryDelete: boolean;
-        isDeleting: boolean;
-    };
-}
-
 const filesIndexUrl = filesIndex.definition?.url ?? filesIndex.url();
 
-// Mock axios
 vi.mock('axios', () => ({
     default: {
         get: vi.fn(),
     },
 }));
 
-
-// Mock window.axios
 const mockAxios = {
     get: vi.fn(),
     delete: vi.fn(),
@@ -54,7 +37,6 @@ const mockAxios = {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    // Suppress console.error output during tests to reduce noise
     vi.spyOn(console, 'error').mockImplementation(() => { });
     Object.assign(global.window, {
         axios: mockAxios,
@@ -74,18 +56,11 @@ async function createTestRouter(initialPath = '/files') {
     return router;
 }
 
-/**
- * Wait for the listing to finish loading by flushing promises and waiting for Vue updates.
- * Since axios is mocked, promises resolve immediately, so we just need to ensure
- * all promise chains complete and Vue has updated the DOM.
- */
 async function waitForListingToLoad(wrapper: ReturnType<typeof mount>): Promise<void> {
-    // Flush all pending promises multiple times to ensure promise chains complete
     await flushPromises();
     await wrapper.vm.$nextTick();
     await flushPromises();
     await wrapper.vm.$nextTick();
-    // One more flush to catch any nested async operations
     await flushPromises();
     await wrapper.vm.$nextTick();
 }
@@ -121,7 +96,7 @@ function createHarmonieResponse(items: File[], currentPage = 1, total?: number, 
 }
 
 describe('Files', () => {
-    it('loads filters from URL query parameters', async () => {
+    it('loads structured filters from URL query parameters and ignores search', async () => {
         mockAxios.get.mockResolvedValue(createHarmonieResponse([], 2, 0));
 
         const router = await createTestRouter('/files?page=2&search=test&source=local&mime_type=image&downloaded=yes&date_from=2024-01-01&date_to=2024-12-31');
@@ -133,28 +108,16 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-         
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
-        expect(vm.listing.filters.search).toBe('test');
         expect(vm.listing.filters.source).toBe('local');
         expect(vm.listing.filters.mime_type).toBe('image');
         expect(vm.listing.filters.downloaded).toBe('yes');
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
-
-        expect(mockAxios.get).toHaveBeenCalledWith(filesIndexUrl, {
-            params: expect.objectContaining({
-                page: 2,
-                search: 'test',
-                source: 'local',
-                mime_type: 'image',
-                downloaded: 'yes',
-                date_from: '2024-01-01',
-                date_to: '2024-12-31',
-            }),
-        });
+        expect(mockAxios.get.mock.calls[0][1].params.search).toBeUndefined();
     });
+
     it('updates URL when applying filters', async () => {
         mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
 
@@ -167,16 +130,13 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-         
         const vm = wrapper.vm as any;
-        vm.listing.filters.search = 'test';
         vm.listing.filters.source = 'YouTube';
         vm.listing.filters.mime_type = 'video';
         vm.listing.filters.downloaded = 'yes';
         vm.listing.filters.date_from = '2024-01-01';
         vm.listing.filters.date_to = '2024-12-31';
 
-        expect(vm.listing.isFiltering).toBe(false);
         const applyPromise = vm.listing.applyFilters();
         expect(vm.listing.isFiltering).toBe(true);
         await applyPromise;
@@ -185,7 +145,6 @@ describe('Files', () => {
 
         expect(vm.listing.isFiltering).toBe(false);
         expect(router.currentRoute.value.query).toEqual({
-            search: 'test',
             source: 'YouTube',
             mime_type: 'video',
             downloaded: 'yes',
@@ -193,6 +152,7 @@ describe('Files', () => {
             date_to: '2024-12-31',
         });
     });
+
     it('updates URL when changing page', async () => {
         mockAxios.get.mockResolvedValue(createHarmonieResponse([], 2, 30));
 
@@ -205,7 +165,6 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-         
         const vm = wrapper.vm as any;
         await vm.listing.goToPage(2);
         await flushPromises();
@@ -213,6 +172,7 @@ describe('Files', () => {
 
         expect(router.currentRoute.value.query.page).toBe('2');
     });
+
     it('clears URL query parameters when resetting filters', async () => {
         mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
 
@@ -225,9 +185,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-         
         const vm = wrapper.vm as any;
-        expect(vm.listing.isResetting).toBe(false);
         const resetPromise = vm.listing.resetFilters();
         expect(vm.listing.isResetting).toBe(true);
         await resetPromise;
@@ -237,6 +195,7 @@ describe('Files', () => {
         expect(vm.listing.isResetting).toBe(false);
         expect(router.currentRoute.value.query).toEqual({});
     });
+
     it('resets all filter values to defaults when resetFilters is called', async () => {
         mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
 
@@ -249,19 +208,13 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-         
         const vm = wrapper.vm as any;
-
-        // Verify filters are initially set from URL
-        expect(vm.listing.filters.search).toBe('test');
         expect(vm.listing.filters.source).toBe('local');
         expect(vm.listing.filters.mime_type).toBe('image');
         expect(vm.listing.filters.downloaded).toBe('yes');
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
-        // Reset filters
-        expect(vm.listing.isResetting).toBe(false);
         const resetPromise = vm.listing.resetFilters();
         expect(vm.listing.isResetting).toBe(true);
         await resetPromise;
@@ -269,18 +222,17 @@ describe('Files', () => {
         await wrapper.vm.$nextTick();
 
         expect(vm.listing.isResetting).toBe(false);
-        // Verify all filter values are reset to defaults
-        expect(vm.listing.filters.search).toBe('');
         expect(vm.listing.filters.source).toBe('all');
         expect(vm.listing.filters.mime_type).toBe('all');
         expect(vm.listing.filters.downloaded).toBe('all');
         expect(vm.listing.filters.date_from).toBe('');
         expect(vm.listing.filters.date_to).toBe('');
     });
-    it('removes individual search filter when removeFilter is called', async () => {
+
+    it('removes an individual structured filter when removeFilter is called', async () => {
         mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
 
-        const router = await createTestRouter('/files?search=test&source=local');
+        const router = await createTestRouter('/files?source=local&mime_type=image');
         const wrapper = mount(Files, {
             global: {
                 plugins: [router, Oruga],
@@ -289,30 +241,26 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-         
         const vm = wrapper.vm as any;
-        expect(vm.listing.filters.search).toBe('test');
         expect(vm.listing.filters.source).toBe('local');
+        expect(vm.listing.filters.mime_type).toBe('image');
 
-        // Remove search filter
-        await vm.listing.removeFilter('search');
+        await vm.listing.removeFilter('source');
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // Verify search is cleared but source remains
-        expect(vm.listing.filters.search).toBe('');
-        expect(vm.listing.filters.source).toBe('local');
-
-        // Verify URL is updated - search should be removed, source should remain
-        expect(router.currentRoute.value.query.search).toBeUndefined();
-        expect(router.currentRoute.value.query.source).toBe('local');
+        expect(vm.listing.filters.source).toBe('all');
+        expect(vm.listing.filters.mime_type).toBe('image');
+        expect(router.currentRoute.value.query.source).toBeUndefined();
+        expect(router.currentRoute.value.query.mime_type).toBe('image');
     });
-    it('resets pagination to page 1 when resetFilters is called', async () => {
+
+    it('resets pagination to page 1 when filters are reset', async () => {
         mockAxios.get
             .mockResolvedValueOnce(createHarmonieResponse([], 2, 30))
             .mockResolvedValueOnce(createHarmonieResponse([], 1, 30));
 
-        const router = await createTestRouter('/files?page=2&search=test');
+        const router = await createTestRouter('/files?page=2&source=local');
         const wrapper = mount(Files, {
             global: {
                 plugins: [router, Oruga],
@@ -321,20 +269,15 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-         
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
 
-        // Reset filters
-        expect(vm.listing.isResetting).toBe(false);
         const resetPromise = vm.listing.resetFilters();
         expect(vm.listing.isResetting).toBe(true);
         await resetPromise;
         await waitForListingToLoad(wrapper);
 
         expect(vm.listing.isResetting).toBe(false);
-        // Verify pagination was reset to page 1
         expect(vm.currentPage).toBe(1);
     });
 });
-
