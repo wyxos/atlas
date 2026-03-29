@@ -169,7 +169,7 @@ const reactionFlow = useFileViewerReactionFlow({
     overlay: overlayState,
     ensureMoreItems,
     closeOverlay: overlayLifecycle.closeOverlay,
-    navigateToIndex: paging.navigateToIndex,
+    navigateToItem: paging.navigateToItem,
     emitReaction: (fileId, type) => emit('reaction', fileId, type),
 });
 

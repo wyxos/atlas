@@ -88,12 +88,12 @@ export function useFileViewerPaging(params: {
         isAnimating.value = false;
     }
 
-    function isNavigationSuperseded(targetIndex: number): boolean {
-        return currentTarget.value !== targetIndex;
+    function isNavigationSuperseded(targetItemId: number): boolean {
+        return currentTarget.value !== targetItemId;
     }
 
-    function stopNavigationIfSuperseded(targetIndex: number): boolean {
-        if (!isNavigationSuperseded(targetIndex)) {
+    function stopNavigationIfSuperseded(targetItemId: number): boolean {
+        if (!isNavigationSuperseded(targetItemId)) {
             return false;
         }
 
@@ -138,33 +138,33 @@ export function useFileViewerPaging(params: {
         key.value += 1;
     }
 
-    async function markItemSeen(item: FeedItem): Promise<void> {
-        await params.handleItemSeen(item.id);
+    function findItemIndex(itemId: number): number {
+        return params.items.value.findIndex((item) => item.id === itemId);
     }
 
-    async function finishSlideIn(targetIndex: number): Promise<boolean> {
-        if (stopNavigationIfSuperseded(targetIndex)) {
+    async function finishSlideIn(targetItemId: number): Promise<boolean> {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
         imageTranslateY.value = 0;
         await wait(transitionDurationMs);
 
-        if (stopNavigationIfSuperseded(targetIndex)) {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
         stopNavigation();
+        void params.handleItemSeen(targetItemId);
         return true;
     }
 
     async function revealImmediateMedia(
-        item: FeedItem,
         target: FileViewerOverlayMediaTarget,
         container: HTMLElement,
-        targetIndex: number,
+        targetItemId: number,
     ): Promise<boolean> {
-        if (stopNavigationIfSuperseded(targetIndex)) {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
@@ -178,9 +178,7 @@ export function useFileViewerPaging(params: {
             fullSizeImage.value = target.previewSrc;
         }
 
-        await markItemSeen(item);
-
-        if (stopNavigationIfSuperseded(targetIndex)) {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
@@ -190,27 +188,24 @@ export function useFileViewerPaging(params: {
         await nextTick();
         await waitForLayoutPasses();
 
-        return finishSlideIn(targetIndex);
+        return finishSlideIn(targetItemId);
     }
 
     async function revealImageMedia(
-        item: FeedItem,
         target: FileViewerOverlayMediaTarget,
         container: HTMLElement,
-        targetIndex: number,
+        targetItemId: number,
     ): Promise<boolean> {
         const dimensions = await preloadImage(target.fullSizeUrl);
 
-        if (stopNavigationIfSuperseded(targetIndex)) {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
         originalDimensions.value = dimensions;
         fullSizeImage.value = target.fullSizeUrl;
 
-        await markItemSeen(item);
-
-        if (stopNavigationIfSuperseded(targetIndex)) {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
@@ -219,13 +214,13 @@ export function useFileViewerPaging(params: {
 
         await nextTick();
 
-        if (stopNavigationIfSuperseded(targetIndex)) {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
         await waitForLayoutPasses();
 
-        if (stopNavigationIfSuperseded(targetIndex)) {
+        if (stopNavigationIfSuperseded(targetItemId)) {
             return false;
         }
 
@@ -234,7 +229,7 @@ export function useFileViewerPaging(params: {
         await waitForLayoutPasses();
         await wait(10);
 
-        return finishSlideIn(targetIndex);
+        return finishSlideIn(targetItemId);
     }
 
     async function revealImageFallback(
@@ -269,40 +264,47 @@ export function useFileViewerPaging(params: {
         if (currentItemIndex.value >= params.items.value.length - 1) {
             await params.ensureMoreItems();
             if (currentItemIndex.value < params.items.value.length - 1) {
-                const nextIndex = currentItemIndex.value + 1;
-                currentItemIndex.value = nextIndex;
-                await navigateToIndex(nextIndex, 'down');
+                const nextItemId = params.items.value[currentItemIndex.value + 1]?.id ?? null;
+                if (nextItemId !== null) {
+                    await navigateToItem(nextItemId, 'down');
+                }
             }
             return;
         }
 
-        const nextIndex = currentItemIndex.value + 1;
-        currentItemIndex.value = nextIndex;
-        await navigateToIndex(nextIndex, 'down');
+        const nextItemId = params.items.value[currentItemIndex.value + 1]?.id ?? null;
+        if (nextItemId !== null) {
+            await navigateToItem(nextItemId, 'down');
+        }
     }
 
     async function navigateToPrevious(): Promise<void> {
         if (!rect.value || !fillComplete.value || currentItemIndex.value === null) return;
         if (currentItemIndex.value <= 0) return;
 
-        const prevIndex = currentItemIndex.value - 1;
-        currentItemIndex.value = prevIndex;
-        await navigateToIndex(prevIndex, 'up');
+        const previousItemId = params.items.value[currentItemIndex.value - 1]?.id ?? null;
+        if (previousItemId !== null) {
+            await navigateToItem(previousItemId, 'up');
+        }
     }
 
-    async function navigateToIndex(index: number, dir?: 'up' | 'down'): Promise<void> {
+    async function navigateToItem(itemId: number, dir?: 'up' | 'down'): Promise<void> {
         if (!rect.value || !fillComplete.value) return;
-        if (index < 0 || index >= params.items.value.length) return;
 
         const tabContent = params.containerRef.value;
         if (!tabContent) return;
 
+        const initialIndex = findItemIndex(itemId);
+        if (initialIndex === -1) {
+            return;
+        }
+
         const resolvedDirection = dir
-            ?? (currentItemIndex.value !== null && index < currentItemIndex.value ? 'up' : 'down');
+            ?? (currentItemIndex.value !== null && initialIndex < currentItemIndex.value ? 'up' : 'down');
 
         direction.value = resolvedDirection;
 
-        currentTarget.value = index;
+        currentTarget.value = itemId;
         isNavigating.value = true;
 
         const { height: slideOutDistance } = getContainerSize(tabContent);
@@ -311,12 +313,19 @@ export function useFileViewerPaging(params: {
 
         await wait(transitionDurationMs);
 
-        const nextItem = params.items.value[index];
+        const nextIndex = findItemIndex(itemId);
+        if (nextIndex === -1) {
+            stopNavigation();
+            return;
+        }
+
+        const nextItem = params.items.value[nextIndex];
         if (!nextItem) {
             stopNavigation();
             return;
         }
 
+        currentItemIndex.value = nextIndex;
         const target = resolveFileViewerOverlayMediaTarget(nextItem);
         applyPreparedMedia(target);
         updateOverlayLayout(tabContent, target.originalDimensions.width, target.originalDimensions.height);
@@ -326,15 +335,15 @@ export function useFileViewerPaging(params: {
         imageScale.value = 1;
         await nextTick();
 
-        const preloadTarget = index;
+        const preloadTarget = itemId;
 
         try {
             if (target.isVideo || target.isAudio || target.isFile) {
-                await revealImmediateMedia(nextItem, target, tabContent, preloadTarget);
+                await revealImmediateMedia(target, tabContent, preloadTarget);
                 return;
             }
 
-            await revealImageMedia(nextItem, target, tabContent, preloadTarget);
+            await revealImageMedia(target, tabContent, preloadTarget);
         } catch (error) {
             await revealImageFallback(nextItem, target, tabContent, error);
         }
@@ -342,9 +351,21 @@ export function useFileViewerPaging(params: {
         stopNavigation();
     }
 
+    async function navigateToIndex(index: number, dir?: 'up' | 'down'): Promise<void> {
+        if (index < 0 || index >= params.items.value.length) return;
+
+        const itemId = params.items.value[index]?.id ?? null;
+        if (itemId === null) {
+            return;
+        }
+
+        await navigateToItem(itemId, dir);
+    }
+
     return {
         navigateToNext,
         navigateToPrevious,
         navigateToIndex,
+        navigateToItem,
     };
 }

@@ -12,7 +12,7 @@ export function useFileViewerReactionFlow(params: {
     };
     ensureMoreItems: () => Promise<boolean>;
     closeOverlay: () => void;
-    navigateToIndex: (index: number, dir?: 'up' | 'down') => void | Promise<void>;
+    navigateToItem: (itemId: number, dir?: 'up' | 'down') => void | Promise<void>;
     emitReaction: (fileId: number, type: ReactionType) => void;
 }) {
     const { currentItemIndex } = toRefs(params.navigation);
@@ -36,6 +36,11 @@ export function useFileViewerReactionFlow(params: {
             return;
         }
 
+        const previousIndex = currentItemIndex.value;
+        const preferredNextItemId = previousIndex === null
+            ? null
+            : params.items.value[previousIndex + 1]?.id ?? null;
+
         params.emitReaction(item.id, type);
         await nextTick();
 
@@ -48,23 +53,29 @@ export function useFileViewerReactionFlow(params: {
             }
         }
 
-        const previousIndex = currentItemIndex.value;
-        const currentIndexInList = params.items.value.findIndex((candidate) => candidate.id === item.id);
-        let targetIndex: number | null = null;
-
-        if (currentIndexInList === -1) {
-            if (previousIndex !== null) {
-                targetIndex = Math.min(previousIndex, params.items.value.length - 1);
+        const resolveTargetItemId = (): number | null => {
+            if (preferredNextItemId !== null) {
+                const preferredItem = params.items.value.find((candidate) => candidate.id === preferredNextItemId);
+                if (preferredItem) {
+                    return preferredItem.id;
+                }
             }
-        } else {
-            const nextIndex = currentIndexInList + 1;
 
-            if (nextIndex < params.items.value.length) {
-                targetIndex = nextIndex;
+            const currentIndexInList = params.items.value.findIndex((candidate) => candidate.id === item.id);
+            if (currentIndexInList !== -1) {
+                return params.items.value[currentIndexInList + 1]?.id ?? null;
             }
-        }
 
-        if (targetIndex === null) {
+            if (previousIndex === null || params.items.value.length === 0) {
+                return null;
+            }
+
+            return params.items.value[Math.min(previousIndex, params.items.value.length - 1)]?.id ?? null;
+        };
+
+        let targetItemId = resolveTargetItemId();
+
+        if (targetItemId === null) {
             await params.ensureMoreItems();
 
             if (params.items.value.length === 0) {
@@ -72,12 +83,15 @@ export function useFileViewerReactionFlow(params: {
                 return;
             }
 
-            targetIndex = Math.min(previousIndex ?? 0, params.items.value.length - 1);
+            targetItemId = resolveTargetItemId();
         }
 
-        currentItemIndex.value = targetIndex;
-        currentItemId.value = params.items.value[targetIndex]?.id ?? null;
-        void params.navigateToIndex(targetIndex, 'down');
+        if (targetItemId === null) {
+            params.closeOverlay();
+            return;
+        }
+
+        void params.navigateToItem(targetItemId, 'down');
     }
 
     watch(
