@@ -213,29 +213,21 @@ export function useFileViewerOpen(params: {
             if (target.isVideo) {
                 videoSrc.value = target.fullSizeUrl;
                 isLoading.value = false;
-
-                await params.handleItemSeen(masonryItem.id);
                 await nextTick();
             } else if (target.isAudio) {
                 fullSizeImage.value = target.initialFullSizeImage;
                 audioSrc.value = target.fullSizeUrl;
                 isLoading.value = false;
-
-                await params.handleItemSeen(masonryItem.id);
                 await nextTick();
             } else if (target.isFile) {
                 fullSizeImage.value = target.initialFullSizeImage;
                 isLoading.value = false;
-
-                await params.handleItemSeen(masonryItem.id);
                 await nextTick();
             } else {
                 const imageDimensions = await preloadImage(target.fullSizeUrl);
                 originalDimensions.value = imageDimensions;
                 fullSizeImage.value = target.fullSizeUrl;
                 isLoading.value = false;
-
-                await params.handleItemSeen(masonryItem.id);
 
                 await nextTick();
                 await wait(50);
@@ -291,7 +283,12 @@ export function useFileViewerOpen(params: {
             };
 
             setTimeout(() => {
+                if (isClosing.value) {
+                    return;
+                }
+
                 fillComplete.value = true;
+                void params.handleItemSeen(masonryItem.id);
             }, transitionDurationMs);
         }, transitionDurationMs);
     }
