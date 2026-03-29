@@ -101,6 +101,37 @@ it('shows retry context when a download is queued for retry', async () => {
     expect(wrapper.text()).toContain('Retry 1/3 scheduled in 30s');
 });
 
+it('shows a yt-dlp badge for transfers that use yt-dlp', async () => {
+    window.axios.get = vi.fn().mockResolvedValue({
+        data: {
+            items: [
+                {
+                    id: 13,
+                    status: 'queued',
+                    created_at: null,
+                    queued_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    failed_at: null,
+                    percent: 0,
+                    error: null,
+                    download_via: 'yt-dlp',
+                },
+            ],
+        },
+    });
+
+    const wrapper = mount(DownloadsQueue);
+    await flushPromises();
+
+    const container = wrapper.find('.flex-1.overflow-auto');
+    Object.defineProperty(container.element, 'clientHeight', { value: 600, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('YT-DLP');
+});
+
 it('clears stale error when progress payload sends error as null', async () => {
     const listeners = new Map<string, (payload: unknown) => void>();
     window.Echo = {

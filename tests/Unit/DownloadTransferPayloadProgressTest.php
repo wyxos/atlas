@@ -83,6 +83,34 @@ it('includes extension user reaction in extension payloads', function () {
         ->and($progressPayload['reaction'])->toBe('funny');
 });
 
+it('includes download_via in list, queued, and progress payloads', function () {
+    $file = File::factory()->create([
+        'url' => 'https://www.youtube.com/watch?v=queue-test',
+        'listing_metadata' => [
+            'download_via' => 'yt-dlp',
+        ],
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://www.youtube.com/watch?v=queue-test',
+        'domain' => 'www.youtube.com',
+        'status' => DownloadTransferStatus::QUEUED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 0,
+    ]);
+
+    $listPayload = DownloadTransferPayload::forListCollection(collect([$transfer]))->first();
+    $queuedPayload = DownloadTransferPayload::forQueued($transfer);
+    $progressPayload = DownloadTransferPayload::forProgress($transfer, 0);
+
+    expect($listPayload)->not->toBeNull()
+        ->and($listPayload['download_via'])->toBe('yt-dlp')
+        ->and($queuedPayload['download_via'])->toBe('yt-dlp')
+        ->and($progressPayload['download_via'])->toBe('yt-dlp');
+});
+
 it('includes null reaction for extension payloads when no reaction exists', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
