@@ -120,9 +120,11 @@ export function useDownloadsQueueActions(params: {
                         also_delete_record: removeAlsoDeleteRecord.value,
                     },
                 });
+                removeNow = data.queued !== true;
                 removedIds = data.ids ?? ids;
             } else if (ids.length === 1) {
                 const { data } = await window.axios.delete<RemoveResponse>(downloadTransfers.destroy.url(ids[0]));
+                removeNow = data.queued !== true;
                 removedIds = data.ids ?? ids;
             } else {
                 const { data } = await window.axios.post<RemoveResponse>(downloadTransfers.destroyBatch.url(), {

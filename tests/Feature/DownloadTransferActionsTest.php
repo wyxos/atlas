@@ -477,7 +477,6 @@ it('keeps reactions and the file record when deleting a non-downloaded file from
 it('removes an active transfer from disk even when the temp directory and stored files are already missing', function () {
     Storage::fake('atlas-app');
 
-    $user = User::factory()->create();
     $file = File::factory()->create([
         'url' => 'https://example.com/missing-active.bin',
         'filename' => 'missing-active.bin',
@@ -505,15 +504,9 @@ it('removes an active transfer from disk even when the temp directory and stored
         'status' => DownloadChunkStatus::DOWNLOADING,
     ]);
 
-    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$transfer->id}/disk");
+    $removedIds = app(DownloadTransferRemovalService::class)->remove($transfer, true);
 
-    $response->assertSuccessful()
-        ->assertJson([
-            'ids' => [$transfer->id],
-            'count' => 1,
-            'queued' => false,
-        ]);
-
+    expect($removedIds)->toBe([$transfer->id]);
     expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
     expect(DownloadChunk::query()->where('download_transfer_id', $transfer->id)->count())->toBe(0);
 
@@ -522,6 +515,132 @@ it('removes an active transfer from disk even when the temp directory and stored
     expect($file->preview_path)->toBeNull();
     expect($file->downloaded)->toBeFalse();
     expect($file->download_progress)->toBe(0);
+});
+
+it('queues active single-transfer removal instead of blocking request cleanup', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/active-remove.bin',
+    ]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 35,
+        'last_broadcast_percent' => 35,
+    ]);
+
+    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$transfer->id}");
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'message' => 'Download removal queued.',
+            'ids' => [$transfer->id],
+            'count' => 1,
+            'queued' => true,
+        ]);
+
+    expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeTrue();
+
+    Bus::assertDispatched(RemoveDownloadTransfers::class, function (RemoveDownloadTransfers $job) use ($transfer): bool {
+        return $job->ids === [$transfer->id]
+            && $job->alsoFromDisk === false
+            && $job->alsoDeleteRecord === false
+            && $job->completedOnly === false;
+    });
+});
+
+it('queues active single-transfer disk removal instead of blocking request cleanup', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/active-remove-disk.bin',
+    ]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 35,
+        'last_broadcast_percent' => 35,
+    ]);
+
+    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$transfer->id}/disk", [
+        'also_delete_record' => true,
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'message' => 'Download removal queued.',
+            'ids' => [$transfer->id],
+            'count' => 1,
+            'queued' => true,
+        ]);
+
+    expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeTrue();
+
+    Bus::assertDispatched(RemoveDownloadTransfers::class, function (RemoveDownloadTransfers $job) use ($transfer): bool {
+        return $job->ids === [$transfer->id]
+            && $job->alsoFromDisk === true
+            && $job->alsoDeleteRecord === true
+            && $job->completedOnly === false;
+    });
+});
+
+it('queues active bulk removal requests even below the sync-size threshold', function () {
+    Bus::fake();
+
+    config()->set('downloads.bulk_removal_sync_limit', 50);
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/active-bulk-remove.bin',
+    ]);
+    $activeTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://example.com/active-bulk-remove.bin',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 35,
+        'last_broadcast_percent' => 35,
+    ]);
+    $completedTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://example.com/active-bulk-remove-2.bin',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/api/download-transfers/bulk-delete', [
+        'ids' => [$activeTransfer->id, $completedTransfer->id],
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'message' => 'Download removal queued.',
+            'count' => 2,
+            'queued' => true,
+        ]);
+
+    expect(DownloadTransfer::query()->whereKey($activeTransfer->id)->exists())->toBeTrue();
+    expect(DownloadTransfer::query()->whereKey($completedTransfer->id)->exists())->toBeTrue();
+
+    Bus::assertDispatched(RemoveDownloadTransfers::class, function (RemoveDownloadTransfers $job) use ($activeTransfer, $completedTransfer): bool {
+        return $job->ids === [$activeTransfer->id, $completedTransfer->id]
+            && $job->alsoFromDisk === false
+            && $job->alsoDeleteRecord === false
+            && $job->completedOnly === false;
+    });
 });
 
 it('removes completed transfers in one request without touching other statuses', function () {
