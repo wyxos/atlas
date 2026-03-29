@@ -93,8 +93,25 @@ function handleCopyPath(): void {
                     <Skeleton v-else class="h-3 w-36 bg-prussian-blue-500/60" />
                 </div>
 
-                <div v-if="details" class="truncate text-xs text-smart-blue-400 hover:text-white">
-                    <a :href="details.referrer_url" target="_blank">{{ details.referrer_url }}</a>
+                <div
+                    v-if="item.download_via === 'yt-dlp' || details?.referrer_url"
+                    class="mt-1 flex min-w-0 items-center gap-2 text-xs"
+                >
+                    <span
+                        v-if="item.download_via === 'yt-dlp'"
+                        class="inline-flex shrink-0 items-center rounded-full border border-warning-400/40 bg-warning-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-warning-200"
+                        title="Downloaded via yt-dlp"
+                    >
+                        YT-DLP
+                    </span>
+                    <a
+                        v-if="details?.referrer_url"
+                        :href="details.referrer_url"
+                        target="_blank"
+                        class="truncate text-smart-blue-400 hover:text-white"
+                    >
+                        {{ details.referrer_url }}
+                    </a>
                 </div>
                 <Skeleton v-else class="mt-1 h-3 w-48 bg-prussian-blue-500/60" />
 

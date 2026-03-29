@@ -94,6 +94,7 @@ final class DownloadTransferPayload
     /**
      * @param  array<int, array{
      *     extension_channel:string|null,
+     *     download_via:string|null,
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
@@ -123,6 +124,7 @@ final class DownloadTransferPayload
     /**
      * @param  array<int, array{
      *     extension_channel:string|null,
+     *     download_via:string|null,
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
@@ -130,6 +132,7 @@ final class DownloadTransferPayload
      * }>  $lookups
      * @return array{
      *     extension_channel:string|null,
+     *     download_via:string|null,
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
@@ -159,6 +162,7 @@ final class DownloadTransferPayload
 
         return [
             'extension_channel' => self::extensionChannelFromListingMetadata($metadata),
+            'download_via' => self::downloadViaFromListingMetadata($metadata),
             'reaction' => $reaction,
             'referrer_url' => self::trimmedStringOrNull($file?->referrer_url),
             'downloaded_at' => self::datetimeToIsoStringOrNull($file?->downloaded_at),
@@ -264,6 +268,7 @@ final class DownloadTransferPayload
      * @param  Collection<int, DownloadTransfer>  $transfers
      * @return array<int, array{
      *     extension_channel:string|null,
+     *     download_via:string|null,
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
@@ -284,6 +289,7 @@ final class DownloadTransferPayload
         $pairByTransferLookupKey = [];
         /** @var array<int, array{
          *     extension_channel:string|null,
+         *     download_via:string|null,
          *     reaction:string|null,
          *     referrer_url:string|null,
          *     downloaded_at:string|null,
@@ -299,6 +305,7 @@ final class DownloadTransferPayload
 
             $lookups[$lookupKey] = [
                 'extension_channel' => self::extensionChannelFromListingMetadata($listing),
+                'download_via' => self::downloadViaFromListingMetadata($listing),
                 'reaction' => null,
                 'referrer_url' => self::trimmedStringOrNull($file?->referrer_url),
                 'downloaded_at' => self::datetimeToIsoStringOrNull($file?->downloaded_at),
@@ -470,5 +477,20 @@ final class DownloadTransferPayload
         $normalized = (int) $value;
 
         return $normalized > 0 ? $normalized : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $listing
+     */
+    private static function downloadViaFromListingMetadata(array $listing): ?string
+    {
+        $value = $listing['download_via'] ?? null;
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+
+        return $normalized !== '' ? $normalized : null;
     }
 }

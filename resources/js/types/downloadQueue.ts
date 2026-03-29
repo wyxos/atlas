@@ -27,6 +27,7 @@ export interface DownloadQueueItem {
     failed_at: string | null;
     percent: number;
     error: string | null;
+    download_via?: string | null;
     can_resume?: boolean;
     can_restart?: boolean;
 }
@@ -75,6 +76,7 @@ export interface DownloadQueueProgressPayload {
     finished_at?: string | null;
     failed_at?: string | null;
     error?: string | null;
+    download_via?: string | null;
     can_resume?: boolean;
     can_restart?: boolean;
     path?: string | null;
