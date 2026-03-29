@@ -44,10 +44,14 @@ if (changed.size === 0) {
   process.exit(0);
 }
 
-const filesTablePatterns = [
+const allowedFilesCreateMigration = 'database/migrations/2025_06_27_235710_create_files_table.php';
+const filesCreatePattern = /Schema::create\(\s*['"]files['"]/i;
+const filesTableTouchPatterns = [
+  filesCreatePattern,
   /Schema::table\(\s*['"]files['"]/i,
-  /Schema::create\(\s*['"]files['"]/i,
   /ALTER\s+TABLE\s+`?files`?/i,
+  /CREATE\s+(?:UNIQUE\s+)?INDEX[\s\S]*?\s+ON\s+`?files`?/i,
+  /DROP\s+INDEX[\s\S]*?\s+ON\s+`?files`?/i,
   /rename\(\s*['"]files['"]/i,
 ];
 
@@ -59,7 +63,18 @@ for (const file of changed) {
   }
 
   const content = readFileSync(file, 'utf8');
-  if (filesTablePatterns.some((pattern) => pattern.test(content))) {
+  const normalizedFile = file.replace(/\\/g, '/');
+  const touchesFilesTable = filesTableTouchPatterns.some((pattern) => pattern.test(content));
+  const isAllowedBaselineCreate =
+    normalizedFile === allowedFilesCreateMigration &&
+    filesCreatePattern.test(content) &&
+    !/Schema::table\(\s*['"]files['"]/i.test(content) &&
+    !/ALTER\s+TABLE\s+`?files`?/i.test(content) &&
+    !/CREATE\s+(?:UNIQUE\s+)?INDEX[\s\S]*?\s+ON\s+`?files`?/i.test(content) &&
+    !/DROP\s+INDEX[\s\S]*?\s+ON\s+`?files`?/i.test(content) &&
+    !/rename\(\s*['"]files['"]/i.test(content);
+
+  if (touchesFilesTable && !isAllowedBaselineCreate) {
     offenders.push(file);
   }
 }
