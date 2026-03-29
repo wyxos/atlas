@@ -180,6 +180,83 @@ describe('useDownloadsQueueActions', () => {
         expect(setSelection).toHaveBeenCalledWith(new Set<number>());
     });
 
+    it('waits for reverb updates when a single remove request is queued', async () => {
+        window.axios.delete = vi.fn().mockResolvedValue({
+            data: {
+                ids: [1],
+                count: 1,
+                queued: true,
+            },
+        });
+
+        const selectedIds = ref(new Set<number>([1]));
+        const removeDownloads = vi.fn();
+        const setSelection = vi.fn();
+        const actions = useDownloadsQueueActions({
+            selectedIds,
+            selectedIdsList: computed(() => [1]),
+            selectedPausableIds: computed(() => []),
+            selectedResumableIds: computed(() => []),
+            selectedCancelableIds: computed(() => []),
+            selectedRestartableIds: computed(() => []),
+            resumableFailedIds: computed(() => []),
+            restartableFailedIds: computed(() => []),
+            completedIds: computed(() => []),
+            removeDownloads,
+            setSelection,
+        });
+
+        actions.openRemoveDialog('single', [1]);
+
+        await actions.confirmRemove();
+
+        expect(removeDownloads).not.toHaveBeenCalled();
+        expect(setSelection).toHaveBeenCalledWith(new Set<number>());
+        expect(mockToast.info).toHaveBeenCalledWith(
+            'Removing downloads in the background. Items will disappear as cleanup completes.',
+            { id: 'downloads-removal-queued' },
+        );
+    });
+
+    it('waits for reverb updates when a single delete-from-disk request is queued', async () => {
+        window.axios.delete = vi.fn().mockResolvedValue({
+            data: {
+                ids: [1],
+                count: 1,
+                queued: true,
+            },
+        });
+
+        const selectedIds = ref(new Set<number>([1]));
+        const removeDownloads = vi.fn();
+        const setSelection = vi.fn();
+        const actions = useDownloadsQueueActions({
+            selectedIds,
+            selectedIdsList: computed(() => [1]),
+            selectedPausableIds: computed(() => []),
+            selectedResumableIds: computed(() => []),
+            selectedCancelableIds: computed(() => []),
+            selectedRestartableIds: computed(() => []),
+            resumableFailedIds: computed(() => []),
+            restartableFailedIds: computed(() => []),
+            completedIds: computed(() => []),
+            removeDownloads,
+            setSelection,
+        });
+
+        actions.openRemoveDialog('single', [1]);
+        actions.removeAlsoFromDisk.value = true;
+
+        await actions.confirmRemove();
+
+        expect(removeDownloads).not.toHaveBeenCalled();
+        expect(setSelection).toHaveBeenCalledWith(new Set<number>());
+        expect(mockToast.info).toHaveBeenCalledWith(
+            'Removing downloads in the background. Items will disappear as cleanup completes.',
+            { id: 'downloads-removal-queued' },
+        );
+    });
+
     it('resets file-record deletion when disk deletion is turned off', async () => {
         const selectedIds = ref(new Set<number>([1]));
         const actions = useDownloadsQueueActions({

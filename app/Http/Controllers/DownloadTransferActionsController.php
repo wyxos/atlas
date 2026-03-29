@@ -202,6 +202,17 @@ class DownloadTransferActionsController extends Controller
 
     public function destroy(DownloadTransfer $downloadTransfer): JsonResponse
     {
+        if ($this->shouldQueueSingleRemoval($downloadTransfer)) {
+            RemoveDownloadTransfers::dispatch(ids: [$downloadTransfer->id]);
+
+            return response()->json([
+                'message' => 'Download removal queued.',
+                'ids' => [$downloadTransfer->id],
+                'count' => 1,
+                'queued' => true,
+            ]);
+        }
+
         $removedIds = $this->transferRemovalService->remove($downloadTransfer);
         $this->broadcastRemoved($removedIds);
 
@@ -220,6 +231,22 @@ class DownloadTransferActionsController extends Controller
         ]);
 
         $alsoDeleteRecord = (bool) ($validated['also_delete_record'] ?? false);
+
+        if ($this->shouldQueueSingleRemoval($downloadTransfer)) {
+            RemoveDownloadTransfers::dispatch(
+                ids: [$downloadTransfer->id],
+                alsoFromDisk: true,
+                alsoDeleteRecord: $alsoDeleteRecord,
+            );
+
+            return response()->json([
+                'message' => 'Download removal queued.',
+                'ids' => [$downloadTransfer->id],
+                'count' => 1,
+                'queued' => true,
+            ]);
+        }
+
         $removedIds = $this->transferRemovalService->remove($downloadTransfer, true, $alsoDeleteRecord);
         $this->broadcastRemoved($removedIds);
 
@@ -246,7 +273,7 @@ class DownloadTransferActionsController extends Controller
         $alsoFromDisk = (bool) ($validated['also_from_disk'] ?? false);
         $alsoDeleteRecord = $alsoFromDisk && (bool) ($validated['also_delete_record'] ?? false);
 
-        if ($this->shouldQueueBulkRemoval(count($ids))) {
+        if ($this->shouldQueueBulkRemoval(count($ids)) || $this->shouldQueueRemovalByIds($ids)) {
             RemoveDownloadTransfers::dispatch(
                 ids: $ids,
                 alsoFromDisk: $alsoFromDisk,
@@ -514,6 +541,27 @@ class DownloadTransferActionsController extends Controller
     private function shouldQueueBulkRemoval(int $count): bool
     {
         return $count > $this->transferRemovalService->bulkRemovalSyncLimit();
+    }
+
+    private function shouldQueueSingleRemoval(DownloadTransfer $downloadTransfer): bool
+    {
+        return ! $downloadTransfer->isTerminal()
+            && $downloadTransfer->status !== DownloadTransferStatus::CANCELED;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    private function shouldQueueRemovalByIds(array $ids): bool
+    {
+        return DownloadTransfer::query()
+            ->whereIn('id', $ids)
+            ->whereNotIn('status', [
+                DownloadTransferStatus::COMPLETED,
+                DownloadTransferStatus::FAILED,
+                DownloadTransferStatus::CANCELED,
+            ])
+            ->exists();
     }
 
     /**
