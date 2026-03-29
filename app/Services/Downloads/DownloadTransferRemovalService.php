@@ -8,6 +8,7 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\DownloadedFileClearService;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
 
 final class DownloadTransferRemovalService
 {
@@ -206,11 +207,16 @@ final class DownloadTransferRemovalService
             return;
         }
 
-        $disk = Storage::disk(config('downloads.disk'));
         $tmpDir = $this->tempDirectory->forTransfer($downloadTransfer);
 
-        if ($disk->exists($tmpDir)) {
-            $disk->deleteDirectory($tmpDir);
+        try {
+            $disk = Storage::disk(config('downloads.disk'));
+
+            if ($disk->exists($tmpDir)) {
+                $disk->deleteDirectory($tmpDir);
+            }
+        } catch (\Throwable) {
+            // Temp cleanup failures should not block transfer removal.
         }
     }
 

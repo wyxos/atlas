@@ -474,6 +474,56 @@ it('keeps reactions and the file record when deleting a non-downloaded file from
     Storage::disk('atlas-app')->assertMissing('thumbnails/pending.jpg');
 });
 
+it('removes an active transfer from disk even when the temp directory and stored files are already missing', function () {
+    Storage::fake('atlas-app');
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/missing-active.bin',
+        'filename' => 'missing-active.bin',
+        'downloaded' => false,
+        'path' => 'downloads/missing-active.bin',
+        'preview_path' => 'thumbnails/missing-active.jpg',
+    ]);
+    File::query()->whereKey($file->id)->update(['download_progress' => 35]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 35,
+        'last_broadcast_percent' => 35,
+    ]);
+    DownloadChunk::query()->create([
+        'download_transfer_id' => $transfer->id,
+        'index' => 0,
+        'range_start' => 0,
+        'range_end' => 34,
+        'bytes_downloaded' => 35,
+        'status' => DownloadChunkStatus::DOWNLOADING,
+    ]);
+
+    $response = $this->actingAs($user)->deleteJson("/api/download-transfers/{$transfer->id}/disk");
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'ids' => [$transfer->id],
+            'count' => 1,
+            'queued' => false,
+        ]);
+
+    expect(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
+    expect(DownloadChunk::query()->where('download_transfer_id', $transfer->id)->count())->toBe(0);
+
+    $file->refresh();
+    expect($file->path)->toBeNull();
+    expect($file->preview_path)->toBeNull();
+    expect($file->downloaded)->toBeFalse();
+    expect($file->download_progress)->toBe(0);
+});
+
 it('removes completed transfers in one request without touching other statuses', function () {
     $user = User::factory()->create();
 
