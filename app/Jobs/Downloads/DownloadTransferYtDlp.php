@@ -132,12 +132,21 @@ class DownloadTransferYtDlp implements ShouldQueue
             $currentTransfer = DownloadTransfer::query()
                 ->whereKey($transfer->id)
                 ->first(['status', 'attempt']);
-            if (! $currentTransfer || $currentTransfer->status !== DownloadTransferStatus::DOWNLOADING || (int) $currentTransfer->attempt !== $this->attempt) {
+            if (
+                ! $currentTransfer
+                || ! in_array($currentTransfer->status, [
+                    DownloadTransferStatus::DOWNLOADING,
+                    DownloadTransferStatus::ASSEMBLING,
+                ], true)
+                || (int) $currentTransfer->attempt !== $this->attempt
+            ) {
                 $this->cleanupTempArtifacts($transfer->id, $this->attempt);
                 PumpDomainDownloads::dispatch((string) $transfer->domain);
 
                 return;
             }
+
+            $this->markAssembling($transfer);
 
             $candidates = $this->finalizedOutputCandidates($absoluteTmpDir);
 
@@ -373,6 +382,10 @@ class DownloadTransferYtDlp implements ShouldQueue
         }
 
         foreach ($lines as $line) {
+            if ($this->shouldMarkAssemblingFromLine($line)) {
+                $this->markAssembling($transfer);
+            }
+
             if (! preg_match_all('/(\d{1,3}(?:\.\d+)?)\s*%/', $line, $matches)) {
                 continue;
             }
@@ -395,7 +408,10 @@ class DownloadTransferYtDlp implements ShouldQueue
         $updated = DownloadTransfer::query()
             ->whereKey($transfer->id)
             ->where('attempt', $this->attempt)
-            ->where('status', DownloadTransferStatus::DOWNLOADING)
+            ->whereIn('status', [
+                DownloadTransferStatus::DOWNLOADING,
+                DownloadTransferStatus::ASSEMBLING,
+            ])
             ->where('last_broadcast_percent', '<', $percent)
             ->update([
                 'last_broadcast_percent' => $percent,
@@ -446,7 +462,64 @@ class DownloadTransferYtDlp implements ShouldQueue
             ->first(['status', 'attempt']);
 
         return $state
-            && $state->status === DownloadTransferStatus::DOWNLOADING
+            && in_array($state->status, [
+                DownloadTransferStatus::DOWNLOADING,
+                DownloadTransferStatus::ASSEMBLING,
+            ], true)
             && (int) $state->attempt === $this->attempt;
+    }
+
+    private function shouldMarkAssemblingFromLine(string $line): bool
+    {
+        $trimmed = trim($line);
+        if ($trimmed === '') {
+            return false;
+        }
+
+        $lower = strtolower($trimmed);
+
+        if (preg_match('/^\[download\]\s+100(?:\.0+)?\s*%/i', $trimmed) === 1) {
+            return true;
+        }
+
+        return str_starts_with($lower, '[merger]')
+            || str_starts_with($lower, '[extractaudio]')
+            || str_starts_with($lower, '[fixup')
+            || str_starts_with($lower, '[metadata]')
+            || str_starts_with($lower, '[modifychapters]')
+            || str_contains($lower, 'merging formats into')
+            || str_contains($lower, 'fixing mpeg-ts')
+            || str_contains($lower, 'correcting container')
+            || str_contains($lower, 'deleting original file');
+    }
+
+    private function markAssembling(DownloadTransfer $transfer): void
+    {
+        if ($transfer->status !== DownloadTransferStatus::DOWNLOADING) {
+            return;
+        }
+
+        $updated = DownloadTransfer::query()
+            ->whereKey($transfer->id)
+            ->where('attempt', $this->attempt)
+            ->where('status', DownloadTransferStatus::DOWNLOADING)
+            ->update([
+                'status' => DownloadTransferStatus::ASSEMBLING,
+                'updated_at' => now(),
+            ]);
+
+        if ($updated === 0) {
+            return;
+        }
+
+        $transfer->status = DownloadTransferStatus::ASSEMBLING;
+
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+            ));
+        } catch (Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
     }
 }

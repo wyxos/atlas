@@ -17,7 +17,7 @@ use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
-it('streams yt-dlp progress and emits monotonic updates before completion', function () {
+it('streams yt-dlp progress, surfaces assembling, and completes at previewing', function () {
     Event::fake([DownloadTransferProgressUpdated::class]);
     Bus::fake([
         GenerateTransferPreview::class,
@@ -60,7 +60,8 @@ fwrite(STDERR, "noise that should be ignored\n");
 fwrite(STDERR, "[download]  11.2% of 10.00MiB at 1.00MiB/s ETA 00:08\n");
 fwrite(STDERR, "[download]  11.1% of 10.00MiB at 1.00MiB/s ETA 00:08\n");
 fwrite(STDERR, "[download]  47.9% of 10.00MiB at 1.00MiB/s ETA 00:04\n");
-fwrite(STDERR, "[download] 100% of 10.00MiB in 00:10\n");
+fwrite(STDERR, "[download]  99.4% of 10.00MiB at 1.00MiB/s ETA 00:00\n");
+fwrite(STDERR, "[Merger] Merging formats into \"streamed-video.mp4\"\n");
 file_put_contents($output, str_repeat("A", 4096));
 PHP;
 
@@ -92,8 +93,8 @@ PHP;
         ->values()
         ->all();
 
-    expect($percents)->toContain(2, 11, 47, 100)
-        ->and($percents)->toBe(array_values(array_unique($percents)))
+    expect(array_values(array_unique($percents)))->toBe([2, 11, 47, 99, 100])
         ->and($percents)->toBe(collect($percents)->sort()->values()->all())
+        ->and($events->firstWhere('status', DownloadTransferStatus::ASSEMBLING)?->percent)->toBe(99)
         ->and($events->firstWhere('percent', 100)?->status)->toBe(DownloadTransferStatus::PREVIEWING);
 });

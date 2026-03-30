@@ -46,6 +46,26 @@ describe('badge-state-cache', () => {
         });
     });
 
+    it('keeps known reaction when check response is null during assembling state', async () => {
+        const cache = await loadModule();
+
+        cache.persistBadgeState(TEST_URL, {
+            exists: false,
+            reaction: 'love',
+            isDownloadLocked: false,
+            status: 'assembling',
+        });
+
+        cache.persistBadgeCheckResult(TEST_URL, emptyCheckResult());
+
+        expect(cache.getPersistedBadgeState(TEST_URL)).toMatchObject({
+            exists: true,
+            reaction: 'love',
+            isDownloadLocked: false,
+            status: 'assembling',
+        });
+    });
+
     it('allows null check response to clear reaction when state is not locally protected', async () => {
         const cache = await loadModule();
 

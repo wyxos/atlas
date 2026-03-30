@@ -31,7 +31,7 @@ function isTerminalStatus(status: string | null): boolean {
 }
 
 function isActiveTransferStatus(status: string | null): boolean {
-    return status === 'queued' || status === 'downloading' || status === 'pending';
+    return status !== null && !isTerminalStatus(status);
 }
 
 function ensureState(url: string): PersistedBadgeState {
