@@ -46,6 +46,12 @@ return [
     // Keep at 1 to disable and raise carefully on domains that tolerate it.
     'yt_dlp_concurrent_fragments' => (int) env('DOWNLOADS_YT_DLP_CONCURRENT_FRAGMENTS', 1),
 
+    // Optional external downloader for yt-dlp handoffs (for example: aria2c).
+    'yt_dlp_downloader' => env('DOWNLOADS_YT_DLP_DOWNLOADER'),
+
+    // Optional raw args passed to yt-dlp via --downloader-args.
+    'yt_dlp_downloader_args' => env('DOWNLOADS_YT_DLP_DOWNLOADER_ARGS'),
+
     // Optional Netscape cookie file path for authenticated yt-dlp runs
     // (useful for age-restricted/auth-required media on X/Twitter/Facebook).
     'yt_dlp_cookies_path' => env('DOWNLOADS_YT_DLP_COOKIES_PATH'),

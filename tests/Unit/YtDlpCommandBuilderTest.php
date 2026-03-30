@@ -102,3 +102,19 @@ it('adds concurrent fragment fetching when configured above one', function () {
     expect($args)->toContain('--concurrent-fragments');
     expect($args)->toContain('4');
 });
+
+it('adds external downloader arguments when configured', function () {
+    config()->set('downloads.yt_dlp_path', 'yt-dlp');
+    config()->set('downloads.ffmpeg_path', 'ffmpeg');
+    config()->set('downloads.yt_dlp_downloader', 'aria2c');
+    config()->set('downloads.yt_dlp_downloader_args', 'aria2c:-x8 -s8 -k1M');
+
+    $builder = new YtDlpCommandBuilder;
+
+    $args = $builder->build('https://example.com/watch?v=123', '/tmp/download.%(ext)s');
+
+    expect($args)->toContain('--downloader');
+    expect($args)->toContain('aria2c');
+    expect($args)->toContain('--downloader-args');
+    expect($args)->toContain('aria2c:-x8 -s8 -k1M');
+});
