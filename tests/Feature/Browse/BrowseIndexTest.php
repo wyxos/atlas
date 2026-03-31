@@ -3,10 +3,28 @@
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\Local\LocalBrowseTypesenseCompiler;
+use App\Services\Local\LocalBrowseTypesenseGateway;
+use App\Services\Local\LocalBrowseTypesenseNames;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
+use function Pest\Laravel\mock;
+
 uses(RefreshDatabase::class);
+
+function mockLocalBrowseGateway(array $files, mixed $nextCursor = null, ?int $total = null): void
+{
+    mock(LocalBrowseTypesenseGateway::class)
+        ->shouldReceive('search')
+        ->andReturn([
+            'files' => $files,
+            'metadata' => [
+                'nextCursor' => $nextCursor,
+                'total' => $total,
+            ],
+        ]);
+}
 
 test('authenticated user can browse files', function () {
     $user = User::factory()->create();
@@ -376,6 +394,8 @@ test('browse uses LocalService when feed is local', function () {
         'source' => 'Wallhaven',
     ]);
 
+    mockLocalBrowseGateway([$file2, $file1], nextCursor: null, total: 2);
+
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20");
 
     $response->assertSuccessful();
@@ -412,6 +432,8 @@ test('browse filters by source in local mode', function () {
         'source' => 'Wallhaven',
     ]);
 
+    mockLocalBrowseGateway([$file1], nextCursor: null, total: 1);
+
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=CivitAI&limit=20");
 
     $response->assertSuccessful();
@@ -443,6 +465,8 @@ test('local browse can return blacklisted files when blacklisted filter is yes',
         'source' => 'Wallhaven',
     ]);
 
+    mockLocalBrowseGateway([$blacklisted], nextCursor: null, total: 1);
+
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&blacklisted=yes");
 
     $response->assertSuccessful();
@@ -454,6 +478,63 @@ test('local browse can return blacklisted files when blacklisted filter is yes',
     $ids = collect($data['items'])->pluck('id')->all();
     expect($ids)->toContain($blacklisted->id);
     expect($ids)->not->toContain($notBlacklisted->id);
+});
+
+test('local browse returns 503 when typesense aliases are missing', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $names = \Mockery::mock(LocalBrowseTypesenseNames::class);
+    $names->shouldReceive('hasFilesAlias')->andReturn(false);
+
+    app()->instance(LocalBrowseTypesenseNames::class, $names);
+    app()->instance(LocalBrowseTypesenseGateway::class, new LocalBrowseTypesenseGateway(
+        app(LocalBrowseTypesenseCompiler::class),
+        $names,
+    ));
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20");
+
+    $response->assertStatus(503);
+    $response->assertExactJson([
+        'message' => 'Local browse unavailable',
+        'service' => 'local',
+        'reason' => 'typesense_unavailable',
+    ]);
+});
+
+test('local browse returns 503 when typesense search execution fails', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $names = \Mockery::mock(LocalBrowseTypesenseNames::class);
+    $names->shouldReceive('hasFilesAlias')->andReturn(true);
+    $names->shouldReceive('hasReactionsAlias')->andReturn(true);
+    $names->shouldReceive('currentReactionJoinCollection')->andReturn('atlas_local_local_browse_files__vtest');
+    $names->shouldReceive('filesAlias')->andReturn('atlas_local_local_browse_files');
+    $names->shouldReceive('reactionsAlias')->andReturn('atlas_local_local_browse_reactions');
+
+    app()->instance(LocalBrowseTypesenseNames::class, $names);
+    app()->instance(LocalBrowseTypesenseGateway::class, new class(app(LocalBrowseTypesenseCompiler::class), $names) extends LocalBrowseTypesenseGateway
+    {
+        protected function runScoutSearch(array $compiled): array
+        {
+            throw new \RuntimeException('Typesense exploded');
+        }
+    });
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20");
+
+    $response->assertStatus(503);
+    $response->assertExactJson([
+        'message' => 'Local browse unavailable',
+        'service' => 'local',
+        'reason' => 'typesense_unavailable',
+    ]);
 });
 
 test('browse detaches all tab files when page is 1', function () {
@@ -538,6 +619,8 @@ test('browse persists current page token for local tabs', function () {
         'source' => 'CivitAI',
     ]);
 
+    mockLocalBrowseGateway([$file], nextCursor: 3, total: 3);
+
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=1&page=2");
 
     $response->assertSuccessful();
@@ -573,6 +656,8 @@ test('browse persists local limit and preset params for tab restore', function (
         'source' => 'CivitAI',
     ]);
 
+    mockLocalBrowseGateway([], nextCursor: 51, total: 0);
+
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=100&page=50&local_preset=inbox_fresh&reaction_mode=unreacted");
 
     $response->assertSuccessful();
@@ -602,6 +687,8 @@ test('browse persists unreacted random preset params for tab restore', function 
         'source' => 'CivitAI',
     ]);
 
+    mockLocalBrowseGateway([], nextCursor: 4, total: 0);
+
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&page=3&local_preset=unreacted_random&reaction_mode=unreacted&sort=random&seed=12345&blacklisted=no&auto_disliked=no");
 
     $response->assertSuccessful();
@@ -619,7 +706,7 @@ test('browse persists unreacted random preset params for tab restore', function 
     expect((string) ($tab->params['auto_disliked'] ?? ''))->toBe('no');
 });
 
-test('local reaction_at dislike browse does not require total count and keeps reaction order', function () {
+test('local reaction_at dislike browse returns typesense totals and keeps reaction order', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
         'params' => ['feed' => 'local'],
@@ -655,6 +742,8 @@ test('local reaction_at dislike browse does not require total count and keeps re
         'type' => 'dislike',
     ])->update(['created_at' => now()->subHours(1), 'updated_at' => now()->subHours(1)]);
 
+    mockLocalBrowseGateway([$newer, $older], nextCursor: null, total: 2);
+
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&reaction_mode=types&reaction[]=dislike&sort=reaction_at&blacklisted=no&auto_disliked=no&max_previewed_count=2");
 
     $response->assertSuccessful();
@@ -663,7 +752,7 @@ test('local reaction_at dislike browse does not require total count and keeps re
     expect($data['items'])->toBeArray();
     expect($data['items'])->not->toBeEmpty();
     expect($data['items'][0]['id'])->toBe($newer->id);
-    expect($data['total'])->toBeNull();
+    expect($data['total'])->toBe(2);
 });
 
 test('local reaction_at dislike browse can include total count when requested', function () {
@@ -701,6 +790,8 @@ test('local reaction_at dislike browse can include total count when requested', 
         'user_id' => $user->id,
         'type' => 'dislike',
     ])->update(['created_at' => now()->subHours(1), 'updated_at' => now()->subHours(1)]);
+
+    mockLocalBrowseGateway([$newer, $older], nextCursor: null, total: 2);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&reaction_mode=types&reaction[]=dislike&sort=reaction_at&blacklisted=no&auto_disliked=no&max_previewed_count=2&include_total=1");
 

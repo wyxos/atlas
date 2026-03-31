@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\ActionType;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\Local\LocalBrowseIndexSyncService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
@@ -196,6 +197,9 @@ abstract class BaseModerationService
                 }
             }
 
+            app(LocalBrowseIndexSyncService::class)->syncFilesByIds($this->autoDislikeFileIds);
+            app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds($this->autoDislikeFileIds);
+
         }
 
         // Batch update blacklisted files
@@ -215,6 +219,8 @@ abstract class BaseModerationService
             if ($filesToClear->isNotEmpty()) {
                 app(DownloadedFileClearService::class)->clearMany($filesToClear, queueDelete: true);
             }
+
+            app(LocalBrowseIndexSyncService::class)->syncFilesByIds($this->blacklistFileIds);
 
         }
 

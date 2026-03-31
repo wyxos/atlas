@@ -4,6 +4,7 @@ namespace App\Services\Downloads;
 
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Services\MetricsService;
 use App\Support\FileMimeType;
 use Illuminate\Contracts\Filesystem\Filesystem;
@@ -147,6 +148,7 @@ class FileDownloadFinalizer
         }
 
         $file->update($updates);
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
 
         $metrics = app(MetricsService::class);
         $metrics->applyDownload($file, $wasDownloaded);

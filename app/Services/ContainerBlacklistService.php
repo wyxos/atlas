@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ActionType;
 use App\Models\Container;
 use App\Models\File;
+use App\Services\Local\LocalBrowseIndexSyncService;
 
 class ContainerBlacklistService
 {
@@ -63,6 +64,7 @@ class ContainerBlacklistService
             ->update(['blacklisted_at' => now()]);
 
         app(DownloadedFileClearService::class)->clearMany($newlyBlacklistedFiles, queueDelete: true);
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($newlyBlacklistedIds);
 
         return $newlyBlacklistedIds;
     }

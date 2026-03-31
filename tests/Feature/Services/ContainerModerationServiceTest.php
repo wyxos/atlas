@@ -7,9 +7,12 @@ use App\Models\Reaction;
 use App\Models\Tab;
 use App\Models\User;
 use App\Services\ContainerModerationService;
+use App\Services\Local\LocalBrowseTypesenseGateway;
 use App\Services\LocalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+
+use function Pest\Laravel\mock;
 
 uses(RefreshDatabase::class);
 
@@ -117,6 +120,17 @@ test('blacklists files for blacklist action type', function () {
             'thumbnails/ab/cd/test.jpg',
         ];
     });
+
+    mock(LocalBrowseTypesenseGateway::class)
+        ->shouldReceive('search')
+        ->once()
+        ->andReturn([
+            'files' => [$file->fresh()],
+            'metadata' => [
+                'nextCursor' => null,
+                'total' => 1,
+            ],
+        ]);
 
     $localBrowse = app(LocalService::class)->fetch([
         'blacklisted' => 'yes',

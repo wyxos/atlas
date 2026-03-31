@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Browser;
+use App\Exceptions\LocalBrowseUnavailableException;
 use App\Services\LocalService;
 use App\Support\ServiceFilterSchema;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,15 @@ class BrowseController extends Controller
      */
     public function index(): JsonResponse
     {
-        $payload = Browser::handle();
+        try {
+            $payload = Browser::handle();
+        } catch (LocalBrowseUnavailableException $e) {
+            return response()->json([
+                'message' => 'Local browse unavailable',
+                'service' => 'local',
+                'reason' => 'typesense_unavailable',
+            ], 503, self::NO_STORE_HEADERS);
+        }
 
         // FileItemFormatter already sets index, page, and key for each item
         return response()->json([
@@ -31,7 +40,7 @@ class BrowseController extends Controller
                 'toDislike' => [],
                 'moderatedOut' => [],
             ],
-        ]);
+        ], headers: self::NO_STORE_HEADERS);
     }
 
     /**

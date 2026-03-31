@@ -6,6 +6,7 @@ use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\Local\LocalBrowseIndexSyncService;
 
 class FileReactionService
 {
@@ -145,6 +146,8 @@ class FileReactionService
 
             $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
             $existingReaction->delete();
+            app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
+            app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds([$file->id]);
 
             return ['reaction' => null];
         }
@@ -206,6 +209,8 @@ class FileReactionService
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
+        app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds([$file->id]);
 
         return $reaction;
     }

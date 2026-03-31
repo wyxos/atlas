@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\File;
+use App\Services\Local\LocalBrowseIndexSyncService;
 use Illuminate\Support\Facades\Storage;
 
 class DownloadedFileClearService
@@ -63,6 +64,7 @@ class DownloadedFileClearService
         }
 
         $this->clearStateByIds($fileIds);
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($fileIds);
 
         if ($queueDelete) {
             $this->dispatchDeleteJobs($paths);

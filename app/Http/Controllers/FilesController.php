@@ -8,6 +8,7 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Services\DownloadedFileClearService;
 use App\Services\FileNotFoundService;
+use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Services\MetricsService;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
@@ -244,7 +245,9 @@ SVG;
         }
 
         if (! $alsoFromDisk || $alsoDeleteRecord) {
+            $deletedFileId = (int) $file->id;
             $file->delete();
+            app(LocalBrowseIndexSyncService::class)->deleteFilesByIds([$deletedFileId]);
 
             return response()->json([
                 'message' => $alsoFromDisk
@@ -434,6 +437,7 @@ SVG;
         $file->increment('previewed_count');
         $file->touch('previewed_at');
         $file->refresh();
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
 
         $willAutoDislike = false;
 
@@ -477,6 +481,7 @@ SVG;
         // Batch increment preview counts
         File::whereIn('id', $fileIds)->increment('previewed_count', $increments);
         File::whereIn('id', $fileIds)->update(['previewed_at' => now()]);
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds(array_map('intval', $fileIds));
 
         // Refresh files to get updated counts
         $files->each->refresh();
@@ -560,6 +565,7 @@ SVG;
                 'blacklisted_at' => $blacklistedAt,
                 'blacklist_reason' => 'Manual blacklist',
             ]);
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($eligibleIds);
 
         $user = Auth::user();
         if ($user) {
@@ -595,6 +601,7 @@ SVG;
             'previewed_count' => 0,
             'previewed_at' => null,
         ]);
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds(array_map('intval', $fileIds));
 
         $files = File::query()
             ->whereIn('id', $fileIds)
@@ -709,6 +716,8 @@ SVG;
 
             app(DownloadedFileClearService::class)->clearMany($validFiles, queueDelete: true);
         });
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds(array_map('intval', $validFileIds));
+        app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds(array_map('intval', $validFileIds));
 
         return response()->json([
             'message' => 'Files auto-disliked successfully.',
@@ -758,6 +767,7 @@ SVG;
 
         $deletedCount = File::count();
         File::query()->delete();
+        app(LocalBrowseIndexSyncService::class)->deleteAll();
 
         // Empty atlas app storage (including directory structure)
         $atlasDisk = Storage::disk('atlas-app');

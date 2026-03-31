@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Exceptions\LocalBrowseUnavailableException;
 use App\Models\File;
 use App\Services\BrowseModerationService;
 use App\Services\BrowsePersister;
@@ -111,6 +112,8 @@ class Browser
                     'items' => [],
                 ];
             }
+        } catch (LocalBrowseUnavailableException $e) {
+            throw $e;
         } catch (ConnectionException $e) {
             $serviceError = [
                 'message' => 'Unable to connect to service',
