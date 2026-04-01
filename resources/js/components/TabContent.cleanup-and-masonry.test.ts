@@ -10,7 +10,7 @@ const {
     mount,
     mockAxios,
     mockClearAutoDislikeCountdowns,
-    mockLoadNext,
+    mockLoadNextPage,
     mockRemove,
 } = setup;
 
@@ -167,7 +167,7 @@ describe('TabContent - Masonry removed', () => {
 
         await nextTick();
 
-        expect(mockLoadNext).not.toHaveBeenCalled();
+        expect(mockLoadNextPage).not.toHaveBeenCalled();
 
         const vm = wrapper.vm as any;
         vm.items = [];
@@ -179,7 +179,7 @@ describe('TabContent - Masonry removed', () => {
         });
         await nextTick();
 
-        expect(mockLoadNext).toHaveBeenCalledTimes(1);
+        expect(mockLoadNextPage).toHaveBeenCalledTimes(1);
     });
 });
 

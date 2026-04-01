@@ -16,12 +16,8 @@ const {
     mockAxios,
     mockIsLoading,
     mockCancelLoad,
-    mockDestroy,
-    mockInit,
     mockRemove,
-    mockRemoveMany,
     mockRestore,
-    mockRestoreMany,
     mockQueuePreviewIncrement,
 } = vi.hoisted(() => ({
     mockAxios: {
@@ -33,12 +29,8 @@ const {
     },
     mockIsLoading: { value: false },
     mockCancelLoad: vi.fn(),
-    mockDestroy: vi.fn(),
-    mockInit: vi.fn(),
     mockRemove: vi.fn(),
-    mockRemoveMany: vi.fn(),
     mockRestore: vi.fn(),
-    mockRestoreMany: vi.fn(),
     mockQueuePreviewIncrement: vi.fn(),
 }));
 
@@ -46,12 +38,8 @@ const mocks: BrowseMocks = {
     mockAxios,
     mockIsLoading: ref(false),
     mockCancelLoad,
-    mockDestroy,
-    mockInit,
     mockRemove,
-    mockRemoveMany,
     mockRestore,
-    mockRestoreMany,
     mockQueuePreviewIncrement,
 };
 
@@ -68,51 +56,10 @@ Object.defineProperty(window, 'axios', {
     writable: true,
 });
 
-vi.mock('@wyxos/vibe', () => ({
-    Masonry: {
-        name: 'Masonry',
-        template: `
-            <div class="masonry-mock">
-                <slot
-                    v-for="(item, index) in items"
-                    :key="item.id || index"
-                    :item="item"
-                    :remove="() => {}"
-                    :index="index"
-                ></slot>
-            </div>
-        `,
-        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
-        emits: ['update:items', 'preloaded', 'failures'],
-        setup() {
-            return {
-                init: mockInit,
-                initialize: mockInit,
-                cancelLoad: mockCancelLoad,
-                destroy: mockDestroy,
-                remove: mockRemove,
-                removeMany: mockRemoveMany,
-                restore: mockRestore,
-                restoreMany: mockRestoreMany,
-                loadPage: vi.fn(),
-                loadNext: vi.fn(),
-                reset: vi.fn(),
-                isLoading: mockIsLoading.value,
-                hasReachedEnd: false,
-            };
-        },
-    },
-    MasonryItem: {
-        name: 'MasonryItem',
-        template: `
-            <div>
-                <slot :item="item" :remove="remove"></slot>
-            </div>
-        `,
-        props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave', 'preload:success'],
-    },
-}));
+vi.mock('@wyxos/vibe', async () => {
+    const { createVibePageMock } = await import('@/test/browse-test-utils');
+    return createVibePageMock({ mockIsLoading, mockCancelLoad, mockRemove, mockRestore });
+});
 
 vi.mock('@/composables/usePreviewBatch', () => ({
     usePreviewBatch: () => ({

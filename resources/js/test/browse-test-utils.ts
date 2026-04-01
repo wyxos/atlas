@@ -19,19 +19,24 @@ export interface BrowseMocks {
     };
     mockIsLoading: Ref<boolean>;
     mockCancelLoad: Mock;
-    mockDestroy: Mock;
-    mockInit: Mock;
     mockRemove: Mock;
-    mockRemoveMany: Mock;
     mockRestore: Mock;
-    mockRestoreMany: Mock;
     mockQueuePreviewIncrement: Mock;
 }
 
 /**
- * Creates the Masonry mock component factory for vi.mock('@wyxos/vibe')
+ * Creates the page-test Vibe mock factory for vi.mock('@wyxos/vibe').
+ * It mirrors the current public Masonry instance contract instead of older
+ * app-local helper methods.
  */
-export function createVibeMockFactory(mocks: BrowseMocks) {
+export function createVibePageMock(
+    mocks: {
+        mockIsLoading: { value: boolean };
+        mockCancelLoad: Mock;
+        mockRemove: Mock;
+        mockRestore: Mock;
+    }
+) {
     return {
         Masonry: {
             name: 'Masonry',
@@ -55,142 +60,82 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
             props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
             emits: ['update:items', 'preloaded', 'failures'],
             setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
-                let currentPage: number | string | null = null;
                 let nextPage: number | string | null = null;
                 let hasReachedEnd = false;
-                let paginationHistory: Array<number | string> = [];
+                let pagesLoaded: Array<number | string> = Array.isArray(props.restoredPages)
+                    ? [...props.restoredPages]
+                    : (props.page !== undefined && props.page !== null ? [props.page] : []);
 
-                const removeFn = (item: any) => {
-                    mocks.mockRemove(item);
-                    const index = props.items.findIndex((i: any) => i.id === item.id);
-                    if (index !== -1) {
-                        props.items.splice(index, 1);
-                        emit('update:items', props.items);
-                    }
-                };
-
-                const remove = removeFn;
-
-                const removeMany = (itemsToRemove: any[]) => {
-                    mocks.mockRemoveMany(itemsToRemove);
-                    const ids = new Set(itemsToRemove.map((i: any) => i.id));
-                    const filtered = props.items.filter((i: any) => !ids.has(i.id));
-                    props.items.splice(0, props.items.length, ...filtered);
-                    emit('update:items', props.items);
-                };
-
-                const restore = (item: any, index: number) => {
-                    mocks.mockRestore(item, index);
-                    const existingIndex = props.items.findIndex((i: any) => i.id === item.id);
-                    if (existingIndex === -1) {
-                        const targetIndex = Math.min(index, props.items.length);
-                        props.items.splice(targetIndex, 0, item);
-                        emit('update:items', props.items);
-                    }
-                };
-
-                const restoreMany = (itemsToRestore: any[], indices: number[]) => {
-                    mocks.mockRestoreMany(itemsToRestore, indices);
-                    const existingIds = new Set(props.items.map((i: any) => i.id));
-                    const itemsToAdd = itemsToRestore.filter((item: any) => !existingIds.has(item.id));
-
-                    const restoredByIndex = new Map<number, any>();
-                    itemsToAdd.forEach((item: any, i: number) => {
-                        restoredByIndex.set(indices[i], item);
-                    });
-
-                    const maxIndex = Math.max(
-                        props.items.length > 0 ? props.items.length - 1 : 0,
-                        ...indices
+                const normalizeIds = (itemsOrIds: any) => {
+                    const raw = Array.isArray(itemsOrIds) ? itemsOrIds : [itemsOrIds];
+                    return new Set(
+                        raw
+                            .map((itemOrId: any) => typeof itemOrId === 'object' ? itemOrId?.id : itemOrId)
+                            .filter((value: any) => value !== undefined && value !== null)
                     );
-
-                    const newItems: any[] = [];
-                    let currentArrayIndex = 0;
-
-                    for (let position = 0; position <= maxIndex; position++) {
-                        if (restoredByIndex.has(position)) {
-                            newItems.push(restoredByIndex.get(position)!);
-                        } else {
-                            if (currentArrayIndex < props.items.length) {
-                                newItems.push(props.items[currentArrayIndex]);
-                                currentArrayIndex++;
-                            }
-                        }
-                    }
-
-                    while (currentArrayIndex < props.items.length) {
-                        newItems.push(props.items[currentArrayIndex]);
-                        currentArrayIndex++;
-                    }
-
-                    props.items.splice(0, props.items.length, ...newItems);
-                    emit('update:items', props.items);
                 };
 
-                const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
-                    mocks.mockInit(itemsToRestore, page, next);
-                    props.items.splice(0, props.items.length, ...itemsToRestore);
-                    emit('update:items', props.items);
-                    currentPage = page;
-                    nextPage = next ?? null;
-                    paginationHistory = nextPage === null ? [] : [nextPage];
-                    hasReachedEnd = nextPage === null;
-                };
-
-                const loadPage = async (page: number | string) => {
-                    if (!props.getPage) {
+                const remove = async (itemsOrIds: any) => {
+                    mocks.mockRemove(itemsOrIds);
+                    const ids = normalizeIds(itemsOrIds);
+                    if (ids.size === 0) {
                         return;
                     }
-                    currentPage = page;
-                    const result = await props.getPage(page);
-                    const newItems = result?.items ?? [];
-                    props.items.splice(0, props.items.length, ...newItems);
+
+                    const nextItems = props.items.filter((item: any) => !ids.has(item?.id));
+                    if (nextItems.length === props.items.length) {
+                        return;
+                    }
+
+                    props.items.splice(0, props.items.length, ...nextItems);
                     emit('update:items', props.items);
-                    nextPage = result?.nextPage ?? null;
-                    paginationHistory = nextPage === null ? [] : [nextPage];
-                    hasReachedEnd = nextPage === null;
-                    return result;
                 };
 
-                const loadNext = async () => {
-                    if (!props.getPage || nextPage === null || nextPage === undefined) {
+                const restore = async (itemsOrIds: any) => {
+                    mocks.mockRestore(itemsOrIds);
+                    const raw = Array.isArray(itemsOrIds) ? itemsOrIds : [itemsOrIds];
+                    const itemsToRestore = raw.filter((item: any) => item && typeof item === 'object' && item.id != null);
+                    if (itemsToRestore.length === 0) {
+                        return;
+                    }
+
+                    const existingIds = new Set(props.items.map((item: any) => item?.id));
+                    const uniqueItems = itemsToRestore.filter((item: any) => !existingIds.has(item.id));
+                    if (uniqueItems.length === 0) {
+                        return;
+                    }
+
+                    props.items.splice(props.items.length, 0, ...uniqueItems);
+                    emit('update:items', props.items);
+                };
+
+                const loadNextPage = async () => {
+                    const getContent = props.getContent ?? props.getPage;
+                    if (!getContent || nextPage === null || nextPage === undefined) {
                         return;
                     }
                     const pageToLoad = nextPage;
-                    currentPage = pageToLoad;
-                    const result = await props.getPage(pageToLoad);
+                    const result = await getContent(pageToLoad);
                     const newItems = result?.items ?? [];
                     props.items.push(...newItems);
                     emit('update:items', props.items);
                     nextPage = result?.nextPage ?? null;
-                    paginationHistory = nextPage === null ? [] : [nextPage];
                     hasReachedEnd = nextPage === null;
+                    pagesLoaded = [...pagesLoaded, pageToLoad];
                     return result;
                 };
 
-                const reset = () => {
-                    props.items.splice(0, props.items.length);
-                    emit('update:items', props.items);
-                    currentPage = null;
-                    nextPage = null;
-                    paginationHistory = [];
-                    hasReachedEnd = false;
+                const cancel = () => {
+                    mocks.mockCancelLoad();
                 };
 
-                // Use getter to mimic Vue's ref auto-unwrapping behavior
-                // When accessing masonry.value.isLoading, it returns boolean, not ref
                 const exposed = {
-                    init: mocks.mockInit,
-                    initialize,
-                    cancelLoad: mocks.mockCancelLoad,
-                    destroy: mocks.mockDestroy,
+                    cancel,
                     remove,
-                    removeMany,
                     restore,
-                    restoreMany,
-                    loadPage,
-                    loadNext,
-                    reset,
+                    loadNextPage,
+                    undo: vi.fn(),
+                    forget: vi.fn(),
                 };
                 Object.defineProperty(exposed, 'isLoading', {
                     get() { return mocks.mockIsLoading.value; },
@@ -202,19 +147,14 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                     set(val: boolean) { hasReachedEnd = val; },
                     enumerable: true,
                 });
-                Object.defineProperty(exposed, 'currentPage', {
-                    get() { return currentPage; },
-                    set(val: number | string | null) { currentPage = val; },
-                    enumerable: true,
-                });
                 Object.defineProperty(exposed, 'nextPage', {
                     get() { return nextPage; },
                     set(val: number | string | null) { nextPage = val; },
                     enumerable: true,
                 });
-                Object.defineProperty(exposed, 'paginationHistory', {
-                    get() { return paginationHistory; },
-                    set(val: Array<number | string>) { paginationHistory = val; },
+                Object.defineProperty(exposed, 'pagesLoaded', {
+                    get() { return pagesLoaded; },
+                    set(val: Array<number | string>) { pagesLoaded = val; },
                     enumerable: true,
                 });
                 return exposed;
@@ -252,12 +192,8 @@ export function setupBrowseTestMocks(mocks: BrowseMocks): void {
     vi.spyOn(console, 'error').mockImplementation(() => { });
     mocks.mockIsLoading.value = false;
     mocks.mockCancelLoad.mockClear();
-    mocks.mockDestroy.mockClear();
-    mocks.mockInit.mockClear();
     mocks.mockRemove.mockClear();
-    mocks.mockRemoveMany.mockClear();
     mocks.mockRestore.mockClear();
-    mocks.mockRestoreMany.mockClear();
 
     const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
 
@@ -541,6 +477,4 @@ export function setupBoundingClientRectMock(): void {
         toJSON: vi.fn(),
     }));
 }
-
-
 

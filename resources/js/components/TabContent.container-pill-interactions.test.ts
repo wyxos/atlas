@@ -9,7 +9,6 @@ import type { FeedItem } from '@/composables/useTabs';
 const {
     mount,
     mockAxios,
-    mockRemoveMany,
 } = setup;
 
 describe('TabContent - Container Badges', () => {
@@ -388,8 +387,7 @@ describe('TabContent - Container Badges', () => {
             // Verify the composable is initialized with masonry instance
             const vm = wrapper.vm as any;
             expect(vm.containerPillInteractions).toBeDefined();
-            // The composable should have access to masonry for removeMany
-            expect(mockRemoveMany).toBeDefined();
+            expect(vm.masonry).toBeDefined();
         });
     });
 });

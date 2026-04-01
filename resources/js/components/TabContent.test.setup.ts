@@ -155,14 +155,8 @@ vi.mock('@/composables/useAutoDislikeQueue', async () => {
 // Mock @wyxos/vibe
 const mockIsLoading = ref(false);
 const mockCancelLoad = vi.fn();
-const mockDestroy = vi.fn();
-const mockInit = vi.fn();
 const mockRemove = vi.fn();
-const mockRemoveMany = vi.fn();
-const mockLoadPage = vi.fn();
-const mockLoadNext = vi.fn();
-const mockReset = vi.fn();
-const mockInitialize = vi.fn();
+const mockLoadNextPage = vi.fn();
 
 const vibeShouldEmitPreloaded = true;
 
@@ -217,32 +211,24 @@ vi.mock('@wyxos/vibe', () => {
                 }
             };
 
-            const removeMany = async (itemsToRemove: any[]) => {
-                mockRemoveMany(itemsToRemove);
-                await remove(itemsToRemove);
-            };
+            const restore = async (itemsOrIds: any) => {
+                const raw = Array.isArray(itemsOrIds) ? itemsOrIds : [itemsOrIds];
+                const itemsToRestore = raw.filter((item: any) => item && typeof item === 'object' && item.id != null);
+                if (itemsToRestore.length === 0) {
+                    return;
+                }
 
-            const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
-                mockInitialize(itemsToRestore, page, next);
-                const nextItems = [...itemsToRestore];
-                emit('update:items', nextItems);
-                currentPage = page;
-                nextPage = next ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
-                hasReachedEnd = nextPage === null;
-            };
+                const existingIds = new Set(renderedItems.value.map((item: any) => item?.id));
+                const uniqueItems = itemsToRestore.filter((item: any) => !existingIds.has(item.id));
+                if (uniqueItems.length === 0) {
+                    return;
+                }
 
-            const reset = () => {
-                mockReset();
-                emit('update:items', []);
-                currentPage = null;
-                nextPage = null;
-                paginationHistory = [];
-                hasReachedEnd = false;
+                emit('update:items', [...renderedItems.value, ...uniqueItems]);
             };
 
             const loadNextPage = async () => {
-                mockLoadNext();
+                mockLoadNextPage();
                 const getContent = props.getContent ?? props.getPage;
                 if (!getContent || nextPage === null || nextPage === undefined) {
                     return;
@@ -264,26 +250,20 @@ vi.mock('@wyxos/vibe', () => {
             };
 
             expose({
-                init: mockInit,
-                initialize,
-                cancelLoad: mockCancelLoad,
                 cancel,
-                destroy: mockDestroy,
                 remove,
-                removeMany,
-                loadNext: loadNextPage,
+                restore,
                 loadNextPage,
-                reset,
                 get isLoading() { return mockIsLoading.value; },
                 set isLoading(value: boolean) { mockIsLoading.value = value; },
-                get currentPage() { return currentPage; },
-                set currentPage(value: number | string | null) { currentPage = value; },
                 get nextPage() { return nextPage; },
                 set nextPage(value: number | string | null) { nextPage = value; },
-                get paginationHistory() { return paginationHistory; },
-                set paginationHistory(value: Array<number | string>) { paginationHistory = value; },
                 get hasReachedEnd() { return hasReachedEnd; },
                 set hasReachedEnd(value: boolean) { hasReachedEnd = value; },
+                get pagesLoaded() { return paginationHistory; },
+                set pagesLoaded(value: Array<number | string>) { paginationHistory = value; },
+                undo: vi.fn(),
+                forget: vi.fn(),
             });
 
             // Simulate Vibe's debounced batch preloaded emit for items already "in view".
@@ -381,14 +361,8 @@ beforeEach(() => {
     mockCancelAutoDislikeCountdown.mockClear();
     mockIsLoading.value = false;
     mockCancelLoad.mockClear();
-    mockDestroy.mockClear();
-    mockInit.mockClear();
     mockRemove.mockClear();
-    mockRemoveMany.mockClear();
-    mockLoadPage.mockClear();
-    mockLoadNext.mockClear();
-    mockReset.mockClear();
-    mockInitialize.mockClear();
+    mockLoadNextPage.mockClear();
 
     // Default mock for axios
     mockAxios.get.mockResolvedValue({ data: { items: [], nextPage: null } });
@@ -415,14 +389,8 @@ export {
     mockHasActiveCountdown,
     mockIsLoading,
     mockCancelLoad,
-    mockDestroy,
-    mockInit,
     mockRemove,
-    mockRemoveMany,
-    mockLoadPage,
-    mockLoadNext,
-    mockReset,
-    mockInitialize,
+    mockLoadNextPage,
     capturedOpenContainerTab,
 };
 
