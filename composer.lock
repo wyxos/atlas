@@ -8712,7 +8712,7 @@
             "authors": [
                 {
                     "name": "Wyxos",
-                    "email": "github@wyxos.com"
+                    "email": "packagist@wyxos.com"
                 }
             ],
             "description": "Backend utilities for Laravel and @wyxos/vision",
@@ -8796,7 +8796,7 @@
             "authors": [
                 {
                     "name": "Wyxos",
-                    "email": "composer@wyxos.com"
+                    "email": "packagist@wyxos.com"
                 }
             ],
             "description": "Laravel SDK to integrate and sync tasks with the SHIFT Dashboard.",
