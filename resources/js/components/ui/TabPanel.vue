@@ -37,7 +37,7 @@ const switchState = computed({
 <template>
     <!-- Panel Content (Always rendered, transitions width like navigation menu) -->
     <div :class="[
-        'absolute lg:relative top-0 bottom-0 z-60 bg-prussian-blue-900 border-r border-twilight-indigo-500 shadow-2xl shrink-0 transition-all duration-300 ease-in-out overflow-hidden flex flex-col',
+        'absolute lg:relative top-0 bottom-0 z-40 bg-prussian-blue-900 border-r border-twilight-indigo-500 shadow-2xl shrink-0 transition-all duration-300 ease-in-out overflow-hidden flex flex-col',
         isOpen && !isMinimized ? 'w-72 translate-x-0' : 'w-72 -translate-x-full lg:w-16 lg:translate-x-0'
     ]">
         <!-- Switch Button (Centered at top) -->

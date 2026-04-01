@@ -38,12 +38,6 @@ const showReactions = computed(() => (
 const countdownActive = computed(() => props.itemInteractions.autoDislikeQueue.hasActiveCountdown(props.item.id));
 const showDislikeProgress = computed(() => props.item.will_auto_dislike && countdownActive.value);
 const currentIndex = computed(() => props.itemInteractions.state.getItemIndex(props.item.id));
-const siblingMaskClass = computed(() => (
-    props.containers.badges.activeHoveredContainerId.value !== null
-    && !props.containers.badges.isSiblingItem(props.item, props.containers.badges.activeHoveredContainerId.value)
-        ? 'opacity-100'
-        : 'opacity-0'
-));
 const countdownLabel = computed(() => props.itemInteractions.autoDislikeQueue.formatCountdown(
     props.itemInteractions.autoDislikeQueue.getCountdownRemainingTime(props.item.id),
 ));
@@ -54,23 +48,16 @@ function handleReaction(type: ReactionType): void {
 </script>
 
 <template>
-    <div class="relative h-full w-full" @mouseenter="(event) => itemInteractions.item.onMouseEnter(event, item)"
+    <div class="relative h-full w-full overflow-hidden rounded-xl transition-colors transition-opacity duration-200"
+        @mouseenter="(event) => itemInteractions.item.onMouseEnter(event, item)"
         @mouseleave="(event) => itemInteractions.item.onMouseLeave(event, item)" :data-file-id="item.id"
-        :class="[
-            'overflow-hidden rounded-xl transition-colors transition-opacity duration-200',
-            containers.badges.getMasonryItemClasses.value(item),
-        ]" @click="(event) => itemInteractions.item.onClick(event, item)"
+        @click="(event) => itemInteractions.item.onClick(event, item)"
         @contextmenu="(event) => itemInteractions.item.onContextMenu(event, item)"
         @mousedown="(event) => itemInteractions.item.onMouseDown(event, item)"
         @auxclick="(event) => itemInteractions.item.onAuxClick(event, item)">
-        <div class="absolute inset-0 bg-black/50 pointer-events-none transition-opacity duration-200"
-            :class="siblingMaskClass" />
-
         <Transition name="fade">
             <div v-if="showContainers" class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
                 <div v-for="container in itemContainers" :key="container.id" class="cursor-pointer"
-                    @mouseenter="containers.pillHandlers.onMouseEnter(container.id)"
-                    @mouseleave="containers.pillHandlers.onMouseLeave"
                     @click.stop="(event) => containers.pillHandlers.onClick(container.id, event)"
                     @dblclick.prevent.stop="(event) => containers.pillHandlers.onDoubleClick(container.id, event)"
                     @contextmenu.prevent.stop="(event) => containers.pillHandlers.onContextMenu(container.id, event)"

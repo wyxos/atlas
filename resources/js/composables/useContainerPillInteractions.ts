@@ -1,4 +1,4 @@
-import { ref, computed, triggerRef, type Ref, type ComputedRef } from 'vue';
+import { computed, getCurrentInstance, onUnmounted, ref, triggerRef, type ComputedRef, type Ref } from 'vue';
 import type { FeedItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
@@ -9,7 +9,7 @@ import {
     type LocalReactionSnapshot,
 } from '@/utils/localReactionState';
 
-type Container = {
+export type ContainerPillTarget = {
     id: number;
     type: string;
     source?: string;
@@ -33,14 +33,15 @@ type ContainerEntry = {
     } | null;
 };
 
-function isContainerEntry(container: ContainerEntry): container is Container {
+function isContainerEntry(container: ContainerEntry): container is ContainerPillTarget {
     return typeof container.id === 'number' && typeof container.type === 'string';
 }
 
 /**
  * Composable for handling container pill interactions (clicks, batch reactions, etc.).
  */
-type OpenContainerTabHandler = (container: Container) => void;
+type ContainerDrawerToggleHandler = (container: ContainerPillTarget) => void;
+type OpenContainerTabHandler = (container: ContainerPillTarget) => void;
 type UseContainerPillInteractionsOptions = {
     items: Ref<FeedItem[]>;
     masonry: Ref<InstanceType<typeof Masonry> | null>;
@@ -49,6 +50,7 @@ type UseContainerPillInteractionsOptions = {
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     onReaction: (fileId: number, type: ReactionType) => void;
     onOpenContainerTab?: OpenContainerTabHandler;
+    onPlainLeftClick?: ContainerDrawerToggleHandler;
 };
 
 export function useContainerPillInteractions(
@@ -61,11 +63,12 @@ export function useContainerPillInteractions(
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
     const DOUBLE_CLICK_DELAY_MS = 300; // Maximum time between clicks to count as double-click
     let pendingMiddleClickTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingLeftClickTimer: ReturnType<typeof setTimeout> | null = null;
 
     /**
      * Get full container data for an item (including referrer URL).
      */
-    function getContainersForItem(item: FeedItem): Container[] {
+    function getContainersForItem(item: FeedItem): ContainerPillTarget[] {
         const containers = (item.containers as ContainerEntry[] | undefined) ?? [];
         return containers.filter(isContainerEntry);
     }
@@ -94,7 +97,7 @@ export function useContainerPillInteractions(
         return null;
     }
 
-    function getContainer(containerId: number): Container | null {
+    function getContainer(containerId: number): ContainerPillTarget | null {
         for (const item of options.items.value) {
             const containers = getContainersForItem(item);
             const container = containers.find((c) => c.id === containerId);
@@ -233,11 +236,36 @@ export function useContainerPillInteractions(
         pendingMiddleClickTimer = null;
     }
 
+    function cancelPendingLeftClick(): void {
+        if (!pendingLeftClickTimer) {
+            return;
+        }
+
+        clearTimeout(pendingLeftClickTimer);
+        pendingLeftClickTimer = null;
+    }
+
     function scheduleMiddleClickOpen(containerId: number): void {
         cancelPendingMiddleClick();
         pendingMiddleClickTimer = setTimeout(() => {
             pendingMiddleClickTimer = null;
             handleMiddleClick(containerId);
+        }, DOUBLE_CLICK_DELAY_MS);
+    }
+
+    function schedulePlainLeftClick(containerId: number): void {
+        if (!options.onPlainLeftClick) {
+            return;
+        }
+
+        cancelPendingLeftClick();
+        pendingLeftClickTimer = setTimeout(() => {
+            pendingLeftClickTimer = null;
+
+            const container = getContainer(containerId);
+            if (container) {
+                options.onPlainLeftClick?.(container);
+            }
         }, DOUBLE_CLICK_DELAY_MS);
     }
 
@@ -255,9 +283,14 @@ export function useContainerPillInteractions(
             e.preventDefault();
         }
 
+        if (e.button !== 0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+            cancelPendingLeftClick();
+        }
+
         // Middle click without alt - open URL (unless it's a double-click)
         if (e.button === 1 && !e.altKey && !isDoubleClick) {
             e.preventDefault();
+            cancelPendingLeftClick();
             scheduleMiddleClickOpen(containerId);
             return;
         }
@@ -273,10 +306,23 @@ export function useContainerPillInteractions(
 
         if (isDouble) {
             cancelPendingMiddleClick();
+            cancelPendingLeftClick();
             lastClickTime.value = null; // Reset after handling
         } else {
             // Track click time and button for double-click detection
             lastClickTime.value = { containerId, timestamp: now, button: e.button };
+        }
+
+        const isPlainLeftClick = e.button === 0
+            && !isDouble
+            && !e.altKey
+            && !e.ctrlKey
+            && !e.metaKey
+            && !e.shiftKey;
+
+        if (isPlainLeftClick) {
+            schedulePlainLeftClick(containerId);
+            return;
         }
 
         // Determine reaction type based on button and modifiers
@@ -317,6 +363,7 @@ export function useContainerPillInteractions(
     function handlePillAuxClick(containerId: number, e: MouseEvent): void {
         // Always stop propagation to prevent triggering parent click handlers (like file viewer)
         e.stopPropagation();
+        cancelPendingLeftClick();
 
         if (e.button === 1) {
             // Check for double-click on middle button
@@ -348,9 +395,17 @@ export function useContainerPillInteractions(
         }
     }
 
+    if (getCurrentInstance()) {
+        onUnmounted(() => {
+            cancelPendingMiddleClick();
+            cancelPendingLeftClick();
+        });
+    }
+
     return {
         getContainersForItem,
         getSiblingItems,
+        getContainer,
         getContainerUrl,
         batchReactToSiblings,
         handlePillClick,

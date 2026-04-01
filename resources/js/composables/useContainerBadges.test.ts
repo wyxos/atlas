@@ -1,17 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick } from 'vue';
+import { describe, it, expect } from 'vitest';
+import { nextTick, ref } from 'vue';
 import { useContainerBadges } from './useContainerBadges';
 import type { FeedItem } from './useTabs';
 
 describe('useContainerBadges', () => {
-    beforeEach(() => {
-        vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-    });
-
     describe('Caching optimizations', () => {
         it('caches container counts for O(1) lookup', async () => {
             const items = ref<FeedItem[]>([
@@ -70,91 +62,6 @@ describe('useContainerBadges', () => {
 
             // Cache should be rebuilt
             expect(getItemCountForContainerId(10)).toBe(2);
-        });
-
-        it('uses Map-based lookup for isSiblingItem', async () => {
-            const items = ref<FeedItem[]>([
-                {
-                    id: 1,
-                    containers: [{ id: 10, type: 'gallery' }],
-                } as FeedItem,
-                {
-                    id: 2,
-                    containers: [{ id: 20, type: 'album' }],
-                } as FeedItem,
-            ]);
-
-            const { isSiblingItem, setHoveredContainerId } = useContainerBadges(items);
-
-            // Wait for cache to be built
-            await nextTick();
-
-            setHoveredContainerId(10);
-            vi.advanceTimersByTime(150); // Wait for debounce
-
-            expect(isSiblingItem(items.value[0], 10)).toBe(true);
-            expect(isSiblingItem(items.value[1], 10)).toBe(false);
-        });
-    });
-
-    describe('Debounced hover state', () => {
-        it('debounces hover state changes', () => {
-            const items = ref<FeedItem[]>([]);
-            const { setHoveredContainerId, getMasonryItemClasses } = useContainerBadges(items);
-
-            // Set hover state
-            setHoveredContainerId(10);
-
-            // Immediately check - should not be updated yet (debounced)
-            const classesBefore = getMasonryItemClasses.value(items.value[0] || { id: 1 } as FeedItem);
-            expect(classesBefore).not.toContain('border-smart-blue-500');
-
-            // Advance timer past debounce delay
-            vi.advanceTimersByTime(150);
-
-            // Now should be updated
-            const classesAfter = getMasonryItemClasses.value(items.value[0] || { id: 1 } as FeedItem);
-            // Note: classesAfter might still not contain the border if item doesn't have container 10
-            // But the debounced value should be set
-            expect(classesAfter).toContain('border-2');
-        });
-
-        it('updates immediately when clearing hover (no debounce)', () => {
-            const items = ref<FeedItem[]>([
-                {
-                    id: 1,
-                    containers: [{ id: 10, type: 'gallery' }],
-                } as FeedItem,
-            ]);
-
-            const { setHoveredContainerId, getMasonryItemClasses } = useContainerBadges(items);
-
-            // Set hover
-            setHoveredContainerId(10);
-            vi.advanceTimersByTime(150);
-
-            // Clear hover - should update immediately
-            setHoveredContainerId(null);
-
-            // Should be cleared immediately (no debounce for null)
-            const classes = getMasonryItemClasses.value(items.value[0]);
-            expect(classes).toContain('border-transparent');
-        });
-
-        it('cancels previous debounce when hover changes rapidly', () => {
-            const items = ref<FeedItem[]>([]);
-            const { setHoveredContainerId } = useContainerBadges(items);
-
-            // Rapid hover changes
-            setHoveredContainerId(10);
-            vi.advanceTimersByTime(30);
-            setHoveredContainerId(20);
-            vi.advanceTimersByTime(30);
-            setHoveredContainerId(30);
-
-            // Only the last one should be set after debounce
-            vi.advanceTimersByTime(60);
-            // The debounced value should be 30, not 10 or 20
         });
     });
 

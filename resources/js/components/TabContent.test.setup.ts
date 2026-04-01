@@ -22,20 +22,9 @@ Object.defineProperty(window, 'axios', {
 
 // Mock composables
 vi.mock('@/composables/useContainerBadges', async () => {
-    const { ref, computed } = await import('vue');
     return {
         useContainerBadges: vi.fn((itemsRef: any) => {
-            const hoveredContainerId = ref<number | null>(null);
-            // TabContent uses the debounced "active" hover id for visual effects.
-            // For unit tests we can mirror it to the immediate hovered state.
-            const activeHoveredContainerId = hoveredContainerId;
-            const setHoveredContainerId = vi.fn((id: number | null) => {
-                hoveredContainerId.value = id;
-            });
             return {
-                hoveredContainerId,
-                activeHoveredContainerId,
-                setHoveredContainerId,
                 getContainersForItem: (item: any) => {
                     const containers = (item as any).containers || [];
                     return containers.filter((c: any) => c?.id && c?.type);
@@ -52,14 +41,6 @@ vi.mock('@/composables/useContainerBadges', async () => {
                     return count;
                 },
                 getVariantForContainerType: () => 'primary',
-                getBorderColorClassForVariant: () => 'border-smart-blue-500',
-                isSiblingItem: (item: any, hoveredId: number | null) => {
-                    if (hoveredId === null) return false;
-                    const containers = (item as any).containers || [];
-                    return containers.some((c: any) => c?.id === hoveredId);
-                },
-                getHoveredContainerVariant: () => null,
-                getMasonryItemClasses: computed(() => () => 'border-2 border-transparent opacity-100'),
             };
         }),
     };
@@ -70,11 +51,30 @@ const mockHandlePillClick = vi.fn();
 const mockHandlePillAuxClick = vi.fn();
 let capturedOpenContainerTab: ((container: any) => void) | null = null;
 vi.mock('@/composables/useContainerPillInteractions', () => ({
-    useContainerPillInteractions: vi.fn((options: { onOpenContainerTab?: (container: any) => void }) => {
+    useContainerPillInteractions: vi.fn((options: {
+        items: { value: any[] };
+        onOpenContainerTab?: (container: any) => void;
+    }) => {
         capturedOpenContainerTab = options.onOpenContainerTab ?? null;
         return {
             getContainersForItem: vi.fn((item: any) => (item as any).containers || []),
-            getSiblingItems: vi.fn((_containerId: number) => []),
+            getSiblingItems: vi.fn((containerId: number) => {
+                return options.items.value.filter((item: any) => {
+                    const containers = (item as any).containers || [];
+                    return containers.some((container: any) => container?.id === containerId);
+                });
+            }),
+            getContainer: vi.fn((containerId: number) => {
+                for (const item of options.items.value) {
+                    const containers = (item as any).containers || [];
+                    const container = containers.find((candidate: any) => candidate?.id === containerId);
+                    if (container) {
+                        return container;
+                    }
+                }
+
+                return null;
+            }),
             getContainerUrl: vi.fn((containerId: number) => `https://example.com/container/${containerId}`),
             batchReactToSiblings: mockBatchReactToSiblings,
             handlePillClick: mockHandlePillClick,

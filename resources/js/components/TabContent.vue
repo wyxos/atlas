@@ -24,6 +24,7 @@ import TabContentPromptDialog from './TabContentPromptDialog.vue';
 import TabContentStartForm from './TabContentStartForm.vue';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentMasonryItemOverlay from './TabContentMasonryItemOverlay.vue';
+import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from '@/components/ui/toast/use-toast';
@@ -147,6 +148,12 @@ const containerInteractions = useTabContentContainerInteractions({
     onReaction: props.onReaction,
     onOpenContainerTab: props.onOpenContainerTab,
 });
+const containerDrawerState = containerInteractions.drawer.state;
+const containerDrawerDerived = containerInteractions.drawer.derived;
+const containerDrawerActions = containerInteractions.drawer.actions;
+const isContainerDrawerOpen = containerDrawerState.isOpen;
+const selectedDrawerContainer = containerDrawerDerived.container;
+const drawerRelatedItems = containerDrawerDerived.items;
 const itemInteractions = useTabContentItemInteractions({
     items,
     tab,
@@ -453,6 +460,12 @@ defineExpose({
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
             :visible="tab !== null && tab !== undefined && !browseState.shouldShowForm" :total="browseState.totalAvailable"
             @first-page="browseActions.goToFirstPage" />
+        <TabContentContainerDrawer
+            :open="isContainerDrawerOpen"
+            :container="selectedDrawerContainer"
+            :items="drawerRelatedItems"
+            @update:open="containerDrawerActions.setOpen"
+        />
 
         <TabContentPromptDialog :open="promptDialog.data.promptDialogOpen.value"
             :item-id="promptDialog.data.promptDialogItemId.value" :loading="promptDialog.data.promptDataLoading.value"
@@ -493,36 +506,6 @@ defineExpose({
 
 :deep([data-testid="masonry-loader-spinner"] svg) {
     @apply text-white/70;
-}
-.ring-fade-enter-active {
-    animation: ringAppear 0.6s ease-out;
-    will-change: transform, opacity;
-}
-
-.ring-fade-leave-active {
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    will-change: transform, opacity;
-}
-
-.ring-fade-leave-to {
-    opacity: 0;
-    transform: scale(0.98);
-}
-
-@keyframes ringAppear {
-    0% {
-        opacity: 0;
-        transform: scale(0.98);
-    }
-
-    50% {
-        opacity: 0.5;
-    }
-
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
 }
 
 .fade-enter-active,

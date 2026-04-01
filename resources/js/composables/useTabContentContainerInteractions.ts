@@ -1,7 +1,7 @@
-import { computed, ref, type Ref, type ShallowRef } from 'vue';
+import { computed, ref, watch, type Ref, type ShallowRef } from 'vue';
 import type { MasonryInstance } from '@wyxos/vibe';
 import { useContainerBadges } from './useContainerBadges';
-import { useContainerPillInteractions } from './useContainerPillInteractions';
+import { useContainerPillInteractions, type ContainerPillTarget } from './useContainerPillInteractions';
 import type { BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
@@ -14,19 +14,7 @@ type ContainerBlacklistDialogTarget = {
     referrer?: string | null;
 };
 
-type BrowseTabPayload = {
-    label: string;
-    params: Record<string, unknown>;
-};
-
-type ContainerTarget = {
-    id: number;
-    type: string;
-    source?: string;
-    source_id?: string;
-    referrer?: string | null;
-    browse_tab?: BrowseTabPayload | null;
-};
+type ContainerTarget = ContainerPillTarget;
 
 type ContainerBlacklistDialogRef = {
     openBlacklistDialog: (container: ContainerBlacklistDialogTarget) => void | Promise<void>;
@@ -106,19 +94,68 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
         onReaction: options.onReaction,
         onOpenContainerTab: handleContainerNavigation,
+        onPlainLeftClick: toggleDrawer,
     });
 
-    function clearHoveredContainer(): void {
-        badges.setHoveredContainerId(null);
+    const selectedContainerId = ref<number | null>(null);
+    const isDrawerOpen = ref(false);
+    const selectedContainer = computed(() => (
+        selectedContainerId.value === null
+            ? null
+            : pillInteractions.getContainer(selectedContainerId.value)
+    ));
+    const relatedItems = computed(() => (
+        selectedContainerId.value === null
+            ? []
+            : pillInteractions.getSiblingItems(selectedContainerId.value)
+    ));
+
+    function closeDrawer(): void {
+        isDrawerOpen.value = false;
+        selectedContainerId.value = null;
     }
 
+    function setDrawerOpen(open: boolean): void {
+        if (!open) {
+            closeDrawer();
+            return;
+        }
+
+        if (selectedContainer.value && relatedItems.value.length > 1) {
+            isDrawerOpen.value = true;
+            return;
+        }
+
+        closeDrawer();
+    }
+
+    function toggleDrawer(container: ContainerTarget): void {
+        if (isDrawerOpen.value && selectedContainerId.value === container.id) {
+            closeDrawer();
+            return;
+        }
+
+        const siblings = pillInteractions.getSiblingItems(container.id);
+        if (siblings.length <= 1) {
+            closeDrawer();
+            return;
+        }
+
+        selectedContainerId.value = container.id;
+        isDrawerOpen.value = true;
+    }
+
+    function clearHoveredContainer(): void {
+        // Hover-based container focus is intentionally disabled.
+    }
+
+    watch([selectedContainer, relatedItems], ([container, items]) => {
+        if (isDrawerOpen.value && (!container || items.length <= 1)) {
+            closeDrawer();
+        }
+    });
+
     const pillHandlers = {
-        onMouseEnter(containerId: number): void {
-            badges.setHoveredContainerId(containerId);
-        },
-        onMouseLeave(): void {
-            clearHoveredContainer();
-        },
         onClick(containerId: number, event: MouseEvent): void {
             pillInteractions.handlePillClick(containerId, event);
         },
@@ -149,6 +186,19 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         pillHandlers,
         clearHoveredContainer,
         isBlacklistable,
+        drawer: {
+            state: {
+                isOpen: isDrawerOpen,
+            },
+            derived: {
+                container: selectedContainer,
+                items: relatedItems,
+            },
+            actions: {
+                close: closeDrawer,
+                setOpen: setDrawerOpen,
+            },
+        },
     };
 }
 

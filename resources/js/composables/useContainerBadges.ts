@@ -1,4 +1,4 @@
-import { ref, computed, watch, nextTick } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import type { FeedItem } from './useTabs';
 import type { PillVariant } from '@/types/pill';
 
@@ -23,26 +23,12 @@ function isContainerEntry(container: ContainerEntry): container is Container {
 }
 
 /**
- * Composable for managing container badges and their hover states.
+ * Composable for managing container badges.
  * Optimized for large item arrays (3k+) with caching and Map-based lookups.
  */
 export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
-    const hoveredContainerId = ref<number | null>(null);
-    const debouncedHoveredContainerId = ref<number | null>(null);
-
-    // Debounce hover state changes to reduce rapid recalculations.
-    // This also avoids a "disco" effect when moving quickly between pills.
-    let hoverDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const HOVER_DEBOUNCE_MS = 120;
-
     // Cache: Map<containerId, count> - O(1) lookup instead of O(n) iteration
     const containerCountCache = ref<Map<number, number>>(new Map());
-
-    // Cache: Map<containerId, containerType> - O(1) lookup for container type
-    const containerTypeCache = ref<Map<number, string>>(new Map());
-
-    // Cache: Map<itemId, Set<containerId>> - O(1) lookup for item's containers
-    const itemContainersCache = ref<Map<number, Set<number>>>(new Map());
 
     // Track previous items to detect removals for incremental updates
     const previousItems = ref<Map<number, FeedItem>>(new Map());
@@ -50,20 +36,19 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
     // Incrementally update caches when items are removed (much faster than full rebuild)
     function updateCachesForRemovedItems(removedItemIds: number[]): void {
         for (const itemId of removedItemIds) {
-            const itemContainers = itemContainersCache.value.get(itemId);
-            if (itemContainers) {
-                // Decrement count for each container
-                for (const containerId of itemContainers) {
+            const item = previousItems.value.get(itemId);
+            if (item) {
+                const containers = getContainersForItem(item);
+
+                for (const container of containers) {
+                    const containerId = container.id;
                     const currentCount = containerCountCache.value.get(containerId) || 0;
                     if (currentCount > 1) {
                         containerCountCache.value.set(containerId, currentCount - 1);
                     } else {
                         containerCountCache.value.delete(containerId);
-                        containerTypeCache.value.delete(containerId);
                     }
                 }
-                // Remove item from cache
-                itemContainersCache.value.delete(itemId);
             }
             previousItems.value.delete(itemId);
         }
@@ -101,36 +86,19 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
 
         // Full rebuild for additions or large changes
         const countMap = new Map<number, number>();
-        const typeMap = new Map<number, string>();
-        const itemContainersMap = new Map<number, Set<number>>();
 
         for (const item of items.value) {
             const containers = (item.containers as ContainerEntry[] | undefined) ?? [];
-            const itemContainerIds = new Set<number>();
 
             for (const container of containers) {
                 if (isContainerEntry(container)) {
                     // Update count cache
                     countMap.set(container.id, (countMap.get(container.id) || 0) + 1);
-
-                    // Update type cache (only store first occurrence, all should be same type)
-                    if (!typeMap.has(container.id)) {
-                        typeMap.set(container.id, container.type);
-                    }
-
-                    // Track this container for this item
-                    itemContainerIds.add(container.id);
                 }
-            }
-
-            if (itemContainerIds.size > 0) {
-                itemContainersMap.set(item.id, itemContainerIds);
             }
         }
 
         containerCountCache.value = countMap;
-        containerTypeCache.value = typeMap;
-        itemContainersCache.value = itemContainersMap;
 
         // Update previousItems
         previousItems.value.clear();
@@ -139,10 +107,10 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
         }
     }
 
-    // Watch items array length and rebuild caches when it changes
+    // Watch array replacement and length changes, then rebuild caches.
     // Defer cache updates to nextTick to avoid blocking animations
     watch(
-        () => items.value.length,
+        () => [items.value, items.value.length],
         () => {
             // Defer cache rebuild to nextTick to avoid blocking removal animations
             // This allows Vibe's FLIP animations to run smoothly
@@ -216,96 +184,9 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
         return variants[index];
     }
 
-    // Get border color class for a container type variant (matches Pill border colors)
-    function getBorderColorClassForVariant(variant: PillVariant): string {
-        const borderColors: Record<string, string> = {
-            primary: 'border-smart-blue-500',
-            secondary: 'border-sapphire-500',
-            success: 'border-success-500',
-            warning: 'border-warning-500',
-            danger: 'border-danger-500',
-            info: 'border-info-500',
-            neutral: 'border-twilight-indigo-500',
-        };
-        return borderColors[variant] || 'border-smart-blue-500';
-    }
-
-    // Check if an item is a sibling (has the same container ID as the hovered one) - O(1) lookup
-    function isSiblingItem(item: FeedItem, hoveredContainerId: number | null): boolean {
-        if (hoveredContainerId === null) {
-            return false;
-        }
-        const itemContainers = itemContainersCache.value.get(item.id);
-        return itemContainers ? itemContainers.has(hoveredContainerId) : false;
-    }
-
-    // Get the variant for the hovered container type - O(1) lookup from cache
-    // Uses debounced value to avoid rapid recalculations
-    function getHoveredContainerVariant(): PillVariant | null {
-        const hoveredId = debouncedHoveredContainerId.value;
-        if (hoveredId === null) {
-            return null;
-        }
-        const containerType = containerTypeCache.value.get(hoveredId);
-        if (containerType) {
-            return getVariantForContainerType(containerType);
-        }
-        return null;
-    }
-
-    // Debounced setter for hovered container ID
-    function setHoveredContainerId(containerId: number | null): void {
-        hoveredContainerId.value = containerId;
-
-        // Clear existing timer
-        if (hoverDebounceTimer) {
-            clearTimeout(hoverDebounceTimer);
-        }
-
-        // If setting to null, update immediately (no debounce for clearing)
-        if (containerId === null) {
-            debouncedHoveredContainerId.value = null;
-            hoverDebounceTimer = null;
-            return;
-        }
-
-        // Debounce setting a container ID
-        hoverDebounceTimer = setTimeout(() => {
-            debouncedHoveredContainerId.value = containerId;
-            hoverDebounceTimer = null;
-        }, HOVER_DEBOUNCE_MS);
-    }
-
-    // Get classes for masonry item based on hover state (uses debounced value)
-    // Note: we avoid setting opacity here because the Masonry "overlay" wrapper is not
-    // the actual image/card; opacity here also inadvertently reduces any dimming overlay.
-    const getMasonryItemClasses = computed(() => (item: FeedItem) => {
-        const classes: string[] = [];
-        const hoveredId = debouncedHoveredContainerId.value;
-
-        // Border (ring) changes with smooth transition
-        // Using border instead of box-shadow to avoid additional rendering cost
-        if (hoveredId !== null && isSiblingItem(item, hoveredId)) {
-            const variant = getHoveredContainerVariant() || 'primary';
-            classes.push(`border-2 ${getBorderColorClassForVariant(variant)}`);
-        } else {
-            classes.push('border-2 border-transparent');
-        }
-
-        return classes.join(' ');
-    });
-
     return {
-        hoveredContainerId,
-        // Debounced/"active" hover state used for visual effects.
-        activeHoveredContainerId: debouncedHoveredContainerId,
-        setHoveredContainerId,
         getContainersForItem,
         getItemCountForContainerId,
         getVariantForContainerType,
-        getBorderColorClassForVariant,
-        isSiblingItem,
-        getHoveredContainerVariant,
-        getMasonryItemClasses,
     };
 }
