@@ -1,7 +1,35 @@
 import { mount } from '@vue/test-utils';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
 import type { FeedItem } from '@/composables/useTabs';
+
+vi.mock('@/components/ui/carousel', () => ({
+    Carousel: {
+        name: 'Carousel',
+        template: '<div v-bind="$attrs" :class="$props.class"><slot /></div>',
+        props: ['opts', 'plugins', 'orientation', 'class'],
+    },
+    CarouselContent: {
+        name: 'CarouselContent',
+        template: '<div v-bind="$attrs"><div :class="$props.class"><slot /></div></div>',
+        props: ['class'],
+    },
+    CarouselItem: {
+        name: 'CarouselItem',
+        template: '<div v-bind="$attrs" :class="$props.class"><slot /></div>',
+        props: ['class'],
+    },
+    CarouselPrevious: {
+        name: 'CarouselPrevious',
+        template: '<button type="button" v-bind="$attrs" :class="$props.class"><slot /></button>',
+        props: ['class', 'variant', 'size'],
+    },
+    CarouselNext: {
+        name: 'CarouselNext',
+        template: '<button type="button" v-bind="$attrs" :class="$props.class"><slot /></button>',
+        props: ['class', 'variant', 'size'],
+    },
+}));
 
 function createItem(id: number, type: 'image' | 'video' = 'image'): FeedItem {
     return {
@@ -42,6 +70,7 @@ describe('TabContentContainerDrawer', () => {
         expect(drawer.attributes('aria-modal')).toBe('false');
         expect(wrapper.get('[data-test="container-related-items-title"]').text()).toBe('Related items');
         expect(wrapper.get('[data-test="container-related-items-description"]').text()).toBe('2 related items from gallery.');
+        expect(wrapper.get('[data-test="container-related-items-carousel"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="container-related-items-track"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="container-related-item-0"] img').exists()).toBe(true);
         expect(wrapper.find('[data-test="container-related-item-1"] video').exists()).toBe(true);

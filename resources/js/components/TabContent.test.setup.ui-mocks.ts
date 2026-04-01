@@ -227,6 +227,34 @@ vi.mock('@/components/ui/sheet', () => ({
     },
 }));
 
+vi.mock('@/components/ui/carousel', () => ({
+    Carousel: {
+        name: 'Carousel',
+        template: '<div v-bind="$attrs" :class="$props.class"><slot></slot></div>',
+        props: ['opts', 'plugins', 'orientation', 'class'],
+    },
+    CarouselContent: {
+        name: 'CarouselContent',
+        template: '<div v-bind="$attrs"><div :class="$props.class"><slot></slot></div></div>',
+        props: ['class'],
+    },
+    CarouselItem: {
+        name: 'CarouselItem',
+        template: '<div v-bind="$attrs" :class="$props.class"><slot></slot></div>',
+        props: ['class'],
+    },
+    CarouselPrevious: {
+        name: 'CarouselPrevious',
+        template: '<button type="button" v-bind="$attrs" :class="$props.class"><slot></slot></button>',
+        props: ['class', 'variant', 'size'],
+    },
+    CarouselNext: {
+        name: 'CarouselNext',
+        template: '<button type="button" v-bind="$attrs" :class="$props.class"><slot></slot></button>',
+        props: ['class', 'variant', 'size'],
+    },
+}));
+
 vi.mock('./ui/switch', () => ({
     Switch: {
         name: 'Switch',
@@ -303,6 +331,7 @@ vi.mock('lucide-vue-next', () => ({
     RotateCw: { name: 'RotateCw', template: '<div class="rotate-cw-icon"></div>', props: ['size', 'class'] },
     ThumbsDown: { name: 'ThumbsDown', template: '<div class="thumbs-down-icon"></div>', props: ['size', 'class'] },
     Pause: { name: 'Pause', template: '<div class="pause-icon"></div>', props: ['size', 'class'] },
+    ChevronLeft: { name: 'ChevronLeft', template: '<div class="chevron-left-icon"></div>', props: ['size', 'class'] },
     Shield: { name: 'Shield', template: '<div class="shield-icon"></div>', props: ['size', 'class'] },
     Plus: { name: 'Plus', template: '<div class="plus-icon"></div>', props: ['size', 'class'] },
     Trash2: { name: 'Trash2', template: '<div class="trash-icon"></div>', props: ['size', 'class'] },

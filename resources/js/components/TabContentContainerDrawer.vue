@@ -4,6 +4,13 @@ import { X } from 'lucide-vue-next';
 import { computed, getCurrentInstance, ref, watch } from 'vue';
 import type { ContainerPillTarget } from '@/composables/useContainerPillInteractions';
 import type { FeedItem } from '@/composables/useTabs';
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+} from '@/components/ui/carousel';
 
 interface Props {
     open: boolean;
@@ -166,15 +173,19 @@ useEventListener('keydown', (event) => {
                 </button>
 
                 <div class="px-6 py-5">
-                    <div
-                        class="overflow-x-auto pb-2"
-                        data-test="container-related-items-track"
+                    <Carousel
+                        class="w-full px-10"
+                        :opts="{ align: 'start', containScroll: 'trimSnaps' }"
+                        data-test="container-related-items-carousel"
                     >
-                        <div class="flex min-w-max gap-4">
-                            <div
+                        <CarouselContent
+                            class="pb-2"
+                            data-test="container-related-items-track"
+                        >
+                            <CarouselItem
                                 v-for="(item, index) in visibleItems"
                                 :key="item.id"
-                                class="w-36 shrink-0"
+                                class="basis-36"
                                 :data-test="`container-related-item-${index}`"
                             >
                                 <div class="aspect-square overflow-hidden rounded-sm border border-border bg-black/30">
@@ -200,9 +211,15 @@ useEventListener('keydown', (event) => {
                                         No preview
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
+                            </CarouselItem>
+                        </CarouselContent>
+                        <CarouselPrevious
+                            class="left-0 bg-prussian-blue-500/95"
+                        />
+                        <CarouselNext
+                            class="right-0 bg-prussian-blue-500/95"
+                        />
+                    </Carousel>
                 </div>
             </section>
         </Transition>
