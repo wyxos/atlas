@@ -163,7 +163,7 @@ vi.mock('./ui/sheet', () => ({
     SheetContent: {
         name: 'SheetContent',
         template: '<div class="sheet-content-mock"><slot></slot></div>',
-        props: ['side', 'class', 'showOverlay'],
+        props: ['side', 'class'],
     },
     SheetHeader: {
         name: 'SheetHeader',
@@ -200,7 +200,7 @@ vi.mock('@/components/ui/sheet', () => ({
     SheetContent: {
         name: 'SheetContent',
         template: '<div class="sheet-content-mock"><slot></slot></div>',
-        props: ['side', 'class', 'showOverlay'],
+        props: ['side', 'class'],
     },
     SheetHeader: {
         name: 'SheetHeader',

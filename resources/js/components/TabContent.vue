@@ -460,6 +460,13 @@ defineExpose({
                         </template>
                     </MasonryItem>
                 </Masonry>
+
+                <TabContentContainerDrawer
+                    :open="isContainerDrawerOpen"
+                    :container="selectedDrawerContainer"
+                    :items="drawerRelatedItems"
+                    @update:open="containerDrawerActions.setOpen"
+                />
             </div>
         </div>
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
@@ -470,12 +477,6 @@ defineExpose({
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
             :visible="tab !== null && tab !== undefined && !browseState.shouldShowForm" :total="browseState.totalAvailable"
             @first-page="browseActions.goToFirstPage" />
-        <TabContentContainerDrawer
-            :open="isContainerDrawerOpen"
-            :container="selectedDrawerContainer"
-            :items="drawerRelatedItems"
-            @update:open="containerDrawerActions.setOpen"
-        />
 
         <TabContentPromptDialog :open="promptDialog.data.promptDialogOpen.value"
             :item-id="promptDialog.data.promptDialogItemId.value" :loading="promptDialog.data.promptDataLoading.value"
