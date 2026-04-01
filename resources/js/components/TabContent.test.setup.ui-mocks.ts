@@ -173,6 +173,48 @@ vi.mock('./ui/sheet', () => ({
         name: 'SheetTitle',
         template: '<div class="sheet-title-mock"><slot></slot></div>',
     },
+    SheetDescription: {
+        name: 'SheetDescription',
+        template: '<div class="sheet-description-mock"><slot></slot></div>',
+        props: ['class'],
+    },
+    SheetTrigger: {
+        name: 'SheetTrigger',
+        template: '<div class="sheet-trigger-mock" @click="$emit(\'update:open\', true)"><slot></slot></div>',
+        props: ['asChild'],
+        emits: ['update:open'],
+    },
+    SheetFooter: {
+        name: 'SheetFooter',
+        template: '<div class="sheet-footer-mock"><slot></slot></div>',
+    },
+}));
+
+vi.mock('@/components/ui/sheet', () => ({
+    Sheet: {
+        name: 'Sheet',
+        template: '<div class="sheet-mock"><slot></slot></div>',
+        props: ['modelValue', 'open'],
+        emits: ['update:modelValue', 'update:open'],
+    },
+    SheetContent: {
+        name: 'SheetContent',
+        template: '<div class="sheet-content-mock"><slot></slot></div>',
+        props: ['side', 'class'],
+    },
+    SheetHeader: {
+        name: 'SheetHeader',
+        template: '<div class="sheet-header-mock"><slot></slot></div>',
+    },
+    SheetTitle: {
+        name: 'SheetTitle',
+        template: '<div class="sheet-title-mock"><slot></slot></div>',
+    },
+    SheetDescription: {
+        name: 'SheetDescription',
+        template: '<div class="sheet-description-mock"><slot></slot></div>',
+        props: ['class'],
+    },
     SheetTrigger: {
         name: 'SheetTrigger',
         template: '<div class="sheet-trigger-mock" @click="$emit(\'update:open\', true)"><slot></slot></div>',

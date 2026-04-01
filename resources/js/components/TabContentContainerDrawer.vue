@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { computed } from 'vue';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import type { ContainerPillTarget } from '@/composables/useContainerPillInteractions';
 import type { FeedItem } from '@/composables/useTabs';
 
@@ -9,11 +10,25 @@ interface Props {
     items: FeedItem[];
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
     'update:open': [open: boolean];
 }>();
+
+const containerLabel = computed(() => (
+    props.container?.browse_tab?.label?.trim()
+    || props.container?.type
+    || 'container'
+));
+
+const itemCountLabel = computed(() => (
+    props.items.length === 1 ? '1 related item' : `${props.items.length} related items`
+));
+
+const drawerDescription = computed(() => (
+    `${itemCountLabel.value} from ${containerLabel.value}.`
+));
 
 function handleDrawerVideoLoadedMetadata(event: Event): void {
     const video = event.target as HTMLVideoElement | null;
@@ -39,6 +54,14 @@ function handleDrawerVideoLoadedMetadata(event: Event): void {
             class="max-h-[48vh] border-x-0 px-0 pb-0 pt-0"
             data-test="container-related-items-drawer"
         >
+            <div class="sr-only">
+                <SheetTitle data-test="container-related-items-title">
+                    Related items
+                </SheetTitle>
+                <SheetDescription data-test="container-related-items-description">
+                    {{ drawerDescription }}
+                </SheetDescription>
+            </div>
             <div class="px-6 py-5">
                 <div
                     class="overflow-x-auto pb-2"

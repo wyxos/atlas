@@ -29,6 +29,11 @@ vi.mock('@/components/ui/sheet', () => ({
         template: '<div class="sheet-title-mock"><slot /></div>',
         props: ['class'],
     },
+    SheetDescription: {
+        name: 'SheetDescription',
+        template: '<div class="sheet-description-mock"><slot /></div>',
+        props: ['class'],
+    },
 }));
 
 function createItem(id: number, type: 'image' | 'video' = 'image'): FeedItem {
@@ -48,7 +53,7 @@ function createItem(id: number, type: 'image' | 'video' = 'image'): FeedItem {
 }
 
 describe('TabContentContainerDrawer', () => {
-    it('renders related previews in the horizontal track', () => {
+    it('renders related previews with accessible sheet copy', () => {
         const wrapper = mount(TabContentContainerDrawer, {
             props: {
                 open: true,
@@ -60,6 +65,8 @@ describe('TabContentContainerDrawer', () => {
             },
         });
 
+        expect(wrapper.get('[data-test="container-related-items-title"]').text()).toBe('Related items');
+        expect(wrapper.get('[data-test="container-related-items-description"]').text()).toBe('2 related items from gallery.');
         expect(wrapper.get('[data-test="container-related-items-track"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="container-related-item-0"] img').exists()).toBe(true);
         expect(wrapper.find('[data-test="container-related-item-1"] video').exists()).toBe(true);
