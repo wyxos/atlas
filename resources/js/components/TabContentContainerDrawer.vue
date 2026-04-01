@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import type { ContainerPillTarget } from '@/composables/useContainerPillInteractions';
 import type { FeedItem } from '@/composables/useTabs';
@@ -16,14 +16,42 @@ const emit = defineEmits<{
     'update:open': [open: boolean];
 }>();
 
+const renderedContainer = ref<ContainerPillTarget | null>(props.container);
+const renderedItems = ref<FeedItem[]>(props.items);
+
+watch(
+    () => [props.open, props.container] as const,
+    ([open, container]) => {
+        if (open || container) {
+            renderedContainer.value = container;
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    () => [props.open, props.items] as const,
+    ([open, items]) => {
+        if (open || items.length > 0) {
+            renderedItems.value = items;
+        }
+    },
+    { immediate: true },
+);
+
+const visibleContainer = computed(() => props.container ?? renderedContainer.value);
+const visibleItems = computed(() => (
+    props.items.length > 0 ? props.items : renderedItems.value
+));
+
 const containerLabel = computed(() => (
-    props.container?.browse_tab?.label?.trim()
-    || props.container?.type
+    visibleContainer.value?.browse_tab?.label?.trim()
+    || visibleContainer.value?.type
     || 'container'
 ));
 
 const itemCountLabel = computed(() => (
-    props.items.length === 1 ? '1 related item' : `${props.items.length} related items`
+    visibleItems.value.length === 1 ? '1 related item' : `${visibleItems.value.length} related items`
 ));
 
 const drawerDescription = computed(() => (
@@ -48,9 +76,10 @@ function handleDrawerVideoLoadedMetadata(event: Event): void {
 </script>
 
 <template>
-    <Sheet :open="open" @update:open="emit('update:open', $event)">
+    <Sheet :open="open" :modal="false" @update:open="emit('update:open', $event)">
         <SheetContent
             side="bottom"
+            :show-overlay="false"
             class="max-h-[48vh] border-x-0 px-0 pb-0 pt-0"
             data-test="container-related-items-drawer"
         >
@@ -69,7 +98,7 @@ function handleDrawerVideoLoadedMetadata(event: Event): void {
                 >
                     <div class="flex min-w-max gap-4">
                         <div
-                            v-for="(item, index) in items"
+                            v-for="(item, index) in visibleItems"
                             :key="item.id"
                             class="w-36 shrink-0"
                             :data-test="`container-related-item-${index}`"

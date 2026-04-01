@@ -58,6 +58,8 @@ function handleReaction(type: ReactionType): void {
         <Transition name="fade">
             <div v-if="showContainers" class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
                 <div v-for="container in itemContainers" :key="container.id" class="cursor-pointer"
+                    @mouseenter="() => containers.pillHandlers.onMouseEnter(container.id)"
+                    @mouseleave="() => containers.pillHandlers.onMouseLeave(container.id)"
                     @click.stop="(event) => containers.pillHandlers.onClick(container.id, event)"
                     @dblclick.prevent.stop="(event) => containers.pillHandlers.onDoubleClick(container.id, event)"
                     @contextmenu.prevent.stop="(event) => containers.pillHandlers.onContextMenu(container.id, event)"

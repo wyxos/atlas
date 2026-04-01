@@ -37,6 +37,14 @@ export function createVibePageMock(
         mockRestore: Mock;
     }
 ) {
+    type MockMasonryProps = {
+        items: any[];
+        getContent?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }>;
+        getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }>;
+        page?: number | string | null;
+        restoredPages?: Array<number | string>;
+    };
+
     return {
         Masonry: {
             name: 'Masonry',
@@ -59,7 +67,7 @@ export function createVibePageMock(
             `,
             props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
             emits: ['update:items', 'preloaded', 'failures'],
-            setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
+            setup(props: MockMasonryProps, { emit }: { emit: (event: string, value: any) => void }) {
                 let nextPage: number | string | null = null;
                 let hasReachedEnd = false;
                 let pagesLoaded: Array<number | string> = Array.isArray(props.restoredPages)
@@ -477,4 +485,3 @@ export function setupBoundingClientRectMock(): void {
         toJSON: vi.fn(),
     }));
 }
-

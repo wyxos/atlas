@@ -167,6 +167,16 @@ const itemInteractions = useTabContentItemInteractions({
     promptDownloadedReaction: downloadedReactionPrompt.prompt,
     clearHoveredContainer: containerInteractions.clearHoveredContainer,
 });
+
+watch(isContainerDrawerOpen, (open) => {
+    if (open) {
+        itemInteractions.autoDislikeQueue.freezeAutoDislikeOnly('container-drawer');
+        return;
+    }
+
+    itemInteractions.autoDislikeQueue.unfreezeAutoDislikeOnly('container-drawer');
+});
+
 const localFileDeletion = useLocalFileDeletion({
     items,
     masonry,

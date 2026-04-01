@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref, type ShallowRef } from 'vue';
+import { computed, getCurrentInstance, onUnmounted, ref, watch, type Ref, type ShallowRef } from 'vue';
 import type { MasonryInstance } from '@wyxos/vibe';
 import { useContainerBadges } from './useContainerBadges';
 import { useContainerPillInteractions, type ContainerPillTarget } from './useContainerPillInteractions';
@@ -30,9 +30,17 @@ type UseTabContentContainerInteractionsOptions = {
     onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;
 };
 
+type DrawerOpenReason = 'hover' | 'click' | null;
+
 export function useTabContentContainerInteractions(options: UseTabContentContainerInteractionsOptions) {
+    const HOVER_OPEN_DELAY_MS = 700;
     const badges = useContainerBadges(options.items);
     const managerRef = ref<ContainerBlacklistDialogRef | null>(null);
+    const selectedContainerId = ref<number | null>(null);
+    const isDrawerOpen = ref(false);
+    const drawerOpenReason = ref<DrawerOpenReason>(null);
+    let pendingHoverOpenTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingHoverContainerId: number | null = null;
 
     function openExternal(url: string | null | undefined): void {
         if (!url) {
@@ -94,11 +102,8 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
         onReaction: options.onReaction,
         onOpenContainerTab: handleContainerNavigation,
-        onPlainLeftClick: toggleDrawer,
+        onPlainLeftClick: toggleDrawerFromClick,
     });
-
-    const selectedContainerId = ref<number | null>(null);
-    const isDrawerOpen = ref(false);
     const selectedContainer = computed(() => (
         selectedContainerId.value === null
             ? null
@@ -110,8 +115,19 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             : pillInteractions.getSiblingItems(selectedContainerId.value)
     ));
 
+    function cancelPendingHoverOpen(): void {
+        if (pendingHoverOpenTimer) {
+            clearTimeout(pendingHoverOpenTimer);
+            pendingHoverOpenTimer = null;
+        }
+
+        pendingHoverContainerId = null;
+    }
+
     function closeDrawer(): void {
+        cancelPendingHoverOpen();
         isDrawerOpen.value = false;
+        drawerOpenReason.value = null;
         selectedContainerId.value = null;
     }
 
@@ -129,11 +145,8 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         closeDrawer();
     }
 
-    function toggleDrawer(container: ContainerTarget): void {
-        if (isDrawerOpen.value && selectedContainerId.value === container.id) {
-            closeDrawer();
-            return;
-        }
+    function openDrawer(container: ContainerTarget, reason: Exclude<DrawerOpenReason, null>): void {
+        cancelPendingHoverOpen();
 
         const siblings = pillInteractions.getSiblingItems(container.id);
         if (siblings.length <= 1) {
@@ -143,10 +156,68 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
 
         selectedContainerId.value = container.id;
         isDrawerOpen.value = true;
+        drawerOpenReason.value = reason;
+    }
+
+    function toggleDrawerFromClick(container: ContainerTarget): void {
+        cancelPendingHoverOpen();
+
+        if (isDrawerOpen.value && selectedContainerId.value === container.id) {
+            closeDrawer();
+            return;
+        }
+
+        openDrawer(container, 'click');
+    }
+
+    function openDrawerFromHover(containerId: number): void {
+        if (drawerOpenReason.value === 'click') {
+            return;
+        }
+
+        const container = pillInteractions.getContainer(containerId);
+        if (!container) {
+            closeDrawer();
+            return;
+        }
+
+        openDrawer(container, 'hover');
+    }
+
+    function handlePillMouseEnter(containerId: number): void {
+        if (drawerOpenReason.value === 'click') {
+            return;
+        }
+
+        cancelPendingHoverOpen();
+        pendingHoverContainerId = containerId;
+        pendingHoverOpenTimer = setTimeout(() => {
+            pendingHoverOpenTimer = null;
+
+            if (pendingHoverContainerId !== containerId) {
+                return;
+            }
+
+            openDrawerFromHover(containerId);
+        }, HOVER_OPEN_DELAY_MS);
+    }
+
+    function handlePillMouseLeave(containerId: number): void {
+        if (pendingHoverContainerId === containerId) {
+            cancelPendingHoverOpen();
+        }
+
+        if (drawerOpenReason.value === 'hover' && selectedContainerId.value === containerId) {
+            closeDrawer();
+        }
     }
 
     function clearHoveredContainer(): void {
-        // Hover-based container focus is intentionally disabled.
+        cancelPendingHoverOpen();
+
+        if (drawerOpenReason.value === 'hover') {
+            closeDrawer();
+        }
     }
 
     watch([selectedContainer, relatedItems], ([container, items]) => {
@@ -154,6 +225,12 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             closeDrawer();
         }
     });
+
+    if (getCurrentInstance()) {
+        onUnmounted(() => {
+            cancelPendingHoverOpen();
+        });
+    }
 
     const pillHandlers = {
         onClick(containerId: number, event: MouseEvent): void {
@@ -169,7 +246,15 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         onAuxClick(containerId: number, event: MouseEvent): void {
             pillInteractions.handlePillAuxClick(containerId, event);
         },
+        onMouseEnter(containerId: number): void {
+            handlePillMouseEnter(containerId);
+        },
+        onMouseLeave(containerId: number): void {
+            handlePillMouseLeave(containerId);
+        },
         onMouseDown(event: MouseEvent): void {
+            cancelPendingHoverOpen();
+
             if (event.button === 1) {
                 event.preventDefault();
             }

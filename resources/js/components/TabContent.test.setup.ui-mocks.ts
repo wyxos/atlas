@@ -157,13 +157,13 @@ vi.mock('./ui/sheet', () => ({
     Sheet: {
         name: 'Sheet',
         template: '<div class="sheet-mock"><slot></slot></div>',
-        props: ['modelValue', 'open'],
+        props: ['modelValue', 'open', 'modal'],
         emits: ['update:modelValue', 'update:open'],
     },
     SheetContent: {
         name: 'SheetContent',
         template: '<div class="sheet-content-mock"><slot></slot></div>',
-        props: ['side', 'class'],
+        props: ['side', 'class', 'showOverlay'],
     },
     SheetHeader: {
         name: 'SheetHeader',
@@ -194,13 +194,13 @@ vi.mock('@/components/ui/sheet', () => ({
     Sheet: {
         name: 'Sheet',
         template: '<div class="sheet-mock"><slot></slot></div>',
-        props: ['modelValue', 'open'],
+        props: ['modelValue', 'open', 'modal'],
         emits: ['update:modelValue', 'update:open'],
     },
     SheetContent: {
         name: 'SheetContent',
         template: '<div class="sheet-content-mock"><slot></slot></div>',
-        props: ['side', 'class'],
+        props: ['side', 'class', 'showOverlay'],
     },
     SheetHeader: {
         name: 'SheetHeader',

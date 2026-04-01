@@ -55,6 +55,48 @@ function createSubject(items: FeedItem[]) {
 }
 
 describe('useTabContentContainerInteractions', () => {
+    it('opens the drawer on hover after the configured delay', () => {
+        vi.useFakeTimers();
+        const interactions = createSubject([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+        ]);
+
+        interactions.pillHandlers.onMouseEnter(10);
+        vi.advanceTimersByTime(699);
+
+        expect(interactions.drawer.state.isOpen.value).toBe(false);
+
+        vi.advanceTimersByTime(1);
+        vi.runOnlyPendingTimers();
+
+        expect(interactions.drawer.state.isOpen.value).toBe(true);
+        expect(interactions.drawer.derived.container.value?.id).toBe(10);
+        expect(interactions.drawer.derived.items.value.map((item) => item.id)).toEqual([1, 2]);
+
+        vi.useRealTimers();
+    });
+
+    it('closes the drawer immediately on hover out when hover opened it', () => {
+        vi.useFakeTimers();
+        const interactions = createSubject([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+        ]);
+
+        interactions.pillHandlers.onMouseEnter(10);
+        vi.advanceTimersByTime(700);
+        vi.runOnlyPendingTimers();
+        expect(interactions.drawer.state.isOpen.value).toBe(true);
+
+        interactions.pillHandlers.onMouseLeave(10);
+
+        expect(interactions.drawer.state.isOpen.value).toBe(false);
+        expect(interactions.drawer.derived.container.value).toBeNull();
+
+        vi.useRealTimers();
+    });
+
     it('opens the drawer on single left click', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
@@ -69,6 +111,26 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.drawer.state.isOpen.value).toBe(true);
         expect(interactions.drawer.derived.container.value?.id).toBe(10);
         expect(interactions.drawer.derived.items.value.map((item) => item.id)).toEqual([1, 2]);
+
+        vi.useRealTimers();
+    });
+
+    it('keeps the drawer open on hover out when it was opened by click', () => {
+        vi.useFakeTimers();
+        const interactions = createSubject([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+        ]);
+
+        interactions.pillHandlers.onClick(10, createEvent());
+        vi.advanceTimersByTime(300);
+        vi.runOnlyPendingTimers();
+        expect(interactions.drawer.state.isOpen.value).toBe(true);
+
+        interactions.pillHandlers.onMouseLeave(10);
+
+        expect(interactions.drawer.state.isOpen.value).toBe(true);
+        expect(interactions.drawer.derived.container.value?.id).toBe(10);
 
         vi.useRealTimers();
     });

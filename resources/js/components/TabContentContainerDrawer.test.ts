@@ -12,13 +12,13 @@ vi.mock('@/components/ui/sheet', () => ({
                 <button data-test="sheet-outside-close" @click="$emit('update:open', false)">Outside</button>
             </div>
         `,
-        props: ['open'],
+        props: ['open', 'modal'],
         emits: ['update:open'],
     },
     SheetContent: {
         name: 'SheetContent',
         template: '<div class="sheet-content-mock" v-bind="$attrs"><slot /></div>',
-        props: ['side', 'class'],
+        props: ['side', 'class', 'showOverlay'],
     },
     SheetHeader: {
         name: 'SheetHeader',
@@ -65,6 +65,8 @@ describe('TabContentContainerDrawer', () => {
             },
         });
 
+        expect(wrapper.getComponent({ name: 'Sheet' }).props('modal')).toBe(false);
+        expect(wrapper.getComponent({ name: 'SheetContent' }).props('showOverlay')).toBe(false);
         expect(wrapper.get('[data-test="container-related-items-title"]').text()).toBe('Related items');
         expect(wrapper.get('[data-test="container-related-items-description"]').text()).toBe('2 related items from gallery.');
         expect(wrapper.get('[data-test="container-related-items-track"]').exists()).toBe(true);
@@ -104,5 +106,28 @@ describe('TabContentContainerDrawer', () => {
         await wrapper.get('[data-test="sheet-outside-close"]').trigger('click');
 
         expect(wrapper.emitted('update:open')).toEqual([[false]]);
+    });
+
+    it('keeps the last rendered content while closing so the exit animation has content', async () => {
+        const wrapper = mount(TabContentContainerDrawer, {
+            props: {
+                open: true,
+                container: {
+                    id: 10,
+                    type: 'gallery',
+                },
+                items: [createItem(1), createItem(2)],
+            },
+        });
+
+        await wrapper.setProps({
+            open: false,
+            container: null,
+            items: [],
+        });
+
+        expect(wrapper.get('[data-test="container-related-items-description"]').text()).toBe('2 related items from gallery.');
+        expect(wrapper.find('[data-test="container-related-item-0"] img').exists()).toBe(true);
+        expect(wrapper.find('[data-test="container-related-item-1"] img').exists()).toBe(true);
     });
 });
