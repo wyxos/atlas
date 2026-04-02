@@ -168,6 +168,14 @@ export function applyExactLocalReactionState(
     item.blacklist_rule = null;
 }
 
+export function applyLocalAutoDislikeState(item: FeedItem): void {
+    item.reaction = { type: 'dislike' };
+    item.auto_disliked = true;
+    item.will_auto_dislike = false;
+
+    applyOptimisticDownloadedCleanup(item);
+}
+
 export function restoreOptimisticLocalReactionState(
     item: FeedItem,
     snapshot: LocalReactionSnapshot,

@@ -1,9 +1,9 @@
-import { ref, type Ref } from 'vue';
+import { ref, triggerRef, type Ref } from 'vue';
 import { queueManager } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 import type { FeedItem } from './useTabs';
 import { Masonry } from '@wyxos/vibe';
-import updateReactionState from '@/utils/reactionStateUpdater';
+import { applyLocalAutoDislikeState } from '@/utils/localReactionState';
 
 const COUNTDOWN_DURATION_MS = 5 * 1000; // 5 seconds
 const DEBOUNCE_DELAY_MS = 500; // 500ms debounce for batch operations
@@ -19,6 +19,7 @@ type UseAutoDislikeQueueOptions = {
     items: Ref<FeedItem[]>;
     masonry: Ref<InstanceType<typeof Masonry> | null>;
     isLocal: Readonly<Ref<boolean>>;
+    matchesActiveLocalFilters?: (item: FeedItem) => boolean;
 };
 
 // Global state for pending dislikes (debounced batch)
@@ -55,6 +56,41 @@ export function useAutoDislikeQueue(
         return activePauseSources.value.size > 0;
     }
 
+    async function syncLocalAutoDislikeState(fileIds: number[]): Promise<void> {
+        if (fileIds.length === 0) {
+            return;
+        }
+
+        const processedFileIds = new Set(fileIds);
+        const processedItems = options.items.value.filter((item) => processedFileIds.has(item.id));
+        if (processedItems.length === 0) {
+            return;
+        }
+
+        processedItems.forEach((item) => {
+            applyLocalAutoDislikeState(item);
+        });
+
+        if (!options.matchesActiveLocalFilters) {
+            triggerRef(options.items);
+            return;
+        }
+
+        const itemsToRemove = processedItems.filter((item) => !options.matchesActiveLocalFilters?.(item));
+        if (itemsToRemove.length === 0) {
+            triggerRef(options.items);
+            return;
+        }
+
+        if (options.masonry.value) {
+            await options.masonry.value.remove(itemsToRemove);
+            return;
+        }
+
+        const removedIds = new Set(itemsToRemove.map((item) => item.id));
+        options.items.value = options.items.value.filter((item) => !removedIds.has(item.id));
+    }
+
     /**
      * Execute batch dislike operation (debounced).
      * Removes items from masonry and calls backend to dislike them.
@@ -83,15 +119,15 @@ export function useAutoDislikeQueue(
 
         // Batch dislike API call
         try {
-            await window.axios.post(batchPerformAutoDislike.url(), {
+            const { data } = await window.axios.post<{ file_ids?: number[] }>(batchPerformAutoDislike.url(), {
                 file_ids: fileIds,
             });
+            const persistedFileIds = Array.isArray(data?.file_ids)
+                ? data.file_ids.filter((value): value is number => typeof value === 'number')
+                : [];
 
-            // Update reaction state in local mode (if items provided)
             if (options.isLocal.value) {
-                fileIds.forEach((fileId) => {
-                    updateReactionState(options.items, fileId, 'dislike');
-                });
+                await syncLocalAutoDislikeState(persistedFileIds);
             }
         } catch (error) {
             console.error('Failed to batch perform auto-dislike:', error);

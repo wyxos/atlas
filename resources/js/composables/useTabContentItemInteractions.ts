@@ -165,6 +165,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         items: options.items,
         masonry: options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
         isLocal: options.form.isLocal,
+        matchesActiveLocalFilters: options.matchesActiveLocalFilters,
     });
 
     const notFoundReconciliation = useTabContentNotFoundReconciliation({

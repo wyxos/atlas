@@ -18,11 +18,25 @@ function createItem(id: number): FeedItem {
     } as FeedItem;
 }
 
-function createSubject() {
+const mockAxiosPost = vi.fn();
+
+Object.defineProperty(window, 'axios', {
+    value: {
+        post: mockAxiosPost,
+    },
+    writable: true,
+});
+
+function createSubject(overrides: Parameters<typeof useAutoDislikeQueue>[0] = {
+    items: ref<FeedItem[]>([]),
+    masonry: ref(null),
+    isLocal: ref(false),
+}) {
     return useAutoDislikeQueue({
-        items: ref<FeedItem[]>([]),
-        masonry: ref(null),
-        isLocal: ref(false),
+        items: overrides.items,
+        masonry: overrides.masonry,
+        isLocal: overrides.isLocal,
+        matchesActiveLocalFilters: overrides.matchesActiveLocalFilters,
     });
 }
 
@@ -34,6 +48,12 @@ describe('useAutoDislikeQueue', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         queueManager.collection.reset();
+        mockAxiosPost.mockReset();
+        mockAxiosPost.mockResolvedValue({
+            data: {
+                file_ids: [],
+            },
+        });
     });
 
     afterEach(() => {
@@ -81,5 +101,40 @@ describe('useAutoDislikeQueue', () => {
         autoDislikeQueue.unfreezeAutoDislikeOnly('file-viewer');
         vi.advanceTimersByTime(2000);
         expect(getCountdownItem(303)?.isPaused).toBe(false);
+    });
+
+    it('removes auto-disliked local items that no longer match the active filters after countdown completion', async () => {
+        const item = createItem(404);
+        const items = ref([item]);
+        const masonry = ref({
+            remove: vi.fn().mockResolvedValue(undefined),
+        } as any);
+        mockAxiosPost.mockResolvedValueOnce({
+            data: {
+                file_ids: [404],
+            },
+        });
+
+        const autoDislikeQueue = createSubject({
+            items,
+            masonry,
+            isLocal: ref(true),
+            matchesActiveLocalFilters: () => false,
+        });
+
+        autoDislikeQueue.startAutoDislikeCountdown(404, item);
+
+        await vi.runAllTimersAsync();
+
+        expect(mockAxiosPost).toHaveBeenCalledWith(
+            expect.stringContaining('/api/files/auto-dislike/batch'),
+            {
+                file_ids: [404],
+            },
+        );
+        expect(item.reaction).toEqual({ type: 'dislike' });
+        expect(item.auto_disliked).toBe(true);
+        expect(item.will_auto_dislike).toBe(false);
+        expect(masonry.value.remove).toHaveBeenCalledWith([item]);
     });
 });
