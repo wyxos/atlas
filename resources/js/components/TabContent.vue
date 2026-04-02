@@ -406,6 +406,7 @@ defineExpose({
             :active-loaded-items-action="activeLoadedItemsAction"
             :on-run-loaded-items-action="loadedItemsActions.actions.runLoadedItemsAction"
             :cancel-masonry-load="itemInteractions.masonry.cancelLoad"
+            :go-to-first-page="browseActions.goToFirstPage"
             :load-next-page="itemInteractions.masonry.loadNextPage">
             <ContainerBlacklistManager :ref="containerInteractions.managerRef" :disabled="masonry?.isLoading"
                 @blacklists-changed="handleContainerBlacklistChange"
@@ -475,8 +476,7 @@ defineExpose({
             @reaction="itemInteractions.viewer.onReaction"
             @preview-failure="itemInteractions.viewer.onPreviewFailure" />
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
-            :visible="tab !== null && tab !== undefined && !browseState.shouldShowForm" :total="browseState.totalAvailable"
-            @first-page="browseActions.goToFirstPage" />
+            :visible="tab !== null && tab !== undefined && !browseState.shouldShowForm" :total="browseState.totalAvailable" />
 
         <TabContentPromptDialog :open="promptDialog.data.promptDialogOpen.value"
             :item-id="promptDialog.data.promptDialogItemId.value" :loading="promptDialog.data.promptDataLoading.value"

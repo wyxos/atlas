@@ -115,6 +115,69 @@ describe('useTabs', () => {
         expect(activeTabId.value).toBe(10);
     });
 
+    it('duplicates a background tab and places the copy next to the source tab', async () => {
+        const { loadTabs, duplicateTab, tabs, activeTabId } = useTabs();
+
+        mockAxios.get.mockResolvedValueOnce({
+            data: [
+                { id: 1, label: 'Tab 1', params: { page: 1 }, position: 0, is_active: true, updated_at: '2024-01-01T00:00:00Z' },
+                {
+                    id: 2,
+                    label: 'Tab 2',
+                    custom_label: 'Saved Search',
+                    params: { page: 4, service: 'civit-ai-images', serviceFilters: ['anime'] },
+                    position: 1,
+                    is_active: false,
+                    updated_at: '2024-01-02T00:00:00Z',
+                },
+                { id: 3, label: 'Tab 3', params: { page: 7 }, position: 2, is_active: false, updated_at: '2024-01-03T00:00:00Z' },
+            ],
+        });
+
+        await loadTabs();
+
+        mockAxios.post.mockImplementation((url: string) => {
+            if (url === '/api/tabs') {
+                return Promise.resolve({
+                    data: {
+                        id: 4,
+                        label: 'Tab 2',
+                        custom_label: 'Saved Search',
+                        params: { page: 4, service: 'civit-ai-images', serviceFilters: ['anime'] },
+                        position: 3,
+                        is_active: false,
+                        updated_at: '2024-01-04T00:00:00Z',
+                    },
+                });
+            }
+
+            if (url === '/api/tabs/reorder') {
+                return Promise.resolve({
+                    data: {
+                        ordered_ids: [1, 2, 4, 3],
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const duplicate = await duplicateTab(2);
+
+        expect(mockAxios.post).toHaveBeenNthCalledWith(1, '/api/tabs', {
+            label: 'Tab 2',
+            custom_label: 'Saved Search',
+            params: { page: 4, service: 'civit-ai-images', serviceFilters: ['anime'] },
+            position: 3,
+        });
+        expect(mockAxios.post).toHaveBeenNthCalledWith(2, '/api/tabs/reorder', {
+            ordered_ids: [1, 2, 4, 3],
+        });
+        expect(duplicate?.id).toBe(4);
+        expect(tabs.value.map(tab => tab.id)).toEqual([1, 2, 4, 3]);
+        expect(activeTabId.value).toBe(1);
+    });
+
     it('closes the active tab and activates the most recently focused surviving tab', async () => {
         const { tabs, activeTabId, closeTab, loadTabs, setActiveTab } = useTabs();
 

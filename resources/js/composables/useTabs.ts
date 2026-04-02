@@ -368,6 +368,34 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
+    async function duplicateTab(tabId: number): Promise<TabData | undefined> {
+        const sourceTab = tabs.value.find(tab => tab.id === tabId);
+        if (!sourceTab) {
+            return undefined;
+        }
+
+        const createdTab = await createTab({
+            label: sourceTab.label,
+            customLabel: sourceTab.customLabel ?? null,
+            params: cloneParams(sourceTab.params),
+            activate: sourceTab.id === activeTabId.value,
+        });
+
+        const orderedIds = tabs.value.map(tab => tab.id);
+        const sourceIndex = orderedIds.indexOf(tabId);
+        const createdIndex = orderedIds.indexOf(createdTab.id);
+
+        if (sourceIndex === -1 || createdIndex === -1 || createdIndex === sourceIndex + 1) {
+            return tabs.value.find(tab => tab.id === createdTab.id) ?? createdTab;
+        }
+
+        const nextOrderedIds = orderedIds.filter(id => id !== createdTab.id);
+        nextOrderedIds.splice(sourceIndex + 1, 0, createdTab.id);
+        await reorderTabs(nextOrderedIds);
+
+        return tabs.value.find(tab => tab.id === createdTab.id) ?? createdTab;
+    }
+
     async function closeTab(tabId: number): Promise<void> {
         await closeTabs([tabId]);
     }
@@ -531,6 +559,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         isLoadingTabs,
         loadTabs,
         createTab,
+        duplicateTab,
         closeTab,
         closeTabs,
         getActiveTab,

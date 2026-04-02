@@ -111,4 +111,48 @@ describe('TabContent - Local Page Jump', () => {
         expect(masonry.props('page')).toBe(50);
         expect(form.data.page).toBe(50);
     });
+
+    it('renders the first-page control in the header actions and resets local pagination to page 1', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab: {
+                    id: 445,
+                    label: 'Browse 1',
+                    params: {
+                        feed: 'local',
+                        source: 'all',
+                        page: 50,
+                        limit: 20,
+                    },
+                    items: [],
+                    position: 0,
+                    isActive: true,
+                },
+            },
+        });
+
+        const wrapper = mount(TabContent, {
+            props: {
+                tabId: 445,
+                availableServices: [],
+                onReaction: vi.fn(),
+                updateActiveTab: vi.fn(),
+            },
+        });
+
+        await flushPromises();
+
+        const form = (wrapper.vm as any).$?.provides?.[BrowseFormKey];
+        expect(form).toBeTruthy();
+
+        const firstPageButton = wrapper.find('[data-test="go-first-page-button"]');
+        expect(firstPageButton.exists()).toBe(true);
+
+        await firstPageButton.trigger('click');
+        await nextTick();
+
+        const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+        expect(masonry.props('page')).toBe(1);
+        expect(form.data.page).toBe(1);
+    });
 });

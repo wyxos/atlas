@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, Play, RotateCcw, X } from 'lucide-vue-next';
+import { ChevronDown, ChevronsUp, Play, RotateCcw, X } from 'lucide-vue-next';
 import type { MasonryInstance } from '@wyxos/vibe';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +35,7 @@ interface Props {
     activeLoadedItemsAction: LoadedItemsAction | null;
     onRunLoadedItemsAction: (action: LoadedItemsAction) => void | Promise<void>;
     cancelMasonryLoad: () => void;
+    goToFirstPage: () => void | Promise<void>;
     loadNextPage: () => void | Promise<void>;
 }
 
@@ -195,6 +196,12 @@ function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
             <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                 data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
                 <X :size="14" />
+            </Button>
+
+            <Button @click="goToFirstPage" size="sm" variant="ghost" class="h-10 w-10"
+                data-test="go-first-page-button" title="Go to first page"
+                :disabled="masonry?.isLoading">
+                <ChevronsUp :size="14" />
             </Button>
 
             <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"

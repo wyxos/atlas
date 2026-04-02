@@ -322,6 +322,7 @@ vi.mock('lucide-vue-next', () => ({
     Info: { name: 'Info', template: '<div class="info-icon"></div>', props: ['size'] },
     Copy: { name: 'Copy', template: '<div class="copy-icon"></div>', props: ['size', 'class'] },
     ChevronsLeft: { name: 'ChevronsLeft', template: '<div class="chevrons-left-icon"></div>', props: ['size'] },
+    ChevronsUp: { name: 'ChevronsUp', template: '<div class="chevrons-up-icon"></div>', props: ['size', 'class'] },
     SlidersHorizontal: { name: 'SlidersHorizontal', template: '<div class="sliders-icon"></div>', props: ['size'] },
     X: { name: 'X', template: '<div class="x-icon"></div>', props: ['size', 'class'] },
     Check: { name: 'Check', template: '<div class="check-icon"></div>', props: ['size', 'class'] },

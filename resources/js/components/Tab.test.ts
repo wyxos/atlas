@@ -85,6 +85,35 @@ describe('Tab', () => {
         wrapper.unmount();
     });
 
+    it('emits duplicate from the tab context menu', async () => {
+        const wrapper = mount(Tab, {
+            attachTo: document.body,
+            props: {
+                id: 1,
+                label: 'Generated Label',
+                customLabel: 'Pinned Search',
+            },
+        });
+
+        await wrapper.get('[role="button"]').trigger('contextmenu', {
+            button: 2,
+            clientX: 24,
+            clientY: 24,
+        });
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+        const duplicateAction = document.body.querySelector('[data-test="tab-context-duplicate"]');
+        if (!(duplicateAction instanceof HTMLElement)) {
+            throw new Error('Duplicate action did not render.');
+        }
+
+        duplicateAction.click();
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+        expect(wrapper.emitted('duplicate')).toHaveLength(1);
+        wrapper.unmount();
+    });
+
     it('emits drag lifecycle events with before and after drop indicators', async () => {
         const wrapper = mount(Tab, {
             props: {

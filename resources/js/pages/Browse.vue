@@ -52,6 +52,7 @@ const {
     loadTabs: loadTabsFromComposable,
     createTab,
     closeTabs,
+    duplicateTab,
     getActiveTab,
     reorderTabs,
     updateActiveTab,
@@ -111,6 +112,10 @@ function handleUpdateTabLabel(label: string): void {
 
 function handleRenameTab(tabId: number, customLabel: string | null): void {
     updateTabCustomLabel(tabId, customLabel);
+}
+
+async function handleDuplicateTab(tabId: number): Promise<void> {
+    await duplicateTab(tabId);
 }
 
 async function handleOpenContainerTab(payload: ContainerTabPayload): Promise<void> {
@@ -313,6 +318,7 @@ onUnmounted(() => {
                         @click="switchTab(tab.id)"
                         @close="handleCloseTab(tab.id)"
                         @rename="handleRenameTab(tab.id, $event)"
+                        @duplicate="handleDuplicateTab(tab.id)"
                         @close-above="handleCloseTabsRelative(tab.id, 'above')"
                         @close-below="handleCloseTabsRelative(tab.id, 'below')"
                         @close-others="handleCloseTabsRelative(tab.id, 'others')"

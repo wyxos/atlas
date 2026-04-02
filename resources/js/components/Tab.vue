@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, useAttrs, watch } from 'vue';
-import { X, Layers, Loader2, SquarePen } from 'lucide-vue-next';
+import { Copy, X, Layers, Loader2, SquarePen } from 'lucide-vue-next';
 import {
     ContextMenu,
     ContextMenuContent,
@@ -32,6 +32,7 @@ const emit = defineEmits<{
     click: [];
     close: [];
     rename: [customLabel: string | null];
+    duplicate: [];
     'close-above': [];
     'close-below': [];
     'close-others': [];
@@ -348,6 +349,15 @@ function handleDragEnd(): void {
                     <span>Clear custom label</span>
                 </ContextMenuItem>
             </template>
+            <ContextMenuSeparator class="bg-twilight-indigo-500" />
+            <ContextMenuItem
+                class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                data-test="tab-context-duplicate"
+                @select="emit('duplicate')"
+            >
+                <Copy :size="14" />
+                <span>Duplicate tab</span>
+            </ContextMenuItem>
             <ContextMenuSeparator class="bg-twilight-indigo-500" />
             <ContextMenuItem
                 :disabled="!canCloseAbove"
