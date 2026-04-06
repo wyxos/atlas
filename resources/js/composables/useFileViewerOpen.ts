@@ -1,4 +1,4 @@
-import { nextTick, toRefs, type Ref } from 'vue';
+import { nextTick, onUnmounted, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 import {
     preloadImage,
@@ -73,9 +73,60 @@ export function useFileViewerOpen(params: {
     const { isOpen } = toRefs(params.sheet);
     const borderWidth = 4;
     const transitionDurationMs = 500;
+    let openSession = 0;
+    let pendingImageAbortController: AbortController | null = null;
+    let pendingEscapeHandler: ((event: KeyboardEvent) => void) | null = null;
 
     function wait(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function clearPendingEscapeHandler(): void {
+        if (!pendingEscapeHandler) {
+            return;
+        }
+
+        window.removeEventListener('keydown', pendingEscapeHandler);
+        pendingEscapeHandler = null;
+    }
+
+    function clearPendingOpenSideEffects(): void {
+        pendingImageAbortController = null;
+        clearPendingEscapeHandler();
+    }
+
+    function cancelPendingOpen(): void {
+        openSession += 1;
+        pendingImageAbortController?.abort();
+        clearPendingOpenSideEffects();
+    }
+
+    function isOpenCancelled(sessionId: number): boolean {
+        return sessionId !== openSession || isClosing.value;
+    }
+
+    function isAbortError(error: unknown): boolean {
+        return error instanceof Error && error.name === 'AbortError';
+    }
+
+    function beginEscapeCancellation(sessionId: number): void {
+        clearPendingEscapeHandler();
+
+        pendingEscapeHandler = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') {
+                return;
+            }
+
+            if (sessionId !== openSession || fillComplete.value || isClosing.value || !rect.value) {
+                return;
+            }
+
+            event.preventDefault();
+            cancelPendingOpen();
+            params.closeOverlay();
+        };
+
+        window.addEventListener('keydown', pendingEscapeHandler);
     }
 
     function getContainerSize(container: HTMLElement): { width: number; height: number } {
@@ -124,6 +175,8 @@ export function useFileViewerOpen(params: {
         const container = params.masonryContainerRef.value;
         const tabContent = params.containerRef.value;
         if (!container || !tabContent) return;
+        cancelPendingOpen();
+        const sessionId = ++openSession;
 
         if (overflow.value === null) {
             overflow.value = tabContent.style.overflow || '';
@@ -206,8 +259,12 @@ export function useFileViewerOpen(params: {
         isAnimating.value = false;
 
         params.emitOpen();
+        beginEscapeCancellation(sessionId);
 
         await nextTick();
+        if (isOpenCancelled(sessionId)) {
+            return;
+        }
 
         try {
             if (target.isVideo) {
@@ -224,31 +281,70 @@ export function useFileViewerOpen(params: {
                 isLoading.value = false;
                 await nextTick();
             } else {
-                const imageDimensions = await preloadImage(target.fullSizeUrl);
+                pendingImageAbortController = new AbortController();
+                const imageDimensions = await preloadImage(
+                    target.fullSizeUrl,
+                    pendingImageAbortController.signal,
+                );
+                pendingImageAbortController = null;
+                if (isOpenCancelled(sessionId)) {
+                    return;
+                }
+
                 originalDimensions.value = imageDimensions;
                 fullSizeImage.value = target.fullSizeUrl;
                 isLoading.value = false;
 
                 await nextTick();
+                if (isOpenCancelled(sessionId)) {
+                    return;
+                }
+
                 await wait(50);
             }
         } catch (error) {
+            pendingImageAbortController = null;
+            if (isAbortError(error) || isOpenCancelled(sessionId)) {
+                return;
+            }
+
             console.warn('Failed to preload full-size image, using original:', error);
             params.emitPreviewFailure(masonryItem);
             fullSizeImage.value = target.previewSrc;
             isLoading.value = false;
             try {
-                const fallbackDimensions = await preloadImage(target.previewSrc);
+                pendingImageAbortController = new AbortController();
+                const fallbackDimensions = await preloadImage(
+                    target.previewSrc,
+                    pendingImageAbortController.signal,
+                );
+                pendingImageAbortController = null;
+                if (isOpenCancelled(sessionId)) {
+                    return;
+                }
+
                 originalDimensions.value = fallbackDimensions;
             } catch {
+                pendingImageAbortController = null;
                 originalDimensions.value = target.originalDimensions;
             }
             await nextTick();
         }
 
         await nextTick();
+        if (isOpenCancelled(sessionId)) {
+            return;
+        }
+
         await wait(50);
+        if (isOpenCancelled(sessionId)) {
+            return;
+        }
+
         await wait(0);
+        if (isOpenCancelled(sessionId)) {
+            return;
+        }
 
         if (!rect.value) return;
 
@@ -266,7 +362,7 @@ export function useFileViewerOpen(params: {
         };
 
         setTimeout(() => {
-            if (!container || !rect.value || !originalDimensions.value) return;
+            if (isOpenCancelled(sessionId) || !container || !rect.value || !originalDimensions.value) return;
 
             updateOverlayLayout(
                 tabContent,
@@ -283,15 +379,20 @@ export function useFileViewerOpen(params: {
             };
 
             setTimeout(() => {
-                if (isClosing.value) {
+                if (isOpenCancelled(sessionId)) {
                     return;
                 }
 
+                clearPendingOpenSideEffects();
                 fillComplete.value = true;
                 void params.handleItemSeen(masonryItem.id);
             }, transitionDurationMs);
         }, transitionDurationMs);
     }
+
+    onUnmounted(() => {
+        cancelPendingOpen();
+    });
 
     return {
         openFromClick,

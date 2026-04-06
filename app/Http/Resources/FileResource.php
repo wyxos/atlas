@@ -164,6 +164,33 @@ class FileResource extends JsonResource
             // Omit persisted details if relation isn't available or anything fails.
         }
 
+        $containers = $this->resource->relationLoaded('containers')
+            ? $this->resource->getRelation('containers')->map(function ($container): array {
+                return [
+                    'id' => (int) ($container->id ?? 0),
+                    'type' => (string) ($container->type ?? ''),
+                    'source' => (string) ($container->source ?? ''),
+                    'source_id' => is_string($container->source_id) && trim($container->source_id) !== ''
+                        ? $container->source_id
+                        : null,
+                    'referrer' => is_string($container->referrer) && trim($container->referrer) !== ''
+                        ? $container->referrer
+                        : null,
+                    'blacklisted' => $container->blacklisted_at !== null,
+                    'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
+                    'action_type' => is_string($container->action_type) && trim($container->action_type) !== ''
+                        ? $container->action_type
+                        : null,
+                    'file_stats' => [
+                        'unreacted' => (int) ($container->unreacted_files_count ?? 0),
+                        'blacklisted' => (int) ($container->blacklisted_files_count ?? 0),
+                        'disliked' => (int) ($container->disliked_files_count ?? 0),
+                        'positive' => (int) ($container->positive_files_count ?? 0),
+                    ],
+                ];
+            })->values()->all()
+            : [];
+
         return [
             'id' => $this->id,
             'source' => $this->source,
@@ -209,6 +236,7 @@ class FileResource extends JsonResource
             'listing_metadata' => $listingMetadata,
             'detail_metadata' => $this->detail_metadata,
             'metadata' => $this->metadata ? ['payload' => $this->metadata->payload] : null,
+            'containers' => $containers,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
         ];

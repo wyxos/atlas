@@ -1,3 +1,17 @@
+import type { ContainerBlacklistActionType, ContainerBlacklistFileStats } from './container-blacklist';
+
+export interface FileContainer {
+    id: number;
+    type: string;
+    source: string;
+    source_id: string | null;
+    referrer?: string | null;
+    blacklisted: boolean;
+    blacklisted_at: string | null;
+    action_type: ContainerBlacklistActionType | null;
+    file_stats: ContainerBlacklistFileStats;
+}
+
 export interface File {
     id: number;
     source: string;
@@ -42,6 +56,7 @@ export interface File {
     not_found: boolean;
     listing_metadata: Record<string, unknown> | null;
     detail_metadata: Record<string, unknown> | null;
+    containers?: FileContainer[];
     created_at: string;
     updated_at: string;
 }

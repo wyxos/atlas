@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick, reactive } from 'vue';
 import FileViewer from './FileViewer.vue';
+import { clearFileViewerPreloadCache } from '@/utils/fileViewer';
 
 const containerRef = document.createElement('div');
 containerRef.getBoundingClientRect = () => ({
@@ -18,6 +19,7 @@ containerRef.getBoundingClientRect = () => ({
 
 afterEach(() => {
     containerRef.replaceChildren();
+    clearFileViewerPreloadCache({ abortPending: true });
     vi.useRealTimers();
 });
 
@@ -36,6 +38,7 @@ function clearLocalStorage(): void {
 
 beforeEach(() => {
     clearLocalStorage();
+    clearFileViewerPreloadCache({ abortPending: true });
 
     const mockAxios = {
         post: vi.fn().mockResolvedValue({ data: { seen_count: 1 } }),

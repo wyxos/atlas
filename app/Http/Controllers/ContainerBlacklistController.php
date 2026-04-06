@@ -77,7 +77,10 @@ class ContainerBlacklistController extends Controller
         $userId = auth()->id();
 
         $container->loadCount([
-            'files as unreacted_files_count' => fn ($query) => $query->whereDoesntHave('reactions', fn ($reactionQuery) => $reactionQuery->where('user_id', $userId)),
+            'files as unreacted_files_count' => fn ($query) => $query
+                ->whereNull('files.blacklisted_at')
+                ->where('files.not_found', false)
+                ->whereDoesntHave('reactions', fn ($reactionQuery) => $reactionQuery->where('user_id', $userId)),
             'files as blacklisted_files_count' => fn ($query) => $query->whereNotNull('files.blacklisted_at'),
             'files as disliked_files_count' => fn ($query) => $query->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
                 ->where('user_id', $userId)

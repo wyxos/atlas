@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\Storage;
 
 class FilesController extends Controller
 {
+    private const DISLIKE_REACTION_TYPES = ['dislike'];
+
+    private const POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
+
     /**
      * Display a listing of the files.
      *
@@ -34,8 +38,7 @@ class FilesController extends Controller
      */
     public function show(File $file): JsonResponse
     {
-        // Load metadata relationship for prompt data
-        $file->load(['metadata', 'autoDislikeModerationAction', 'autoBlacklistModerationAction']);
+        $this->loadViewerRelations($file);
         $this->hydrateDiskMetadata($file);
 
         return response()->json([
@@ -256,11 +259,62 @@ SVG;
             ]);
         }
 
-        $file->load(['metadata', 'autoDislikeModerationAction', 'autoBlacklistModerationAction']);
+        $this->loadViewerRelations($file);
 
         return response()->json([
             'message' => 'File deleted from disk. Record kept.',
             'file' => new \App\Http\Resources\FileResource($file),
+        ]);
+    }
+
+    private function loadViewerRelations(File $file): void
+    {
+        $userId = Auth::id();
+
+        $file->load([
+            'metadata',
+            'autoDislikeModerationAction',
+            'autoBlacklistModerationAction',
+            'containers' => function ($query) use ($userId) {
+                $query->withCount([
+                    'files as unreacted_files_count' => function ($containerFilesQuery) use ($userId) {
+                        $containerFilesQuery
+                            ->whereNull('files.blacklisted_at')
+                            ->where('files.not_found', false);
+
+                        if (is_int($userId)) {
+                            $containerFilesQuery->whereDoesntHave('reactions', fn ($reactionQuery) => $reactionQuery->where('user_id', $userId));
+
+                            return;
+                        }
+
+                        $containerFilesQuery->whereDoesntHave('reactions');
+                    },
+                    'files as blacklisted_files_count' => fn ($containerFilesQuery) => $containerFilesQuery->whereNotNull('files.blacklisted_at'),
+                    'files as disliked_files_count' => function ($containerFilesQuery) use ($userId) {
+                        if (! is_int($userId)) {
+                            $containerFilesQuery->whereRaw('0 = 1');
+
+                            return;
+                        }
+
+                        $containerFilesQuery->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
+                            ->where('user_id', $userId)
+                            ->whereIn('type', self::DISLIKE_REACTION_TYPES));
+                    },
+                    'files as positive_files_count' => function ($containerFilesQuery) use ($userId) {
+                        if (! is_int($userId)) {
+                            $containerFilesQuery->whereRaw('0 = 1');
+
+                            return;
+                        }
+
+                        $containerFilesQuery->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
+                            ->where('user_id', $userId)
+                            ->whereIn('type', self::POSITIVE_REACTION_TYPES));
+                    },
+                ]);
+            },
         ]);
     }
 

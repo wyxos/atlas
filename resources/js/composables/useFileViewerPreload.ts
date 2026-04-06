@@ -1,6 +1,11 @@
-import { ref, watch, type Ref } from 'vue';
+import { watch, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 import { getMimeTypeCategory } from '@/utils/file';
+import {
+    clearFileViewerPreloadCache,
+    preloadImage,
+    preloadVideoMetadata,
+} from '@/utils/fileViewer';
 
 interface PreloadOptions {
     items: Ref<FeedItem[]>;
@@ -15,58 +20,6 @@ export function useFileViewerPreload({
     fillComplete,
     preloadCount = 2,
 }: PreloadOptions) {
-    const preloadedUrls = ref<Set<string>>(new Set());
-    const preloadingUrls = ref<Set<string>>(new Set());
-
-    function preloadImage(url: string): Promise<void> {
-        if (preloadedUrls.value.has(url) || preloadingUrls.value.has(url)) {
-            return Promise.resolve();
-        }
-
-        preloadingUrls.value.add(url);
-
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                preloadedUrls.value.add(url);
-                preloadingUrls.value.delete(url);
-                resolve();
-            };
-            img.onerror = () => {
-                preloadingUrls.value.delete(url);
-                resolve(); // Don't reject, just skip failed preloads
-            };
-            img.src = url;
-        });
-    }
-
-    function preloadVideo(url: string): Promise<void> {
-        if (preloadedUrls.value.has(url) || preloadingUrls.value.has(url)) {
-            return Promise.resolve();
-        }
-
-        preloadingUrls.value.add(url);
-
-        return new Promise((resolve) => {
-            const video = document.createElement('video');
-            video.preload = 'metadata';
-
-            video.onloadedmetadata = () => {
-                preloadedUrls.value.add(url);
-                preloadingUrls.value.delete(url);
-                resolve();
-            };
-            video.onerror = () => {
-                preloadingUrls.value.delete(url);
-                resolve();
-            };
-
-            // Start loading but don't add to DOM
-            video.src = url;
-            video.load();
-        });
-    }
-
     function preloadItem(item: FeedItem): void {
         const mediaKind = typeof item.media_kind === 'string' ? item.media_kind : null;
         const mimeType = typeof item.mime_type === 'string' ? item.mime_type : null;
@@ -83,22 +36,22 @@ export function useFileViewerPreload({
         if (isVideo) {
             // Preload video poster (preview image) and optionally video metadata
             if (item.preview) {
-                void preloadImage(item.preview);
+                void preloadImage(item.preview).catch(() => {});
             }
             if (item.original) {
-                void preloadVideo(item.original);
+                void preloadVideoMetadata(item.original);
             }
         } else if (isAudio || isFile) {
             // Keep it light: preload the icon/thumbnail, not the underlying file stream.
             if (item.preview) {
-                void preloadImage(item.preview);
+                void preloadImage(item.preview).catch(() => {});
             }
         } else {
             // Preload full-size image
             if (item.original) {
-                void preloadImage(item.original);
+                void preloadImage(item.original).catch(() => {});
             } else if (item.preview) {
-                void preloadImage(item.preview);
+                void preloadImage(item.preview).catch(() => {});
             }
         }
     }
@@ -135,12 +88,10 @@ export function useFileViewerPreload({
     });
 
     function clearPreloadCache(): void {
-        preloadedUrls.value.clear();
-        preloadingUrls.value.clear();
+        clearFileViewerPreloadCache();
     }
 
     return {
-        preloadedUrls,
         preloadNextItems,
         clearPreloadCache,
     };

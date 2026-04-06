@@ -8,14 +8,270 @@ import type { FeedItem } from '@/composables/useTabs';
 import { getMimeTypeCategory } from '@/utils/file';
 
 export type FileViewerOverlayMediaType = 'image' | 'video' | 'audio' | 'file';
+type ImageDimensions = { width: number; height: number };
 
-export function preloadImage(url: string): Promise<{ width: number; height: number }> {
+type PendingImagePreload = {
+    promise: Promise<ImageDimensions>;
+    consumers: number;
+    abort: () => void;
+};
+
+type PendingVideoPreload = {
+    promise: Promise<void>;
+    consumers: number;
+};
+
+const MAX_COMPLETED_IMAGE_PRELOADS = 64;
+const MAX_COMPLETED_VIDEO_PRELOADS = 32;
+const completedImagePreloads = new Map<string, ImageDimensions>();
+const pendingImagePreloads = new Map<string, PendingImagePreload>();
+const completedVideoPreloads = new Set<string>();
+const pendingVideoPreloads = new Map<string, PendingVideoPreload>();
+
+function createImagePreloadAbortError(): Error {
+    try {
+        return new DOMException('Image preload aborted', 'AbortError');
+    } catch {
+        const error = new Error('Image preload aborted');
+        error.name = 'AbortError';
+        return error;
+    }
+}
+
+function rememberCompletedImagePreload(url: string, dimensions: ImageDimensions): void {
+    if (completedImagePreloads.has(url)) {
+        completedImagePreloads.delete(url);
+    }
+
+    completedImagePreloads.set(url, dimensions);
+
+    while (completedImagePreloads.size > MAX_COMPLETED_IMAGE_PRELOADS) {
+        const oldestUrl = completedImagePreloads.keys().next().value;
+        if (typeof oldestUrl !== 'string') {
+            break;
+        }
+
+        completedImagePreloads.delete(oldestUrl);
+    }
+}
+
+function rememberCompletedVideoPreload(url: string): void {
+    if (completedVideoPreloads.has(url)) {
+        completedVideoPreloads.delete(url);
+    }
+
+    completedVideoPreloads.add(url);
+
+    while (completedVideoPreloads.size > MAX_COMPLETED_VIDEO_PRELOADS) {
+        const oldestUrl = completedVideoPreloads.values().next().value;
+        if (typeof oldestUrl !== 'string') {
+            break;
+        }
+
+        completedVideoPreloads.delete(oldestUrl);
+    }
+}
+
+function createPendingImagePreload(url: string): PendingImagePreload {
+    const img = new Image();
+    let settled = false;
+    let resolvePromise: ((value: ImageDimensions) => void) | null = null;
+    let rejectPromise: ((reason?: unknown) => void) | null = null;
+
+    const cleanup = (): void => {
+        img.onload = null;
+        img.onerror = null;
+    };
+
+    const rejectOnce = (error: Error): void => {
+        if (settled) {
+            return;
+        }
+
+        settled = true;
+        cleanup();
+        pendingImagePreloads.delete(url);
+        rejectPromise?.(error);
+    };
+
+    const entry: PendingImagePreload = {
+        promise: new Promise<ImageDimensions>((resolve, reject) => {
+            resolvePromise = resolve;
+            rejectPromise = reject;
+        }),
+        consumers: 0,
+        abort: () => {
+            try {
+                img.src = '';
+            } catch {
+                // Ignore browser-specific image reset errors.
+            }
+
+            rejectOnce(createImagePreloadAbortError());
+        },
+    };
+
+    img.onload = () => {
+        if (settled) {
+            return;
+        }
+
+        settled = true;
+        cleanup();
+        const dimensions = { width: img.naturalWidth, height: img.naturalHeight };
+        pendingImagePreloads.delete(url);
+        rememberCompletedImagePreload(url, dimensions);
+        resolvePromise?.(dimensions);
+    };
+    img.onerror = () => rejectOnce(new Error(`Failed to load image: ${url}`));
+    img.src = url;
+    pendingImagePreloads.set(url, entry);
+
+    return entry;
+}
+
+function attachImagePreloadConsumer(
+    url: string,
+    entry: PendingImagePreload,
+    signal?: AbortSignal,
+): Promise<ImageDimensions> {
+    entry.consumers += 1;
+
     return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-        img.src = url;
+        let settled = false;
+
+        const cleanup = (): void => {
+            if (settled) {
+                return;
+            }
+
+            settled = true;
+            entry.consumers = Math.max(0, entry.consumers - 1);
+            signal?.removeEventListener('abort', handleAbort);
+        };
+
+        const handleAbort = (): void => {
+            if (settled) {
+                return;
+            }
+
+            cleanup();
+            if (entry.consumers === 0 && pendingImagePreloads.get(url) === entry) {
+                entry.abort();
+            }
+
+            reject(createImagePreloadAbortError());
+        };
+
+        if (signal?.aborted) {
+            handleAbort();
+            return;
+        }
+
+        signal?.addEventListener('abort', handleAbort, { once: true });
+
+        entry.promise.then(
+            (value) => {
+                if (settled) {
+                    return;
+                }
+
+                cleanup();
+                resolve(value);
+            },
+            (error) => {
+                if (settled) {
+                    return;
+                }
+
+                cleanup();
+                reject(error);
+            },
+        );
     });
+}
+
+export function preloadImage(url: string, signal?: AbortSignal): Promise<ImageDimensions> {
+    const normalizedUrl = url.trim();
+    if (normalizedUrl === '') {
+        return Promise.reject(new Error('Failed to load image:'));
+    }
+
+    const completed = completedImagePreloads.get(normalizedUrl);
+    if (completed) {
+        return Promise.resolve(completed);
+    }
+
+    const pending = pendingImagePreloads.get(normalizedUrl) ?? createPendingImagePreload(normalizedUrl);
+
+    return attachImagePreloadConsumer(normalizedUrl, pending, signal);
+}
+
+export function preloadVideoMetadata(url: string): Promise<void> {
+    const normalizedUrl = url.trim();
+    if (normalizedUrl === '') {
+        return Promise.resolve();
+    }
+
+    if (completedVideoPreloads.has(normalizedUrl)) {
+        return Promise.resolve();
+    }
+
+    const pending = pendingVideoPreloads.get(normalizedUrl);
+    if (pending) {
+        pending.consumers += 1;
+
+        return pending.promise.finally(() => {
+            pending.consumers = Math.max(0, pending.consumers - 1);
+        });
+    }
+
+    const promise = new Promise<void>((resolve) => {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+
+        const complete = (): void => {
+            video.onloadedmetadata = null;
+            video.onerror = null;
+            pendingVideoPreloads.delete(normalizedUrl);
+            rememberCompletedVideoPreload(normalizedUrl);
+            resolve();
+        };
+
+        video.onloadedmetadata = complete;
+        video.onerror = complete;
+        video.src = normalizedUrl;
+        video.load();
+    });
+
+    pendingVideoPreloads.set(normalizedUrl, {
+        promise,
+        consumers: 1,
+    });
+
+    return promise.finally(() => {
+        const entry = pendingVideoPreloads.get(normalizedUrl);
+        if (!entry) {
+            return;
+        }
+
+        entry.consumers = Math.max(0, entry.consumers - 1);
+    });
+}
+
+export function clearFileViewerPreloadCache(options: { abortPending?: boolean } = {}): void {
+    completedImagePreloads.clear();
+    completedVideoPreloads.clear();
+
+    if (!options.abortPending) {
+        return;
+    }
+
+    for (const entry of pendingImagePreloads.values()) {
+        entry.abort();
+    }
+    pendingImagePreloads.clear();
+    pendingVideoPreloads.clear();
 }
 
 export function calculateBestFitSize(

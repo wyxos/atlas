@@ -41,6 +41,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         previewed_count: 0,
         seen_at: null,
         seen_count: 0,
+        auto_disliked: false,
         blacklisted_at: null,
         blacklist_reason: null,
         downloaded: true,
@@ -49,6 +50,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         not_found: false,
         listing_metadata: null,
         detail_metadata: null,
+        containers: [],
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
         ...overrides,
@@ -86,6 +88,53 @@ describe('FileViewerSheet', () => {
             'Path',
             { showToast: false }
         );
+    });
+
+    it('renders container state and stats when file details include containers', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile({
+                    containers: [
+                        {
+                            id: 17,
+                            type: 'gallery',
+                            source: 'CivitAI',
+                            source_id: 'abc123',
+                            referrer: 'https://example.com/gallery/abc123',
+                            blacklisted: true,
+                            blacklisted_at: '2026-04-06T09:30:00Z',
+                            action_type: 'blacklist',
+                            file_stats: {
+                                unreacted: 12,
+                                blacklisted: 9,
+                                disliked: 3,
+                                positive: 4,
+                            },
+                        },
+                    ],
+                }),
+            },
+        });
+
+        const text = wrapper.text();
+
+        expect(text).toContain('Containers');
+        expect(text).toContain('#17 gallery');
+        expect(text).toContain('CivitAI');
+        expect(text).toContain('abc123');
+        expect(text).toContain('blacklisted');
+        expect(text).toContain('Action');
+        expect(text).toContain('Unreacted');
+        expect(text).toContain('12');
+        expect(text).toContain('Blacklisted');
+        expect(text).toContain('9');
+        expect(text).toContain('Disliked');
+        expect(text).toContain('3');
+        expect(text).toContain('Positive');
+        expect(text).toContain('4');
     });
 });
 

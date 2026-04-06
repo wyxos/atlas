@@ -30,7 +30,7 @@ test('compiler builds default browse query', function () {
 
     expect($compiled['mode'])->toBe('files')
         ->and($compiled['collection'])->toBe(app(LocalBrowseTypesenseNames::class)->filesAlias())
-        ->and($compiled['options']['filter_by'])->toBe('')
+        ->and($compiled['options']['filter_by'])->toBe('not_found:=false')
         ->and($compiled['options']['sort_by'])->toBe('downloaded_at:desc,updated_at:desc,sort_id:desc');
 });
 
@@ -55,6 +55,7 @@ test('compiler builds source downloaded file-type and random filters', function 
     ], 7);
 
     expect($compiled['options']['filter_by'])->toContain('source:=`Wallhaven`')
+        ->and($compiled['options']['filter_by'])->toContain('not_found:=false')
         ->and($compiled['options']['filter_by'])->toContain('downloaded:=false')
         ->and($compiled['options']['filter_by'])->toContain('previewed_count:<=2')
         ->and($compiled['options']['filter_by'])->toContain('mime_group:=[`video`]')
@@ -87,8 +88,10 @@ test('compiler builds blacklisted manual auto and auto disliked filters', functi
     ], 11);
 
     expect($manualFilter)->toContain('blacklisted:=true')
+        ->and($manualFilter)->toContain('not_found:=false')
         ->and($manualFilter)->toContain('blacklist_type:=`manual`')
         ->and($manualFilter)->toContain('auto_disliked:=true')
+        ->and($autoFilter)->toContain('not_found:=false')
         ->and($autoFilter)->toContain('blacklisted:=true')
         ->and($autoFilter)->toContain('blacklist_type:=`auto`')
         ->and($autoFilter)->toContain('auto_disliked:=false');
@@ -131,10 +134,13 @@ test('compiler builds reacted types and unreacted filters', function () {
     ], 9);
 
     expect($reacted)->toContain('love_user_ids:=[9]')
+        ->and($reacted)->toContain('not_found:=false')
         ->and($reacted)->toContain('like_user_ids:=[9]')
         ->and($reacted)->toContain('funny_user_ids:=[9]')
+        ->and($typed)->toContain('not_found:=false')
         ->and($typed)->toContain('dislike_user_ids:=[9]')
         ->and($typed)->toContain('funny_user_ids:=[9]')
+        ->and($unreacted)->toContain('not_found:=false')
         ->and($unreacted)->toContain('reacted_user_ids:!=[9]');
 });
 
@@ -152,6 +158,7 @@ test('compiler builds moderation union filter', function () {
     ], 11);
 
     expect($filter)->toContain('auto_disliked:=true && dislike_user_ids:=[11]')
+        ->and($filter)->toContain('not_found:=false')
         ->and($filter)->toContain('blacklisted:=true && blacklist_type:=`auto`');
 });
 
@@ -197,6 +204,7 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         ->and($desc['options']['filter_by'])->toContain('user_id:=5')
         ->and($desc['options']['filter_by'])->toContain('type:=[`love`, `like`, `funny`]')
         ->and($desc['options']['filter_by'])->toContain('$atlas_local_local_browse_files__v20260331_000000(')
+        ->and($desc['options']['filter_by'])->toContain('not_found:=false')
         ->and($desc['options']['filter_by'])->toContain('source:=`CivitAI`')
         ->and($desc['options']['filter_by'])->toContain('downloaded:=true')
         ->and($desc['options']['filter_by'])->toContain('blacklisted:=false')

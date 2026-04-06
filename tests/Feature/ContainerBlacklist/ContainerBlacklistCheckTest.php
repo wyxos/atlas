@@ -75,6 +75,9 @@ test('check returns container file stats scoped to the current user', function (
     $blacklistedFile = File::factory()->create([
         'blacklisted_at' => now(),
     ]);
+    $notFoundFile = File::factory()->create([
+        'not_found' => true,
+    ]);
     $otherUserPositiveFile = File::factory()->create();
     $untouchedFile = File::factory()->create();
     $dislikedFile = File::factory()->create();
@@ -82,6 +85,7 @@ test('check returns container file stats scoped to the current user', function (
     $container->files()->attach([
         $positiveFile->id,
         $blacklistedFile->id,
+        $notFoundFile->id,
         $otherUserPositiveFile->id,
         $untouchedFile->id,
         $dislikedFile->id,
@@ -109,7 +113,7 @@ test('check returns container file stats scoped to the current user', function (
 
     $response->assertSuccessful();
     expect($response->json('file_stats'))->toBe([
-        'unreacted' => 3,
+        'unreacted' => 2,
         'blacklisted' => 1,
         'disliked' => 1,
         'positive' => 1,
