@@ -11,6 +11,7 @@ use App\Models\DownloadTransfer;
 use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRequestOptions;
+use Illuminate\Bus\Batch;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -286,17 +287,36 @@ class PrepareDownloadTransfer implements ShouldQueue
             }
 
             $jobs = array_map(fn (int $chunkId) => new DownloadTransferChunk($transfer->id, $chunkId, $contentType), $chunkIds);
+            $transferId = $transfer->id;
+            $transferDomain = $transfer->domain;
+            $queueConnection = (string) config('queue.default');
 
             $batch = Bus::batch($jobs)
-                ->then(fn () => AssembleDownloadTransfer::dispatch($transfer->id, $contentType))
-                ->catch(function (Throwable $e) use ($transfer) {
-                    DownloadTransfer::query()->whereKey($transfer->id)->update([
+                ->onConnection($queueConnection)
+                ->onQueue('downloads')
+                ->then(fn () => AssembleDownloadTransfer::dispatch($transferId, $contentType))
+                ->catch(function (Batch $batch, Throwable $e) use ($transferId, $transferDomain) {
+                    $message = trim(str_replace(["\r", "\n"], ' ', $e->getMessage()));
+                    if ($message === '') {
+                        $message = 'Chunk download batch failed.';
+                    }
+
+                    DownloadChunk::query()
+                        ->where('download_transfer_id', $transferId)
+                        ->whereIn('status', [DownloadChunkStatus::PENDING, DownloadChunkStatus::DOWNLOADING])
+                        ->update([
+                            'status' => DownloadChunkStatus::FAILED,
+                            'failed_at' => now(),
+                            'error' => $message,
+                        ]);
+
+                    DownloadTransfer::query()->whereKey($transferId)->update([
                         'status' => DownloadTransferStatus::FAILED,
                         'failed_at' => now(),
-                        'error' => $e->getMessage(),
+                        'error' => $message,
                     ]);
 
-                    $updated = DownloadTransfer::query()->find($transfer->id);
+                    $updated = DownloadTransfer::query()->find($transferId);
                     if ($updated) {
                         try {
                             event(new DownloadTransferProgressUpdated(
@@ -307,7 +327,7 @@ class PrepareDownloadTransfer implements ShouldQueue
                         }
                     }
 
-                    PumpDomainDownloads::dispatch($transfer->domain);
+                    PumpDomainDownloads::dispatch($transferDomain);
                 })
                 ->dispatch();
 

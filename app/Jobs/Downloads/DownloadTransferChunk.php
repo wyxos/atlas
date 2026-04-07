@@ -31,6 +31,8 @@ class DownloadTransferChunk implements ShouldQueue
 
     public int $backoff = 30;
 
+    public int $timeout = 600;
+
     public function __construct(
         public int $downloadTransferId,
         public int $downloadChunkId,
@@ -189,6 +191,28 @@ class DownloadTransferChunk implements ShouldQueue
                 $this->failTransfer($transfer, $chunk, $e->getMessage());
             }
         }
+    }
+
+    public function failed(Throwable $e): void
+    {
+        $transfer = DownloadTransfer::query()->find($this->downloadTransferId);
+        if (! $transfer || ! in_array($transfer->status, [
+            DownloadTransferStatus::DOWNLOADING,
+            DownloadTransferStatus::ASSEMBLING,
+        ], true)) {
+            return;
+        }
+
+        $chunk = DownloadChunk::query()
+            ->where('download_transfer_id', $transfer->id)
+            ->find($this->downloadChunkId);
+
+        $message = trim($e->getMessage());
+        if ($message === '') {
+            $message = 'Download chunk failed.';
+        }
+
+        $this->failTransfer($transfer, $chunk, $message);
     }
 
     private function shouldStop(int $transferId, DownloadChunk $chunk, $fh): bool
