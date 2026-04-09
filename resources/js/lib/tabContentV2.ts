@@ -28,6 +28,7 @@ type TabContentV2ResolveArgs = {
         previousCursor: string | null;
     }>>;
     availableServices: Ref<ServiceOption[]>;
+    filterItems?: (items: FeedItem[]) => FeedItem[];
     localService: Ref<ServiceOption | null | undefined>;
     toast: {
         error: (message: string) => void;
@@ -180,7 +181,10 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
                 signal: params.signal,
             });
 
-            const nextItems = Array.isArray(data.items) ? data.items as FeedItem[] : [];
+            const receivedItems = Array.isArray(data.items) ? data.items as FeedItem[] : [];
+            const nextItems = typeof args.filterItems === 'function'
+                ? args.filterItems(receivedItems)
+                : receivedItems;
             const nextCursor = normalizeCursor(data.nextPage ?? null);
             const previousCursor = normalizeCursor(data.previousPage ?? null);
 

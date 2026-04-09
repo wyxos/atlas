@@ -1,31 +1,30 @@
 <script setup lang="ts">
-import { computed, provide, reactive, ref, shallowRef, toRef, watch, watchEffect, type Ref } from 'vue';
-import { ArrowLeft, Loader2, PanelRightOpen } from 'lucide-vue-next';
-import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe-v3';
+import { computed, provide, reactive, ref, shallowRef, toRef, watch, watchEffect } from 'vue';
+import { type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe-v3';
 import type { MasonryInstance } from '@wyxos/vibe';
 import { useToast } from '@/components/ui/toast/use-toast';
-import { Button } from '@/components/ui/button';
 import { createBrowseForm, BrowseFormKey } from '@/composables/useBrowseForm';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useFileViewerData } from '@/composables/useFileViewerData';
 import { useFileViewerSheetState } from '@/composables/useFileViewerSheetState';
 import { useItemPreview } from '@/composables/useItemPreview';
-import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
+import { useLocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
-import { useTabContentNotFoundReconciliation } from '@/composables/useTabContentNotFoundReconciliation';
+import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
+import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
+import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import { createBrowseCatalog } from '@/lib/browseCatalog';
 import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession } from '@/lib/tabContentBrowseBootstrap';
+import { filterItemsByContainerBlacklists, removeContainerBlacklist, upsertContainerBlacklist } from '@/lib/tabContentV2Blacklists';
 import { createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, type OverlayMediaType } from '@/lib/tabContentV2';
 import { createBrowseV2MouseShortcutHandlers } from '@/lib/tabContentV2MouseShortcuts';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
-import FileReactions from './FileReactions.vue';
-import FileViewerSheet from './FileViewerSheet.vue';
-import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
-import TabContentStartForm from './TabContentStartForm.vue';
-import TabContentServiceHeader from './TabContentServiceHeader.vue';
+import type { ContainerBlacklist } from '@/types/container-blacklist';
+import { isPositiveOnlyLocalView, matchesLocalViewFilters } from '@/utils/localReactionState';
+import TabContentV2View from './TabContentV2View.vue';
 
 interface Props {
     tabId: number | null;
@@ -58,6 +57,90 @@ const availableSources = browseCatalogState.availableSources;
 const localService = browseCatalogState.localService;
 const itemPreview = useItemPreview(items, computed(() => tab.value ?? undefined));
 const downloadedReactionPrompt = useDownloadedReactionPrompt();
+const promptDialog = useTabContentPromptDialog(items);
+const emptyStatus = createTabContentV2EmptyStatus();
+const vibeStatus = computed(() => vibeRef.value?.status ?? emptyStatus);
+const isVibeLoading = computed(() => vibeStatus.value.phase === 'loading'
+    || vibeStatus.value.phase === 'filling'
+    || vibeStatus.value.phase === 'reloading'
+    || vibeStatus.value.loadState === 'loading');
+
+function matchesActiveLocalFilters(item: FeedItem): boolean {
+    return !form.isLocal.value || matchesLocalViewFilters(item, form.data.serviceFilters);
+}
+
+function isActivePositiveOnlyLocalView(): boolean {
+    return form.isLocal.value && isPositiveOnlyLocalView(form.data.serviceFilters);
+}
+
+function collectTargetIds(target: FeedItem | FeedItem[] | string | string[]): string[] {
+    const values = Array.isArray(target) ? target : [target];
+
+    return values
+        .map((value) => {
+            if (typeof value === 'string') {
+                return value;
+            }
+
+            return String(value.id);
+        })
+        .filter((value) => value.trim().length > 0);
+}
+
+const vibeMasonry = computed<MasonryInstance | null>(() => {
+    const handle = vibeRef.value;
+    if (!handle) {
+        return null;
+    }
+
+    return {
+        cancel: () => handle.cancel(),
+        hasReachedEnd: !vibeStatus.value.hasNextPage,
+        isLoading: isVibeLoading.value,
+        loadNextPage: async () => {
+            await handle.loadNext();
+        },
+        nextPage: vibeStatus.value.nextCursor,
+        remove: async (target: FeedItem | FeedItem[] | string | string[]) => {
+            const ids = collectTargetIds(target);
+            const result = handle.remove(ids);
+            syncRemovedIds(result?.ids ?? ids, 'remove');
+            return result;
+        },
+        restore: async (target: FeedItem | FeedItem[] | string | string[]) => {
+            const ids = collectTargetIds(target);
+            const result = handle.restore(ids);
+            syncRemovedIds(result?.ids ?? ids, 'restore');
+            return result;
+        },
+    } as unknown as MasonryInstance;
+});
+
+const containerInteractions = useTabContentContainerInteractions({
+    items,
+    tab,
+    form,
+    masonry: vibeMasonry,
+    matchesActiveLocalFilters,
+    onReaction: props.onReaction,
+    onOpenContainerTab: props.onOpenContainerTab,
+});
+const fileViewerStub = ref<{ openFromClick: (event: MouseEvent) => void } | null>({
+    openFromClick: () => undefined,
+});
+const itemInteractions = useTabContentItemInteractions({
+    items,
+    tab,
+    form,
+    masonry: vibeMasonry,
+    fileViewer: fileViewerStub,
+    matchesActiveLocalFilters,
+    isPositiveOnlyLocalView: isActivePositiveOnlyLocalView,
+    itemPreview,
+    onReaction: props.onReaction,
+    promptDownloadedReaction: downloadedReactionPrompt.prompt,
+    clearHoveredContainer: containerInteractions.clearHoveredContainer,
+});
 
 const browse = useTabContentBrowseState({
     tabId,
@@ -71,7 +154,7 @@ const browse = useTabContentBrowseState({
     },
     view: {
         clearPreviewedItems: () => itemPreview.clearPreviewedItems(),
-        resetPreloadedItems: () => {},
+        resetPreloadedItems: () => itemInteractions.preload.reset(),
     },
     events: {
         onPageLoadingChange: setTabDataLoading,
@@ -89,6 +172,13 @@ const isFilterSheetOpen = ref(false);
 const vibeInitialCursor = computed(() => normalizeCursor(browseState.startPageToken.value));
 const hydratedInitialState = ref<VibeInitialState | undefined>(undefined);
 const vibeInitialState = computed(() => hydratedInitialState.value);
+const localFileDeletion = useLocalFileDeletion({
+    items,
+    masonry: vibeMasonry,
+    isLocal: form.isLocal,
+    totalAvailable: browseState.totalAvailable,
+    clearHover: itemInteractions.state.clearHover,
+});
 
 const currentNavigation = reactive({ currentItemIndex: 0 as number | null });
 const fullscreenOverlayState = reactive({
@@ -104,28 +194,12 @@ const fileViewerData = useFileViewerData({
     overlay: fullscreenOverlayState,
     sheet: fileSheetState,
 });
-const notFoundReconciliation = useTabContentNotFoundReconciliation({
-    items,
-    tab,
-    masonry: ref(null),
-    hoveredItemId: ref(null),
-    cancelAutoDislikeCountdown: () => {},
-    clearHover: () => {},
-});
-const emptyStatus = createTabContentV2EmptyStatus();
-const vibeStatus = computed(() => vibeRef.value?.status ?? emptyStatus);
 const visibleItems = computed(() => items.value.filter((item) => !removedIds.value.has(item.id)));
 const currentVisibleItem = computed(() => visibleItems.value[vibeStatus.value.activeIndex] ?? null);
-const headerMasonry = computed<MasonryInstance | null>(() => ({
-    hasReachedEnd: !vibeStatus.value.hasNextPage,
-    isLoading: vibeStatus.value.phase === 'loading'
-        || vibeStatus.value.phase === 'filling'
-        || vibeStatus.value.phase === 'reloading',
-} as unknown as MasonryInstance));
+const headerMasonry = vibeMasonry;
 
-function setTabDataLoading(isLoading: boolean): void {
-    props.onTabDataLoadingChange?.(isLoading);
-}
+function setTabDataLoading(isLoading: boolean): void { props.onTabDataLoadingChange?.(isLoading); }
+function setVibeHandle(handle: VibeHandle | null): void { vibeRef.value = handle; }
 
 function syncRemovedIds(ids: string[], mode: 'remove' | 'restore' | 'undo' = 'remove'): void {
     const next = new Set(removedIds.value);
@@ -195,6 +269,49 @@ function updateTabLabel(cursor: string | number | null | undefined): void {
     }
 }
 
+type ContainerBlacklistChange = {
+    action: 'created' | 'deleted';
+    blacklist: ContainerBlacklist;
+};
+
+const activeContainerBlacklists = ref<ContainerBlacklist[]>([]);
+
+function filterItemsByActiveContainerBlacklists(candidateItems: FeedItem[]): FeedItem[] {
+    return filterItemsByContainerBlacklists(candidateItems, activeContainerBlacklists.value);
+}
+
+function applyActiveContainerBlacklistFilter(): void {
+    const filteredItems = filterItemsByActiveContainerBlacklists(items.value);
+    if (filteredItems.length === items.value.length) {
+        return;
+    }
+
+    const filteredIds = new Set(filteredItems.map((item) => item.id));
+    const itemsInBlacklistedContainers = items.value.filter((item) => !filteredIds.has(item.id));
+    if (itemsInBlacklistedContainers.length === 0) {
+        return;
+    }
+
+    if (vibeMasonry.value) {
+        void vibeMasonry.value.remove(itemsInBlacklistedContainers).catch((error: unknown) => {
+            console.error('Failed to remove blacklisted container items from browse-v2:', error);
+        });
+        return;
+    }
+
+    items.value = filterItemsByActiveContainerBlacklists(items.value);
+}
+
+function handleContainerBlacklistChange(change: ContainerBlacklistChange): void {
+    if (change.action === 'created' && change.blacklist.action_type === 'blacklist') {
+        activeContainerBlacklists.value = upsertContainerBlacklist(activeContainerBlacklists.value, change.blacklist);
+        applyActiveContainerBlacklistFilter();
+        return;
+    }
+
+    activeContainerBlacklists.value = removeContainerBlacklist(activeContainerBlacklists.value, change.blacklist);
+}
+
 const resolve = createTabContentV2Resolve({
     form,
     startPageToken: browseState.startPageToken,
@@ -203,85 +320,41 @@ const resolve = createTabContentV2Resolve({
     items,
     itemsBuckets,
     availableServices,
+    filterItems: filterItemsByActiveContainerBlacklists,
     localService,
     toast,
 });
 
-type ReactionMasonryAdapter = {
-    remove: (item: FeedItem) => Promise<void> | void;
-    restore: (item: FeedItem) => Promise<void> | void;
-};
-
-const reactionMasonryRef = computed<ReactionMasonryAdapter | null>(() => {
-    if (!vibeRef.value) {
-        return null;
-    }
-
-    return {
-        remove: async (item: FeedItem) => {
-            const result = vibeRef.value?.remove(String(item.id));
-            syncRemovedIds(result?.ids ?? [String(item.id)], 'remove');
-            return result;
-        },
-        restore: async (item: FeedItem) => {
-            const result = vibeRef.value?.restore(String(item.id));
-            syncRemovedIds(result?.ids ?? [String(item.id)], 'restore');
-            return result;
-        },
-    };
-});
-
-const reactionHandlers = useMasonryReactionHandler({
-    items,
-    masonry: reactionMasonryRef as unknown as Ref<MasonryInstance | null>,
-    tab: computed(() => tab.value ?? undefined),
-    isLocal: form.isLocal,
-    matchesActiveLocalFilters: (item) => !item.reaction?.type,
-    isPositiveOnlyLocalView: () => false,
-    onReaction: props.onReaction,
-    promptDownloadedReaction: downloadedReactionPrompt.prompt,
-});
+function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
+    return (item.feedItem as FeedItem | undefined) ?? null;
+}
 
 function handleAssetLoads(loads: VibeAssetLoadEvent[]): void {
-    for (const load of loads) {
-        const feedItem = load.item.feedItem as FeedItem | undefined;
-        if (feedItem) {
-            void itemPreview.incrementPreviewCount(feedItem.id);
-        }
-    }
+    const batch = loads.map((load) => getFeedItemFromVibeItem(load.item)).filter((item): item is FeedItem => item !== null);
+    if (batch.length > 0) itemInteractions.preload.onBatchPreloaded(batch);
 }
 
 function handleAssetErrors(errors: VibeAssetErrorEvent[]): void {
-    notFoundReconciliation.onBatchFailures(errors.map((error) => ({
+    itemInteractions.preload.onBatchFailures(errors.map((error) => ({
         item: error.item.feedItem as FeedItem,
         error,
     })));
 }
 
 async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> {
-    const feedItem = item.feedItem as FeedItem | undefined;
-    if (feedItem) {
-        await reactionHandlers.handleMasonryReaction(feedItem, type);
-    }
+    const feedItem = getFeedItemFromVibeItem(item);
+    if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type);
 }
 
-function openFileSheet(): void {
-    fileViewerSheet.setSheetOpen(true);
-}
-
-function closeFileSheet(): void {
-    fileViewerSheet.setSheetOpen(false);
-}
-
-function handleLoadedItemsAction(): void {
-    return;
-}
+function openFileSheet(): void { fileViewerSheet.setSheetOpen(true); }
+function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); }
+function handleLoadedItemsAction(): void {}
 const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
     getCurrentItem: () => currentVisibleItem.value,
     getVisibleItems: () => visibleItems.value,
     getSurfaceMode: () => vibeStatus.value.surfaceMode,
     onReaction: async (item, type) => {
-        await reactionHandlers.handleMasonryReaction(item, type);
+        itemInteractions.reactions.onFileReaction(item, type);
     },
 });
 
@@ -314,11 +387,33 @@ watch(
 );
 
 watch(
+    () => vibeStatus.value.surfaceMode,
+    (mode, previousMode) => {
+        if (mode === 'fullscreen' && previousMode !== 'fullscreen') {
+            itemInteractions.viewer.onOpen();
+            return;
+        }
+
+        if (previousMode === 'fullscreen' && mode !== 'fullscreen') {
+            itemInteractions.viewer.onClose();
+        }
+    },
+);
+
+watch(
     () => visibleItems.value,
     (nextItems) => {
         props.updateActiveTab(nextItems);
     },
     { deep: false, immediate: true },
+);
+
+watch(
+    () => items.value,
+    () => {
+        applyActiveContainerBlacklistFilter();
+    },
+    { deep: false },
 );
 
 watchEffect(() => {
@@ -340,169 +435,49 @@ watch(
 </script>
 
 <template>
-    <div v-if="tab" class="flex h-full min-h-0 flex-col">
-        <TabContentServiceHeader
-            v-if="!shouldShowForm"
-            :form="form"
-            :available-services="availableServices"
-            :available-sources="availableSources"
-            :local-service="localService ?? null"
-            :masonry="headerMasonry"
-            :filter-sheet-open="isFilterSheetOpen"
-            :update-filter-sheet-open="(value) => isFilterSheetOpen = value"
-            :update-feed="(value) => form.data.feed = value"
-            :update-service="browseActions.updateService"
-            :update-source="(value) => form.data.source = value"
-            :apply-service="applyService"
-            :apply-filters="applyFilters"
-            :reset-filters="form.reset"
-            :loaded-items-count="0"
-            :active-loaded-items-action="null"
-            :on-run-loaded-items-action="handleLoadedItemsAction"
-            :cancel-masonry-load="() => vibeRef?.cancel()"
-            :go-to-first-page="goToFirstPage"
-            :load-next-page="() => vibeRef?.loadNext()"
-        >
-            <div class="flex items-center gap-2">
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    class="h-10 px-3 gap-2"
-                    :disabled="headerMasonry?.isLoading || !vibeStatus.hasPreviousPage"
-                    @click="vibeRef?.loadPrevious()"
-                >
-                    <ArrowLeft :size="14" />
-                    <span>Previous</span>
-                </Button>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    class="h-10 px-3 gap-2"
-                    :disabled="headerMasonry?.isLoading || vibeStatus.loadState !== 'failed'"
-                    @click="vibeRef?.retry()"
-                >
-                    Retry
-                </Button>
-            </div>
-        </TabContentServiceHeader>
-        <TabContentStartForm
-            v-if="shouldShowForm"
-            :form="form"
-            :available-services="availableServices"
-            :available-sources="availableSources"
-            :is-loading="vibeStatus.phase === 'loading' || vibeStatus.phase === 'filling' || vibeStatus.phase === 'reloading'"
-            :set-local-mode="(value) => form.isLocalMode.value = value"
-            :update-service="browseActions.updateService"
-            :update-source="(value) => form.data.source = value"
-            :apply-service="applyService"
-        />
-        <div v-else class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-4">
-            <div
-                class="flex min-h-0 flex-1 overflow-hidden border border-white/10 bg-black/20 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.9)]"
-                @click.capture="mouseShortcuts.handleClickCapture"
-                @contextmenu.capture="mouseShortcuts.handleContextMenuCapture"
-                @mousedown.capture="mouseShortcuts.handleMouseDownCapture"
-                @auxclick.capture="mouseShortcuts.handleAuxClickCapture"
-            >
-                <VibeLayout
-                    :key="`${tab.id}-${masonryRenderKey}`"
-                    ref="vibeRef"
-                    class="h-full min-h-0 w-full"
-                    :resolve="resolve"
-                    :mode="vibeFeedMode"
-                    :page-size="Number(form.data.limit)"
-                    :initial-cursor="vibeInitialCursor"
-                    :initial-state="vibeInitialState"
-                    :fill-delay-ms="1000"
-                    :fill-delay-step-ms="250"
-                    @asset-loads="handleAssetLoads"
-                    @asset-errors="handleAssetErrors"
-                    @update:active-index="() => undefined"
-                >
-                    <template #grid-item-overlay="{ item, hovered, active, index }">
-                        <div v-if="hovered || active" class="pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-center px-3 pb-3">
-                            <div class="pointer-events-auto">
-                                <FileReactions
-                                    :file-id="(item as Record<string, unknown>).fileId as number"
-                                    :reaction="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.reaction ?? null"
-                                    :previewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.previewed_count ?? 0"
-                                    :viewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.seen_count ?? 0"
-                                    :current-index="index"
-                                    :total-items="vibeStatus.itemCount"
-                                    variant="small"
-                                    @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
-                                />
-                            </div>
-                        </div>
-                    </template>
-                    <template #grid-footer>
-                        <div class="pointer-events-none flex justify-center px-4 pb-4 pt-2">
-                            <BrowseV2StatusBar :status="vibeStatus" />
-                        </div>
-                    </template>
-                    <template #grid-status="{ kind, message }">
-                        <div
-                            class="inline-flex items-center gap-2 border px-4 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] backdrop-blur-[18px]"
-                            :class="kind === 'end'
-                                ? 'border-amber-300/35 bg-black/55 text-amber-200'
-                                : 'border-smart-blue-500/70 bg-prussian-blue-800/88 text-smart-blue-100'"
-                        >
-                            <Loader2 v-if="kind === 'loading-more'" :size="14" class="animate-spin" />
-                            <span>{{ message }}</span>
-                        </div>
-                    </template>
-                    <template #fullscreen-overlay="{ item, index, total }">
-                        <div class="pointer-events-none absolute inset-0 z-[5]">
-                            <div class="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2">
-                                <FileReactions
-                                    :file-id="(item as Record<string, unknown>).fileId as number"
-                                    :reaction="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.reaction ?? null"
-                                    :previewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.previewed_count ?? 0"
-                                    :viewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.seen_count ?? 0"
-                                    :current-index="index"
-                                    :total-items="total"
-                                    variant="default"
-                                    @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
-                                />
-                            </div>
-                        </div>
-                    </template>
-                    <template #fullscreen-header-actions>
-                        <button
-                            type="button"
-                            class="inline-flex h-11 w-11 items-center justify-center border border-white/12 bg-black/50 text-[#f7f1ea]/82 backdrop-blur-[18px] transition hover:border-white/24 hover:bg-black/65"
-                            :aria-label="fileSheetState.isOpen ? 'Hide file sheet' : 'Show file sheet'"
-                            @click="fileSheetState.isOpen ? closeFileSheet() : openFileSheet()"
-                        >
-                            <PanelRightOpen :size="16" />
-                        </button>
-                    </template>
-                    <template #fullscreen-status="{ kind, message }">
-                        <div
-                            class="inline-flex items-center gap-2 border px-4 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] backdrop-blur-[18px]"
-                            :class="kind === 'end'
-                                ? 'border-amber-300/35 bg-black/55 text-amber-200'
-                                : 'border-smart-blue-500/70 bg-prussian-blue-800/88 text-smart-blue-100'"
-                        >
-                            <Loader2 v-if="kind === 'loading-more'" :size="14" class="animate-spin" />
-                            <span>{{ message }}</span>
-                        </div>
-                    </template>
-                    <template #fullscreen-aside>
-                        <FileViewerSheet
-                            v-if="fileSheetState.isOpen"
-                            embedded
-                            :is-open="fileSheetState.isOpen"
-                            :file-id="currentVisibleItem?.id ?? null"
-                            :file-data="fileViewerData.fileData.value"
-                            :is-loading="fileViewerData.isLoadingFileData.value"
-                            @close="closeFileSheet"
-                        />
-                    </template>
-                </VibeLayout>
-            </div>
-        </div>
-    </div>
+    <TabContentV2View
+        :tab="tab"
+        :should-show-form="shouldShowForm"
+        :form="form"
+        :available-services="availableServices"
+        :available-sources="availableSources"
+        :local-service="localService"
+        :header-masonry="headerMasonry"
+        :is-filter-sheet-open="isFilterSheetOpen"
+        :set-filter-sheet-open="(value) => isFilterSheetOpen = value"
+        :update-feed="(value) => form.data.feed = value"
+        :set-local-mode="(value) => form.isLocalMode.value = value"
+        :update-service="browseActions.updateService"
+        :update-source="(value) => form.data.source = value"
+        :apply-service="applyService"
+        :apply-filters="applyFilters"
+        :go-to-first-page="goToFirstPage"
+        :handle-loaded-items-action="handleLoadedItemsAction"
+        :cancel-load="() => vibeRef?.cancel()"
+        :load-next="() => vibeRef?.loadNext()"
+        :load-previous="() => vibeRef?.loadPrevious()"
+        :retry-load="() => vibeRef?.retry()"
+        :vibe-status="vibeStatus"
+        :set-vibe-handle="setVibeHandle"
+        :masonry-render-key="masonryRenderKey"
+        :resolve="resolve"
+        :vibe-feed-mode="vibeFeedMode"
+        :vibe-initial-cursor="vibeInitialCursor"
+        :vibe-initial-state="vibeInitialState"
+        :handle-asset-loads="handleAssetLoads"
+        :handle-asset-errors="handleAssetErrors"
+        :mouse-shortcuts="mouseShortcuts"
+        :container-interactions="containerInteractions"
+        :item-interactions="itemInteractions"
+        :prompt-dialog="promptDialog"
+        :local-file-deletion="localFileDeletion"
+        :handle-reaction="handleReaction"
+        :file-sheet-state="fileSheetState"
+        :current-visible-item="currentVisibleItem"
+        :file-viewer-data="fileViewerData"
+        :open-file-sheet="openFileSheet"
+        :close-file-sheet="closeFileSheet"
+        :downloaded-reaction-prompt="downloadedReactionPrompt"
+        :handle-container-blacklist-change="handleContainerBlacklistChange"
+    />
 </template>
