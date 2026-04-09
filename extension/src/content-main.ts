@@ -19,6 +19,7 @@ import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { createDownloadEventSheet } from './content/download-event-sheet';
 import { createDuplicateAnchorTabGuard } from './content/duplicate-anchor-tab-guard';
 import { clearDeviantArtBackgroundImageStyle } from './content/deviantart-background-image-style';
+import { installCivitAiModelBrowseCtas } from './content/civitai-model-browse-cta';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
@@ -272,6 +273,7 @@ async function loadRulesAndProcess(): Promise<void> {
 function bootstrap(): void {
     duplicateAnchorTabGuard = createDuplicateAnchorTabGuard();
     clearDeviantArtBackgroundImageStyle();
+    installCivitAiModelBrowseCtas();
     installMutationObserver();
     installStorageListener();
     installRuntimeMessageListener();

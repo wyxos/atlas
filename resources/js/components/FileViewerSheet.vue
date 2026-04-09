@@ -3,6 +3,7 @@ import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
 import { copyToClipboard } from '@/utils/clipboard';
 
 interface Props {
+    embedded?: boolean;
     isOpen: boolean;
     fileId: number | null;
     fileData: import('@/types/file').File | null;
@@ -52,9 +53,9 @@ const emit = defineEmits<{
 <template>
     <div
         class="flex h-full min-h-0 flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden pointer-events-auto"
-        :class="isOpen ? 'w-80 max-w-80' : 'w-0 max-w-0'"
+        :class="embedded ? 'w-full max-w-none' : (isOpen ? 'w-80 max-w-80' : 'w-0 max-w-0')"
     >
-        <div class="flex h-full min-h-0 w-80 min-w-80 max-w-80 flex-col">
+        <div class="flex h-full min-h-0 flex-col" :class="embedded ? 'w-full min-w-0 max-w-none' : 'w-80 min-w-80 max-w-80'">
             <div
                 class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap"
                 :class="isOpen ? '' : 'opacity-0 pointer-events-none'"

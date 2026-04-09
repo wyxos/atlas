@@ -6,6 +6,7 @@ use App\Enums\DownloadTransferStatus;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Models\Tab;
 use App\Models\User;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
@@ -17,6 +18,7 @@ use App\Support\CivitAiMediaUrl;
 use App\Support\FileTypeDetector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -388,6 +390,49 @@ class ExtensionApiController extends Controller
         ]);
     }
 
+    public function openCivitAiModelBrowseTab(
+        Request $request,
+        ExtensionApiKeyService $extensionApiKey,
+    ): JsonResponse {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'model_id' => ['required', 'integer', 'min:1'],
+            'model_version_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $modelId = (int) $validated['model_id'];
+        $modelVersionId = isset($validated['model_version_id']) ? (int) $validated['model_version_id'] : null;
+        $params = array_filter([
+            'feed' => 'online',
+            'service' => CivitAiImages::key(),
+            'page' => 1,
+            'limit' => 20,
+            'modelId' => $modelId,
+            'modelVersionId' => $modelVersionId,
+        ], static fn (mixed $value): bool => $value !== null);
+
+        $tab = $this->createExtensionBrowseTab(
+            $user,
+            $this->buildCivitAiModelBrowseTabLabel($modelId, $modelVersionId),
+            $params,
+        );
+
+        return response()->json([
+            'tab' => [
+                'id' => $tab->id,
+                'label' => $tab->label,
+                'params' => $tab->params ?? [],
+            ],
+            'browse_url' => url('/browse'),
+        ]);
+    }
+
     private function resolveExtensionUser(Request $request, ExtensionApiKeyService $extensionApiKey): ?\App\Models\User
     {
         $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
@@ -396,6 +441,37 @@ class ExtensionApiController extends Controller
         }
 
         return $extensionApiKey->resolveUserForApiKey($apiKey);
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     */
+    private function createExtensionBrowseTab(User $user, string $label, array $params): Tab
+    {
+        return DB::transaction(function () use ($user, $label, $params) {
+            $userId = (int) $user->id;
+            $nextPosition = (Tab::forUser($userId)->max('position') ?? -1) + 1;
+
+            Tab::forUser($userId)->update(['is_active' => false]);
+
+            return Tab::query()->create([
+                'user_id' => $userId,
+                'label' => $label,
+                'custom_label' => null,
+                'params' => $params,
+                'position' => $nextPosition,
+                'is_active' => true,
+            ]);
+        });
+    }
+
+    private function buildCivitAiModelBrowseTabLabel(int $modelId, ?int $modelVersionId): string
+    {
+        if ($modelVersionId !== null && $modelVersionId > 0) {
+            return "CivitAI Images: Model {$modelId} @ {$modelVersionId} - 1";
+        }
+
+        return "CivitAI Images: Model {$modelId} - 1";
     }
 
     private function normalizeUrl(?string $url): ?string

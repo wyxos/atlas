@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCollectCookiesForUrls = vi.fn();
+const mockGetStoredOptions = vi.fn();
 const mockNotifyTabsExtensionReloaded = vi.fn();
 const mockPrimeGlobalReferrerCheckCache = vi.fn();
+
+vi.mock('./atlas-options', () => ({
+    getStoredOptions: mockGetStoredOptions,
+}));
 
 vi.mock('./background-cookie-runtime', () => ({
     collectCookiesForUrls: mockCollectCookiesForUrls,
@@ -54,6 +59,14 @@ function createChromeMock(initialTabs: BrowserTab[]) {
                 callback([...tabs]);
             }),
             sendMessage: vi.fn(),
+            create: vi.fn((createProperties: { url?: string }, callback?: (tab?: BrowserTab) => void) => {
+                const createdTab = {
+                    id: tabs.length + 1,
+                    url: createProperties.url,
+                };
+                tabs.push(createdTab);
+                callback?.(createdTab);
+            }),
             remove: vi.fn((tabId: number, callback?: () => void) => {
                 const index = tabs.findIndex((tab) => tab.id === tabId);
                 if (index >= 0) {
@@ -106,6 +119,11 @@ describe('background runtime message bridge', () => {
         vi.resetModules();
         vi.clearAllMocks();
         vi.unstubAllGlobals();
+        mockGetStoredOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'test-api-token',
+            siteCustomizations: [],
+        });
     });
 
     it('normalizes cookie urls and proxies cookie lookups through the background runtime', async () => {
@@ -317,6 +335,55 @@ describe('background runtime message bridge', () => {
             skippedCount: 1,
         });
         expect(chromeMock.tabs.discard).toHaveBeenCalledTimes(2);
+    });
+
+    it('creates a new Atlas browser tab for a Civitai model browse request', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            browse_url: 'https://atlas.test/browse',
+            tab: {
+                id: 44,
+                label: 'CivitAI Images: Model 960593 @ 1804885 - 1',
+            },
+        }), { status: 200 }));
+        vi.stubGlobal('chrome', chromeMock);
+        vi.stubGlobal('fetch', fetchMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        const response = await sendRuntimeMessage(listener!, {
+            type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
+            modelId: 960593,
+            modelVersionId: 1804885,
+        });
+
+        expect(mockGetStoredOptions).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.test/api/extension/browse-tabs/civitai-model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Atlas-Api-Key': 'test-api-token',
+            },
+            body: JSON.stringify({
+                model_id: 960593,
+                model_version_id: 1804885,
+            }),
+        });
+        expect(chromeMock.tabs.create).toHaveBeenCalledWith({ url: 'https://atlas.test/browse' }, expect.any(Function));
+        expect(response).toEqual({
+            ok: true,
+            status: 200,
+            payload: {
+                browse_url: 'https://atlas.test/browse',
+                tab: {
+                    id: 44,
+                    label: 'CivitAI Images: Model 960593 @ 1804885 - 1',
+                },
+            },
+        });
     });
 
     it('notifies tabs to reload after extension installs and updates', async () => {

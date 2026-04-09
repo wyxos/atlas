@@ -8,9 +8,25 @@ type RestorableTabData = TabData & {
 };
 
 export type RestoredBrowseSession = {
+    activeIndex: number;
+    cursor: PageToken;
+    nextCursor: PageToken | null;
     items: FeedItem[];
     startPageToken: PageToken;
+    previousCursor: PageToken | null;
 };
+
+function normalizeRestoredPageToken(value: unknown): PageToken | null {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+        return value;
+    }
+
+    return null;
+}
 
 function resolveRestoredStartPageToken(params: Record<string, unknown>, items: FeedItem[]): PageToken {
     const page = (params.page ?? 1) as PageToken;
@@ -27,6 +43,22 @@ function resolveRestoredStartPageToken(params: Record<string, unknown>, items: F
     return page;
 }
 
+function resolveRestoredActiveIndex(items: FeedItem[], pageToken: PageToken): number {
+    const pageValue = typeof pageToken === 'number'
+        ? pageToken
+        : (typeof pageToken === 'string' && pageToken.trim().length > 0 && Number.isFinite(Number(pageToken))
+            ? Number(pageToken)
+            : null);
+
+    if (pageValue === null) {
+        return 0;
+    }
+
+    const firstPageItemIndex = items.findIndex((item) => item.page === pageValue);
+
+    return firstPageItemIndex >= 0 ? firstPageItemIndex : 0;
+}
+
 export function extractRestoredBrowseSession(tab?: RestorableTabData | null): RestoredBrowseSession | null {
     if (!tab) {
         return null;
@@ -34,14 +66,19 @@ export function extractRestoredBrowseSession(tab?: RestorableTabData | null): Re
 
     const params = (tab.params ?? {}) as Record<string, unknown>;
     const items = Array.isArray(tab.items) ? tab.items : [];
+    const page = resolveRestoredStartPageToken(params, items);
 
     if (items.length === 0 && Object.keys(params).length === 0) {
         return null;
     }
 
     return {
+        activeIndex: resolveRestoredActiveIndex(items, page),
+        cursor: page,
+        nextCursor: normalizeRestoredPageToken(params.next),
         items,
         startPageToken: resolveRestoredStartPageToken(params, items),
+        previousCursor: normalizeRestoredPageToken(params.previous),
     };
 }
 

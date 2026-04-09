@@ -8,6 +8,7 @@ import App from './App.vue';
 import routes from './routes';
 import './bootstrap';
 import './icons';
+import '@wyxos/vibe-v3/style.css';
 import { configureEcho, echo } from '@laravel/echo-vue';
 import type Echo from 'laravel-echo';
 

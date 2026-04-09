@@ -6,6 +6,7 @@ import { notifyTabsExtensionReloaded } from './background-reload-overlay';
 import {
     handleAtlasApiRequestRuntimeMessage,
     handleGetUrlCookiesRuntimeMessage,
+    handleOpenCivitAiModelTabRuntimeMessage,
     handleQueuedBadgeCheckRuntimeMessage,
     handleQueuedReferrerCheckRuntimeMessage,
     handleSubmitReactionRuntimeMessage,
@@ -238,7 +239,8 @@ chrome.runtime.onMessage.addListener((
         || handleSubmitReactionRuntimeMessage(message, sender, sendResponse)
         || handleQueuedBadgeCheckRuntimeMessage(message, sendResponse)
         || handleQueuedReferrerCheckRuntimeMessage(message, sendResponse)
-        || handleAtlasApiRequestRuntimeMessage(message, sendResponse)) {
+        || handleAtlasApiRequestRuntimeMessage(message, sendResponse)
+        || handleOpenCivitAiModelTabRuntimeMessage(message, sendResponse)) {
         return true;
     }
 

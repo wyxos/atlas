@@ -33,12 +33,18 @@ describe('tabContentBrowseBootstrap', () => {
             params: {
                 service: 'test-service',
                 page: 'CURSOR_NEXT',
+                next: 'CURSOR_AFTER',
+                previous: 'CURSOR_BEFORE',
             },
-            items: [{ id: 1 }],
+            items: [{ id: 1, page: 17 }, { id: 2, page: 17 }],
         }));
 
         expect(session).toEqual({
-            items: [{ id: 1 }],
+            activeIndex: 0,
+            cursor: 'CURSOR_NEXT',
+            items: [{ id: 1, page: 17 }, { id: 2, page: 17 }],
+            nextCursor: 'CURSOR_AFTER',
+            previousCursor: 'CURSOR_BEFORE',
             startPageToken: 'CURSOR_NEXT',
         });
     });
@@ -51,7 +57,11 @@ describe('tabContentBrowseBootstrap', () => {
         }));
 
         expect(session).toEqual({
+            activeIndex: 0,
+            cursor: 1,
             items: [],
+            nextCursor: null,
+            previousCursor: null,
             startPageToken: 1,
         });
     });
@@ -65,7 +75,11 @@ describe('tabContentBrowseBootstrap', () => {
         }));
 
         expect(session).toEqual({
+            activeIndex: 0,
+            cursor: 1,
             items: [],
+            nextCursor: null,
+            previousCursor: null,
             startPageToken: 1,
         });
     });
@@ -76,11 +90,15 @@ describe('tabContentBrowseBootstrap', () => {
                 service: 'civit-ai-images',
                 page: '20|1773762966318',
             },
-            items: [{ id: 1 }],
+            items: [{ id: 1, page: 20 }],
         }));
 
         expect(session).toEqual({
-            items: [{ id: 1 }],
+            activeIndex: 0,
+            cursor: '20|1773762966318',
+            items: [{ id: 1, page: 20 }],
+            nextCursor: null,
+            previousCursor: null,
             startPageToken: '20|1773762966318',
         });
     });

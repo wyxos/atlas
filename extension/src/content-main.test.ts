@@ -23,6 +23,7 @@ const mockDuplicateAnchorTabGuard = {
     handleTabPresenceChanged: vi.fn(),
     refreshSnapshot: vi.fn(),
 };
+const mockInstallCivitAiModelBrowseCtas = vi.fn();
 const mockClearDeviantArtBackgroundImageStyle = vi.fn();
 const mockMutationObserverObserve = vi.fn();
 
@@ -98,6 +99,10 @@ vi.mock('./content/duplicate-anchor-tab-guard', () => ({
 
 vi.mock('./content/deviantart-background-image-style', () => ({
     clearDeviantArtBackgroundImageStyle: mockClearDeviantArtBackgroundImageStyle,
+}));
+
+vi.mock('./content/civitai-model-browse-cta', () => ({
+    installCivitAiModelBrowseCtas: mockInstallCivitAiModelBrowseCtas,
 }));
 
 function flushPromises(): Promise<void> {
@@ -200,6 +205,7 @@ describe('content-main', () => {
         expect(mockOverlayRemove).toHaveBeenCalledWith(linkedImage);
         expect(mockAnchorRuntime.registerFromDocument).toHaveBeenCalledTimes(1);
         expect(mockClearDeviantArtBackgroundImageStyle).toHaveBeenCalledTimes(1);
+        expect(mockInstallCivitAiModelBrowseCtas).toHaveBeenCalledTimes(1);
         expect(runtimeMessageListener).toBeTypeOf('function');
         expect(storageChangeListener).toBeTypeOf('function');
         expect(progressListener).toBeTypeOf('function');

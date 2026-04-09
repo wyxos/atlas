@@ -136,5 +136,23 @@ describe('FileViewerSheet', () => {
         expect(text).toContain('Positive');
         expect(text).toContain('4');
     });
+
+    it('supports embedded layout without fixed overlay width classes', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                embedded: true,
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile(),
+            },
+        });
+
+        const root = wrapper.get('div');
+
+        expect(root.classes()).toContain('w-full');
+        expect(root.classes()).not.toContain('w-80');
+        expect(root.classes()).not.toContain('max-w-80');
+    });
 });
 
