@@ -166,7 +166,7 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
         />
         <div v-else class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-4">
             <div
-                class="flex min-h-0 flex-1 overflow-hidden border border-white/10 bg-black/20 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.9)]"
+                class="relative flex min-h-0 flex-1 overflow-hidden border border-white/10 bg-black/20 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.9)]"
                 @click.capture="mouseShortcuts.handleClickCapture"
                 @contextmenu.capture="mouseShortcuts.handleContextMenuCapture"
                 @mousedown.capture="mouseShortcuts.handleMouseDownCapture"
@@ -268,15 +268,15 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
                         />
                     </template>
                 </VibeLayout>
+
+                <TabContentContainerDrawer
+                    :open="containerInteractions.drawer.state.isOpen.value"
+                    :container="containerInteractions.drawer.derived.container.value"
+                    :items="containerInteractions.drawer.derived.items.value"
+                    @update:open="containerInteractions.drawer.actions.setOpen"
+                />
             </div>
         </div>
-
-        <TabContentContainerDrawer
-            :open="containerInteractions.drawer.state.isOpen.value"
-            :container="containerInteractions.drawer.derived.container.value"
-            :items="containerInteractions.drawer.derived.items.value"
-            @update:open="containerInteractions.drawer.actions.setOpen"
-        />
 
         <TabContentPromptDialog
             :open="promptDialog.data.promptDialogOpen.value"

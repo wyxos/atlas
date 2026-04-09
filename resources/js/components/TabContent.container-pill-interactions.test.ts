@@ -108,7 +108,7 @@ describe('TabContent - Container Badges', () => {
             }
         });
 
-        it('calls handlePillAuxClick when middle clicking on a pill', async () => {
+        it('calls handlePillAuxClick when middle mouseup occurs on a pill', async () => {
             const item1 = createMockItem(1, [
                 { id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' },
             ]);
@@ -139,7 +139,7 @@ describe('TabContent - Container Badges', () => {
             const pillContainer = pillContainers.find((el: any) => el.classes().includes('cursor-pointer'));
 
             if (pillContainer) {
-                await pillContainer.trigger('auxclick', { button: 1 });
+                await pillContainer.trigger('mouseup', { button: 1 });
 
                 // Verify handlePillAuxClick was called
                 expect(vm.containerPillInteractions.handlePillAuxClick).toHaveBeenCalled();

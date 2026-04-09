@@ -67,8 +67,8 @@ function handleReaction(type: ReactionType): void {
                     @click.stop="(event) => containers.pillHandlers.onClick(container.id, event)"
                     @dblclick.prevent.stop="(event) => containers.pillHandlers.onDoubleClick(container.id, event)"
                     @contextmenu.prevent.stop="(event) => containers.pillHandlers.onContextMenu(container.id, event)"
-                    @auxclick.prevent.stop="(event) => containers.pillHandlers.onAuxClick(container.id, event)"
-                    @mousedown.stop="containers.pillHandlers.onMouseDown">
+                    @mousedown.stop="containers.pillHandlers.onMouseDown"
+                    @mouseup.stop="(event) => { if (event.button === 1) containers.pillHandlers.onAuxClick(container.id, event) }">
                     <Pill :label="container.type" :value="containers.badges.getItemCountForContainerId(container.id)"
                         :variant="containers.badges.getVariantForContainerType(container.type)"
                         :dismissible="containers.isBlacklistable(container) ? 'danger' : false"

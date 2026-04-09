@@ -24,8 +24,6 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': '/resources/js',
-            '@wyxos/vibe-v3/style.css': '/node_modules/@wyxos/vibe-v3/lib/style.css',
-            '@wyxos/vibe-v3': '/node_modules/@wyxos/vibe-v3/lib/index.js',
         },
     },
 });

@@ -36,6 +36,10 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
             return false;
         }
 
+        if (target.closest('[data-container-pill-trigger]')) {
+            return true;
+        }
+
         return Boolean(target.closest('button,input,select,textarea,a,[role="button"],[role="slider"],[data-swipe-lock="true"]'));
     }
 
