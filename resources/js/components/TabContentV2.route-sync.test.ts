@@ -312,7 +312,7 @@ vi.mock('./TabContentV2View.vue', () => ({
 
 const status = reactive({
     activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillDelayRemainingMs: null,
-    fillTargetCount: null, hasNextPage: true, hasPreviousPage: false, isAutoMode: true, itemCount: 0,
+    fillTargetCount: null, hasNextPage: true, hasPreviousPage: false, itemCount: 0,
     loadState: 'loaded' as const, mode: 'dynamic' as const, nextCursor: '2', phase: 'idle' as const,
     previousCursor: null, removedCount: 0, removedIds: [] as string[], surfaceMode: 'list' as const,
 });

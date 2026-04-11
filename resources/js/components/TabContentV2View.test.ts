@@ -175,7 +175,6 @@ function createProps() {
             fillTargetCount: null,
             hasNextPage: true,
             hasPreviousPage: false,
-            isAutoMode: true,
             itemCount: 20,
             loadState: 'loaded' as const,
             mode: 'dynamic' as const,
