@@ -74,6 +74,10 @@ const statusVariant = computed(() => {
     return 'warning'
   }
 
+  if (!props.status.hasNextPage && props.status.itemCount > 0) {
+    return 'neutral'
+  }
+
   return 'success'
 })
 

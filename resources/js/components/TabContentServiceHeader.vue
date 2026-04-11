@@ -138,7 +138,7 @@ function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
                         data-test="loaded-items-favorite-all"
                         @select="onRunLoadedItemsAction('love')"
                     >
-                        {{ isLoadedItemsActionBusy('love') ? 'Favoriting...' : 'Favorite all' }}
+                        {{ isLoadedItemsActionBusy('love') ? 'Favoriting...' : 'Favorite' }}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
@@ -146,7 +146,7 @@ function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
                         data-test="loaded-items-like-all"
                         @select="onRunLoadedItemsAction('like')"
                     >
-                        {{ isLoadedItemsActionBusy('like') ? 'Liking...' : 'Like all' }}
+                        {{ isLoadedItemsActionBusy('like') ? 'Liking...' : 'Like' }}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
@@ -154,7 +154,7 @@ function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
                         data-test="loaded-items-funny-all"
                         @select="onRunLoadedItemsAction('funny')"
                     >
-                        {{ isLoadedItemsActionBusy('funny') ? 'Updating...' : 'Funny all' }}
+                        {{ isLoadedItemsActionBusy('funny') ? 'Updating...' : 'Funny' }}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
@@ -162,7 +162,7 @@ function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
                         data-test="loaded-items-dislike-all"
                         @select="onRunLoadedItemsAction('dislike')"
                     >
-                        {{ isLoadedItemsActionBusy('dislike') ? 'Disliking...' : 'Dislike all' }}
+                        {{ isLoadedItemsActionBusy('dislike') ? 'Disliking...' : 'Dislike' }}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator class="bg-twilight-indigo-500" />
                     <DropdownMenuItem
@@ -188,7 +188,7 @@ function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
                         data-test="loaded-items-blacklist-all"
                         @select="onRunLoadedItemsAction('blacklist')"
                     >
-                        {{ isLoadedItemsActionBusy('blacklist') ? 'Blacklisting...' : 'Blacklist all' }}
+                        {{ isLoadedItemsActionBusy('blacklist') ? 'Blacklisting...' : 'Blacklist' }}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

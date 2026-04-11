@@ -24,6 +24,7 @@ type FileViewerRef = {
 
 type UseTabContentItemInteractionsOptions = {
     items: ShallowRef<FeedItem[]>;
+    loadedItems?: Ref<FeedItem[]>;
     tab: Ref<TabData | null>;
     form: BrowseFormInstance;
     masonry: Ref<BrowseFeedHandle | null>;
@@ -226,7 +227,9 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     }
 
     function getLoadedItems(): FeedItem[] {
-        return options.items.value.filter((item): item is FeedItem => typeof item.id === 'number');
+        const source = options.loadedItems?.value ?? options.items.value;
+
+        return source.filter((item): item is FeedItem => typeof item.id === 'number');
     }
 
     function getItemsToRemoveAfterLocalMutation(mutatedItems: FeedItem[]): FeedItem[] {
@@ -479,7 +482,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     }
 
     async function resetPreviewedState(): Promise<number> {
-        const resettableItems = options.items.value.filter((item) => {
+        const resettableItems = getLoadedItems().filter((item) => {
             return typeof item.id === 'number' && !hasActiveReaction(item);
         });
         const fileIds = resettableItems.map((item) => item.id);

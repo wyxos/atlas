@@ -206,6 +206,17 @@ vi.mock('@/composables/useTabContentItemInteractions', () => ({
     }),
 }));
 
+vi.mock('@/composables/useTabContentLoadedItemsActions', () => ({
+    useTabContentLoadedItemsActions: () => ({
+        state: {
+            activeLoadedItemsAction: ref(null),
+        },
+        actions: {
+            runLoadedItemsAction: vi.fn(async () => undefined),
+        },
+    }),
+}));
+
 vi.mock('@/composables/useTabContentPromptDialog', () => ({
     useTabContentPromptDialog: () => ({
         data: {

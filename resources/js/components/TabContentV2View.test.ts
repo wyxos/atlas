@@ -101,7 +101,7 @@ function createProps() {
         handleAssetErrors: vi.fn(),
         handleAssetLoads: vi.fn(),
         handleContainerBlacklistChange: vi.fn(),
-        handleLoadedItemsAction: vi.fn(),
+        handleLoadedItemsAction: vi.fn(async () => undefined),
         handleReaction: vi.fn(),
         headerMasonry: null,
         isFilterSheetOpen: false,
@@ -121,6 +121,7 @@ function createProps() {
         localService: null,
         loadNext: vi.fn(async () => undefined),
         loadPrevious: vi.fn(async () => undefined),
+        loadedItemsCount: 45,
         masonryRenderKey: 0,
         mouseShortcuts: {
             handleAuxClickCapture: vi.fn(),
@@ -157,6 +158,7 @@ function createProps() {
         },
         updateFeed: vi.fn(),
         updateActiveIndex: vi.fn(),
+        activeLoadedItemsAction: null,
         retryLoad: vi.fn(async () => undefined),
         updateSource: vi.fn(),
         updateSurfaceMode: vi.fn(),
@@ -281,5 +283,49 @@ describe('TabContentV2View', () => {
         expect(props.updateSurfaceMode).toHaveBeenCalledWith('list');
         expect(props.handleAssetLoads).toHaveBeenCalledWith([]);
         expect(props.handleAssetErrors).toHaveBeenCalledWith([]);
+    });
+
+    it('passes the loaded-items count and action handlers through to the service header', async () => {
+        const props = createProps();
+        const serviceHeaderStub = defineComponent({
+            name: 'TabContentServiceHeaderStub',
+            props: {
+                activeLoadedItemsAction: { type: String, default: null },
+                loadedItemsCount: { type: Number, required: true },
+                onRunLoadedItemsAction: { type: Function, required: true },
+            },
+            setup(serviceHeaderProps) {
+                return () => h('button', {
+                    'data-testid': 'service-header-loaded-items',
+                    onClick: () => serviceHeaderProps.onRunLoadedItemsAction('like'),
+                }, `${serviceHeaderProps.loadedItemsCount}|${serviceHeaderProps.activeLoadedItemsAction ?? 'idle'}`);
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: {
+                    BrowseV2StatusBar: testStub,
+                    Button: testStub,
+                    ContainerBlacklistManager: testStub,
+                    DownloadedReactionDialog: testStub,
+                    FileReactions: testStub,
+                    FileViewerSheet: testStub,
+                    LocalFileDeleteDialog: testStub,
+                    TabContentContainerDrawer: testStub,
+                    TabContentPromptDialog: testStub,
+                    TabContentServiceHeader: serviceHeaderStub,
+                    TabContentStartForm: testStub,
+                    TabContentV2GridOverlay: testStub,
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-testid="service-header-loaded-items"]').text()).toBe('45|idle');
+
+        await wrapper.get('[data-testid="service-header-loaded-items"]').trigger('click');
+
+        expect(props.handleLoadedItemsAction).toHaveBeenCalledWith('like');
     });
 });

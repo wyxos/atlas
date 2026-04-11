@@ -113,6 +113,6 @@ describe('BrowseV2StatusBar', () => {
         });
 
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('End of list');
-        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('success');
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('neutral');
     });
 });

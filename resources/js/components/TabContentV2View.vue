@@ -6,6 +6,7 @@ import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
+import type { LoadedItemsAction } from '@/composables/useTabContentLoadedItemsActions';
 import type { TabContentPromptDialog as TabContentPromptDialogHandle } from '@/composables/useTabContentPromptDialog';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
@@ -63,7 +64,7 @@ const props = defineProps<{
     handleAssetErrors: (errors: VibeAssetErrorEvent[]) => void;
     handleAssetLoads: (loads: VibeAssetLoadEvent[]) => void;
     handleContainerBlacklistChange: (change: { action: 'created' | 'deleted'; blacklist: import('@/types/container-blacklist').ContainerBlacklist }) => void;
-    handleLoadedItemsAction: () => void;
+    handleLoadedItemsAction: (action: LoadedItemsAction) => void | Promise<void>;
     handleReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
     headerMasonry: BrowseFeedHandle | null;
     isFilterSheetOpen: boolean;
@@ -72,6 +73,7 @@ const props = defineProps<{
     localService: ServiceOption | null | undefined;
     loadNext: () => void | Promise<void>;
     loadPrevious: () => void | Promise<void>;
+    loadedItemsCount: number;
     masonryRenderKey: number;
     mouseShortcuts: MouseShortcutHandlers;
     openFileSheet: () => void;
@@ -84,6 +86,7 @@ const props = defineProps<{
     tab: TabData | null;
     updateFeed: (value: 'local' | 'online') => void;
     updateActiveIndex: (value: number) => void;
+    activeLoadedItemsAction: LoadedItemsAction | null;
     retryLoad: () => void | Promise<void>;
     updateSource: (value: string | null) => void;
     updateSurfaceMode: (value: 'fullscreen' | 'list') => void;
@@ -136,8 +139,8 @@ const vibeLayoutBindings = computed(() => ({
             :apply-service="applyService"
             :apply-filters="applyFilters"
             :reset-filters="form.reset"
-            :loaded-items-count="0"
-            :active-loaded-items-action="null"
+            :loaded-items-count="loadedItemsCount"
+            :active-loaded-items-action="activeLoadedItemsAction"
             :on-run-loaded-items-action="handleLoadedItemsAction"
             :cancel-masonry-load="cancelLoad"
             :go-to-first-page="goToFirstPage"
