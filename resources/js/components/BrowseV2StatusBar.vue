@@ -10,6 +10,7 @@ type VibeStatusLike = {
   fillCollectedCount: number | null
   fillDelayRemainingMs: number | null
   fillTargetCount: number | null
+  hasNextPage: boolean
   itemCount: number
   loadState: 'failed' | 'loaded' | 'loading'
   nextCursor: string | null
@@ -50,6 +51,10 @@ const statusLabel = computed(() => {
 
   if (props.status.loadState === 'loading') {
     return 'Loading'
+  }
+
+  if (!props.status.hasNextPage && props.status.itemCount > 0) {
+    return 'End of list'
   }
 
   return 'Loaded'

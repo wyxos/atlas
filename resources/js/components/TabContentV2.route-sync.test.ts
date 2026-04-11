@@ -13,6 +13,8 @@ const mockAxios = vi.hoisted(() => ({
 }));
 
 const testState = vi.hoisted(() => ({
+    bootstrapBehavior: 'success' as 'error' | 'loading' | 'success',
+    initializeSpy: vi.fn(async () => undefined),
     restoredItems: [] as Array<Record<string, unknown>>,
     toastError: vi.fn(),
     viewerOnClose: vi.fn(),
@@ -116,26 +118,39 @@ vi.mock('@/composables/useTabContentBrowseState', () => ({
         events: { onTabDataLoadingChange?: (value: boolean) => void };
         tabId: { value: number | null };
     }) => {
-        queueMicrotask(() => {
-            options.data.tab.value = {
-                id: options.tabId.value ?? 1,
-                isActive: true,
-                items: testState.restoredItems.map((item) => ({ ...item })),
-                label: 'Browse Tab',
-                params: {
-                    feed: 'online',
-                    page: 1,
-                    service: 'civit-ai-images',
-                    tab_id: options.tabId.value ?? 1,
-                },
-                position: 0,
-                updatedAt: null,
-            };
-            options.events.onTabDataLoadingChange?.(false);
-        });
+        const isInitializing = ref(testState.bootstrapBehavior === 'loading');
+        const bootstrapFailed = ref(testState.bootstrapBehavior === 'error');
+
+        if (testState.bootstrapBehavior === 'success') {
+            queueMicrotask(() => {
+                options.data.tab.value = {
+                    id: options.tabId.value ?? 1,
+                    isActive: true,
+                    items: testState.restoredItems.map((item) => ({ ...item })),
+                    label: 'Browse Tab',
+                    params: {
+                        feed: 'online',
+                        page: 1,
+                        service: 'civit-ai-images',
+                        tab_id: options.tabId.value ?? 1,
+                    },
+                    position: 0,
+                    updatedAt: null,
+                };
+                isInitializing.value = false;
+                options.events.onTabDataLoadingChange?.(false);
+            });
+        } else if (testState.bootstrapBehavior === 'error') {
+            queueMicrotask(() => {
+                isInitializing.value = false;
+                options.events.onTabDataLoadingChange?.(false);
+            });
+        }
 
         return {
             state: {
+                bootstrapFailed,
+                isInitializing,
                 masonryRenderKey: ref(0),
                 shouldShowForm: ref(false),
                 startPageToken: ref(1),
@@ -145,6 +160,7 @@ vi.mock('@/composables/useTabContentBrowseState', () => ({
                 applyFilters: vi.fn(async () => undefined),
                 applyService: vi.fn(async () => undefined),
                 goToFirstPage: vi.fn(async () => undefined),
+                initialize: testState.initializeSpy,
                 updateService: vi.fn(),
             },
         };
@@ -371,6 +387,8 @@ async function mountTabContent(initialPath = '/browse') {
 
 describe('TabContentV2 browse route sync', () => {
     beforeEach(() => {
+        testState.bootstrapBehavior = 'success';
+        testState.initializeSpy.mockReset();
         testState.restoredItems = [];
         testState.toastError.mockReset();
         testState.viewerOnClose.mockReset();
@@ -385,6 +403,29 @@ describe('TabContentV2 browse route sync', () => {
             value: mockAxios,
             writable: true,
         });
+    });
+
+    it('shows a loading placeholder while the browse tab is bootstrapping', async () => {
+        testState.bootstrapBehavior = 'loading';
+
+        const { wrapper } = await mountTabContent('/browse');
+
+        expect(wrapper.find('[data-testid="tab-content-v2-view"]').exists()).toBe(false);
+        expect(wrapper.get('[data-test="browse-tab-bootstrap-loading"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="browse-tab-bootstrap-status"]').text()).toBe('Loading browse tab');
+    });
+
+    it('shows a retry action instead of a blank surface when browse tab bootstrap fails', async () => {
+        testState.bootstrapBehavior = 'error';
+
+        const { wrapper } = await mountTabContent('/browse');
+
+        expect(wrapper.find('[data-testid="tab-content-v2-view"]').exists()).toBe(false);
+        expect(wrapper.get('[data-test="browse-tab-bootstrap-status"]').text()).toBe('Browse tab failed to load');
+
+        await wrapper.get('[data-test="browse-tab-bootstrap-retry"]').trigger('click');
+
+        expect(testState.initializeSpy).toHaveBeenCalledTimes(1);
     });
 
     it('pushes /browse/file/:id when a browse item opens in fullscreen', async () => {

@@ -2,9 +2,8 @@
 import { computed, provide, reactive, ref, shallowRef, toRef, watch, watchEffect } from 'vue';
 import { useRoute } from 'vue-router';
 import { type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe';
-import { show as showFile } from '@/actions/App/Http/Controllers/FilesController';
 import { useToast } from '@/components/ui/toast/use-toast';
-import { useBrowseV2SurfaceRouteSync, mapBrowseV2FileToFeedItem } from '@/composables/useBrowseV2SurfaceRouteSync';
+import { useBrowseV2SurfaceRouteSync } from '@/composables/useBrowseV2SurfaceRouteSync';
 import { createBrowseForm, BrowseFormKey } from '@/composables/useBrowseForm';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useFileViewerData } from '@/composables/useFileViewerData';
@@ -17,17 +16,18 @@ import { useTabContentItemInteractions } from '@/composables/useTabContentItemIn
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import { createBrowseCatalog } from '@/lib/browseCatalog';
+import { loadBrowseV2StandaloneFileItem } from '@/lib/browseV2StandaloneItem';
 import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession } from '@/lib/tabContentBrowseBootstrap';
 import { filterItemsByContainerBlacklists, removeContainerBlacklist, upsertContainerBlacklist } from '@/lib/tabContentV2Blacklists';
 import { createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, type OverlayMediaType } from '@/lib/tabContentV2';
 import { createBrowseV2MouseShortcutHandlers } from '@/lib/tabContentV2MouseShortcuts';
 import type { FeedItem, TabData } from '@/composables/useTabs';
-import type { File } from '@/types/file';
 import type { ReactionType } from '@/types/reaction';
 import type { ContainerBlacklist } from '@/types/container-blacklist';
 import type { BrowseFeedHandle } from '@/types/browse';
 import { isPositiveOnlyLocalView, matchesLocalViewFilters } from '@/utils/localReactionState';
+import TabContentV2BootstrapState from './TabContentV2BootstrapState.vue';
 import TabContentV2View from './TabContentV2View.vue';
 
 interface Props {
@@ -177,6 +177,8 @@ const browse = useTabContentBrowseState({
 const browseState = browse.state;
 const browseActions = browse.actions;
 const shouldShowForm = browseState.shouldShowForm;
+const isTabBootstrapping = browseState.isInitializing;
+const hasTabBootstrapError = computed(() => !isTabBootstrapping.value && browseState.bootstrapFailed.value);
 const masonryRenderKey = browseState.masonryRenderKey;
 const isFilterSheetOpen = ref(false);
 const hydratedInitialState = ref<VibeInitialState | undefined>(undefined);
@@ -375,26 +377,10 @@ const resolve = createTabContentV2Resolve({
     toast,
 });
 
-function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
-    return (item.feedItem as FeedItem | undefined) ?? null;
-}
-
-function handleAssetLoads(loads: VibeAssetLoadEvent[]): void {
-    const batch = loads.map((load) => getFeedItemFromVibeItem(load.item)).filter((item): item is FeedItem => item !== null);
-    if (batch.length > 0) itemInteractions.preload.onBatchPreloaded(batch);
-}
-
-function handleAssetErrors(errors: VibeAssetErrorEvent[]): void {
-    itemInteractions.preload.onBatchFailures(errors.map((error) => ({
-        item: error.item.feedItem as FeedItem,
-        error,
-    })));
-}
-
-async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> {
-    const feedItem = getFeedItemFromVibeItem(item);
-    if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type);
-}
+function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null { return (item.feedItem as FeedItem | undefined) ?? null; }
+function handleAssetLoads(loads: VibeAssetLoadEvent[]): void { const batch = loads.map((load) => getFeedItemFromVibeItem(load.item)).filter((item): item is FeedItem => item !== null); if (batch.length > 0) itemInteractions.preload.onBatchPreloaded(batch); }
+function handleAssetErrors(errors: VibeAssetErrorEvent[]): void { itemInteractions.preload.onBatchFailures(errors.map((error) => ({ item: error.item.feedItem as FeedItem, error }))); }
+async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> { const feedItem = getFeedItemFromVibeItem(item); if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type); }
 
 function openFileSheet(): void { fileViewerSheet.setSheetOpen(true); }
 function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); }
@@ -402,11 +388,7 @@ function handleLoadedItemsAction(): void {}
 
 async function loadStandaloneFileItem(fileId: number): Promise<FeedItem | null> {
     try {
-        const { data } = await window.axios.get<{ file: File }>(showFile.url(fileId));
-        if (!data?.file) {
-            return null;
-        }
-        return mapBrowseV2FileToFeedItem(data.file);
+        return await loadBrowseV2StandaloneFileItem(fileId);
     } catch (error) {
         console.error('Failed to load standalone browse-v2 file:', error);
         toast.error('Failed to open the requested file.');
@@ -439,6 +421,7 @@ const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
 async function applyFilters(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.applyFilters(); }
 async function applyService(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.applyService(); }
 async function goToFirstPage(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.goToFirstPage(); }
+async function retryTabBootstrap(): Promise<void> { await browseActions.initialize(); }
 
 watch(
     () => vibeStatus.value.loadState,
@@ -503,6 +486,7 @@ watch(
 
 <template>
     <TabContentV2View
+        v-if="tab"
         :active-index="activeIndex"
         :tab="tab"
         :should-show-form="shouldShowForm"
@@ -551,5 +535,11 @@ watch(
         :close-file-sheet="closeFileSheet"
         :downloaded-reaction-prompt="downloadedReactionPrompt"
         :handle-container-blacklist-change="handleContainerBlacklistChange"
+    />
+    <TabContentV2BootstrapState
+        v-else
+        :is-loading="isTabBootstrapping"
+        :has-error="hasTabBootstrapError"
+        :on-retry="retryTabBootstrap"
     />
 </template>

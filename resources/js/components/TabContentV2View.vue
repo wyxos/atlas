@@ -113,6 +113,7 @@ const vibeLayoutBindings = computed(() => ({
     mode: props.vibeFeedMode,
     pageSize: Number(props.form.data.limit),
     resolve: props.resolve,
+    showEndBadge: false,
     showStatusBadges: false,
     surfaceMode: props.surfaceMode,
 }));

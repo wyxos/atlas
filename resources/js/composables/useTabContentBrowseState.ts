@@ -39,6 +39,8 @@ type TabContentBrowseStateRefs = {
     masonryRenderKey: Ref<number>;
     startPageToken: Ref<BrowsePageToken>;
     shouldShowForm: Ref<boolean>;
+    isInitializing: Ref<boolean>;
+    bootstrapFailed: Ref<boolean>;
 };
 
 function normalizeTotal(value: unknown): number | null {
@@ -160,6 +162,7 @@ function createTabContentPageLoader(args: {
 function createTabContentBootstrap(args: {
     options: UseTabContentBrowseStateOptions;
     state: TabContentBrowseStateRefs;
+    toast: ReturnType<typeof useToast>;
     updateService: (nextService: string) => void;
 }) {
     async function restoreTabState(): Promise<void> {
@@ -196,24 +199,41 @@ function createTabContentBootstrap(args: {
 
     async function initialize(): Promise<void> {
         if (!args.options.tabId.value) {
+            args.state.isInitializing.value = false;
+            args.state.bootstrapFailed.value = false;
             return;
         }
 
+        args.state.isInitializing.value = true;
+        args.state.bootstrapFailed.value = false;
         args.options.events.onTabDataLoadingChange?.(true);
 
         try {
             const { data } = await window.axios.get(tabsShow.url(args.options.tabId.value));
 
-            if (data.tab) {
-                args.options.data.tab.value = data.tab;
-                args.options.form.syncFromTab(args.options.data.tab.value ?? undefined);
-                await restoreTabState();
+            if (!data.tab) {
+                throw new Error('Browse tab not found.');
             }
 
+            args.options.data.tab.value = data.tab;
+            args.options.form.syncFromTab(args.options.data.tab.value ?? undefined);
+            await restoreTabState();
             await args.options.catalog.loadServices();
             applyLegacyServiceFallback();
             await args.options.catalog.loadSources();
+        } catch (error: unknown) {
+            const err = error as { message?: unknown; response?: { data?: { message?: unknown } } };
+            const message =
+                (typeof err?.response?.data?.message === 'string' ? err.response.data.message : null)
+                || (typeof err?.message === 'string' ? err.message : null)
+                || 'Failed to load browse tab.';
+            const trimmed = message.length > 280 ? `${message.slice(0, 280)}…` : message;
+
+            args.state.bootstrapFailed.value = true;
+            args.toast.error(trimmed);
+            console.error('Failed to initialize browse tab:', error);
         } finally {
+            args.state.isInitializing.value = false;
             args.options.events.onTabDataLoadingChange?.(false);
         }
     }
@@ -230,6 +250,8 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     const masonryRenderKey = ref(0);
     const startPageToken = ref<BrowsePageToken>(1);
     const shouldShowForm = ref(true);
+    const isInitializing = ref(true);
+    const bootstrapFailed = ref(false);
 
     const selectedService = computed({
         get: () => options.form.data.service,
@@ -263,6 +285,8 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
         masonryRenderKey,
         startPageToken,
         shouldShowForm,
+        isInitializing,
+        bootstrapFailed,
     };
     const loader = createTabContentPageLoader({
         form: options.form,
@@ -274,6 +298,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     const bootstrap = createTabContentBootstrap({
         options,
         state,
+        toast,
         updateService,
     });
 
@@ -305,6 +330,8 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
             masonryRenderKey,
             startPageToken,
             shouldShowForm,
+            isInitializing,
+            bootstrapFailed,
         },
         derived: {
             selectedService,
@@ -312,6 +339,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
             hasServiceSelected,
         },
         actions: {
+            initialize: bootstrap.initialize,
             updateService,
             getPage: loader.getPage,
             applyFilters,

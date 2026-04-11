@@ -36,6 +36,7 @@ function createStatus(overrides: Partial<InstanceType<typeof BrowseV2StatusBar>[
         fillCollectedCount: null,
         fillDelayRemainingMs: null,
         fillTargetCount: null,
+        hasNextPage: true,
         itemCount: 20,
         loadState: 'loaded' as const,
         nextCursor: '2',
@@ -98,6 +99,20 @@ describe('BrowseV2StatusBar', () => {
             },
         });
 
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('success');
+    });
+
+    it('shows end of list when browse-v2 is exhausted', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    hasNextPage: false,
+                    nextCursor: null,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('End of list');
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('success');
     });
 });
