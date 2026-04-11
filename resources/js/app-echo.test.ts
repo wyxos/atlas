@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createApp } from 'vue';
 
 vi.mock('@laravel/echo-vue', () => ({
     configureEcho: vi.fn(),
@@ -43,6 +44,7 @@ describe('Echo setup', () => {
     beforeEach(() => {
         document.body.innerHTML = '<div id="app"></div><div></div>';
         delete (window as { Echo?: unknown }).Echo;
+        vi.clearAllMocks();
         vi.resetModules();
     });
 
@@ -50,5 +52,14 @@ describe('Echo setup', () => {
         await expect(import('./app')).resolves.toBeDefined();
 
         expect((window as { Echo?: unknown }).Echo).toBeUndefined();
+        expect(createApp).not.toHaveBeenCalled();
+    });
+
+    it('mounts the SPA when the app container explicitly opts in', async () => {
+        document.body.innerHTML = '<div id="app" data-vue-root="spa"></div><svg></svg>';
+
+        await expect(import('./app')).resolves.toBeDefined();
+
+        expect(createApp).toHaveBeenCalledTimes(1);
     });
 });

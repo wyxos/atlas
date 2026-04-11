@@ -30,10 +30,9 @@ try {
 // Register only the Oruga icons Atlas actually uses.
 library.add(faChevronLeft, faChevronRight);
 
-// Only mount Vue app if the #app element exists AND is empty (Vue SPA route)
-// Blade pages have content after the #app element, Vue SPA pages have an empty #app element
+// Only mount Vue on Blade views that explicitly opt into the SPA shell.
 const appElement = document.getElementById('app');
-if (appElement && appElement.children.length === 0 && !appElement.nextElementSibling) {
+if (appElement?.dataset.vueRoot === 'spa') {
     const router = createRouter({
         history: createWebHistory(),
         routes,
