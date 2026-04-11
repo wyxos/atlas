@@ -14,7 +14,7 @@ type VibeStatusLike = {
   itemCount: number
   loadState: 'failed' | 'loaded' | 'loading'
   nextCursor: string | null
-  phase: 'failed' | 'filling' | 'idle' | 'loading' | 'reloading'
+  phase: 'failed' | 'filling' | 'idle' | 'initializing' | 'loading' | 'refreshing'
   previousCursor: string | null
 }
 
@@ -45,8 +45,8 @@ const statusLabel = computed(() => {
     return 'Filling'
   }
 
-  if (props.status.phase === 'reloading') {
-    return 'Reloading'
+  if (props.status.phase === 'refreshing') {
+    return 'Refreshing'
   }
 
   if (props.status.loadState === 'loading') {
@@ -68,8 +68,9 @@ const statusVariant = computed(() => {
   if (
     props.status.loadState === 'loading'
     || props.status.phase === 'filling'
+    || props.status.phase === 'initializing'
     || props.status.phase === 'loading'
-    || props.status.phase === 'reloading'
+    || props.status.phase === 'refreshing'
   ) {
     return 'warning'
   }
@@ -84,8 +85,9 @@ const statusVariant = computed(() => {
 const isPending = computed(() => (
   props.status.loadState === 'loading'
   || props.status.phase === 'filling'
+  || props.status.phase === 'initializing'
   || props.status.phase === 'loading'
-  || props.status.phase === 'reloading'
+  || props.status.phase === 'refreshing'
 ))
 </script>
 

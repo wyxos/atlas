@@ -79,17 +79,17 @@ describe('BrowseV2StatusBar', () => {
             },
         });
 
-        const reloadingWrapper = mount(BrowseV2StatusBar, {
+        const refreshingWrapper = mount(BrowseV2StatusBar, {
             props: {
                 status: createStatus({
-                    phase: 'reloading',
+                    phase: 'refreshing',
                 }),
             },
         });
 
         expect(loadingWrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
         expect(fillingWrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
-        expect(reloadingWrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
+        expect(refreshingWrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
     });
 
     it('uses the success variant when browse-v2 is loaded and idle', () => {

@@ -180,7 +180,7 @@ const vibeLayoutBindings = computed(() => ({
             :form="form"
             :available-services="availableServices"
             :available-sources="availableSources"
-            :is-loading="vibeStatus.phase === 'loading' || vibeStatus.phase === 'filling' || vibeStatus.phase === 'reloading'"
+            :is-loading="vibeStatus.phase === 'loading' || vibeStatus.phase === 'filling' || vibeStatus.phase === 'refreshing'"
             :set-local-mode="setLocalMode"
             :update-service="updateService"
             :update-source="updateSource"

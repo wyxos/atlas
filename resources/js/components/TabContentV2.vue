@@ -92,7 +92,7 @@ const visibleItems = computed(() => {
 const sessionItems = computed(() => standaloneItem.value ? [standaloneItem.value] : visibleItems.value);
 const isVibeLoading = computed(() => vibeStatus.value.phase === 'loading'
     || vibeStatus.value.phase === 'filling'
-    || vibeStatus.value.phase === 'reloading'
+    || vibeStatus.value.phase === 'refreshing'
     || vibeStatus.value.loadState === 'loading');
 const hasRouteFileSelection = computed(() => route.name === 'browse-file');
 
@@ -425,7 +425,7 @@ watch(
     () => {
         const isLoading = vibeStatus.value.phase === 'loading'
             || vibeStatus.value.phase === 'filling'
-            || vibeStatus.value.phase === 'reloading'
+            || vibeStatus.value.phase === 'refreshing'
             || vibeStatus.value.loadState === 'loading';
         emit('update:loading', isLoading);
         props.onLoadingChange?.(isLoading);
