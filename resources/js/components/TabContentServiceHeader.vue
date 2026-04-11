@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronsUp, Play, RotateCcw, X } from 'lucide-vue-next';
-import type { MasonryInstance } from '@wyxos/vibe';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -16,13 +15,14 @@ import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { LoadedItemsAction } from '@/composables/useTabContentLoadedItemsActions';
 import type { ServiceOption } from '@/lib/browseCatalog';
+import type { BrowseFeedHandle } from '@/types/browse';
 
 interface Props {
     form: BrowseFormInstance;
     availableServices: ServiceOption[];
     availableSources: string[];
     localService: ServiceOption | null;
-    masonry: MasonryInstance | null;
+    masonry: BrowseFeedHandle | null;
     filterSheetOpen: boolean;
     updateFilterSheetOpen: (value: boolean) => void;
     updateFeed: (value: 'online' | 'local') => void;

@@ -1,11 +1,11 @@
 import { computed, nextTick, onMounted, ref, type ComputedRef, type Ref, type ShallowRef } from 'vue';
-import type { PageToken } from '@wyxos/vibe';
 import { useToast } from '@/components/ui/toast/use-toast';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession, resolveLegacyBrowseService } from '@/lib/tabContentBrowseBootstrap';
+import type { BrowsePageToken } from '@/types/browse';
 import type { BrowseFormData, BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
@@ -37,7 +37,7 @@ type UseTabContentBrowseStateOptions = {
 type TabContentBrowseStateRefs = {
     totalAvailable: Ref<number | null>;
     masonryRenderKey: Ref<number>;
-    startPageToken: Ref<PageToken>;
+    startPageToken: Ref<BrowsePageToken>;
     shouldShowForm: Ref<boolean>;
 };
 
@@ -65,7 +65,7 @@ function normalizeLocalPage(form: BrowseFormInstance): number {
 function resetBrowseResults(
     state: TabContentBrowseStateRefs,
     options: UseTabContentBrowseStateOptions,
-    nextStart: PageToken,
+    nextStart: BrowsePageToken,
 ): void {
     state.shouldShowForm.value = false;
     state.totalAvailable.value = null;
@@ -83,7 +83,7 @@ function createTabContentPageLoader(args: {
     toast: ReturnType<typeof useToast>;
     events: UseTabContentBrowseStateOptions['events'];
 }) {
-    function updateTabLabel(formData: BrowseFormData, page: PageToken): void {
+    function updateTabLabel(formData: BrowseFormData, page: BrowsePageToken): void {
         if (!args.events.onUpdateTabLabel) {
             return;
         }
@@ -102,7 +102,7 @@ function createTabContentPageLoader(args: {
         args.events.onUpdateTabLabel(label);
     }
 
-    async function getPage(page: PageToken, context?: BrowseFormData) {
+    async function getPage(page: BrowsePageToken, context?: BrowseFormData) {
         const formData = context ?? args.form.getData();
         const params: Record<string, unknown> = {
             feed: formData.feed,
@@ -228,7 +228,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
 
     const totalAvailable = ref<number | null>(null);
     const masonryRenderKey = ref(0);
-    const startPageToken = ref<PageToken>(1);
+    const startPageToken = ref<BrowsePageToken>(1);
     const shouldShowForm = ref(true);
 
     const selectedService = computed({
@@ -278,7 +278,7 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
     });
 
     async function applyFilters(): Promise<void> {
-        const nextStart: PageToken = options.form.data.feed === 'local' ? normalizeLocalPage(options.form) : 1;
+        const nextStart: BrowsePageToken = options.form.data.feed === 'local' ? normalizeLocalPage(options.form) : 1;
 
         options.form.data.page = nextStart;
         resetBrowseResults(state, options, nextStart);

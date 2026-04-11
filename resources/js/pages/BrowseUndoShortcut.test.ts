@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { shallowMount } from '@vue/test-utils';
-import Browse from './Browse.vue';
+import BrowseV2 from './BrowseV2.vue';
 
 const {
     mockLoadTabs,
@@ -58,7 +58,7 @@ describe('Browse undo shortcut', () => {
 
     it('uses Ctrl+Z to undo the latest queued reaction', () => {
         mockUndoLatestQueuedReaction.mockReturnValue(true);
-        const wrapper = shallowMount(Browse);
+        const wrapper = shallowMount(BrowseV2);
 
         const event = new KeyboardEvent('keydown', {
             key: 'z',
@@ -76,7 +76,7 @@ describe('Browse undo shortcut', () => {
     });
 
     it('leaves text inputs on their native undo behavior', () => {
-        const wrapper = shallowMount(Browse);
+        const wrapper = shallowMount(BrowseV2);
         const input = document.createElement('input');
         document.body.appendChild(input);
 
@@ -96,7 +96,7 @@ describe('Browse undo shortcut', () => {
     });
 
     it('does not prevent default when there is nothing queued to undo', () => {
-        const wrapper = shallowMount(Browse);
+        const wrapper = shallowMount(BrowseV2);
 
         const event = new KeyboardEvent('keydown', {
             key: 'z',

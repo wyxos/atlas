@@ -1,0 +1,467 @@
+import { flushPromises, mount } from '@vue/test-utils';
+import { defineComponent, h, reactive, ref } from 'vue';
+import { createMemoryHistory, createRouter } from 'vue-router';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import TabContentV2 from './TabContentV2.vue';
+
+const mockAxios = vi.hoisted(() => ({
+    delete: vi.fn(),
+    get: vi.fn(),
+    patch: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+}));
+
+const testState = vi.hoisted(() => ({
+    restoredItems: [] as Array<Record<string, unknown>>,
+    toastError: vi.fn(),
+    viewerOnClose: vi.fn(),
+    viewerOnOpen: vi.fn(),
+}));
+
+vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
+    show: {
+        url: (fileId: number) => `/api/files/${fileId}`,
+    },
+}));
+
+vi.mock('@/components/ui/toast/use-toast', () => ({
+    useToast: () => ({
+        error: testState.toastError,
+    }),
+}));
+
+vi.mock('@/composables/useBrowseForm', () => ({
+    BrowseFormKey: Symbol('BrowseForm'),
+    createBrowseForm: () => ({
+        data: reactive({
+            feed: 'online',
+            limit: 20,
+            page: 1,
+            service: 'civit-ai-images',
+            serviceFilters: [],
+            source: 'all',
+            tab_id: 1,
+        }),
+        getData() {
+            return this.data;
+        },
+        isLocal: ref(false),
+        isLocalMode: ref(false),
+        reset: vi.fn(),
+        setService: vi.fn(),
+        syncFromTab: vi.fn(),
+    }),
+}));
+
+vi.mock('@/composables/useDownloadedReactionPrompt', () => ({
+    useDownloadedReactionPrompt: () => ({
+        data: {
+            open: ref(false),
+        },
+        prompt: vi.fn(),
+        chooseReact: vi.fn(),
+        chooseRedownload: vi.fn(),
+        close: vi.fn(),
+        setOpen: vi.fn(),
+    }),
+}));
+
+vi.mock('@/composables/useFileViewerData', () => ({
+    useFileViewerData: () => ({
+        fileData: ref(null),
+        isLoadingFileData: ref(false),
+    }),
+}));
+
+vi.mock('@/composables/useFileViewerSheetState', () => ({
+    useFileViewerSheetState: () => {
+        const sheetState = reactive({
+            isOpen: false,
+        });
+
+        return {
+            sheetState,
+            setSheetOpen: (value: boolean) => {
+                sheetState.isOpen = value;
+            },
+        };
+    },
+}));
+
+vi.mock('@/composables/useItemPreview', () => ({
+    useItemPreview: () => ({
+        clearPreviewedItems: vi.fn(),
+    }),
+}));
+
+vi.mock('@/composables/useLocalFileDeletion', () => ({
+    useLocalFileDeletion: () => ({
+        state: {
+            deleteError: ref(null),
+            deleting: ref(false),
+            dialogOpen: ref(false),
+            itemToDelete: ref(null),
+        },
+        actions: {
+            close: vi.fn(),
+            confirm: vi.fn(),
+        },
+    }),
+}));
+
+vi.mock('@/composables/useTabContentBrowseState', () => ({
+    useTabContentBrowseState: (options: {
+        data: { tab: { value: unknown } };
+        events: { onTabDataLoadingChange?: (value: boolean) => void };
+        tabId: { value: number | null };
+    }) => {
+        queueMicrotask(() => {
+            options.data.tab.value = {
+                id: options.tabId.value ?? 1,
+                isActive: true,
+                items: testState.restoredItems.map((item) => ({ ...item })),
+                label: 'Browse Tab',
+                params: {
+                    feed: 'online',
+                    page: 1,
+                    service: 'civit-ai-images',
+                    tab_id: options.tabId.value ?? 1,
+                },
+                position: 0,
+                updatedAt: null,
+            };
+            options.events.onTabDataLoadingChange?.(false);
+        });
+
+        return {
+            state: {
+                masonryRenderKey: ref(0),
+                shouldShowForm: ref(false),
+                startPageToken: ref(1),
+                totalAvailable: ref(null),
+            },
+            actions: {
+                applyFilters: vi.fn(async () => undefined),
+                applyService: vi.fn(async () => undefined),
+                goToFirstPage: vi.fn(async () => undefined),
+                updateService: vi.fn(),
+            },
+        };
+    },
+}));
+
+vi.mock('@/composables/useTabContentContainerInteractions', () => ({
+    useTabContentContainerInteractions: () => ({
+        clearHoveredContainer: vi.fn(),
+        managerRef: ref(null),
+        drawer: {
+            actions: {
+                setOpen: vi.fn(),
+            },
+            derived: {
+                container: ref(null),
+                items: ref([]),
+            },
+            state: {
+                isOpen: ref(false),
+            },
+        },
+    }),
+}));
+
+vi.mock('@/composables/useTabContentItemInteractions', () => ({
+    useTabContentItemInteractions: () => ({
+        preload: {
+            onBatchFailures: vi.fn(),
+            onBatchPreloaded: vi.fn(),
+            reset: vi.fn(),
+        },
+        reactions: {
+            onFileReaction: vi.fn(),
+        },
+        state: {
+            clearHover: vi.fn(),
+        },
+        viewer: {
+            onClose: testState.viewerOnClose,
+            onOpen: testState.viewerOnOpen,
+        },
+    }),
+}));
+
+vi.mock('@/composables/useTabContentPromptDialog', () => ({
+    useTabContentPromptDialog: () => ({
+        data: {
+            currentPromptData: ref(null),
+            promptDataLoading: ref(false),
+            promptDialogItemId: ref(null),
+            promptDialogOpen: ref(false),
+        },
+        close: vi.fn(),
+        copy: vi.fn(),
+        openTestPage: vi.fn(),
+        setOpen: vi.fn(),
+    }),
+}));
+
+vi.mock('@/lib/browseCatalog', () => ({
+    createBrowseCatalog: () => ({
+        state: {
+            availableServices: ref([{ key: 'civit-ai-images', label: 'CivitAI Images' }]),
+            availableSources: ref([]),
+            localService: ref(null),
+        },
+        actions: {
+            loadServices: vi.fn(async () => undefined),
+            loadSources: vi.fn(async () => undefined),
+        },
+    }),
+}));
+
+vi.mock('@/lib/tabContentV2MouseShortcuts', () => ({
+    createBrowseV2MouseShortcutHandlers: () => ({
+        handleAuxClickCapture: vi.fn(),
+        handleClickCapture: vi.fn(),
+        handleContextMenuCapture: vi.fn(),
+        handleMouseDownCapture: vi.fn(),
+    }),
+}));
+
+vi.mock('./TabContentV2View.vue', () => ({
+    default: defineComponent({
+        name: 'TabContentV2View',
+        props: {
+            currentVisibleItem: { type: Object, default: null },
+            surfaceMode: { type: String, default: 'list' },
+            updateActiveIndex: { type: Function, required: true },
+            updateSurfaceMode: { type: Function, required: true },
+        },
+        setup(props) {
+            return () => h('div', { 'data-testid': 'tab-content-v2-view' }, [
+                h('div', { 'data-testid': 'current-item-id' }, String((props.currentVisibleItem as { id?: number } | null)?.id ?? 'none')),
+                h('div', { 'data-testid': 'surface-mode' }, props.surfaceMode),
+                h('button', {
+                    'data-testid': 'select-first',
+                    onClick: () => props.updateActiveIndex(0),
+                }),
+                h('button', {
+                    'data-testid': 'select-second',
+                    onClick: () => props.updateActiveIndex(1),
+                }),
+                h('button', {
+                    'data-testid': 'open-fullscreen',
+                    onClick: () => props.updateSurfaceMode('fullscreen'),
+                }),
+                h('button', {
+                    'data-testid': 'close-fullscreen',
+                    onClick: () => props.updateSurfaceMode('list'),
+                }),
+            ]);
+        },
+    }),
+}));
+
+function createFeedItem(id: number) {
+    return {
+        id,
+        width: 512,
+        height: 512,
+        page: 1,
+        key: `1-${id}`,
+        index: id - 1,
+        src: `https://example.test/${id}/preview.jpg`,
+        preview: `https://example.test/${id}/preview.jpg`,
+        original: `https://example.test/${id}/original.jpg`,
+        originalUrl: `https://example.test/${id}/original.jpg`,
+        type: 'image' as const,
+    };
+}
+
+function createFilePayload(id: number) {
+    return {
+        file: {
+            absolute_path: null,
+            absolute_preview_path: null,
+            auto_dislike_rule: null,
+            auto_disliked: false,
+            blacklisted_at: null,
+            blacklist_reason: null,
+            blacklist_rule: null,
+            blacklist_type: null,
+            chapter: null,
+            containers: [],
+            created_at: '2026-04-10T00:00:00Z',
+            description: null,
+            detail_metadata: null,
+            disk_url: `/api/files/${id}/downloaded`,
+            download_progress: 0,
+            downloaded: true,
+            downloaded_at: null,
+            ext: 'jpg',
+            file_url: `/api/files/${id}/downloaded`,
+            filename: `file-${id}.jpg`,
+            hash: null,
+            height: 768,
+            id,
+            listing_metadata: null,
+            mime_type: 'image/jpeg',
+            not_found: false,
+            parent_id: null,
+            path: null,
+            poster_path: null,
+            poster_url: null,
+            preview_file_url: `/api/files/${id}/preview`,
+            preview_path: null,
+            preview_url: `/api/files/${id}/preview`,
+            previewed_at: null,
+            previewed_count: 0,
+            referrer_url: null,
+            seen_at: null,
+            seen_count: 0,
+            size: 123,
+            source: 'local',
+            source_id: null,
+            tags: null,
+            title: `File ${id}`,
+            updated_at: '2026-04-10T00:00:00Z',
+            url: null,
+            width: 1024,
+        },
+    };
+}
+
+async function createTestRouter(initialPath: string) {
+    const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+            { path: '/browse', name: 'browse', component: { template: '<div />' } },
+            { path: '/browse/file/:fileId', name: 'browse-file', component: { template: '<div />' } },
+        ],
+    });
+
+    await router.push(initialPath);
+    await router.isReady();
+
+    return router;
+}
+
+async function mountTabContent(initialPath = '/browse') {
+    const router = await createTestRouter(initialPath);
+    const pushSpy = vi.spyOn(router, 'push');
+    const replaceSpy = vi.spyOn(router, 'replace');
+
+    const wrapper = mount(TabContentV2, {
+        props: {
+            availableServices: [],
+            onReaction: vi.fn(),
+            tabId: 1,
+            updateActiveTab: vi.fn(),
+        },
+        global: {
+            plugins: [router],
+        },
+    });
+
+    await flushPromises();
+    await flushPromises();
+
+    return { pushSpy, replaceSpy, router, wrapper };
+}
+
+describe('TabContentV2 browse route sync', () => {
+    beforeEach(() => {
+        testState.restoredItems = [];
+        testState.toastError.mockReset();
+        testState.viewerOnClose.mockReset();
+        testState.viewerOnOpen.mockReset();
+        mockAxios.delete.mockReset();
+        mockAxios.get.mockReset();
+        mockAxios.patch.mockReset();
+        mockAxios.post.mockReset();
+        mockAxios.put.mockReset();
+        Object.defineProperty(window, 'axios', {
+            configurable: true,
+            value: mockAxios,
+            writable: true,
+        });
+    });
+
+    it('pushes /browse/file/:id when a browse item opens in fullscreen', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
+
+        const { pushSpy, router, wrapper } = await mountTabContent('/browse');
+
+        await wrapper.get('[data-testid="select-second"]').trigger('click');
+        await wrapper.get('[data-testid="open-fullscreen"]').trigger('click');
+        await flushPromises();
+
+        expect(pushSpy).toHaveBeenCalledWith('/browse/file/2');
+        expect(router.currentRoute.value.fullPath).toBe('/browse/file/2');
+    });
+
+    it('replaces the current file route while navigating fullscreen items', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
+
+        const { replaceSpy, router, wrapper } = await mountTabContent('/browse');
+
+        await wrapper.get('[data-testid="select-second"]').trigger('click');
+        await wrapper.get('[data-testid="open-fullscreen"]').trigger('click');
+        await flushPromises();
+        replaceSpy.mockClear();
+
+        await wrapper.get('[data-testid="select-first"]').trigger('click');
+        await flushPromises();
+
+        expect(replaceSpy).toHaveBeenCalledWith('/browse/file/1');
+        expect(router.currentRoute.value.fullPath).toBe('/browse/file/1');
+    });
+
+    it('replaces back to /browse when fullscreen closes', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
+
+        const { replaceSpy, router, wrapper } = await mountTabContent('/browse');
+
+        await wrapper.get('[data-testid="select-second"]').trigger('click');
+        await wrapper.get('[data-testid="open-fullscreen"]').trigger('click');
+        await flushPromises();
+        replaceSpy.mockClear();
+
+        await wrapper.get('[data-testid="close-fullscreen"]').trigger('click');
+        await flushPromises();
+
+        expect(replaceSpy).toHaveBeenCalledWith('/browse');
+        expect(router.currentRoute.value.fullPath).toBe('/browse');
+    });
+
+    it('opens a direct file route in the active tab context when the file is already restored', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
+
+        const { wrapper } = await mountTabContent('/browse/file/2');
+
+        expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('2');
+        expect(wrapper.get('[data-testid="surface-mode"]').text()).toBe('fullscreen');
+        expect(mockAxios.get).not.toHaveBeenCalledWith('/api/files/2');
+    });
+
+    it('falls back to a standalone fullscreen session for a direct file route outside the active tab context', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
+        mockAxios.get.mockImplementation(async (url: string) => {
+            if (url === '/api/files/99') {
+                return { data: createFilePayload(99) };
+            }
+
+            throw new Error(`Unexpected GET ${url}`);
+        });
+
+        const { router, wrapper } = await mountTabContent('/browse/file/99');
+
+        expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('99');
+        expect(wrapper.get('[data-testid="surface-mode"]').text()).toBe('fullscreen');
+
+        await wrapper.get('[data-testid="close-fullscreen"]').trigger('click');
+        await flushPromises();
+
+        expect(router.currentRoute.value.fullPath).toBe('/browse');
+    });
+});

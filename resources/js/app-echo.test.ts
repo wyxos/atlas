@@ -27,7 +27,8 @@ vi.mock('@fortawesome/vue-fontawesome', () => ({
     FontAwesomeIcon: {},
 }));
 vi.mock('@fortawesome/free-solid-svg-icons', () => ({
-    fas: {},
+    faChevronLeft: {},
+    faChevronRight: {},
 }));
 vi.mock('./App.vue', () => ({
     default: {},

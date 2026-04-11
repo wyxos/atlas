@@ -2,7 +2,7 @@ import { computed, getCurrentInstance, onUnmounted, ref, triggerRef, type Comput
 import type { FeedItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
-import { Masonry } from '@wyxos/vibe';
+import type { BrowseFeedHandle } from '@/types/browse';
 import {
     applyOptimisticLocalReactionState,
     restoreOptimisticLocalReactionState,
@@ -44,7 +44,7 @@ type ContainerDrawerToggleHandler = (container: ContainerPillTarget) => void;
 type OpenContainerTabHandler = (container: ContainerPillTarget) => void;
 type UseContainerPillInteractionsOptions = {
     items: Ref<FeedItem[]>;
-    masonry: Ref<InstanceType<typeof Masonry> | null>;
+    masonry: Ref<BrowseFeedHandle | null>;
     tabId: number | undefined | ComputedRef<number | undefined>;
     isLocal: Readonly<Ref<boolean>>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;

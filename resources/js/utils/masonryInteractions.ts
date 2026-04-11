@@ -1,11 +1,11 @@
 import type { Ref } from 'vue';
-import { Masonry } from '@wyxos/vibe';
 import type { FeedItem } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
+import type { BrowseFeedHandle } from '@/types/browse';
 
 export function createMasonryInteractions(
     items: Ref<FeedItem[]>,
-    masonry: Ref<InstanceType<typeof Masonry> | null>,
+    masonry: Ref<BrowseFeedHandle | null>,
     handleMasonryReaction: (item: FeedItem, type: ReactionType, index?: number) => Promise<void>
 ) {
     function handleAltClickReaction(e: MouseEvent, item: FeedItem, index?: number): void {

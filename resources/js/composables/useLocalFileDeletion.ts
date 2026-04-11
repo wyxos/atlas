@@ -1,16 +1,16 @@
 import { computed, ref, type Ref, type ShallowRef } from 'vue';
-import type { MasonryInstance } from '@wyxos/vibe';
 import type { FeedItem } from '@/composables/useTabs';
+import type { BrowseFeedHandle } from '@/types/browse';
 
 type UseLocalFileDeletionOptions = {
     items: ShallowRef<FeedItem[]>;
-    masonry: Ref<MasonryInstance | null>;
+    masonry: Ref<BrowseFeedHandle | null>;
     isLocal: Ref<boolean>;
     totalAvailable: Ref<number | null>;
     clearHover: () => void;
 };
 
-type MasonryRemoveTarget = Parameters<MasonryInstance['remove']>[0];
+type MasonryRemoveTarget = Parameters<BrowseFeedHandle['remove']>[0];
 
 function getDeleteErrorMessage(error: unknown): string {
     const axiosError = error as {

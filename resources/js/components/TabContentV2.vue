@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, provide, reactive, ref, shallowRef, toRef, watch, watchEffect } from 'vue';
-import { type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe-v3';
-import type { MasonryInstance } from '@wyxos/vibe';
+import { useRoute } from 'vue-router';
+import { type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe';
+import { show as showFile } from '@/actions/App/Http/Controllers/FilesController';
 import { useToast } from '@/components/ui/toast/use-toast';
+import { useBrowseV2SurfaceRouteSync, mapBrowseV2FileToFeedItem } from '@/composables/useBrowseV2SurfaceRouteSync';
 import { createBrowseForm, BrowseFormKey } from '@/composables/useBrowseForm';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useFileViewerData } from '@/composables/useFileViewerData';
@@ -21,8 +23,10 @@ import { filterItemsByContainerBlacklists, removeContainerBlacklist, upsertConta
 import { createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, type OverlayMediaType } from '@/lib/tabContentV2';
 import { createBrowseV2MouseShortcutHandlers } from '@/lib/tabContentV2MouseShortcuts';
 import type { FeedItem, TabData } from '@/composables/useTabs';
+import type { File } from '@/types/file';
 import type { ReactionType } from '@/types/reaction';
 import type { ContainerBlacklist } from '@/types/container-blacklist';
+import type { BrowseFeedHandle } from '@/types/browse';
 import { isPositiveOnlyLocalView, matchesLocalViewFilters } from '@/utils/localReactionState';
 import TabContentV2View from './TabContentV2View.vue';
 
@@ -41,12 +45,18 @@ const props = defineProps<Props>();
 const emit = defineEmits<{ 'update:loading': [isLoading: boolean] }>();
 
 const toast = useToast();
+const route = useRoute();
 const tabId = toRef(props, 'tabId');
 const items = shallowRef<FeedItem[]>([]);
 const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
 const removedIds = ref<Set<number>>(new Set());
 const vibeRef = ref<VibeHandle | null>(null);
 const tab = ref<TabData | null>(null);
+const activeIndex = ref(0);
+const surfaceMode = ref<'fullscreen' | 'list'>('list');
+const standaloneItem = ref<FeedItem | null>(null);
+const isSessionReady = ref(false);
+const isTabDataLoading = ref(true);
 const form = createBrowseForm();
 provide(BrowseFormKey, form);
 
@@ -64,6 +74,7 @@ const isVibeLoading = computed(() => vibeStatus.value.phase === 'loading'
     || vibeStatus.value.phase === 'filling'
     || vibeStatus.value.phase === 'reloading'
     || vibeStatus.value.loadState === 'loading');
+const hasRouteFileSelection = computed(() => route.name === 'browse-file');
 
 function matchesActiveLocalFilters(item: FeedItem): boolean {
     return !form.isLocal.value || matchesLocalViewFilters(item, form.data.serviceFilters);
@@ -87,7 +98,7 @@ function collectTargetIds(target: FeedItem | FeedItem[] | string | string[]): st
         .filter((value) => value.trim().length > 0);
 }
 
-const vibeMasonry = computed<MasonryInstance | null>(() => {
+const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
     const handle = vibeRef.value;
     if (!handle) {
         return null;
@@ -113,7 +124,7 @@ const vibeMasonry = computed<MasonryInstance | null>(() => {
             syncRemovedIds(result?.ids ?? ids, 'restore');
             return result;
         },
-    } as unknown as MasonryInstance;
+    };
 });
 
 const containerInteractions = useTabContentContainerInteractions({
@@ -167,11 +178,8 @@ const browseState = browse.state;
 const browseActions = browse.actions;
 const shouldShowForm = browseState.shouldShowForm;
 const masonryRenderKey = browseState.masonryRenderKey;
-const vibeFeedMode = computed(() => (form.data.feed === 'local' ? 'static' : 'dynamic'));
 const isFilterSheetOpen = ref(false);
-const vibeInitialCursor = computed(() => normalizeCursor(browseState.startPageToken.value));
 const hydratedInitialState = ref<VibeInitialState | undefined>(undefined);
-const vibeInitialState = computed(() => hydratedInitialState.value);
 const localFileDeletion = useLocalFileDeletion({
     items,
     masonry: vibeMasonry,
@@ -188,17 +196,49 @@ const fullscreenOverlayState = reactive({
 });
 const fileViewerSheet = useFileViewerSheetState({ overlay: fullscreenOverlayState });
 const fileSheetState = fileViewerSheet.sheetState;
+const visibleItems = computed(() => items.value.filter((item) => !removedIds.value.has(item.id)));
+const sessionItems = computed(() => standaloneItem.value ? [standaloneItem.value] : visibleItems.value);
+const vibeFeedMode = computed(() => {
+    if (standaloneItem.value) {
+        return 'static';
+    }
+
+    return form.data.feed === 'local' ? 'static' : 'dynamic';
+});
+const vibeInitialCursor = computed(() => (standaloneItem.value ? null : normalizeCursor(browseState.startPageToken.value)));
+const vibeInitialState = computed<VibeInitialState | undefined>(() => {
+    if (standaloneItem.value) {
+        return {
+            items: [mapFeedItemToVibeItem(standaloneItem.value)],
+            cursor: null,
+            nextCursor: null,
+            previousCursor: null,
+            activeIndex: 0,
+        };
+    }
+
+    return hydratedInitialState.value;
+});
+const viewerKey = computed(() => `${tab.value?.id ?? 'tab'}-${masonryRenderKey.value}-${standaloneItem.value?.id ?? 'feed'}`);
 const fileViewerData = useFileViewerData({
-    items: computed(() => items.value.filter((item) => !removedIds.value.has(item.id))),
+    items: sessionItems,
     navigation: currentNavigation,
     overlay: fullscreenOverlayState,
     sheet: fileSheetState,
 });
-const visibleItems = computed(() => items.value.filter((item) => !removedIds.value.has(item.id)));
-const currentVisibleItem = computed(() => visibleItems.value[vibeStatus.value.activeIndex] ?? null);
+const currentVisibleItem = computed(() => {
+    if (sessionItems.value.length === 0) {
+        return null;
+    }
+    const safeIndex = Math.max(0, Math.min(activeIndex.value, sessionItems.value.length - 1));
+    return sessionItems.value[safeIndex] ?? null;
+});
 const headerMasonry = vibeMasonry;
 
-function setTabDataLoading(isLoading: boolean): void { props.onTabDataLoadingChange?.(isLoading); }
+function setTabDataLoading(isLoading: boolean): void {
+    isTabDataLoading.value = isLoading;
+    props.onTabDataLoadingChange?.(isLoading);
+}
 function setVibeHandle(handle: VibeHandle | null): void { vibeRef.value = handle; }
 
 function syncRemovedIds(ids: string[], mode: 'remove' | 'restore' | 'undo' = 'remove'): void {
@@ -226,11 +266,19 @@ function resetLocalFeedState(): void {
 }
 
 function applyRestoredSession(): void {
+    isSessionReady.value = false;
     resetLocalFeedState();
+    hydratedInitialState.value = undefined;
+
+    if (!hasRouteFileSelection.value) {
+        standaloneItem.value = null;
+        surfaceMode.value = 'list';
+        activeIndex.value = 0;
+    }
 
     const restored = extractRestoredBrowseSession(tab.value);
     if (!restored || restored.items.length === 0) {
-        hydratedInitialState.value = undefined;
+        isSessionReady.value = true;
         return;
     }
 
@@ -249,7 +297,9 @@ function applyRestoredSession(): void {
         previousCursor: normalizeCursor(restored.previousCursor),
     }];
     items.value = [...restored.items];
+    activeIndex.value = restored.activeIndex;
     updateTabLabel(restored.cursor);
+    isSessionReady.value = true;
 }
 
 function updateTabLabel(cursor: string | number | null | undefined): void {
@@ -349,29 +399,46 @@ async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise
 function openFileSheet(): void { fileViewerSheet.setSheetOpen(true); }
 function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); }
 function handleLoadedItemsAction(): void {}
+
+async function loadStandaloneFileItem(fileId: number): Promise<FeedItem | null> {
+    try {
+        const { data } = await window.axios.get<{ file: File }>(showFile.url(fileId));
+        if (!data?.file) {
+            return null;
+        }
+        return mapBrowseV2FileToFeedItem(data.file);
+    } catch (error) {
+        console.error('Failed to load standalone browse-v2 file:', error);
+        toast.error('Failed to open the requested file.');
+        return null;
+    }
+}
+
+const { handleVibeActiveIndexUpdate, handleVibeSurfaceModeUpdate } = useBrowseV2SurfaceRouteSync({
+    activeIndex,
+    currentVisibleItem,
+    isSessionReady,
+    isTabDataLoading,
+    loadStandaloneFileItem,
+    sessionItems,
+    standaloneItem,
+    surfaceMode,
+    tabId: computed(() => tab.value?.id ?? null),
+    visibleItems,
+});
+
 const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
     getCurrentItem: () => currentVisibleItem.value,
-    getVisibleItems: () => visibleItems.value,
-    getSurfaceMode: () => vibeStatus.value.surfaceMode,
+    getVisibleItems: () => sessionItems.value,
+    getSurfaceMode: () => surfaceMode.value,
     onReaction: async (item, type) => {
         itemInteractions.reactions.onFileReaction(item, type);
     },
 });
 
-async function applyFilters(): Promise<void> {
-    hydratedInitialState.value = undefined;
-    await browseActions.applyFilters();
-}
-
-async function applyService(): Promise<void> {
-    hydratedInitialState.value = undefined;
-    await browseActions.applyService();
-}
-
-async function goToFirstPage(): Promise<void> {
-    hydratedInitialState.value = undefined;
-    await browseActions.goToFirstPage();
-}
+async function applyFilters(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.applyFilters(); }
+async function applyService(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.applyService(); }
+async function goToFirstPage(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.goToFirstPage(); }
 
 watch(
     () => vibeStatus.value.loadState,
@@ -387,7 +454,7 @@ watch(
 );
 
 watch(
-    () => vibeStatus.value.surfaceMode,
+    surfaceMode,
     (mode, previousMode) => {
         if (mode === 'fullscreen' && previousMode !== 'fullscreen') {
             itemInteractions.viewer.onOpen();
@@ -417,7 +484,7 @@ watch(
 );
 
 watchEffect(() => {
-    currentNavigation.currentItemIndex = vibeStatus.value.activeIndex;
+    currentNavigation.currentItemIndex = activeIndex.value;
     fullscreenOverlayState.mediaType = currentVisibleItem.value ? resolveOverlayMediaType(currentVisibleItem.value) : 'image';
     fullscreenOverlayState.fillComplete = vibeStatus.value.phase === 'idle'
         || vibeStatus.value.phase === 'failed'
@@ -436,6 +503,7 @@ watch(
 
 <template>
     <TabContentV2View
+        :active-index="activeIndex"
         :tab="tab"
         :should-show-form="shouldShowForm"
         :form="form"
@@ -461,11 +529,15 @@ watch(
         :set-vibe-handle="setVibeHandle"
         :masonry-render-key="masonryRenderKey"
         :resolve="resolve"
+        :viewer-key="viewerKey"
         :vibe-feed-mode="vibeFeedMode"
         :vibe-initial-cursor="vibeInitialCursor"
         :vibe-initial-state="vibeInitialState"
         :handle-asset-loads="handleAssetLoads"
         :handle-asset-errors="handleAssetErrors"
+        :surface-mode="surfaceMode"
+        :update-active-index="handleVibeActiveIndexUpdate"
+        :update-surface-mode="handleVibeSurfaceModeUpdate"
         :mouse-shortcuts="mouseShortcuts"
         :container-interactions="containerInteractions"
         :item-interactions="itemInteractions"

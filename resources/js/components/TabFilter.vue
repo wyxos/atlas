@@ -4,9 +4,9 @@ import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SlidersHorizontal } from 'lucide-vue-next';
-import { Masonry } from '@wyxos/vibe';
 import Input from '@/components/ui/input/Input.vue';
 import type { ServiceOption } from '@/lib/browseCatalog';
+import type { BrowseFeedHandle } from '@/types/browse';
 import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
 import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
 import { useTabFilterState } from '@/composables/useTabFilterState';
@@ -16,7 +16,7 @@ interface Props {
     open: boolean;
     availableServices: ServiceOption[];
     localDef?: ServiceOption | null;
-    masonry?: InstanceType<typeof Masonry> | null;
+    masonry?: BrowseFeedHandle | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {

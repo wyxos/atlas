@@ -26,4 +26,47 @@ export default defineConfig({
             '@': '/resources/js',
         },
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) {
+                        return;
+                    }
+
+                    const normalizedId = id.replace(/\\/g, '/');
+
+                    if (normalizedId.includes('/node_modules/vue') || normalizedId.includes('/node_modules/@vue')) {
+                        return 'vendor-vue';
+                    }
+
+                    if (normalizedId.includes('/node_modules/@oruga-ui') || normalizedId.includes('/node_modules/reka-ui')) {
+                        return 'vendor-ui';
+                    }
+
+                    if (normalizedId.includes('/node_modules/@unovis')) {
+                        return 'vendor-charts';
+                    }
+
+                    if (normalizedId.includes('/node_modules/@sentry')) {
+                        return 'vendor-sentry';
+                    }
+
+                    if (normalizedId.includes('/node_modules/laravel-echo') || normalizedId.includes('/node_modules/pusher-js')) {
+                        return 'vendor-realtime';
+                    }
+
+                    if (normalizedId.includes('/node_modules/lucide') || normalizedId.includes('/node_modules/lucide-vue-next')) {
+                        return 'vendor-icons';
+                    }
+
+                    if (normalizedId.includes('/node_modules/embla-carousel') || normalizedId.includes('/node_modules/@internationalized/date')) {
+                        return 'vendor-media';
+                    }
+
+                    return 'vendor';
+                },
+            },
+        },
+    },
 });

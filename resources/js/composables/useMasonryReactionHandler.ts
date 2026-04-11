@@ -5,7 +5,7 @@ import type { FeedItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import type { ReactionType } from '@/types/reaction';
-import { Masonry } from '@wyxos/vibe';
+import type { BrowseFeedHandle } from '@/types/browse';
 import {
     applyOptimisticLocalReactionState,
     isPositiveReactionType,
@@ -15,7 +15,7 @@ import {
 
 type UseMasonryReactionHandlerOptions = {
     items: Ref<FeedItem[]>;
-    masonry: Ref<InstanceType<typeof Masonry> | null>;
+    masonry: Ref<BrowseFeedHandle | null>;
     tab: Ref<TabData | undefined>;
     isLocal: Readonly<Ref<boolean>>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;

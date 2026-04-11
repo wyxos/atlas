@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { MasonryInstance } from '@wyxos/vibe';
-import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeResolveResult, type VibeViewerItem } from '@wyxos/vibe-v3';
-import { ArrowLeft, Loader2, PanelRightOpen } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeResolveResult, type VibeViewerItem, type VibeStatus } from '@wyxos/vibe';
+import { ArrowLeft, PanelRightOpen } from 'lucide-vue-next';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
@@ -9,8 +9,8 @@ import type { TabContentItemInteractions } from '@/composables/useTabContentItem
 import type { TabContentPromptDialog as TabContentPromptDialogHandle } from '@/composables/useTabContentPromptDialog';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
+import type { BrowseFeedHandle } from '@/types/browse';
 import type { ReactionType } from '@/types/reaction';
-import type { VibeStatus } from '@wyxos/vibe-v3';
 import { Button } from '@/components/ui/button';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -46,6 +46,7 @@ type DownloadedReactionPromptShape = {
 type MouseShortcutHandlers = ReturnType<typeof import('@/lib/tabContentV2MouseShortcuts').createBrowseV2MouseShortcutHandlers>;
 
 const props = defineProps<{
+    activeIndex: number;
     availableServices: ServiceOption[];
     availableSources: ServiceOption[];
     applyFilters: () => Promise<void>;
@@ -64,7 +65,7 @@ const props = defineProps<{
     handleContainerBlacklistChange: (change: { action: 'created' | 'deleted'; blacklist: import('@/types/container-blacklist').ContainerBlacklist }) => void;
     handleLoadedItemsAction: () => void;
     handleReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
-    headerMasonry: MasonryInstance | null;
+    headerMasonry: BrowseFeedHandle | null;
     isFilterSheetOpen: boolean;
     itemInteractions: TabContentItemInteractions;
     localFileDeletion: LocalFileDeletion;
@@ -82,13 +83,17 @@ const props = defineProps<{
     shouldShowForm: boolean;
     tab: TabData | null;
     updateFeed: (value: 'local' | 'online') => void;
+    updateActiveIndex: (value: number) => void;
     retryLoad: () => void | Promise<void>;
     updateSource: (value: string | null) => void;
+    updateSurfaceMode: (value: 'fullscreen' | 'list') => void;
     updateService: (value: string) => void | Promise<void>;
+    surfaceMode: 'fullscreen' | 'list';
     vibeFeedMode: 'dynamic' | 'static';
     vibeInitialCursor: string | null;
     vibeInitialState: VibeInitialState | undefined;
     vibeStatus: VibeStatus;
+    viewerKey: string;
 }>();
 
 function handleVibeRef(instance: unknown): void {
@@ -98,6 +103,19 @@ function handleVibeRef(instance: unknown): void {
 function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
     return (item.feedItem as FeedItem | undefined) ?? null;
 }
+
+const vibeLayoutBindings = computed(() => ({
+    activeIndex: props.activeIndex,
+    fillDelayMs: 2000,
+    fillDelayStepMs: 1000,
+    initialCursor: props.vibeInitialCursor,
+    initialState: props.vibeInitialState,
+    mode: props.vibeFeedMode,
+    pageSize: Number(props.form.data.limit),
+    resolve: props.resolve,
+    showStatusBadges: false,
+    surfaceMode: props.surfaceMode,
+}));
 </script>
 
 <template>
@@ -173,19 +191,14 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
                 @auxclick.capture="mouseShortcuts.handleAuxClickCapture"
             >
                 <VibeLayout
-                    :key="`${tab.id}-${masonryRenderKey}`"
+                    :key="viewerKey"
                     :ref="handleVibeRef"
                     class="h-full min-h-0 w-full"
-                    :resolve="resolve"
-                    :mode="vibeFeedMode"
-                    :page-size="Number(form.data.limit)"
-                    :initial-cursor="vibeInitialCursor"
-                    :initial-state="vibeInitialState"
-                    :fill-delay-ms="1000"
-                    :fill-delay-step-ms="250"
-                    @asset-loads="handleAssetLoads"
-                    @asset-errors="handleAssetErrors"
-                    @update:active-index="() => undefined"
+                    v-bind="vibeLayoutBindings"
+                    @update:active-index="props.updateActiveIndex"
+                    @update:surface-mode="props.updateSurfaceMode"
+                    @asset-errors="props.handleAssetErrors"
+                    @asset-loads="props.handleAssetLoads"
                 >
                     <template #grid-item-overlay="{ item, hovered, active, index }">
                         <TabContentV2GridOverlay
@@ -206,17 +219,6 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
                     <template #grid-footer>
                         <div class="pointer-events-none flex justify-center px-4 pb-4 pt-2">
                             <BrowseV2StatusBar :status="vibeStatus" />
-                        </div>
-                    </template>
-                    <template #grid-status="{ kind, message }">
-                        <div
-                            class="inline-flex items-center gap-2 border px-4 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] backdrop-blur-[18px]"
-                            :class="kind === 'end'
-                                ? 'border-amber-300/35 bg-black/55 text-amber-200'
-                                : 'border-smart-blue-500/70 bg-prussian-blue-800/88 text-smart-blue-100'"
-                        >
-                            <Loader2 v-if="kind === 'loading-more'" :size="14" class="animate-spin" />
-                            <span>{{ message }}</span>
                         </div>
                     </template>
                     <template #fullscreen-overlay="{ item, index, total }">
@@ -244,17 +246,6 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
                         >
                             <PanelRightOpen :size="16" />
                         </button>
-                    </template>
-                    <template #fullscreen-status="{ kind, message }">
-                        <div
-                            class="inline-flex items-center gap-2 border px-4 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] backdrop-blur-[18px]"
-                            :class="kind === 'end'
-                                ? 'border-amber-300/35 bg-black/55 text-amber-200'
-                                : 'border-smart-blue-500/70 bg-prussian-blue-800/88 text-smart-blue-100'"
-                        >
-                            <Loader2 v-if="kind === 'loading-more'" :size="14" class="animate-spin" />
-                            <span>{{ message }}</span>
-                        </div>
                     </template>
                     <template #fullscreen-aside>
                         <FileViewerSheet

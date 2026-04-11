@@ -1,15 +1,15 @@
 import type { Ref } from 'vue';
-import type { PageToken } from '@wyxos/vibe';
 import type {
     VibeResolveParams,
     VibeResolveResult,
     VibeStatus,
     VibeViewerItem,
-} from '@wyxos/vibe-v3';
+} from '@wyxos/vibe';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { FeedItem } from '@/composables/useTabs';
+import type { BrowsePageToken } from '@/types/browse';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 
 export type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
@@ -17,9 +17,9 @@ type VibeResolveParamsWithSignal = VibeResolveParams & { signal?: AbortSignal };
 
 type TabContentV2ResolveArgs = {
     form: BrowseFormInstance;
-    startPageToken: Ref<PageToken>;
+    startPageToken: Ref<BrowsePageToken>;
     updateActiveTab: (items: FeedItem[]) => void;
-    updateTabLabel?: (cursor: PageToken | string | number | null | undefined) => void;
+    updateTabLabel?: (cursor: BrowsePageToken | string | number | null | undefined) => void;
     items: Ref<FeedItem[]>;
     itemsBuckets: Ref<Array<{
         cursor: string | null;
@@ -57,7 +57,7 @@ export function createTabContentV2EmptyStatus(): VibeStatus {
     };
 }
 
-export function normalizeCursor(value: PageToken | string | number | null | undefined): string | null {
+export function normalizeCursor(value: BrowsePageToken | string | number | null | undefined): string | null {
     if (typeof value === 'number') {
         return Number.isFinite(value) ? String(value) : null;
     }

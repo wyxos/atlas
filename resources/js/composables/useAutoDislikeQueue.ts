@@ -2,7 +2,7 @@ import { ref, triggerRef, type Ref } from 'vue';
 import { queueManager } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 import type { FeedItem } from './useTabs';
-import { Masonry } from '@wyxos/vibe';
+import type { BrowseFeedHandle } from '@/types/browse';
 import { applyLocalAutoDislikeState } from '@/utils/localReactionState';
 
 const COUNTDOWN_DURATION_MS = 5 * 1000; // 5 seconds
@@ -17,7 +17,7 @@ type AutoDislikePauseSource = 'file-viewer' | 'container-drawer';
 
 type UseAutoDislikeQueueOptions = {
     items: Ref<FeedItem[]>;
-    masonry: Ref<InstanceType<typeof Masonry> | null>;
+    masonry: Ref<BrowseFeedHandle | null>;
     isLocal: Readonly<Ref<boolean>>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
 };

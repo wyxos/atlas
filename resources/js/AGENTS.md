@@ -54,7 +54,7 @@ npm run check:js
 - ✅ DO: Keep pages focused on layout and composition
 - ✅ DO: Delegate logic to composables
 - ✅ DO: Keep parent components as orchestrators; child components should own DOM-level event noise for a focused UI slice
-- ✅ Example: `resources/js/pages/Browse.vue` - main browse page
+- ✅ Example: `resources/js/pages/BrowseV2.vue` - main browse page
 - ✅ Example: `resources/js/pages/Dashboard.vue` - dashboard layout
 
 **Composables** (`resources/js/composables/`)
@@ -419,7 +419,7 @@ export function useTabs() {
 ### Component Examples
 
 **✅ DO: Component with props and emits**
-See `resources/js/components/FileViewer.vue`:
+See `resources/js/components/TabContentV2View.vue`:
 - TypeScript props interface
 - Composition API
 - Tailwind styling
@@ -431,7 +431,7 @@ See `resources/js/components/ui/Button/Button.vue`:
 - TypeScript types
 
 **✅ DO: Page component**
-See `resources/js/pages/Browse.vue`:
+See `resources/js/pages/BrowseV2.vue`:
 - Uses composables for logic
 - Focuses on layout
 - Uses Vue Router
@@ -461,9 +461,9 @@ See `resources/js/lib/browseCatalog.ts`:
 - **Layouts**: `resources/js/layouts/` - Page layouts (DashboardLayout, PublicLayout)
 - **UI Components**: `resources/js/components/ui/` - Reusable UI components
 - **Feature Components**: `resources/js/components/` - Feature-specific components
-  - `FileViewer.vue` - File viewing component
-  - `TabContent.vue` - Tab content with masonry layout
-  - `BrowseStatusBar.vue` - Browse status display
+  - `TabContentV2.vue` - browse-v2 orchestration and route sync
+  - `TabContentV2View.vue` - browse-v2 layout shell around `VibeLayout`
+  - `BrowseV2StatusBar.vue` - browse-v2 status display
 
 ### Key Composables
 - `resources/js/composables/useTabs.ts` - Tab management
@@ -629,9 +629,9 @@ Before submitting code, verify:
 ## External Packages
 
 ### @wyxos/vibe
-- Masonry layout component
-- Import: `import { Masonry } from '@wyxos/vibe'`
-- See `resources/js/components/TabContent.vue` for usage
+- Browse-v2 viewer/layout package
+- Import: `import { VibeLayout } from '@wyxos/vibe'`
+- See `resources/js/components/TabContentV2View.vue` for usage
 
 ### @wyxos/listing
 - Listing table component

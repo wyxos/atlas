@@ -1,6 +1,6 @@
 import { onMounted, onUnmounted, triggerRef, type Ref, type ShallowRef } from 'vue';
-import type { MasonryInstance } from '@wyxos/vibe';
 import type { FeedItem, TabData } from './useTabs';
+import type { BrowseFeedHandle } from '@/types/browse';
 
 type EchoChannel = {
     listen: (event: string, callback: (payload: unknown) => void) => void;
@@ -20,13 +20,13 @@ type PreviewFailureResponse = {
 type UseTabContentNotFoundReconciliationOptions = {
     items: ShallowRef<FeedItem[]>;
     tab: Ref<TabData | null>;
-    masonry: Ref<MasonryInstance | null>;
+    masonry: Ref<BrowseFeedHandle | null>;
     hoveredItemId: Ref<number | null>;
     cancelAutoDislikeCountdown: (fileId: number) => void;
     clearHover: () => void;
 };
 
-type MasonryRemoveTarget = Parameters<MasonryInstance['remove']>[0];
+type MasonryRemoveTarget = Parameters<BrowseFeedHandle['remove']>[0];
 
 const NOT_FOUND_REMOVAL_DELAY_MS = 5000;
 

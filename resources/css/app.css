@@ -1,9 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-@import '@wyxos/vibe-v3/style.css';
+@import '@wyxos/vibe/style.css';
 @import 'tailwindcss';
 @import "tw-animate-css";
-/*@import '@wyxos/vibe/vibe.css';*/
-@import './masonry.css';
 @import './listing.css';
 
 /* Oruga Component Overrides */

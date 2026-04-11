@@ -1,10 +1,10 @@
 import { computed, getCurrentInstance, onUnmounted, ref, watch, type Ref, type ShallowRef } from 'vue';
-import type { MasonryInstance } from '@wyxos/vibe';
 import { useContainerBadges } from './useContainerBadges';
 import { useContainerPillInteractions, type ContainerPillTarget } from './useContainerPillInteractions';
 import type { BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
+import type { BrowseFeedHandle } from '@/types/browse';
 
 type ContainerBlacklistDialogTarget = {
     id: number;
@@ -24,7 +24,7 @@ type UseTabContentContainerInteractionsOptions = {
     items: ShallowRef<FeedItem[]>;
     tab: Ref<TabData | null>;
     form: BrowseFormInstance;
-    masonry: Ref<MasonryInstance | null>;
+    masonry: Ref<BrowseFeedHandle | null>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     onReaction: (fileId: number, type: ReactionType) => void;
     onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;

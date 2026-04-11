@@ -1,5 +1,4 @@
 import { computed, nextTick, onUnmounted, ref, triggerRef, type Ref, type ShallowRef } from 'vue';
-import type { MasonryInstance } from '@wyxos/vibe';
 import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import type { DownloadedReactionChoice } from './useDownloadedReactionPrompt';
 import { useMasonryReactionHandler } from './useMasonryReactionHandler';
@@ -7,6 +6,7 @@ import { useAutoDislikeQueue } from './useAutoDislikeQueue';
 import type { BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
+import type { BrowseFeedHandle } from '@/types/browse';
 import { applyExactLocalReactionState } from '@/utils/localReactionState';
 import { useTabContentNotFoundReconciliation } from './useTabContentNotFoundReconciliation';
 
@@ -26,7 +26,7 @@ type UseTabContentItemInteractionsOptions = {
     items: ShallowRef<FeedItem[]>;
     tab: Ref<TabData | null>;
     form: BrowseFormInstance;
-    masonry: Ref<MasonryInstance | null>;
+    masonry: Ref<BrowseFeedHandle | null>;
     fileViewer: Ref<FileViewerRef | null>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     isPositiveOnlyLocalView?: () => boolean;
@@ -55,7 +55,7 @@ type BatchBlacklistResponse = {
     }>;
 };
 
-type MasonryRemoveTarget = Parameters<MasonryInstance['remove']>[0];
+type MasonryRemoveTarget = Parameters<BrowseFeedHandle['remove']>[0];
 
 function safelyPlayVideoPreview(video: HTMLVideoElement): void {
     try {
@@ -118,7 +118,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
     const { handleMasonryReaction } = useMasonryReactionHandler({
         items: options.items,
-        masonry: options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
+        masonry: options.masonry,
         tab: computed(() => options.tab.value ?? undefined),
         isLocal: options.form.isLocal,
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
@@ -163,7 +163,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
     const autoDislikeQueue = useAutoDislikeQueue({
         items: options.items,
-        masonry: options.masonry as Ref<InstanceType<typeof import('@wyxos/vibe').Masonry> | null>,
+        masonry: options.masonry,
         isLocal: options.form.isLocal,
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
     });

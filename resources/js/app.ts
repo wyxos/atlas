@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Oruga from '@oruga-ui/oruga-next';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { fas } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import App from './App.vue';
 import routes from './routes';
 import './bootstrap';
@@ -27,8 +27,8 @@ try {
     window.Echo = undefined;
 }
 
-// Add all solid icons to the library
-library.add(fas);
+// Register only the Oruga icons Atlas actually uses.
+library.add(faChevronLeft, faChevronRight);
 
 // Only mount Vue app if the #app element exists AND is empty (Vue SPA route)
 // Blade pages have content after the #app element, Vue SPA pages have an empty #app element

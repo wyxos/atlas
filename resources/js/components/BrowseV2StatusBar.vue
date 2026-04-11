@@ -54,6 +54,30 @@ const statusLabel = computed(() => {
 
   return 'Loaded'
 })
+
+const statusVariant = computed(() => {
+  if (props.status.loadState === 'failed') {
+    return 'danger'
+  }
+
+  if (
+    props.status.loadState === 'loading'
+    || props.status.phase === 'filling'
+    || props.status.phase === 'loading'
+    || props.status.phase === 'reloading'
+  ) {
+    return 'warning'
+  }
+
+  return 'success'
+})
+
+const isPending = computed(() => (
+  props.status.loadState === 'loading'
+  || props.status.phase === 'filling'
+  || props.status.phase === 'loading'
+  || props.status.phase === 'reloading'
+))
 </script>
 
 <template>
@@ -67,14 +91,14 @@ const statusLabel = computed(() => {
     <Pill
       label="Status"
       :value="statusLabel"
-      :variant="status.loadState === 'failed' ? 'danger' : (status.phase === 'filling' || status.phase === 'reloading' ? 'warning' : 'success')"
+      :variant="statusVariant"
       reversed
       data-testid="browse-v2-status-pill"
     >
       <template #value>
         <span class="flex items-center gap-2">
           <Loader2
-            v-if="status.phase === 'filling' || status.phase === 'reloading' || status.loadState === 'loading'"
+            v-if="isPending"
             :size="14"
             class="animate-spin"
           />

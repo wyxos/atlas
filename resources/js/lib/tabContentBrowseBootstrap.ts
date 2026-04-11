@@ -1,6 +1,6 @@
-import type { PageToken } from '@wyxos/vibe';
 import type { BrowseFormData } from '@/composables/useBrowseForm';
 import type { FeedItem, TabData } from '@/composables/useTabs';
+import type { BrowsePageToken } from '@/types/browse';
 import type { ServiceOption } from './browseCatalog';
 
 type RestorableTabData = TabData & {
@@ -9,14 +9,14 @@ type RestorableTabData = TabData & {
 
 export type RestoredBrowseSession = {
     activeIndex: number;
-    cursor: PageToken;
-    nextCursor: PageToken | null;
+    cursor: BrowsePageToken;
+    nextCursor: BrowsePageToken | null;
     items: FeedItem[];
-    startPageToken: PageToken;
-    previousCursor: PageToken | null;
+    startPageToken: BrowsePageToken;
+    previousCursor: BrowsePageToken | null;
 };
 
-function normalizeRestoredPageToken(value: unknown): PageToken | null {
+function normalizeRestoredPageToken(value: unknown): BrowsePageToken | null {
     if (typeof value === 'number') {
         return Number.isFinite(value) ? value : null;
     }
@@ -28,8 +28,8 @@ function normalizeRestoredPageToken(value: unknown): PageToken | null {
     return null;
 }
 
-function resolveRestoredStartPageToken(params: Record<string, unknown>, items: FeedItem[]): PageToken {
-    const page = (params.page ?? 1) as PageToken;
+function resolveRestoredStartPageToken(params: Record<string, unknown>, items: FeedItem[]): BrowsePageToken {
+    const page = (params.page ?? 1) as BrowsePageToken;
     const feed = params.feed === 'local' ? 'local' : 'online';
     const service = typeof params.service === 'string' ? params.service : null;
     const usesCursorToken = typeof page === 'string' && page.includes('|');
@@ -43,7 +43,7 @@ function resolveRestoredStartPageToken(params: Record<string, unknown>, items: F
     return page;
 }
 
-function resolveRestoredActiveIndex(items: FeedItem[], pageToken: PageToken): number {
+function resolveRestoredActiveIndex(items: FeedItem[], pageToken: BrowsePageToken): number {
     const pageValue = typeof pageToken === 'number'
         ? pageToken
         : (typeof pageToken === 'string' && pageToken.trim().length > 0 && Number.isFinite(Number(pageToken))

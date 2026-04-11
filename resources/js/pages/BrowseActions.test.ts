@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import Browse from './Browse.vue';
+import BrowseV2 from './BrowseV2.vue';
 
 const {
     activeTabIdRef,
@@ -80,9 +80,9 @@ vi.mock('../components/Tab.vue', () => ({
     },
 }));
 
-vi.mock('../components/TabContent.vue', () => ({
+vi.mock('../components/TabContentV2.vue', () => ({
     default: {
-        name: 'TabContent',
+        name: 'TabContentV2',
         template: '<div data-test="tab-content-stub"></div>',
         props: [
             'tabId',
@@ -149,7 +149,7 @@ beforeEach(async () => {
 
 describe('Browse actions', () => {
     it('forwards duplicate tab requests from the tab UI into useTabs', async () => {
-        const wrapper = mount(Browse);
+        const wrapper = mount(BrowseV2);
 
         await flushPromises();
 
@@ -159,7 +159,7 @@ describe('Browse actions', () => {
     });
 
     it('does not render the first page action in the page shell', async () => {
-        const wrapper = mount(Browse);
+        const wrapper = mount(BrowseV2);
 
         await flushPromises();
 

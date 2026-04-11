@@ -1,11 +1,11 @@
-import type { PageToken } from '@wyxos/vibe';
 import type { BrowseFormData } from '@/composables/useBrowseForm';
+import type { BrowsePageToken } from '@/types/browse';
 import { getLocalPresetLabel } from './localPresets';
 import type { ServiceOption } from './browseCatalog';
 
 type BuildBrowseTabLabelOptions = {
     formData: BrowseFormData;
-    pageToken: PageToken;
+    pageToken: BrowsePageToken;
     availableServices: ServiceOption[];
     localService?: ServiceOption | null;
 };
@@ -44,7 +44,7 @@ function getBrowseContainerLabel(formData: BrowseFormData): string | null {
     return null;
 }
 
-export function formatTabLabel(serviceLabel: string, pageToken: PageToken, containerLabel?: string | null): string {
+export function formatTabLabel(serviceLabel: string, pageToken: BrowsePageToken, containerLabel?: string | null): string {
     const prefix = containerLabel ? `${serviceLabel}: ${containerLabel}` : serviceLabel;
 
     return `${prefix} - ${String(pageToken)}`;

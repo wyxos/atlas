@@ -83,7 +83,7 @@
     }
 
     /* Ensure value content can shrink and truncate on mobile */
-    .o-table__td > *:not(:before) {
+    .o-table__td > * {
         min-width: 0;
         flex: 1 1 auto;
         overflow: hidden;
@@ -92,9 +92,9 @@
     }
 
     /* Allow nested elements to also truncate */
-    .o-table__td > *:not(:before) > *,
-    .o-table__td > *:not(:before) a,
-    .o-table__td > *:not(:before) span {
+    .o-table__td > * > *,
+    .o-table__td > * a,
+    .o-table__td > * span {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

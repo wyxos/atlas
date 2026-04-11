@@ -13,15 +13,23 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/browse',
+        component: () => import('./pages/BrowseV2.vue'),
         name: 'browse',
-        component: () => import('./pages/Browse.vue'),
+        meta: { layout: 'DashboardLayout' },
+    },
+    {
+        path: '/browse/file/:fileId',
+        name: 'browse-file',
+        component: () => import('./pages/BrowseV2.vue'),
         meta: { layout: 'DashboardLayout' },
     },
     {
         path: '/browse-v2',
-        name: 'browse-v2',
-        component: () => import('./pages/BrowseV2.vue'),
-        meta: { layout: 'DashboardLayout' },
+        redirect: '/browse',
+    },
+    {
+        path: '/browse-v2/file/:fileId',
+        redirect: to => `/browse/file/${to.params.fileId}`,
     },
     {
         path: '/audio',
