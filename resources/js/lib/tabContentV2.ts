@@ -53,6 +53,7 @@ export function createTabContentV2EmptyStatus(): VibeStatus {
         phase: 'idle',
         previousCursor: null,
         removedCount: 0,
+        removedIds: [],
         surfaceMode: 'list',
     };
 }

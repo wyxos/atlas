@@ -260,11 +260,36 @@ vi.mock('./TabContentV2View.vue', () => ({
         name: 'TabContentV2View',
         props: {
             currentVisibleItem: { type: Object, default: null },
+            setVibeHandle: { type: Function, default: null },
             surfaceMode: { type: String, default: 'list' },
             updateActiveIndex: { type: Function, required: true },
             updateSurfaceMode: { type: Function, required: true },
         },
         setup(props) {
+            const handle = {
+                cancel: vi.fn(), clearRemoved: vi.fn(), getRemovedIds: () => [...status.removedIds],
+                loadNext: vi.fn(async () => undefined), loadPrevious: vi.fn(async () => undefined),
+                remove(target: string | string[]) {
+                    const ids = Array.isArray(target) ? target : [target];
+                    const nextIds = ids.filter((id) => !status.removedIds.includes(id));
+                    status.removedIds = [...status.removedIds, ...nextIds];
+                    status.removedCount = status.removedIds.length;
+                    return { ids: nextIds };
+                },
+                restore(target: string | string[]) {
+                    const ids = new Set(Array.isArray(target) ? target : [target]);
+                    const restoredIds = status.removedIds.filter((id) => ids.has(id));
+                    status.removedIds = status.removedIds.filter((id) => !ids.has(id));
+                    status.removedCount = status.removedIds.length;
+                    return { ids: restoredIds };
+                },
+                retry: vi.fn(async () => undefined),
+                status,
+                undo: vi.fn(),
+            };
+
+            props.setVibeHandle?.(handle);
+
             return () => h('div', { 'data-testid': 'tab-content-v2-view' }, [
                 h('div', { 'data-testid': 'current-item-id' }, String((props.currentVisibleItem as { id?: number } | null)?.id ?? 'none')),
                 h('div', { 'data-testid': 'surface-mode' }, props.surfaceMode),
@@ -272,22 +297,25 @@ vi.mock('./TabContentV2View.vue', () => ({
                     'data-testid': 'select-first',
                     onClick: () => props.updateActiveIndex(0),
                 }),
-                h('button', {
-                    'data-testid': 'select-second',
-                    onClick: () => props.updateActiveIndex(1),
-                }),
+                h('button', { 'data-testid': 'select-second', onClick: () => props.updateActiveIndex(1) }),
                 h('button', {
                     'data-testid': 'open-fullscreen',
                     onClick: () => props.updateSurfaceMode('fullscreen'),
                 }),
-                h('button', {
-                    'data-testid': 'close-fullscreen',
-                    onClick: () => props.updateSurfaceMode('list'),
-                }),
+                h('button', { 'data-testid': 'close-fullscreen', onClick: () => props.updateSurfaceMode('list') }),
+                h('button', { 'data-testid': 'remove-second', onClick: () => handle.remove('2') }),
+                h('button', { 'data-testid': 'restore-second', onClick: () => handle.restore('2') }),
             ]);
         },
     }),
 }));
+
+const status = reactive({
+    activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillDelayRemainingMs: null,
+    fillTargetCount: null, hasNextPage: true, hasPreviousPage: false, isAutoMode: true, itemCount: 0,
+    loadState: 'loaded' as const, mode: 'dynamic' as const, nextCursor: '2', phase: 'idle' as const,
+    previousCursor: null, removedCount: 0, removedIds: [] as string[], surfaceMode: 'list' as const,
+});
 
 function createFeedItem(id: number) {
     return {
@@ -367,23 +395,21 @@ async function createTestRouter(initialPath: string) {
         ],
     });
 
-    await router.push(initialPath);
-    await router.isReady();
+    await router.push(initialPath); await router.isReady();
 
     return router;
 }
 
-async function mountTabContent(initialPath = '/browse') {
+async function mountTabContent(initialPath = '/browse', updateActiveTab = vi.fn()) {
     const router = await createTestRouter(initialPath);
-    const pushSpy = vi.spyOn(router, 'push');
-    const replaceSpy = vi.spyOn(router, 'replace');
+    const pushSpy = vi.spyOn(router, 'push'); const replaceSpy = vi.spyOn(router, 'replace');
 
     const wrapper = mount(TabContentV2, {
         props: {
             availableServices: [],
             onReaction: vi.fn(),
             tabId: 1,
-            updateActiveTab: vi.fn(),
+            updateActiveTab,
         },
         global: {
             plugins: [router],
@@ -393,7 +419,7 @@ async function mountTabContent(initialPath = '/browse') {
     await flushPromises();
     await flushPromises();
 
-    return { pushSpy, replaceSpy, router, wrapper };
+    return { pushSpy, replaceSpy, router, updateActiveTab, wrapper };
 }
 
 describe('TabContentV2 browse route sync', () => {
@@ -404,6 +430,7 @@ describe('TabContentV2 browse route sync', () => {
         testState.toastError.mockReset();
         testState.viewerOnClose.mockReset();
         testState.viewerOnOpen.mockReset();
+        status.itemCount = 0; status.removedCount = 0; status.removedIds = [];
         mockAxios.delete.mockReset();
         mockAxios.get.mockReset();
         mockAxios.patch.mockReset();
@@ -414,6 +441,29 @@ describe('TabContentV2 browse route sync', () => {
             value: mockAxios,
             writable: true,
         });
+    });
+
+    it('syncs updateActiveTab from Vibe removed ids instead of a local removal mirror', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
+        const { updateActiveTab, wrapper } = await mountTabContent('/browse', vi.fn());
+        expect(updateActiveTab).toHaveBeenLastCalledWith([
+            expect.objectContaining({ id: 1 }),
+            expect.objectContaining({ id: 2 }),
+        ]);
+        await wrapper.get('[data-testid="remove-second"]').trigger('click');
+        await flushPromises();
+
+        expect(updateActiveTab).toHaveBeenLastCalledWith([
+            expect.objectContaining({ id: 1 }),
+        ]);
+
+        await wrapper.get('[data-testid="restore-second"]').trigger('click');
+        await flushPromises();
+
+        expect(updateActiveTab).toHaveBeenLastCalledWith([
+            expect.objectContaining({ id: 1 }),
+            expect.objectContaining({ id: 2 }),
+        ]);
     });
 
     it('shows a loading placeholder while the browse tab is bootstrapping', async () => {

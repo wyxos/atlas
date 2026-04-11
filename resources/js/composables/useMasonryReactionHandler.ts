@@ -28,6 +28,22 @@ function hasDownloadSource(item: FeedItem): boolean {
     return typeof item.url === 'string' && item.url.trim() !== '';
 }
 
+function restoreItemAtOriginalIndex(options: UseMasonryReactionHandlerOptions, item: FeedItem, index: number): void {
+    const nextItems = [...options.items.value];
+    const existingIndex = nextItems.findIndex((candidate) => candidate.id === item.id);
+
+    if (existingIndex !== -1) {
+        nextItems.splice(existingIndex, 1);
+    }
+
+    const insertionIndex = index >= 0
+        ? Math.min(index, nextItems.length)
+        : nextItems.length;
+
+    nextItems.splice(insertionIndex, 0, item);
+    options.items.value = nextItems;
+}
+
 /**
  * Composable for handling masonry item reactions with restore functionality.
  */
@@ -79,6 +95,10 @@ export function useMasonryReactionHandler(
         const shouldRemoveFromView = options.matchesActiveLocalFilters
             ? !options.matchesActiveLocalFilters(item)
             : false;
+        const removedLocally = shouldRemoveFromView && options.masonry.value === null;
+        const localRemovalIndex = removedLocally
+            ? options.items.value.findIndex((candidate) => candidate.id === item.id)
+            : -1;
 
         if (shouldRemoveFromView) {
             if (options.masonry.value) {
@@ -99,12 +119,14 @@ export function useMasonryReactionHandler(
                     return;
                 }
 
-                if (options.masonry.value) {
+                if (!removedLocally && options.masonry.value) {
                     await options.masonry.value.restore(item);
                     return;
                 }
 
-                options.items.value = [...options.items.value, item];
+                if (removedLocally) {
+                    restoreItemAtOriginalIndex(options, item, localRemovalIndex);
+                }
             },
         };
     }

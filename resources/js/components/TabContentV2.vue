@@ -50,7 +50,6 @@ const route = useRoute();
 const tabId = toRef(props, 'tabId');
 const items = shallowRef<FeedItem[]>([]);
 const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
-const removedIds = ref<Set<number>>(new Set());
 const vibeRef = ref<VibeHandle | null>(null);
 const tab = ref<TabData | null>(null);
 const activeIndex = ref(0);
@@ -71,7 +70,25 @@ const downloadedReactionPrompt = useDownloadedReactionPrompt();
 const promptDialog = useTabContentPromptDialog(items);
 const emptyStatus = createTabContentV2EmptyStatus();
 const vibeStatus = computed(() => vibeRef.value?.status ?? emptyStatus);
-const visibleItems = computed(() => items.value.filter((item) => !removedIds.value.has(item.id)));
+const removedItemIds = computed(() => {
+    const next = new Set<number>();
+
+    for (const id of vibeStatus.value.removedIds) {
+        const parsed = Number(id);
+        if (Number.isFinite(parsed)) {
+            next.add(parsed);
+        }
+    }
+
+    return next;
+});
+const visibleItems = computed(() => {
+    if (removedItemIds.value.size === 0) {
+        return items.value;
+    }
+
+    return items.value.filter((item) => !removedItemIds.value.has(item.id));
+});
 const sessionItems = computed(() => standaloneItem.value ? [standaloneItem.value] : visibleItems.value);
 const isVibeLoading = computed(() => vibeStatus.value.phase === 'loading'
     || vibeStatus.value.phase === 'filling'
@@ -116,16 +133,10 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
         },
         nextPage: vibeStatus.value.nextCursor,
         remove: async (target: FeedItem | FeedItem[] | string | string[]) => {
-            const ids = collectTargetIds(target);
-            const result = handle.remove(ids);
-            syncRemovedIds(result?.ids ?? ids, 'remove');
-            return result;
+            return handle.remove(collectTargetIds(target));
         },
         restore: async (target: FeedItem | FeedItem[] | string | string[]) => {
-            const ids = collectTargetIds(target);
-            const result = handle.restore(ids);
-            syncRemovedIds(result?.ids ?? ids, 'restore');
-            return result;
+            return handle.restore(collectTargetIds(target));
         },
     };
 });
@@ -247,27 +258,9 @@ function setTabDataLoading(isLoading: boolean): void {
 }
 function setVibeHandle(handle: VibeHandle | null): void { vibeRef.value = handle; }
 
-function syncRemovedIds(ids: string[], mode: 'remove' | 'restore' | 'undo' = 'remove'): void {
-    const next = new Set(removedIds.value);
-    for (const id of ids) {
-        const parsed = Number(id);
-        if (!Number.isFinite(parsed)) {
-            continue;
-        }
-
-        if (mode === 'restore' || mode === 'undo') {
-            next.delete(parsed);
-        } else {
-            next.add(parsed);
-        }
-    }
-    removedIds.value = next;
-}
-
 function resetLocalFeedState(): void {
     items.value = [];
     itemsBuckets.value = [];
-    removedIds.value = new Set();
     fileViewerSheet.setSheetOpen(false, { persist: false });
 }
 

@@ -107,6 +107,36 @@ describe('useMasonryReactionHandler', () => {
         expect(masonry.value.restore).toHaveBeenCalledWith(item);
     });
 
+    it('restores locally-removed items at their original index when Vibe is unavailable', async () => {
+        const first = createItem({ id: 1, key: '1-1' });
+        const second = createItem({ id: 2, key: '1-2' });
+        const third = createItem({ id: 3, key: '1-3' });
+        const items = ref([first, second, third]);
+        const onReaction = vi.fn();
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry: ref(null),
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            matchesActiveLocalFilters: () => false,
+            isPositiveOnlyLocalView: () => false,
+            onReaction,
+        });
+
+        await handleMasonryReaction(second, 'love');
+
+        expect(items.value.map((item) => item.id)).toEqual([1, 3]);
+
+        const restoreCallback = mockQueueReaction.mock.calls[0]?.[3] as (() => Promise<void>) | undefined;
+        expect(restoreCallback).toBeTypeOf('function');
+
+        await restoreCallback?.();
+
+        expect(items.value.map((item) => item.id)).toEqual([1, 2, 3]);
+        expect(onReaction).toHaveBeenCalledWith(2, 'love');
+    });
+
     it('prompts before queueing a new positive reaction for an already-downloaded file outside positive-only local views', async () => {
         const item = createItem({
             downloaded: true,

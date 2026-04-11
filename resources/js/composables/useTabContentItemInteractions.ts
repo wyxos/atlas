@@ -251,9 +251,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         }
 
         if (options.masonry.value) {
-            for (const item of itemsToRemove) {
-                await options.masonry.value.remove(item as unknown as MasonryRemoveTarget);
-            }
+            await options.masonry.value.remove(itemsToRemove as unknown as MasonryRemoveTarget);
 
             return;
         }

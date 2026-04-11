@@ -183,6 +183,7 @@ function createProps() {
             phase: 'idle' as const,
             previousCursor: null,
             removedCount: 0,
+            removedIds: [],
             surfaceMode: 'list' as const,
         },
         viewerKey: 'viewer-key',

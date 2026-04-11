@@ -53,6 +53,11 @@ type UseContainerPillInteractionsOptions = {
     onPlainLeftClick?: ContainerDrawerToggleHandler;
 };
 
+type LocalRemovalSnapshot = {
+    item: FeedItem;
+    index: number;
+};
+
 export function useContainerPillInteractions(
     options: UseContainerPillInteractionsOptions,
 ) {
@@ -127,6 +132,7 @@ export function useContainerPillInteractions(
 
         if (options.isLocal.value) {
             const snapshots = new Map<number, LocalReactionSnapshot>();
+            const removedLocally = options.masonry.value === null;
 
             for (const sibling of siblings) {
                 snapshots.set(sibling.id, applyOptimisticLocalReactionState(sibling, reactionType));
@@ -134,6 +140,12 @@ export function useContainerPillInteractions(
 
             const itemsToTemporarilyRemove = matchesActiveLocalFilters
                 ? siblings.filter((sibling) => !matchesActiveLocalFilters(sibling))
+                : [];
+            const localRemovalSnapshots: LocalRemovalSnapshot[] = removedLocally
+                ? itemsToTemporarilyRemove.map((item) => ({
+                    item,
+                    index: options.items.value.findIndex((candidate) => candidate.id === item.id),
+                }))
                 : [];
 
             if (itemsToTemporarilyRemove.length > 0) {
@@ -162,12 +174,30 @@ export function useContainerPillInteractions(
                     return;
                 }
 
-                if (options.masonry.value) {
+                if (!removedLocally && options.masonry.value) {
                     await options.masonry.value.restore(itemsToTemporarilyRemove);
                     return;
                 }
 
-                options.items.value = [...options.items.value, ...itemsToTemporarilyRemove];
+                if (removedLocally && localRemovalSnapshots.length > 0) {
+                    const nextItems = [...options.items.value];
+                    const sortedSnapshots = [...localRemovalSnapshots].sort((left, right) => left.index - right.index);
+
+                    for (const { item, index } of sortedSnapshots) {
+                        const existingIndex = nextItems.findIndex((candidate) => candidate.id === item.id);
+                        if (existingIndex !== -1) {
+                            nextItems.splice(existingIndex, 1);
+                        }
+
+                        const insertionIndex = index >= 0
+                            ? Math.min(index, nextItems.length)
+                            : nextItems.length;
+
+                        nextItems.splice(insertionIndex, 0, item);
+                    }
+
+                    options.items.value = nextItems;
+                }
             };
         } else {
             // Only remove from masonry in online mode (not in local mode)

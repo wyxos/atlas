@@ -3,13 +3,17 @@ import { ref, computed } from 'vue';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { FeedItem } from './useTabs';
 
+const { mockQueueBatchReaction } = vi.hoisted(() => ({
+    mockQueueBatchReaction: vi.fn(),
+}));
+
 // Mock dependencies
 vi.mock('@/utils/reactions', () => ({
     createReactionCallback: vi.fn(() => vi.fn()),
 }));
 
 vi.mock('@/utils/reactionQueue', () => ({
-    queueBatchReaction: vi.fn(),
+    queueBatchReaction: mockQueueBatchReaction,
 }));
 
 describe('useContainerPillInteractions', () => {
@@ -77,6 +81,68 @@ describe('useContainerPillInteractions', () => {
             expect.objectContaining({ id: 2 }),
             expect.objectContaining({ id: 3 }),
         ]);
+    });
+
+    it('restores Vibe-owned sibling visibility without appending into options.items', async () => {
+        const items = ref<FeedItem[]>([
+            {
+                id: 1,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-1',
+                index: 0,
+                src: 'https://example.com/image1.jpg',
+                containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
+            } as FeedItem,
+            {
+                id: 2,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-2',
+                index: 1,
+                src: 'https://example.com/image2.jpg',
+                containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
+            } as FeedItem,
+            {
+                id: 3,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-3',
+                index: 2,
+                src: 'https://example.com/image3.jpg',
+                containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
+            } as FeedItem,
+        ]);
+
+        const masonry = ref<any>({
+            remove: vi.fn().mockResolvedValue(undefined),
+            restore: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const { batchReactToSiblings } = useContainerPillInteractions({
+            items,
+            masonry,
+            tabId: 1,
+            isLocal: computed(() => true),
+            matchesActiveLocalFilters: (item) => item.id === 1,
+            onReaction: mockOnReaction,
+        });
+
+        await batchReactToSiblings(1, 'like');
+
+        expect(items.value.map((item) => item.id)).toEqual([1, 2, 3]);
+        expect(masonry.value.remove).toHaveBeenCalledTimes(1);
+
+        const restoreCallback = mockQueueBatchReaction.mock.calls[0]?.[3] as (() => Promise<void>) | undefined;
+        expect(restoreCallback).toBeTypeOf('function');
+
+        masonry.value = null;
+        await restoreCallback?.();
+
+        expect(items.value.map((item) => item.id)).toEqual([1, 2, 3]);
     });
 
     it('handles alt + middle click to favorite all siblings', async () => {
