@@ -11,7 +11,6 @@ import { useFileViewerSheetState } from '@/composables/useFileViewerSheetState';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { useLocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
-import { useTabContentLoadedItemsActions, type LoadedItemsAction } from '@/composables/useTabContentLoadedItemsActions';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
@@ -167,7 +166,6 @@ const itemInteractions = useTabContentItemInteractions({
     promptDownloadedReaction: downloadedReactionPrompt.prompt,
     clearHoveredContainer: containerInteractions.clearHoveredContainer,
 });
-const loadedItemsActions = useTabContentLoadedItemsActions(itemInteractions);
 
 const browse = useTabContentBrowseState({
     tabId,
@@ -198,7 +196,6 @@ const hasTabBootstrapError = computed(() => !isTabBootstrapping.value && browseS
 const masonryRenderKey = browseState.masonryRenderKey;
 const isFilterSheetOpen = ref(false);
 const hydratedInitialState = ref<VibeInitialState | undefined>(undefined);
-const loadedItemsCount = computed(() => sessionItems.value.length);
 const localFileDeletion = useLocalFileDeletion({
     items,
     masonry: vibeMasonry,
@@ -381,7 +378,6 @@ async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise
 
 function openFileSheet(): void { fileViewerSheet.setSheetOpen(true); }
 function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); }
-async function handleLoadedItemsAction(action: LoadedItemsAction): Promise<void> { await loadedItemsActions.actions.runLoadedItemsAction(action); }
 
 async function loadStandaloneFileItem(fileId: number): Promise<FeedItem | null> {
     try {
@@ -501,13 +497,8 @@ watch(
         :apply-service="applyService"
         :apply-filters="applyFilters"
         :go-to-first-page="goToFirstPage"
-        :loaded-items-count="loadedItemsCount"
-        :handle-loaded-items-action="handleLoadedItemsAction"
-        :active-loaded-items-action="loadedItemsActions.state.activeLoadedItemsAction"
         :cancel-load="() => vibeRef?.cancel()"
         :load-next="() => vibeRef?.loadNext()"
-        :load-previous="() => vibeRef?.loadPrevious()"
-        :retry-load="() => vibeRef?.retry()"
         :vibe-status="vibeStatus"
         :set-vibe-handle="setVibeHandle"
         :masonry-render-key="masonryRenderKey"

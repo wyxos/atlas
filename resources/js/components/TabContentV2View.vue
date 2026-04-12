@@ -2,18 +2,16 @@
 import { computed } from 'vue';
 import { useEventListener } from '@vueuse/core';
 import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeResolveResult, type VibeViewerItem, type VibeStatus } from '@wyxos/vibe';
-import { ArrowLeft, PanelRightOpen } from 'lucide-vue-next';
+import { PanelRightOpen } from 'lucide-vue-next';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
-import type { LoadedItemsAction } from '@/composables/useTabContentLoadedItemsActions';
 import type { TabContentPromptDialog as TabContentPromptDialogHandle } from '@/composables/useTabContentPromptDialog';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
 import type { ReactionType } from '@/types/reaction';
-import { Button } from '@/components/ui/button';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import DownloadedReactionDialog from './DownloadedReactionDialog.vue';
@@ -65,7 +63,6 @@ const props = defineProps<{
     handleAssetErrors: (errors: VibeAssetErrorEvent[]) => void;
     handleAssetLoads: (loads: VibeAssetLoadEvent[]) => void;
     handleContainerBlacklistChange: (change: { action: 'created' | 'deleted'; blacklist: import('@/types/container-blacklist').ContainerBlacklist }) => void;
-    handleLoadedItemsAction: (action: LoadedItemsAction) => void | Promise<void>;
     handleReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
     headerMasonry: BrowseFeedHandle | null;
     isFilterSheetOpen: boolean;
@@ -73,8 +70,6 @@ const props = defineProps<{
     localFileDeletion: LocalFileDeletion;
     localService: ServiceOption | null | undefined;
     loadNext: () => void | Promise<void>;
-    loadPrevious: () => void | Promise<void>;
-    loadedItemsCount: number;
     masonryRenderKey: number;
     mouseShortcuts: MouseShortcutHandlers;
     openFileSheet: () => void;
@@ -87,8 +82,6 @@ const props = defineProps<{
     tab: TabData | null;
     updateFeed: (value: 'local' | 'online') => void;
     updateActiveIndex: (value: number) => void;
-    activeLoadedItemsAction: LoadedItemsAction | null;
-    retryLoad: () => void | Promise<void>;
     updateSource: (value: string | null) => void;
     updateSurfaceMode: (value: 'fullscreen' | 'list') => void;
     updateService: (value: string) => void | Promise<void>;
@@ -145,9 +138,6 @@ useEventListener(document, 'pointermove', (event) => {
             :apply-service="applyService"
             :apply-filters="applyFilters"
             :reset-filters="form.reset"
-            :loaded-items-count="loadedItemsCount"
-            :active-loaded-items-action="activeLoadedItemsAction"
-            :on-run-loaded-items-action="handleLoadedItemsAction"
             :cancel-masonry-load="cancelLoad"
             :go-to-first-page="goToFirstPage"
             :load-next-page="loadNext"
@@ -157,29 +147,6 @@ useEventListener(document, 'pointermove', (event) => {
                 :disabled="Boolean(headerMasonry?.isLoading)"
                 @blacklists-changed="handleContainerBlacklistChange"
             />
-            <div class="flex items-center gap-2">
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    class="h-10 gap-2 px-3"
-                    :disabled="headerMasonry?.isLoading || !vibeStatus.hasPreviousPage"
-                    @click="loadPrevious"
-                >
-                    <ArrowLeft :size="14" />
-                    <span>Previous</span>
-                </Button>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    class="h-10 gap-2 px-3"
-                    :disabled="headerMasonry?.isLoading || vibeStatus.loadState !== 'failed'"
-                    @click="retryLoad"
-                >
-                    Retry
-                </Button>
-            </div>
         </TabContentServiceHeader>
         <TabContentStartForm
             v-if="shouldShowForm"

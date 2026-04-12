@@ -1,19 +1,10 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronsUp, Play, RotateCcw, X } from 'lucide-vue-next';
+import { ChevronDown, ChevronsUp, Play, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import TabFilter from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
-import type { LoadedItemsAction } from '@/composables/useTabContentLoadedItemsActions';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
 
@@ -31,25 +22,16 @@ interface Props {
     applyService: () => void | Promise<void>;
     applyFilters: () => void | Promise<void>;
     resetFilters: () => void;
-    loadedItemsCount: number;
-    activeLoadedItemsAction: LoadedItemsAction | null;
-    onRunLoadedItemsAction: (action: LoadedItemsAction) => void | Promise<void>;
     cancelMasonryLoad: () => void;
     goToFirstPage: () => void | Promise<void>;
     loadNextPage: () => void | Promise<void>;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
     localService: null,
     masonry: null,
     filterSheetOpen: false,
-    activeLoadedItemsAction: null,
-    loadedItemsCount: 0,
 });
-
-function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
-    return props.activeLoadedItemsAction === action;
-}
 </script>
 
 <template>
@@ -105,93 +87,7 @@ function isLoadedItemsActionBusy(action: LoadedItemsAction): boolean {
                 :masonry="masonry" @update:open="updateFilterSheetOpen" @reset="resetFilters" @apply="applyFilters" />
 
             <ModerationRulesManager :disabled="masonry?.isLoading" />
-
             <slot />
-
-            <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        :loading="activeLoadedItemsAction !== null"
-                        class="h-10 px-3 gap-2"
-                        data-test="loaded-items-menu-trigger"
-                        title="Run actions on loaded items in this tab"
-                        :disabled="masonry?.isLoading"
-                    >
-                        <RotateCcw :size="14" />
-                        <span>Loaded Items</span>
-                        <ChevronDown :size="14" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    align="end"
-                    class="w-64 border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100"
-                >
-                    <DropdownMenuLabel class="text-smart-blue-100">
-                        {{ `Loaded items (${loadedItemsCount})` }}
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator class="bg-twilight-indigo-500" />
-                    <DropdownMenuItem
-                        :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
-                        class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
-                        data-test="loaded-items-favorite-all"
-                        @select="onRunLoadedItemsAction('love')"
-                    >
-                        {{ isLoadedItemsActionBusy('love') ? 'Favoriting...' : 'Favorite' }}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
-                        class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
-                        data-test="loaded-items-like-all"
-                        @select="onRunLoadedItemsAction('like')"
-                    >
-                        {{ isLoadedItemsActionBusy('like') ? 'Liking...' : 'Like' }}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
-                        class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
-                        data-test="loaded-items-funny-all"
-                        @select="onRunLoadedItemsAction('funny')"
-                    >
-                        {{ isLoadedItemsActionBusy('funny') ? 'Updating...' : 'Funny' }}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
-                        class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
-                        data-test="loaded-items-dislike-all"
-                        @select="onRunLoadedItemsAction('dislike')"
-                    >
-                        {{ isLoadedItemsActionBusy('dislike') ? 'Disliking...' : 'Dislike' }}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator class="bg-twilight-indigo-500" />
-                    <DropdownMenuItem
-                        :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
-                        class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
-                        data-test="loaded-items-increment-preview-4"
-                        @select="onRunLoadedItemsAction('increment-preview-4')"
-                    >
-                        {{ isLoadedItemsActionBusy('increment-preview-4') ? 'Incrementing...' : 'Increment previewed 4' }}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
-                        class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
-                        data-test="loaded-items-reset-previewed"
-                        @select="onRunLoadedItemsAction('reset-previewed')"
-                    >
-                        {{ isLoadedItemsActionBusy('reset-previewed') ? 'Resetting...' : 'Reset previewed' }}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator class="bg-twilight-indigo-500" />
-                    <DropdownMenuItem
-                        :disabled="activeLoadedItemsAction !== null || loadedItemsCount === 0"
-                        class="cursor-pointer text-danger-200 focus:bg-danger-600/20 focus:text-danger-100"
-                        data-test="loaded-items-blacklist-all"
-                        @select="onRunLoadedItemsAction('blacklist')"
-                    >
-                        {{ isLoadedItemsActionBusy('blacklist') ? 'Blacklisting...' : 'Blacklist' }}
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
 
             <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                 data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
