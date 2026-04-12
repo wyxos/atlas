@@ -110,6 +110,7 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
 
 const vibeLayoutBindings = computed(() => ({
     activeIndex: props.activeIndex,
+    emptyStateMode: 'hidden' as const,
     fillDelayMs: 2000,
     fillDelayStepMs: 1000,
     initialCursor: props.vibeInitialCursor,

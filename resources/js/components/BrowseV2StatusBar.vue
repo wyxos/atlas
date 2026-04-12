@@ -33,6 +33,10 @@ const statusLabel = computed(() => {
     return props.status.errorMessage ?? 'Failed'
   }
 
+  if (props.status.itemCount === 0) {
+    return 'No items available'
+  }
+
   if (props.status.phase === 'filling') {
     if (props.status.fillCollectedCount !== null && props.status.fillTargetCount !== null) {
       const delaySeconds = props.status.fillDelayRemainingMs !== null
@@ -63,6 +67,10 @@ const statusLabel = computed(() => {
 const statusVariant = computed(() => {
   if (props.status.loadState === 'failed') {
     return 'danger'
+  }
+
+  if (props.status.itemCount === 0) {
+    return 'neutral'
   }
 
   if (

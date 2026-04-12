@@ -102,6 +102,19 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('success');
     });
 
+    it('shows no items available when the feed is empty', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    itemCount: 0,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('No items available');
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('neutral');
+    });
+
     it('shows end of list when browse-v2 is exhausted', () => {
         const wrapper = mount(BrowseV2StatusBar, {
             props: {

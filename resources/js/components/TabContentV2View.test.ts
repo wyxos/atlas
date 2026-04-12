@@ -18,6 +18,7 @@ vi.mock('@wyxos/vibe', () => ({
         emits: ['asset-errors', 'asset-loads', 'update:activeIndex', 'update:surfaceMode'],
         props: {
             activeIndex: { type: Number, default: 0 },
+            emptyStateMode: { type: String, default: 'inline' },
             showEndBadge: { type: Boolean, default: true },
             showStatusBadges: { type: Boolean, default: true },
             surfaceMode: { type: String, default: 'list' },
@@ -27,6 +28,7 @@ vi.mock('@wyxos/vibe', () => ({
                 attrs,
                 props: {
                     activeIndex: props.activeIndex,
+                    emptyStateMode: props.emptyStateMode,
                     showEndBadge: props.showEndBadge,
                     showStatusBadges: props.showStatusBadges,
                     surfaceMode: props.surfaceMode,
@@ -220,6 +222,7 @@ describe('TabContentV2View', () => {
         expect(wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names')).toContain('grid-footer');
         expect(vibeLayoutSpy).toHaveBeenCalled();
         expect(vibeLayoutSpy.mock.calls[0][0].props.activeIndex).toBe(1);
+        expect(vibeLayoutSpy.mock.calls[0][0].props.emptyStateMode).toBe('hidden');
         expect(vibeLayoutSpy.mock.calls[0][0].props.showEndBadge).toBe(false);
         expect(vibeLayoutSpy.mock.calls[0][0].props.surfaceMode).toBe('fullscreen');
         expect(vibeLayoutSpy.mock.calls[0][0].props.showStatusBadges).toBe(false);
