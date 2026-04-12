@@ -142,4 +142,44 @@ describe('TabContentContainerDrawer', () => {
 
         wrapper.unmount();
     });
+
+    it('emits close on drawer mouseleave when configured for hover-open behavior', async () => {
+        const wrapper = mount(TabContentContainerDrawer, {
+            props: {
+                open: true,
+                closeOnMouseLeave: true,
+                container: {
+                    id: 10,
+                    type: 'gallery',
+                },
+                items: [createItem(1)],
+            },
+        });
+
+        await wrapper.get('[data-test="container-related-items-drawer"]').trigger('mouseleave');
+
+        expect(wrapper.emitted('update:open')).toEqual([[false]]);
+
+        wrapper.unmount();
+    });
+
+    it('does not emit close on drawer mouseleave for click-open behavior', async () => {
+        const wrapper = mount(TabContentContainerDrawer, {
+            props: {
+                open: true,
+                closeOnMouseLeave: false,
+                container: {
+                    id: 10,
+                    type: 'gallery',
+                },
+                items: [createItem(1)],
+            },
+        });
+
+        await wrapper.get('[data-test="container-related-items-drawer"]').trigger('mouseleave');
+
+        expect(wrapper.emitted('update:open')).toBeUndefined();
+
+        wrapper.unmount();
+    });
 });

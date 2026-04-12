@@ -74,4 +74,49 @@ describe('useTabContentItemInteractions', () => {
             expect.objectContaining({ id: 2 }),
         ]);
     });
+
+    it('clears hover state when reacting to a hovered online item that is removed from view', async () => {
+        const item = {
+            id: 1,
+            width: 500,
+            height: 500,
+            page: 1,
+            key: '1-1',
+            index: 0,
+            src: 'https://example.com/image1.jpg',
+            preview: 'https://example.com/image1.jpg',
+        } as FeedItem;
+        const items = shallowRef<FeedItem[]>([item]);
+        const clearHoveredContainer = vi.fn();
+        const remove = vi.fn().mockResolvedValue(undefined);
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            loadedItems: ref(items.value),
+            tab: ref(null),
+            form: {
+                isLocal: ref(false),
+                data: {
+                    feed: 'online',
+                },
+            } as any,
+            masonry: ref({ remove } as any),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer,
+        });
+
+        interactions.item.onMouseEnter({ currentTarget: document.createElement('div') } as MouseEvent, item);
+        interactions.reactions.onFileReaction(item, 'like');
+        await Promise.resolve();
+
+        expect(interactions.state.hoveredItemId.value).toBeNull();
+        expect(clearHoveredContainer).toHaveBeenCalledTimes(1);
+        expect(remove).toHaveBeenCalledWith(item);
+    });
 });

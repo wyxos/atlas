@@ -8,6 +8,7 @@ import { wayfinder } from "@laravel/vite-plugin-wayfinder";
 const atlasRoot = process.cwd();
 const vibeRoot = path.resolve(atlasRoot, '../../vue/vibe');
 const vibeSourceEntry = path.resolve(vibeRoot, 'src/index.ts');
+const vibeStyleEntry = path.resolve(vibeRoot, 'src/style.css');
 
 export default defineConfig(({ command }) => {
     const useLocalVibeSource = command === 'serve';
@@ -30,12 +31,13 @@ export default defineConfig(({ command }) => {
             tailwindcss(),
         ],
         resolve: {
-            alias: {
-                '@': '/resources/js',
-                ...(useLocalVibeSource ? {
-                    '@wyxos/vibe': vibeSourceEntry,
-                } : {}),
-            },
+            alias: [
+                { find: '@', replacement: '/resources/js' },
+                ...(useLocalVibeSource ? [
+                    { find: /^@wyxos\/vibe$/, replacement: vibeSourceEntry },
+                    { find: /^@wyxos\/vibe\/style\.css$/, replacement: vibeStyleEntry },
+                ] : []),
+            ],
             dedupe: ['vue'],
         },
         optimizeDeps: useLocalVibeSource ? {

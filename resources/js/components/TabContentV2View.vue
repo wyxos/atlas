@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useEventListener } from '@vueuse/core';
 import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeResolveResult, type VibeViewerItem, type VibeStatus } from '@wyxos/vibe';
 import { ArrowLeft, PanelRightOpen } from 'lucide-vue-next';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
@@ -120,6 +121,10 @@ const vibeLayoutBindings = computed(() => ({
     showStatusBadges: false,
     surfaceMode: props.surfaceMode,
 }));
+
+useEventListener(document, 'pointermove', (event) => {
+    props.containerInteractions.drawer.actions.syncHoverTarget?.(event.target);
+});
 </script>
 
 <template>
@@ -268,6 +273,7 @@ const vibeLayoutBindings = computed(() => ({
                     :open="containerInteractions.drawer.state.isOpen.value"
                     :container="containerInteractions.drawer.derived.container.value"
                     :items="containerInteractions.drawer.derived.items.value"
+                    :close-on-mouse-leave="containerInteractions.drawer.state.openReason?.value === 'hover'"
                     @update:open="containerInteractions.drawer.actions.setOpen"
                 />
             </div>

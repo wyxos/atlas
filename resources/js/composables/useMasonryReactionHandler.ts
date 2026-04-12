@@ -22,6 +22,7 @@ type UseMasonryReactionHandlerOptions = {
     isPositiveOnlyLocalView?: () => boolean;
     onReaction: (fileId: number, type: ReactionType) => void;
     promptDownloadedReaction?: () => Promise<DownloadedReactionChoice>;
+    onWillRemoveItemFromView?: (item: FeedItem) => void;
 };
 
 function hasDownloadSource(item: FeedItem): boolean {
@@ -101,6 +102,8 @@ export function useMasonryReactionHandler(
             : -1;
 
         if (shouldRemoveFromView) {
+            options.onWillRemoveItemFromView?.(item);
+
             if (options.masonry.value) {
                 await options.masonry.value.remove(item);
             } else {
@@ -205,6 +208,7 @@ export function useMasonryReactionHandler(
         } else {
             // Only remove from masonry in online mode (not in local mode)
             // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
+            options.onWillRemoveItemFromView?.(item);
             options.masonry.value?.remove(item);
 
             // Create restore callback for undo functionality (only in online mode where items are removed)

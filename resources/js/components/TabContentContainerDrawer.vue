@@ -16,6 +16,7 @@ interface Props {
     open: boolean;
     container: ContainerPillTarget | null;
     items: FeedItem[];
+    closeOnMouseLeave?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -84,6 +85,12 @@ function closeDrawer(): void {
     emit('update:open', false);
 }
 
+function handleMouseLeave(): void {
+    if (props.closeOnMouseLeave) {
+        closeDrawer();
+    }
+}
+
 function handleAfterLeave(): void {
     if (!props.open) {
         shouldRenderDrawer.value = false;
@@ -148,9 +155,11 @@ useEventListener('keydown', (event) => {
                 :aria-labelledby="drawerTitleId"
                 :aria-describedby="drawerDescriptionId"
                 class="pointer-events-auto relative max-h-[48vh] overflow-hidden rounded-t-xl border border-b-0 border-white/10 border-t-2 border-twilight-indigo-500 bg-prussian-blue-600 shadow-2xl"
+                data-container-pill-drawer
                 data-test="container-related-items-drawer"
                 @click.stop
                 @mousedown.stop
+                @mouseleave="handleMouseLeave"
                 @contextmenu.prevent.stop
                 @auxclick.stop
             >

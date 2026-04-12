@@ -32,6 +32,14 @@ type UseTabContentContainerInteractionsOptions = {
 
 type DrawerOpenReason = 'hover' | 'click' | null;
 
+function isContainerHoverTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) {
+        return false;
+    }
+
+    return target.closest('[data-container-pill-trigger], [data-container-pill-drawer]') !== null;
+}
+
 export function useTabContentContainerInteractions(options: UseTabContentContainerInteractionsOptions) {
     const HOVER_OPEN_DELAY_MS = 700;
     const badges = useContainerBadges(options.items);
@@ -220,6 +228,22 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         }
     }
 
+    function syncHoverTarget(target: EventTarget | null): void {
+        if (drawerOpenReason.value === 'click') {
+            return;
+        }
+
+        if (!isContainerHoverTarget(target)) {
+            if (pendingHoverContainerId !== null) {
+                cancelPendingHoverOpen();
+            }
+
+            if (drawerOpenReason.value === 'hover' && isDrawerOpen.value) {
+                closeDrawer();
+            }
+        }
+    }
+
     watch([selectedContainer, relatedItems], ([container, items]) => {
         if (isDrawerOpen.value && (!container || items.length <= 1)) {
             closeDrawer();
@@ -274,6 +298,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         drawer: {
             state: {
                 isOpen: isDrawerOpen,
+                openReason: drawerOpenReason,
             },
             derived: {
                 container: selectedContainer,
@@ -282,6 +307,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             actions: {
                 close: closeDrawer,
                 setOpen: setDrawerOpen,
+                syncHoverTarget,
             },
         },
     };

@@ -126,6 +126,11 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         isPositiveOnlyLocalView: options.isPositiveOnlyLocalView,
         onReaction: options.onReaction,
         promptDownloadedReaction: options.promptDownloadedReaction,
+        onWillRemoveItemFromView: (item) => {
+            if (hoveredItemId.value === item.id) {
+                clearHoverState();
+            }
+        },
     });
 
     const masonryInteractions = createMasonryInteractions(
