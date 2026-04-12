@@ -142,6 +142,7 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
 
 const containerInteractions = useTabContentContainerInteractions({
     items,
+    visibleItems,
     tab,
     form,
     masonry: vibeMasonry,

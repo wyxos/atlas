@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { nextTick, ref, shallowRef } from 'vue';
+import { computed, nextTick, ref, shallowRef } from 'vue';
 import type { BrowseFormInstance } from './useBrowseForm';
 import { useTabContentContainerInteractions } from './useTabContentContainerInteractions';
 import type { FeedItem, TabData } from './useTabs';
@@ -285,6 +285,48 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.drawer.state.isOpen.value).toBe(true);
 
         subjectItems.value = [createItem(3, [{ id: 20, type: 'album' }])];
+        await nextTick();
+
+        expect(interactions.drawer.state.isOpen.value).toBe(false);
+        expect(interactions.drawer.derived.container.value).toBeNull();
+
+        vi.useRealTimers();
+    });
+
+    it('closes a hover-open drawer when the selected container is removed from the visible item set', async () => {
+        vi.useFakeTimers();
+        const subjectItems = shallowRef([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+            createItem(3, [{ id: 20, type: 'album' }]),
+        ]);
+        const removedIds = ref(new Set<number>());
+        const visibleItems = computed(() => (
+            subjectItems.value.filter((item) => !removedIds.value.has(item.id))
+        ));
+        const interactions = useTabContentContainerInteractions({
+            items: subjectItems,
+            visibleItems,
+            tab: ref<TabData | null>({
+                id: 1,
+                label: 'Test tab',
+                params: {},
+                position: 0,
+                isActive: true,
+                updatedAt: null,
+            }),
+            form: { isLocal: ref(false) } as unknown as BrowseFormInstance,
+            masonry: ref(null),
+            onReaction: vi.fn(),
+            onOpenContainerTab: vi.fn(),
+        });
+
+        interactions.pillHandlers.onMouseEnter(10);
+        vi.advanceTimersByTime(700);
+        vi.runOnlyPendingTimers();
+        expect(interactions.drawer.state.isOpen.value).toBe(true);
+
+        removedIds.value = new Set([1, 2]);
         await nextTick();
 
         expect(interactions.drawer.state.isOpen.value).toBe(false);

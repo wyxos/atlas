@@ -1,4 +1,4 @@
-import { computed, getCurrentInstance, onUnmounted, ref, watch, type Ref, type ShallowRef } from 'vue';
+import { computed, getCurrentInstance, onUnmounted, ref, watch, type Ref } from 'vue';
 import { useContainerBadges } from './useContainerBadges';
 import { useContainerPillInteractions, type ContainerPillTarget } from './useContainerPillInteractions';
 import type { BrowseFormInstance } from './useBrowseForm';
@@ -21,7 +21,8 @@ type ContainerBlacklistDialogRef = {
 };
 
 type UseTabContentContainerInteractionsOptions = {
-    items: ShallowRef<FeedItem[]>;
+    items: Ref<FeedItem[]>;
+    visibleItems?: Ref<FeedItem[]>;
     tab: Ref<TabData | null>;
     form: BrowseFormInstance;
     masonry: Ref<BrowseFeedHandle | null>;
@@ -42,13 +43,31 @@ function isContainerHoverTarget(target: EventTarget | null): boolean {
 
 export function useTabContentContainerInteractions(options: UseTabContentContainerInteractionsOptions) {
     const HOVER_OPEN_DELAY_MS = 700;
-    const badges = useContainerBadges(options.items);
+    const visibleItems = computed(() => options.visibleItems?.value ?? options.items.value);
+    const badges = useContainerBadges(visibleItems);
     const managerRef = ref<ContainerBlacklistDialogRef | null>(null);
     const selectedContainerId = ref<number | null>(null);
     const isDrawerOpen = ref(false);
     const drawerOpenReason = ref<DrawerOpenReason>(null);
     let pendingHoverOpenTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingHoverContainerId: number | null = null;
+
+    function getVisibleSiblingItems(containerId: number): FeedItem[] {
+        return visibleItems.value.filter((item) => (
+            pillInteractions.getContainersForItem(item).some((container) => container.id === containerId)
+        ));
+    }
+
+    function getVisibleContainer(containerId: number): ContainerTarget | null {
+        for (const item of visibleItems.value) {
+            const container = pillInteractions.getContainersForItem(item).find((candidate) => candidate.id === containerId);
+            if (container) {
+                return container;
+            }
+        }
+
+        return null;
+    }
 
     function openExternal(url: string | null | undefined): void {
         if (!url) {
@@ -115,12 +134,12 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     const selectedContainer = computed(() => (
         selectedContainerId.value === null
             ? null
-            : pillInteractions.getContainer(selectedContainerId.value)
+            : getVisibleContainer(selectedContainerId.value)
     ));
     const relatedItems = computed(() => (
         selectedContainerId.value === null
             ? []
-            : pillInteractions.getSiblingItems(selectedContainerId.value)
+            : getVisibleSiblingItems(selectedContainerId.value)
     ));
 
     function cancelPendingHoverOpen(): void {
@@ -156,7 +175,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     function openDrawer(container: ContainerTarget, reason: Exclude<DrawerOpenReason, null>): void {
         cancelPendingHoverOpen();
 
-        const siblings = pillInteractions.getSiblingItems(container.id);
+        const siblings = getVisibleSiblingItems(container.id);
         if (siblings.length <= 1) {
             closeDrawer();
             return;
