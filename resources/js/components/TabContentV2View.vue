@@ -191,7 +191,7 @@ useEventListener(document, 'pointermove', (event) => {
             :update-source="updateSource"
             :apply-service="applyService"
         />
-        <div v-else class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-4">
+        <div v-else class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
             <div
                 class="relative flex min-h-0 flex-1 overflow-hidden border border-white/10 bg-black/20 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.9)]"
                 @click.capture="mouseShortcuts.handleClickCapture"
