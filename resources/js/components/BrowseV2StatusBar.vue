@@ -33,10 +33,6 @@ const statusLabel = computed(() => {
     return props.status.errorMessage ?? 'Failed'
   }
 
-  if (props.status.itemCount === 0) {
-    return 'No items available'
-  }
-
   if (props.status.phase === 'filling') {
     if (props.status.fillCollectedCount !== null && props.status.fillTargetCount !== null) {
       const delaySeconds = props.status.fillDelayRemainingMs !== null
@@ -57,6 +53,10 @@ const statusLabel = computed(() => {
     return 'Loading'
   }
 
+  if (props.status.itemCount === 0) {
+    return 'No items available'
+  }
+
   if (!props.status.hasNextPage && props.status.itemCount > 0) {
     return 'End of list'
   }
@@ -69,10 +69,6 @@ const statusVariant = computed(() => {
     return 'danger'
   }
 
-  if (props.status.itemCount === 0) {
-    return 'neutral'
-  }
-
   if (
     props.status.loadState === 'loading'
     || props.status.phase === 'filling'
@@ -81,6 +77,10 @@ const statusVariant = computed(() => {
     || props.status.phase === 'refreshing'
   ) {
     return 'warning'
+  }
+
+  if (props.status.itemCount === 0) {
+    return 'neutral'
   }
 
   if (!props.status.hasNextPage && props.status.itemCount > 0) {

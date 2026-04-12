@@ -115,6 +115,24 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('neutral');
     });
 
+    it('shows filling status instead of empty state while refill is active with zero loaded items', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    itemCount: 0,
+                    phase: 'filling',
+                    fillCollectedCount: 0,
+                    fillTargetCount: 8,
+                    fillDelayRemainingMs: 1200,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 0/8');
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).not.toContain('No items available');
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
+    });
+
     it('shows end of list when browse-v2 is exhausted', () => {
         const wrapper = mount(BrowseV2StatusBar, {
             props: {
