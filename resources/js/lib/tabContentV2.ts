@@ -49,6 +49,7 @@ export function createTabContentV2EmptyStatus(): VibeStatus {
         loadState: 'loaded',
         mode: 'dynamic',
         nextCursor: null,
+        pageLoadingLocked: false,
         phase: 'idle',
         previousCursor: null,
         removedCount: 0,
