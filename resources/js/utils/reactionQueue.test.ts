@@ -265,7 +265,7 @@ describe('reactionQueue', () => {
 
             const items = queue.collection.getAll();
             expect(items.length).toBe(1);
-            expect(items[0].id).toMatch(/^batch-like-123-456-789-\d+$/);
+            expect(items[0].id).toMatch(/^batch-like-123-3-\d+$/);
         });
 
         it('shows toast immediately with BatchReactionQueueToast component', () => {

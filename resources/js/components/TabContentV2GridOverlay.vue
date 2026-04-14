@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { Info, Trash2 } from 'lucide-vue-next';
 import type { VibeViewerItem } from '@wyxos/vibe';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
@@ -47,6 +47,37 @@ const showDislikeProgress = computed(() => (
 const countdownLabel = computed(() => props.itemInteractions.autoDislikeQueue.formatCountdown(
     props.itemInteractions.autoDislikeQueue.getCountdownRemainingTime(props.item.id),
 ));
+const pausedByHover = ref(false);
+
+function syncHoverPauseState(hovered: boolean): void {
+    const hasActiveCountdown = props.itemInteractions.autoDislikeQueue.hasActiveCountdown(props.item.id);
+
+    if (hovered && hasActiveCountdown) {
+        pausedByHover.value = true;
+        props.itemInteractions.autoDislikeQueue.freezeAll();
+        return;
+    }
+
+    if (pausedByHover.value) {
+        pausedByHover.value = false;
+        props.itemInteractions.autoDislikeQueue.unfreezeAll();
+    }
+}
+
+watch(
+    () => props.hovered,
+    (hovered) => {
+        syncHoverPauseState(hovered);
+    },
+    { immediate: true },
+);
+
+onUnmounted(() => {
+    if (pausedByHover.value) {
+        pausedByHover.value = false;
+        props.itemInteractions.autoDislikeQueue.unfreezeAll();
+    }
+});
 </script>
 
 <template>

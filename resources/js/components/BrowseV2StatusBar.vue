@@ -20,6 +20,7 @@ type VibeStatusLike = {
 
 interface Props {
   status: VibeStatusLike
+  totalAvailable?: number | null
 }
 
 const props = defineProps<Props>()
@@ -125,6 +126,14 @@ const isPending = computed(() => (
         </span>
       </template>
     </Pill>
-    <Pill label="Total" :value="status.itemCount" variant="primary" reversed data-testid="browse-v2-total-pill" />
+    <Pill label="Loaded" :value="status.itemCount" variant="primary" reversed data-testid="browse-v2-loaded-total-pill" />
+    <Pill
+      v-if="props.totalAvailable !== null && props.totalAvailable !== undefined"
+      label="Available"
+      :value="props.totalAvailable"
+      variant="primary"
+      reversed
+      data-testid="browse-v2-available-total-pill"
+    />
   </div>
 </template>

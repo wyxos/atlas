@@ -90,9 +90,24 @@ export function useItemPreview(
         previewedItems.value = nextPreviewedItems;
     }
 
+    function markPreviewedItems(fileIds: number[]): void {
+        if (fileIds.length === 0) {
+            return;
+        }
+
+        const nextPreviewedItems = new Set(previewedItems.value);
+
+        for (const fileId of fileIds) {
+            nextPreviewedItems.add(fileId);
+        }
+
+        previewedItems.value = nextPreviewedItems;
+    }
+
     return {
         previewedItems,
         incrementPreviewCount,
         clearPreviewedItems,
+        markPreviewedItems,
     };
 }

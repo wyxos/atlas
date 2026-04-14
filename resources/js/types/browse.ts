@@ -13,7 +13,10 @@ export interface BrowseFeedHandle {
     hasReachedEnd: boolean;
     isLoading: boolean;
     loadNextPage?: () => Promise<void> | void;
+    lockPageLoading?: () => void;
     nextPage?: BrowsePageToken | null;
+    pageLoadingLocked?: boolean;
     remove: (target: BrowseFeedMutationTarget) => Promise<BrowseFeedMutationResult> | BrowseFeedMutationResult;
     restore: (target: BrowseFeedMutationTarget) => Promise<BrowseFeedMutationResult> | BrowseFeedMutationResult;
+    unlockPageLoading?: () => void;
 }

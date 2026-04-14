@@ -7,16 +7,10 @@ import type { BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
 import type { BrowseFeedHandle } from '@/types/browse';
-import { applyExactLocalReactionState } from '@/utils/localReactionState';
+import { createLoadedItemsBulkActions } from '@/lib/tabContentLoadedItemsBulkActions';
 import { useTabContentNotFoundReconciliation } from './useTabContentNotFoundReconciliation';
 
-export type LoadedItemsBulkAction =
-    | 'love'
-    | 'like'
-    | 'funny'
-    | 'dislike'
-    | 'blacklist'
-    | 'increment-preview-4';
+export type { LoadedItemsBulkAction } from '@/lib/tabContentLoadedItemsBulkActions';
 
 type FileViewerRef = {
     openFromClick: (event: MouseEvent) => void;
@@ -34,29 +28,12 @@ type UseTabContentItemInteractionsOptions = {
     itemPreview: {
         incrementPreviewCount: (fileId: number) => Promise<{ will_auto_dislike: boolean } | null>;
         clearPreviewedItems: (fileIds?: number[]) => void;
+        markPreviewedItems: (fileIds: number[]) => void;
     };
     onReaction: (fileId: number, type: ReactionType) => void;
     promptDownloadedReaction: () => Promise<DownloadedReactionChoice>;
     clearHoveredContainer: () => void;
 };
-
-type BatchPreviewResponse = {
-    results?: Array<{
-        id: number;
-        previewed_count: number;
-        will_auto_dislike: boolean;
-    }>;
-};
-
-type BatchBlacklistResponse = {
-    results?: Array<{
-        id: number;
-        blacklisted_at: string;
-        blacklist_reason: string;
-    }>;
-};
-
-type MasonryRemoveTarget = Parameters<BrowseFeedHandle['remove']>[0];
 
 function safelyPlayVideoPreview(video: HTMLVideoElement): void {
     try {
@@ -237,178 +214,24 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         return source.filter((item): item is FeedItem => typeof item.id === 'number');
     }
 
-    function getItemsToRemoveAfterLocalMutation(mutatedItems: FeedItem[]): FeedItem[] {
-        if (!options.matchesActiveLocalFilters) {
-            return [];
-        }
-
-        return mutatedItems.filter((item) => !options.matchesActiveLocalFilters?.(item));
-    }
-
-    async function removeItemsFromView(itemsToRemove: FeedItem[]): Promise<void> {
-        if (itemsToRemove.length === 0) {
-            return;
-        }
-
-        const removedItemIds = new Set(itemsToRemove.map((item) => item.id));
-        if (hoveredItemId.value !== null && removedItemIds.has(hoveredItemId.value)) {
-            clearHoverState();
-        }
-
-        if (options.masonry.value) {
-            await options.masonry.value.remove(itemsToRemove as unknown as MasonryRemoveTarget);
-
-            return;
-        }
-
-        options.items.value = options.items.value.filter((item) => !removedItemIds.has(item.id));
-    }
-
-    async function syncLocalMutationView(mutatedItems: FeedItem[]): Promise<void> {
-        const itemsToRemove = getItemsToRemoveAfterLocalMutation(mutatedItems);
-
-        if (itemsToRemove.length > 0) {
-            await removeItemsFromView(itemsToRemove);
-        } else {
-            triggerRef(options.items);
-        }
-
-        await nextTick();
-    }
-
-    async function applyBatchReaction(type: ReactionType): Promise<number> {
-        const loadedItems = getLoadedItems();
-        if (loadedItems.length === 0) {
-            return 0;
-        }
-
-        const fileIds = loadedItems.map((item) => item.id);
-        await window.axios.post('/api/files/reactions/batch/store', {
-            reactions: fileIds.map((fileId) => ({
-                file_id: fileId,
-                type,
-            })),
-        });
-
-        if (options.form.isLocal.value) {
-            for (const item of loadedItems) {
-                autoDislikeQueue.cancelAutoDislikeCountdown(item.id);
-                applyExactLocalReactionState(item, type);
+    const loadedItemsBulkActions = createLoadedItemsBulkActions({
+        getLoadedItems,
+        items: options.items,
+        tab: options.tab,
+        isLocal: options.form.isLocal,
+        masonry: options.masonry,
+        matchesActiveLocalFilters: options.matchesActiveLocalFilters,
+        itemPreview: {
+            markPreviewedItems: options.itemPreview.markPreviewedItems,
+        },
+        cancelAutoDislikeCountdown: autoDislikeQueue.cancelAutoDislikeCountdown,
+        clearHoverForRemovedItems: (removedItemIds) => {
+            if (hoveredItemId.value !== null && removedItemIds.has(hoveredItemId.value)) {
+                clearHoverState();
             }
-
-            await syncLocalMutationView(loadedItems);
-        } else {
-            for (const item of loadedItems) {
-                autoDislikeQueue.cancelAutoDislikeCountdown(item.id);
-            }
-
-            await removeItemsFromView(loadedItems);
-        }
-
-        for (const fileId of fileIds) {
-            options.onReaction(fileId, type);
-        }
-
-        return fileIds.length;
-    }
-
-    async function batchBlacklistLoadedItems(): Promise<number> {
-        const loadedItems = getLoadedItems();
-        if (loadedItems.length === 0) {
-            return 0;
-        }
-
-        const fileIds = loadedItems.map((item) => item.id);
-        const { data } = await window.axios.post<BatchBlacklistResponse>('/api/files/blacklist/batch', {
-            file_ids: fileIds,
-        });
-        const results = Array.isArray(data.results) ? data.results : [];
-        const resultMap = new Map(results.map((result) => [result.id, result]));
-        const mutatedItems = loadedItems.filter((item) => resultMap.has(item.id));
-
-        for (const item of mutatedItems) {
-            const result = resultMap.get(item.id);
-            if (!result) {
-                continue;
-            }
-
-            autoDislikeQueue.cancelAutoDislikeCountdown(item.id);
-            item.blacklisted_at = result.blacklisted_at;
-            item.blacklist_reason = result.blacklist_reason;
-            item.blacklist_type = 'manual';
-            item.blacklist_rule = null;
-            item.will_auto_dislike = false;
-        }
-
-        if (mutatedItems.length === 0) {
-            return 0;
-        }
-
-        if (options.form.isLocal.value) {
-            await syncLocalMutationView(mutatedItems);
-        } else {
-            await removeItemsFromView(mutatedItems);
-        }
-
-        return mutatedItems.length;
-    }
-
-    async function incrementLoadedPreviewCounts(increments: number): Promise<number> {
-        const loadedItems = getLoadedItems();
-        if (loadedItems.length === 0) {
-            return 0;
-        }
-
-        const fileIds = loadedItems.map((item) => item.id);
-        const { data } = await window.axios.post<BatchPreviewResponse>('/api/files/preview/batch', {
-            file_ids: fileIds,
-            increments,
-        });
-        const results = Array.isArray(data.results) ? data.results : [];
-        const resultMap = new Map(results.map((result) => [result.id, result]));
-        const mutatedItems = loadedItems.filter((item) => resultMap.has(item.id));
-
-        for (const item of mutatedItems) {
-            const result = resultMap.get(item.id);
-            if (!result) {
-                continue;
-            }
-
-            item.previewed_count = result.previewed_count;
-            item.will_auto_dislike = result.will_auto_dislike;
-
-            if (result.will_auto_dislike) {
-                autoDislikeQueue.startAutoDislikeCountdown(item.id, item);
-            } else {
-                autoDislikeQueue.cancelAutoDislikeCountdown(item.id);
-            }
-        }
-
-        if (mutatedItems.length === 0) {
-            return 0;
-        }
-
-        if (options.form.isLocal.value) {
-            await syncLocalMutationView(mutatedItems);
-        } else {
-            triggerRef(options.items);
-            await nextTick();
-        }
-
-        return mutatedItems.length;
-    }
-
-    async function performLoadedItemsBulkAction(action: LoadedItemsBulkAction): Promise<number> {
-        if (action === 'blacklist') {
-            return batchBlacklistLoadedItems();
-        }
-
-        if (action === 'increment-preview-4') {
-            return incrementLoadedPreviewCounts(4);
-        }
-
-        return applyBatchReaction(action);
-    }
+        },
+        onReaction: options.onReaction,
+    });
 
     const itemHandlers = {
         onClick(event: MouseEvent, item: FeedItem): void {
@@ -577,7 +400,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         viewer: viewerHandlers,
         autoDislikeQueue,
         resetPreviewedState,
-        performLoadedItemsBulkAction,
+        performLoadedItemsBulkAction: loadedItemsBulkActions.performLoadedItemsBulkAction,
     };
 }
 

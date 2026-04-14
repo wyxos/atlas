@@ -3,6 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTabContentItemInteractions } from './useTabContentItemInteractions';
 import type { FeedItem } from './useTabs';
 
+const { mockQueueBatchReaction, mockQueueReaction } = vi.hoisted(() => ({
+    mockQueueBatchReaction: vi.fn(),
+    mockQueueReaction: vi.fn(),
+}));
+
+vi.mock('@/utils/reactionQueue', () => ({
+    queueBatchReaction: mockQueueBatchReaction,
+    queueReaction: mockQueueReaction,
+}));
+
 describe('useTabContentItemInteractions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -14,7 +24,7 @@ describe('useTabContentItemInteractions', () => {
         } as typeof window.axios;
     });
 
-    it('sends a single batched remove call for loaded-items reactions', async () => {
+    it('queues loaded-items reactions through the batch reaction queue', async () => {
         const items = shallowRef<FeedItem[]>([
             {
                 id: 1,
@@ -53,6 +63,7 @@ describe('useTabContentItemInteractions', () => {
             itemPreview: {
                 incrementPreviewCount: vi.fn(),
                 clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
             },
             onReaction: vi.fn(),
             promptDownloadedReaction: vi.fn(),
@@ -62,17 +73,23 @@ describe('useTabContentItemInteractions', () => {
         const count = await interactions.performLoadedItemsBulkAction('like');
 
         expect(count).toBe(2);
-        expect(window.axios.post).toHaveBeenCalledWith('/api/files/reactions/batch/store', {
-            reactions: [
-                { file_id: 1, type: 'like' },
-                { file_id: 2, type: 'like' },
-            ],
-        });
         expect(remove).toHaveBeenCalledTimes(1);
         expect(remove).toHaveBeenCalledWith([
             expect.objectContaining({ id: 1 }),
             expect.objectContaining({ id: 2 }),
         ]);
+        expect(mockQueueBatchReaction).toHaveBeenCalledTimes(1);
+        expect(mockQueueBatchReaction).toHaveBeenCalledWith(
+            [1, 2],
+            'like',
+            [
+                { fileId: 1, thumbnail: 'https://example.com/image1.jpg' },
+                { fileId: 2, thumbnail: 'https://example.com/image2.jpg' },
+            ],
+            undefined,
+            items,
+            { updateLocalState: false },
+        );
     });
 
     it('clears hover state when reacting to a hovered online item that is removed from view', async () => {
@@ -105,6 +122,7 @@ describe('useTabContentItemInteractions', () => {
             itemPreview: {
                 incrementPreviewCount: vi.fn(),
                 clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
             },
             onReaction: vi.fn(),
             promptDownloadedReaction: vi.fn(),
@@ -118,5 +136,174 @@ describe('useTabContentItemInteractions', () => {
         expect(interactions.state.hoveredItemId.value).toBeNull();
         expect(clearHoveredContainer).toHaveBeenCalledTimes(1);
         expect(remove).toHaveBeenCalledWith(item);
+    });
+
+    it('previews loaded items up to four and removes the full loaded set from view', async () => {
+        const items = shallowRef<FeedItem[]>([
+            {
+                id: 1,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-1',
+                index: 0,
+                previewed_count: 0,
+                src: 'https://example.com/image1.jpg',
+            } as FeedItem,
+            {
+                id: 2,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-2',
+                index: 1,
+                previewed_count: 2,
+                src: 'https://example.com/image2.jpg',
+            } as FeedItem,
+            {
+                id: 3,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-3',
+                index: 2,
+                previewed_count: 5,
+                src: 'https://example.com/image3.jpg',
+            } as FeedItem,
+        ]);
+        const loadedItems = ref(items.value);
+        const remove = vi.fn().mockResolvedValue(undefined);
+        const markPreviewedItems = vi.fn();
+
+        window.axios.post = vi.fn().mockImplementation((url: string, payload: { file_ids: number[]; increments: number }) => {
+            if (url === '/api/files/preview/batch' && payload.increments === 4) {
+                return Promise.resolve({
+                    data: {
+                        results: [{ id: 1, previewed_count: 4, will_auto_dislike: false }],
+                    },
+                });
+            }
+
+            if (url === '/api/files/preview/batch' && payload.increments === 2) {
+                return Promise.resolve({
+                    data: {
+                        results: [{ id: 2, previewed_count: 4, will_auto_dislike: true }],
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        }) as typeof window.axios.post;
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            loadedItems,
+            tab: ref(null),
+            form: {
+                isLocal: ref(false),
+                data: {
+                    feed: 'online',
+                },
+            } as any,
+            masonry: ref({ remove } as any),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems,
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+        });
+
+        const count = await interactions.performLoadedItemsBulkAction('preview-to-4-and-remove');
+
+        expect(count).toBe(3);
+        expect(window.axios.post).toHaveBeenCalledTimes(2);
+        expect(window.axios.post).toHaveBeenNthCalledWith(1, '/api/files/preview/batch', {
+            file_ids: [1],
+            increments: 4,
+        });
+        expect(window.axios.post).toHaveBeenNthCalledWith(2, '/api/files/preview/batch', {
+            file_ids: [2],
+            increments: 2,
+        });
+        expect(markPreviewedItems).toHaveBeenCalledWith([1, 2, 3]);
+        expect(items.value[0].previewed_count).toBe(4);
+        expect(items.value[1].previewed_count).toBe(4);
+        expect(items.value[1].will_auto_dislike).toBe(true);
+        expect(remove).toHaveBeenCalledTimes(1);
+        expect(remove).toHaveBeenCalledWith([
+            expect.objectContaining({ id: 1 }),
+            expect.objectContaining({ id: 2 }),
+            expect.objectContaining({ id: 3 }),
+        ]);
+    });
+
+    it('chunks large blacklist requests before removing loaded items', async () => {
+        const items = shallowRef<FeedItem[]>(
+            Array.from({ length: 205 }, (_, index) => ({
+                id: index + 1,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: `1-${index + 1}`,
+                index,
+                src: `https://example.com/image${index + 1}.jpg`,
+            } as FeedItem)),
+        );
+        const loadedItems = ref(items.value);
+        const remove = vi.fn().mockResolvedValue(undefined);
+
+        window.axios.post = vi.fn().mockImplementation((_url: string, payload: { file_ids: number[] }) => {
+            return Promise.resolve({
+                data: {
+                    results: payload.file_ids.map((fileId) => ({
+                        id: fileId,
+                        blacklisted_at: '2026-04-14T00:00:00Z',
+                        blacklist_reason: 'Manual blacklist',
+                    })),
+                },
+            });
+        }) as typeof window.axios.post;
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            loadedItems,
+            tab: ref(null),
+            form: {
+                isLocal: ref(false),
+                data: {
+                    feed: 'online',
+                },
+            } as any,
+            masonry: ref({ remove } as any),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+        });
+
+        const count = await interactions.performLoadedItemsBulkAction('blacklist');
+
+        expect(count).toBe(205);
+        expect(window.axios.post).toHaveBeenCalledTimes(3);
+        expect(window.axios.post).toHaveBeenNthCalledWith(1, '/api/files/blacklist/batch', {
+            file_ids: Array.from({ length: 100 }, (_, index) => index + 1),
+        });
+        expect(window.axios.post).toHaveBeenNthCalledWith(2, '/api/files/blacklist/batch', {
+            file_ids: Array.from({ length: 100 }, (_, index) => index + 101),
+        });
+        expect(window.axios.post).toHaveBeenNthCalledWith(3, '/api/files/blacklist/batch', {
+            file_ids: Array.from({ length: 5 }, (_, index) => index + 201),
+        });
+        expect(remove).toHaveBeenCalledTimes(1);
+        expect(remove).toHaveBeenCalledWith(items.value);
     });
 });

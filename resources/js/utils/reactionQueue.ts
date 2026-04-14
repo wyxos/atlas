@@ -189,7 +189,7 @@ export function queueBatchReaction(
         return;
     }
 
-    const queueId = `batch-${reactionType}-${fileIds.join('-')}-${Date.now()}`;
+    const queueId = `batch-${reactionType}-${fileIds[0]}-${fileIds.length}-${Date.now()}`;
 
     const batchReactionCallback = createBatchReactionCallback();
 

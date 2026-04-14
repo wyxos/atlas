@@ -80,6 +80,7 @@ const props = defineProps<{
     setVibeHandle: (value: VibeHandle | null) => void;
     shouldShowForm: boolean;
     tab: TabData | null;
+    totalAvailable: number | null;
     updateFeed: (value: 'local' | 'online') => void;
     updateActiveIndex: (value: number) => void;
     updateSource: (value: string | null) => void;
@@ -141,6 +142,8 @@ useEventListener(document, 'pointermove', (event) => {
             :cancel-masonry-load="cancelLoad"
             :go-to-first-page="goToFirstPage"
             :load-next-page="loadNext"
+            :loaded-items-count="vibeStatus.itemCount"
+            :perform-loaded-items-bulk-action="itemInteractions.performLoadedItemsBulkAction"
         >
             <ContainerBlacklistManager
                 :ref="containerInteractions.managerRef"
@@ -195,7 +198,7 @@ useEventListener(document, 'pointermove', (event) => {
                     </template>
                     <template #grid-footer>
                         <div class="pointer-events-none flex justify-center px-4 pb-4 pt-2">
-                            <BrowseV2StatusBar :status="vibeStatus" />
+                            <BrowseV2StatusBar :status="vibeStatus" :total-available="totalAvailable" />
                         </div>
                     </template>
                     <template #fullscreen-overlay="{ item, index, total }">

@@ -146,4 +146,32 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('End of list');
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('neutral');
     });
+
+    it('shows loaded and backend available totals when available total exists', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    itemCount: 24,
+                }),
+                totalAvailable: 381,
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-loaded-total-pill"]').text()).toContain('24');
+        expect(wrapper.get('[data-testid="browse-v2-available-total-pill"]').text()).toContain('381');
+    });
+
+    it('hides backend available total when unavailable', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    itemCount: 24,
+                }),
+                totalAvailable: null,
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-loaded-total-pill"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="browse-v2-available-total-pill"]').exists()).toBe(false);
+    });
 });

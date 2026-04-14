@@ -4,11 +4,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TabContentV2View from './TabContentV2View.vue';
 
 const vibeLayoutSpy = vi.hoisted(() => vi.fn());
+const browseV2StatusBarSpy = vi.hoisted(() => vi.fn());
 
 const testStub = defineComponent({
     name: 'TestStub',
     render() {
         return h('div');
+    },
+});
+
+const browseV2StatusBarStub = defineComponent({
+    name: 'BrowseV2StatusBarStub',
+    props: {
+        status: { type: Object, required: true },
+        totalAvailable: { default: null },
+    },
+    setup(props) {
+        browseV2StatusBarSpy(props);
+
+        return () => h('div', { 'data-testid': 'browse-v2-status-bar-stub' });
     },
 });
 
@@ -56,6 +70,7 @@ vi.mock('@wyxos/vibe', () => ({
                     'data-testid': 'emit-asset-errors',
                     onClick: () => emit('asset-errors', []),
                 }),
+                slots['grid-footer']?.(),
             ]);
         },
     }),
@@ -106,7 +121,9 @@ function createProps() {
         handleReaction: vi.fn(),
         headerMasonry: null,
         isFilterSheetOpen: false,
-        itemInteractions: {},
+        itemInteractions: {
+            performLoadedItemsBulkAction: vi.fn(),
+        },
         localFileDeletion: {
             state: {
                 dialogOpen: ref(false),
@@ -155,6 +172,7 @@ function createProps() {
             isActive: true,
             updatedAt: null,
         },
+        totalAvailable: null,
         updateFeed: vi.fn(),
         updateActiveIndex: vi.fn(),
         updateSource: vi.fn(),
@@ -189,6 +207,7 @@ function createProps() {
 describe('TabContentV2View', () => {
     beforeEach(() => {
         vibeLayoutSpy.mockClear();
+        browseV2StatusBarSpy.mockClear();
     });
 
     it('passes the controlled surface props through to VibeLayout', () => {
@@ -196,7 +215,7 @@ describe('TabContentV2View', () => {
             props: createProps(),
             global: {
                 stubs: {
-                    BrowseV2StatusBar: testStub,
+                    BrowseV2StatusBar: browseV2StatusBarStub,
                     Button: testStub,
                     ContainerBlacklistManager: testStub,
                     DownloadedReactionDialog: testStub,
@@ -227,7 +246,7 @@ describe('TabContentV2View', () => {
             props: createProps(),
             global: {
                 stubs: {
-                    BrowseV2StatusBar: testStub,
+                    BrowseV2StatusBar: browseV2StatusBarStub,
                     Button: testStub,
                     ContainerBlacklistManager: testStub,
                     DownloadedReactionDialog: testStub,
@@ -255,7 +274,7 @@ describe('TabContentV2View', () => {
             props,
             global: {
                 stubs: {
-                    BrowseV2StatusBar: testStub,
+                    BrowseV2StatusBar: browseV2StatusBarStub,
                     Button: testStub,
                     ContainerBlacklistManager: testStub,
                     DownloadedReactionDialog: testStub,
@@ -280,6 +299,34 @@ describe('TabContentV2View', () => {
         expect(props.updateSurfaceMode).toHaveBeenCalledWith('list');
         expect(props.handleAssetLoads).toHaveBeenCalledWith([]);
         expect(props.handleAssetErrors).toHaveBeenCalledWith([]);
+    });
+
+    it('passes backend available total to the status bar', () => {
+        const props = createProps();
+        props.totalAvailable = 312;
+
+        mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: {
+                    BrowseV2StatusBar: browseV2StatusBarStub,
+                    Button: testStub,
+                    ContainerBlacklistManager: testStub,
+                    DownloadedReactionDialog: testStub,
+                    FileReactions: testStub,
+                    FileViewerSheet: testStub,
+                    LocalFileDeleteDialog: testStub,
+                    TabContentContainerDrawer: testStub,
+                    TabContentPromptDialog: testStub,
+                    TabContentServiceHeader: testStub,
+                    TabContentStartForm: testStub,
+                    TabContentV2GridOverlay: testStub,
+                },
+            },
+        });
+
+        expect(browseV2StatusBarSpy).toHaveBeenCalled();
+        expect(browseV2StatusBarSpy.mock.calls[0][0].totalAvailable).toBe(312);
     });
 
 });

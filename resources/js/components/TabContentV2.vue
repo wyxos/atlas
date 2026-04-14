@@ -127,16 +127,19 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
         cancel: () => handle.cancel(),
         hasReachedEnd: !vibeStatus.value.hasNextPage,
         isLoading: isVibeLoading.value,
+        lockPageLoading: () => handle.lockPageLoading(),
         loadNextPage: async () => {
             await handle.loadNext();
         },
         nextPage: vibeStatus.value.nextCursor,
+        pageLoadingLocked: vibeStatus.value.pageLoadingLocked,
         remove: async (target: FeedItem | FeedItem[] | string | string[]) => {
             return handle.remove(collectTargetIds(target));
         },
         restore: async (target: FeedItem | FeedItem[] | string | string[]) => {
             return handle.restore(collectTargetIds(target));
         },
+        unlockPageLoading: () => handle.unlockPageLoading(),
     };
 });
 
@@ -195,6 +198,7 @@ const shouldShowForm = browseState.shouldShowForm;
 const isTabBootstrapping = browseState.isInitializing;
 const hasTabBootstrapError = computed(() => !isTabBootstrapping.value && browseState.bootstrapFailed.value);
 const masonryRenderKey = browseState.masonryRenderKey;
+const totalAvailable = browseState.totalAvailable;
 const isFilterSheetOpen = ref(false);
 const hydratedInitialState = ref<VibeInitialState | undefined>(undefined);
 const localFileDeletion = useLocalFileDeletion({
@@ -483,6 +487,7 @@ watch(
         v-if="tab"
         :active-index="activeIndex"
         :tab="tab"
+        :total-available="totalAvailable"
         :should-show-form="shouldShowForm"
         :form="form"
         :available-services="availableServices"

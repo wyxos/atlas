@@ -93,7 +93,9 @@ vi.mock('@/composables/useFileViewerSheetState', () => ({
 
 vi.mock('@/composables/useItemPreview', () => ({
     useItemPreview: () => ({
+        incrementPreviewCount: vi.fn(),
         clearPreviewedItems: vi.fn(),
+        markPreviewedItems: vi.fn(),
     }),
 }));
 
