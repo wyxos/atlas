@@ -20,7 +20,7 @@ import { loadBrowseV2StandaloneFileItem } from '@/lib/browseV2StandaloneItem';
 import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession } from '@/lib/tabContentBrowseBootstrap';
 import { filterItemsByContainerBlacklists, removeContainerBlacklist, upsertContainerBlacklist } from '@/lib/tabContentV2Blacklists';
-import { createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, type OverlayMediaType } from '@/lib/tabContentV2';
+import { createRemovedItemIdSet, createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, syncRemovedItemIdSet, type OverlayMediaType } from '@/lib/tabContentV2';
 import { createBrowseV2MouseShortcutHandlers } from '@/lib/tabContentV2MouseShortcuts';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
@@ -69,18 +69,7 @@ const downloadedReactionPrompt = useDownloadedReactionPrompt();
 const promptDialog = useTabContentPromptDialog(items);
 const emptyStatus = createTabContentV2EmptyStatus();
 const vibeStatus = computed(() => vibeRef.value?.status ?? emptyStatus);
-const removedItemIds = computed(() => {
-    const next = new Set<number>();
-
-    for (const id of vibeStatus.value.removedIds) {
-        const parsed = Number(id);
-        if (Number.isFinite(parsed)) {
-            next.add(parsed);
-        }
-    }
-
-    return next;
-});
+const removedItemIds = ref<Set<number>>(new Set());
 const visibleItems = computed(() => {
     if (removedItemIds.value.size === 0) {
         return items.value;
@@ -134,10 +123,14 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
         nextPage: vibeStatus.value.nextCursor,
         pageLoadingLocked: vibeStatus.value.pageLoadingLocked,
         remove: async (target: FeedItem | FeedItem[] | string | string[]) => {
-            return handle.remove(collectTargetIds(target));
+            const result = handle.remove(collectTargetIds(target));
+            removedItemIds.value = syncRemovedItemIdSet(removedItemIds.value, result.ids);
+            return result;
         },
         restore: async (target: FeedItem | FeedItem[] | string | string[]) => {
-            return handle.restore(collectTargetIds(target));
+            const result = handle.restore(collectTargetIds(target));
+            removedItemIds.value = syncRemovedItemIdSet(removedItemIds.value, result.ids, 'restore');
+            return result;
         },
         unlockPageLoading: () => handle.unlockPageLoading(),
     };
@@ -263,6 +256,7 @@ function setVibeHandle(handle: VibeHandle | null): void { vibeRef.value = handle
 function resetLocalFeedState(): void {
     items.value = [];
     itemsBuckets.value = [];
+    removedItemIds.value = new Set();
     fileViewerSheet.setSheetOpen(false, { persist: false });
 }
 
@@ -366,6 +360,7 @@ function handleContainerBlacklistChange(change: ContainerBlacklistChange): void 
 const resolve = createTabContentV2Resolve({
     form,
     startPageToken: browseState.startPageToken,
+    totalAvailable,
     updateActiveTab: props.updateActiveTab,
     updateTabLabel,
     items,
@@ -400,6 +395,7 @@ const { handleVibeActiveIndexUpdate, handleVibeSurfaceModeUpdate } = useBrowseV2
     isSessionReady,
     isTabDataLoading,
     loadStandaloneFileItem,
+    removedItemIds,
     sessionItems,
     standaloneItem,
     surfaceMode,
@@ -462,6 +458,14 @@ watch(
         applyActiveContainerBlacklistFilter();
     },
     { deep: false },
+);
+
+watch(
+    () => vibeStatus.value.removedIds.join(','),
+    () => {
+        removedItemIds.value = createRemovedItemIdSet(vibeStatus.value.removedIds);
+    },
+    { immediate: true },
 );
 
 watchEffect(() => {

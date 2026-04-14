@@ -18,6 +18,7 @@ type VibeResolveParamsWithSignal = VibeResolveParams & { signal?: AbortSignal };
 type TabContentV2ResolveArgs = {
     form: BrowseFormInstance;
     startPageToken: Ref<BrowsePageToken>;
+    totalAvailable?: Ref<number | null>;
     updateActiveTab: (items: FeedItem[]) => void;
     updateTabLabel?: (cursor: BrowsePageToken | string | number | null | undefined) => void;
     items: Ref<FeedItem[]>;
@@ -69,6 +70,53 @@ export function normalizeCursor(value: BrowsePageToken | string | number | null 
     }
 
     return null;
+}
+
+export function createRemovedItemIdSet(ids: readonly string[]): Set<number> {
+    const next = new Set<number>();
+
+    for (const id of ids) {
+        const parsed = Number(id);
+        if (Number.isFinite(parsed)) {
+            next.add(parsed);
+        }
+    }
+
+    return next;
+}
+
+export function syncRemovedItemIdSet(
+    currentIds: ReadonlySet<number>,
+    ids: readonly string[],
+    mode: 'remove' | 'restore' = 'remove',
+): Set<number> {
+    const next = new Set(currentIds);
+
+    for (const id of ids) {
+        const parsed = Number(id);
+        if (!Number.isFinite(parsed)) {
+            continue;
+        }
+
+        if (mode === 'restore') {
+            next.delete(parsed);
+            continue;
+        }
+
+        next.add(parsed);
+    }
+
+    return next;
+}
+
+function normalizeTotal(value: unknown): number | null {
+    if (typeof value === 'number') {
+        return value;
+    }
+
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : null;
 }
 
 function normalizeUrl(value: unknown): string | null {
@@ -182,6 +230,10 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
                 signal: params.signal,
             });
 
+            if (args.totalAvailable) {
+                args.totalAvailable.value = normalizeTotal(data.total);
+            }
+
             const receivedItems = Array.isArray(data.items) ? data.items as FeedItem[] : [];
             const nextItems = typeof args.filterItems === 'function'
                 ? args.filterItems(receivedItems)
@@ -208,6 +260,10 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
 
             args.toast.error(trimmed);
             console.error('Browse request failed', { query, error });
+
+            if (args.totalAvailable) {
+                args.totalAvailable.value = null;
+            }
 
             return {
                 items: [],

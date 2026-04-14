@@ -11,6 +11,7 @@ type UseBrowseV2SurfaceRouteSyncOptions = {
     isSessionReady: Ref<boolean>;
     isTabDataLoading: Ref<boolean>;
     loadStandaloneFileItem: (fileId: number) => Promise<FeedItem | null>;
+    removedItemIds: Ref<Set<number>>;
     sessionItems: ComputedRef<FeedItem[]>;
     standaloneItem: Ref<FeedItem | null>;
     surfaceMode: Ref<SurfaceMode>;
@@ -145,6 +146,20 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
                 isApplyingRouteState.value = false;
             }
 
+            return;
+        }
+
+        if (options.surfaceMode.value === 'fullscreen'
+            && options.standaloneItem.value === null
+            && options.removedItemIds.value.has(fileId)) {
+            const nextContextualItemId = options.currentVisibleItem.value?.id ?? null;
+
+            if (nextContextualItemId !== null) {
+                await router.replace(buildBrowseV2FilePath(nextContextualItemId));
+                return;
+            }
+
+            await router.replace('/browse');
             return;
         }
 

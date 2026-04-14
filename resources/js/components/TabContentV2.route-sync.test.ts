@@ -4,21 +4,11 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TabContentV2 from './TabContentV2.vue';
 
-const mockAxios = vi.hoisted(() => ({
-    delete: vi.fn(),
-    get: vi.fn(),
-    patch: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-}));
+const mockAxios = vi.hoisted(() => ({ delete: vi.fn(), get: vi.fn(), patch: vi.fn(), post: vi.fn(), put: vi.fn() }));
 
 const testState = vi.hoisted(() => ({
-    bootstrapBehavior: 'success' as 'error' | 'loading' | 'success',
-    initializeSpy: vi.fn(async () => undefined),
-    restoredItems: [] as Array<Record<string, unknown>>,
-    toastError: vi.fn(),
-    viewerOnClose: vi.fn(),
-    viewerOnOpen: vi.fn(),
+    bootstrapBehavior: 'success' as 'error' | 'loading' | 'success', initializeSpy: vi.fn(async () => undefined),
+    restoredItems: [] as Array<Record<string, unknown>>, toastError: vi.fn(), viewerOnClose: vi.fn(), viewerOnOpen: vi.fn(),
 }));
 
 vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
@@ -189,14 +179,14 @@ vi.mock('@/composables/useTabContentContainerInteractions', () => ({
 }));
 
 vi.mock('@/composables/useTabContentItemInteractions', () => ({
-    useTabContentItemInteractions: () => ({
+    useTabContentItemInteractions: (options: { masonry: { value: { remove?: (target: { id: number }) => unknown } | null } }) => ({
         preload: {
             onBatchFailures: vi.fn(),
             onBatchPreloaded: vi.fn(),
             reset: vi.fn(),
         },
         reactions: {
-            onFileReaction: vi.fn(),
+            onFileReaction: vi.fn((item: { id: number }) => { queueMicrotask(() => options.masonry.value?.remove?.(item)); }),
         },
         state: {
             clearHover: vi.fn(),
@@ -251,6 +241,7 @@ vi.mock('./TabContentV2View.vue', () => ({
         name: 'TabContentV2View',
         props: {
             currentVisibleItem: { type: Object, default: null },
+            handleReaction: { type: Function, required: true },
             setVibeHandle: { type: Function, default: null },
             surfaceMode: { type: String, default: 'list' },
             updateActiveIndex: { type: Function, required: true },
@@ -265,6 +256,7 @@ vi.mock('./TabContentV2View.vue', () => ({
                     const nextIds = ids.filter((id) => !status.removedIds.includes(id));
                     status.removedIds = [...status.removedIds, ...nextIds];
                     status.removedCount = status.removedIds.length;
+
                     return { ids: nextIds };
                 },
                 restore(target: string | string[]) {
@@ -294,6 +286,7 @@ vi.mock('./TabContentV2View.vue', () => ({
                     onClick: () => props.updateSurfaceMode('fullscreen'),
                 }),
                 h('button', { 'data-testid': 'close-fullscreen', onClick: () => props.updateSurfaceMode('list') }),
+                h('button', { 'data-testid': 'react-current', onClick: () => { const current = props.currentVisibleItem as { id?: number } | null; if (current) void props.handleReaction({ feedItem: current, fileId: current.id ?? null, id: String(current.id ?? '') }, 'like'); } }),
                 h('button', { 'data-testid': 'remove-second', onClick: () => handle.remove('2') }),
                 h('button', { 'data-testid': 'restore-second', onClick: () => handle.restore('2') }),
             ]);
@@ -302,25 +295,16 @@ vi.mock('./TabContentV2View.vue', () => ({
 }));
 
 const status = reactive({
-    activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillDelayRemainingMs: null,
-    fillTargetCount: null, hasNextPage: true, hasPreviousPage: false, itemCount: 0,
-    loadState: 'loaded' as const, mode: 'dynamic' as const, nextCursor: '2', phase: 'idle' as const,
+    activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillDelayRemainingMs: null, fillTargetCount: null,
+    hasNextPage: true, hasPreviousPage: false, itemCount: 0, loadState: 'loaded' as const, mode: 'dynamic' as const, nextCursor: '2', phase: 'idle' as const,
     previousCursor: null, removedCount: 0, removedIds: [] as string[], surfaceMode: 'list' as const,
 });
 
 function createFeedItem(id: number) {
     return {
-        id,
-        width: 512,
-        height: 512,
-        page: 1,
-        key: `1-${id}`,
-        index: id - 1,
-        src: `https://example.test/${id}/preview.jpg`,
-        preview: `https://example.test/${id}/preview.jpg`,
-        original: `https://example.test/${id}/original.jpg`,
-        originalUrl: `https://example.test/${id}/original.jpg`,
-        type: 'image' as const,
+        id, width: 512, height: 512, page: 1, key: `1-${id}`, index: id - 1,
+        src: `https://example.test/${id}/preview.jpg`, preview: `https://example.test/${id}/preview.jpg`,
+        original: `https://example.test/${id}/original.jpg`, originalUrl: `https://example.test/${id}/original.jpg`, type: 'image' as const,
     };
 }
 
@@ -556,5 +540,17 @@ describe('TabContentV2 browse route sync', () => {
         await flushPromises();
 
         expect(router.currentRoute.value.fullPath).toBe('/browse');
+    });
+
+    it('advances fullscreen and removes the reacted item from restored session visibility', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2), createFeedItem(3)];
+        const { replaceSpy, router, updateActiveTab, wrapper } = await mountTabContent('/browse');
+        await wrapper.get('[data-testid="select-second"]').trigger('click'); await wrapper.get('[data-testid="open-fullscreen"]').trigger('click'); await flushPromises();
+        replaceSpy.mockClear();
+        expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('2');
+        await wrapper.get('[data-testid="react-current"]').trigger('click'); await flushPromises(); await flushPromises();
+        expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('3');
+        expect(updateActiveTab).toHaveBeenLastCalledWith([expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 3 })]);
+        expect(replaceSpy).toHaveBeenCalledWith('/browse/file/3'); expect(router.currentRoute.value.fullPath).toBe('/browse/file/3');
     });
 });
