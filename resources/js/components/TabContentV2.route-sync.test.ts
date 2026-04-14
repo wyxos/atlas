@@ -553,4 +553,14 @@ describe('TabContentV2 browse route sync', () => {
         expect(updateActiveTab).toHaveBeenLastCalledWith([expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 3 })]);
         expect(replaceSpy).toHaveBeenCalledWith('/browse/file/3'); expect(router.currentRoute.value.fullPath).toBe('/browse/file/3');
     });
+
+    it('does not force /browse while fullscreen is waiting for the next page after removing the last visible item', async () => {
+        testState.restoredItems = [createFeedItem(1)];
+        const { replaceSpy, router, wrapper } = await mountTabContent('/browse');
+        await wrapper.get('[data-testid="select-first"]').trigger('click'); await wrapper.get('[data-testid="open-fullscreen"]').trigger('click'); await flushPromises();
+        replaceSpy.mockClear();
+        await wrapper.get('[data-testid="react-current"]').trigger('click'); await flushPromises(); await flushPromises();
+        expect(replaceSpy).not.toHaveBeenCalledWith('/browse');
+        expect(router.currentRoute.value.fullPath).toBe('/browse/file/1');
+    });
 });

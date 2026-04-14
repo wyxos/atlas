@@ -156,10 +156,8 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
 
             if (nextContextualItemId !== null) {
                 await router.replace(buildBrowseV2FilePath(nextContextualItemId));
-                return;
             }
 
-            await router.replace('/browse');
             return;
         }
 
