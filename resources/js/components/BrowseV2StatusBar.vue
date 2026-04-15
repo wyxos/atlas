@@ -1,8 +1,57 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Loader2 } from 'lucide-vue-next'
+import { Ban, Eye, Heart, Loader2, LockKeyhole, LockKeyholeOpen, ThumbsDown, ThumbsUp } from 'lucide-vue-next'
 
+import { Button } from '@/components/ui/button'
+import type { LoadedItemsBulkAction } from '@/composables/useTabContentItemInteractions'
 import Pill from './ui/Pill.vue'
+
+const bulkActionButtons: Array<{
+  action: LoadedItemsBulkAction
+  color?: 'danger'
+  dataTest: string
+  icon: typeof Eye
+  label: string
+  title: string
+}> = [
+  {
+    action: 'preview-to-4-and-remove',
+    dataTest: 'loaded-items-preview-to-four-button',
+    icon: Eye,
+    label: 'Preview to 4',
+    title: 'Set all loaded items to preview count 4 and remove them from the grid',
+  },
+  {
+    action: 'like',
+    dataTest: 'loaded-items-like-button',
+    icon: ThumbsUp,
+    label: 'Like all',
+    title: 'Run the ALT + left click reaction on all loaded items',
+  },
+  {
+    action: 'love',
+    dataTest: 'loaded-items-love-button',
+    icon: Heart,
+    label: 'Love all',
+    title: 'Run the ALT + middle click reaction on all loaded items',
+  },
+  {
+    action: 'dislike',
+    color: 'danger',
+    dataTest: 'loaded-items-dislike-button',
+    icon: ThumbsDown,
+    label: 'Dislike all',
+    title: 'Run the ALT + right click reaction on all loaded items',
+  },
+  {
+    action: 'blacklist',
+    color: 'danger',
+    dataTest: 'loaded-items-blacklist-button',
+    icon: Ban,
+    label: 'Blacklist all',
+    title: 'Blacklist every loaded item and remove it from the grid',
+  },
+]
 
 type VibeStatusLike = {
   currentCursor: string | null
@@ -21,13 +70,26 @@ type VibeStatusLike = {
 interface Props {
   status: VibeStatusLike
   totalAvailable?: number | null
+  bulkActionsDisabled?: boolean
+  canTogglePageLoadingLock?: boolean
+  pageLoadingLocked?: boolean
+  performLoadedItemsBulkAction?: ((action: LoadedItemsBulkAction) => void | Promise<number>) | null
+  togglePageLoadingLock?: (() => void) | null
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  totalAvailable: null,
+  bulkActionsDisabled: true,
+  canTogglePageLoadingLock: false,
+  pageLoadingLocked: false,
+  performLoadedItemsBulkAction: null,
+  togglePageLoadingLock: null,
+})
 
 const currentLabel = computed(() => props.status.currentCursor ?? 'N/A')
 const nextLabel = computed(() => props.status.nextCursor ?? 'N/A')
 const previousLabel = computed(() => props.status.previousCursor ?? 'N/A')
+const showActionRail = computed(() => props.performLoadedItemsBulkAction !== null || props.canTogglePageLoadingLock)
 
 const statusLabel = computed(() => {
   if (props.status.loadState === 'failed') {
@@ -98,42 +160,98 @@ const isPending = computed(() => (
   || props.status.phase === 'loading'
   || props.status.phase === 'refreshing'
 ))
+
+function handleLoadedItemsBulkAction(action: LoadedItemsBulkAction): void {
+  if (!props.performLoadedItemsBulkAction) {
+    return
+  }
+
+  void props.performLoadedItemsBulkAction(action)
+}
+
+function handleTogglePageLoadingLock(): void {
+  if (!props.togglePageLoadingLock) {
+    return
+  }
+
+  props.togglePageLoadingLock()
+}
 </script>
 
 <template>
   <div
     data-testid="browse-v2-status-bar"
-    class="pointer-events-auto flex w-full max-w-[1120px] flex-wrap items-center justify-center gap-x-5 gap-y-2 border border-white/12 bg-black/55 px-4 py-3 backdrop-blur-[18px] sm:px-5"
+    class="pointer-events-auto flex w-full max-w-[1280px] flex-col gap-3 border border-white/12 bg-black/55 px-4 py-3 backdrop-blur-[18px] sm:px-5 lg:flex-row lg:items-center lg:justify-between"
   >
-    <Pill label="Viewing" :value="currentLabel" variant="neutral" reversed data-testid="browse-v2-viewing-pill" />
-    <Pill label="Next" :value="nextLabel" variant="secondary" reversed data-testid="browse-v2-next-pill" />
-    <Pill label="Previous" :value="previousLabel" variant="secondary" reversed data-testid="browse-v2-previous-pill" />
-    <Pill
-      label="Status"
-      :value="statusLabel"
-      :variant="statusVariant"
-      reversed
-      data-testid="browse-v2-status-pill"
+    <div class="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:justify-start">
+      <Pill label="Viewing" :value="currentLabel" variant="neutral" reversed data-testid="browse-v2-viewing-pill" />
+      <Pill label="Next" :value="nextLabel" variant="secondary" reversed data-testid="browse-v2-next-pill" />
+      <Pill label="Previous" :value="previousLabel" variant="secondary" reversed data-testid="browse-v2-previous-pill" />
+      <Pill
+        label="Status"
+        :value="statusLabel"
+        :variant="statusVariant"
+        reversed
+        data-testid="browse-v2-status-pill"
+      >
+        <template #value>
+          <span class="flex items-center gap-2">
+            <Loader2
+              v-if="isPending"
+              :size="14"
+              class="animate-spin"
+            />
+            <span>{{ statusLabel }}</span>
+          </span>
+        </template>
+      </Pill>
+      <Pill label="Loaded" :value="status.itemCount" variant="primary" reversed data-testid="browse-v2-loaded-total-pill" />
+      <Pill
+        v-if="props.totalAvailable !== null && props.totalAvailable !== undefined"
+        label="Available"
+        :value="props.totalAvailable"
+        variant="primary"
+        reversed
+        data-testid="browse-v2-available-total-pill"
+      />
+    </div>
+
+    <div
+      v-if="showActionRail"
+      class="flex items-center justify-center lg:justify-end"
     >
-      <template #value>
-        <span class="flex items-center gap-2">
-          <Loader2
-            v-if="isPending"
-            :size="14"
-            class="animate-spin"
-          />
-          <span>{{ statusLabel }}</span>
-        </span>
-      </template>
-    </Pill>
-    <Pill label="Loaded" :value="status.itemCount" variant="primary" reversed data-testid="browse-v2-loaded-total-pill" />
-    <Pill
-      v-if="props.totalAvailable !== null && props.totalAvailable !== undefined"
-      label="Available"
-      :value="props.totalAvailable"
-      variant="primary"
-      reversed
-      data-testid="browse-v2-available-total-pill"
-    />
+      <div class="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 shadow-[0_18px_60px_-38px_rgba(0,0,0,0.95)]">
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
+          :class="props.pageLoadingLocked ? 'border-danger-400/60 bg-danger-500/18 text-danger-100 hover:border-danger-300 hover:bg-danger-500/28 hover:text-white' : ''"
+          data-test="page-loading-lock-button"
+          :aria-label="props.pageLoadingLocked ? 'Unlock page loading' : 'Lock page loading'"
+          :aria-pressed="props.pageLoadingLocked ? 'true' : 'false'"
+          :disabled="!props.canTogglePageLoadingLock"
+          :title="props.pageLoadingLocked ? 'Unlock Vibe page loading' : 'Lock Vibe page loading'"
+          @click="handleTogglePageLoadingLock"
+        >
+          <component :is="props.pageLoadingLocked ? LockKeyhole : LockKeyholeOpen" :size="14" />
+        </Button>
+
+        <Button
+          v-for="action in bulkActionButtons"
+          :key="action.dataTest"
+          size="icon-sm"
+          variant="ghost"
+          class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
+          :class="action.color === 'danger' ? 'text-danger-100 hover:border-danger-400/60 hover:bg-danger-500/20 hover:text-white' : ''"
+          :aria-label="action.label"
+          :data-test="action.dataTest"
+          :disabled="props.bulkActionsDisabled || !props.performLoadedItemsBulkAction"
+          :title="action.title"
+          @click="handleLoadedItemsBulkAction(action.action)"
+        >
+          <component :is="action.icon" :size="14" />
+        </Button>
+      </div>
+    </div>
   </div>
 </template>

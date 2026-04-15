@@ -43,25 +43,18 @@ function createProps() {
         cancelMasonryLoad: vi.fn(),
         goToFirstPage: vi.fn(async () => undefined),
         loadNextPage: vi.fn(async () => undefined),
-        loadedItemsCount: 0,
-        performLoadedItemsBulkAction: vi.fn(async () => 0),
     };
 }
 
 describe('TabContentServiceHeader', () => {
-    it('keeps the compact page navigation buttons while removing the loaded-items dropdown', () => {
+    it('keeps only the top-level browse controls in the header', () => {
         const wrapper = mount(TabContentServiceHeader, {
             props: createProps(),
             global: {
                 stubs: {
-                    Ban: simpleStub,
                     Button: buttonStub,
                     ChevronDown: simpleStub,
                     ChevronsUp: simpleStub,
-                    Eye: simpleStub,
-                    Heart: simpleStub,
-                    LockKeyhole: simpleStub,
-                    LockKeyholeOpen: simpleStub,
                     ModerationRulesManager: simpleStub,
                     Play: simpleStub,
                     Select: simpleStub,
@@ -70,8 +63,6 @@ describe('TabContentServiceHeader', () => {
                     SelectTrigger: simpleStub,
                     SelectValue: simpleStub,
                     TabFilter: simpleStub,
-                    ThumbsDown: simpleStub,
-                    ThumbsUp: simpleStub,
                     X: simpleStub,
                 },
             },
@@ -81,41 +72,29 @@ describe('TabContentServiceHeader', () => {
         expect(wrapper.get('[data-test="cancel-loading-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="go-first-page-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="load-next-page-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="page-loading-lock-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-preview-to-four-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-like-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-love-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-dislike-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="page-loading-lock-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-preview-to-four-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-like-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-love-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-dislike-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-blacklist-button"]').exists()).toBe(false);
         expect(wrapper.get('[data-test="apply-service-button"]').exists()).toBe(true);
     });
 
-    it('routes bulk actions and the page-loading lock through the wired handlers', async () => {
+    it('routes header navigation and apply buttons through the wired handlers', async () => {
         const props = createProps();
-        props.loadedItemsCount = 3;
         props.masonry = {
-            cancel: vi.fn(),
             hasReachedEnd: false,
             isLoading: false,
-            lockPageLoading: vi.fn(),
-            pageLoadingLocked: false,
-            remove: vi.fn(),
-            restore: vi.fn(),
-            unlockPageLoading: vi.fn(),
         };
 
         const wrapper = mount(TabContentServiceHeader, {
             props,
             global: {
                 stubs: {
-                    Ban: simpleStub,
                     Button: buttonStub,
                     ChevronDown: simpleStub,
                     ChevronsUp: simpleStub,
-                    Eye: simpleStub,
-                    Heart: simpleStub,
-                    LockKeyhole: simpleStub,
-                    LockKeyholeOpen: simpleStub,
                     ModerationRulesManager: simpleStub,
                     Play: simpleStub,
                     Select: simpleStub,
@@ -124,35 +103,27 @@ describe('TabContentServiceHeader', () => {
                     SelectTrigger: simpleStub,
                     SelectValue: simpleStub,
                     TabFilter: simpleStub,
-                    ThumbsDown: simpleStub,
-                    ThumbsUp: simpleStub,
                     X: simpleStub,
                 },
             },
         });
 
-        await wrapper.get('[data-test="loaded-items-preview-to-four-button"]').trigger('click');
-        await wrapper.get('[data-test="loaded-items-like-button"]').trigger('click');
-        await wrapper.get('[data-test="loaded-items-love-button"]').trigger('click');
-        await wrapper.get('[data-test="loaded-items-dislike-button"]').trigger('click');
-        await wrapper.get('[data-test="loaded-items-blacklist-button"]').trigger('click');
-        await wrapper.get('[data-test="page-loading-lock-button"]').trigger('click');
+        await wrapper.get('[data-test="go-first-page-button"]').trigger('click');
+        await wrapper.get('[data-test="load-next-page-button"]').trigger('click');
+        await wrapper.get('[data-test="apply-service-button"]').trigger('click');
 
-        expect(props.performLoadedItemsBulkAction).toHaveBeenNthCalledWith(1, 'preview-to-4-and-remove');
-        expect(props.performLoadedItemsBulkAction).toHaveBeenNthCalledWith(2, 'like');
-        expect(props.performLoadedItemsBulkAction).toHaveBeenNthCalledWith(3, 'love');
-        expect(props.performLoadedItemsBulkAction).toHaveBeenNthCalledWith(4, 'dislike');
-        expect(props.performLoadedItemsBulkAction).toHaveBeenNthCalledWith(5, 'blacklist');
-        expect(props.masonry.lockPageLoading).toHaveBeenCalledTimes(1);
+        expect(props.goToFirstPage).toHaveBeenCalledTimes(1);
+        expect(props.loadNextPage).toHaveBeenCalledTimes(1);
+        expect(props.applyService).toHaveBeenCalledTimes(1);
 
         await wrapper.setProps({
             masonry: {
                 ...props.masonry,
-                pageLoadingLocked: true,
+                isLoading: true,
             },
         });
-        await wrapper.get('[data-test="page-loading-lock-button"]').trigger('click');
+        await wrapper.get('[data-test="cancel-loading-button"]').trigger('click');
 
-        expect(props.masonry.unlockPageLoading).toHaveBeenCalledTimes(1);
+        expect(props.cancelMasonryLoad).toHaveBeenCalledTimes(1);
     });
 });

@@ -102,6 +102,19 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
     return (item.feedItem as FeedItem | undefined) ?? null;
 }
 
+function togglePageLoadingLock(): void {
+    if (!props.headerMasonry?.lockPageLoading || !props.headerMasonry?.unlockPageLoading) {
+        return;
+    }
+
+    if (props.headerMasonry.pageLoadingLocked) {
+        props.headerMasonry.unlockPageLoading();
+        return;
+    }
+
+    props.headerMasonry.lockPageLoading();
+}
+
 const vibeLayoutBindings = computed(() => ({
     activeIndex: props.activeIndex,
     emptyStateMode: 'hidden' as const,
@@ -142,8 +155,6 @@ useEventListener(document, 'pointermove', (event) => {
             :cancel-masonry-load="cancelLoad"
             :go-to-first-page="goToFirstPage"
             :load-next-page="loadNext"
-            :loaded-items-count="vibeStatus.itemCount"
-            :perform-loaded-items-bulk-action="itemInteractions.performLoadedItemsBulkAction"
         >
             <ContainerBlacklistManager
                 :ref="containerInteractions.managerRef"
@@ -198,7 +209,15 @@ useEventListener(document, 'pointermove', (event) => {
                     </template>
                     <template #grid-footer>
                         <div class="pointer-events-none flex justify-center px-4 pb-4 pt-2">
-                            <BrowseV2StatusBar :status="vibeStatus" :total-available="totalAvailable" />
+                            <BrowseV2StatusBar
+                                :status="vibeStatus"
+                                :total-available="totalAvailable"
+                                :bulk-actions-disabled="Boolean(headerMasonry?.isLoading) || vibeStatus.itemCount === 0"
+                                :can-toggle-page-loading-lock="Boolean(headerMasonry?.lockPageLoading && headerMasonry?.unlockPageLoading)"
+                                :page-loading-locked="Boolean(headerMasonry?.pageLoadingLocked)"
+                                :perform-loaded-items-bulk-action="itemInteractions.performLoadedItemsBulkAction"
+                                :toggle-page-loading-lock="togglePageLoadingLock"
+                            />
                         </div>
                     </template>
                     <template #fullscreen-overlay="{ item, index, total }">

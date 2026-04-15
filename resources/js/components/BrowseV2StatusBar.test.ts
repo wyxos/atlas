@@ -4,10 +4,67 @@ import { describe, expect, it, vi } from 'vitest';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 
 vi.mock('lucide-vue-next', () => ({
+    Ban: defineComponent({
+        name: 'MockBanIcon',
+        render() {
+            return h('div', { 'data-testid': 'ban-icon' });
+        },
+    }),
+    Eye: defineComponent({
+        name: 'MockEyeIcon',
+        render() {
+            return h('div', { 'data-testid': 'eye-icon' });
+        },
+    }),
+    Heart: defineComponent({
+        name: 'MockHeartIcon',
+        render() {
+            return h('div', { 'data-testid': 'heart-icon' });
+        },
+    }),
     Loader2: defineComponent({
         name: 'MockLoaderIcon',
         render() {
             return h('div', { 'data-testid': 'loader-icon' });
+        },
+    }),
+    LockKeyhole: defineComponent({
+        name: 'MockLockKeyholeIcon',
+        render() {
+            return h('div', { 'data-testid': 'lock-keyhole-icon' });
+        },
+    }),
+    LockKeyholeOpen: defineComponent({
+        name: 'MockLockKeyholeOpenIcon',
+        render() {
+            return h('div', { 'data-testid': 'lock-keyhole-open-icon' });
+        },
+    }),
+    ThumbsDown: defineComponent({
+        name: 'MockThumbsDownIcon',
+        render() {
+            return h('div', { 'data-testid': 'thumbs-down-icon' });
+        },
+    }),
+    ThumbsUp: defineComponent({
+        name: 'MockThumbsUpIcon',
+        render() {
+            return h('div', { 'data-testid': 'thumbs-up-icon' });
+        },
+    }),
+}));
+
+vi.mock('@/components/ui/button', () => ({
+    Button: defineComponent({
+        name: 'MockButton',
+        props: {
+            disabled: { type: Boolean, default: false },
+        },
+        setup(props, { attrs, slots }) {
+            return () => h('button', {
+                ...attrs,
+                disabled: props.disabled,
+            }, slots.default?.());
         },
     }),
 }));
@@ -173,5 +230,88 @@ describe('BrowseV2StatusBar', () => {
 
         expect(wrapper.get('[data-testid="browse-v2-loaded-total-pill"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="browse-v2-available-total-pill"]').exists()).toBe(false);
+    });
+
+    it('renders the moved bulk actions as icon-only status bar buttons', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus(),
+                bulkActionsDisabled: false,
+                canTogglePageLoadingLock: true,
+                performLoadedItemsBulkAction: vi.fn(),
+                togglePageLoadingLock: vi.fn(),
+            },
+        });
+
+        expect(wrapper.get('[data-test="page-loading-lock-button"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="loaded-items-preview-to-four-button"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="loaded-items-like-button"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="loaded-items-love-button"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="loaded-items-dislike-button"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').exists()).toBe(true);
+        expect(wrapper.text()).not.toContain('Preview to 4');
+        expect(wrapper.text()).not.toContain('Like all');
+        expect(wrapper.text()).not.toContain('Lock paging');
+    });
+
+    it('shows a closed red lock icon while paging is locked', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus(),
+                canTogglePageLoadingLock: true,
+                pageLoadingLocked: true,
+                togglePageLoadingLock: vi.fn(),
+            },
+        });
+
+        const lockButton = wrapper.get('[data-test="page-loading-lock-button"]');
+
+        expect(lockButton.classes().join(' ')).toContain('border-danger-400/60');
+        expect(lockButton.classes().join(' ')).toContain('text-danger-100');
+        expect(lockButton.find('[data-testid="lock-keyhole-icon"]').exists()).toBe(true);
+        expect(lockButton.find('[data-testid="lock-keyhole-open-icon"]').exists()).toBe(false);
+    });
+
+    it('routes bulk actions and the page-loading lock through the provided handlers', async () => {
+        const performLoadedItemsBulkAction = vi.fn(async () => 0);
+        const togglePageLoadingLock = vi.fn();
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus(),
+                bulkActionsDisabled: false,
+                canTogglePageLoadingLock: true,
+                performLoadedItemsBulkAction,
+                togglePageLoadingLock,
+            },
+        });
+
+        await wrapper.get('[data-test="loaded-items-preview-to-four-button"]').trigger('click');
+        await wrapper.get('[data-test="loaded-items-like-button"]').trigger('click');
+        await wrapper.get('[data-test="loaded-items-love-button"]').trigger('click');
+        await wrapper.get('[data-test="loaded-items-dislike-button"]').trigger('click');
+        await wrapper.get('[data-test="loaded-items-blacklist-button"]').trigger('click');
+        await wrapper.get('[data-test="page-loading-lock-button"]').trigger('click');
+
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(1, 'preview-to-4-and-remove');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(2, 'like');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(3, 'love');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(4, 'dislike');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(5, 'blacklist');
+        expect(togglePageLoadingLock).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the action rail when handlers are unavailable', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus(),
+                bulkActionsDisabled: true,
+                canTogglePageLoadingLock: false,
+                performLoadedItemsBulkAction: vi.fn(),
+            },
+        });
+
+        expect(wrapper.get('[data-test="page-loading-lock-button"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[data-test="loaded-items-preview-to-four-button"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').attributes('disabled')).toBeDefined();
     });
 });

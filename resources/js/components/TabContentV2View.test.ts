@@ -18,6 +18,11 @@ const browseV2StatusBarStub = defineComponent({
     props: {
         status: { type: Object, required: true },
         totalAvailable: { default: null },
+        bulkActionsDisabled: { type: Boolean, default: true },
+        canTogglePageLoadingLock: { type: Boolean, default: false },
+        pageLoadingLocked: { type: Boolean, default: false },
+        performLoadedItemsBulkAction: { type: Function, default: null },
+        togglePageLoadingLock: { type: Function, default: null },
     },
     setup(props) {
         browseV2StatusBarSpy(props);
@@ -327,6 +332,58 @@ describe('TabContentV2View', () => {
 
         expect(browseV2StatusBarSpy).toHaveBeenCalled();
         expect(browseV2StatusBarSpy.mock.calls[0][0].totalAvailable).toBe(312);
+    });
+
+    it('passes status bar action handlers and lock state through to the footer overlay', () => {
+        const props = createProps();
+        const lockPageLoading = vi.fn();
+        const unlockPageLoading = vi.fn();
+
+        props.headerMasonry = {
+            hasReachedEnd: false,
+            isLoading: false,
+            lockPageLoading,
+            pageLoadingLocked: false,
+            remove: vi.fn(),
+            restore: vi.fn(),
+            unlockPageLoading,
+        };
+
+        mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: {
+                    BrowseV2StatusBar: browseV2StatusBarStub,
+                    Button: testStub,
+                    ContainerBlacklistManager: testStub,
+                    DownloadedReactionDialog: testStub,
+                    FileReactions: testStub,
+                    FileViewerSheet: testStub,
+                    LocalFileDeleteDialog: testStub,
+                    TabContentContainerDrawer: testStub,
+                    TabContentPromptDialog: testStub,
+                    TabContentServiceHeader: testStub,
+                    TabContentStartForm: testStub,
+                    TabContentV2GridOverlay: testStub,
+                },
+            },
+        });
+
+        expect(browseV2StatusBarSpy).toHaveBeenCalled();
+
+        const statusBarProps = browseV2StatusBarSpy.mock.calls[0][0];
+
+        expect(statusBarProps.bulkActionsDisabled).toBe(false);
+        expect(statusBarProps.canTogglePageLoadingLock).toBe(true);
+        expect(statusBarProps.pageLoadingLocked).toBe(false);
+        expect(statusBarProps.performLoadedItemsBulkAction).toBe(props.itemInteractions.performLoadedItemsBulkAction);
+
+        statusBarProps.togglePageLoadingLock();
+        expect(lockPageLoading).toHaveBeenCalledTimes(1);
+
+        props.headerMasonry.pageLoadingLocked = true;
+        statusBarProps.togglePageLoadingLock();
+        expect(unlockPageLoading).toHaveBeenCalledTimes(1);
     });
 
 });
