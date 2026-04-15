@@ -108,11 +108,38 @@ describe('tabContentV2 resolve', () => {
             url: '/api/files/10/icon',
             mediaType: 'image',
         });
+        expect(audioItem.healthCheck).toMatchObject({
+            kind: 'playback',
+            url: '/api/files/10/downloaded',
+        });
 
         expect(videoItem.type).toBe('video');
         expect(videoItem.preview).toMatchObject({
             url: '/api/files/11/preview',
             mediaType: 'video',
+        });
+        expect(videoItem.healthCheck).toBeUndefined();
+    });
+
+    it('adds playback health checks for generic file tiles that render with icon previews', () => {
+        const fileItem = mapFeedItemToVibeItem({
+            ...createFeedItem(12),
+            preview: '/api/files/12/icon',
+            src: '/api/files/12/icon',
+            original: '/api/files/12/downloaded',
+            originalUrl: '/api/files/12/downloaded',
+            media_kind: 'file',
+            mime_type: 'application/pdf',
+        });
+
+        expect(fileItem.type).toBe('other');
+        expect(fileItem.preview).toMatchObject({
+            url: '/api/files/12/icon',
+            mediaType: 'image',
+        });
+        expect(fileItem.healthCheck).toMatchObject({
+            kind: 'playback',
+            url: '/api/files/12/downloaded',
         });
     });
 });

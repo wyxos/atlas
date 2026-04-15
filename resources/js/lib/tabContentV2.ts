@@ -14,6 +14,12 @@ import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 
 export type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
 type VibeResolveParamsWithSignal = VibeResolveParams & { signal?: AbortSignal };
+type AtlasVibeViewerItem = VibeViewerItem & {
+    healthCheck?: {
+        kind: 'playback';
+        url: string;
+    };
+};
 
 type TabContentV2ResolveArgs = {
     form: BrowseFormInstance;
@@ -146,7 +152,7 @@ export function resolveOverlayMediaType(item: FeedItem): OverlayMediaType {
     return 'image';
 }
 
-export function mapFeedItemToVibeItem(item: FeedItem): VibeViewerItem {
+export function mapFeedItemToVibeItem(item: FeedItem): AtlasVibeViewerItem {
     const previewUrl = normalizeUrl(item.preview ?? item.src ?? null);
     const fullUrl = normalizeUrl(item.originalUrl ?? item.original ?? item.url ?? item.preview ?? item.src ?? null) ?? '';
     const type = item.media_kind === 'audio'
@@ -161,6 +167,12 @@ export function mapFeedItemToVibeItem(item: FeedItem): VibeViewerItem {
         height: item.height,
         mediaType: previewMediaType,
     } as VibeViewerItem['preview']) : undefined;
+    const healthCheck = (type === 'audio' || type === 'other') && fullUrl !== '' && fullUrl !== previewUrl
+        ? {
+            url: fullUrl,
+            kind: 'playback' as const,
+        }
+        : undefined;
 
     return {
         id: String(item.id),
@@ -168,6 +180,7 @@ export function mapFeedItemToVibeItem(item: FeedItem): VibeViewerItem {
         title: typeof item.title === 'string' ? item.title : undefined,
         url: fullUrl,
         preview: previewAsset,
+        healthCheck,
         width: item.width,
         height: item.height,
         feedItem: item,
