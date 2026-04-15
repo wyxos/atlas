@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { FeedItem } from '@/composables/useTabs';
-import { createTabContentV2Resolve } from './tabContentV2';
+import { createTabContentV2Resolve, mapFeedItemToVibeItem } from './tabContentV2';
 
 function createFeedItem(id: number): FeedItem {
     return {
@@ -79,5 +79,40 @@ describe('tabContentV2 resolve', () => {
         ]);
         expect(result.nextPage).toBe('2');
         expect(result.items).toHaveLength(2);
+    });
+
+    it('marks audio and video previews with explicit renderable media types', () => {
+        const audioItem = mapFeedItemToVibeItem({
+            ...createFeedItem(10),
+            preview: '/api/files/10/icon',
+            src: '/api/files/10/icon',
+            original: '/api/files/10/downloaded',
+            originalUrl: '/api/files/10/downloaded',
+            media_kind: 'audio',
+            mime_type: 'audio/mpeg',
+        });
+
+        const videoItem = mapFeedItemToVibeItem({
+            ...createFeedItem(11),
+            preview: '/api/files/11/preview',
+            src: '/api/files/11/preview',
+            original: '/api/files/11/downloaded',
+            originalUrl: '/api/files/11/downloaded',
+            media_kind: 'video',
+            mime_type: 'video/mp4',
+            type: 'video',
+        });
+
+        expect(audioItem.type).toBe('audio');
+        expect(audioItem.preview).toMatchObject({
+            url: '/api/files/10/icon',
+            mediaType: 'image',
+        });
+
+        expect(videoItem.type).toBe('video');
+        expect(videoItem.preview).toMatchObject({
+            url: '/api/files/11/preview',
+            mediaType: 'video',
+        });
     });
 });

@@ -154,17 +154,20 @@ export function mapFeedItemToVibeItem(item: FeedItem): VibeViewerItem {
         : item.media_kind === 'file'
             ? 'other'
             : (item.type === 'video' || item.media_kind === 'video' ? 'video' : 'image');
+    const previewMediaType = type === 'video' ? 'video' : 'image';
+    const previewAsset = previewUrl ? ({
+        url: previewUrl,
+        width: item.width,
+        height: item.height,
+        mediaType: previewMediaType,
+    } as VibeViewerItem['preview']) : undefined;
 
     return {
         id: String(item.id),
         type,
         title: typeof item.title === 'string' ? item.title : undefined,
         url: fullUrl,
-        preview: previewUrl ? {
-            url: previewUrl,
-            width: item.width,
-            height: item.height,
-        } : undefined,
+        preview: previewAsset,
         width: item.width,
         height: item.height,
         feedItem: item,
