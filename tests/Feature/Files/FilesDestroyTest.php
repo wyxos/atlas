@@ -63,6 +63,42 @@ it('deletes local assets but keeps the file record by default when requested', f
     Storage::disk(config('downloads.disk'))->assertMissing('posters/deletable.jpg');
 });
 
+it('deletes local source files from atlas disk when requested', function () {
+    Storage::fake('atlas-app');
+    Storage::fake('atlas');
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => null,
+        'filename' => 'local-track.mp3',
+        'source' => 'local',
+        'downloaded' => false,
+        'path' => '0000 - Downloads/audio/local-track.mp3',
+        'mime_type' => 'audio/mpeg',
+    ]);
+
+    Storage::disk('atlas')->put($file->path, 'audio');
+
+    $response = $this->actingAs($user)->deleteJson("/api/files/{$file->id}", [
+        'also_from_disk' => true,
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'message' => 'File deleted from disk. Record kept.',
+        ]);
+
+    $file->refresh();
+
+    expect($file->downloaded)->toBeFalse()
+        ->and($file->downloaded_at)->toBeNull()
+        ->and($file->path)->toBeNull()
+        ->and($file->preview_path)->toBeNull()
+        ->and($file->poster_path)->toBeNull();
+
+    Storage::disk('atlas')->assertMissing('0000 - Downloads/audio/local-track.mp3');
+});
+
 it('can delete the local assets and the file record together', function () {
     Storage::fake(config('downloads.disk'));
 

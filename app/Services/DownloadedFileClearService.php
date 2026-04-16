@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\File;
 use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Support\AtlasPathResolver;
 use Illuminate\Support\Facades\Storage;
 
 class DownloadedFileClearService
@@ -96,15 +97,16 @@ class DownloadedFileClearService
             return;
         }
 
-        $disk = Storage::disk(config('downloads.disk'));
-
-        foreach ($paths as $path) {
-            try {
-                if ($disk->exists($path)) {
-                    $disk->delete($path);
+        foreach (AtlasPathResolver::preferredDiskNames() as $diskName) {
+            foreach ($paths as $path) {
+                try {
+                    $disk = Storage::disk($diskName);
+                    if ($disk->exists($path)) {
+                        $disk->delete($path);
+                    }
+                } catch (\Throwable) {
+                    // Cleanup failures should not prevent state repair.
                 }
-            } catch (\Throwable) {
-                // Cleanup failures should not prevent state repair.
             }
         }
     }

@@ -2,10 +2,10 @@
 
 namespace App\Http\Resources;
 
+use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 class FileResource extends JsonResource
 {
@@ -41,26 +41,7 @@ class FileResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $downloadsDisk = Storage::disk(config('downloads.disk'));
-
-        $resolveAbsolutePath = function (?string $path) use ($downloadsDisk): ?string {
-            if (! $path) {
-                return null;
-            }
-
-            $fullPath = $downloadsDisk->path($path);
-
-            // Normalize the path: use realpath() if file exists (returns canonical absolute path)
-            // This handles symlinks, relative paths, and normalizes separators for the OS
-            $normalized = realpath($fullPath);
-            if ($normalized !== false) {
-                return $normalized;
-            }
-
-            // If file doesn't exist, use the constructed path with OS-native separators
-            // storage_path() already uses DIRECTORY_SEPARATOR, so it's OS-appropriate
-            return $fullPath;
-        };
+        $resolveAbsolutePath = fn (?string $path): ?string => AtlasPathResolver::absolutePath($path);
 
         $absolutePath = $resolveAbsolutePath($this->path);
         $absolutePreviewPath = $resolveAbsolutePath($this->preview_path);

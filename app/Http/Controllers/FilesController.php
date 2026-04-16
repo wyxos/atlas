@@ -11,6 +11,7 @@ use App\Services\FileNotFoundService;
 use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Services\MetricsService;
 use App\Services\TabFileService;
+use App\Support\AtlasPathResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -51,17 +52,17 @@ class FilesController extends Controller
      */
     public function serve(File $file)
     {
-        if (! $file->path) {
+        $resolvedPath = AtlasPathResolver::resolveExistingPath($file->path);
+        if (! $resolvedPath) {
             abort(404, 'File not found');
         }
 
-        $fullPath = storage_path('app/'.$file->path);
-
-        if (! file_exists($fullPath)) {
+        $fullPath = $resolvedPath['full_path'];
+        $size = is_int($resolvedPath['size']) ? $resolvedPath['size'] : @filesize($fullPath);
+        if (! is_int($size) || $size < 0) {
             abort(404, 'File not found');
         }
 
-        $size = filesize($fullPath);
         $mimeType = $file->mime_type ?? 'application/octet-stream';
 
         $baseHeaders = [
@@ -159,10 +160,8 @@ class FilesController extends Controller
      */
     public function servePreview(File $file)
     {
-        $disk = Storage::disk(config('downloads.disk'));
-
-        if (! $file->preview_path || ! $disk->exists($file->preview_path)) {
-            $this->dispatchPreviewGeneration($file, $disk);
+        if (! $file->preview_path || ! AtlasPathResolver::resolveExistingPath($file->preview_path)) {
+            $this->dispatchPreviewGeneration($file, Storage::disk(config('downloads.disk')));
             abort(404, 'File not found');
         }
 
@@ -320,18 +319,17 @@ SVG;
 
     private function serveDiskPath(?string $path, ?string $mimeType)
     {
-        if (! $path) {
+        $resolvedPath = AtlasPathResolver::resolveExistingPath($path);
+        if (! $resolvedPath) {
             abort(404, 'File not found');
         }
 
-        $disk = Storage::disk(config('downloads.disk'));
-
-        if (! $disk->exists($path)) {
+        $fullPath = $resolvedPath['full_path'];
+        $size = is_int($resolvedPath['size']) ? $resolvedPath['size'] : @filesize($fullPath);
+        if (! is_int($size) || $size < 0) {
             abort(404, 'File not found');
         }
 
-        $fullPath = $disk->path($path);
-        $size = $disk->size($path);
         $mimeType = $mimeType ?? 'application/octet-stream';
 
         $baseHeaders = [
@@ -425,12 +423,12 @@ SVG;
             return;
         }
 
-        $disk = Storage::disk(config('downloads.disk'));
-        if (! $disk->exists($file->path)) {
+        $resolvedPath = AtlasPathResolver::resolveExistingPath($file->path);
+        if (! $resolvedPath) {
             return;
         }
 
-        $fullPath = $disk->path($file->path);
+        $fullPath = $resolvedPath['full_path'];
 
         $updates = [];
 
@@ -454,7 +452,7 @@ SVG;
         }
 
         if (! is_int($file->size) || $file->size <= 0) {
-            $size = $disk->size($file->path);
+            $size = $resolvedPath['size'] ?? @filesize($fullPath);
             if (is_int($size) && $size > 0) {
                 $updates['size'] = $size;
             }
