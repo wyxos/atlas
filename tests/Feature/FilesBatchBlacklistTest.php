@@ -63,3 +63,30 @@ test('batch blacklist skips files that are already blacklisted', function () {
 
     expect($alreadyBlacklisted->blacklist_reason)->toBe('Manual blacklist');
 });
+
+test('batch blacklist converts auto-blacklisted files into manual blacklists', function () {
+    $admin = User::factory()->admin()->create();
+    $autoBlacklisted = File::factory()->create([
+        'blacklisted_at' => now()->subHour(),
+        'blacklist_reason' => null,
+    ]);
+    $tab = Tab::factory()
+        ->for($admin)
+        ->withFiles([$autoBlacklisted->id])
+        ->create();
+
+    $response = $this->actingAs($admin)->postJson('/api/files/blacklist/batch', [
+        'file_ids' => [$autoBlacklisted->id],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonCount(1, 'results');
+    $response->assertJsonPath('results.0.id', $autoBlacklisted->id);
+    $response->assertJsonPath('results.0.blacklist_reason', 'Manual blacklist');
+
+    $autoBlacklisted->refresh();
+    $tab->refresh();
+
+    expect($autoBlacklisted->blacklist_reason)->toBe('Manual blacklist')
+        ->and($tab->files()->count())->toBe(0);
+});

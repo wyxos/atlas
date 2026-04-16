@@ -13,18 +13,7 @@ export type LoadedItemsBulkAction =
     | 'love'
     | 'like'
     | 'dislike'
-    | 'blacklist'
-    | 'preview-to-4-and-remove';
-
-type BatchPreviewResponse = {
-    results?: Array<{
-        id: number;
-        previewed_count: number;
-        will_auto_dislike: boolean;
-    }>;
-};
-
-type BatchPreviewResult = NonNullable<BatchPreviewResponse['results']>[number];
+    | 'blacklist';
 
 type BatchBlacklistResponse = {
     results?: Array<{
@@ -46,9 +35,6 @@ type CreateLoadedItemsBulkActionsOptions = {
     isLocal: Readonly<Ref<boolean>>;
     masonry: Ref<BrowseFeedHandle | null>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
-    itemPreview: {
-        markPreviewedItems: (fileIds: number[]) => void;
-    };
     cancelAutoDislikeCountdown: (fileId: number) => void;
     clearHoverForRemovedItems: (itemIds: Set<number>) => void;
     onReaction: (fileId: number, type: ReactionType) => void;
@@ -264,75 +250,9 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
         return mutatedItems.length;
     }
 
-    async function previewLoadedItemsToCountAndRemove(targetCount: number): Promise<number> {
-        const loadedItems = options.getLoadedItems();
-        if (loadedItems.length === 0) {
-            return 0;
-        }
-
-        const fileIds = loadedItems.map((item) => item.id);
-        const previewBatches = new Map<number, number[]>();
-
-        for (const item of loadedItems) {
-            const currentPreviewCount = typeof item.previewed_count === 'number' ? item.previewed_count : 0;
-            const incrementsNeeded = Math.max(0, targetCount - currentPreviewCount);
-
-            if (incrementsNeeded === 0) {
-                continue;
-            }
-
-            const existingBatch = previewBatches.get(incrementsNeeded);
-            if (existingBatch) {
-                existingBatch.push(item.id);
-                continue;
-            }
-
-            previewBatches.set(incrementsNeeded, [item.id]);
-        }
-
-        const resultMap = new Map<number, BatchPreviewResult>();
-
-        for (const [increments, batchFileIds] of previewBatches) {
-            for (let index = 0; index < batchFileIds.length; index += LOADED_ITEMS_BATCH_SIZE) {
-                const chunk = batchFileIds.slice(index, index + LOADED_ITEMS_BATCH_SIZE);
-                const { data } = await window.axios.post<BatchPreviewResponse>('/api/files/preview/batch', {
-                    file_ids: chunk,
-                    increments,
-                });
-                const results = Array.isArray(data.results) ? data.results : [];
-
-                for (const result of results) {
-                    resultMap.set(result.id, result);
-                }
-            }
-        }
-
-        options.itemPreview.markPreviewedItems(fileIds);
-
-        for (const item of loadedItems) {
-            const result = resultMap.get(item.id);
-            if (!result) {
-                options.cancelAutoDislikeCountdown(item.id);
-                continue;
-            }
-
-            item.previewed_count = result.previewed_count;
-            item.will_auto_dislike = result.will_auto_dislike;
-            options.cancelAutoDislikeCountdown(item.id);
-        }
-
-        await removeItemsFromView(loadedItems);
-
-        return loadedItems.length;
-    }
-
     async function performLoadedItemsBulkAction(action: LoadedItemsBulkAction): Promise<number> {
         if (action === 'blacklist') {
             return batchBlacklistLoadedItems();
-        }
-
-        if (action === 'preview-to-4-and-remove') {
-            return previewLoadedItemsToCountAndRemove(4);
         }
 
         return applyBatchReaction(action);

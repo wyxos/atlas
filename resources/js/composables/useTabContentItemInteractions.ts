@@ -221,9 +221,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         isLocal: options.form.isLocal,
         masonry: options.masonry,
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
-        itemPreview: {
-            markPreviewedItems: options.itemPreview.markPreviewedItems,
-        },
         cancelAutoDislikeCountdown: autoDislikeQueue.cancelAutoDislikeCountdown,
         clearHoverForRemovedItems: (removedItemIds) => {
             if (hoveredItemId.value !== null && removedItemIds.has(hoveredItemId.value)) {

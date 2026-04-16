@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Ban, Eye, Heart, Loader2, LockKeyhole, LockKeyholeOpen, ThumbsDown, ThumbsUp } from 'lucide-vue-next'
+import { Ban, Heart, Loader2, LockKeyhole, LockKeyholeOpen, ThumbsDown, ThumbsUp } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
 import type { LoadedItemsBulkAction } from '@/composables/useTabContentItemInteractions'
@@ -10,17 +10,10 @@ const bulkActionButtons: Array<{
   action: LoadedItemsBulkAction
   color?: 'danger'
   dataTest: string
-  icon: typeof Eye
+  icon: typeof Heart
   label: string
   title: string
 }> = [
-  {
-    action: 'preview-to-4-and-remove',
-    dataTest: 'loaded-items-preview-to-four-button',
-    icon: Eye,
-    label: 'Preview to 4',
-    title: 'Set all loaded items to preview count 4 and remove them from the grid',
-  },
   {
     action: 'like',
     dataTest: 'loaded-items-like-button',
@@ -63,7 +56,10 @@ type VibeStatusLike = {
   itemCount: number
   loadState: 'failed' | 'loaded' | 'loading'
   nextCursor: string | null
+  nextBoundaryLoadProgress: number
+  pageLoadingLocked?: boolean
   phase: 'failed' | 'filling' | 'idle' | 'initializing' | 'loading' | 'refreshing'
+  previousBoundaryLoadProgress: number
   previousCursor: string | null
 }
 
@@ -90,6 +86,8 @@ const currentLabel = computed(() => props.status.currentCursor ?? 'N/A')
 const nextLabel = computed(() => props.status.nextCursor ?? 'N/A')
 const previousLabel = computed(() => props.status.previousCursor ?? 'N/A')
 const showActionRail = computed(() => props.performLoadedItemsBulkAction !== null || props.canTogglePageLoadingLock)
+const nextBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.nextBoundaryLoadProgress) * 100))
+const previousBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.previousBoundaryLoadProgress) * 100))
 
 const statusLabel = computed(() => {
   if (props.status.loadState === 'failed') {
@@ -176,12 +174,22 @@ function handleTogglePageLoadingLock(): void {
 
   props.togglePageLoadingLock()
 }
+
+function clampProgress(value: unknown): number {
+  const numeric = Number(value)
+
+  if (!Number.isFinite(numeric)) {
+    return 0
+  }
+
+  return Math.min(Math.max(numeric, 0), 1)
+}
 </script>
 
 <template>
   <div
     data-testid="browse-v2-status-bar"
-    class="pointer-events-auto flex w-full max-w-[1280px] flex-col gap-3 border border-white/12 bg-black/55 px-4 py-3 backdrop-blur-[18px] sm:px-5 lg:flex-row lg:items-center lg:justify-between"
+    class="pointer-events-auto flex w-fit max-w-full flex-col gap-3 border border-white/12 bg-black/55 px-4 py-3 backdrop-blur-[18px] sm:px-5 lg:flex-row lg:items-center lg:justify-between"
   >
     <div class="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:justify-start">
       <Pill label="Viewing" :value="currentLabel" variant="neutral" reversed data-testid="browse-v2-viewing-pill" />
@@ -214,6 +222,42 @@ function handleTogglePageLoadingLock(): void {
         reversed
         data-testid="browse-v2-available-total-pill"
       />
+      <div class="grid min-w-[7.5rem] gap-1">
+        <span class="text-[0.58rem] font-bold uppercase tracking-[0.22em] text-[#f7f1ea]/46">Prev load</span>
+        <div
+          data-testid="browse-v2-previous-boundary-progress"
+          role="progressbar"
+          aria-label="Previous page load proximity"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="previousBoundaryProgressPercent"
+          class="relative h-2 w-28 overflow-hidden border border-white/10 bg-white/[0.04]"
+        >
+          <div
+            class="absolute inset-y-0 left-0 bg-sky-300/80 transition-[width] duration-150"
+            :class="props.pageLoadingLocked ? 'opacity-45' : ''"
+            :style="{ width: `${previousBoundaryProgressPercent}%` }"
+          />
+        </div>
+      </div>
+      <div class="grid min-w-[7.5rem] gap-1">
+        <span class="text-[0.58rem] font-bold uppercase tracking-[0.22em] text-[#f7f1ea]/46">Next load</span>
+        <div
+          data-testid="browse-v2-next-boundary-progress"
+          role="progressbar"
+          aria-label="Next page load proximity"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="nextBoundaryProgressPercent"
+          class="relative h-2 w-28 overflow-hidden border border-white/10 bg-white/[0.04]"
+        >
+          <div
+            class="absolute inset-y-0 left-0 bg-amber-300/80 transition-[width] duration-150"
+            :class="props.pageLoadingLocked ? 'opacity-45' : ''"
+            :style="{ width: `${nextBoundaryProgressPercent}%` }"
+          />
+        </div>
+      </div>
     </div>
 
     <div

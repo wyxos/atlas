@@ -594,34 +594,60 @@ SVG;
             ->with(['metadata', 'reactions'])
             ->get()
             ->keyBy('id');
-        $eligibleIds = $files
+        $newBlacklistIds = $files
             ->filter(fn (File $file): bool => $file->blacklisted_at === null)
             ->keys()
             ->map(fn (mixed $fileId): int => (int) $fileId)
             ->values()
             ->all();
+        $convertToManualIds = $files
+            ->filter(function (File $file): bool {
+                if ($file->blacklisted_at === null) {
+                    return false;
+                }
 
-        if ($eligibleIds === []) {
+                $reason = is_string($file->blacklist_reason) ? trim($file->blacklist_reason) : '';
+
+                return $reason === '';
+            })
+            ->keys()
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->values()
+            ->all();
+        $processedIds = array_values(array_unique([...$newBlacklistIds, ...$convertToManualIds]));
+
+        if ($processedIds === []) {
             return response()->json([
                 'message' => 'No files were blacklisted.',
                 'results' => [],
             ]);
         }
 
-        app(MetricsService::class)->applyBlacklistAdd($eligibleIds, true);
-
         $blacklistedAt = now();
-        File::query()
-            ->whereIn('id', $eligibleIds)
-            ->update([
-                'blacklisted_at' => $blacklistedAt,
-                'blacklist_reason' => 'Manual blacklist',
-            ]);
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($eligibleIds);
+        if ($newBlacklistIds !== []) {
+            app(MetricsService::class)->applyBlacklistAdd($newBlacklistIds, true);
+
+            File::query()
+                ->whereIn('id', $newBlacklistIds)
+                ->update([
+                    'blacklisted_at' => $blacklistedAt,
+                    'blacklist_reason' => 'Manual blacklist',
+                ]);
+        }
+
+        if ($convertToManualIds !== []) {
+            File::query()
+                ->whereIn('id', $convertToManualIds)
+                ->update([
+                    'blacklist_reason' => 'Manual blacklist',
+                ]);
+        }
+
+        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($processedIds);
 
         $user = Auth::user();
         if ($user) {
-            app(TabFileService::class)->detachFilesFromUserTabs($user->id, $eligibleIds);
+            app(TabFileService::class)->detachFilesFromUserTabs($user->id, $processedIds);
         }
 
         return response()->json([
@@ -629,10 +655,12 @@ SVG;
             'results' => array_map(
                 static fn (int $fileId): array => [
                     'id' => $fileId,
-                    'blacklisted_at' => $blacklistedAt->toIso8601String(),
+                    'blacklisted_at' => in_array($fileId, $newBlacklistIds, true)
+                        ? $blacklistedAt->toIso8601String()
+                        : $files[$fileId]?->blacklisted_at?->toIso8601String(),
                     'blacklist_reason' => 'Manual blacklist',
                 ],
-                $eligibleIds
+                $processedIds
             ),
         ]);
     }

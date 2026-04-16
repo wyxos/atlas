@@ -10,12 +10,6 @@ vi.mock('lucide-vue-next', () => ({
             return h('div', { 'data-testid': 'ban-icon' });
         },
     }),
-    Eye: defineComponent({
-        name: 'MockEyeIcon',
-        render() {
-            return h('div', { 'data-testid': 'eye-icon' });
-        },
-    }),
     Heart: defineComponent({
         name: 'MockHeartIcon',
         render() {
@@ -96,8 +90,11 @@ function createStatus(overrides: Partial<InstanceType<typeof BrowseV2StatusBar>[
         hasNextPage: true,
         itemCount: 20,
         loadState: 'loaded' as const,
+        nextBoundaryLoadProgress: 0,
         nextCursor: '2',
+        pageLoadingLocked: false,
         phase: 'idle' as const,
+        previousBoundaryLoadProgress: 0,
         previousCursor: null,
         ...overrides,
     };
@@ -244,14 +241,27 @@ describe('BrowseV2StatusBar', () => {
         });
 
         expect(wrapper.get('[data-test="page-loading-lock-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-preview-to-four-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="loaded-items-like-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="loaded-items-love-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="loaded-items-dislike-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').exists()).toBe(true);
-        expect(wrapper.text()).not.toContain('Preview to 4');
         expect(wrapper.text()).not.toContain('Like all');
         expect(wrapper.text()).not.toContain('Lock paging');
+    });
+
+    it('mirrors the previous and next boundary progress bars from the Vibe status', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    nextBoundaryLoadProgress: 0.42,
+                    previousBoundaryLoadProgress: 0.68,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-previous-boundary-progress"]').attributes('aria-valuenow')).toBe('68');
+        expect(wrapper.get('[data-testid="browse-v2-next-boundary-progress"]').attributes('aria-valuenow')).toBe('42');
+        expect(wrapper.html()).not.toContain('max-w-[1280px]');
     });
 
     it('shows a closed red lock icon while paging is locked', () => {
@@ -285,18 +295,16 @@ describe('BrowseV2StatusBar', () => {
             },
         });
 
-        await wrapper.get('[data-test="loaded-items-preview-to-four-button"]').trigger('click');
         await wrapper.get('[data-test="loaded-items-like-button"]').trigger('click');
         await wrapper.get('[data-test="loaded-items-love-button"]').trigger('click');
         await wrapper.get('[data-test="loaded-items-dislike-button"]').trigger('click');
         await wrapper.get('[data-test="loaded-items-blacklist-button"]').trigger('click');
         await wrapper.get('[data-test="page-loading-lock-button"]').trigger('click');
 
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(1, 'preview-to-4-and-remove');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(2, 'like');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(3, 'love');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(4, 'dislike');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(5, 'blacklist');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(1, 'like');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(2, 'love');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(3, 'dislike');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(4, 'blacklist');
         expect(togglePageLoadingLock).toHaveBeenCalledTimes(1);
     });
 
@@ -311,7 +319,6 @@ describe('BrowseV2StatusBar', () => {
         });
 
         expect(wrapper.get('[data-test="page-loading-lock-button"]').attributes('disabled')).toBeDefined();
-        expect(wrapper.get('[data-test="loaded-items-preview-to-four-button"]').attributes('disabled')).toBeDefined();
         expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').attributes('disabled')).toBeDefined();
     });
 });
