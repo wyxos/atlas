@@ -104,10 +104,7 @@ describe('tabContentV2 resolve', () => {
         });
 
         expect(audioItem.type).toBe('audio');
-        expect(audioItem.preview).toMatchObject({
-            url: '/api/files/10/icon',
-            mediaType: 'image',
-        });
+        expect(audioItem.preview).toBeUndefined();
         expect(audioItem.healthCheck).toMatchObject({
             kind: 'playback',
             url: '/api/files/10/downloaded',
