@@ -10,13 +10,17 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class GenerateFilePreviewAssets implements ShouldQueue
+class RegenerateVideoPreviewAssets implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $tries = 2;
+
+    public int $timeout = 300;
+
     public function __construct(public int $fileId)
     {
-        $this->onQueue('processing');
+        $this->onQueue('maintenance');
     }
 
     public function handle(FileDownloadFinalizer $finalizer): void
@@ -31,7 +35,7 @@ class GenerateFilePreviewAssets implements ShouldQueue
             return;
         }
 
-        $updates = $finalizer->generatePreviewAssets($file);
+        $updates = $finalizer->regenerateVideoPreviewAssets($file);
         if ($updates === []) {
             return;
         }

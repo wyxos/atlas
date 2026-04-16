@@ -99,6 +99,7 @@ return [
     'waits' => [
         'redis:default' => 60,
         'redis:downloads' => 600,
+        'redis:maintenance' => 600,
         'redis:processing' => 300,
         'redis:scout' => 300,
     ],
@@ -239,6 +240,19 @@ return [
             'timeout' => 600,
             'nice' => 0,
         ],
+        'supervisor-maintenance' => [
+            'connection' => 'redis',
+            'queue' => ['maintenance'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 384,
+            'tries' => 2,
+            'timeout' => 600,
+            'nice' => 0,
+        ],
         'supervisor-scout' => [
             'connection' => 'redis',
             'queue' => ['scout'],
@@ -274,6 +288,10 @@ return [
                 'balanceCooldown' => 5,
                 'memory' => 256,
             ],
+            'supervisor-maintenance' => [
+                'maxProcesses' => 1,
+                'memory' => 384,
+            ],
             'supervisor-scout' => [
                 'maxProcesses' => 4,
                 'memory' => 128,
@@ -289,6 +307,9 @@ return [
             ],
             'supervisor-downloads' => [
                 'maxProcesses' => 8,
+            ],
+            'supervisor-maintenance' => [
+                'maxProcesses' => 1,
             ],
             'supervisor-scout' => [
                 'maxProcesses' => 2,

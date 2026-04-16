@@ -7,6 +7,7 @@ use App\Models\FileMetadata;
 use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Services\MetricsService;
 use App\Support\FileMimeType;
+use App\Support\VideoPreviewSamplingPlan;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -55,6 +56,39 @@ class FileDownloadFinalizer
             if ($posterPath && ! $file->poster_path) {
                 $updates['poster_path'] = $posterPath;
             }
+        }
+
+        return $updates;
+    }
+
+    /**
+     * @return array{preview_path?: string, poster_path?: string}
+     */
+    public function regenerateVideoPreviewAssets(File $file): array
+    {
+        if (! $file->path) {
+            return [];
+        }
+
+        $disk = Storage::disk(config('downloads.disk'));
+        if (! $disk->exists($file->path)) {
+            return [];
+        }
+
+        $absolutePath = $disk->path($file->path);
+        $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->getMimeTypeFromFile($absolutePath));
+        if (! $this->isVideoMimeType($mimeType)) {
+            return [];
+        }
+
+        [$previewPath, $posterPath] = $this->generateVideoPreview($disk, $absolutePath, $file->path);
+
+        $updates = [];
+        if ($previewPath) {
+            $updates['preview_path'] = $previewPath;
+        }
+        if ($posterPath) {
+            $updates['poster_path'] = $posterPath;
         }
 
         return $updates;
@@ -306,9 +340,18 @@ class FileDownloadFinalizer
         }
 
         $previewWidth = (int) config('downloads.video_preview_width', 450);
-        $previewSeconds = (float) config('downloads.video_preview_seconds', 6);
-        $posterSecond = (float) config('downloads.video_poster_second', 1);
+        $previewStartSecond = (float) config('downloads.video_preview_start_second', 1);
+        $previewTakeSeconds = (float) config('downloads.video_preview_take_seconds', 5);
+        $previewSkipSeconds = (float) config('downloads.video_preview_skip_seconds', 10);
+        $previewTakeCount = (int) config('downloads.video_preview_take_count', 5);
+        $posterSecond = (float) config('downloads.video_poster_second', $previewStartSecond);
         $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
+        $previewFilter = VideoPreviewSamplingPlan::selectFilter(
+            $previewStartSecond,
+            $previewTakeSeconds,
+            $previewSkipSeconds,
+            $previewTakeCount,
+        ).",scale={$previewWidth}:-2";
 
         $directory = pathinfo($finalPath, PATHINFO_DIRNAME);
         $filename = pathinfo($finalPath, PATHINFO_FILENAME);
@@ -325,14 +368,10 @@ class FileDownloadFinalizer
         $previewProcess = new Process([
             $ffmpegPath,
             '-y',
-            '-ss',
-            (string) $posterSecond,
-            '-t',
-            (string) max(1, $previewSeconds),
             '-i',
             $absolutePath,
             '-vf',
-            "scale={$previewWidth}:-2",
+            $previewFilter,
             '-c:v',
             'libx264',
             '-preset',

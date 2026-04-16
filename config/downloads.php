@@ -28,9 +28,13 @@ return [
 
     'video_preview_width' => (int) env('DOWNLOADS_VIDEO_PREVIEW_WIDTH', 450),
 
-    // Duration of generated video previews (in seconds).
-    // Keep this short: previews are for fast grid rendering, not full playback.
-    'video_preview_seconds' => (float) env('DOWNLOADS_VIDEO_PREVIEW_SECONDS', 6),
+    // Start the sampled preview slightly after the file begins to skip blank lead-in frames.
+    'video_preview_start_second' => (float) env('DOWNLOADS_VIDEO_PREVIEW_START_SECOND', 1),
+
+    // Each preview clip keeps N seconds, skips M seconds, and repeats K times.
+    'video_preview_take_seconds' => (float) env('DOWNLOADS_VIDEO_PREVIEW_TAKE_SECONDS', 5),
+    'video_preview_skip_seconds' => (float) env('DOWNLOADS_VIDEO_PREVIEW_SKIP_SECONDS', 10),
+    'video_preview_take_count' => (int) env('DOWNLOADS_VIDEO_PREVIEW_TAKE_COUNT', 5),
 
     'video_poster_second' => (float) env('DOWNLOADS_VIDEO_POSTER_SECOND', 1),
 
