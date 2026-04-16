@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.schemastore.org/package.json",
   "private": true,
-  "version": "1.0.93",
+  "version": "1.0.94",
   "type": "module",
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('public/hot', { force: true })\" && vite build",
