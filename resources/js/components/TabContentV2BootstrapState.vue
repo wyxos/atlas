@@ -6,6 +6,8 @@ defineProps<{
     hasError: boolean;
     isLoading: boolean;
     onRetry: () => void | Promise<void>;
+    statusLabel?: string;
+    message?: string;
 }>();
 </script>
 
@@ -15,10 +17,10 @@ defineProps<{
             <Loader2 v-if="isLoading" class="size-8 animate-spin text-smart-blue-200" data-test="browse-tab-bootstrap-loading" />
             <div class="space-y-2">
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-smart-blue-200/80" data-test="browse-tab-bootstrap-status">
-                    {{ hasError ? 'Browse tab failed to load' : 'Loading browse tab' }}
+                    {{ statusLabel ?? (hasError ? 'Browse tab failed to load' : 'Loading browse tab') }}
                 </p>
                 <p class="text-sm text-[#f7f1ea]/70" data-test="browse-tab-bootstrap-message">
-                    {{ hasError ? 'The active browse tab could not be restored. Retry to load it again.' : 'Restoring the active tab and browse session.' }}
+                    {{ message ?? (hasError ? 'The active browse tab could not be restored. Retry to load it again.' : 'Restoring the active tab and browse session.') }}
                 </p>
             </div>
             <Button v-if="hasError" size="sm" data-test="browse-tab-bootstrap-retry" @click="onRetry">

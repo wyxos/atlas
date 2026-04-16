@@ -133,6 +133,50 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
 
         await nextTick();
 
+        const shouldOpenStandaloneRoute = options.surfaceMode.value !== 'fullscreen'
+            && options.standaloneItem.value === null;
+
+        if (shouldOpenStandaloneRoute) {
+            const nextStandaloneItem = options.visibleItems.value.find((item) => item.id === fileId)
+                ?? await options.loadStandaloneFileItem(fileId);
+
+            if (routeSyncRequestId.value !== requestId) {
+                return;
+            }
+
+            if (!nextStandaloneItem) {
+                await router.replace('/browse');
+                return;
+            }
+
+            isApplyingRouteState.value = true;
+
+            try {
+                options.standaloneItem.value = nextStandaloneItem;
+                options.activeIndex.value = 0;
+                options.surfaceMode.value = 'fullscreen';
+            } finally {
+                await nextTick();
+                isApplyingRouteState.value = false;
+            }
+
+            return;
+        }
+
+        if (options.standaloneItem.value?.id === fileId) {
+            isApplyingRouteState.value = true;
+
+            try {
+                options.activeIndex.value = 0;
+                options.surfaceMode.value = 'fullscreen';
+            } finally {
+                await nextTick();
+                isApplyingRouteState.value = false;
+            }
+
+            return;
+        }
+
         const contextualIndex = options.visibleItems.value.findIndex((item) => item.id === fileId);
         if (contextualIndex >= 0) {
             isApplyingRouteState.value = true;
@@ -160,21 +204,6 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
 
             return;
         }
-
-        if (options.standaloneItem.value?.id === fileId) {
-            isApplyingRouteState.value = true;
-
-            try {
-                options.activeIndex.value = 0;
-                options.surfaceMode.value = 'fullscreen';
-            } finally {
-                await nextTick();
-                isApplyingRouteState.value = false;
-            }
-
-            return;
-        }
-
         const nextStandaloneItem = await options.loadStandaloneFileItem(fileId);
         if (routeSyncRequestId.value !== requestId) {
             return;
@@ -220,8 +249,12 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
         }
 
         if (previousMode === 'fullscreen') {
+            isApplyingRouteState.value = true;
             options.standaloneItem.value = null;
-            void router.replace('/browse');
+            void router.replace('/browse').finally(async () => {
+                await nextTick();
+                isApplyingRouteState.value = false;
+            });
         }
     }
 

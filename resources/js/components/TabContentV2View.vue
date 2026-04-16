@@ -115,6 +115,14 @@ function togglePageLoadingLock(): void {
     props.headerMasonry.lockPageLoading();
 }
 
+function getFullscreenReactionPositionClasses(item: VibeViewerItem): string {
+    if (item.type === 'audio' || item.type === 'video') {
+        return 'bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] max-[720px]:bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)]';
+    }
+
+    return 'bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)]';
+}
+
 const vibeLayoutBindings = computed(() => ({
     activeIndex: props.activeIndex,
     emptyStateMode: 'hidden' as const,
@@ -222,7 +230,11 @@ useEventListener(document, 'pointermove', (event) => {
                     </template>
                     <template #fullscreen-overlay="{ item, index, total }">
                         <div class="pointer-events-none absolute inset-0 z-[5]">
-                            <div class="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2">
+                            <div
+                                data-testid="browse-fullscreen-reactions"
+                                class="pointer-events-auto absolute left-1/2 -translate-x-1/2"
+                                :class="getFullscreenReactionPositionClasses(item as VibeViewerItem)"
+                            >
                                 <FileReactions
                                     :file-id="(item as Record<string, unknown>).fileId as number"
                                     :reaction="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.reaction ?? null"

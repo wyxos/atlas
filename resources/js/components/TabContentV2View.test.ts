@@ -5,6 +5,19 @@ import TabContentV2View from './TabContentV2View.vue';
 
 const vibeLayoutSpy = vi.hoisted(() => vi.fn());
 const browseV2StatusBarSpy = vi.hoisted(() => vi.fn());
+const testState = vi.hoisted(() => ({
+    fullscreenOverlayItem: {
+        fileId: 11,
+        feedItem: {
+            id: 11,
+            previewed_count: 1,
+            reaction: null,
+            seen_count: 0,
+        },
+        id: 'overlay-item',
+        type: 'image',
+    } as Record<string, unknown>,
+}));
 
 const testStub = defineComponent({
     name: 'TestStub',
@@ -74,6 +87,14 @@ vi.mock('@wyxos/vibe', () => ({
                 h('button', {
                     'data-testid': 'emit-asset-errors',
                     onClick: () => emit('asset-errors', []),
+                }),
+                slots['fullscreen-overlay']?.({
+                    hasNextPage: true,
+                    index: props.activeIndex,
+                    item: testState.fullscreenOverlayItem,
+                    loading: false,
+                    paginationDetail: null,
+                    total: 20,
                 }),
                 slots['grid-footer']?.(),
             ]);
@@ -213,6 +234,17 @@ describe('TabContentV2View', () => {
     beforeEach(() => {
         vibeLayoutSpy.mockClear();
         browseV2StatusBarSpy.mockClear();
+        testState.fullscreenOverlayItem = {
+            fileId: 11,
+            feedItem: {
+                id: 11,
+                previewed_count: 1,
+                reaction: null,
+                seen_count: 0,
+            },
+            id: 'overlay-item',
+            type: 'image',
+        };
     });
 
     it('passes the controlled surface props through to VibeLayout', () => {
@@ -384,6 +416,47 @@ describe('TabContentV2View', () => {
         props.headerMasonry.pageLoadingLocked = true;
         statusBarProps.togglePageLoadingLock();
         expect(unlockPageLoading).toHaveBeenCalledTimes(1);
+    });
+
+    it('offsets fullscreen reactions above the media bar for audio and video items', () => {
+        for (const type of ['audio', 'video'] as const) {
+            testState.fullscreenOverlayItem = {
+                fileId: type === 'audio' ? 44711 : 2853735,
+                feedItem: {
+                    id: type === 'audio' ? 44711 : 2853735,
+                    previewed_count: 1,
+                    reaction: null,
+                    seen_count: 0,
+                },
+                id: `${type}-overlay-item`,
+                type,
+            };
+
+            const wrapper = mount(TabContentV2View, {
+                props: createProps(),
+                global: {
+                    stubs: {
+                        BrowseV2StatusBar: browseV2StatusBarStub,
+                        Button: testStub,
+                        ContainerBlacklistManager: testStub,
+                        DownloadedReactionDialog: testStub,
+                        FileReactions: testStub,
+                        FileViewerSheet: testStub,
+                        LocalFileDeleteDialog: testStub,
+                        TabContentContainerDrawer: testStub,
+                        TabContentPromptDialog: testStub,
+                        TabContentServiceHeader: testStub,
+                        TabContentStartForm: testStub,
+                        TabContentV2GridOverlay: testStub,
+                    },
+                },
+            });
+
+            expect(wrapper.get('[data-testid="browse-fullscreen-reactions"]').attributes('class')).toContain('bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)]');
+            expect(wrapper.get('[data-testid="browse-fullscreen-reactions"]').attributes('class')).toContain('max-[720px]:bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)]');
+
+            wrapper.unmount();
+        }
     });
 
 });

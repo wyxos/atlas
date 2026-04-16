@@ -232,6 +232,10 @@ const vibeInitialState = computed<VibeInitialState | undefined>(() => {
     return hydratedInitialState.value;
 });
 const viewerKey = computed(() => `${tab.value?.id ?? 'tab'}-${masonryRenderKey.value}-${standaloneItem.value?.id ?? 'feed'}`);
+const shouldShowStandaloneRouteBootstrap = computed(() => Boolean(tab.value)
+    && hasRouteFileSelection.value
+    && standaloneItem.value === null
+    && surfaceMode.value !== 'fullscreen');
 const fileViewerData = useFileViewerData({
     items: sessionItems,
     navigation: currentNavigation,
@@ -488,7 +492,7 @@ watch(
 
 <template>
     <TabContentV2View
-        v-if="tab"
+        v-if="tab && !shouldShowStandaloneRouteBootstrap"
         :active-index="activeIndex"
         :tab="tab"
         :total-available="totalAvailable"
@@ -538,8 +542,10 @@ watch(
     />
     <TabContentV2BootstrapState
         v-else
-        :is-loading="isTabBootstrapping"
+        :is-loading="isTabBootstrapping || shouldShowStandaloneRouteBootstrap"
         :has-error="hasTabBootstrapError"
         :on-retry="retryTabBootstrap"
+        :status-label="shouldShowStandaloneRouteBootstrap ? 'Loading file' : undefined"
+        :message="shouldShowStandaloneRouteBootstrap ? 'Opening the requested file directly in fullscreen.' : undefined"
     />
 </template>

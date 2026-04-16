@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, reactive, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
@@ -244,6 +245,7 @@ vi.mock('./TabContentV2View.vue', () => ({
             handleReaction: { type: Function, required: true },
             setVibeHandle: { type: Function, default: null },
             surfaceMode: { type: String, default: 'list' },
+            vibeFeedMode: { type: String, default: 'dynamic' },
             updateActiveIndex: { type: Function, required: true },
             updateSurfaceMode: { type: Function, required: true },
         },
@@ -275,6 +277,7 @@ vi.mock('./TabContentV2View.vue', () => ({
 
             return () => h('div', { 'data-testid': 'tab-content-v2-view' }, [
                 h('div', { 'data-testid': 'current-item-id' }, String((props.currentVisibleItem as { id?: number } | null)?.id ?? 'none')),
+                h('div', { 'data-testid': 'feed-mode' }, props.vibeFeedMode),
                 h('div', { 'data-testid': 'surface-mode' }, props.surfaceMode),
                 h('button', {
                     'data-testid': 'select-first',
@@ -511,12 +514,13 @@ describe('TabContentV2 browse route sync', () => {
         expect(router.currentRoute.value.fullPath).toBe('/browse');
     });
 
-    it('opens a direct file route in the active tab context when the file is already restored', async () => {
+    it('opens a direct file route as a standalone fullscreen session even when the file is already restored', async () => {
         testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
 
         const { wrapper } = await mountTabContent('/browse/file/2');
 
         expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('2');
+        expect(wrapper.get('[data-testid="feed-mode"]').text()).toBe('static');
         expect(wrapper.get('[data-testid="surface-mode"]').text()).toBe('fullscreen');
         expect(mockAxios.get).not.toHaveBeenCalledWith('/api/files/2');
     });
@@ -540,6 +544,34 @@ describe('TabContentV2 browse route sync', () => {
         await flushPromises();
 
         expect(router.currentRoute.value.fullPath).toBe('/browse');
+    });
+
+    it('shows a direct-route loading state instead of mounting the tab feed while resolving a standalone file', async () => {
+        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
+        let resolveRequest: ((value: { data: ReturnType<typeof createFilePayload> }) => void) | null = null;
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url === '/api/files/99') {
+                return new Promise((resolve) => {
+                    resolveRequest = resolve;
+                });
+            }
+
+            throw new Error(`Unexpected GET ${url}`);
+        });
+
+        const { wrapper } = await mountTabContent('/browse/file/99');
+
+        expect(wrapper.find('[data-testid="tab-content-v2-view"]').exists()).toBe(false);
+        expect(wrapper.get('[data-test="browse-tab-bootstrap-status"]').text()).toBe('Loading file');
+        expect(wrapper.get('[data-test="browse-tab-bootstrap-message"]').text()).toBe('Opening the requested file directly in fullscreen.');
+
+        resolveRequest?.({ data: createFilePayload(99) });
+        await flushPromises();
+        await flushPromises();
+
+        expect(wrapper.get('[data-testid="tab-content-v2-view"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('99');
+        expect(wrapper.get('[data-testid="feed-mode"]').text()).toBe('static');
     });
 
     it('advances fullscreen and removes the reacted item from restored session visibility', async () => {
