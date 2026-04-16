@@ -234,6 +234,7 @@ const vibeInitialState = computed<VibeInitialState | undefined>(() => {
 const viewerKey = computed(() => `${tab.value?.id ?? 'tab'}-${masonryRenderKey.value}-${standaloneItem.value?.id ?? 'feed'}`);
 const shouldShowStandaloneRouteBootstrap = computed(() => Boolean(tab.value)
     && hasRouteFileSelection.value
+    && !isClosingFullscreenRoute.value
     && standaloneItem.value === null
     && surfaceMode.value !== 'fullscreen');
 const fileViewerData = useFileViewerData({
@@ -393,7 +394,7 @@ async function loadStandaloneFileItem(fileId: number): Promise<FeedItem | null> 
     }
 }
 
-const { handleVibeActiveIndexUpdate, handleVibeSurfaceModeUpdate } = useBrowseV2SurfaceRouteSync({
+const { handleVibeActiveIndexUpdate, handleVibeSurfaceModeUpdate, isClosingFullscreenRoute } = useBrowseV2SurfaceRouteSync({
     activeIndex,
     currentVisibleItem,
     isSessionReady,

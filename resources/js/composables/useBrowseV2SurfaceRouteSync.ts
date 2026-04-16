@@ -95,6 +95,7 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
     const route = useRoute();
     const router = useRouter();
     const isApplyingRouteState = ref(false);
+    const isClosingFullscreenRoute = ref(false);
     const routeSyncRequestId = ref(0);
 
     const routeFileId = computed(() => {
@@ -121,6 +122,7 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
                 options.surfaceMode.value = 'list';
             } finally {
                 await nextTick();
+                isClosingFullscreenRoute.value = false;
                 isApplyingRouteState.value = false;
             }
 
@@ -250,9 +252,13 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
 
         if (previousMode === 'fullscreen') {
             isApplyingRouteState.value = true;
+            isClosingFullscreenRoute.value = true;
             options.standaloneItem.value = null;
             void router.replace('/browse').finally(async () => {
                 await nextTick();
+                if (routeFileId.value === null) {
+                    isClosingFullscreenRoute.value = false;
+                }
                 isApplyingRouteState.value = false;
             });
         }
@@ -309,5 +315,6 @@ export function useBrowseV2SurfaceRouteSync(options: UseBrowseV2SurfaceRouteSync
     return {
         handleVibeActiveIndexUpdate,
         handleVibeSurfaceModeUpdate,
+        isClosingFullscreenRoute,
     };
 }
