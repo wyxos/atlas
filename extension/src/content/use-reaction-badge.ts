@@ -32,18 +32,19 @@ import {
 } from './badge-state-cache';
 import { useCloseTabAfterQueuePreference } from './close-tab-after-queue-state';
 import { useReactAllItemsInPostPreference } from './react-all-items-in-post-state';
+import { isCivitAiHostname } from '../civitai-domains';
+
 type UseReactionBadgeProps = {
     media: MediaElement;
     onShortcutReady?: ((handler: ((type: BadgeReactionType) => void) | null) => void) | undefined;
 };
 const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
-const CIVITAI_HOST_PATTERN = /(^|\.)civitai\.com$/i;
 const RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS = [120, 400, 1000, 2200] as const;
 export function useReactionBadge(props: UseReactionBadgeProps) {
     ensureReactionBadgeRuntimeStyles();
     const pageHostname = window.location.hostname.trim().toLowerCase();
     const isDeviantArtPage = DEVIANT_ART_HOST_PATTERN.test(pageHostname);
-    const isCivitAiPage = CIVITAI_HOST_PATTERN.test(pageHostname);
+    const isCivitAiPage = isCivitAiHostname(pageHostname);
     const closeTabAfterQueuePreference = useCloseTabAfterQueuePreference(pageHostname);
     const reactAllItemsInPostPreference = useReactAllItemsInPostPreference(pageHostname);
     const downloadedReactionDialog = createDownloadedReactionDialog();

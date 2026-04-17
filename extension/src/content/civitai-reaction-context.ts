@@ -1,12 +1,15 @@
 import type { MediaElement } from './media-utils';
 import type { ListingMetadataOverrides, ListingMetadataResourceContainer } from './reaction-batch-types';
+import {
+    createCivitAiLinkSelector,
+    isCivitAiHostname,
+    isCivitAiMediaHostname,
+} from '../civitai-domains';
 
-const CIVITAI_HOST_PATTERN = /(^|\.)civitai\.com$/i;
 const CIVITAI_POST_PATH_PATTERN = /^\/posts\/(\d+)(?:\/|$)/i;
 const CIVITAI_IMAGE_PATH_PATTERN = /^\/images\/(\d+)(?:\/|$)/i;
-const CIVITAI_MEDIA_HOST = 'image.civitai.com';
-const USER_LINK_SELECTOR = 'a[href^="/user/"], a[href*="://civitai.com/user/"]';
-const MODEL_LINK_SELECTOR = 'a[href^="/models/"], a[href*="://civitai.com/models/"]';
+const USER_LINK_SELECTOR = createCivitAiLinkSelector('/user/');
+const MODEL_LINK_SELECTOR = createCivitAiLinkSelector('/models/');
 const CREATOR_CARD_SELECTOR = '[class*="CreatorCard_profileDetailsContainer"], [class*="CreatorCard_profileDetails"]';
 const MENU_BUTTON_SELECTOR = 'button[aria-haspopup="menu"]';
 const MODEL_RESOURCE_TYPES = new Set<ListingMetadataResourceContainer['type']>(['Checkpoint', 'LoRA']);
@@ -80,7 +83,7 @@ function resolveImageIdForMedia(media: MediaElement | null, href: string): numbe
 
 export function classifyCivitAiReactionPage(href: string = window.location.href): CivitAiReactionPageKind | null {
     const url = parseRelativeOrAbsoluteUrl(href);
-    if (url === null || !CIVITAI_HOST_PATTERN.test(url.hostname)) {
+    if (url === null || !isCivitAiHostname(url.hostname)) {
         return null;
     }
 
@@ -128,7 +131,7 @@ export function canonicalizeCivitAiMediaUrl(
     }
 
     const parsed = parseRelativeOrAbsoluteUrl(trimmed);
-    if (parsed === null || parsed.hostname.trim().toLowerCase() !== CIVITAI_MEDIA_HOST) {
+    if (parsed === null || !isCivitAiMediaHostname(parsed.hostname)) {
         return trimmed;
     }
 

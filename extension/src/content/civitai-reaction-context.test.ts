@@ -13,9 +13,9 @@ function setWindowLocation(url: string): void {
 }
 
 describe('classifyCivitAiReactionPage', () => {
-    it('classifies post and image pages', () => {
+    it('classifies post and image pages on both civitai hostnames', () => {
         expect(classifyCivitAiReactionPage('https://civitai.com/posts/16973563')).toBe('post-page');
-        expect(classifyCivitAiReactionPage('https://civitai.com/images/76477306')).toBe('image-page');
+        expect(classifyCivitAiReactionPage('https://civitai.red/images/76477306')).toBe('image-page');
         expect(classifyCivitAiReactionPage('https://example.com/images/76477306')).toBeNull();
     });
 });
@@ -25,11 +25,11 @@ describe('canonicalizeCivitAiBadgeCheckUrl', () => {
         document.body.innerHTML = '';
     });
 
-    it('canonicalizes civitai image variants to the stable original url', () => {
-        setWindowLocation('https://civitai.com/images/123066308');
+    it('canonicalizes civitai image variants to the stable original url on civitai.red', () => {
+        setWindowLocation('https://civitai.red/images/123066308');
         document.body.innerHTML = `
             <a href="/images/123066308">
-                <img id="image" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
+                <img id="image" src="https://image.civitai.red/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
             </a>
         `;
 
@@ -39,7 +39,7 @@ describe('canonicalizeCivitAiBadgeCheckUrl', () => {
         }
 
         expect(canonicalizeCivitAiBadgeCheckUrl(image.src, image)).toBe(
-            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
+            'https://image.civitai.red/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
         );
     });
 
@@ -65,7 +65,7 @@ describe('canonicalizeCivitAiBadgeCheckUrl', () => {
 describe('collectCivitAiListingMetadataOverrides', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
-        setWindowLocation('https://civitai.com/images/105372859');
+        setWindowLocation('https://civitai.red/images/105372859');
     });
 
     it('opens the image page menu when needed and extracts post, user, and resource containers', async () => {
@@ -82,7 +82,7 @@ describe('collectCivitAiListingMetadataOverrides', () => {
         const creatorCard = document.createElement('div');
         creatorCard.className = 'CreatorCard_profileDetailsContainer__8QORX';
         creatorCard.innerHTML = `
-            <a href="/user/shepretends">
+            <a href="https://civitai.red/user/shepretends">
                 <p>shepretends</p>
             </a>
         `;
@@ -91,11 +91,11 @@ describe('collectCivitAiListingMetadataOverrides', () => {
         const models = document.createElement('ul');
         models.innerHTML = `
             <li>
-                <a href="/models/833294/noobai-xl-nai-xl?modelVersionId=1190596"><p>NoobAI-XL (NAI-XL)</p></a>
+                <a href="https://civitai.red/models/833294/noobai-xl-nai-xl?modelVersionId=1190596"><p>NoobAI-XL (NAI-XL)</p></a>
                 <div><span>Checkpoint</span></div>
             </li>
             <li>
-                <a href="/models/1368095/incase-style-noobai?modelVersionId=1545615"><p>Incase Style (NoobAI)</p></a>
+                <a href="https://civitai.red/models/1368095/incase-style-noobai?modelVersionId=1545615"><p>Incase Style (NoobAI)</p></a>
                 <div><span>LoRA</span></div>
             </li>
             <li>
@@ -144,13 +144,13 @@ describe('collectCivitAiListingMetadataOverrides', () => {
                     type: 'Checkpoint',
                     modelId: 833294,
                     modelVersionId: 1190596,
-                    referrerUrl: 'https://civitai.com/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+                    referrerUrl: 'https://civitai.red/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
                 },
                 {
                     type: 'LoRA',
                     modelId: 1368095,
                     modelVersionId: 1545615,
-                    referrerUrl: 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+                    referrerUrl: 'https://civitai.red/models/1368095/incase-style-noobai?modelVersionId=1545615',
                 },
             ],
         });

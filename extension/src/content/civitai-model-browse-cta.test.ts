@@ -76,10 +76,10 @@ describe('installCivitAiModelBrowseCtas', () => {
         }, expect.any(Function));
     });
 
-    it('supports rows that only expose a model id', async () => {
+    it('supports rows that only expose a model id on civitai.red', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://civitai.com/models/178169/example') as unknown as Location,
+            value: new URL('https://civitai.red/models/178169/example') as unknown as Location,
         });
         document.body.innerHTML = `
             <table>
@@ -115,6 +115,82 @@ describe('installCivitAiModelBrowseCtas', () => {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
             modelId: 178169,
             modelVersionId: null,
+        }, expect.any(Function));
+    });
+
+    it('renders the CTA for the current Mantine URN table row structure', async () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://civitai.com/models/2544636/example') as unknown as Location,
+        });
+        document.body.innerHTML = `
+            <tr class="m_4e7aa4fd mantine-Table-tr" data-with-row-border="true">
+                <td
+                    style="width:30%;padding:7px 7px !important"
+                    class="m_4e7aa4ef mantine-Table-td bg-gray-0 dark:bg-dark-6"
+                    data-with-column-border="true"
+                >
+                    <div
+                        style="--group-gap:var(--mantine-spacing-xs);--group-align:center;--group-justify:flex-start;--group-wrap:wrap"
+                        class="m_4081bf90 mantine-Group-root"
+                    >
+                        <p style="font-weight:500" class="mantine-focus-auto m_b6d8b162 mantine-Text-root">AIR</p>
+                    </div>
+                </td>
+                <td style="padding:7px 7px !important" class="m_4e7aa4ef mantine-Table-td" data-with-column-border="true">
+                    <div
+                        style="--group-gap:calc(0.25rem * var(--mantine-scale));--group-align:center;--group-justify:flex-start;--group-wrap:wrap"
+                        class="m_4081bf90 mantine-Group-root"
+                    >
+                        <div
+                            style="--group-gap:0rem;--group-align:center;--group-justify:flex-start;--group-wrap:wrap"
+                            class="m_4081bf90 mantine-Group-root"
+                        >
+                            <code class="ModelURN_code__eKiIQ m_b183c0a2 mantine-Code-root" dir="ltr">civitai:</code>
+                            <code
+                                style="--code-bg:var(--mantine-color-blue-filled)"
+                                class="ModelURN_code__eKiIQ m_b183c0a2 mantine-Code-root"
+                                dir="ltr"
+                            >2544636</code>
+                            <code class="ModelURN_code__eKiIQ m_b183c0a2 mantine-Code-root" dir="ltr">@</code>
+                            <code
+                                style="--code-bg:var(--mantine-color-blue-filled)"
+                                class="ModelURN_code__eKiIQ m_b183c0a2 mantine-Code-root"
+                                dir="ltr"
+                            >2859702</code>
+                        </div>
+                        <button
+                            class="mantine-focus-auto mantine-active m_8d3f4000 mantine-ActionIcon-root m_87cf2631 mantine-UnstyledButton-root"
+                            data-variant="subtle"
+                            data-size="xs"
+                            type="button"
+                        >
+                            <span class="m_8d3afb97 mantine-ActionIcon-icon">Copy</span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        const { installCivitAiModelBrowseCtas } = await import('./civitai-model-browse-cta');
+
+        installCivitAiModelBrowseCtas();
+
+        const allButtons = Array.from(document.querySelectorAll('button'));
+        const openButton = allButtons.find((candidate) => candidate.textContent === 'Open in Atlas');
+        const copyButton = allButtons.find((candidate) => candidate.textContent?.includes('Copy'));
+
+        expect(openButton).toBeTruthy();
+        expect(copyButton).toBeTruthy();
+        expect(openButton?.nextElementSibling).toBe(copyButton ?? null);
+
+        openButton?.click();
+        await flushPromises();
+
+        expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+            type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
+            modelId: 2544636,
+            modelVersionId: 2859702,
         }, expect.any(Function));
     });
 

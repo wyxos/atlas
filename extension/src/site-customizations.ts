@@ -12,6 +12,7 @@ import {
     parseStoredReferrerQueryParamsToStripByDomain,
     validateReferrerQueryParam,
 } from './referrer-cleanup';
+import { CIVITAI_SUPPORTED_DOMAINS, normalizeCivitAiHostnameForMatching } from './civitai-domains';
 
 export const MEDIA_CLEANER_STRATEGIES = ['civitaiCanonical'] as const;
 export const SITE_CUSTOMIZATIONS_EXPORT_VERSION = 1 as const;
@@ -68,9 +69,9 @@ const BUILT_IN_SITE_CUSTOMIZATIONS: SiteCustomization[] = [
             strategies: [],
         },
     },
-    {
+    ...CIVITAI_SUPPORTED_DOMAINS.map((domain) => ({
         enabled: true,
-        domain: 'civitai.com',
+        domain,
         matchRules: [],
         referrerCleaner: {
             stripQueryParams: [],
@@ -78,9 +79,9 @@ const BUILT_IN_SITE_CUSTOMIZATIONS: SiteCustomization[] = [
         mediaCleaner: {
             stripQueryParams: [],
             rewriteRules: [],
-            strategies: ['civitaiCanonical'],
+            strategies: ['civitaiCanonical'] as MediaCleanerStrategy[],
         },
-    },
+    })),
 ];
 
 function normalizeSiteCustomizationDomain(input: string): string {
@@ -437,9 +438,27 @@ export function resolveStoredSiteCustomizationForHostname(
         return null;
     }
 
+    const resolveMatchPriority = (domain: string): number | null => {
+        if (hostMatchesRuleDomain(normalizedHostname, domain)) {
+            return 0;
+        }
+
+        const normalizedAliasHostname = normalizeCivitAiHostnameForMatching(normalizedHostname);
+        const normalizedAliasDomain = normalizeCivitAiHostnameForMatching(domain);
+
+        return hostMatchesRuleDomain(normalizedAliasHostname, normalizedAliasDomain) ? 1 : null;
+    };
+
     const matches = customizations
-        .filter((customization) => hostMatchesRuleDomain(normalizedHostname, customization.domain))
-        .sort((left, right) => right.domain.length - left.domain.length || left.domain.localeCompare(right.domain));
+        .map((customization) => ({
+            customization,
+            priority: resolveMatchPriority(customization.domain),
+        }))
+        .filter((match): match is { customization: SiteCustomization; priority: number } => match.priority !== null)
+        .sort((left, right) => left.priority - right.priority
+            || right.customization.domain.length - left.customization.domain.length
+            || left.customization.domain.localeCompare(right.customization.domain))
+        .map((match) => match.customization);
 
     return matches[0] ?? null;
 }

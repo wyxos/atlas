@@ -1,4 +1,5 @@
-const CIVITAI_HOST_PATTERN = /(^|\.)civitai\.com$/i;
+import { isCivitAiHostname as isSupportedCivitAiHostname } from '../civitai-domains';
+
 const URN_PREFIX = 'civitai:';
 const CTA_TEXT = 'Open in Atlas';
 const CTA_PENDING_TEXT = 'Opening...';
@@ -16,10 +17,15 @@ type RuntimeOpenResponse = {
     ok?: boolean;
 };
 
+type CivitAiActionTarget = {
+    referenceRoot: HTMLElement;
+    actionHost: HTMLElement;
+};
+
 let isInstalled = false;
 
 function isCivitAiHostname(hostname: string = window.location.hostname): boolean {
-    return CIVITAI_HOST_PATTERN.test(hostname);
+    return isSupportedCivitAiHostname(hostname);
 }
 
 function parsePositiveInteger(value: string | null | undefined): number | null {
@@ -35,19 +41,6 @@ function parsePositiveInteger(value: string | null | undefined): number | null {
     const parsed = Number(trimmed);
 
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
-function resolveActionHost(prefixCode: HTMLElement): HTMLElement | null {
-    const directParent = prefixCode.parentElement;
-    if (!(directParent instanceof HTMLElement)) {
-        return null;
-    }
-
-    if (directParent.parentElement instanceof HTMLElement) {
-        return directParent.parentElement;
-    }
-
-    return directParent;
 }
 
 function resolveModelReference(actionHost: ParentNode): CivitAiModelReference | null {
@@ -77,6 +70,38 @@ function resolveModelReference(actionHost: ParentNode): CivitAiModelReference | 
     }
 
     return null;
+}
+
+function resolveActionTarget(prefixCode: HTMLElement): CivitAiActionTarget | null {
+    let referenceRoot: HTMLElement | null = null;
+    let current: HTMLElement | null = prefixCode.parentElement;
+    let depth = 0;
+
+    while (current instanceof HTMLElement && depth < 8) {
+        if (resolveModelReference(current) !== null) {
+            referenceRoot = current;
+            break;
+        }
+
+        if (current.tagName === 'TD' || current.tagName === 'TR' || current.tagName === 'TABLE') {
+            break;
+        }
+
+        current = current.parentElement;
+        depth += 1;
+    }
+
+    if (!(referenceRoot instanceof HTMLElement)) {
+        return null;
+    }
+
+    const parent = referenceRoot.parentElement;
+    const actionHost = parent instanceof HTMLElement ? parent : referenceRoot;
+
+    return {
+        referenceRoot,
+        actionHost,
+    };
 }
 
 function setButtonState(
@@ -157,13 +182,13 @@ function createCtaButton(reference: CivitAiModelReference): HTMLButtonElement {
     return button;
 }
 
-function applyBrowseCta(actionHost: HTMLElement): void {
-    const reference = resolveModelReference(actionHost);
+function applyBrowseCta(target: CivitAiActionTarget): void {
+    const reference = resolveModelReference(target.referenceRoot);
     if (reference === null) {
         return;
     }
 
-    const existingButton = actionHost.querySelector(CTA_SELECTOR);
+    const existingButton = target.actionHost.querySelector(CTA_SELECTOR);
     if (existingButton instanceof HTMLButtonElement) {
         if (existingButton.dataset.atlasCivitaiModelBrowseCta === reference.key) {
             return;
@@ -172,7 +197,15 @@ function applyBrowseCta(actionHost: HTMLElement): void {
         existingButton.remove();
     }
 
-    actionHost.appendChild(createCtaButton(reference));
+    const button = createCtaButton(reference);
+    const insertBefore = target.referenceRoot.nextElementSibling;
+
+    if (insertBefore instanceof Element) {
+        target.actionHost.insertBefore(button, insertBefore);
+        return;
+    }
+
+    target.actionHost.appendChild(button);
 }
 
 function syncBrowseCtas(root: ParentNode): void {
@@ -184,13 +217,13 @@ function syncBrowseCtas(root: ParentNode): void {
             continue;
         }
 
-        const actionHost = resolveActionHost(code);
-        if (!(actionHost instanceof HTMLElement) || seen.has(actionHost)) {
+        const target = resolveActionTarget(code);
+        if (target === null || seen.has(target.actionHost)) {
             continue;
         }
 
-        seen.add(actionHost);
-        applyBrowseCta(actionHost);
+        seen.add(target.actionHost);
+        applyBrowseCta(target);
     }
 }
 

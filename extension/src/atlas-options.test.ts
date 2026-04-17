@@ -85,6 +85,19 @@ describe('atlas-options', () => {
                 },
                 {
                     enabled: true,
+                    domain: 'civitai.red',
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: [],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: ['civitaiCanonical'],
+                    },
+                },
+                {
+                    enabled: true,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
                     referrerCleaner: {
