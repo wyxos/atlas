@@ -7,6 +7,7 @@ use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
+use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\DownloadTransferRequestOptions;
@@ -19,6 +20,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -314,7 +316,8 @@ class DownloadTransferChunk implements ShouldQueue
         return str_contains($message, 'timed out')
             || str_contains($message, 'curl error 28')
             || str_contains($message, 'connection refused')
-            || str_contains($message, 'temporarily unavailable');
+            || str_contains($message, 'temporarily unavailable')
+            || str_contains($message, 'unable to read from stream');
     }
 
     private function scheduleRetry(DownloadTransfer $transfer, ?DownloadChunk $chunk, string $reason): void
@@ -324,8 +327,12 @@ class DownloadTransferChunk implements ShouldQueue
         $message = $this->retryMessage($attempt, $delay, $reason);
 
         if ($chunk) {
+            $this->resetChunkProgressForRetry($transfer, $chunk);
+
             DownloadChunk::query()->whereKey($chunk->id)->update([
                 'status' => DownloadChunkStatus::PENDING,
+                'bytes_downloaded' => 0,
+                'finished_at' => null,
                 'failed_at' => null,
                 'error' => $message,
                 'updated_at' => now(),
@@ -350,6 +357,52 @@ class DownloadTransferChunk implements ShouldQueue
         }
 
         $this->release($delay);
+    }
+
+    private function resetChunkProgressForRetry(DownloadTransfer $transfer, DownloadChunk $chunk): void
+    {
+        $chunkBytes = max(0, (int) ($chunk->bytes_downloaded ?? 0));
+
+        if ($chunkBytes > 0) {
+            DownloadTransfer::query()->whereKey($transfer->id)->update([
+                'bytes_downloaded' => DB::raw("CASE WHEN bytes_downloaded >= {$chunkBytes} THEN bytes_downloaded - {$chunkBytes} ELSE 0 END"),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $updatedTransfer = DownloadTransfer::query()->find($transfer->id);
+        if (! $updatedTransfer) {
+            return;
+        }
+
+        $boundary = $this->retryPercentBoundary(
+            max(0, (int) ($updatedTransfer->bytes_downloaded ?? 0)),
+            $updatedTransfer->bytes_total,
+        );
+
+        DownloadTransfer::query()->whereKey($transfer->id)->update([
+            'last_broadcast_percent' => $boundary,
+            'updated_at' => now(),
+        ]);
+
+        if ($transfer->file_id) {
+            File::query()->whereKey($transfer->file_id)->update([
+                'download_progress' => $boundary,
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function retryPercentBoundary(int $bytesDownloaded, ?int $bytesTotal): int
+    {
+        if (! $bytesTotal || $bytesTotal <= 0) {
+            return 0;
+        }
+
+        $percent = (int) floor(($bytesDownloaded / $bytesTotal) * 100);
+        $percent = max(0, min(100, $percent));
+
+        return intdiv($percent, 5) * 5;
     }
 
     private function retryMessage(int $attempt, int $delay, string $reason): string

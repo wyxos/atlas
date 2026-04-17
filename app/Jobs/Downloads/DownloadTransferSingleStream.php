@@ -305,7 +305,8 @@ class DownloadTransferSingleStream implements ShouldQueue
         return str_contains($message, 'timed out')
             || str_contains($message, 'curl error 28')
             || str_contains($message, 'connection refused')
-            || str_contains($message, 'temporarily unavailable');
+            || str_contains($message, 'temporarily unavailable')
+            || str_contains($message, 'unable to read from stream');
     }
 
     private function scheduleRetry(DownloadTransfer $transfer, string $reason): void
@@ -313,6 +314,8 @@ class DownloadTransferSingleStream implements ShouldQueue
         $delay = max(1, (int) $this->backoff);
         $attempt = max(1, $this->attempts());
         $message = $this->retryMessage($attempt, $delay, $reason);
+
+        $this->resetProgressForRetry($transfer);
 
         DownloadTransfer::query()->whereKey($transfer->id)->update([
             'failed_at' => null,
@@ -332,6 +335,22 @@ class DownloadTransferSingleStream implements ShouldQueue
         }
 
         $this->release($delay);
+    }
+
+    private function resetProgressForRetry(DownloadTransfer $transfer): void
+    {
+        DownloadTransfer::query()->whereKey($transfer->id)->update([
+            'bytes_downloaded' => 0,
+            'last_broadcast_percent' => 0,
+            'updated_at' => now(),
+        ]);
+
+        if ($transfer->file_id) {
+            File::query()->whereKey($transfer->file_id)->update([
+                'download_progress' => 0,
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function retryMessage(int $attempt, int $delay, string $reason): string
