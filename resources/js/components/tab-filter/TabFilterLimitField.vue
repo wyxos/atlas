@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TAB_FILTER_LIMIT_OPTIONS } from '@/utils/tabFilter';
 
 interface Props {
     modelValue: string;
+    options: readonly string[];
 }
 
 defineProps<Props>();
@@ -22,7 +22,7 @@ const emit = defineEmits<{
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem v-for="option in TAB_FILTER_LIMIT_OPTIONS" :key="option" :value="option">
+                <SelectItem v-for="option in options" :key="option" :value="option">
                     {{ option }}
                 </SelectItem>
             </SelectContent>

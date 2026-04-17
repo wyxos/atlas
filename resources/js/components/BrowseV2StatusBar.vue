@@ -222,42 +222,62 @@ function clampProgress(value: unknown): number {
         reversed
         data-testid="browse-v2-available-total-pill"
       />
-      <div class="grid min-w-[7.5rem] gap-1">
-        <span class="text-[0.58rem] font-bold uppercase tracking-[0.22em] text-[#f7f1ea]/46">Prev load</span>
-        <div
-          data-testid="browse-v2-previous-boundary-progress"
-          role="progressbar"
-          aria-label="Previous page load proximity"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuenow="previousBoundaryProgressPercent"
-          class="relative h-2 w-28 overflow-hidden border border-white/10 bg-white/[0.04]"
-        >
-          <div
-            class="absolute inset-y-0 left-0 bg-sky-300/80 transition-[width] duration-150"
-            :class="props.pageLoadingLocked ? 'opacity-45' : ''"
-            :style="{ width: `${previousBoundaryProgressPercent}%` }"
-          />
-        </div>
-      </div>
-      <div class="grid min-w-[7.5rem] gap-1">
-        <span class="text-[0.58rem] font-bold uppercase tracking-[0.22em] text-[#f7f1ea]/46">Next load</span>
-        <div
-          data-testid="browse-v2-next-boundary-progress"
-          role="progressbar"
-          aria-label="Next page load proximity"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuenow="nextBoundaryProgressPercent"
-          class="relative h-2 w-28 overflow-hidden border border-white/10 bg-white/[0.04]"
-        >
-          <div
-            class="absolute inset-y-0 left-0 bg-amber-300/80 transition-[width] duration-150"
-            :class="props.pageLoadingLocked ? 'opacity-45' : ''"
-            :style="{ width: `${nextBoundaryProgressPercent}%` }"
-          />
-        </div>
-      </div>
+      <Pill
+        label="Prev load"
+        value=""
+        variant="info"
+        reversed
+        data-testid="browse-v2-previous-boundary-pill"
+      >
+        <template #value>
+          <span class="flex min-w-[7.5rem] items-center gap-2">
+            <span
+              data-testid="browse-v2-previous-boundary-progress"
+              role="progressbar"
+              aria-label="Previous page load proximity"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-valuenow="previousBoundaryProgressPercent"
+              class="relative h-2 flex-1 overflow-hidden rounded-full border border-white/10 bg-white/[0.08]"
+            >
+              <span
+                class="absolute inset-y-0 left-0 rounded-full bg-sky-300/80 transition-[width] duration-150"
+                :class="props.pageLoadingLocked ? 'opacity-45' : ''"
+                :style="{ width: `${previousBoundaryProgressPercent}%` }"
+              />
+            </span>
+            <span class="min-w-[2.25rem] text-right tabular-nums">{{ previousBoundaryProgressPercent }}%</span>
+          </span>
+        </template>
+      </Pill>
+      <Pill
+        label="Next load"
+        value=""
+        variant="warning"
+        reversed
+        data-testid="browse-v2-next-boundary-pill"
+      >
+        <template #value>
+          <span class="flex min-w-[7.5rem] items-center gap-2">
+            <span
+              data-testid="browse-v2-next-boundary-progress"
+              role="progressbar"
+              aria-label="Next page load proximity"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-valuenow="nextBoundaryProgressPercent"
+              class="relative h-2 flex-1 overflow-hidden rounded-full border border-white/10 bg-white/[0.08]"
+            >
+              <span
+                class="absolute inset-y-0 left-0 rounded-full bg-amber-300/80 transition-[width] duration-150"
+                :class="props.pageLoadingLocked ? 'opacity-45' : ''"
+                :style="{ width: `${nextBoundaryProgressPercent}%` }"
+              />
+            </span>
+            <span class="min-w-[2.25rem] text-right tabular-nums">{{ nextBoundaryProgressPercent }}%</span>
+          </span>
+        </template>
+      </Pill>
     </div>
 
     <div

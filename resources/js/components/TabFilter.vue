@@ -10,7 +10,7 @@ import type { BrowseFeedHandle } from '@/types/browse';
 import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
 import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
 import { useTabFilterState } from '@/composables/useTabFilterState';
-import { shouldShowTabFilterDescriptionBelow, type TabFilterFieldUpdate } from '@/utils/tabFilter';
+import { getTabFilterLimitOptions, shouldShowTabFilterDescriptionBelow, type TabFilterFieldUpdate } from '@/utils/tabFilter';
 
 interface Props {
     open: boolean;
@@ -52,6 +52,7 @@ const localPresetGroups = filter.derived.localPresetGroups;
 const selectedLocalPreset = filter.derived.selectedLocalPreset;
 const selectedLocalPresetLabel = filter.derived.selectedLocalPresetLabel;
 const localPageInput = filter.models.localPageInput;
+const limitOptions = computed(() => getTabFilterLimitOptions(form.data.feed, activeSchema.value));
 const onlineServices = computed(() => props.availableServices.filter((service) => service.key !== 'local'));
 
 function updateLimit(value: string): void {
@@ -128,7 +129,7 @@ function handleFieldUpdate(field: TabFilterFieldUpdate): void {
                         </p>
                     </div>
 
-                    <TabFilterLimitField :model-value="form.data.limit" @update:model-value="updateLimit" />
+                    <TabFilterLimitField :model-value="form.data.limit" :options="limitOptions" @update:model-value="updateLimit" />
 
                     <div class="form-field">
                         <label class="form-label">Page</label>
@@ -177,7 +178,7 @@ function handleFieldUpdate(field: TabFilterFieldUpdate): void {
                 </template>
 
                 <template v-if="isOnlineFeed && selectedServiceDef">
-                    <TabFilterLimitField :model-value="form.data.limit" @update:model-value="updateLimit" />
+                    <TabFilterLimitField :model-value="form.data.limit" :options="limitOptions" @update:model-value="updateLimit" />
 
                     <TabFilterFieldControl
                         v-for="field in visibleServiceFields"

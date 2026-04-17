@@ -74,6 +74,10 @@ class BrowseController extends Controller
         }
 
         $localSchema = ServiceFilterSchema::make();
+        $localLimitOptions = array_map(fn (int $value) => [
+            'label' => (string) $value,
+            'value' => $value,
+        ], [20, 40, 60, 80, 100, 200, 500, 1000]);
         $sourcesWithAll = $this->sourcesWithAll();
         $sourceOptions = array_map(fn (string $source) => [
             'label' => $source === 'all' ? 'All' : $source,
@@ -113,6 +117,10 @@ class BrowseController extends Controller
                         ]),
                         $localSchema->limitField([
                             'type' => 'number',
+                            'description' => 'The number of local results per page (1-1000).',
+                            'min' => 1,
+                            'max' => 1000,
+                            'options' => $localLimitOptions,
                         ]),
                         $localSchema->field('source', [
                             'type' => 'select',

@@ -12,7 +12,8 @@ export type LocalPresetGroup = {
     presets: LocalPreset[];
 };
 
-export const TAB_FILTER_LIMIT_OPTIONS = ['20', '40', '60', '80', '100', '200'] as const;
+export const ONLINE_TAB_FILTER_LIMIT_OPTIONS = ['20', '40', '60', '80', '100', '200'] as const;
+export const LOCAL_TAB_FILTER_LIMIT_OPTIONS = ['20', '40', '60', '80', '100', '200', '500', '1000'] as const;
 
 export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
     {
@@ -375,6 +376,23 @@ export function getLocalSourceField(schema: ServiceFilterSchema | null | undefin
     }
 
     return schema.fields.find((field) => field.uiKey === 'source') ?? null;
+}
+
+export function getTabFilterLimitOptions(
+    feed: BrowseFormData['feed'],
+    schema: ServiceFilterSchema | null | undefined,
+): string[] {
+    const schemaOptions = schema?.fields
+        .find((field) => field.uiKey === 'limit')
+        ?.options
+        ?.map((option) => String(option.value))
+        .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+
+    if (schemaOptions && schemaOptions.length > 0) {
+        return schemaOptions;
+    }
+
+    return [...(feed === 'local' ? LOCAL_TAB_FILTER_LIMIT_OPTIONS : ONLINE_TAB_FILTER_LIMIT_OPTIONS)];
 }
 
 export function getTabFilterValueOrDefault(field: ServiceFilterField, value: unknown): unknown {

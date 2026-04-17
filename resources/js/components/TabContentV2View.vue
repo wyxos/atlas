@@ -130,6 +130,7 @@ const vibeLayoutBindings = computed(() => ({
     fillDelayStepMs: 1000,
     initialCursor: props.vibeInitialCursor,
     initialState: props.vibeInitialState,
+    loopFullscreenVideo: true,
     mode: props.vibeFeedMode,
     pageSize: Number(props.form.data.limit),
     resolve: props.resolve,

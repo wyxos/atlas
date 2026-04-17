@@ -2,6 +2,7 @@ import { computed, nextTick, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router';
 import type { FeedItem } from '@/composables/useTabs';
 import type { File } from '@/types/file';
+import { getMimeTypeCategory } from '@/utils/file';
 
 type SurfaceMode = 'fullscreen' | 'list';
 
@@ -24,18 +25,10 @@ export function buildBrowseV2FilePath(fileId: number): string {
 }
 
 function resolveFileMediaKind(file: File): FeedItem['media_kind'] {
-    if (typeof file.mime_type === 'string') {
-        if (file.mime_type.startsWith('audio/')) {
-            return 'audio';
-        }
+    const category = getMimeTypeCategory(file.mime_type);
 
-        if (file.mime_type.startsWith('video/')) {
-            return 'video';
-        }
-
-        if (file.mime_type.startsWith('image/')) {
-            return 'image';
-        }
+    if (category === 'audio' || category === 'video' || category === 'image') {
+        return category;
     }
 
     return 'file';

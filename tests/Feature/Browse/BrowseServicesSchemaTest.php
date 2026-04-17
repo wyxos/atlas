@@ -59,6 +59,20 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'max_previewed_count',
     ]);
 
+    $localLimit = collect($localFields)->firstWhere('uiKey', 'limit');
+    expect($localLimit)->not->toBeNull();
+    expect($localLimit['max'])->toBe(1000);
+    expect($localLimit['options'])->toBe([
+        ['label' => '20', 'value' => 20],
+        ['label' => '40', 'value' => 40],
+        ['label' => '60', 'value' => 60],
+        ['label' => '80', 'value' => 80],
+        ['label' => '100', 'value' => 100],
+        ['label' => '200', 'value' => 200],
+        ['label' => '500', 'value' => 500],
+        ['label' => '1000', 'value' => 1000],
+    ]);
+
     $civit = collect($services)->firstWhere('key', 'civit-ai-images');
     expect($civit)->not->toBeNull();
 
