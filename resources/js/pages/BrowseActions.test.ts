@@ -11,7 +11,6 @@ const {
     reorderTabsMock,
     setActiveTabMock,
     tabsRef,
-    updateActiveTabMock,
     updateTabCustomLabelMock,
     updateTabLabelMock,
 } = vi.hoisted(() => ({
@@ -28,7 +27,6 @@ const {
     createTabMock: vi.fn(),
     closeTabsMock: vi.fn(),
     reorderTabsMock: vi.fn(),
-    updateActiveTabMock: vi.fn(),
     updateTabLabelMock: vi.fn(),
     updateTabCustomLabelMock: vi.fn(),
     setActiveTabMock: vi.fn(),
@@ -87,7 +85,6 @@ vi.mock('../components/TabContentV2.vue', () => ({
         props: [
             'tabId',
             'availableServices',
-            'updateActiveTab',
             'onReaction',
             'onLoadingChange',
             'onTabDataLoadingChange',
@@ -112,7 +109,6 @@ vi.mock('@/composables/useTabs', async () => {
             duplicateTab: duplicateTabMock,
             getActiveTab: () => liveTabsRef.value.find(tab => tab.id === liveActiveTabIdRef.value),
             reorderTabs: reorderTabsMock,
-            updateActiveTab: updateActiveTabMock,
             updateTabLabel: updateTabLabelMock,
             updateTabCustomLabel: updateTabCustomLabelMock,
             setActiveTab: setActiveTabMock,

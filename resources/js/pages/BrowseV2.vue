@@ -55,7 +55,6 @@ const {
     duplicateTab,
     getActiveTab,
     reorderTabs,
-    updateActiveTab,
     updateTabLabel,
     updateTabCustomLabel,
     setActiveTab,
@@ -354,7 +353,6 @@ onUnmounted(() => {
                     :key="activeTab.id"
                     :tab-id="activeTab.id"
                     :available-services="[]"
-                    :update-active-tab="updateActiveTab"
                     :on-reaction="handleReaction"
                     :on-loading-change="handleMasonryLoadingChangeFromTab"
                     :on-tab-data-loading-change="handleTabDataLoadingChangeFromTab"

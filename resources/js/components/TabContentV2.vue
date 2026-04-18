@@ -36,7 +36,6 @@ interface Props {
     onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
-    updateActiveTab: (items: FeedItem[]) => void;
     onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;
     onUpdateTabLabel?: (label: string) => void;
 }
@@ -366,7 +365,6 @@ const resolve = createTabContentV2Resolve({
     form,
     startPageToken: browseState.startPageToken,
     totalAvailable,
-    updateActiveTab: props.updateActiveTab,
     updateTabLabel,
     items,
     itemsBuckets,
@@ -447,14 +445,6 @@ watch(
             itemInteractions.viewer.onClose();
         }
     },
-);
-
-watch(
-    () => visibleItems.value,
-    (nextItems) => {
-        props.updateActiveTab(nextItems);
-    },
-    { deep: false, immediate: true },
 );
 
 watch(

@@ -34,7 +34,6 @@ describe('tabContentV2 resolve', () => {
         const items = ref<FeedItem[]>([]);
         const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
         const totalAvailable = ref<number | null>(null);
-        const updateActiveTab = vi.fn();
 
         window.axios.get = vi.fn().mockResolvedValue({
             data: {
@@ -59,7 +58,6 @@ describe('tabContentV2 resolve', () => {
             } as any,
             startPageToken: ref(1),
             totalAvailable,
-            updateActiveTab,
             items,
             itemsBuckets,
             availableServices: ref([]),
@@ -73,10 +71,6 @@ describe('tabContentV2 resolve', () => {
 
         expect(totalAvailable.value).toBe(381);
         expect(items.value).toHaveLength(2);
-        expect(updateActiveTab).toHaveBeenCalledWith([
-            expect.objectContaining({ id: 1 }),
-            expect.objectContaining({ id: 2 }),
-        ]);
         expect(result.nextPage).toBe('2');
         expect(result.items).toHaveLength(2);
     });

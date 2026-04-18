@@ -378,4 +378,55 @@ describe('useTabs', () => {
         ]);
         expect(mockToast).toHaveBeenCalled();
     });
+
+    it('debounces repeated tab label updates to the latest payload', async () => {
+        vi.useFakeTimers();
+
+        try {
+            mockAxios.get.mockResolvedValueOnce({
+                data: [
+                    {
+                        id: 52,
+                        label: 'Local - Reacted (Random) - 8',
+                        custom_label: 'Reacted - random',
+                        params: { feed: 'local' },
+                        position: 6,
+                        is_active: true,
+                        updated_at: '2024-01-01T00:00:00Z',
+                    },
+                ],
+            });
+            mockAxios.put.mockResolvedValueOnce({
+                data: {
+                    id: 52,
+                    label: 'Local Files - Reacted (Random) - 9',
+                    custom_label: 'Reacted - random',
+                    params: { feed: 'local' },
+                    position: 6,
+                    is_active: true,
+                    updated_at: '2024-01-02T00:00:00Z',
+                },
+            });
+
+            const { loadTabs, updateTabLabel } = useTabs();
+            await loadTabs();
+
+            updateTabLabel(52, 'Local Files - Reacted (Random) - 8');
+            updateTabLabel(52, 'Local Files - Reacted (Random) - 9');
+            updateTabLabel(52, 'Local Files - Reacted (Random) - 9');
+
+            await vi.advanceTimersByTimeAsync(499);
+            expect(mockAxios.put).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockAxios.put).toHaveBeenCalledTimes(1);
+            expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/52', {
+                label: 'Local Files - Reacted (Random) - 9',
+                custom_label: 'Reacted - random',
+                position: 6,
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, reactive, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
@@ -378,7 +377,7 @@ async function createTestRouter(initialPath: string) {
     return router;
 }
 
-async function mountTabContent(initialPath = '/browse', updateActiveTab = vi.fn()) {
+async function mountTabContent(initialPath = '/browse') {
     const router = await createTestRouter(initialPath);
     const pushSpy = vi.spyOn(router, 'push'); const replaceSpy = vi.spyOn(router, 'replace');
 
@@ -387,7 +386,6 @@ async function mountTabContent(initialPath = '/browse', updateActiveTab = vi.fn(
             availableServices: [],
             onReaction: vi.fn(),
             tabId: 1,
-            updateActiveTab,
         },
         global: {
             plugins: [router],
@@ -397,7 +395,7 @@ async function mountTabContent(initialPath = '/browse', updateActiveTab = vi.fn(
     await flushPromises();
     await flushPromises();
 
-    return { pushSpy, replaceSpy, router, updateActiveTab, wrapper };
+    return { pushSpy, replaceSpy, router, wrapper };
 }
 
 describe('TabContentV2 browse route sync', () => {
@@ -419,29 +417,6 @@ describe('TabContentV2 browse route sync', () => {
             value: mockAxios,
             writable: true,
         });
-    });
-
-    it('syncs updateActiveTab from Vibe removed ids instead of a local removal mirror', async () => {
-        testState.restoredItems = [createFeedItem(1), createFeedItem(2)];
-        const { updateActiveTab, wrapper } = await mountTabContent('/browse', vi.fn());
-        expect(updateActiveTab).toHaveBeenLastCalledWith([
-            expect.objectContaining({ id: 1 }),
-            expect.objectContaining({ id: 2 }),
-        ]);
-        await wrapper.get('[data-testid="remove-second"]').trigger('click');
-        await flushPromises();
-
-        expect(updateActiveTab).toHaveBeenLastCalledWith([
-            expect.objectContaining({ id: 1 }),
-        ]);
-
-        await wrapper.get('[data-testid="restore-second"]').trigger('click');
-        await flushPromises();
-
-        expect(updateActiveTab).toHaveBeenLastCalledWith([
-            expect.objectContaining({ id: 1 }),
-            expect.objectContaining({ id: 2 }),
-        ]);
     });
 
     it('shows a loading placeholder while the browse tab is bootstrapping', async () => {
@@ -576,13 +551,12 @@ describe('TabContentV2 browse route sync', () => {
 
     it('advances fullscreen and removes the reacted item from restored session visibility', async () => {
         testState.restoredItems = [createFeedItem(1), createFeedItem(2), createFeedItem(3)];
-        const { replaceSpy, router, updateActiveTab, wrapper } = await mountTabContent('/browse');
+        const { replaceSpy, router, wrapper } = await mountTabContent('/browse');
         await wrapper.get('[data-testid="select-second"]').trigger('click'); await wrapper.get('[data-testid="open-fullscreen"]').trigger('click'); await flushPromises();
         replaceSpy.mockClear();
         expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('2');
         await wrapper.get('[data-testid="react-current"]').trigger('click'); await flushPromises(); await flushPromises();
         expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('3');
-        expect(updateActiveTab).toHaveBeenLastCalledWith([expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 3 })]);
         expect(replaceSpy).toHaveBeenCalledWith('/browse/file/3'); expect(router.currentRoute.value.fullPath).toBe('/browse/file/3');
     });
 

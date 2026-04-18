@@ -6,7 +6,6 @@ import {
     index as tabsIndex,
     reorder as tabsReorder,
     setActive as tabsSetActive,
-    show as tabsShow,
     store as tabsStore,
     update as tabsUpdate,
 } from '@/actions/App/Http/Controllers/TabController';
@@ -83,12 +82,13 @@ type TabsSnapshot = {
 };
 
 export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
+    const TAB_SAVE_DEBOUNCE_MS = 500;
     const toast = useToast();
     const tabs = ref<TabData[]>([]);
     const activeTabId = ref<number | null>(null);
     const isLoadingTabs = ref(false);
-    const saveTabDebounceTimer = ref<number | null>(null);
     const recentTabIds = ref<number[]>([]);
+    const saveTabDebounceTimers = new Map<number, number>();
 
     function cloneParams(params: TabData['params']): TabData['params'] {
         return Object.fromEntries(
@@ -447,20 +447,6 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         return tabs.value.find(tab => tab.id === activeTabId.value);
     }
 
-    function updateActiveTab(items: FeedItem[]): void {
-        const activeTab = getActiveTab();
-        if (!activeTab) {
-            return;
-        }
-
-        if (items.length > 0) {
-            void saveTab(activeTab);
-            return;
-        }
-
-        saveTabDebounced(activeTab);
-    }
-
     function updateTabLabel(tabId: number, label: string): void {
         const tab = tabs.value.find(currentTab => currentTab.id === tabId);
         if (!tab || tab.label === label) {
@@ -468,7 +454,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
 
         tab.label = label;
-        void saveTab(tab);
+        saveTabDebounced(tab.id);
     }
 
     function updateTabCustomLabel(tabId: number, customLabel: string | null): void {
@@ -478,7 +464,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
 
         tab.customLabel = customLabel;
-        void saveTab(tab);
+        saveTabDebounced(tab.id);
     }
 
     async function reorderTabs(orderedIds: number[]): Promise<void> {
@@ -506,14 +492,24 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
-    function saveTabDebounced(tab: TabData): void {
-        if (saveTabDebounceTimer.value) {
-            clearTimeout(saveTabDebounceTimer.value);
+    function saveTabDebounced(tabId: number): void {
+        const existingTimer = saveTabDebounceTimers.get(tabId);
+        if (existingTimer !== undefined) {
+            clearTimeout(existingTimer);
         }
 
-        saveTabDebounceTimer.value = window.setTimeout(() => {
-            void saveTab(tab);
-        }, 500);
+        const timer = window.setTimeout(() => {
+            saveTabDebounceTimers.delete(tabId);
+
+            const currentTab = tabs.value.find((tab) => tab.id === tabId);
+            if (!currentTab) {
+                return;
+            }
+
+            void saveTab(currentTab);
+        }, TAB_SAVE_DEBOUNCE_MS);
+
+        saveTabDebounceTimers.set(tabId, timer);
     }
 
     async function saveTab(tab: TabData): Promise<void> {
@@ -526,17 +522,6 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             updateTabFromApi(tab.id, response?.data);
         } catch (error) {
             console.error('Failed to save tab:', error);
-            throw error;
-        }
-    }
-
-    async function loadTabItems(tabId: number): Promise<FeedItem[]> {
-        try {
-            const { data } = await window.axios.get(tabsShow.url(tabId));
-
-            return data.tab?.items || [];
-        } catch (error) {
-            console.error('Failed to load tab items:', error);
             throw error;
         }
     }
@@ -563,10 +548,8 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         closeTab,
         closeTabs,
         getActiveTab,
-        updateActiveTab,
         updateTabLabel,
         updateTabCustomLabel,
-        loadTabItems,
         reorderTabs,
         setActiveTab,
     };

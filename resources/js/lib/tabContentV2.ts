@@ -25,7 +25,6 @@ type TabContentV2ResolveArgs = {
     form: BrowseFormInstance;
     startPageToken: Ref<BrowsePageToken>;
     totalAvailable?: Ref<number | null>;
-    updateActiveTab: (items: FeedItem[]) => void;
     updateTabLabel?: (cursor: BrowsePageToken | string | number | null | undefined) => void;
     items: Ref<FeedItem[]>;
     itemsBuckets: Ref<Array<{
@@ -261,7 +260,6 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
 
             updateBuckets(args.itemsBuckets, args.items, requestedCursor, nextItems, nextCursor, previousCursor);
             args.updateTabLabel?.(nextCursor ?? requestedCursor);
-            args.updateActiveTab(args.items.value.filter((item) => item !== undefined));
 
             return {
                 items: nextItems.map(mapFeedItemToVibeItem),

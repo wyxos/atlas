@@ -1,4 +1,4 @@
-import { ref, nextTick, triggerRef } from 'vue';
+import { nextTick, triggerRef } from 'vue';
 import type { FeedItem, TabData } from './useTabs';
 import { usePreviewBatch } from './usePreviewBatch';
 
@@ -9,19 +9,19 @@ export function useItemPreview(
     items: import('vue').Ref<FeedItem[]>,
     _tab: import('vue').Ref<TabData | undefined>
 ) {
-    const previewedItems = ref<Set<number>>(new Set());
+    const previewedItems = new Set<number>();
     const { queuePreviewIncrement } = usePreviewBatch();
 
     // Increment preview count when item comes into view (batched)
     async function incrementPreviewCount(fileId: number): Promise<{ will_auto_dislike: boolean } | null> {
         // Skip if we've already incremented preview count for this item
         // Mark as previewed IMMEDIATELY to prevent race conditions (before queueing)
-        if (previewedItems.value.has(fileId)) {
+        if (previewedItems.has(fileId)) {
             return null;
         }
 
         // Mark as previewed immediately to prevent duplicate calls while request is pending
-        previewedItems.value.add(fileId);
+        previewedItems.add(fileId);
 
         try {
             // Queue the preview increment (will be batched with other requests)
@@ -54,17 +54,10 @@ export function useItemPreview(
             // Return the combined will_auto_dislike flag (existing OR response)
             return { will_auto_dislike: combinedWillAutoDislike === true };
         } catch (error) {
-            // If the error is "already queued", it means another call is handling it - that's fine
-            if (error instanceof Error && error.message.includes('already queued')) {
-                // Another call is already handling this - return null silently
-                return null;
-            }
-
-            // For other errors, log but don't throw - preview count is not critical
             console.error('Failed to increment preview count:', error);
 
             // Remove from previewedItems so it can be retried if needed
-            previewedItems.value.delete(fileId);
+            previewedItems.delete(fileId);
 
             return null;
         }
@@ -73,7 +66,7 @@ export function useItemPreview(
     // Clear previewed items (useful when switching tabs)
     function clearPreviewedItems(fileIds?: number[]): void {
         if (fileIds === undefined) {
-            previewedItems.value = new Set();
+            previewedItems.clear();
             return;
         }
 
@@ -81,13 +74,9 @@ export function useItemPreview(
             return;
         }
 
-        const nextPreviewedItems = new Set(previewedItems.value);
-
         for (const fileId of fileIds) {
-            nextPreviewedItems.delete(fileId);
+            previewedItems.delete(fileId);
         }
-
-        previewedItems.value = nextPreviewedItems;
     }
 
     function markPreviewedItems(fileIds: number[]): void {
@@ -95,17 +84,12 @@ export function useItemPreview(
             return;
         }
 
-        const nextPreviewedItems = new Set(previewedItems.value);
-
         for (const fileId of fileIds) {
-            nextPreviewedItems.add(fileId);
+            previewedItems.add(fileId);
         }
-
-        previewedItems.value = nextPreviewedItems;
     }
 
     return {
-        previewedItems,
         incrementPreviewCount,
         clearPreviewedItems,
         markPreviewedItems,
