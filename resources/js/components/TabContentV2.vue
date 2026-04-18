@@ -209,13 +209,6 @@ const fullscreenOverlayState = reactive({
 });
 const fileViewerSheet = useFileViewerSheetState({ overlay: fullscreenOverlayState });
 const fileSheetState = fileViewerSheet.sheetState;
-const vibeFeedMode = computed(() => {
-    if (standaloneItem.value) {
-        return 'static';
-    }
-
-    return form.data.feed === 'local' ? 'static' : 'dynamic';
-});
 const vibeInitialCursor = computed(() => (standaloneItem.value ? null : normalizeCursor(browseState.startPageToken.value)));
 const vibeInitialState = computed<VibeInitialState | undefined>(() => {
     if (standaloneItem.value) {
@@ -509,7 +502,6 @@ watch(
         :masonry-render-key="masonryRenderKey"
         :resolve="resolve"
         :viewer-key="viewerKey"
-        :vibe-feed-mode="vibeFeedMode"
         :vibe-initial-cursor="vibeInitialCursor"
         :vibe-initial-state="vibeInitialState"
         :handle-asset-loads="handleAssetLoads"

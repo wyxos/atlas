@@ -244,7 +244,6 @@ vi.mock('./TabContentV2View.vue', () => ({
             handleReaction: { type: Function, required: true },
             setVibeHandle: { type: Function, default: null },
             surfaceMode: { type: String, default: 'list' },
-            vibeFeedMode: { type: String, default: 'dynamic' },
             updateActiveIndex: { type: Function, required: true },
             updateSurfaceMode: { type: Function, required: true },
         },
@@ -276,7 +275,6 @@ vi.mock('./TabContentV2View.vue', () => ({
 
             return () => h('div', { 'data-testid': 'tab-content-v2-view' }, [
                 h('div', { 'data-testid': 'current-item-id' }, String((props.currentVisibleItem as { id?: number } | null)?.id ?? 'none')),
-                h('div', { 'data-testid': 'feed-mode' }, props.vibeFeedMode),
                 h('div', { 'data-testid': 'surface-mode' }, props.surfaceMode),
                 h('button', {
                     'data-testid': 'select-first',
@@ -298,7 +296,7 @@ vi.mock('./TabContentV2View.vue', () => ({
 
 const status = reactive({
     activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillDelayRemainingMs: null, fillTargetCount: null,
-    hasNextPage: true, hasPreviousPage: false, itemCount: 0, loadState: 'loaded' as const, mode: 'dynamic' as const, nextCursor: '2', phase: 'idle' as const,
+    hasNextPage: true, hasPreviousPage: false, itemCount: 0, loadState: 'loaded' as const, nextCursor: '2', phase: 'idle' as const,
     previousCursor: null, removedCount: 0, removedIds: [] as string[], surfaceMode: 'list' as const,
 });
 
@@ -495,7 +493,6 @@ describe('TabContentV2 browse route sync', () => {
         const { wrapper } = await mountTabContent('/browse/file/2');
 
         expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('2');
-        expect(wrapper.get('[data-testid="feed-mode"]').text()).toBe('static');
         expect(wrapper.get('[data-testid="surface-mode"]').text()).toBe('fullscreen');
         expect(mockAxios.get).not.toHaveBeenCalledWith('/api/files/2');
     });
@@ -546,7 +543,6 @@ describe('TabContentV2 browse route sync', () => {
 
         expect(wrapper.get('[data-testid="tab-content-v2-view"]').exists()).toBe(true);
         expect(wrapper.get('[data-testid="current-item-id"]').text()).toBe('99');
-        expect(wrapper.get('[data-testid="feed-mode"]').text()).toBe('static');
     });
 
     it('advances fullscreen and removes the reacted item from restored session visibility', async () => {

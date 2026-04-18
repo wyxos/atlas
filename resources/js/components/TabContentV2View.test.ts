@@ -206,7 +206,6 @@ function createProps() {
         updateSource: vi.fn(),
         updateSurfaceMode: vi.fn(),
         updateService: vi.fn(async () => undefined),
-        vibeFeedMode: 'dynamic' as const,
         vibeInitialCursor: '1',
         vibeInitialState: undefined,
         vibeStatus: {
@@ -220,7 +219,6 @@ function createProps() {
             hasPreviousPage: false,
             itemCount: 20,
             loadState: 'loaded' as const,
-            mode: 'dynamic' as const,
             nextBoundaryLoadProgress: 0,
             nextCursor: '2',
             pageLoadingLocked: false,

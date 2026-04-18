@@ -87,7 +87,6 @@ const props = defineProps<{
     updateSurfaceMode: (value: 'fullscreen' | 'list') => void;
     updateService: (value: string) => void | Promise<void>;
     surfaceMode: 'fullscreen' | 'list';
-    vibeFeedMode: 'dynamic' | 'static';
     vibeInitialCursor: string | null;
     vibeInitialState: VibeInitialState | undefined;
     vibeStatus: VibeStatus;
@@ -131,7 +130,6 @@ const vibeLayoutBindings = computed(() => ({
     initialCursor: props.vibeInitialCursor,
     initialState: props.vibeInitialState,
     loopFullscreenVideo: true,
-    mode: props.vibeFeedMode,
     pageSize: Number(props.form.data.limit),
     resolve: props.resolve,
     showEndBadge: false,
