@@ -13,7 +13,7 @@ export type LocalPresetGroup = {
 };
 
 export const ONLINE_TAB_FILTER_LIMIT_OPTIONS = ['20', '40', '60', '80', '100', '200'] as const;
-export const LOCAL_TAB_FILTER_LIMIT_OPTIONS = ['20', '40', '60', '80', '100', '200', '500', '1000'] as const;
+export const LOCAL_TAB_FILTER_LIMIT_OPTIONS = ['20', '40', '60', '80', '100', '200', '250'] as const;
 
 export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
     {

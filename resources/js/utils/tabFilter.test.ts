@@ -12,12 +12,12 @@ describe('getTabFilterLimitOptions', () => {
                     label: 'Limit',
                     options: [
                         { label: '20', value: 20 },
-                        { label: '500', value: 500 },
-                        { label: '1000', value: 1000 },
+                        { label: '200', value: 200 },
+                        { label: '250', value: 250 },
                     ],
                 },
             ],
-        })).toEqual(['20', '500', '1000']);
+        })).toEqual(['20', '200', '250']);
     });
 
     it('falls back to online defaults when schema options are absent', () => {
