@@ -50,6 +50,7 @@ type VibeStatusLike = {
   currentCursor: string | null
   errorMessage: string | null
   fillCollectedCount: number | null
+  fillCursor?: string | null
   fillDelayRemainingMs: number | null
   fillTargetCount: number | null
   hasNextPage: boolean
@@ -83,7 +84,13 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const currentLabel = computed(() => props.status.currentCursor ?? 'N/A')
-const nextLabel = computed(() => props.status.nextCursor ?? 'N/A')
+const nextLabel = computed(() => {
+  if (props.status.phase === 'filling' && props.status.fillCursor) {
+    return props.status.fillCursor
+  }
+
+  return props.status.nextCursor ?? 'N/A'
+})
 const previousLabel = computed(() => props.status.previousCursor ?? 'N/A')
 const showActionRail = computed(() => props.performLoadedItemsBulkAction !== null || props.canTogglePageLoadingLock)
 const nextBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.nextBoundaryLoadProgress) * 100))

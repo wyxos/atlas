@@ -85,6 +85,7 @@ function createStatus(overrides: Partial<InstanceType<typeof BrowseV2StatusBar>[
         currentCursor: '1',
         errorMessage: null,
         fillCollectedCount: null,
+        fillCursor: null,
         fillDelayRemainingMs: null,
         fillTargetCount: null,
         hasNextPage: true,
@@ -185,6 +186,22 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 0/8');
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).not.toContain('No items available');
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
+    });
+
+    it('shows the in-flight fill cursor in the next pill while refilling', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    phase: 'filling',
+                    nextCursor: null,
+                    fillCursor: '200|1747849304567',
+                    fillCollectedCount: 181,
+                    fillTargetCount: 200,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-next-pill"]').text()).toContain('200|1747849304567');
     });
 
     it('shows end of list when browse-v2 is exhausted', () => {
