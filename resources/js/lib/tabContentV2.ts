@@ -47,6 +47,7 @@ export function createTabContentV2EmptyStatus(): VibeStatus {
         currentCursor: null,
         errorMessage: null,
         fillCollectedCount: null,
+        fillCursor: null,
         fillDelayRemainingMs: null,
         fillTargetCount: null,
         hasNextPage: false,
