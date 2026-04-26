@@ -20,7 +20,7 @@ import { loadBrowseV2StandaloneFileItem } from '@/lib/browseV2StandaloneItem';
 import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession } from '@/lib/tabContentBrowseBootstrap';
 import { filterItemsByContainerBlacklists, removeContainerBlacklist, upsertContainerBlacklist } from '@/lib/tabContentV2Blacklists';
-import { createRemovedItemIdSet, createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, syncRemovedItemIdSet, type OverlayMediaType } from '@/lib/tabContentV2';
+import { createRemovedItemIdSet, createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, type OverlayMediaType } from '@/lib/tabContentV2';
 import { createBrowseV2MouseShortcutHandlers } from '@/lib/tabContentV2MouseShortcuts';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
@@ -122,14 +122,10 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
         nextPage: vibeStatus.value.nextCursor,
         pageLoadingLocked: vibeStatus.value.pageLoadingLocked,
         remove: async (target: FeedItem | FeedItem[] | string | string[]) => {
-            const result = handle.remove(collectTargetIds(target));
-            removedItemIds.value = syncRemovedItemIdSet(removedItemIds.value, result.ids);
-            return result;
+            return handle.remove(collectTargetIds(target));
         },
         restore: async (target: FeedItem | FeedItem[] | string | string[]) => {
-            const result = handle.restore(collectTargetIds(target));
-            removedItemIds.value = syncRemovedItemIdSet(removedItemIds.value, result.ids, 'restore');
-            return result;
+            return handle.restore(collectTargetIds(target));
         },
         unlockPageLoading: () => handle.unlockPageLoading(),
     };
@@ -248,7 +244,14 @@ function setTabDataLoading(isLoading: boolean): void {
     isTabDataLoading.value = isLoading;
     props.onTabDataLoadingChange?.(isLoading);
 }
-function setVibeHandle(handle: VibeHandle | null): void { vibeRef.value = handle; }
+
+function setVibeHandle(handle: VibeHandle | null): void {
+    vibeRef.value = handle;
+
+    if (handle) {
+        applyActiveContainerBlacklistFilter();
+    }
+}
 
 function resetLocalFeedState(): void {
     items.value = [];
@@ -334,14 +337,14 @@ function applyActiveContainerBlacklistFilter(): void {
         return;
     }
 
-    if (vibeMasonry.value) {
-        void vibeMasonry.value.remove(itemsInBlacklistedContainers).catch((error: unknown) => {
-            console.error('Failed to remove blacklisted container items from browse-v2:', error);
-        });
+    const handle = vibeMasonry.value;
+    if (!handle) {
         return;
     }
 
-    items.value = filterItemsByActiveContainerBlacklists(items.value);
+    void handle.remove(itemsInBlacklistedContainers).catch((error: unknown) => {
+        console.error('Failed to remove blacklisted container items from browse-v2:', error);
+    });
 }
 
 function handleContainerBlacklistChange(change: ContainerBlacklistChange): void {

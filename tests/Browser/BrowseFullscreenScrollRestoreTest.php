@@ -148,7 +148,23 @@ it('preserves the browse grid scroll position when fullscreen closes', function 
     expect($stateBeforeOpen['listVisible'])->toBe('true');
     expect($targetLabel)->not->toBeNull();
 
-    $page->click(sprintf('[aria-label="%s"]', addslashes((string) $targetLabel)));
+    $targetLabelJson = json_encode($targetLabel, JSON_THROW_ON_ERROR);
+    $opened = $page->script(<<<JS
+        () => {
+            const targetLabel = {$targetLabelJson};
+            const button = Array.from(document.querySelectorAll('[data-testid="vibe-list-card-open"]'))
+                .find((candidate) => candidate.getAttribute('aria-label') === targetLabel);
+
+            if (!button) {
+                return false;
+            }
+
+            button.click();
+            return true;
+        }
+        JS);
+
+    expect($opened)->toBeTrue();
 
     preg_match('/(\d+)$/', (string) $targetLabel, $matches);
     $targetFileId = isset($matches[1]) ? (int) $matches[1] : null;

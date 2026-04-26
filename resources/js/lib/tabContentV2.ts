@@ -92,30 +92,6 @@ export function createRemovedItemIdSet(ids: readonly string[]): Set<number> {
     return next;
 }
 
-export function syncRemovedItemIdSet(
-    currentIds: ReadonlySet<number>,
-    ids: readonly string[],
-    mode: 'remove' | 'restore' = 'remove',
-): Set<number> {
-    const next = new Set(currentIds);
-
-    for (const id of ids) {
-        const parsed = Number(id);
-        if (!Number.isFinite(parsed)) {
-            continue;
-        }
-
-        if (mode === 'restore') {
-            next.delete(parsed);
-            continue;
-        }
-
-        next.add(parsed);
-    }
-
-    return next;
-}
-
 function normalizeTotal(value: unknown): number | null {
     if (typeof value === 'number') {
         return value;
