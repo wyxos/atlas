@@ -76,6 +76,56 @@ describe('installCivitAiModelBrowseCtas', () => {
         }, expect.any(Function));
     });
 
+    it('uses the current Civitai model version when the page switches versions without recreating the CTA', async () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://civitai.com/models/1894057?modelVersionId=2897869') as unknown as Location,
+        });
+        document.body.innerHTML = `
+            <table>
+                <tbody>
+                    <tr>
+                        <td>AIR</td>
+                        <td>
+                            <div>
+                                <div>
+                                    <code>civitai:</code>
+                                    <code>1894057</code>
+                                    <code>@</code>
+                                    <code>2897869</code>
+                                </div>
+                                <button type="button">Copy</button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+
+        const { installCivitAiModelBrowseCtas } = await import('./civitai-model-browse-cta');
+
+        installCivitAiModelBrowseCtas();
+
+        const button = Array.from(document.querySelectorAll('button'))
+            .find((candidate) => candidate.textContent === 'Open in Atlas');
+
+        expect(button).toBeTruthy();
+
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://civitai.com/models/1894057?modelVersionId=2457413') as unknown as Location,
+        });
+
+        button?.click();
+        await flushPromises();
+
+        expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+            type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
+            modelId: 1894057,
+            modelVersionId: 2457413,
+        }, expect.any(Function));
+    });
+
     it('supports rows that only expose a model id on civitai.red', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,

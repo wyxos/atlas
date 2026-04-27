@@ -43,6 +43,38 @@ function parsePositiveInteger(value: string | null | undefined): number | null {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseModelReferenceFromUrl(href: string = window.location.href): CivitAiModelReference | null {
+    let url: URL;
+
+    try {
+        url = new URL(href);
+    } catch {
+        return null;
+    }
+
+    if (!isCivitAiHostname(url.hostname)) {
+        return null;
+    }
+
+    const segments = url.pathname.split('/').filter((segment) => segment !== '');
+    if (segments[0] !== 'models') {
+        return null;
+    }
+
+    const modelId = parsePositiveInteger(segments[1]);
+    if (modelId === null) {
+        return null;
+    }
+
+    const modelVersionId = parsePositiveInteger(url.searchParams.get('modelVersionId'));
+
+    return {
+        modelId,
+        modelVersionId,
+        key: modelVersionId === null ? `${modelId}` : `${modelId}@${modelVersionId}`,
+    };
+}
+
 function resolveModelReference(actionHost: ParentNode): CivitAiModelReference | null {
     const values = Array.from(actionHost.querySelectorAll('code'))
         .map((code) => code.textContent?.trim() ?? '')
@@ -70,6 +102,22 @@ function resolveModelReference(actionHost: ParentNode): CivitAiModelReference | 
     }
 
     return null;
+}
+
+function resolveCurrentModelReference(referenceRoot: ParentNode): CivitAiModelReference | null {
+    const domReference = resolveModelReference(referenceRoot);
+    const urlReference = parseModelReferenceFromUrl();
+
+    if (
+        domReference !== null
+        && urlReference !== null
+        && domReference.modelId === urlReference.modelId
+        && urlReference.modelVersionId !== null
+    ) {
+        return urlReference;
+    }
+
+    return domReference ?? urlReference;
 }
 
 function resolveActionTarget(prefixCode: HTMLElement): CivitAiActionTarget | null {
@@ -140,7 +188,7 @@ function requestOpenCivitAiModelTab(reference: CivitAiModelReference): Promise<R
     });
 }
 
-function createCtaButton(reference: CivitAiModelReference): HTMLButtonElement {
+function createCtaButton(target: CivitAiActionTarget, reference: CivitAiModelReference): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.atlasCivitaiModelBrowseCta = reference.key;
@@ -163,9 +211,13 @@ function createCtaButton(reference: CivitAiModelReference): HTMLButtonElement {
     setButtonState(button, CTA_TEXT, false);
 
     button.addEventListener('click', () => {
+        const currentReference = resolveCurrentModelReference(
+            target.referenceRoot.isConnected ? target.referenceRoot : button.parentElement ?? document,
+        ) ?? reference;
+
         setButtonState(button, CTA_PENDING_TEXT, true);
 
-        void requestOpenCivitAiModelTab(reference)
+        void requestOpenCivitAiModelTab(currentReference)
             .then((response) => {
                 setButtonState(button, response?.ok === true ? CTA_SUCCESS_TEXT : CTA_FAILURE_TEXT, true);
             })
@@ -183,7 +235,7 @@ function createCtaButton(reference: CivitAiModelReference): HTMLButtonElement {
 }
 
 function applyBrowseCta(target: CivitAiActionTarget): void {
-    const reference = resolveModelReference(target.referenceRoot);
+    const reference = resolveCurrentModelReference(target.referenceRoot);
     if (reference === null) {
         return;
     }
@@ -197,7 +249,7 @@ function applyBrowseCta(target: CivitAiActionTarget): void {
         existingButton.remove();
     }
 
-    const button = createCtaButton(reference);
+    const button = createCtaButton(target, reference);
     const insertBefore = target.referenceRoot.nextElementSibling;
 
     if (insertBefore instanceof Element) {
@@ -227,6 +279,17 @@ function syncBrowseCtas(root: ParentNode): void {
     }
 }
 
+function syncMutationTarget(mutation: MutationRecord): void {
+    if (mutation.target instanceof Element) {
+        syncBrowseCtas(mutation.target);
+        return;
+    }
+
+    if (mutation.target.parentElement instanceof HTMLElement) {
+        syncBrowseCtas(mutation.target.parentElement);
+    }
+}
+
 export function installCivitAiModelBrowseCtas(): void {
     if (isInstalled || !isCivitAiHostname()) {
         return;
@@ -237,9 +300,16 @@ export function installCivitAiModelBrowseCtas(): void {
 
     const observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
+            if (mutation.type === 'characterData') {
+                syncMutationTarget(mutation);
+                continue;
+            }
+
             if (mutation.type !== 'childList') {
                 continue;
             }
+
+            syncMutationTarget(mutation);
 
             for (const addedNode of mutation.addedNodes) {
                 if (!(addedNode instanceof Element)) {
@@ -253,6 +323,7 @@ export function installCivitAiModelBrowseCtas(): void {
 
     observer.observe(document.documentElement, {
         childList: true,
+        characterData: true,
         subtree: true,
     });
 }
