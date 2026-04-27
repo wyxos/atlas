@@ -38,14 +38,18 @@ npm run dev                 # Vite dev server
 ### Build & Typecheck
 ```bash
 # Backend
-vendor/bin/pint --dirty     # Format PHP code
+npm run backend:lint        # Verify PHP formatting without changing files
+npm run backend:lint:fix    # Apply Pint fixes intentionally
 php artisan test            # Run Pest tests
 composer lint:php:max-lines # Fail on new/regressed PHP files above 500 lines
 composer lint:php:max-lines:report # Audit the remaining legacy >500-line baseline
 
 # Frontend
 npm run build               # Production build
-npm run check               # TypeScript + ESLint check
+npm run check               # Non-mutating full validation gate
+npm run lint                # Non-mutating ESLint check
+npm run lint:fix            # Apply ESLint fixes intentionally
+npm run verify:vibe-dependency # Confirm the declared @wyxos/vibe range resolves on npm
 npm run test                # Run Vitest tests
 ```
 
@@ -74,8 +78,8 @@ Services gotcha:
 ## Universal Conventions
 
 ### Code Style
-- **PHP**: Laravel Pint (run `vendor/bin/pint --dirty` before commits) → [see app/AGENTS.md for PHP conventions](app/AGENTS.md)
-- **TypeScript/JavaScript**: ESLint + TypeScript strict mode → [see resources/js/AGENTS.md for JS/TS conventions](resources/js/AGENTS.md)
+- **PHP**: Laravel Pint (`npm run backend:lint` verifies; `npm run backend:lint:fix` formats) → [see app/AGENTS.md for PHP conventions](app/AGENTS.md)
+- **TypeScript/JavaScript**: ESLint + TypeScript strict mode (`npm run lint` verifies; `npm run lint:fix` formats) → [see resources/js/AGENTS.md for JS/TS conventions](resources/js/AGENTS.md)
 - **Vue**: Composition API only, `<script setup>` syntax → [see resources/js/AGENTS.md for Vue conventions](resources/js/AGENTS.md)
 - **CSS**: Tailwind CSS v4 (CSS-first config, no `tailwind.config.js`) → [see resources/js/AGENTS.md for Tailwind conventions](resources/js/AGENTS.md)
 - **UI design system**: For component styling/layout/variants, follow [resources/js/components/ui/AGENTS.md](resources/js/components/ui/AGENTS.md) and prefer reusing primitives from `resources/js/components/ui/` before creating new UI components.
@@ -200,6 +204,12 @@ After you've finished editing
   - JS tests: `resources/js/**/*.test.ts`
 - Browser-media test gotcha: do not assume `HTMLMediaElement.play()` returns a promise; jsdom can return `undefined`, so guard the return before chaining `.catch()` in video/audio composables.
 
+### Vibe Dependency Releases
+
+- For Atlas work that bumps `@wyxos/vibe`, verify the Vibe release is visible on npm before deploying Atlas.
+- Run `npm run verify:vibe-dependency` before an Atlas release that depends on Vibe. It confirms the tracked semver range resolves on npm and reports local linked-workspace or untracked lockfile state.
+- Preserve the local `npm link @wyxos/vibe` workflow unless the user explicitly asks to change it; production depends on the semver range in `package.json`, not the workstation junction.
+
 ### Database
 - Migrations: `database/migrations/`
 - Factories: `database/factories/`
@@ -235,11 +245,12 @@ find resources/js -name "*.test.ts"
 
 Before creating a PR:
 
-- [ ] PHP code formatted with Pint: `vendor/bin/pint --dirty`
-- [ ] TypeScript/ESLint passes: `npm run check`
+- [ ] PHP formatting verified with Pint: `npm run backend:lint`
+- [ ] Non-mutating full validation passes: `npm run check`
 - [ ] All relevant tests pass: `php artisan test` and `npm run test`
 - [ ] Frontend builds successfully: `npm run build`
 - [ ] No linter errors or warnings
+- [ ] Fix commands (`npm run lint:fix`, `npm run backend:lint:fix`) were used only intentionally, with the resulting diff reviewed
 - [ ] Code follows existing patterns (check sibling files)
 - [ ] No unnecessary wrappers around single method calls
 - [ ] No redundant type checks or validation (trust TypeScript and libraries)
@@ -248,7 +259,9 @@ Before creating a PR:
 ## AI Agent Requirement
 
 After any code changes, always run frontend linting and report the result:
-- `npm run lint` (minimum requirement; do not skip)
+- `npm run lint` (minimum requirement; non-mutating; do not skip)
+
+Use `npm run lint:fix` only as an intentional edit step, then rerun `npm run lint` and inspect the diff.
 
 ---
 
@@ -259,12 +272,10 @@ After any code changes, always run frontend linting and report the result:
 - No manual HTTP server setup needed
 - Use `php artisan route:list` to see all routes
 
-## WSL + Herd Runtime
-- Environment assumption: commands run from WSL on a Windows host where Laravel Herd manages primary PHP/Laravel services.
-- Before PHP/Laravel tasks, verify runtime resolution (`which php`, `php -v`).
-- In this workspace, `php` may resolve to a WSL shim (`/home/wyxos/.local/bin/php`) that forwards to `cmd.exe`; if Windows interop is unavailable, PHP/Artisan/Pint/tests cannot run from this shell.
-- Git hooks run under `sh` and call `php` directly; if hook-time PHP fails with `UtilBindVsockAnyPort`, run PHP checks explicitly via `cmd.exe /C ...` and commit with `--no-verify` only after those checks pass.
-- If binaries/services are not available in WSL PATH, use Windows/Herd-aware invocation paths as needed.
-- For DB/service operations, confirm whether runtime/services are Windows-hosted before executing maintenance/debug commands.
-- Playwright browser runs in WSL require system Chromium deps; if launch fails with missing `libnspr4.so` (or similar), install required packages before relying on browser automation.
-- `flux pull` in WSL may fail local MySQL CLI detection even when Herd MariaDB exists on Windows. In WSL, set `FLUX_MYSQL_CLI` to the WSL path of `mariadb.exe` (discover with `cmd.exe /C where mariadb` + `wslpath -u`) before running Flux.
+## Windows + Herd Runtime
+- Environment assumption: project and Herd commands run from Windows/PowerShell on this machine; WSL is not the active project runtime.
+- Laravel Herd manages the primary PHP/Laravel services.
+- Before PHP/Laravel tasks, verify runtime resolution (`Get-Command php`, `php -v`) from the current shell.
+- Git hooks call `php` directly; if hook-time PHP fails, run the PHP checks explicitly from Windows and commit with `--no-verify` only after those checks pass.
+- For DB/service operations, confirm the Windows-hosted Herd/database service before executing maintenance/debug commands.
+- Do not route project/Herd work through WSL shims, WSL paths, or `wsl2-ubuntu` unless the user explicitly asks for that path.
