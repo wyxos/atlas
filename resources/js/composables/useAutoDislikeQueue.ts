@@ -87,8 +87,7 @@ export function useAutoDislikeQueue(
             return;
         }
 
-        const removedIds = new Set(itemsToRemove.map((item) => item.id));
-        options.items.value = options.items.value.filter((item) => !removedIds.has(item.id));
+        triggerRef(options.items);
     }
 
     /**

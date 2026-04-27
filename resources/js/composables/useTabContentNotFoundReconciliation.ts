@@ -26,8 +26,6 @@ type UseTabContentNotFoundReconciliationOptions = {
     clearHover: () => void;
 };
 
-type MasonryRemoveTarget = Parameters<BrowseFeedHandle['remove']>[0];
-
 const NOT_FOUND_REMOVAL_DELAY_MS = 5000;
 
 export function useTabContentNotFoundReconciliation(options: UseTabContentNotFoundReconciliationOptions) {
@@ -92,14 +90,11 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
                 options.clearHover();
             }
 
-            if (options.masonry.value) {
-                void Promise.resolve(
-                    options.masonry.value.remove(item as unknown as MasonryRemoveTarget)
-                ).catch(() => {
-                    options.items.value = options.items.value.filter((candidate) => candidate.id !== fileId);
+            const removeResult = options.masonry.value?.remove(item);
+            if (removeResult !== undefined) {
+                void Promise.resolve(removeResult).catch((error: unknown) => {
+                    console.error('Failed to remove not-found item from masonry:', error);
                 });
-            } else {
-                options.items.value = options.items.value.filter((candidate) => candidate.id !== fileId);
             }
         }, NOT_FOUND_REMOVAL_DELAY_MS);
 

@@ -23,11 +23,6 @@ type BatchBlacklistResponse = {
     }>;
 };
 
-type LocalRemovalSnapshot = {
-    item: FeedItem;
-    index: number;
-};
-
 type CreateLoadedItemsBulkActionsOptions = {
     getLoadedItems: () => FeedItem[];
     items: ShallowRef<FeedItem[]>;
@@ -51,37 +46,6 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
         return mutatedItems.filter((item) => !options.matchesActiveLocalFilters?.(item));
     }
 
-    function buildLocalRemovalSnapshots(itemsToRemove: FeedItem[]): LocalRemovalSnapshot[] {
-        return itemsToRemove.map((item) => ({
-            item,
-            index: options.items.value.findIndex((candidate) => candidate.id === item.id),
-        }));
-    }
-
-    function restoreItemsAtOriginalIndices(removalSnapshots: LocalRemovalSnapshot[]): void {
-        if (removalSnapshots.length === 0) {
-            return;
-        }
-
-        const nextItems = [...options.items.value];
-        const sortedSnapshots = [...removalSnapshots].sort((left, right) => left.index - right.index);
-
-        for (const { item, index } of sortedSnapshots) {
-            const existingIndex = nextItems.findIndex((candidate) => candidate.id === item.id);
-            if (existingIndex !== -1) {
-                nextItems.splice(existingIndex, 1);
-            }
-
-            const insertionIndex = index >= 0
-                ? Math.min(index, nextItems.length)
-                : nextItems.length;
-
-            nextItems.splice(insertionIndex, 0, item);
-        }
-
-        options.items.value = nextItems;
-    }
-
     async function removeItemsFromView(itemsToRemove: FeedItem[]): Promise<void> {
         if (itemsToRemove.length === 0) {
             return;
@@ -89,13 +53,7 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
 
         options.clearHoverForRemovedItems(new Set(itemsToRemove.map((item) => item.id)));
 
-        if (options.masonry.value) {
-            await options.masonry.value.remove(itemsToRemove);
-            return;
-        }
-
-        const removedIds = new Set(itemsToRemove.map((item) => item.id));
-        options.items.value = options.items.value.filter((item) => !removedIds.has(item.id));
+        await options.masonry.value?.remove(itemsToRemove);
     }
 
     async function syncLocalMutationView(mutatedItems: FeedItem[]): Promise<void> {
@@ -133,10 +91,6 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
             }
 
             const itemsToTemporarilyRemove = getItemsToRemoveAfterLocalMutation(loadedItems);
-            const removedLocally = options.masonry.value === null;
-            const localRemovalSnapshots = removedLocally
-                ? buildLocalRemovalSnapshots(itemsToTemporarilyRemove)
-                : [];
 
             if (itemsToTemporarilyRemove.length > 0) {
                 await removeItemsFromView(itemsToTemporarilyRemove);
@@ -160,35 +114,20 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
                     return;
                 }
 
-                if (!removedLocally && options.masonry.value) {
-                    await options.masonry.value.restore(itemsToTemporarilyRemove);
-                    return;
-                }
-
-                restoreItemsAtOriginalIndices(localRemovalSnapshots);
+                await options.masonry.value?.restore(itemsToTemporarilyRemove);
             };
         } else {
             for (const item of loadedItems) {
                 options.cancelAutoDislikeCountdown(item.id);
             }
 
-            const removedLocally = options.masonry.value === null;
-            const localRemovalSnapshots = removedLocally
-                ? buildLocalRemovalSnapshots(loadedItems)
-                : [];
-
             await removeItemsFromView(loadedItems);
 
-            restoreCallback = !removedLocally && currentTabId === undefined
-                ? undefined
-                : async () => {
-                    if (options.masonry.value) {
-                        await options.masonry.value.restore(loadedItems);
-                        return;
-                    }
-
-                    restoreItemsAtOriginalIndices(localRemovalSnapshots);
-                };
+            restoreCallback = currentTabId !== undefined
+                ? async () => {
+                    await options.masonry.value?.restore(loadedItems);
+                }
+                : undefined;
         }
 
         queueBatchReaction(fileIds, type, previews, restoreCallback, options.items, {

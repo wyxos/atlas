@@ -107,7 +107,7 @@ describe('useMasonryReactionHandler', () => {
         expect(masonry.value.restore).toHaveBeenCalledWith(item);
     });
 
-    it('restores locally-removed items at their original index when Vibe is unavailable', async () => {
+    it('does not manually remove local filtered items when Vibe is unavailable', async () => {
         const first = createItem({ id: 1, key: '1-1' });
         const second = createItem({ id: 2, key: '1-2' });
         const third = createItem({ id: 3, key: '1-3' });
@@ -126,13 +126,15 @@ describe('useMasonryReactionHandler', () => {
 
         await handleMasonryReaction(second, 'love');
 
-        expect(items.value.map((item) => item.id)).toEqual([1, 3]);
+        expect(second.reaction).toEqual({ type: 'love' });
+        expect(items.value.map((item) => item.id)).toEqual([1, 2, 3]);
 
         const restoreCallback = mockQueueReaction.mock.calls[0]?.[3] as (() => Promise<void>) | undefined;
         expect(restoreCallback).toBeTypeOf('function');
 
         await restoreCallback?.();
 
+        expect(second.reaction).toEqual({ type: 'dislike' });
         expect(items.value.map((item) => item.id)).toEqual([1, 2, 3]);
         expect(onReaction).toHaveBeenCalledWith(2, 'love');
     });

@@ -10,8 +10,6 @@ type UseLocalFileDeletionOptions = {
     clearHover: () => void;
 };
 
-type MasonryRemoveTarget = Parameters<BrowseFeedHandle['remove']>[0];
-
 function getDeleteErrorMessage(error: unknown): string {
     const axiosError = error as {
         response?: {
@@ -85,14 +83,11 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
 
         if (options.masonry.value) {
             try {
-                await options.masonry.value.remove(item as unknown as MasonryRemoveTarget);
-                return;
+                await options.masonry.value.remove(item);
             } catch (error) {
                 console.error('Failed to remove deleted local item from masonry:', error);
             }
         }
-
-        options.items.value = options.items.value.filter((candidate) => candidate.id !== item.id);
     }
 
     async function confirm(): Promise<void> {

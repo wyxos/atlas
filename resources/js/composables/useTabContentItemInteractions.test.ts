@@ -92,6 +92,58 @@ describe('useTabContentItemInteractions', () => {
         );
     });
 
+    it('does not manually remove loaded items when Vibe is unavailable', async () => {
+        const items = shallowRef<FeedItem[]>([
+            {
+                id: 1,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-1',
+                index: 0,
+                src: 'https://example.com/image1.jpg',
+            } as FeedItem,
+            {
+                id: 2,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-2',
+                index: 1,
+                src: 'https://example.com/image2.jpg',
+            } as FeedItem,
+        ]);
+        const loadedItems = ref(items.value);
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            loadedItems,
+            tab: ref(null),
+            form: {
+                isLocal: ref(false),
+                data: {
+                    feed: 'online',
+                },
+            } as any,
+            masonry: ref(null),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+        });
+
+        const count = await interactions.performLoadedItemsBulkAction('like');
+
+        expect(count).toBe(2);
+        expect(items.value.map((item) => item.id)).toEqual([1, 2]);
+        expect(mockQueueBatchReaction).toHaveBeenCalledTimes(1);
+    });
+
     it('clears hover state when reacting to a hovered online item that is removed from view', async () => {
         const item = {
             id: 1,

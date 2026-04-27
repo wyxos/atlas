@@ -137,4 +137,29 @@ describe('useAutoDislikeQueue', () => {
         expect(item.will_auto_dislike).toBe(false);
         expect(masonry.value.remove).toHaveBeenCalledWith([item]);
     });
+
+    it('does not manually remove auto-disliked local items when Vibe is unavailable', async () => {
+        const item = createItem(505);
+        const items = ref([item]);
+        mockAxiosPost.mockResolvedValueOnce({
+            data: {
+                file_ids: [505],
+            },
+        });
+
+        const autoDislikeQueue = createSubject({
+            items,
+            masonry: ref(null),
+            isLocal: ref(true),
+            matchesActiveLocalFilters: () => false,
+        });
+
+        autoDislikeQueue.startAutoDislikeCountdown(505, item);
+
+        await vi.runAllTimersAsync();
+
+        expect(item.reaction).toEqual({ type: 'dislike' });
+        expect(item.auto_disliked).toBe(true);
+        expect(items.value.map((candidate) => candidate.id)).toEqual([505]);
+    });
 });
