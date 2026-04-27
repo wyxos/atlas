@@ -10,6 +10,13 @@ import {
     update as tabsUpdate,
 } from '@/actions/App/Http/Controllers/TabController';
 
+const NO_CACHE_REQUEST_CONFIG = {
+    headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+    },
+};
+
 export type FeedItem = {
     id: number; // Database file ID
     width: number;
@@ -297,7 +304,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     async function loadTabs(): Promise<void> {
         isLoadingTabs.value = true;
         try {
-            const { data } = await window.axios.get(tabsIndex.url());
+            const { data } = await window.axios.get(tabsIndex.url(), NO_CACHE_REQUEST_CONFIG);
             tabs.value = data.map((tab: ApiTabData) => mapTabData(tab));
             sortTabsByPosition();
             syncActiveState(tabs.value.find(tab => tab.isActive)?.id ?? null);

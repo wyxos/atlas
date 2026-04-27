@@ -70,7 +70,12 @@ describe('useTabs', () => {
         const { tabs, activeTabId, loadTabs } = useTabs();
         await loadTabs();
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs');
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs', {
+            headers: {
+                'Cache-Control': 'no-cache',
+                Pragma: 'no-cache',
+            },
+        });
         expect(tabs.value.map(tab => tab.id)).toEqual([1, 2]);
         expect(tabs.value[0].customLabel).toBe('Pinned');
         expect(tabs.value[0].updatedAt).toBe('2024-01-01T00:00:00Z');

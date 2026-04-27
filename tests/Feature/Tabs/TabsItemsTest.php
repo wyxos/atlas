@@ -21,6 +21,8 @@ test('authenticated user can load items for their tab', function () {
     $response = $this->actingAs($user)->getJson(route('api.tabs.show', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
+    expect((string) $response->headers->get('Cache-Control'))->toContain('no-store');
+    expect((string) $response->headers->get('Pragma'))->toBe('no-cache');
     $data = $response->json();
     expect($data)->toHaveKey('tab');
     expect($data['tab'])->toHaveKey('items');

@@ -14,6 +14,11 @@ use Illuminate\Validation\ValidationException;
 
 class TabController extends Controller
 {
+    private const array NO_STORE_HEADERS = [
+        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma' => 'no-cache',
+    ];
+
     /**
      * Get all tabs for the authenticated user.
      * Note: items are NOT loaded here to support 1000+ tabs efficiently.
@@ -30,7 +35,7 @@ class TabController extends Controller
             ->ordered()
             ->get();
 
-        return response()->json($tabs);
+        return response()->json($tabs, headers: self::NO_STORE_HEADERS);
     }
 
     /**
@@ -305,7 +310,7 @@ class TabController extends Controller
                 'position' => $tab->position ?? 0,
                 'isActive' => $tab->is_active ?? false,
             ],
-        ]);
+        ], headers: self::NO_STORE_HEADERS);
     }
 
     /**

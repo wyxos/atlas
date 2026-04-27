@@ -14,6 +14,8 @@ test('authenticated user can view their browse tabs', function () {
     $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
+    expect((string) $response->headers->get('Cache-Control'))->toContain('no-store');
+    expect((string) $response->headers->get('Pragma'))->toBe('no-cache');
     $data = $response->json();
     expect($data)->toBeArray();
     expect(count($data))->toBe(3);

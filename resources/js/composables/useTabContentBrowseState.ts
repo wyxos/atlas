@@ -10,6 +10,13 @@ import type { BrowseFormData, BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 
+const NO_CACHE_REQUEST_CONFIG = {
+    headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+    },
+};
+
 type UseTabContentBrowseStateOptions = {
     tabId: Ref<number | null>;
     form: BrowseFormInstance;
@@ -209,7 +216,7 @@ function createTabContentBootstrap(args: {
         args.options.events.onTabDataLoadingChange?.(true);
 
         try {
-            const { data } = await window.axios.get(tabsShow.url(args.options.tabId.value));
+            const { data } = await window.axios.get(tabsShow.url(args.options.tabId.value), NO_CACHE_REQUEST_CONFIG);
 
             if (!data.tab) {
                 throw new Error('Browse tab not found.');

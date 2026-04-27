@@ -75,6 +75,58 @@ describe('tabContentV2 resolve', () => {
         expect(result.items).toHaveLength(2);
     });
 
+    it('resolves a params-only CivitAI startup state as a page one model-version query', async () => {
+        const items = ref<FeedItem[]>([]);
+        const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
+
+        window.axios.get = vi.fn().mockResolvedValue({
+            data: {
+                items: [createFeedItem(1)],
+                nextPage: '20|1773762966318',
+                previousPage: null,
+                total: null,
+            },
+        }) as typeof window.axios.get;
+
+        const resolve = createTabContentV2Resolve({
+            form: {
+                getData: () => ({
+                    feed: 'online',
+                    limit: 20,
+                    page: 1,
+                    service: 'civit-ai-images',
+                    serviceFilters: {
+                        modelId: 1894057,
+                        modelVersionId: 2457413,
+                    },
+                    source: 'all',
+                    tab_id: 44,
+                }),
+            } as any,
+            startPageToken: ref(1),
+            items,
+            itemsBuckets,
+            availableServices: ref([]),
+            localService: ref(null),
+            toast: {
+                error: vi.fn(),
+            },
+        });
+
+        await resolve({ cursor: null, pageSize: 20 });
+
+        const requestedUrl = vi.mocked(window.axios.get).mock.calls[0]?.[0] as string;
+
+        expect(decodeURIComponent(requestedUrl)).toContain('/api/browse?feed=online');
+        expect(decodeURIComponent(requestedUrl)).toContain('tab_id=44');
+        expect(decodeURIComponent(requestedUrl)).toContain('page=1');
+        expect(decodeURIComponent(requestedUrl)).toContain('limit=20');
+        expect(decodeURIComponent(requestedUrl)).toContain('service=civit-ai-images');
+        expect(decodeURIComponent(requestedUrl)).toContain('modelId=1894057');
+        expect(decodeURIComponent(requestedUrl)).toContain('modelVersionId=2457413');
+        expect(items.value).toHaveLength(1);
+    });
+
     it('marks audio and video previews with explicit renderable media types', () => {
         const audioItem = mapFeedItemToVibeItem({
             ...createFeedItem(10),
