@@ -6,11 +6,14 @@ import { notifyTabsExtensionReloaded } from './background-reload-overlay';
 import {
     handleAtlasApiRequestRuntimeMessage,
     handleGetUrlCookiesRuntimeMessage,
-    handleOpenCivitAiModelTabRuntimeMessage,
     handleQueuedBadgeCheckRuntimeMessage,
     handleQueuedReferrerCheckRuntimeMessage,
     handleSubmitReactionRuntimeMessage,
 } from './background-runtime-message-handlers';
+import {
+    handleOpenCivitAiModelTabRuntimeMessage,
+    handleOpenCivitAiUsernameTabRuntimeMessage,
+} from './background-civitai-browse-tabs';
 import { normalizeComparableOpenTabUrl } from './open-tab-url';
 import { resolveTabDomainGroupKey, summarizeTabCounts } from './tab-counts';
 type TabPresenceChangedMessage = {
@@ -240,7 +243,8 @@ chrome.runtime.onMessage.addListener((
         || handleQueuedBadgeCheckRuntimeMessage(message, sendResponse)
         || handleQueuedReferrerCheckRuntimeMessage(message, sendResponse)
         || handleAtlasApiRequestRuntimeMessage(message, sendResponse)
-        || handleOpenCivitAiModelTabRuntimeMessage(message, sendResponse)) {
+        || handleOpenCivitAiModelTabRuntimeMessage(message, sendResponse)
+        || handleOpenCivitAiUsernameTabRuntimeMessage(message, sendResponse)) {
         return true;
     }
 

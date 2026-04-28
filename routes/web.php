@@ -44,6 +44,8 @@ Route::post('/api/extension/download-status', [\App\Http\Controllers\ExtensionAp
     ->name('api.extension.download-status');
 Route::post('/api/extension/browse-tabs/civitai-model', [\App\Http\Controllers\ExtensionApiController::class, 'openCivitAiModelBrowseTab'])
     ->name('api.extension.browse-tabs.civitai-model');
+Route::post('/api/extension/browse-tabs/civitai-user', [\App\Http\Controllers\ExtensionApiController::class, 'openCivitAiUserBrowseTab'])
+    ->name('api.extension.browse-tabs.civitai-user');
 Route::post('/api/extension/broadcasting/auth', [\App\Http\Controllers\ExtensionApiController::class, 'broadcastAuth'])
     ->name('api.extension.broadcast-auth');
 

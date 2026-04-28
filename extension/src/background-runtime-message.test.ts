@@ -386,6 +386,53 @@ describe('background runtime message bridge', () => {
         });
     });
 
+    it('creates a new Atlas browser tab for a Civitai username browse request', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            browse_url: 'https://atlas.test/browse',
+            tab: {
+                id: 45,
+                label: 'CivitAI Images: User forsunlee404 - 1',
+            },
+        }), { status: 200 }));
+        vi.stubGlobal('chrome', chromeMock);
+        vi.stubGlobal('fetch', fetchMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        const response = await sendRuntimeMessage(listener!, {
+            type: 'ATLAS_OPEN_CIVITAI_USERNAME_TAB',
+            username: 'forsunlee404',
+        });
+
+        expect(mockGetStoredOptions).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.test/api/extension/browse-tabs/civitai-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Atlas-Api-Key': 'test-api-token',
+            },
+            body: JSON.stringify({
+                username: 'forsunlee404',
+            }),
+        });
+        expect(chromeMock.tabs.create).toHaveBeenCalledWith({ url: 'https://atlas.test/browse' }, expect.any(Function));
+        expect(response).toEqual({
+            ok: true,
+            status: 200,
+            payload: {
+                browse_url: 'https://atlas.test/browse',
+                tab: {
+                    id: 45,
+                    label: 'CivitAI Images: User forsunlee404 - 1',
+                },
+            },
+        });
+    });
+
     it('notifies tabs to reload after extension installs and updates', async () => {
         const { chromeMock, getRuntimeInstalledListener } = createChromeMock([]);
         vi.stubGlobal('chrome', chromeMock);

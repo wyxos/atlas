@@ -100,3 +100,39 @@ it('creates and activates a civitai browse tab for the requested model filter', 
     'model only' => [null],
     'model and version' => [9404101],
 ]);
+
+it('creates and activates a civitai browse tab for the requested username filter', function () {
+    $user = User::factory()->create();
+    setExtensionBrowseTabsApiKey('valid-api-key', $user->id);
+
+    $existingActiveTab = Tab::factory()->create([
+        'user_id' => $user->id,
+        'label' => 'Existing Active',
+        'position' => 0,
+        'is_active' => true,
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/browse-tabs/civitai-user', [
+        'username' => ' forsunlee404 ',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('tab.label', 'CivitAI Images: User forsunlee404 - 1');
+    $response->assertJsonPath('tab.params.feed', 'online');
+    $response->assertJsonPath('tab.params.service', 'civit-ai-images');
+    $response->assertJsonPath('tab.params.username', 'forsunlee404');
+    $response->assertJsonPath('browse_url', url('/browse'));
+
+    $createdTab = Tab::query()
+        ->where('user_id', $user->id)
+        ->where('label', 'CivitAI Images: User forsunlee404 - 1')
+        ->first();
+
+    expect($createdTab)->not->toBeNull();
+    expect($createdTab?->position)->toBe(1);
+    expect($createdTab?->is_active)->toBeTrue();
+    expect($existingActiveTab->fresh()?->is_active)->toBeFalse();
+    expect($createdTab?->params['username'] ?? null)->toBe('forsunlee404');
+});

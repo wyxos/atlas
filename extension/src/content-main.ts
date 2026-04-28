@@ -20,6 +20,7 @@ import { createDownloadEventSheet } from './content/download-event-sheet';
 import { createDuplicateAnchorTabGuard } from './content/duplicate-anchor-tab-guard';
 import { clearDeviantArtBackgroundImageStyle } from './content/deviantart-background-image-style';
 import { installCivitAiModelBrowseCtas } from './content/civitai-model-browse-cta';
+import { installCivitAiUserBrowseLinks } from './content/civitai-user-browse-link';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
@@ -274,6 +275,7 @@ function bootstrap(): void {
     duplicateAnchorTabGuard = createDuplicateAnchorTabGuard();
     clearDeviantArtBackgroundImageStyle();
     installCivitAiModelBrowseCtas();
+    installCivitAiUserBrowseLinks();
     installMutationObserver();
     installStorageListener();
     installRuntimeMessageListener();

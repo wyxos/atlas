@@ -438,6 +438,50 @@ class ExtensionApiController extends Controller
         ]);
     }
 
+    public function openCivitAiUserBrowseTab(
+        Request $request,
+        ExtensionApiKeyService $extensionApiKey,
+    ): JsonResponse {
+        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        if (! $user) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'username' => ['required', 'string', 'max:255'],
+        ]);
+
+        $username = trim((string) $validated['username']);
+        if ($username === '') {
+            throw ValidationException::withMessages([
+                'username' => 'The username field is required.',
+            ]);
+        }
+
+        $tab = $this->createExtensionBrowseTab(
+            $user,
+            "CivitAI Images: User $username - 1",
+            [
+                'feed' => 'online',
+                'service' => CivitAiImages::key(),
+                'page' => 1,
+                'limit' => 20,
+                'username' => $username,
+            ],
+        );
+
+        return response()->json([
+            'tab' => [
+                'id' => $tab->id,
+                'label' => $tab->label,
+                'params' => $tab->params ?? [],
+            ],
+            'browse_url' => url('/browse'),
+        ]);
+    }
+
     private function resolveExtensionUser(Request $request, ExtensionApiKeyService $extensionApiKey): ?\App\Models\User
     {
         $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));

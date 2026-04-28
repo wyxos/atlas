@@ -1,4 +1,3 @@
-import { getStoredOptions } from './atlas-options';
 import { collectCookiesForUrls } from './background-cookie-runtime';
 import {
     emptyBadgeCheckResult,
@@ -55,12 +54,6 @@ type QueueReferrerCheckPayload = {
     normalizedReferrerUrl: string;
 };
 
-type OpenCivitAiModelTabPayload = {
-    type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB';
-    modelId: unknown;
-    modelVersionId?: unknown;
-};
-
 function parseJsonResponse(response: Response): Promise<unknown> {
     return response.text()
         .then((bodyText) => {
@@ -88,33 +81,6 @@ function isAllowedAtlasApiEndpoint(
     }
 
     return method === 'GET' && endpoint === `${atlasDomain}/api/extension/ping`;
-}
-
-function parsePositiveInteger(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
-        return value;
-    }
-
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed !== '' && /^\d+$/.test(trimmed)) {
-            const parsed = Number(trimmed);
-
-            return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-        }
-    }
-
-    return null;
-}
-
-function resolveBrowseUrlFromPayload(payload: unknown): string | null {
-    if (!payload || typeof payload !== 'object') {
-        return null;
-    }
-
-    const browseUrl = (payload as Record<string, unknown>).browse_url;
-
-    return typeof browseUrl === 'string' && browseUrl.trim() !== '' ? browseUrl.trim() : null;
 }
 
 export function handleGetUrlCookiesRuntimeMessage(
@@ -378,75 +344,6 @@ export function handleAtlasApiRequestRuntimeMessage(
                 ok: response.ok,
                 status: response.status,
                 payload: await parseJsonResponse(response),
-            });
-        })
-        .catch(() => {
-            sendResponse({ ok: false, status: 0, payload: null });
-        });
-
-    return true;
-}
-
-export function handleOpenCivitAiModelTabRuntimeMessage(
-    message: unknown,
-    sendResponse: RuntimeSendResponse,
-): boolean {
-    if (!message || typeof message !== 'object') {
-        return false;
-    }
-
-    const payload = message as OpenCivitAiModelTabPayload;
-    if (payload.type !== 'ATLAS_OPEN_CIVITAI_MODEL_TAB') {
-        return false;
-    }
-
-    const modelId = parsePositiveInteger(payload.modelId);
-    const modelVersionId = parsePositiveInteger(payload.modelVersionId);
-
-    if (modelId === null) {
-        sendResponse({ ok: false, status: 0, payload: null });
-        return false;
-    }
-
-    void getStoredOptions()
-        .then(async (stored) => {
-            const atlasDomain = stored.atlasDomain.trim().replace(/\/+$/, '');
-            const apiToken = stored.apiToken.trim();
-            if (atlasDomain === '' || apiToken === '') {
-                sendResponse({ ok: false, status: 0, payload: null });
-                return;
-            }
-
-            const endpoint = `${atlasDomain}/api/extension/browse-tabs/civitai-model`;
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Atlas-Api-Key': apiToken,
-                },
-                body: JSON.stringify({
-                    model_id: modelId,
-                    model_version_id: modelVersionId,
-                }),
-            });
-            const responsePayload = await parseJsonResponse(response);
-            const browseUrl = resolveBrowseUrlFromPayload(responsePayload);
-
-            if (!response.ok || browseUrl === null) {
-                sendResponse({
-                    ok: false,
-                    status: response.status,
-                    payload: responsePayload,
-                });
-                return;
-            }
-
-            chrome.tabs.create({ url: browseUrl }, () => {
-                sendResponse({
-                    ok: !chrome.runtime.lastError,
-                    status: response.status,
-                    payload: responsePayload,
-                });
             });
         })
         .catch(() => {
