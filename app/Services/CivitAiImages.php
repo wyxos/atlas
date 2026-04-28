@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
+use App\Support\CivitAiImagesFilterSchema;
 use App\Support\CivitAiMediaUrl;
+use App\Support\CivitAiPageUrls;
 use App\Support\FileTypeDetector;
 use App\Support\HttpRateLimiter;
-use App\Support\ServiceFilterSchema;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
@@ -191,106 +192,7 @@ class CivitAiImages extends BaseService
 
     public function filterSchema(): array
     {
-        $schema = ServiceFilterSchema::make()
-            ->keys($this->schemaKeyMap())
-            ->types($this->schemaTypeMap())
-            ->labels($this->schemaLabelMap());
-
-        return $schema->fields([
-            // Global keys (canonical UI keys)
-            ...$schema->paginationFields(),
-
-            // Service-specific keys
-            $schema->field('postId', [
-                'placeholder' => 'The ID of a post to get images from.',
-                'min' => 1,
-                'step' => 1,
-            ]),
-            $schema->field('modelId', [
-                'placeholder' => 'The ID of a model to get images from.',
-                'min' => 1,
-                'step' => 1,
-            ]),
-            $schema->field('modelVersionId', [
-                'placeholder' => 'The ID of a model version to get images from.',
-                'min' => 1,
-                'step' => 1,
-            ]),
-            $schema->field('username', [
-                'placeholder' => 'Filter to images from a specific user (e.g. someUser).',
-            ]),
-            $schema->field('nsfw', [
-                'description' => 'Include NSFW results.',
-            ]),
-            $schema->field('type', [
-                'description' => 'Filter by media type.',
-                'options' => [
-                    ['label' => 'All', 'value' => 'all'],
-                    ['label' => 'Image', 'value' => 'image'],
-                    ['label' => 'Video', 'value' => 'video'],
-                ],
-            ]),
-            $schema->field('sort', [
-                'description' => 'Order of results.',
-                'options' => [
-                    ['label' => 'Newest', 'value' => 'Newest'],
-                    ['label' => 'Most Reactions', 'value' => 'Most Reactions'],
-                    ['label' => 'Most Comments', 'value' => 'Most Comments'],
-                ],
-            ]),
-            $schema->field('period', [
-                'description' => 'Time window for sorting.',
-                'options' => [
-                    ['label' => 'All Time', 'value' => 'AllTime'],
-                    ['label' => 'Year', 'value' => 'Year'],
-                    ['label' => 'Month', 'value' => 'Month'],
-                    ['label' => 'Week', 'value' => 'Week'],
-                    ['label' => 'Day', 'value' => 'Day'],
-                ],
-            ]),
-        ]);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function schemaKeyMap(): array
-    {
-        return [
-            'page' => 'cursor',
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function schemaTypeMap(): array
-    {
-        return [
-            'page' => 'hidden',
-            'limit' => 'number',
-            'postId' => 'number',
-            'modelId' => 'number',
-            'modelVersionId' => 'number',
-            'username' => 'text',
-            'nsfw' => 'boolean',
-            'type' => 'radio',
-            'sort' => 'select',
-            'period' => 'select',
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function schemaLabelMap(): array
-    {
-        return [
-            'postId' => 'Post ID',
-            'modelId' => 'Model ID',
-            'modelVersionId' => 'Model Version ID',
-            'nsfw' => 'NSFW',
-        ];
+        return CivitAiImagesFilterSchema::make();
     }
 
     /**
@@ -332,7 +234,7 @@ class CivitAiImages extends BaseService
         $id = $row['id'];
         $rawUrl = is_string($row['url'] ?? null) ? $row['url'] : '';
         $url = CivitAiMediaUrl::normalizeImageUrl($rawUrl) ?? $rawUrl;
-        $referrer = "https://civitai.com/images/{$id}";
+        $referrer = CivitAiPageUrls::imageReferrer((string) $id, $row);
 
         // Build thumbnail from scratch based on token/guid and row id (CivitAI new URL scheme)
         $path = (string) parse_url($url, PHP_URL_PATH);
@@ -527,34 +429,7 @@ class CivitAiImages extends BaseService
         return [
             'type' => $type,
             'source_id' => $sourceId,
-            'referrer' => $this->buildContainerReferrer($type, $sourceId, $resourceContainer),
+            'referrer' => CivitAiPageUrls::containerReferrer($type, $sourceId, $listingMetadata, $resourceContainer),
         ];
-    }
-
-    private function buildContainerReferrer(string $type, string $sourceId, array $resourceContainer = []): ?string
-    {
-        return match ($type) {
-            'Post' => "https://civitai.com/posts/{$sourceId}",
-            'User' => "https://civitai.com/user/{$sourceId}",
-            'Checkpoint', 'LoRA' => $this->buildResourceContainerReferrer($sourceId, $resourceContainer),
-            default => null,
-        };
-    }
-
-    private function buildResourceContainerReferrer(string $sourceId, array $resourceContainer): ?string
-    {
-        $submittedReferrer = isset($resourceContainer['referrerUrl']) && is_string($resourceContainer['referrerUrl'])
-            ? trim($resourceContainer['referrerUrl'])
-            : null;
-        if ($submittedReferrer !== null && $submittedReferrer !== '') {
-            return $submittedReferrer;
-        }
-
-        $modelId = isset($resourceContainer['modelId']) ? (int) $resourceContainer['modelId'] : null;
-        if ($modelId !== null && $modelId > 0) {
-            return "https://civitai.com/models/{$modelId}?modelVersionId={$sourceId}";
-        }
-
-        return null;
     }
 }

@@ -60,6 +60,35 @@ describe('referrer-check-queue', () => {
         expect(queue.getCachedReferrerCheck('https://example.com/gallery?tab=1#section')).toEqual(result);
     });
 
+    it('falls back to the civitai.com referrer alias when a civitai.red check misses', async () => {
+        mockRequestQueuedReferrerCheckViaRuntime.mockImplementation(({ normalizedReferrerUrl }) => Promise.resolve({
+            ok: true,
+            status: 200,
+            payload: normalizedReferrerUrl === 'https://civitai.com/images/9101001'
+                ? {
+                    exists: true,
+                    reaction: 'love',
+                }
+                : {
+                    exists: false,
+                    reaction: null,
+                },
+        }));
+
+        const queue = await import('./referrer-check-queue');
+        const result = await queue.enqueueReferrerCheck('https://civitai.red/images/9101001');
+
+        expect(result.reaction).toBe('love');
+        expect(mockRequestQueuedReferrerCheckViaRuntime).toHaveBeenCalledWith(expect.objectContaining({
+            normalizedReferrerUrl: 'https://civitai.red/images/9101001',
+        }));
+        expect(mockRequestQueuedReferrerCheckViaRuntime).toHaveBeenCalledWith(expect.objectContaining({
+            normalizedReferrerUrl: 'https://civitai.com/images/9101001',
+        }));
+        expect(queue.getCachedReferrerCheck('https://civitai.red/images/9101001')).toEqual(result);
+        expect(queue.getCachedReferrerCheck('https://civitai.com/images/9101001')).toEqual(result);
+    });
+
     it('supports optimistic local cache updates for synchronous anchor lookups', async () => {
         const queue = await import('./referrer-check-queue');
 

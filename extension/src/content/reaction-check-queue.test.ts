@@ -57,11 +57,11 @@ describe('reaction-check-queue', () => {
     it('applies the civitai.com media cleaner on civitai.red pages before dispatching background checks', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://civitai.red/images/123066308') as unknown as Location,
+            value: new URL('https://civitai.red/images/9101001') as unknown as Location,
         });
         document.body.innerHTML = `
-            <a href="/images/123066308">
-                <img id="image" src="https://image.civitai.red/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
+            <a href="/images/9101001">
+                <img id="image" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
             </a>
         `;
         mockGetStoredOptions.mockResolvedValue({
@@ -97,7 +97,7 @@ describe('reaction-check-queue', () => {
         expect(mockRequestQueuedBadgeCheckViaRuntime).toHaveBeenCalledWith({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
-            normalizedMediaUrl: 'https://image.civitai.red/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
+            normalizedMediaUrl: 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
         });
     });
 

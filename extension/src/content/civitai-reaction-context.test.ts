@@ -14,9 +14,9 @@ function setWindowLocation(url: string): void {
 
 describe('classifyCivitAiReactionPage', () => {
     it('classifies post and image pages on both civitai hostnames', () => {
-        expect(classifyCivitAiReactionPage('https://civitai.com/posts/16973563')).toBe('post-page');
-        expect(classifyCivitAiReactionPage('https://civitai.red/images/76477306')).toBe('image-page');
-        expect(classifyCivitAiReactionPage('https://example.com/images/76477306')).toBeNull();
+        expect(classifyCivitAiReactionPage('https://civitai.com/posts/9202002')).toBe('post-page');
+        expect(classifyCivitAiReactionPage('https://civitai.red/images/9101002')).toBe('image-page');
+        expect(classifyCivitAiReactionPage('https://example.com/images/9101002')).toBeNull();
     });
 });
 
@@ -25,11 +25,11 @@ describe('canonicalizeCivitAiBadgeCheckUrl', () => {
         document.body.innerHTML = '';
     });
 
-    it('canonicalizes civitai image variants to the stable original url on civitai.red', () => {
-        setWindowLocation('https://civitai.red/images/123066308');
+    it('canonicalizes civitai image variants to the stable original url while browsing civitai.red', () => {
+        setWindowLocation('https://civitai.red/images/9101001');
         document.body.innerHTML = `
-            <a href="/images/123066308">
-                <img id="image" src="https://image.civitai.red/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
+            <a href="/images/9101001">
+                <img id="image" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
             </a>
         `;
 
@@ -39,14 +39,14 @@ describe('canonicalizeCivitAiBadgeCheckUrl', () => {
         }
 
         expect(canonicalizeCivitAiBadgeCheckUrl(image.src, image)).toBe(
-            'https://image.civitai.red/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
+            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true/8928e082-af52-4ade-a86e-d79e0ed63aa9.jpeg',
         );
     });
 
     it('uses the media image-page anchor to canonicalize civitai videos', () => {
-        setWindowLocation('https://civitai.com/posts/16973563');
+        setWindowLocation('https://civitai.com/posts/9202002');
         document.body.innerHTML = `
-            <a href="/images/76477306">
+            <a href="/images/9101002">
                 <video id="video" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/4MGM4VAVYH67B8TYY43NVH1780.mp4"></video>
             </a>
         `;
@@ -57,7 +57,7 @@ describe('canonicalizeCivitAiBadgeCheckUrl', () => {
         }
 
         expect(canonicalizeCivitAiBadgeCheckUrl(video.src, video)).toBe(
-            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/76477306.mp4',
+            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/9101002.mp4',
         );
     });
 });
@@ -65,7 +65,7 @@ describe('canonicalizeCivitAiBadgeCheckUrl', () => {
 describe('collectCivitAiListingMetadataOverrides', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
-        setWindowLocation('https://civitai.red/images/105372859');
+        setWindowLocation('https://civitai.red/images/9101003');
     });
 
     it('opens the image page menu when needed and extracts post, user, and resource containers', async () => {
@@ -73,7 +73,7 @@ describe('collectCivitAiListingMetadataOverrides', () => {
         card.className = 'mantine-Paper-root';
         card.innerHTML = `
             <button type="button" aria-haspopup="menu" aria-expanded="false" id="image-menu"></button>
-            <a href="/images/105372859">
+            <a href="/images/9101003">
                 <img src="https://image.civitai.com/token/guid/width=800,original=false/example.jpeg" alt="image">
             </a>
         `;
@@ -82,8 +82,8 @@ describe('collectCivitAiListingMetadataOverrides', () => {
         const creatorCard = document.createElement('div');
         creatorCard.className = 'CreatorCard_profileDetailsContainer__8QORX';
         creatorCard.innerHTML = `
-            <a href="https://civitai.red/user/shepretends">
-                <p>shepretends</p>
+            <a href="https://civitai.red/user/exampleCreator">
+                <p>exampleCreator</p>
             </a>
         `;
         document.body.appendChild(creatorCard);
@@ -91,11 +91,11 @@ describe('collectCivitAiListingMetadataOverrides', () => {
         const models = document.createElement('ul');
         models.innerHTML = `
             <li>
-                <a href="https://civitai.red/models/833294/noobai-xl-nai-xl?modelVersionId=1190596"><p>NoobAI-XL (NAI-XL)</p></a>
+                <a href="https://civitai.red/models/9303001/example-checkpoint?modelVersionId=9404001"><p>Example Checkpoint</p></a>
                 <div><span>Checkpoint</span></div>
             </li>
             <li>
-                <a href="https://civitai.red/models/1368095/incase-style-noobai?modelVersionId=1545615"><p>Incase Style (NoobAI)</p></a>
+                <a href="https://civitai.red/models/9303002/example-lora?modelVersionId=9404002"><p>Example LoRA</p></a>
                 <div><span>LoRA</span></div>
             </li>
             <li>
@@ -121,7 +121,7 @@ describe('collectCivitAiListingMetadataOverrides', () => {
             }
 
             const postLink = document.createElement('a');
-            postLink.href = '/posts/23377656';
+            postLink.href = '/posts/9202001';
             postLink.textContent = 'View Post';
             postLink.setAttribute('data-test-post-link', '1');
             document.body.appendChild(postLink);
@@ -137,20 +137,20 @@ describe('collectCivitAiListingMetadataOverrides', () => {
 
         expect(clickCount).toBeGreaterThan(0);
         expect(overrides).toEqual({
-            postId: 23377656,
-            username: 'shepretends',
+            postId: 9202001,
+            username: 'exampleCreator',
             resource_containers: [
                 {
                     type: 'Checkpoint',
-                    modelId: 833294,
-                    modelVersionId: 1190596,
-                    referrerUrl: 'https://civitai.red/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+                    modelId: 9303001,
+                    modelVersionId: 9404001,
+                    referrerUrl: 'https://civitai.red/models/9303001/example-checkpoint?modelVersionId=9404001',
                 },
                 {
                     type: 'LoRA',
-                    modelId: 1368095,
-                    modelVersionId: 1545615,
-                    referrerUrl: 'https://civitai.red/models/1368095/incase-style-noobai?modelVersionId=1545615',
+                    modelId: 9303002,
+                    modelVersionId: 9404002,
+                    referrerUrl: 'https://civitai.red/models/9303002/example-lora?modelVersionId=9404002',
                 },
             ],
         });
@@ -161,7 +161,7 @@ describe('collectCivitAiListingMetadataOverrides', () => {
         card.className = 'mantine-Paper-root';
         card.innerHTML = `
             <button type="button" aria-haspopup="menu" aria-expanded="false" id="image-menu"></button>
-            <a href="/images/105372859">
+            <a href="/images/9101003">
                 <img src="https://image.civitai.com/token/guid/width=800,original=false/example.jpeg" alt="image">
             </a>
         `;
@@ -170,14 +170,14 @@ describe('collectCivitAiListingMetadataOverrides', () => {
         const creatorCard = document.createElement('div');
         creatorCard.className = 'CreatorCard_profileDetailsContainer__8QORX';
         creatorCard.innerHTML = `
-            <a href="/user/shepretends">
-                <p>shepretends</p>
+            <a href="/user/exampleCreator">
+                <p>exampleCreator</p>
             </a>
         `;
         document.body.appendChild(creatorCard);
 
         const postLink = document.createElement('a');
-        postLink.href = '/posts/23377656';
+        postLink.href = '/posts/9202001';
         postLink.textContent = 'View Post';
         document.body.appendChild(postLink);
 
@@ -200,8 +200,8 @@ describe('collectCivitAiListingMetadataOverrides', () => {
 
         expect(clickCount).toBe(0);
         expect(overrides).toMatchObject({
-            postId: 23377656,
-            username: 'shepretends',
+            postId: 9202001,
+            username: 'exampleCreator',
         });
     });
 });

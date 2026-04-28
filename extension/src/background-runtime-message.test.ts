@@ -343,7 +343,7 @@ describe('background runtime message bridge', () => {
             browse_url: 'https://atlas.test/browse',
             tab: {
                 id: 44,
-                label: 'CivitAI Images: Model 960593 @ 1804885 - 1',
+                label: 'CivitAI Images: Model 9303101 @ 9404101 - 1',
             },
         }), { status: 200 }));
         vi.stubGlobal('chrome', chromeMock);
@@ -356,8 +356,8 @@ describe('background runtime message bridge', () => {
 
         const response = await sendRuntimeMessage(listener!, {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
-            modelId: 960593,
-            modelVersionId: 1804885,
+            modelId: 9303101,
+            modelVersionId: 9404101,
         });
 
         expect(mockGetStoredOptions).toHaveBeenCalledTimes(1);
@@ -368,8 +368,8 @@ describe('background runtime message bridge', () => {
                 'X-Atlas-Api-Key': 'test-api-token',
             },
             body: JSON.stringify({
-                model_id: 960593,
-                model_version_id: 1804885,
+                model_id: 9303101,
+                model_version_id: 9404101,
             }),
         });
         expect(chromeMock.tabs.create).toHaveBeenCalledWith({ url: 'https://atlas.test/browse' }, expect.any(Function));
@@ -380,7 +380,7 @@ describe('background runtime message bridge', () => {
                 browse_url: 'https://atlas.test/browse',
                 tab: {
                     id: 44,
-                    label: 'CivitAI Images: Model 960593 @ 1804885 - 1',
+                    label: 'CivitAI Images: Model 9303101 @ 9404101 - 1',
                 },
             },
         });

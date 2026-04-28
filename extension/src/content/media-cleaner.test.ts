@@ -51,11 +51,11 @@ describe('applyMediaCleaner', () => {
     });
 
     it('canonicalizes civitai image-page variants to the stable stored media url', async () => {
-        setWindowLocation('https://civitai.com/images/123066308');
+        setWindowLocation('https://civitai.com/images/9101001');
         const { applyMediaCleaner } = await import('./media-cleaner');
 
         document.body.innerHTML = `
-            <a href="/images/123066308">
+            <a href="/images/9101001">
                 <img id="image" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/8928e082-af52-4ade-a86e-d79e0ed63aa9/original=true,quality=90/f3a666a2-65dd-4738-a1f2-dd1de72f2636.jpeg" alt="image">
             </a>
         `;
@@ -78,11 +78,11 @@ describe('applyMediaCleaner', () => {
     });
 
     it('preserves civitai video canonicalization via candidate image-page urls', async () => {
-        setWindowLocation('https://civitai.com/posts/16973563');
+        setWindowLocation('https://civitai.com/posts/9202002');
         const { applyMediaCleaner } = await import('./media-cleaner');
 
         document.body.innerHTML = `
-            <a href="/images/76477306">
+            <a href="/images/9101002">
                 <video id="video" src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/4MGM4VAVYH67B8TYY43NVH1780.mp4"></video>
             </a>
         `;
@@ -98,9 +98,9 @@ describe('applyMediaCleaner', () => {
             rewriteRules: [],
         }, {
             media: video,
-            candidatePageUrls: [window.location.href, 'https://civitai.com/images/76477306'],
+            candidatePageUrls: [window.location.href, 'https://civitai.com/images/9101002'],
         })).toBe(
-            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/76477306.mp4',
+            'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0d6b721b-6256-4849-99ba-05c7cbb5b64f/transcode=true,original=true,quality=90/9101002.mp4',
         );
     });
 });

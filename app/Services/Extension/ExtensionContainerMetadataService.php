@@ -3,6 +3,7 @@
 namespace App\Services\Extension;
 
 use App\Services\CivitAiImages;
+use App\Support\CivitAiMediaUrl;
 
 class ExtensionContainerMetadataService
 {
@@ -175,7 +176,10 @@ class ExtensionContainerMetadataService
             return 'deviantart.com';
         }
 
-        if ($normalizedHost === 'civitai.com' || str_ends_with($normalizedHost, '.civitai.com')) {
+        if ($normalizedHost === CivitAiMediaUrl::PRIMARY_PAGE_HOST
+            || str_ends_with($normalizedHost, '.'.CivitAiMediaUrl::PRIMARY_PAGE_HOST)
+            || $normalizedHost === CivitAiMediaUrl::NSFW_PAGE_HOST
+            || str_ends_with($normalizedHost, '.'.CivitAiMediaUrl::NSFW_PAGE_HOST)) {
             return CivitAiImages::source();
         }
 

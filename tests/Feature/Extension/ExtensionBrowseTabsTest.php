@@ -34,7 +34,7 @@ test('extension civitai browse tab endpoint requires a valid api key', function 
     setExtensionBrowseTabsApiKey('valid-api-key');
 
     $this->postJson('/api/extension/browse-tabs/civitai-model', [
-        'model_id' => 960593,
+        'model_id' => 9303101,
     ])->assertUnauthorized();
 });
 
@@ -56,7 +56,7 @@ it('creates and activates a civitai browse tab for the requested model filter', 
     ]);
 
     $payload = [
-        'model_id' => 960593,
+        'model_id' => 9303101,
     ];
 
     if ($modelVersionId !== null) {
@@ -69,25 +69,25 @@ it('creates and activates a civitai browse tab for the requested model filter', 
 
     $response->assertSuccessful();
     $response->assertJsonPath('tab.label', $modelVersionId === null
-        ? 'CivitAI Images: Model 960593 - 1'
-        : "CivitAI Images: Model 960593 @ {$modelVersionId} - 1");
+        ? 'CivitAI Images: Model 9303101 - 1'
+        : "CivitAI Images: Model 9303101 @ {$modelVersionId} - 1");
     $response->assertJsonPath('tab.params.feed', 'online');
     $response->assertJsonPath('tab.params.service', 'civit-ai-images');
-    $response->assertJsonPath('tab.params.modelId', 960593);
+    $response->assertJsonPath('tab.params.modelId', 9303101);
     $response->assertJsonPath('browse_url', url('/browse'));
 
     $createdTab = Tab::query()
         ->where('user_id', $user->id)
         ->where('label', $modelVersionId === null
-            ? 'CivitAI Images: Model 960593 - 1'
-            : "CivitAI Images: Model 960593 @ {$modelVersionId} - 1")
+            ? 'CivitAI Images: Model 9303101 - 1'
+            : "CivitAI Images: Model 9303101 @ {$modelVersionId} - 1")
         ->first();
 
     expect($createdTab)->not->toBeNull();
     expect($createdTab?->position)->toBe(2);
     expect($createdTab?->is_active)->toBeTrue();
     expect($existingActiveTab->fresh()?->is_active)->toBeFalse();
-    expect($createdTab?->params['modelId'] ?? null)->toBe(960593);
+    expect($createdTab?->params['modelId'] ?? null)->toBe(9303101);
 
     if ($modelVersionId === null) {
         expect(array_key_exists('modelVersionId', $createdTab?->params ?? []))->toBeFalse();
@@ -98,5 +98,5 @@ it('creates and activates a civitai browse tab for the requested model filter', 
     expect($createdTab?->params['modelVersionId'] ?? null)->toBe($modelVersionId);
 })->with([
     'model only' => [null],
-    'model and version' => [1804885],
+    'model and version' => [9404101],
 ]);

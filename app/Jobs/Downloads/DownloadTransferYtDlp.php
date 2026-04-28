@@ -13,6 +13,7 @@ use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\Downloads\YtDlpCommandBuilder;
+use App\Services\Downloads\YtDlpProgressLineClassifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -83,7 +84,7 @@ class DownloadTransferYtDlp implements ShouldQueue
 
             $absoluteTmpDir = $disk->path($tmpDir);
             $outputTemplate = $absoluteTmpDir.DIRECTORY_SEPARATOR.'download.%(ext)s';
-            [$runtimeOptions, $runtimeCookieJarPath] = $this->buildRuntimeOptions($transfer, $absoluteTmpDir, $requestOptions);
+            [$runtimeOptions, $runtimeCookieJarPath] = $requestOptions->ytDlpRuntimeOptions($transfer, $absoluteTmpDir);
 
             $lastBroadcastPercent = (int) ($transfer->last_broadcast_percent ?? 0);
             $progressBuffer = '';
@@ -382,7 +383,7 @@ class DownloadTransferYtDlp implements ShouldQueue
         }
 
         foreach ($lines as $line) {
-            if ($this->shouldMarkAssemblingFromLine($line)) {
+            if (YtDlpProgressLineClassifier::shouldMarkAssemblingFromLine($line)) {
                 $this->markAssembling($transfer);
             }
 
@@ -439,17 +440,6 @@ class DownloadTransferYtDlp implements ShouldQueue
         }
     }
 
-    /**
-     * @return array{0: array{cookies_path?: string, user_agent?: string}, 1: string|null}
-     */
-    private function buildRuntimeOptions(
-        DownloadTransfer $transfer,
-        string $absoluteTmpDir,
-        DownloadTransferRequestOptions $requestOptions
-    ): array {
-        return $requestOptions->ytDlpRuntimeOptions($transfer, $absoluteTmpDir);
-    }
-
     private function matchesAttempt(DownloadTransfer $transfer): bool
     {
         return (int) ($transfer->attempt ?? 0) === $this->attempt;
@@ -467,30 +457,6 @@ class DownloadTransferYtDlp implements ShouldQueue
                 DownloadTransferStatus::ASSEMBLING,
             ], true)
             && (int) $state->attempt === $this->attempt;
-    }
-
-    private function shouldMarkAssemblingFromLine(string $line): bool
-    {
-        $trimmed = trim($line);
-        if ($trimmed === '') {
-            return false;
-        }
-
-        $lower = strtolower($trimmed);
-
-        if (preg_match('/^\[download\]\s+100(?:\.0+)?\s*%/i', $trimmed) === 1) {
-            return true;
-        }
-
-        return str_starts_with($lower, '[merger]')
-            || str_starts_with($lower, '[extractaudio]')
-            || str_starts_with($lower, '[fixup')
-            || str_starts_with($lower, '[metadata]')
-            || str_starts_with($lower, '[modifychapters]')
-            || str_contains($lower, 'merging formats into')
-            || str_contains($lower, 'fixing mpeg-ts')
-            || str_contains($lower, 'correcting container')
-            || str_contains($lower, 'deleting original file');
     }
 
     private function markAssembling(DownloadTransfer $transfer): void

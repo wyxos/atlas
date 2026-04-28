@@ -4,6 +4,46 @@ namespace App\Support;
 
 final class CivitAiMediaUrl
 {
+    public const string PRIMARY_PAGE_HOST = 'civitai.com';
+
+    public const string NSFW_PAGE_HOST = 'civitai.red';
+
+    public const string PRIMARY_MEDIA_HOST = 'image.civitai.com';
+
+    public static function pageBaseUrl(bool $nsfw = false): string
+    {
+        return 'https://'.($nsfw ? self::NSFW_PAGE_HOST : self::PRIMARY_PAGE_HOST);
+    }
+
+    public static function isPageHost(?string $host): bool
+    {
+        $normalized = self::normalizeHost($host);
+        if ($normalized === null) {
+            return false;
+        }
+
+        return in_array($normalized, [
+            self::PRIMARY_PAGE_HOST,
+            'www.'.self::PRIMARY_PAGE_HOST,
+            self::NSFW_PAGE_HOST,
+            'www.'.self::NSFW_PAGE_HOST,
+        ], true);
+    }
+
+    public static function isMediaHost(?string $host): bool
+    {
+        $normalized = self::normalizeHost($host);
+
+        return $normalized === self::PRIMARY_MEDIA_HOST;
+    }
+
+    public static function isRedHost(?string $host): bool
+    {
+        $normalized = self::normalizeHost($host);
+
+        return $normalized !== null && ($normalized === self::NSFW_PAGE_HOST || str_ends_with($normalized, '.'.self::NSFW_PAGE_HOST));
+    }
+
     public static function isMediaUrl(?string $url): bool
     {
         return self::parseMediaUrl($url) !== null;
@@ -23,7 +63,7 @@ final class CivitAiMediaUrl
             return null;
         }
 
-        return "{$parts['scheme']}://{$parts['host']}/{$parts['token']}/{$parts['guid']}/original=true/{$parts['guid']}.{$parts['extension']}";
+        return "{$parts['scheme']}://".self::PRIMARY_MEDIA_HOST."/{$parts['token']}/{$parts['guid']}/original=true/{$parts['guid']}.{$parts['extension']}";
     }
 
     /**
@@ -50,7 +90,7 @@ final class CivitAiMediaUrl
         $host = isset($parts['host']) && is_string($parts['host']) ? strtolower($parts['host']) : null;
         $path = isset($parts['path']) && is_string($parts['path']) ? trim($parts['path'], '/') : null;
 
-        if ($scheme === null || ! in_array($scheme, ['http', 'https'], true) || $host !== 'image.civitai.com' || $path === null || $path === '') {
+        if ($scheme === null || ! in_array($scheme, ['http', 'https'], true) || ! self::isMediaHost($host) || $path === null || $path === '') {
             return null;
         }
 
@@ -83,5 +123,16 @@ final class CivitAiMediaUrl
     private static function isVideoExtension(string $extension): bool
     {
         return in_array($extension, ['mp4', 'm4v', 'mov', 'webm'], true);
+    }
+
+    private static function normalizeHost(?string $host): ?string
+    {
+        if (! is_string($host)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($host, ". \t\n\r\0\x0B"));
+
+        return $normalized === '' ? null : $normalized;
     }
 }

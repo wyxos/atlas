@@ -125,7 +125,7 @@ it('creates version-precise resource containers from listing metadata overrides'
     $transformedItems = [
         [
             'file' => [
-                'referrer_url' => 'https://civitai.com/images/105372859',
+                'referrer_url' => 'https://civitai.com/images/9101003',
                 'source' => 'CivitAI',
                 'url' => 'https://image.civitai.com/file-resource.jpg',
                 'filename' => 'file-resource.jpg',
@@ -135,21 +135,21 @@ it('creates version-precise resource containers from listing metadata overrides'
                     'resource_containers' => [
                         [
                             'type' => 'Checkpoint',
-                            'modelId' => 833294,
-                            'modelVersionId' => 1190596,
-                            'referrerUrl' => 'https://civitai.com/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+                            'modelId' => 9303001,
+                            'modelVersionId' => 9404001,
+                            'referrerUrl' => 'https://civitai.com/models/9303001/example-checkpoint?modelVersionId=9404001',
                         ],
                         [
                             'type' => 'LoRA',
-                            'modelId' => 1368095,
-                            'modelVersionId' => 1545615,
-                            'referrerUrl' => 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+                            'modelId' => 9303002,
+                            'modelVersionId' => 9404002,
+                            'referrerUrl' => 'https://civitai.com/models/9303002/example-lora?modelVersionId=9404002',
                         ],
                     ],
                 ]),
             ],
             'metadata' => [
-                'file_referrer_url' => 'https://civitai.com/images/105372859',
+                'file_referrer_url' => 'https://civitai.com/images/9101003',
                 'payload' => json_encode(['test' => 'data']),
             ],
         ],
@@ -161,17 +161,17 @@ it('creates version-precise resource containers from listing metadata overrides'
     $this->assertDatabaseHas('containers', [
         'type' => 'Checkpoint',
         'source' => 'CivitAI',
-        'source_id' => '1190596',
-        'referrer' => 'https://civitai.com/models/833294/noobai-xl-nai-xl?modelVersionId=1190596',
+        'source_id' => '9404001',
+        'referrer' => 'https://civitai.com/models/9303001/example-checkpoint?modelVersionId=9404001',
     ]);
     $this->assertDatabaseHas('containers', [
         'type' => 'LoRA',
         'source' => 'CivitAI',
-        'source_id' => '1545615',
-        'referrer' => 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+        'source_id' => '9404002',
+        'referrer' => 'https://civitai.com/models/9303002/example-lora?modelVersionId=9404002',
     ]);
 
-    $file = File::where('referrer_url', 'https://civitai.com/images/105372859')->first();
+    $file = File::where('referrer_url', 'https://civitai.com/images/9101003')->first();
     expect($file)->not->toBeNull();
     expect($file?->containers()->where('type', 'Checkpoint')->exists())->toBeTrue();
     expect($file?->containers()->where('type', 'LoRA')->exists())->toBeTrue();
@@ -383,15 +383,15 @@ it('allows different civitai container types to share the same source id', funct
     Container::create([
         'type' => 'Post',
         'source' => 'CivitAI',
-        'source_id' => '1763717',
-        'referrer' => 'https://civitai.com/posts/1763717',
+        'source_id' => '9404003',
+        'referrer' => 'https://civitai.com/posts/9404003',
     ]);
 
     Container::create([
         'type' => 'Checkpoint',
         'source' => 'CivitAI',
-        'source_id' => '1763717',
-        'referrer' => 'https://civitai.com/models/621659/smooth-mix-old-ver-noobaiillustriouspony?modelVersionId=1763717',
+        'source_id' => '9404003',
+        'referrer' => 'https://civitai.com/models/9303003/example-shared-checkpoint?modelVersionId=9404003',
     ]);
 
     $this->assertDatabaseCount('containers', 2);

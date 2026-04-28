@@ -3,6 +3,7 @@ import { requestQueuedReferrerCheckViaRuntime } from '../atlas-runtime-request';
 import { cleanupUrlQueryParams } from '../referrer-cleanup';
 import { atlasLoggedRuntimeRequest } from './atlas-request-log';
 import { normalizeHashAwareUrl, shouldExcludeMediaOrAnchorUrl } from './media-utils';
+import { createCivitAiDomainAliasUrls } from '../civitai-domains';
 
 export type ReferrerMatchResult = {
     exists: boolean;
@@ -53,6 +54,35 @@ function parseMatchResult(value: unknown): ReferrerMatchResult {
     };
 }
 
+function hasMatch(result: ReferrerMatchResult): boolean {
+    return result.exists
+        || result.reaction !== null
+        || result.reactedAt !== null
+        || result.downloadedAt !== null
+        || result.blacklistedAt !== null;
+}
+
+function cacheResult(urls: string[], result: ReferrerMatchResult): void {
+    const cachedAt = Date.now();
+    urls.forEach((url) => {
+        resultCacheByKey.set(url, {
+            result,
+            cachedAt,
+        });
+    });
+}
+
+function getCachedResult(urls: string[]): ReferrerMatchResult | null {
+    for (const url of urls) {
+        const cached = resultCacheByKey.get(url);
+        if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
+            return cached.result;
+        }
+    }
+
+    return null;
+}
+
 export async function enqueueReferrerCheck(
     referrerUrl: string | null,
     referrerCleanerQueryParams: string[] = [],
@@ -62,9 +92,13 @@ export async function enqueueReferrerCheck(
         return emptyResult();
     }
 
-    const cached = resultCacheByKey.get(normalizedReferrerUrl);
-    if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
-        return cached.result;
+    const lookupUrls = Array.from(new Set([
+        normalizedReferrerUrl,
+        ...createCivitAiDomainAliasUrls(normalizedReferrerUrl),
+    ]));
+    const cached = getCachedResult(lookupUrls);
+    if (cached !== null) {
+        return cached;
     }
 
     try {
@@ -74,28 +108,31 @@ export async function enqueueReferrerCheck(
         }
 
         const endpoint = `${stored.atlasDomain}/api/extension/referrer-checks`;
-        const runtimeResponse = await atlasLoggedRuntimeRequest(
-            endpoint,
-            'POST',
-            { referrer_url: normalizedReferrerUrl },
-            () => requestQueuedReferrerCheckViaRuntime({
-                atlasDomain: stored.atlasDomain,
-                apiToken: stored.apiToken,
-                normalizedReferrerUrl,
-            }),
-        );
+        for (const lookupUrl of lookupUrls) {
+            const runtimeResponse = await atlasLoggedRuntimeRequest(
+                endpoint,
+                'POST',
+                { referrer_url: lookupUrl },
+                () => requestQueuedReferrerCheckViaRuntime({
+                    atlasDomain: stored.atlasDomain,
+                    apiToken: stored.apiToken,
+                    normalizedReferrerUrl: lookupUrl,
+                }),
+            );
 
-        if (runtimeResponse === null || !runtimeResponse.ok) {
-            return emptyResult();
+            if (runtimeResponse === null || !runtimeResponse.ok) {
+                continue;
+            }
+
+            const result = parseMatchResult(runtimeResponse.payload);
+            if (hasMatch(result) || lookupUrl === lookupUrls[lookupUrls.length - 1]) {
+                cacheResult(lookupUrls, result);
+
+                return result;
+            }
         }
 
-        const result = parseMatchResult(runtimeResponse.payload);
-        resultCacheByKey.set(normalizedReferrerUrl, {
-            result,
-            cachedAt: Date.now(),
-        });
-
-        return result;
+        return emptyResult();
     } catch {
         return emptyResult();
     }
@@ -121,15 +158,15 @@ export function upsertReferrerCheckCache(
         || nextBlacklistedAt !== null;
     const nextExists = update.exists ?? (cached.exists || hasState);
 
-    resultCacheByKey.set(normalizedReferrerUrl, {
-        result: {
-            exists: nextExists,
-            reaction: nextReaction,
-            reactedAt: nextReactedAt,
-            downloadedAt: nextDownloadedAt,
-            blacklistedAt: nextBlacklistedAt,
-        },
-        cachedAt: Date.now(),
+    cacheResult([
+        normalizedReferrerUrl,
+        ...createCivitAiDomainAliasUrls(normalizedReferrerUrl),
+    ], {
+        exists: nextExists,
+        reaction: nextReaction,
+        reactedAt: nextReactedAt,
+        downloadedAt: nextDownloadedAt,
+        blacklistedAt: nextBlacklistedAt,
     });
 }
 
@@ -142,10 +179,8 @@ export function getCachedReferrerCheck(
         return null;
     }
 
-    const cached = resultCacheByKey.get(normalizedReferrerUrl);
-    if (!cached || (Date.now() - cached.cachedAt) >= CACHE_TTL_MS) {
-        return null;
-    }
-
-    return cached.result;
+    return getCachedResult([
+        normalizedReferrerUrl,
+        ...createCivitAiDomainAliasUrls(normalizedReferrerUrl),
+    ]);
 }

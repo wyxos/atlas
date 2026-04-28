@@ -11,7 +11,7 @@ describe('submitBadgeReaction civitai overrides', () => {
         vi.resetModules();
         vi.clearAllMocks();
         vi.unstubAllGlobals();
-        history.replaceState({}, '', '/images/76477306');
+        history.replaceState({}, '', '/images/9101002');
     });
 
     it('includes listing metadata overrides for civitai single-image reactions', async () => {
@@ -62,14 +62,14 @@ describe('submitBadgeReaction civitai overrides', () => {
 
         await submitBadgeReaction(image, 'like', {
             listingMetadataOverrides: {
-                postId: 23377656,
-                username: 'shepretends',
+                postId: 9202001,
+                username: 'exampleCreator',
                 resource_containers: [
                     {
                         type: 'LoRA',
-                        modelId: 1368095,
-                        modelVersionId: 1545615,
-                        referrerUrl: 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+                        modelId: 9303002,
+                        modelVersionId: 9404002,
+                        referrerUrl: 'https://civitai.com/models/9303002/example-lora?modelVersionId=9404002',
                     },
                 ],
             },
@@ -79,14 +79,14 @@ describe('submitBadgeReaction civitai overrides', () => {
         const body = submitCall[0].body as Record<string, unknown>;
 
         expect(body.listing_metadata_overrides).toEqual({
-            postId: 23377656,
-            username: 'shepretends',
+            postId: 9202001,
+            username: 'exampleCreator',
             resource_containers: [
                 {
                     type: 'LoRA',
-                    modelId: 1368095,
-                    modelVersionId: 1545615,
-                    referrerUrl: 'https://civitai.com/models/1368095/incase-style-noobai?modelVersionId=1545615',
+                    modelId: 9303002,
+                    modelVersionId: 9404002,
+                    referrerUrl: 'https://civitai.com/models/9303002/example-lora?modelVersionId=9404002',
                 },
             ],
         });

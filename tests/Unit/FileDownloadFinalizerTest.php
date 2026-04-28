@@ -1,29 +1,29 @@
 <?php
 
-use App\Services\Downloads\FileDownloadFinalizer;
+use App\Services\Downloads\FileThumbnailMemoryGuard;
 use Tests\TestCase;
 
 uses(TestCase::class);
 
-function fileDownloadFinalizerProbe(?int $availableMemory = null): FileDownloadFinalizer
+function fileThumbnailMemoryGuardProbe(?int $availableMemory = null): FileThumbnailMemoryGuard
 {
-    return new class($availableMemory) extends FileDownloadFinalizer
+    return new class($availableMemory) extends FileThumbnailMemoryGuard
     {
         public function __construct(private readonly ?int $forcedAvailableMemory) {}
 
         public function parseLimit(string|false $memoryLimit): ?int
         {
-            return $this->parseMemoryLimitToBytes($memoryLimit);
+            return $this->parseLimitToBytes($memoryLimit);
         }
 
         public function canGenerate(int $originalWidth, int $originalHeight, int $thumbnailWidth, int $thumbnailHeight): bool
         {
-            return $this->canGenerateThumbnail($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight);
+            return parent::canGenerate($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight);
         }
 
         public function estimateUsage(int $originalWidth, int $originalHeight, int $thumbnailWidth, int $thumbnailHeight): int
         {
-            return $this->estimateThumbnailMemoryUsage($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight);
+            return parent::estimateUsage($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight);
         }
 
         protected function availableMemoryForThumbnailGeneration(): ?int
@@ -38,7 +38,7 @@ function fileDownloadFinalizerProbe(?int $availableMemory = null): FileDownloadF
 }
 
 it('parses php memory limit shorthand values', function () {
-    $probe = fileDownloadFinalizerProbe();
+    $probe = fileThumbnailMemoryGuardProbe();
 
     expect($probe->parseLimit('128M'))->toBe(128 * 1024 * 1024)
         ->and($probe->parseLimit('2g'))->toBe(2 * 1024 * 1024 * 1024)
@@ -47,19 +47,19 @@ it('parses php memory limit shorthand values', function () {
 });
 
 it('skips thumbnails when the estimated GD memory exceeds what is available', function () {
-    $probe = fileDownloadFinalizerProbe(128 * 1024 * 1024);
+    $probe = fileThumbnailMemoryGuardProbe(128 * 1024 * 1024);
 
     expect($probe->canGenerate(8000, 8000, 450, 450))->toBeFalse();
 });
 
 it('skips large portrait png-like images on a 128 MB worker budget', function () {
-    $probe = fileDownloadFinalizerProbe(128 * 1024 * 1024);
+    $probe = fileThumbnailMemoryGuardProbe(128 * 1024 * 1024);
 
     expect($probe->canGenerate(3088, 4608, 450, 671))->toBeFalse();
 });
 
 it('allows thumbnails when the image memory estimate fits the worker budget', function () {
-    $probe = fileDownloadFinalizerProbe(128 * 1024 * 1024);
+    $probe = fileThumbnailMemoryGuardProbe(128 * 1024 * 1024);
 
     expect($probe->canGenerate(1200, 800, 450, 300))->toBeTrue()
         ->and($probe->estimateUsage(1200, 800, 450, 300))->toBeLessThan(128 * 1024 * 1024);

@@ -34,7 +34,7 @@ describe('installCivitAiModelBrowseCtas', () => {
     it('adds an Open in Atlas CTA beside Civitai model urn rows and forwards the ids', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://civitai.com/models/960593/example') as unknown as Location,
+            value: new URL('https://civitai.com/models/9303101/example') as unknown as Location,
         });
         document.body.innerHTML = `
             <table>
@@ -45,9 +45,9 @@ describe('installCivitAiModelBrowseCtas', () => {
                             <div>
                                 <div>
                                     <code>civitai:</code>
-                                    <code>960593</code>
+                                    <code>9303101</code>
                                     <code>@</code>
-                                    <code>1804885</code>
+                                    <code>9404101</code>
                                 </div>
                                 <button type="button">Copy</button>
                             </div>
@@ -71,15 +71,15 @@ describe('installCivitAiModelBrowseCtas', () => {
 
         expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
-            modelId: 960593,
-            modelVersionId: 1804885,
+            modelId: 9303101,
+            modelVersionId: 9404101,
         }, expect.any(Function));
     });
 
     it('uses the current Civitai model version when the page switches versions without recreating the CTA', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://civitai.com/models/1894057?modelVersionId=2897869') as unknown as Location,
+            value: new URL('https://civitai.com/models/9303102?modelVersionId=9404102') as unknown as Location,
         });
         document.body.innerHTML = `
             <table>
@@ -90,9 +90,9 @@ describe('installCivitAiModelBrowseCtas', () => {
                             <div>
                                 <div>
                                     <code>civitai:</code>
-                                    <code>1894057</code>
+                                    <code>9303102</code>
                                     <code>@</code>
-                                    <code>2897869</code>
+                                    <code>9404102</code>
                                 </div>
                                 <button type="button">Copy</button>
                             </div>
@@ -113,7 +113,7 @@ describe('installCivitAiModelBrowseCtas', () => {
 
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://civitai.com/models/1894057?modelVersionId=2457413') as unknown as Location,
+            value: new URL('https://civitai.com/models/9303102?modelVersionId=9404103') as unknown as Location,
         });
 
         button?.click();
@@ -121,15 +121,15 @@ describe('installCivitAiModelBrowseCtas', () => {
 
         expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
-            modelId: 1894057,
-            modelVersionId: 2457413,
+            modelId: 9303102,
+            modelVersionId: 9404103,
         }, expect.any(Function));
     });
 
     it('supports rows that only expose a model id on civitai.red', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://civitai.red/models/178169/example') as unknown as Location,
+            value: new URL('https://civitai.red/models/9303103/example') as unknown as Location,
         });
         document.body.innerHTML = `
             <table>
@@ -140,7 +140,7 @@ describe('installCivitAiModelBrowseCtas', () => {
                             <div>
                                 <div>
                                     <code>civitai:</code>
-                                    <code>178169</code>
+                                    <code>9303103</code>
                                 </div>
                             </div>
                         </td>
@@ -163,7 +163,7 @@ describe('installCivitAiModelBrowseCtas', () => {
 
         expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
-            modelId: 178169,
+            modelId: 9303103,
             modelVersionId: null,
         }, expect.any(Function));
     });
@@ -171,7 +171,7 @@ describe('installCivitAiModelBrowseCtas', () => {
     it('renders the CTA for the current Mantine URN table row structure', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://civitai.com/models/2544636/example') as unknown as Location,
+            value: new URL('https://civitai.com/models/9303104/example') as unknown as Location,
         });
         document.body.innerHTML = `
             <tr class="m_4e7aa4fd mantine-Table-tr" data-with-row-border="true">
@@ -201,13 +201,13 @@ describe('installCivitAiModelBrowseCtas', () => {
                                 style="--code-bg:var(--mantine-color-blue-filled)"
                                 class="ModelURN_code__eKiIQ m_b183c0a2 mantine-Code-root"
                                 dir="ltr"
-                            >2544636</code>
+                            >9303104</code>
                             <code class="ModelURN_code__eKiIQ m_b183c0a2 mantine-Code-root" dir="ltr">@</code>
                             <code
                                 style="--code-bg:var(--mantine-color-blue-filled)"
                                 class="ModelURN_code__eKiIQ m_b183c0a2 mantine-Code-root"
                                 dir="ltr"
-                            >2859702</code>
+                            >9404104</code>
                         </div>
                         <button
                             class="mantine-focus-auto mantine-active m_8d3f4000 mantine-ActionIcon-root m_87cf2631 mantine-UnstyledButton-root"
@@ -239,22 +239,22 @@ describe('installCivitAiModelBrowseCtas', () => {
 
         expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
-            modelId: 2544636,
-            modelVersionId: 2859702,
+            modelId: 9303104,
+            modelVersionId: 9404104,
         }, expect.any(Function));
     });
 
     it('does nothing outside Civitai pages', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,
-            value: new URL('https://example.com/models/960593') as unknown as Location,
+            value: new URL('https://example.com/models/9303101') as unknown as Location,
         });
         document.body.innerHTML = `
             <div>
                 <code>civitai:</code>
-                <code>960593</code>
+                <code>9303101</code>
                 <code>@</code>
-                <code>1804885</code>
+                <code>9404101</code>
             </div>
         `;
 
