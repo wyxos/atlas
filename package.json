@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.schemastore.org/package.json",
   "private": true,
-  "version": "1.0.114",
+  "version": "1.0.115",
   "type": "module",
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('public/hot', { force: true })\" && vite build",
@@ -79,7 +79,7 @@
     "@unovis/vue": "^1.6.2",
     "@vueuse/core": "^14.1.0",
     "@wyxos/listing": "^1.0.3",
-        "@wyxos/vibe": "^3.1.17",
+    "@wyxos/vibe": "^3.1.17",
     "embla-carousel-vue": "^8.6.0",
     "mysql2": "^3.16.1",
     "reka-ui": "^2.7.0",
