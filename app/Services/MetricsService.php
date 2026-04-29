@@ -48,8 +48,11 @@ class MetricsService
         }
 
         DB::transaction(function () use ($key, $delta, $description) {
+            $valueExpression = $delta < 0
+                ? 'CASE WHEN value < '.abs($delta).' THEN 0 ELSE value - '.abs($delta).' END'
+                : "value + {$delta}";
             $updates = [
-                'value' => DB::raw("CASE WHEN value + {$delta} < 0 THEN 0 ELSE value + {$delta} END"),
+                'value' => DB::raw($valueExpression),
                 'updated_at' => now(),
             ];
 

@@ -6,6 +6,7 @@ use App\Models\Reaction;
 use App\Models\User;
 use App\Services\MetricsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -143,6 +144,19 @@ test('incrementContainersByCounts applies batched deltas and clamps at zero', fu
 
     expect($first->fresh()->files_downloaded)->toBe(0);
     expect($second->fresh()->files_downloaded)->toBe(3);
+});
+
+test('incrementMetric clamps negative deltas without unsigned underflow', function () {
+    $service = app(MetricsService::class);
+    $key = MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED;
+
+    $service->setMetric($key, 0);
+    $service->incrementMetric($key, -1);
+    expect((int) DB::table('metrics')->where('key', $key)->value('value'))->toBe(0);
+
+    $service->setMetric($key, 2);
+    $service->incrementMetric($key, -5);
+    expect((int) DB::table('metrics')->where('key', $key)->value('value'))->toBe(0);
 });
 
 test('incrementContainersByCounts chunks large container batches', function () {
