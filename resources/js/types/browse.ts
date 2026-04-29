@@ -10,6 +10,8 @@ export type BrowseFeedMutationResult = {
 
 export interface BrowseFeedHandle {
     cancel: () => void;
+    getItemByOccurrenceKey?: (occurrenceKey: string) => FeedItem | null;
+    getItems?: () => FeedItem[];
     hasReachedEnd: boolean;
     isLoading: boolean;
     loadNextPage?: () => Promise<void> | void;

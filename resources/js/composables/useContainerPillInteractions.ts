@@ -44,6 +44,7 @@ type ContainerDrawerToggleHandler = (container: ContainerPillTarget) => void;
 type OpenContainerTabHandler = (container: ContainerPillTarget) => void;
 type UseContainerPillInteractionsOptions = {
     items: Ref<FeedItem[]>;
+    getItems?: () => FeedItem[];
     masonry: Ref<BrowseFeedHandle | null>;
     tabId: number | undefined | ComputedRef<number | undefined>;
     isLocal: Readonly<Ref<boolean>>;
@@ -65,6 +66,10 @@ export function useContainerPillInteractions(
     let pendingMiddleClickTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingLeftClickTimer: ReturnType<typeof setTimeout> | null = null;
 
+    function getInteractionItems(): FeedItem[] {
+        return options.getItems?.() ?? options.items.value;
+    }
+
     /**
      * Get full container data for an item (including referrer URL).
      */
@@ -77,7 +82,7 @@ export function useContainerPillInteractions(
      * Get all sibling items (items with the same container ID).
      */
     function getSiblingItems(containerId: number): FeedItem[] {
-        return options.items.value.filter((item) => {
+        return getInteractionItems().filter((item) => {
             const containers = getContainersForItem(item);
             return containers.some((container) => container.id === containerId);
         });
@@ -87,7 +92,7 @@ export function useContainerPillInteractions(
      * Get the referrer URL for a container (from the first item that has this container).
      */
     function getContainerUrl(containerId: number): string | null {
-        for (const item of options.items.value) {
+        for (const item of getInteractionItems()) {
             const containers = getContainersForItem(item);
             const container = containers.find((c) => c.id === containerId);
             if (container?.referrer) {
@@ -98,7 +103,7 @@ export function useContainerPillInteractions(
     }
 
     function getContainer(containerId: number): ContainerPillTarget | null {
-        for (const item of options.items.value) {
+        for (const item of getInteractionItems()) {
             const containers = getContainersForItem(item);
             const container = containers.find((c) => c.id === containerId);
             if (container) {
@@ -164,7 +169,10 @@ export function useContainerPillInteractions(
         } else {
             // Only remove from masonry in online mode (not in local mode)
             // Vibe tracks removals and restores internally; restoring does not require indices.
-            await options.masonry.value?.remove(siblings);
+            const removalResult = await options.masonry.value?.remove(siblings);
+            if (removalResult && removalResult.ids.length === 0) {
+                return;
+            }
 
             batchRestoreCallback = currentTabId !== undefined
                 ? async () => {

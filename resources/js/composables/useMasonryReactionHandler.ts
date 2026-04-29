@@ -177,7 +177,10 @@ export function useMasonryReactionHandler(
             // Only remove from masonry in online mode (not in local mode)
             // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
             options.onWillRemoveItemFromView?.(item);
-            options.masonry.value?.remove(item);
+            const removalResult = await options.masonry.value?.remove(item);
+            if (removalResult && removalResult.ids.length === 0) {
+                return;
+            }
 
             // Create restore callback for undo functionality (only in online mode where items are removed)
             restoreCallback = tabId !== undefined

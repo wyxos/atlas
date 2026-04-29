@@ -13,18 +13,18 @@ import { useLocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
+import { useTabContentV2ContainerBlacklists } from '@/composables/useTabContentV2ContainerBlacklists';
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import { createBrowseCatalog } from '@/lib/browseCatalog';
 import { loadBrowseV2StandaloneFileItem } from '@/lib/browseV2StandaloneItem';
 import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession } from '@/lib/tabContentBrowseBootstrap';
-import { filterItemsByContainerBlacklists, removeContainerBlacklist, upsertContainerBlacklist } from '@/lib/tabContentV2Blacklists';
 import { createRemovedItemIdSet, createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, type OverlayMediaType } from '@/lib/tabContentV2';
 import { createBrowseV2MouseShortcutHandlers } from '@/lib/tabContentV2MouseShortcuts';
+import { getFeedItemFromVibeItem, getFeedItemsFromVibeHandle, getFeedItemFromVibeOccurrenceTarget, type AtlasVibeHandle } from '@/lib/tabContentV2VibeItems';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
-import type { ContainerBlacklist } from '@/types/container-blacklist';
 import type { BrowseFeedHandle } from '@/types/browse';
 import { isPositiveOnlyLocalView, matchesLocalViewFilters } from '@/utils/localReactionState';
 import TabContentV2BootstrapState from './TabContentV2BootstrapState.vue';
@@ -48,7 +48,7 @@ const route = useRoute();
 const tabId = toRef(props, 'tabId');
 const items = shallowRef<FeedItem[]>([]);
 const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
-const vibeRef = ref<VibeHandle | null>(null);
+const vibeRef = ref<AtlasVibeHandle | null>(null);
 const tab = ref<TabData | null>(null);
 const activeIndex = ref(0);
 const surfaceMode = ref<'fullscreen' | 'list'>('list');
@@ -77,6 +77,16 @@ const visibleItems = computed(() => {
     return items.value.filter((item) => !removedItemIds.value.has(item.id));
 });
 const sessionItems = computed(() => standaloneItem.value ? [standaloneItem.value] : visibleItems.value);
+const interactionItems = computed(() => {
+    if (standaloneItem.value) {
+        return [standaloneItem.value];
+    }
+
+    void vibeStatus.value.itemCount;
+    void vibeStatus.value.removedIds.join(',');
+
+    return getCurrentVibeFeedItems();
+});
 const isVibeLoading = computed(() => vibeStatus.value.phase === 'loading'
     || vibeStatus.value.phase === 'filling'
     || vibeStatus.value.phase === 'refreshing'
@@ -121,6 +131,11 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
         },
         nextPage: vibeStatus.value.nextCursor,
         pageLoadingLocked: vibeStatus.value.pageLoadingLocked,
+        getItemByOccurrenceKey: (occurrenceKey: string) => {
+            const item = handle.getItemByOccurrenceKey(occurrenceKey);
+            return item ? getFeedItemFromVibeItem(item) : null;
+        },
+        getItems: getCurrentVibeFeedItems,
         remove: async (target: FeedItem | FeedItem[] | string | string[]) => {
             return handle.remove(collectTargetIds(target));
         },
@@ -133,7 +148,7 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
 
 const containerInteractions = useTabContentContainerInteractions({
     items,
-    visibleItems,
+    getItems: () => interactionItems.value,
     tab,
     form,
     masonry: vibeMasonry,
@@ -146,7 +161,7 @@ const fileViewerStub = ref<{ openFromClick: (event: MouseEvent) => void } | null
 });
 const itemInteractions = useTabContentItemInteractions({
     items,
-    loadedItems: sessionItems,
+    loadedItems: interactionItems,
     tab,
     form,
     masonry: vibeMasonry,
@@ -195,6 +210,10 @@ const localFileDeletion = useLocalFileDeletion({
     isLocal: form.isLocal,
     totalAvailable: browseState.totalAvailable,
     clearHover: itemInteractions.state.clearHover,
+});
+const containerBlacklists = useTabContentV2ContainerBlacklists({
+    items,
+    masonry: vibeMasonry,
 });
 
 const currentNavigation = reactive({ currentItemIndex: 0 as number | null });
@@ -246,10 +265,10 @@ function setTabDataLoading(isLoading: boolean): void {
 }
 
 function setVibeHandle(handle: VibeHandle | null): void {
-    vibeRef.value = handle;
+    vibeRef.value = handle as AtlasVibeHandle | null;
 
     if (handle) {
-        applyActiveContainerBlacklistFilter();
+        containerBlacklists.applyActiveContainerBlacklistFilter();
     }
 }
 
@@ -314,49 +333,6 @@ function updateTabLabel(cursor: string | number | null | undefined): void {
     }
 }
 
-type ContainerBlacklistChange = {
-    action: 'created' | 'deleted';
-    blacklist: ContainerBlacklist;
-};
-
-const activeContainerBlacklists = ref<ContainerBlacklist[]>([]);
-
-function filterItemsByActiveContainerBlacklists(candidateItems: FeedItem[]): FeedItem[] {
-    return filterItemsByContainerBlacklists(candidateItems, activeContainerBlacklists.value);
-}
-
-function applyActiveContainerBlacklistFilter(): void {
-    const filteredItems = filterItemsByActiveContainerBlacklists(items.value);
-    if (filteredItems.length === items.value.length) {
-        return;
-    }
-
-    const filteredIds = new Set(filteredItems.map((item) => item.id));
-    const itemsInBlacklistedContainers = items.value.filter((item) => !filteredIds.has(item.id));
-    if (itemsInBlacklistedContainers.length === 0) {
-        return;
-    }
-
-    const handle = vibeMasonry.value;
-    if (!handle) {
-        return;
-    }
-
-    void handle.remove(itemsInBlacklistedContainers).catch((error: unknown) => {
-        console.error('Failed to remove blacklisted container items from browse-v2:', error);
-    });
-}
-
-function handleContainerBlacklistChange(change: ContainerBlacklistChange): void {
-    if (change.action === 'created' && change.blacklist.action_type === 'blacklist') {
-        activeContainerBlacklists.value = upsertContainerBlacklist(activeContainerBlacklists.value, change.blacklist);
-        applyActiveContainerBlacklistFilter();
-        return;
-    }
-
-    activeContainerBlacklists.value = removeContainerBlacklist(activeContainerBlacklists.value, change.blacklist);
-}
-
 const resolve = createTabContentV2Resolve({
     form,
     startPageToken: browseState.startPageToken,
@@ -365,12 +341,17 @@ const resolve = createTabContentV2Resolve({
     items,
     itemsBuckets,
     availableServices,
-    filterItems: filterItemsByActiveContainerBlacklists,
+    filterItems: containerBlacklists.filterItemsByActiveContainerBlacklists,
     localService,
     toast,
 });
 
-function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null { return (item.feedItem as FeedItem | undefined) ?? null; }
+function getCurrentVibeFeedItems(): FeedItem[] {
+    return getFeedItemsFromVibeHandle(vibeRef.value, visibleItems.value);
+}
+function getFeedItemFromShortcutTarget(target: EventTarget | null): FeedItem | null {
+    return getFeedItemFromVibeOccurrenceTarget(vibeRef.value, target);
+}
 function handleAssetLoads(loads: VibeAssetLoadEvent[]): void { const batch = loads.map((load) => getFeedItemFromVibeItem(load.item)).filter((item): item is FeedItem => item !== null); if (batch.length > 0) itemInteractions.preload.onBatchPreloaded(batch); }
 function handleAssetErrors(errors: VibeAssetErrorEvent[]): void { itemInteractions.preload.onBatchFailures(errors.map((error) => ({ item: error.item.feedItem as FeedItem, error }))); }
 async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> { const feedItem = getFeedItemFromVibeItem(item); if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type); }
@@ -404,7 +385,7 @@ const { handleVibeActiveIndexUpdate, handleVibeSurfaceModeUpdate, isClosingFulls
 
 const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
     getCurrentItem: () => currentVisibleItem.value,
-    getVisibleItems: () => sessionItems.value,
+    getItemFromTarget: getFeedItemFromShortcutTarget,
     getSurfaceMode: () => surfaceMode.value,
     onReaction: async (item, type) => {
         itemInteractions.reactions.onFileReaction(item, type);
@@ -446,7 +427,7 @@ watch(
 watch(
     () => items.value,
     () => {
-        applyActiveContainerBlacklistFilter();
+        containerBlacklists.applyActiveContainerBlacklistFilter();
     },
     { deep: false },
 );
@@ -524,7 +505,7 @@ watch(
         :open-file-sheet="openFileSheet"
         :close-file-sheet="closeFileSheet"
         :downloaded-reaction-prompt="downloadedReactionPrompt"
-        :handle-container-blacklist-change="handleContainerBlacklistChange"
+        :handle-container-blacklist-change="containerBlacklists.handleContainerBlacklistChange"
     />
     <TabContentV2BootstrapState
         v-else

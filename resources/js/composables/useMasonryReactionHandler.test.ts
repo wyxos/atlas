@@ -306,6 +306,30 @@ describe('useMasonryReactionHandler', () => {
         expect(masonry.value.remove.mock.invocationCallOrder[0]).toBeLessThan(mockQueueReaction.mock.invocationCallOrder[0]);
     });
 
+    it('does not queue an online reaction when Vibe reports the item was already removed', async () => {
+        const item = createItem();
+        const items = ref([item]);
+        const masonry = ref({
+            remove: vi.fn().mockResolvedValue({ ids: [] }),
+            restore: vi.fn().mockResolvedValue(undefined),
+        } as any);
+        const onReaction = vi.fn();
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry,
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(false),
+            onReaction,
+        });
+
+        await handleMasonryReaction(item, 'dislike');
+
+        expect(masonry.value.remove).toHaveBeenCalledWith(item);
+        expect(mockQueueReaction).not.toHaveBeenCalled();
+        expect(onReaction).not.toHaveBeenCalled();
+    });
+
     it('does not queue or mutate local state when the downloaded-file prompt is canceled', async () => {
         const item = createItem({
             downloaded: true,

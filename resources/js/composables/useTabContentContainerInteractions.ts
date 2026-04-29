@@ -22,6 +22,7 @@ type ContainerBlacklistDialogRef = {
 
 type UseTabContentContainerInteractionsOptions = {
     items: Ref<FeedItem[]>;
+    getItems?: () => FeedItem[];
     visibleItems?: Ref<FeedItem[]>;
     tab: Ref<TabData | null>;
     form: BrowseFormInstance;
@@ -43,7 +44,7 @@ function isContainerHoverTarget(target: EventTarget | null): boolean {
 
 export function useTabContentContainerInteractions(options: UseTabContentContainerInteractionsOptions) {
     const HOVER_OPEN_DELAY_MS = 700;
-    const visibleItems = computed(() => options.visibleItems?.value ?? options.items.value);
+    const visibleItems = computed(() => options.getItems?.() ?? options.visibleItems?.value ?? options.items.value);
     const badges = useContainerBadges(visibleItems);
     const managerRef = ref<ContainerBlacklistDialogRef | null>(null);
     const selectedContainerId = ref<number | null>(null);
@@ -123,6 +124,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
 
     const pillInteractions = useContainerPillInteractions({
         items: options.items,
+        getItems: () => visibleItems.value,
         masonry: options.masonry,
         tabId: computed(() => options.tab.value?.id),
         isLocal: options.form.isLocal,

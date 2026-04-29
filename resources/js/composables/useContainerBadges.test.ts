@@ -63,6 +63,45 @@ describe('useContainerBadges', () => {
             // Cache should be rebuilt
             expect(getItemCountForContainerId(10)).toBe(2);
         });
+
+        it('rebuilds cache when a smaller list also contains replacement items', async () => {
+            const items = ref<FeedItem[]>([
+                {
+                    id: 1,
+                    containers: [{ id: 10, type: 'Post' }],
+                } as FeedItem,
+                {
+                    id: 2,
+                    containers: [{ id: 10, type: 'Post' }],
+                } as FeedItem,
+                {
+                    id: 3,
+                    containers: [{ id: 20, type: 'User' }],
+                } as FeedItem,
+            ]);
+
+            const { getItemCountForContainerId } = useContainerBadges(items);
+
+            await nextTick();
+
+            items.value = [
+                {
+                    id: 1,
+                    containers: [{ id: 10, type: 'Post' }],
+                } as FeedItem,
+                {
+                    id: 4,
+                    containers: [{ id: 30, type: 'Post' }],
+                } as FeedItem,
+            ];
+
+            await nextTick();
+            await nextTick();
+
+            expect(getItemCountForContainerId(10)).toBe(1);
+            expect(getItemCountForContainerId(20)).toBe(0);
+            expect(getItemCountForContainerId(30)).toBe(1);
+        });
     });
 
     describe('Performance with large arrays', () => {

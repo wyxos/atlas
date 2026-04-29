@@ -150,4 +150,5 @@ describe('TabContentV2GridOverlay', () => {
 
         expect(props.unfreezeAll).toHaveBeenCalledTimes(1);
     });
+
 });

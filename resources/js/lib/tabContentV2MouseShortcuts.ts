@@ -3,7 +3,7 @@ import type { ReactionType } from '@/types/reaction';
 
 type BrowseV2MouseShortcutOptions = {
     getCurrentItem: () => FeedItem | null;
-    getVisibleItems: () => FeedItem[];
+    getItemFromTarget: (target: EventTarget | null) => FeedItem | null;
     getSurfaceMode: () => 'fullscreen' | 'list';
     onReaction: (item: FeedItem, type: ReactionType) => void | Promise<void>;
 };
@@ -18,13 +18,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
             return null;
         }
 
-        const itemElement = target.closest<HTMLElement>('[data-item-id]');
-        const itemId = Number(itemElement?.dataset.itemId ?? '');
-        if (!Number.isFinite(itemId)) {
-            return null;
-        }
-
-        return options.getVisibleItems().find((item) => item.id === itemId) ?? null;
+        return options.getItemFromTarget(target);
     }
 
     function isShortcutSuppressedTarget(target: EventTarget | null): boolean {

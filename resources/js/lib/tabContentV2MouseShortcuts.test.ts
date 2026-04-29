@@ -33,7 +33,7 @@ describe('tabContentV2MouseShortcuts', () => {
         const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
         const handlers = createBrowseV2MouseShortcutHandlers({
             getCurrentItem: () => item,
-            getVisibleItems: () => [item],
+            getItemFromTarget: () => item,
             getSurfaceMode: () => 'list',
             onReaction,
         });
@@ -61,7 +61,7 @@ describe('tabContentV2MouseShortcuts', () => {
         const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
         const handlers = createBrowseV2MouseShortcutHandlers({
             getCurrentItem: () => item,
-            getVisibleItems: () => [item],
+            getItemFromTarget: () => item,
             getSurfaceMode: () => 'list',
             onReaction: vi.fn(),
         });
@@ -79,5 +79,32 @@ describe('tabContentV2MouseShortcuts', () => {
         handlers.handleAuxClickCapture(event);
 
         expect(openSpy).toHaveBeenCalledWith(item.original, '_blank', 'noopener,noreferrer');
+    });
+
+    it('uses the caller-provided target resolver for duplicate item ids', () => {
+        const firstDuplicate = createFeedItem(1);
+        const secondDuplicate = createFeedItem(1);
+        secondDuplicate.key = '1-1-duplicate';
+        const onReaction = vi.fn();
+        const handlers = createBrowseV2MouseShortcutHandlers({
+            getCurrentItem: () => firstDuplicate,
+            getItemFromTarget: () => secondDuplicate,
+            getSurfaceMode: () => 'list',
+            onReaction,
+        });
+
+        document.body.innerHTML = `
+            <article data-item-id="1" data-occurrence-key="vibe-occurrence-2">
+                <div id="card-body">Card</div>
+            </article>
+        `;
+
+        const target = document.getElementById('card-body');
+        const event = new MouseEvent('contextmenu', { altKey: true, button: 2 });
+        Object.defineProperty(event, 'target', { value: target, configurable: true });
+
+        handlers.handleContextMenuCapture(event);
+
+        expect(onReaction).toHaveBeenCalledWith(secondDuplicate, 'dislike');
     });
 });

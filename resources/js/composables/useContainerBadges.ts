@@ -63,6 +63,7 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
         // If items were removed and we have previous state, use incremental update
         if (isRemoval && previousCount > 0 && itemCount > 0) {
             const currentItemIds = new Set(items.value.map(item => item.id));
+            const hasNewItems = items.value.some((item) => !previousItems.value.has(item.id));
             const removedItemIds: number[] = [];
 
             for (const itemId of previousItems.value.keys()) {
@@ -71,7 +72,7 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
                 }
             }
 
-            if (removedItemIds.length > 0 && removedItemIds.length < itemCount) {
+            if (!hasNewItems && removedItemIds.length > 0 && removedItemIds.length < itemCount) {
                 // Incremental update is faster for small removals
                 updateCachesForRemovedItems(removedItemIds);
 
