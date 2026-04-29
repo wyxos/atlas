@@ -36,7 +36,7 @@ class LocalBrowseTypesenseGateway
         }
 
         $ids = $this->extractIds($compiled, $results);
-        $total = (int) ($results['found'] ?? 0);
+        $total = $this->resolveTotal($results);
         $page = (int) ($compiled['page'] ?? 1);
         $limit = max(1, (int) ($compiled['limit'] ?? 20));
 
@@ -105,5 +105,31 @@ class LocalBrowseTypesenseGateway
             ->filter(fn ($id) => is_int($id))
             ->values()
             ->all();
+    }
+
+    /**
+     * Laravel Scout wraps Typesense responses when `take()` reaches its max page size.
+     * In that wrapper, `found` is the fetched hit count and `out_of` carries the real
+     * Typesense total from the first page.
+     *
+     * @param  array<string, mixed>  $results
+     */
+    private function resolveTotal(array $results): int
+    {
+        $found = (int) ($results['found'] ?? 0);
+        $outOf = (int) ($results['out_of'] ?? 0);
+        $hits = $results['hits'] ?? [];
+        $hitCount = is_array($hits) ? count($hits) : 0;
+
+        if (
+            $outOf > $found
+            && $hitCount === $found
+            && array_key_exists('request_params', $results)
+            && ! array_key_exists('search_time_ms', $results)
+        ) {
+            return $outOf;
+        }
+
+        return $found;
     }
 }

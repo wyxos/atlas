@@ -40,7 +40,7 @@ test('local service hydrates typesense file hits in returned order and uses foun
     $names = fakeLocalBrowseNames();
     app()->instance(LocalBrowseTypesenseNames::class, $names);
 
-    $gateway = new class(app(LocalBrowseTypesenseCompiler::class), $names, ['hits' => [['document' => ['id' => (string) $newer->id]], ['document' => ['id' => (string) $older->id]]], 'found' => 42]) extends LocalBrowseTypesenseGateway
+    $gateway = new class(app(LocalBrowseTypesenseCompiler::class), $names, ['hits' => [['document' => ['id' => (string) $newer->id]], ['document' => ['id' => (string) $older->id]]], 'found' => 42, 'out_of' => 999, 'search_time_ms' => 1]) extends LocalBrowseTypesenseGateway
     {
         public array $compiled = [];
 
@@ -69,6 +69,41 @@ test('local service hydrates typesense file hits in returned order and uses foun
     expect(collect($result['files'])->pluck('id')->all())->toBe([$newer->id, $older->id])
         ->and($result['metadata']['nextCursor'])->toBe(2)
         ->and($result['metadata']['total'])->toBe(42);
+});
+
+test('local service uses scout paginated out_of as total at max page size', function () {
+    $names = fakeLocalBrowseNames();
+    app()->instance(LocalBrowseTypesenseNames::class, $names);
+
+    $hits = array_map(
+        fn (int $id): array => ['document' => ['id' => (string) $id]],
+        range(1, 250),
+    );
+
+    $gateway = new class(app(LocalBrowseTypesenseCompiler::class), $names, ['hits' => $hits, 'found' => 250, 'out_of' => 20391, 'page' => 1, 'request_params' => ['per_page' => 250]]) extends LocalBrowseTypesenseGateway
+    {
+        /**
+         * @param  array<string, mixed>  $results
+         */
+        public function __construct($compiler, $names, private array $results)
+        {
+            parent::__construct($compiler, $names);
+        }
+
+        protected function runScoutSearch(array $compiled): array
+        {
+            return $this->results;
+        }
+    };
+    app()->instance(LocalBrowseTypesenseGateway::class, $gateway);
+
+    $result = app(LocalService::class)->fetch([
+        'page' => 1,
+        'limit' => 250,
+    ]);
+
+    expect($result['metadata']['nextCursor'])->toBe(2)
+        ->and($result['metadata']['total'])->toBe(20391);
 });
 
 test('local service hydrates reaction timestamp hits from file ids', function () {
