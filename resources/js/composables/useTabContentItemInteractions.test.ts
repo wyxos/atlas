@@ -144,6 +144,43 @@ describe('useTabContentItemInteractions', () => {
         expect(mockQueueBatchReaction).toHaveBeenCalledTimes(1);
     });
 
+    it('asks Vibe to load more when online removals leave the grid empty', async () => {
+        const items = shallowRef<FeedItem[]>([]);
+        const loadNextPage = vi.fn(async () => undefined);
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            loadedItems: ref(items.value),
+            tab: ref(null),
+            form: {
+                isLocal: ref(false),
+                data: {
+                    feed: 'online',
+                },
+            } as any,
+            masonry: ref({
+                cancel: vi.fn(),
+                isLoading: false,
+                loadNextPage,
+                remove: vi.fn(),
+                restore: vi.fn(),
+            }),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+        });
+
+        await interactions.masonry.onRemoved({ items: [], ids: ['1'] });
+
+        expect(loadNextPage).toHaveBeenCalledTimes(1);
+    });
+
     it('clears hover state when reacting to a hovered online item that is removed from view', async () => {
         const item = {
             id: 1,

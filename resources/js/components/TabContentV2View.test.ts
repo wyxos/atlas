@@ -376,7 +376,6 @@ describe('TabContentV2View', () => {
         const unlockPageLoading = vi.fn();
 
         props.headerMasonry = {
-            hasReachedEnd: false,
             isLoading: false,
             lockPageLoading,
             pageLoadingLocked: false,

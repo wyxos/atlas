@@ -129,7 +129,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             return;
         }
 
-        if (!options.masonry.value || options.masonry.value.isLoading || options.masonry.value.hasReachedEnd) {
+        if (!options.masonry.value || options.masonry.value.isLoading) {
             return;
         }
 

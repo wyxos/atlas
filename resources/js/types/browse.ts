@@ -12,11 +12,9 @@ export interface BrowseFeedHandle {
     cancel: () => void;
     getItemByOccurrenceKey?: (occurrenceKey: string) => FeedItem | null;
     getItems?: () => FeedItem[];
-    hasReachedEnd: boolean;
     isLoading: boolean;
     loadNextPage?: () => Promise<void> | void;
     lockPageLoading?: () => void;
-    nextPage?: BrowsePageToken | null;
     pageLoadingLocked?: boolean;
     remove: (target: BrowseFeedMutationTarget) => Promise<BrowseFeedMutationResult> | BrowseFeedMutationResult;
     restore: (target: BrowseFeedMutationTarget) => Promise<BrowseFeedMutationResult> | BrowseFeedMutationResult;

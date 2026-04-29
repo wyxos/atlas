@@ -84,7 +84,6 @@ describe('TabContentServiceHeader', () => {
     it('routes header navigation and apply buttons through the wired handlers', async () => {
         const props = createProps();
         props.masonry = {
-            hasReachedEnd: false,
             isLoading: false,
         };
 

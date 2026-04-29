@@ -123,13 +123,11 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
 
     return {
         cancel: () => handle.cancel(),
-        hasReachedEnd: !vibeStatus.value.hasNextPage,
         isLoading: isVibeLoading.value,
         lockPageLoading: () => handle.lockPageLoading(),
         loadNextPage: async () => {
             await handle.loadNext();
         },
-        nextPage: vibeStatus.value.nextCursor,
         pageLoadingLocked: vibeStatus.value.pageLoadingLocked,
         getItemByOccurrenceKey: (occurrenceKey: string) => {
             const item = handle.getItemByOccurrenceKey(occurrenceKey);

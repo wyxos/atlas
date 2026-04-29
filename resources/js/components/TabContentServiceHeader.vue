@@ -102,7 +102,7 @@ withDefaults(defineProps<Props>(), {
 
             <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
                 data-test="load-next-page-button" title="Load next page"
-                :disabled="masonry?.isLoading || masonry?.hasReachedEnd">
+                :disabled="masonry?.isLoading">
                 <ChevronDown :size="14" />
             </Button>
 
