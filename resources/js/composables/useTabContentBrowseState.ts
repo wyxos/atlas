@@ -1,14 +1,11 @@
 import { computed, nextTick, onMounted, ref, type ComputedRef, type Ref, type ShallowRef } from 'vue';
 import { useToast } from '@/components/ui/toast/use-toast';
-import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
 import type { ServiceOption } from '@/lib/browseCatalog';
-import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession, resolveLegacyBrowseService } from '@/lib/tabContentBrowseBootstrap';
 import type { BrowsePageToken } from '@/types/browse';
-import type { BrowseFormData, BrowseFormInstance } from './useBrowseForm';
+import type { BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
-import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 
 const NO_CACHE_REQUEST_CONFIG = {
     headers: {
@@ -35,7 +32,6 @@ type UseTabContentBrowseStateOptions = {
         resetPreloadedItems: () => void;
     };
     events: {
-        onPageLoadingChange: (isLoading: boolean) => void;
         onTabDataLoadingChange?: (isLoading: boolean) => void;
         onUpdateTabLabel?: (label: string) => void;
     };
@@ -50,19 +46,8 @@ type TabContentBrowseStateRefs = {
     bootstrapFailed: Ref<boolean>;
 };
 
-function normalizeTotal(value: unknown): number | null {
-    if (typeof value === 'number') {
-        return value;
-    }
-
-    const parsed = Number(value);
-
-    return Number.isFinite(parsed) ? parsed : null;
-}
-
 function normalizeLocalPage(form: BrowseFormInstance): number {
-    const raw = form.data.page;
-    const page = typeof raw === 'number' ? raw : Number(raw);
+    const page = Number(form.data.page);
 
     if (!Number.isFinite(page) || page < 1) {
         return 1;
@@ -83,87 +68,6 @@ function resetBrowseResults(
     options.view.resetPreloadedItems();
     state.startPageToken.value = nextStart;
     state.masonryRenderKey.value += 1;
-}
-
-function createTabContentPageLoader(args: {
-    form: BrowseFormInstance;
-    catalog: UseTabContentBrowseStateOptions['catalog'];
-    totalAvailable: Ref<number | null>;
-    toast: ReturnType<typeof useToast>;
-    events: UseTabContentBrowseStateOptions['events'];
-}) {
-    function updateTabLabel(formData: BrowseFormData, page: BrowsePageToken): void {
-        if (!args.events.onUpdateTabLabel) {
-            return;
-        }
-
-        const label = buildBrowseTabLabel({
-            formData,
-            pageToken: page,
-            availableServices: args.catalog.availableServices.value,
-            localService: args.catalog.localService?.value ?? null,
-        });
-
-        if (!label) {
-            return;
-        }
-
-        args.events.onUpdateTabLabel(label);
-    }
-
-    async function getPage(page: BrowsePageToken, context?: BrowseFormData) {
-        const formData = context ?? args.form.getData();
-        const params: Record<string, unknown> = {
-            feed: formData.feed,
-            tab_id: formData.tab_id,
-            page,
-            limit: formData.limit,
-        };
-
-        if (formData.feed === 'online') {
-            params.service = formData.service;
-        } else {
-            params.source = formData.source;
-        }
-
-        appendBrowseServiceFilters(params, formData.serviceFilters);
-        updateTabLabel(formData, page);
-
-        args.events.onPageLoadingChange(true);
-
-        try {
-            const { data } = await window.axios.get(browseIndex.url({ query: params }));
-
-            args.totalAvailable.value = normalizeTotal(data.total);
-
-            return {
-                items: data.items || [],
-                nextPage: data.nextPage,
-            };
-        } catch (error: unknown) {
-            const err = error as { message?: unknown; response?: { data?: { message?: unknown } } };
-            const message =
-                (typeof err?.response?.data?.message === 'string' ? err.response.data.message : null)
-                || (typeof err?.message === 'string' ? err.message : null)
-                || 'Browse request failed.';
-            const trimmed = message.length > 280 ? `${message.slice(0, 280)}…` : message;
-
-            args.toast.error(trimmed);
-            console.error('Browse request failed', { params, error });
-            args.totalAvailable.value = null;
-
-            return {
-                items: [],
-                nextPage: null,
-            };
-        } finally {
-            args.events.onPageLoadingChange(false);
-        }
-    }
-
-    return {
-        getPage,
-    };
 }
 
 function createTabContentBootstrap(args: {
@@ -219,7 +123,12 @@ function createTabContentBootstrap(args: {
             const { data } = await window.axios.get(tabsShow.url(args.options.tabId.value), NO_CACHE_REQUEST_CONFIG);
 
             if (!data.tab) {
-                throw new Error('Browse tab not found.');
+                const message = 'Browse tab not found.';
+
+                args.state.bootstrapFailed.value = true;
+                args.toast.error(message);
+                console.error('Failed to initialize browse tab:', new Error(message));
+                return;
             }
 
             args.options.data.tab.value = data.tab;
@@ -295,13 +204,6 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
         isInitializing,
         bootstrapFailed,
     };
-    const loader = createTabContentPageLoader({
-        form: options.form,
-        catalog: options.catalog,
-        totalAvailable,
-        toast,
-        events: options.events,
-    });
     const bootstrap = createTabContentBootstrap({
         options,
         state,
@@ -348,7 +250,6 @@ export function useTabContentBrowseState(options: UseTabContentBrowseStateOption
         actions: {
             initialize: bootstrap.initialize,
             updateService,
-            getPage: loader.getPage,
             applyFilters,
             goToFirstPage,
             applyService,

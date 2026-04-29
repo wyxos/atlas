@@ -66,7 +66,7 @@ describe('tabContentBrowseBootstrap', () => {
         });
     });
 
-    it('restarts empty restored CivitAI tabs from the first page', () => {
+    it('keeps the saved CivitAI cursor when restored items are empty', () => {
         const session = extractRestoredBrowseSession(createTab({
             params: {
                 service: 'civit-ai-images',
@@ -76,11 +76,11 @@ describe('tabContentBrowseBootstrap', () => {
 
         expect(session).toEqual({
             activeIndex: 0,
-            cursor: 1,
+            cursor: '20|1773762966318',
             items: [],
             nextCursor: null,
             previousCursor: null,
-            startPageToken: 1,
+            startPageToken: '20|1773762966318',
         });
     });
 

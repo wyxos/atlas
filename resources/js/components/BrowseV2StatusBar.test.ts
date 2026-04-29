@@ -218,6 +218,20 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('neutral');
     });
 
+    it('keeps showing the retained retry cursor after browse-v2 reaches an exhausted next cursor', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    hasNextPage: false,
+                    nextCursor: '400|1777443670108',
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-next-pill"]').text()).toContain('400|1777443670108');
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('End of list');
+    });
+
     it('shows loaded and backend available totals when available total exists', () => {
         const wrapper = mount(BrowseV2StatusBar, {
             props: {

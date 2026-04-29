@@ -127,6 +127,51 @@ describe('tabContentV2 resolve', () => {
         expect(items.value).toHaveLength(1);
     });
 
+    it('throws browse request failures instead of converting them into empty final pages', async () => {
+        const items = ref<FeedItem[]>([]);
+        const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
+        const totalAvailable = ref<number | null>(381);
+        const toast = {
+            error: vi.fn(),
+        };
+
+        window.axios.get = vi.fn().mockRejectedValue({
+            response: {
+                data: {
+                    message: 'Upstream failed',
+                },
+            },
+        }) as typeof window.axios.get;
+
+        const resolve = createTabContentV2Resolve({
+            form: {
+                getData: () => ({
+                    feed: 'online',
+                    limit: 20,
+                    page: 1,
+                    service: 'civit-ai-images',
+                    serviceFilters: {},
+                    source: 'all',
+                    tab_id: 44,
+                }),
+            } as any,
+            startPageToken: ref('400|1777443670108'),
+            totalAvailable,
+            items,
+            itemsBuckets,
+            availableServices: ref([]),
+            localService: ref(null),
+            toast,
+        });
+
+        await expect(resolve({ cursor: '400|1777443670108', pageSize: 20 })).rejects.toThrow('Upstream failed');
+
+        expect(toast.error).toHaveBeenCalledWith('Upstream failed');
+        expect(totalAvailable.value).toBeNull();
+        expect(items.value).toEqual([]);
+        expect(itemsBuckets.value).toEqual([]);
+    });
+
     it('marks audio and video previews with explicit renderable media types', () => {
         const audioItem = mapFeedItemToVibeItem({
             ...createFeedItem(10),

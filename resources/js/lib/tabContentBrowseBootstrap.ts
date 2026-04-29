@@ -28,25 +28,14 @@ function normalizeRestoredPageToken(value: unknown): BrowsePageToken | null {
     return null;
 }
 
-function resolveRestoredStartPageToken(params: Record<string, unknown>, items: FeedItem[]): BrowsePageToken {
-    const page = (params.page ?? 1) as BrowsePageToken;
-    const feed = params.feed === 'local' ? 'local' : 'online';
-    const service = typeof params.service === 'string' ? params.service : null;
-    const usesCursorToken = typeof page === 'string' && page.includes('|');
-
-    // CivitAI stores some next cursors in `page` as `offset|timestamp`. If we do not also
-    // have restored items, reusing that token can reopen into an empty result set after filters change.
-    if (feed === 'online' && service === 'civit-ai-images' && items.length === 0 && usesCursorToken) {
-        return 1;
-    }
-
-    return page;
+function resolveRestoredStartPageToken(params: Record<string, unknown>): BrowsePageToken {
+    return (params.page ?? 1) as BrowsePageToken;
 }
 
 function resolveRestoredActiveIndex(items: FeedItem[], pageToken: BrowsePageToken): number {
     const pageValue = typeof pageToken === 'number'
         ? pageToken
-        : (typeof pageToken === 'string' && pageToken.trim().length > 0 && Number.isFinite(Number(pageToken))
+        : (pageToken.trim().length > 0 && Number.isFinite(Number(pageToken))
             ? Number(pageToken)
             : null);
 
@@ -66,7 +55,7 @@ export function extractRestoredBrowseSession(tab?: RestorableTabData | null): Re
 
     const params = (tab.params ?? {}) as Record<string, unknown>;
     const items = Array.isArray(tab.items) ? tab.items : [];
-    const page = resolveRestoredStartPageToken(params, items);
+    const page = resolveRestoredStartPageToken(params);
 
     if (items.length === 0 && Object.keys(params).length === 0) {
         return null;
@@ -77,7 +66,7 @@ export function extractRestoredBrowseSession(tab?: RestorableTabData | null): Re
         cursor: page,
         nextCursor: normalizeRestoredPageToken(params.next),
         items,
-        startPageToken: resolveRestoredStartPageToken(params, items),
+        startPageToken: resolveRestoredStartPageToken(params),
         previousCursor: normalizeRestoredPageToken(params.previous),
     };
 }

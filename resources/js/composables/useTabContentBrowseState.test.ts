@@ -41,7 +41,6 @@ describe('useTabContentBrowseState', () => {
         const loadSources = vi.fn().mockResolvedValue(undefined);
         const clearPreviewedItems = vi.fn();
         const resetPreloadedItems = vi.fn();
-        const onPageLoadingChange = vi.fn();
         const onTabDataLoadingChange = vi.fn();
 
         mockAxios.get.mockResolvedValueOnce({
@@ -94,7 +93,6 @@ describe('useTabContentBrowseState', () => {
                         resetPreloadedItems,
                     },
                     events: {
-                        onPageLoadingChange,
                         onTabDataLoadingChange,
                     },
                 });

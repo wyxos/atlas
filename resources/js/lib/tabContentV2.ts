@@ -257,10 +257,7 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
                 args.totalAvailable.value = null;
             }
 
-            return {
-                items: [],
-                nextPage: null,
-            };
+            throw new Error(trimmed);
         }
     };
 }

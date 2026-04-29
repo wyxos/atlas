@@ -187,7 +187,6 @@ const browse = useTabContentBrowseState({
         resetPreloadedItems: () => itemInteractions.preload.reset(),
     },
     events: {
-        onPageLoadingChange: setTabDataLoading,
         onTabDataLoadingChange: setTabDataLoading,
         onUpdateTabLabel: props.onUpdateTabLabel,
     },
