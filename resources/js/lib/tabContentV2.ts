@@ -7,7 +7,6 @@ import type {
 } from '@wyxos/vibe';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
-import type { ServiceOption } from '@/lib/browseCatalog';
 import type { FeedItem } from '@/composables/useTabs';
 import type { BrowsePageToken } from '@/types/browse';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
@@ -26,16 +25,7 @@ type TabContentV2ResolveArgs = {
     startPageToken: Ref<BrowsePageToken>;
     totalAvailable?: Ref<number | null>;
     updateTabLabel?: (cursor: BrowsePageToken | string | number | null | undefined) => void;
-    items: Ref<FeedItem[]>;
-    itemsBuckets: Ref<Array<{
-        cursor: string | null;
-        items: FeedItem[];
-        nextCursor: string | null;
-        previousCursor: string | null;
-    }>>;
-    availableServices: Ref<ServiceOption[]>;
     filterItems?: (items: FeedItem[]) => FeedItem[];
-    localService: Ref<ServiceOption | null | undefined>;
     toast: {
         error: (message: string) => void;
     };
@@ -165,39 +155,6 @@ export function mapFeedItemToVibeItem(item: FeedItem): AtlasVibeViewerItem {
     };
 }
 
-function updateBuckets(
-    itemsBuckets: TabContentV2ResolveArgs['itemsBuckets'],
-    items: TabContentV2ResolveArgs['items'],
-    cursor: string | null,
-    nextItems: FeedItem[],
-    nextCursor: string | null,
-    previousCursor: string | null,
-): void {
-    const nextBucket = {
-        cursor,
-        items: nextItems,
-        nextCursor,
-        previousCursor,
-    };
-    const currentBuckets = [...itemsBuckets.value];
-    const existingIndex = currentBuckets.findIndex((bucket) => bucket.cursor === cursor);
-
-    if (existingIndex >= 0) {
-        currentBuckets.splice(existingIndex, 1, nextBucket);
-    } else if (currentBuckets.length === 0) {
-        currentBuckets.push(nextBucket);
-    } else if (currentBuckets[0]?.previousCursor === cursor) {
-        currentBuckets.unshift(nextBucket);
-    } else if (currentBuckets[currentBuckets.length - 1]?.nextCursor === cursor) {
-        currentBuckets.push(nextBucket);
-    } else {
-        currentBuckets.push(nextBucket);
-    }
-
-    itemsBuckets.value = currentBuckets;
-    items.value = currentBuckets.flatMap((bucket) => bucket.items);
-}
-
 export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
     return async function resolve(params: VibeResolveParamsWithSignal): Promise<VibeResolveResult> {
         const formData = args.form.getData();
@@ -234,7 +191,6 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
             const nextCursor = normalizeCursor(data.nextPage ?? null);
             const previousCursor = normalizeCursor(data.previousPage ?? null);
 
-            updateBuckets(args.itemsBuckets, args.items, requestedCursor, nextItems, nextCursor, previousCursor);
             args.updateTabLabel?.(nextCursor ?? requestedCursor);
 
             return {

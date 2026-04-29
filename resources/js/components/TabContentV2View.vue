@@ -63,6 +63,7 @@ const props = defineProps<{
     handleAssetErrors: (errors: VibeAssetErrorEvent[]) => void;
     handleAssetLoads: (loads: VibeAssetLoadEvent[]) => void;
     handleContainerBlacklistChange: (change: { action: 'created' | 'deleted'; blacklist: import('@/types/container-blacklist').ContainerBlacklist }) => void;
+    handleItemsChange: (items: VibeViewerItem[]) => void;
     handleReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
     headerMasonry: BrowseFeedHandle | null;
     isFilterSheetOpen: boolean;
@@ -197,6 +198,7 @@ useEventListener(document, 'pointermove', (event) => {
                     @update:surface-mode="props.updateSurfaceMode"
                     @asset-errors="props.handleAssetErrors"
                     @asset-loads="props.handleAssetLoads"
+                    @items-change="props.handleItemsChange"
                 >
                     <template #grid-item-overlay="{ item, hovered, active, index }">
                         <TabContentV2GridOverlay

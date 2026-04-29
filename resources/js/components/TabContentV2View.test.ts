@@ -47,7 +47,7 @@ const browseV2StatusBarStub = defineComponent({
 vi.mock('@wyxos/vibe', () => ({
     VibeLayout: defineComponent({
         name: 'VibeLayout',
-        emits: ['asset-errors', 'asset-loads', 'update:activeIndex', 'update:surfaceMode'],
+        emits: ['asset-errors', 'asset-loads', 'items-change', 'update:activeIndex', 'update:surfaceMode'],
         props: {
             activeIndex: { type: Number, default: 0 },
             emptyStateMode: { type: String, default: 'inline' },
@@ -89,6 +89,10 @@ vi.mock('@wyxos/vibe', () => ({
                 h('button', {
                     'data-testid': 'emit-asset-errors',
                     onClick: () => emit('asset-errors', []),
+                }),
+                h('button', {
+                    'data-testid': 'emit-items-change',
+                    onClick: () => emit('items-change', [testState.fullscreenOverlayItem]),
                 }),
                 slots['fullscreen-overlay']?.({
                     hasNextPage: true,
@@ -146,6 +150,7 @@ function createProps() {
         handleAssetErrors: vi.fn(),
         handleAssetLoads: vi.fn(),
         handleContainerBlacklistChange: vi.fn(),
+        handleItemsChange: vi.fn(),
         handleReaction: vi.fn(),
         headerMasonry: null,
         isFilterSheetOpen: false,
@@ -335,11 +340,13 @@ describe('TabContentV2View', () => {
         await wrapper.get('[data-testid="emit-surface-mode"]').trigger('click');
         await wrapper.get('[data-testid="emit-asset-loads"]').trigger('click');
         await wrapper.get('[data-testid="emit-asset-errors"]').trigger('click');
+        await wrapper.get('[data-testid="emit-items-change"]').trigger('click');
 
         expect(props.updateActiveIndex).toHaveBeenCalledWith(7);
         expect(props.updateSurfaceMode).toHaveBeenCalledWith('list');
         expect(props.handleAssetLoads).toHaveBeenCalledWith([]);
         expect(props.handleAssetErrors).toHaveBeenCalledWith([]);
+        expect(props.handleItemsChange).toHaveBeenCalledWith([testState.fullscreenOverlayItem]);
     });
 
     it('passes backend available total to the status bar', () => {

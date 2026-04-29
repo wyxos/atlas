@@ -47,7 +47,6 @@ const toast = useToast();
 const route = useRoute();
 const tabId = toRef(props, 'tabId');
 const items = shallowRef<FeedItem[]>([]);
-const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
 const vibeRef = ref<AtlasVibeHandle | null>(null);
 const tab = ref<TabData | null>(null);
 const activeIndex = ref(0);
@@ -269,9 +268,14 @@ function setVibeHandle(handle: VibeHandle | null): void {
     }
 }
 
+function handleVibeItemsChange(vibeItems: VibeViewerItem[]): void {
+    items.value = vibeItems
+        .map(getFeedItemFromVibeItem)
+        .filter((item): item is FeedItem => item !== null);
+}
+
 function resetLocalFeedState(): void {
     items.value = [];
-    itemsBuckets.value = [];
     removedItemIds.value = new Set();
     fileViewerSheet.setSheetOpen(false, { persist: false });
 }
@@ -301,12 +305,6 @@ function applyRestoredSession(): void {
         activeIndex: restored.activeIndex,
     };
 
-    itemsBuckets.value = [{
-        cursor: normalizeCursor(restored.cursor),
-        items: restored.items,
-        nextCursor: normalizeCursor(restored.nextCursor),
-        previousCursor: normalizeCursor(restored.previousCursor),
-    }];
     items.value = [...restored.items];
     activeIndex.value = restored.activeIndex;
     updateTabLabel(restored.cursor);
@@ -335,11 +333,7 @@ const resolve = createTabContentV2Resolve({
     startPageToken: browseState.startPageToken,
     totalAvailable,
     updateTabLabel,
-    items,
-    itemsBuckets,
-    availableServices,
     filterItems: containerBlacklists.filterItemsByActiveContainerBlacklists,
-    localService,
     toast,
 });
 
@@ -487,6 +481,7 @@ watch(
         :vibe-initial-state="vibeInitialState"
         :handle-asset-loads="handleAssetLoads"
         :handle-asset-errors="handleAssetErrors"
+        :handle-items-change="handleVibeItemsChange"
         :surface-mode="surfaceMode"
         :update-active-index="handleVibeActiveIndexUpdate"
         :update-surface-mode="handleVibeSurfaceModeUpdate"

@@ -31,8 +31,6 @@ describe('tabContentV2 resolve', () => {
     });
 
     it('stores backend totalAvailable from the Vibe resolve fetch path', async () => {
-        const items = ref<FeedItem[]>([]);
-        const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
         const totalAvailable = ref<number | null>(null);
 
         window.axios.get = vi.fn().mockResolvedValue({
@@ -58,10 +56,6 @@ describe('tabContentV2 resolve', () => {
             } as any,
             startPageToken: ref(1),
             totalAvailable,
-            items,
-            itemsBuckets,
-            availableServices: ref([]),
-            localService: ref(null),
             toast: {
                 error: vi.fn(),
             },
@@ -70,15 +64,11 @@ describe('tabContentV2 resolve', () => {
         const result = await resolve({ cursor: null, pageSize: 20 });
 
         expect(totalAvailable.value).toBe(381);
-        expect(items.value).toHaveLength(2);
         expect(result.nextPage).toBe('2');
         expect(result.items).toHaveLength(2);
     });
 
     it('resolves a params-only CivitAI startup state as a page one model-version query', async () => {
-        const items = ref<FeedItem[]>([]);
-        const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
-
         window.axios.get = vi.fn().mockResolvedValue({
             data: {
                 items: [createFeedItem(1)],
@@ -104,16 +94,12 @@ describe('tabContentV2 resolve', () => {
                 }),
             } as any,
             startPageToken: ref(1),
-            items,
-            itemsBuckets,
-            availableServices: ref([]),
-            localService: ref(null),
             toast: {
                 error: vi.fn(),
             },
         });
 
-        await resolve({ cursor: null, pageSize: 20 });
+        const result = await resolve({ cursor: null, pageSize: 20 });
 
         const requestedUrl = vi.mocked(window.axios.get).mock.calls[0]?.[0] as string;
 
@@ -124,12 +110,10 @@ describe('tabContentV2 resolve', () => {
         expect(decodeURIComponent(requestedUrl)).toContain('service=civit-ai-images');
         expect(decodeURIComponent(requestedUrl)).toContain('modelId=1894057');
         expect(decodeURIComponent(requestedUrl)).toContain('modelVersionId=2457413');
-        expect(items.value).toHaveLength(1);
+        expect(result.items).toHaveLength(1);
     });
 
     it('throws browse request failures instead of converting them into empty final pages', async () => {
-        const items = ref<FeedItem[]>([]);
-        const itemsBuckets = ref<Array<{ cursor: string | null; items: FeedItem[]; nextCursor: string | null; previousCursor: string | null }>>([]);
         const totalAvailable = ref<number | null>(381);
         const toast = {
             error: vi.fn(),
@@ -157,10 +141,6 @@ describe('tabContentV2 resolve', () => {
             } as any,
             startPageToken: ref('400|1777443670108'),
             totalAvailable,
-            items,
-            itemsBuckets,
-            availableServices: ref([]),
-            localService: ref(null),
             toast,
         });
 
@@ -168,8 +148,6 @@ describe('tabContentV2 resolve', () => {
 
         expect(toast.error).toHaveBeenCalledWith('Upstream failed');
         expect(totalAvailable.value).toBeNull();
-        expect(items.value).toEqual([]);
-        expect(itemsBuckets.value).toEqual([]);
     });
 
     it('marks audio and video previews with explicit renderable media types', () => {
