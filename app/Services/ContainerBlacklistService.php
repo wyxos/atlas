@@ -4,8 +4,6 @@ namespace App\Services;
 
 use App\Enums\ActionType;
 use App\Models\Container;
-use App\Models\File;
-use App\Services\Local\LocalBrowseIndexSyncService;
 
 class ContainerBlacklistService
 {
@@ -58,42 +56,11 @@ class ContainerBlacklistService
                 'files.downloaded_at',
                 'files.download_progress',
                 'files.blacklisted_at',
+                'files.auto_disliked',
             ])
             ->whereDoesntHave('reactions')
             ->get();
 
-        $fileIds = $files
-            ->pluck('id')
-            ->map(fn ($value) => (int) $value)
-            ->all();
-
-        if ($fileIds === []) {
-            return [];
-        }
-
-        if (is_int($userId)) {
-            app(TabFileService::class)->detachFilesFromUserTabs($userId, $fileIds);
-        }
-
-        $newlyBlacklistedFiles = $files->whereNull('blacklisted_at')->values();
-        $newlyBlacklistedIds = $newlyBlacklistedFiles
-            ->pluck('id')
-            ->map(fn ($value) => (int) $value)
-            ->all();
-
-        if ($newlyBlacklistedIds === []) {
-            return [];
-        }
-
-        app(MetricsService::class)->applyBlacklistAdd($newlyBlacklistedIds);
-
-        File::query()
-            ->whereIn('id', $newlyBlacklistedIds)
-            ->update(['blacklisted_at' => now()]);
-
-        app(DownloadedFileClearService::class)->clearMany($newlyBlacklistedFiles, queueDelete: true);
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($newlyBlacklistedIds);
-
-        return $newlyBlacklistedIds;
+        return app(FileBlacklistService::class)->apply($files, $userId);
     }
 }

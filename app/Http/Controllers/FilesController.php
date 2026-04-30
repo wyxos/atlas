@@ -5,14 +5,12 @@ namespace App\Http\Controllers;
 use App\Listings\FileListing;
 use App\Models\File;
 use App\Services\DownloadedFileClearService;
+use App\Services\FileBlacklistService;
 use App\Services\FileNotFoundService;
 use App\Services\FileStorageResponseService;
 use App\Services\Local\LocalBrowseIndexSyncService;
-use App\Services\MetricsService;
-use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class FilesController extends Controller
@@ -218,7 +216,7 @@ SVG;
     /**
      * Batch manually blacklist multiple files.
      */
-    public function batchBlacklist(\Illuminate\Http\Request $request): JsonResponse
+    public function batchBlacklist(\Illuminate\Http\Request $request, FileBlacklistService $fileBlacklistService): JsonResponse
     {
         $request->validate([
             'file_ids' => 'required|array',
@@ -232,16 +230,14 @@ SVG;
             ->all();
         $files = File::query()
             ->whereIn('id', $fileIds)
-            ->with(['metadata', 'reactions'])
+            ->with('reactions')
             ->get()
             ->keyBy('id');
-        $newBlacklistIds = $files
-            ->filter(fn (File $file): bool => $file->blacklisted_at === null)
-            ->keys()
-            ->map(fn (mixed $fileId): int => (int) $fileId)
-            ->values()
-            ->all();
-        $processedIds = $newBlacklistIds;
+        $userId = Auth::id();
+        $processedIds = $fileBlacklistService->apply(
+            $files->values(),
+            is_int($userId) ? $userId : null,
+        );
 
         if ($processedIds === []) {
             return response()->json([
@@ -250,49 +246,19 @@ SVG;
             ]);
         }
 
-        $blacklistedAt = now();
-        DB::transaction(function () use ($files, $newBlacklistIds, $blacklistedAt): void {
-            if ($newBlacklistIds === []) {
-                return;
-            }
-
-            $metrics = app(MetricsService::class);
-            $metrics->applyBlacklistAdd($newBlacklistIds);
-
-            foreach ($files->only($newBlacklistIds) as $file) {
-                $metrics->applyAutoDislikeClear($file);
-
-                foreach ($file->reactions as $reaction) {
-                    $metrics->applyReactionChange($file, $reaction->type, null, false, true);
-                    $reaction->delete();
-                }
-            }
-
-            File::query()
-                ->whereIn('id', $newBlacklistIds)
-                ->update([
-                    'blacklisted_at' => $blacklistedAt,
-                    'auto_disliked' => false,
-                ]);
-        });
-
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($processedIds);
-        app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds($processedIds);
-
-        $user = Auth::user();
-        if ($user) {
-            app(TabFileService::class)->detachFilesFromUserTabs($user->id, $processedIds);
-        }
+        $resultFiles = File::query()
+            ->whereIn('id', $processedIds)
+            ->get(['id', 'blacklisted_at'])
+            ->keyBy('id');
 
         return response()->json([
             'message' => 'Files blacklisted successfully.',
-            'results' => array_map(
-                static fn (int $fileId): array => [
+            'results' => collect($processedIds)
+                ->map(static fn (int $fileId): array => [
                     'id' => $fileId,
-                    'blacklisted_at' => $blacklistedAt->toIso8601String(),
-                ],
-                $processedIds
-            ),
+                    'blacklisted_at' => $resultFiles->get($fileId)?->blacklisted_at?->toIso8601String(),
+                ])
+                ->all(),
         ]);
     }
 

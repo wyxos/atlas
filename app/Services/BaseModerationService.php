@@ -7,7 +7,6 @@ namespace App\Services;
 use App\Enums\ActionType;
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\Local\LocalBrowseIndexSyncService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
@@ -40,13 +39,6 @@ abstract class BaseModerationService
      * @var array<int>
      */
     protected array $blacklistFileIds = [];
-
-    /**
-     * Files whose downloaded assets should be cleared.
-     *
-     * @var array<int, File>
-     */
-    protected array $filesToClear = [];
 
     /**
      * Immediate actions (auto_dislike/blacklist) tracked for toast notification.
@@ -143,7 +135,6 @@ abstract class BaseModerationService
         $this->autoDislikeFileIds = [];
         $this->autoDislikeFiles = [];
         $this->blacklistFileIds = [];
-        $this->filesToClear = [];
         $this->immediateActions = [];
     }
 
@@ -157,14 +148,6 @@ abstract class BaseModerationService
             $this->autoDislikeFiles[(int) $file->id] = $file;
         } elseif ($actionType === ActionType::BLACKLIST) {
             $this->blacklistFileIds[] = $file->id;
-            if (
-                (bool) $file->downloaded
-                || is_string($file->path) && $file->path !== ''
-                || is_string($file->preview_path) && $file->preview_path !== ''
-                || is_string($file->poster_path) && $file->poster_path !== ''
-            ) {
-                $this->filesToClear[(int) $file->id] = $file;
-            }
         }
     }
 
@@ -182,24 +165,13 @@ abstract class BaseModerationService
 
         // Batch update blacklisted files
         if (! empty($this->blacklistFileIds)) {
-            app(MetricsService::class)->applyBlacklistAdd($this->blacklistFileIds);
-            File::whereIn('id', $this->blacklistFileIds)->update(['blacklisted_at' => now()]);
-
             $userId = Auth::id();
-            if (is_int($userId)) {
-                app(TabFileService::class)->detachFilesFromUserTabs($userId, $this->blacklistFileIds);
-            }
-
-            $filesToClear = collect($this->filesToClear)
-                ->only($this->blacklistFileIds)
-                ->values();
-
-            if ($filesToClear->isNotEmpty()) {
-                app(DownloadedFileClearService::class)->clearMany($filesToClear, queueDelete: true);
-            }
-
-            app(LocalBrowseIndexSyncService::class)->syncFilesByIds($this->blacklistFileIds);
-
+            app(FileBlacklistService::class)->apply(
+                File::query()
+                    ->whereIn('id', $this->blacklistFileIds)
+                    ->get(),
+                is_int($userId) ? $userId : null,
+            );
         }
 
         return array_merge($this->autoDislikeFileIds, $this->blacklistFileIds);
