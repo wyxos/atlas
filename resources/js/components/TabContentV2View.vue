@@ -102,6 +102,14 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
     return (item.feedItem as FeedItem | undefined) ?? null;
 }
 
+async function handleBlacklist(item: VibeViewerItem): Promise<void> {
+    const feedItem = getFeedItemFromVibeItem(item);
+
+    if (feedItem) {
+        await props.itemInteractions.reactions.onFileBlacklist(feedItem);
+    }
+}
+
 function togglePageLoadingLock(): void {
     if (!props.headerMasonry?.lockPageLoading || !props.headerMasonry?.unlockPageLoading) {
         return;
@@ -239,12 +247,14 @@ useEventListener(document, 'pointermove', (event) => {
                                 <FileReactions
                                     :file-id="(item as Record<string, unknown>).fileId as number"
                                     :reaction="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.reaction ?? null"
+                                    :blacklisted-at="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.blacklisted_at ?? null"
                                     :previewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.previewed_count ?? 0"
                                     :viewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.seen_count ?? 0"
                                     :current-index="index"
                                     :total-items="total"
                                     variant="default"
                                     @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
+                                    @blacklist="() => handleBlacklist(item as VibeViewerItem)"
                                 />
                             </div>
                         </div>

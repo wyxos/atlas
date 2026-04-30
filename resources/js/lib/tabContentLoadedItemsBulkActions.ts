@@ -36,12 +36,12 @@ type CreateLoadedItemsBulkActionsOptions = {
 const LOADED_ITEMS_BATCH_SIZE = 100;
 
 export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActionsOptions) {
-    function getItemsToRemoveAfterLocalMutation(mutatedItems: FeedItem[]): FeedItem[] {
+    function getItemsToRemoveAfterLocalMutation(changedItems: FeedItem[]): FeedItem[] {
         if (!options.matchesActiveLocalFilters) {
             return [];
         }
 
-        return mutatedItems.filter((item) => !options.matchesActiveLocalFilters?.(item));
+        return changedItems.filter((item) => !options.matchesActiveLocalFilters?.(item));
     }
 
     async function removeItemsFromView(itemsToRemove: FeedItem[]): Promise<void> {
@@ -54,8 +54,8 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
         await options.masonry.value?.remove(itemsToRemove);
     }
 
-    async function syncLocalMutationView(mutatedItems: FeedItem[]): Promise<void> {
-        const itemsToRemove = getItemsToRemoveAfterLocalMutation(mutatedItems);
+    async function syncLocalMutationView(changedItems: FeedItem[]): Promise<void> {
+        const itemsToRemove = getItemsToRemoveAfterLocalMutation(changedItems);
 
         if (itemsToRemove.length > 0) {
             await removeItemsFromView(itemsToRemove);
@@ -132,13 +132,12 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
         return fileIds.length;
     }
 
-    async function batchBlacklistLoadedItems(): Promise<number> {
-        const loadedItems = options.getLoadedItems();
-        if (loadedItems.length === 0) {
+    async function blacklistItems(itemsToBlacklist: FeedItem[]): Promise<number> {
+        if (itemsToBlacklist.length === 0) {
             return 0;
         }
 
-        const fileIds = loadedItems.map((item) => item.id);
+        const fileIds = itemsToBlacklist.map((item) => item.id);
         const results: NonNullable<BatchBlacklistResponse['results']> = [];
 
         for (let index = 0; index < fileIds.length; index += LOADED_ITEMS_BATCH_SIZE) {
@@ -153,9 +152,9 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
         }
 
         const resultMap = new Map(results.map((result) => [result.id, result]));
-        const mutatedItems = loadedItems.filter((item) => resultMap.has(item.id));
+        const confirmedBlacklistedItems = itemsToBlacklist.filter((item) => resultMap.has(item.id));
 
-        for (const item of mutatedItems) {
+        for (const item of confirmedBlacklistedItems) {
             const result = resultMap.get(item.id);
             if (!result) {
                 continue;
@@ -168,28 +167,29 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
             item.auto_dislike_rule = null;
         }
 
-        if (mutatedItems.length === 0) {
+        if (confirmedBlacklistedItems.length === 0) {
             return 0;
         }
 
         if (options.isLocal.value) {
-            await syncLocalMutationView(mutatedItems);
+            await syncLocalMutationView(confirmedBlacklistedItems);
         } else {
-            await removeItemsFromView(mutatedItems);
+            await removeItemsFromView(confirmedBlacklistedItems);
         }
 
-        return mutatedItems.length;
+        return confirmedBlacklistedItems.length;
     }
 
     async function performLoadedItemsBulkAction(action: LoadedItemsBulkAction): Promise<number> {
         if (action === 'blacklist') {
-            return batchBlacklistLoadedItems();
+            return blacklistItems(options.getLoadedItems());
         }
 
         return applyBatchReaction(action);
     }
 
     return {
+        blacklistItems,
         performLoadedItemsBulkAction,
     };
 }

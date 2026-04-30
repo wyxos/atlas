@@ -144,43 +144,6 @@ describe('useTabContentItemInteractions', () => {
         expect(mockQueueBatchReaction).toHaveBeenCalledTimes(1);
     });
 
-    it('asks Vibe to load more when online removals leave the grid empty', async () => {
-        const items = shallowRef<FeedItem[]>([]);
-        const loadNextPage = vi.fn(async () => undefined);
-
-        const interactions = useTabContentItemInteractions({
-            items,
-            loadedItems: ref(items.value),
-            tab: ref(null),
-            form: {
-                isLocal: ref(false),
-                data: {
-                    feed: 'online',
-                },
-            } as any,
-            masonry: ref({
-                cancel: vi.fn(),
-                isLoading: false,
-                loadNextPage,
-                remove: vi.fn(),
-                restore: vi.fn(),
-            }),
-            fileViewer: ref(null),
-            itemPreview: {
-                incrementPreviewCount: vi.fn(),
-                clearPreviewedItems: vi.fn(),
-                markPreviewedItems: vi.fn(),
-            },
-            onReaction: vi.fn(),
-            promptDownloadedReaction: vi.fn(),
-            clearHoveredContainer: vi.fn(),
-        });
-
-        await interactions.masonry.onRemoved({ items: [], ids: ['1'] });
-
-        expect(loadNextPage).toHaveBeenCalledTimes(1);
-    });
-
     it('clears hover state when reacting to a hovered online item that is removed from view', async () => {
         const item = {
             id: 1,
@@ -297,5 +260,68 @@ describe('useTabContentItemInteractions', () => {
         expect(items.value[0].auto_disliked).toBe(false);
         expect(items.value[0].auto_dislike_rule).toBeNull();
         expect(items.value[0].blacklisted_at).toBe('2026-04-14T00:00:00Z');
+    });
+
+    it('blacklists a single item through the shared blacklist action', async () => {
+        const item = {
+            id: 42,
+            width: 500,
+            height: 500,
+            page: 1,
+            key: '1-42',
+            index: 0,
+            src: 'https://example.com/image42.jpg',
+            reaction: { type: 'dislike' },
+            auto_disliked: true,
+            auto_dislike_rule: { id: 7, name: 'Auto dislike' },
+            blacklist_rule: { id: 8, name: 'Container rule' },
+        } as FeedItem;
+        const items = shallowRef<FeedItem[]>([item]);
+        const remove = vi.fn().mockResolvedValue(undefined);
+
+        window.axios.post = vi.fn().mockResolvedValue({
+            data: {
+                results: [
+                    {
+                        id: 42,
+                        blacklisted_at: '2026-04-30T00:00:00Z',
+                    },
+                ],
+            },
+        }) as typeof window.axios.post;
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            tab: ref(null),
+            form: {
+                isLocal: ref(false),
+                data: {
+                    feed: 'online',
+                },
+            } as any,
+            masonry: ref({ remove } as any),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+        });
+
+        const count = await interactions.reactions.onFileBlacklist(item);
+
+        expect(count).toBe(1);
+        expect(window.axios.post).toHaveBeenCalledWith('/api/files/blacklist/batch', {
+            file_ids: [42],
+        });
+        expect(remove).toHaveBeenCalledWith([item]);
+        expect(item.blacklisted_at).toBe('2026-04-30T00:00:00Z');
+        expect(item.reaction).toBeNull();
+        expect(item.auto_disliked).toBe(false);
+        expect(item.auto_dislike_rule).toBeNull();
+        expect(item.blacklist_rule).toBeNull();
     });
 });

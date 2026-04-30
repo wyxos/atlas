@@ -93,6 +93,10 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         return Boolean(item.reaction?.type);
     }
 
+    function hasBlacklistState(item: FeedItem): boolean {
+        return Boolean(item.blacklisted_at);
+    }
+
     const { handleMasonryReaction } = useMasonryReactionHandler({
         items: options.items,
         masonry: options.masonry,
@@ -121,26 +125,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
     async function loadNextPage(): Promise<void> {
         await options.masonry.value?.loadNextPage?.();
-    }
-
-    async function handleRemoved(payload: { items: FeedItem[]; ids: string[] }): Promise<void> {
-        if (options.form.data.feed !== 'online') {
-            return;
-        }
-
-        if (!options.masonry.value || options.masonry.value.isLoading) {
-            return;
-        }
-
-        if (payload.ids.length === 0) {
-            return;
-        }
-
-        await nextTick();
-
-        if (options.items.value.length === 0) {
-            await options.masonry.value.loadNextPage?.();
-        }
     }
 
     const notFoundReconciliation = useTabContentNotFoundReconciliation({
@@ -179,9 +163,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
                 event.stopPropagation();
             }
         },
-        async onRemoved(payload: { items: FeedItem[]; ids: string[] }): Promise<void> {
-            await handleRemoved(payload);
-        },
         cancelLoad,
         loadNextPage,
     };
@@ -193,9 +174,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     }
 
     function getLoadedItems(): FeedItem[] {
-        const source = options.loadedItems?.value ?? options.items.value;
-
-        return source.filter((item): item is FeedItem => typeof item.id === 'number');
+        return options.loadedItems?.value ?? options.items.value;
     }
 
     const loadedItemsBulkActions = createLoadedItemsBulkActions({
@@ -276,9 +255,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     }
 
     async function resetPreviewedState(): Promise<number> {
-        const resettableItems = getLoadedItems().filter((item) => {
-            return typeof item.id === 'number' && !hasActiveReaction(item);
-        });
+        const resettableItems = getLoadedItems().filter((item) => !hasActiveReaction(item));
         const fileIds = resettableItems.map((item) => item.id);
 
         if (fileIds.length === 0) {
@@ -321,8 +298,12 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
     const reactionHandlers = {
         hasActiveReaction,
+        hasBlacklistState,
         onFileReaction(item: FeedItem, type: ReactionType): void {
             void handleMasonryReaction(item, type);
+        },
+        async onFileBlacklist(item: FeedItem): Promise<number> {
+            return loadedItemsBulkActions.blacklistItems([item]);
         },
         onFileViewerReaction(itemId: number, type: ReactionType): void {
             const item = options.items.value.find((candidate) => candidate.id === itemId);
@@ -330,6 +311,15 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             if (item) {
                 reactionHandlers.onFileReaction(item, type);
             }
+        },
+        async onFileViewerBlacklist(itemId: number): Promise<number> {
+            const item = options.items.value.find((candidate) => candidate.id === itemId);
+
+            if (!item) {
+                return 0;
+            }
+
+            return reactionHandlers.onFileBlacklist(item);
         },
     };
 

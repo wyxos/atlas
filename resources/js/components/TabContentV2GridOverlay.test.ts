@@ -60,6 +60,8 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
             },
             reactions: {
                 hasActiveReaction: vi.fn().mockReturnValue(false),
+                hasBlacklistState: vi.fn((candidate: FeedItem) => Boolean(candidate.blacklisted_at)),
+                onFileBlacklist: vi.fn(),
             },
         } as any,
         promptDialog: {
@@ -91,5 +93,46 @@ it('renders hover actions without preview-side dependencies', () => {
         });
 
         expect(wrapper.exists()).toBe(true);
+    });
+
+    it('shows and wires the blacklist state action for blacklisted items', async () => {
+        const props = createProps();
+        props.item.blacklisted_at = '2026-04-30T00:00:00Z';
+        const fileReactionsSpy = vi.fn();
+
+        const fileReactionsStub = defineComponent({
+            name: 'FileReactionsStub',
+            emits: ['blacklist'],
+            props: {
+                blacklistedAt: { type: String, default: null },
+            },
+            setup(stubProps, { emit }) {
+                fileReactionsSpy(stubProps);
+
+                return () => h('button', {
+                    'data-testid': 'blacklist-trigger',
+                    onClick: () => emit('blacklist'),
+                });
+            },
+        });
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: testStub,
+                    FileReactions: fileReactionsStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        expect(fileReactionsSpy).toHaveBeenCalledWith(expect.objectContaining({
+            blacklistedAt: '2026-04-30T00:00:00Z',
+        }));
+
+        await wrapper.get('[data-testid="blacklist-trigger"]').trigger('click');
+
+        expect(props.itemInteractions.reactions.onFileBlacklist).toHaveBeenCalledWith(props.item);
     });
 });

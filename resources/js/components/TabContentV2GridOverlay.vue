@@ -36,7 +36,12 @@ const showDeleteButton = computed(() => props.hovered
     && isPreloaded.value
     && props.localFileDeletion.actions.canDelete(props.item));
 const showReactions = computed(() => (
-    (props.hovered || props.active || props.itemInteractions.reactions.hasActiveReaction(props.item))
+    (
+        props.hovered
+        || props.active
+        || props.itemInteractions.reactions.hasActiveReaction(props.item)
+        || props.itemInteractions.reactions.hasBlacklistState(props.item)
+    )
     && isPreloaded.value
 ));
 </script>
@@ -105,12 +110,14 @@ const showReactions = computed(() => (
                 <FileReactions
                     :file-id="item.id"
                     :reaction="item.reaction ?? null"
+                    :blacklisted-at="item.blacklisted_at ?? null"
                     :previewed-count="item.previewed_count ?? 0"
                     :viewed-count="item.seen_count ?? 0"
                     :current-index="index"
                     :total-items="totalItems"
                     variant="small"
                     @reaction="(type) => onReaction(vibeItem, type)"
+                    @blacklist="() => itemInteractions.reactions.onFileBlacklist(item)"
                 />
             </div>
         </div>

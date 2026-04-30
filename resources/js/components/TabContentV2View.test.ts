@@ -156,6 +156,9 @@ function createProps() {
         isFilterSheetOpen: false,
         itemInteractions: {
             performLoadedItemsBulkAction: vi.fn(),
+            reactions: {
+                onFileBlacklist: vi.fn(async () => 1),
+            },
         },
         localFileDeletion: {
             state: {
@@ -467,6 +470,62 @@ describe('TabContentV2View', () => {
 
             wrapper.unmount();
         }
+    });
+
+    it('passes fullscreen blacklist state and action to FileReactions', async () => {
+        testState.fullscreenOverlayItem.feedItem = {
+            id: 11,
+            blacklisted_at: '2026-04-30T00:00:00Z',
+            previewed_count: 1,
+            reaction: null,
+            seen_count: 0,
+        };
+        const props = createProps();
+        const fileReactionsSpy = vi.fn();
+
+        const fileReactionsStub = defineComponent({
+            name: 'FileReactionsStub',
+            emits: ['blacklist'],
+            props: {
+                blacklistedAt: { type: String, default: null },
+            },
+            setup(stubProps, { emit }) {
+                fileReactionsSpy(stubProps);
+
+                return () => h('button', {
+                    'data-testid': 'fullscreen-blacklist-trigger',
+                    onClick: () => emit('blacklist'),
+                });
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: {
+                    BrowseV2StatusBar: browseV2StatusBarStub,
+                    Button: testStub,
+                    ContainerBlacklistManager: testStub,
+                    DownloadedReactionDialog: testStub,
+                    FileReactions: fileReactionsStub,
+                    FileViewerSheet: testStub,
+                    LocalFileDeleteDialog: testStub,
+                    TabContentContainerDrawer: testStub,
+                    TabContentPromptDialog: testStub,
+                    TabContentServiceHeader: testStub,
+                    TabContentStartForm: testStub,
+                    TabContentV2GridOverlay: testStub,
+                },
+            },
+        });
+
+        expect(fileReactionsSpy).toHaveBeenCalledWith(expect.objectContaining({
+            blacklistedAt: '2026-04-30T00:00:00Z',
+        }));
+
+        await wrapper.get('[data-testid="fullscreen-blacklist-trigger"]').trigger('click');
+
+        expect(props.itemInteractions.reactions.onFileBlacklist).toHaveBeenCalledWith(testState.fullscreenOverlayItem.feedItem);
     });
 
 });

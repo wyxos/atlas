@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
+import { Ban, Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
 import type { ReactionType } from '@/types/reaction';
 
 interface Props {
     fileId?: number;
     reaction?: { type: string } | null;
+    blacklistedAt?: string | null;
     previewedCount?: number;
     viewedCount?: number;
     currentIndex?: number;
@@ -18,6 +19,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     fileId: undefined,
     reaction: null,
+    blacklistedAt: null,
     previewedCount: 0,
     viewedCount: 0,
     currentIndex: undefined,
@@ -29,6 +31,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
     reaction: [type: ReactionType];
+    blacklist: [];
 }>();
 
 // Computed properties for each reaction type
@@ -36,6 +39,7 @@ const favorite = computed(() => props.reaction?.type === 'love');
 const like = computed(() => props.reaction?.type === 'like');
 const dislike = computed(() => props.reaction?.type === 'dislike');
 const funny = computed(() => props.reaction?.type === 'funny');
+const blacklisted = computed(() => Boolean(props.blacklistedAt));
 
 // Handle reaction click
 function handleReactionClick(type: ReactionType): void {
@@ -61,6 +65,14 @@ function handleDislikeClick(): void {
 
 function handleFunnyClick(): void {
     handleReactionClick('funny');
+}
+
+function handleBlacklistClick(): void {
+    if (!props.fileId || blacklisted.value) {
+        return;
+    }
+
+    emit('blacklist');
 }
 
 // Computed properties for variant checks
@@ -117,6 +129,22 @@ const indexDisplay = computed(() => {
                 dislike ? 'bg-gray-500 text-white' : 'text-white hover:text-gray-400'
             ]" aria-label="Dislike">
                 <ThumbsDown :size="18" />
+            </button>
+
+            <!-- Blacklist -->
+            <button
+                v-if="!hideDislike && !isReactionOnly"
+                @click="handleBlacklistClick"
+                :disabled="blacklisted"
+                :aria-pressed="blacklisted"
+                :class="[
+                    'rounded transition-colors',
+                    isSmall ? 'p-1' : 'p-2',
+                    blacklisted ? 'cursor-default bg-danger-600 text-white' : 'text-white hover:text-danger-300'
+                ]"
+                aria-label="Blacklist"
+            >
+                <Ban :size="18" />
             </button>
 
             <!-- Funny -->
