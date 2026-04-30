@@ -104,6 +104,6 @@ class Tab extends Model
      */
     public static function formatFilesToItems($files, int|string $page = 1, array $browseContext = []): array
     {
-        return FileItemFormatter::format($files, $page, [], $browseContext);
+        return FileItemFormatter::format($files, $page, $browseContext);
     }
 }

@@ -44,7 +44,6 @@ class LocalBrowseFileDocument extends File
             'previewed_count' => (int) ($this->previewed_count ?? 0),
             'blacklisted' => $this->blacklisted_at !== null,
             'blacklisted_at' => $this->timestampOrNull($this->blacklisted_at),
-            'blacklist_type' => $this->resolveBlacklistType(),
             'downloaded' => (bool) $this->downloaded,
             'downloaded_at' => $this->timestampOrNull($this->downloaded_at),
             'not_found' => (bool) $this->not_found,
@@ -67,7 +66,7 @@ class LocalBrowseFileDocument extends File
     public function typesenseSearchParameters(): array
     {
         return [
-            'query_by' => 'source,mime_group,mime_type,blacklist_type',
+            'query_by' => 'source,mime_group,mime_type',
             'prefix' => false,
         ];
     }
@@ -129,17 +128,6 @@ class LocalBrowseFileDocument extends File
             str_starts_with($mimeType, 'audio/') => 'audio',
             default => 'other',
         };
-    }
-
-    private function resolveBlacklistType(): ?string
-    {
-        if ($this->blacklisted_at === null) {
-            return null;
-        }
-
-        return is_string($this->blacklist_reason) && trim($this->blacklist_reason) !== ''
-            ? 'manual'
-            : 'auto';
     }
 
     private function timestampOrNull(mixed $value): ?int

@@ -45,7 +45,7 @@ class FileItemFormatter
     /**
      * Format files into items structure for frontend.
      */
-    public static function format($files, int|string $page = 1, array $willAutoDislikeIds = [], array $browseContext = []): array
+    public static function format($files, int|string $page = 1, array $browseContext = []): array
     {
         // Eager load containers relationship to avoid N+1 queries
         if ($files instanceof Collection) {
@@ -191,7 +191,6 @@ class FileItemFormatter
                 'seen_count' => $file->seen_count ?? 0,
                 'downloaded' => (bool) $file->downloaded,
                 'auto_disliked' => $file->auto_disliked ?? false,
-                'will_auto_dislike' => in_array($file->id, $willAutoDislikeIds, true),
                 'reaction' => $reaction, // Current user's reaction for this file
                 // Include metadata with prompt if available - full metadata loaded on-demand
                 'metadata' => $prompt ? ['prompt' => $prompt] : null,

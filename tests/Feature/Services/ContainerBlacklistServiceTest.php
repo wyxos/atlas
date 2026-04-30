@@ -32,8 +32,10 @@ test('returns empty arrays when no blacklisted containers exist', function () {
     expect($result['processedIds'])->toBeEmpty();
 });
 
-test('flags files for dislike action type', function () {
+test('auto dislikes files for dislike action type', function () {
     Bus::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
 
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
@@ -42,15 +44,25 @@ test('flags files for dislike action type', function () {
     $file = File::factory()->create([
         'auto_disliked' => false,
         'blacklisted_at' => null,
+        'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'downloaded_at' => null,
     ]);
     $file->containers()->attach($container->id);
 
     $result = $this->service->moderate(collect([$file]));
 
-    expect($result['flaggedIds'])->toContain($file->id);
-    expect($result['processedIds'])->toBeEmpty();
-    expect($file->fresh()->auto_disliked)->toBeFalse();
+    expect($result['flaggedIds'])->toBeEmpty();
+    expect($result['processedIds'])->toContain($file->id);
+    expect($file->fresh()->auto_disliked)->toBeTrue();
     expect($file->fresh()->blacklisted_at)->toBeNull();
+    $this->assertDatabaseHas('reactions', [
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'dislike',
+    ]);
     Bus::assertNothingDispatched();
 });
 
@@ -169,6 +181,8 @@ test('does not dispatch delete job when file has no path', function () {
 
 test('handles multiple files with different action types', function () {
     Bus::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
 
     $container1 = Container::factory()->create([
         'blacklisted_at' => now(),
@@ -194,15 +208,19 @@ test('handles multiple files with different action types', function () {
 
     $result = $this->service->moderate(collect([$file1, $file2, $file3]));
 
-    expect($result['flaggedIds'])->toContain($file1->id);
+    expect($result['flaggedIds'])->toBeEmpty();
+    expect($result['processedIds'])->toContain($file1->id);
     expect($result['processedIds'])->toContain($file2->id);
     expect($result['processedIds'])->toContain($file3->id);
+    expect($file1->fresh()->auto_disliked)->toBeTrue();
     expect($file2->fresh()->blacklisted_at)->not->toBeNull();
     expect($file3->fresh()->blacklisted_at)->not->toBeNull();
 });
 
 test('handles files with multiple containers', function () {
     Bus::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
 
     $container1 = Container::factory()->create([
         'blacklisted_at' => now(),
@@ -217,6 +235,7 @@ test('handles files with multiple containers', function () {
 
     $result = $this->service->moderate(collect([$file]));
 
-    // Should use the first matched container's action type
-    expect($result['flaggedIds'])->toContain($file->id);
+    expect($result['flaggedIds'])->toBeEmpty();
+    expect($result['processedIds'])->toContain($file->id);
+    expect($file->fresh()->auto_disliked)->toBeTrue();
 });

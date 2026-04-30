@@ -202,7 +202,6 @@ class Browser
             'filterCurrentUserReacted' => ! $isLocalMode,
         ]);
         $persisted = $moderationResult['files'];
-        $flaggedIds = $moderationResult['flaggedIds'];
         $immediateActions = $moderationResult['immediateActions'];
 
         // Attach filtered files to tab if tab_id is provided and not in local mode
@@ -293,11 +292,9 @@ class Browser
             }
         }
 
-        // Transform persisted files to items format for frontend
-        // Pass flagged IDs so they get will_auto_dislike = true (includes both moderation and container blacklist)
         // Page can be int (page number) or string (cursor) for pagination tracking
         $page = request()->input('page', 1);
-        $items = FileItemFormatter::format($persisted, $page, $flaggedIds, [
+        $items = FileItemFormatter::format($persisted, $page, [
             ...$params,
             'feed' => $isLocalMode ? 'local' : 'online',
             'service' => $serviceKey,

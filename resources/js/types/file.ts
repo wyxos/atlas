@@ -47,8 +47,6 @@ export interface File {
     auto_disliked: boolean;
     auto_dislike_rule?: { id: number; name: string } | null;
     blacklisted_at: string | null;
-    blacklist_reason: string | null;
-    blacklist_type?: 'manual' | 'auto' | null;
     blacklist_rule?: { id: number; name: string } | null;
     downloaded: boolean;
     downloaded_at: string | null;

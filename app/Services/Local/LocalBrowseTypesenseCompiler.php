@@ -4,7 +4,6 @@ namespace App\Services\Local;
 
 use App\Models\Search\LocalBrowseFileDocument;
 use App\Models\Search\LocalBrowseReactionDocument;
-use App\Services\LocalService;
 
 class LocalBrowseTypesenseCompiler
 {
@@ -89,7 +88,6 @@ class LocalBrowseTypesenseCompiler
             ...$context,
             'reactionMode' => 'any',
             'reactionTypes' => null,
-            'moderationUnion' => 'none',
         ], $userId);
 
         $filters = [
@@ -146,12 +144,6 @@ class LocalBrowseTypesenseCompiler
             $filters[] = 'blacklisted:=false';
         }
 
-        $blacklistType = (string) ($context['blacklistType'] ?? 'any');
-        if (in_array($blacklistType, ['manual', 'auto'], true)) {
-            $filters[] = 'blacklisted:=true';
-            $filters[] = 'blacklist_type:='.$this->quote($blacklistType);
-        }
-
         $maxPreviewed = $context['maxPreviewed'] ?? null;
         if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
             $filters[] = 'previewed_count:<='.(int) $maxPreviewed;
@@ -174,17 +166,6 @@ class LocalBrowseTypesenseCompiler
             $filters[] = 'auto_disliked:=true';
         } elseif ($autoDisliked === 'no') {
             $filters[] = 'auto_disliked:=false';
-        }
-
-        $moderationUnion = (string) ($context['moderationUnion'] ?? 'none');
-        if ($moderationUnion === LocalService::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO) {
-            if (! is_int($userId)) {
-                return self::EMPTY_FILTER;
-            }
-
-            $filters[] = '((auto_disliked:=true && dislike_user_ids:=['.$userId.']) || (blacklisted:=true && blacklist_type:=`auto`))';
-
-            return implode(' && ', $filters);
         }
 
         $reactionMode = (string) ($context['reactionMode'] ?? 'any');

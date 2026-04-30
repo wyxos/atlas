@@ -246,19 +246,19 @@ function handleCancel(): void {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="dislike">
-                                Dislike (5s countdown)
+                                Dislike
                             </SelectItem>
                             <SelectItem value="blacklist">
-                                Immediate Blacklist
+                                Blacklist
                             </SelectItem>
                         </SelectContent>
                     </Select>
                     <p class="text-xs text-twilight-indigo-400">
                         <span v-if="actionType === 'dislike'">
-                            Files in this container will show a 5-second countdown before being disliked.
+                            Files in this container will be auto-disliked during browse.
                         </span>
                         <span v-else>
-                            Files in this container will be immediately blacklisted and removed from results.
+                            Files in this container will be blacklisted during browse and removed from results.
                         </span>
                     </p>
                 </div>

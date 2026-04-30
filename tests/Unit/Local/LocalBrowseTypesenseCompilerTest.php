@@ -23,9 +23,7 @@ test('compiler builds default browse query', function () {
         'reactionTypes' => null,
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'blacklistType' => 'any',
         'autoDisliked' => 'any',
-        'moderationUnion' => 'none',
     ], 7);
 
     expect($compiled['mode'])->toBe('files')
@@ -49,9 +47,7 @@ test('compiler builds source downloaded file-type and random filters', function 
         'reactionMode' => 'any',
         'reactionTypes' => null,
         'blacklisted' => 'any',
-        'blacklistType' => 'any',
         'autoDisliked' => 'any',
-        'moderationUnion' => 'none',
     ], 7);
 
     expect($compiled['options']['filter_by'])->toContain('source:=`Wallhaven`')
@@ -62,39 +58,21 @@ test('compiler builds source downloaded file-type and random filters', function 
         ->and($compiled['options']['sort_by'])->toBe('_rand(123):desc,sort_id:desc');
 });
 
-test('compiler builds blacklisted manual auto and auto disliked filters', function () {
+test('compiler builds blacklisted and auto disliked filters', function () {
     $compiler = app(LocalBrowseTypesenseCompiler::class);
 
-    $manualFilter = $compiler->compileFileFilter([
+    $filter = $compiler->compileFileFilter([
         'blacklisted' => 'yes',
-        'blacklistType' => 'manual',
         'autoDisliked' => 'yes',
         'reactionMode' => 'any',
         'reactionTypes' => null,
         'fileTypes' => ['all'],
         'downloaded' => 'any',
-        'moderationUnion' => 'none',
     ], 11);
 
-    $autoFilter = $compiler->compileFileFilter([
-        'blacklisted' => 'yes',
-        'blacklistType' => 'auto',
-        'autoDisliked' => 'no',
-        'reactionMode' => 'any',
-        'reactionTypes' => null,
-        'fileTypes' => ['all'],
-        'downloaded' => 'any',
-        'moderationUnion' => 'none',
-    ], 11);
-
-    expect($manualFilter)->toContain('blacklisted:=true')
-        ->and($manualFilter)->toContain('not_found:=false')
-        ->and($manualFilter)->toContain('blacklist_type:=`manual`')
-        ->and($manualFilter)->toContain('auto_disliked:=true')
-        ->and($autoFilter)->toContain('not_found:=false')
-        ->and($autoFilter)->toContain('blacklisted:=true')
-        ->and($autoFilter)->toContain('blacklist_type:=`auto`')
-        ->and($autoFilter)->toContain('auto_disliked:=false');
+    expect($filter)->toContain('blacklisted:=true')
+        ->and($filter)->toContain('not_found:=false')
+        ->and($filter)->toContain('auto_disliked:=true');
 });
 
 test('compiler builds reacted types and unreacted filters', function () {
@@ -106,9 +84,7 @@ test('compiler builds reacted types and unreacted filters', function () {
         'fileTypes' => ['all'],
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'blacklistType' => 'any',
         'autoDisliked' => 'any',
-        'moderationUnion' => 'none',
     ], 9);
 
     $typed = $compiler->compileFileFilter([
@@ -117,9 +93,7 @@ test('compiler builds reacted types and unreacted filters', function () {
         'fileTypes' => ['all'],
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'blacklistType' => 'any',
         'autoDisliked' => 'any',
-        'moderationUnion' => 'none',
     ], 9);
 
     $unreacted = $compiler->compileFileFilter([
@@ -128,9 +102,7 @@ test('compiler builds reacted types and unreacted filters', function () {
         'fileTypes' => ['all'],
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'blacklistType' => 'any',
         'autoDisliked' => 'any',
-        'moderationUnion' => 'none',
     ], 9);
 
     expect($reacted)->toContain('love_user_ids:=[9]')
@@ -144,24 +116,6 @@ test('compiler builds reacted types and unreacted filters', function () {
         ->and($unreacted)->toContain('reacted_user_ids:!=[9]');
 });
 
-test('compiler builds moderation union filter', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
-
-    $filter = $compiler->compileFileFilter([
-        'moderationUnion' => 'auto_disliked_or_blacklisted_auto',
-        'reactionMode' => 'any',
-        'fileTypes' => ['all'],
-        'downloaded' => 'any',
-        'blacklisted' => 'any',
-        'blacklistType' => 'any',
-        'autoDisliked' => 'any',
-    ], 11);
-
-    expect($filter)->toContain('auto_disliked:=true && dislike_user_ids:=[11]')
-        ->and($filter)->toContain('not_found:=false')
-        ->and($filter)->toContain('blacklisted:=true && blacklist_type:=`auto`');
-});
-
 test('compiler builds reaction timestamp queries for descending and ascending sorts', function () {
     $compiler = app(LocalBrowseTypesenseCompiler::class);
 
@@ -172,13 +126,11 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'source' => 'CivitAI',
         'downloaded' => 'yes',
         'blacklisted' => 'no',
-        'blacklistType' => 'any',
         'maxPreviewed' => 1,
         'fileTypes' => ['image', 'video'],
         'reactionMode' => 'reacted',
         'reactionTypes' => null,
         'autoDisliked' => 'no',
-        'moderationUnion' => 'none',
         'allTypes' => ['love', 'like', 'dislike', 'funny'],
     ], 5, 'atlas_local_local_browse_files__v20260331_000000');
 
@@ -189,13 +141,11 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'source' => 'CivitAI',
         'downloaded' => 'yes',
         'blacklisted' => 'no',
-        'blacklistType' => 'any',
         'maxPreviewed' => 1,
         'fileTypes' => ['image', 'video'],
         'reactionMode' => 'types',
         'reactionTypes' => ['dislike'],
         'autoDisliked' => 'no',
-        'moderationUnion' => 'none',
         'allTypes' => ['love', 'like', 'dislike', 'funny'],
     ], 5, 'atlas_local_local_browse_files__v20260331_000000');
 

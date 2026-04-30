@@ -38,7 +38,6 @@ class FileDownloadFinalizer
     ): void {
         $wasDownloaded = (bool) $file->downloaded;
         $wasBlacklisted = $file->blacklisted_at !== null;
-        $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
 
         $disk = Storage::disk(config('downloads.disk'));
 
@@ -109,7 +108,6 @@ class FileDownloadFinalizer
 
         if ($file->blacklisted_at !== null) {
             $updates['blacklisted_at'] = null;
-            $updates['blacklist_reason'] = null;
         }
 
         $file->update($updates);
@@ -118,7 +116,7 @@ class FileDownloadFinalizer
         $metrics = app(MetricsService::class);
         $metrics->applyDownload($file, $wasDownloaded);
         if ($wasBlacklisted) {
-            $metrics->applyBlacklistClear($file, $wasManual);
+            $metrics->applyBlacklistClear($file);
         }
     }
 

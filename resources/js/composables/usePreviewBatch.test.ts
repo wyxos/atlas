@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type PreviewBatchResult = {
     id: number;
     previewed_count: number;
-    will_auto_dislike: boolean;
 };
 
 function createBatchResponse(fileIds: number[]) {
@@ -13,7 +12,6 @@ function createBatchResponse(fileIds: number[]) {
             results: fileIds.map((fileId) => ({
                 id: fileId,
                 previewed_count: fileId * 10,
-                will_auto_dislike: fileId % 2 === 0,
             })),
         },
     };
@@ -87,9 +85,9 @@ describe('usePreviewBatch', () => {
                 file_ids: [1, 2, 3],
             });
             await expect(Promise.all([first, second, third])).resolves.toEqual([
-                { previewed_count: 10, will_auto_dislike: false },
-                { previewed_count: 20, will_auto_dislike: true },
-                { previewed_count: 30, will_auto_dislike: false },
+                { previewed_count: 10 },
+                { previewed_count: 20 },
+                { previewed_count: 30 },
             ]);
         } finally {
             vi.useRealTimers();
@@ -145,9 +143,9 @@ describe('usePreviewBatch', () => {
                 file_ids: [2, 3],
             });
             await expect(Promise.all([first, second, third])).resolves.toEqual([
-                { previewed_count: 10, will_auto_dislike: false },
-                { previewed_count: 20, will_auto_dislike: true },
-                { previewed_count: 30, will_auto_dislike: false },
+                { previewed_count: 10 },
+                { previewed_count: 20 },
+                { previewed_count: 30 },
             ]);
         } finally {
             vi.useRealTimers();

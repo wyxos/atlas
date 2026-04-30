@@ -18,14 +18,13 @@ test('dashboard metrics report file and reaction totals', function () {
 
     $manualBlacklisted = File::factory()->create([
         'blacklisted_at' => now(),
-        'blacklist_reason' => 'Manual review',
         'downloaded' => true,
         'source' => 'local',
     ]);
 
-    $autoBlacklisted = File::factory()->create([
+    $autoDisliked = File::factory()->create([
         'blacklisted_at' => now(),
-        'blacklist_reason' => null,
+        'auto_disliked' => true,
         'downloaded' => false,
         'source' => 'NAS',
     ]);
@@ -63,7 +62,7 @@ test('dashboard metrics report file and reaction totals', function () {
     ]);
 
     $containerUser->files()->attach([$manualBlacklisted->id, $unblacklisted->id]);
-    $containerGallery->files()->attach([$autoBlacklisted->id, $notFound->id]);
+    $containerGallery->files()->attach([$autoDisliked->id, $notFound->id]);
     $containerPost->files()->attach([$unreacted->id]);
 
     Reaction::create([
@@ -79,7 +78,7 @@ test('dashboard metrics report file and reaction totals', function () {
     ]);
 
     Reaction::create([
-        'file_id' => $autoBlacklisted->id,
+        'file_id' => $autoDisliked->id,
         'user_id' => $user->id,
         'type' => 'like',
     ]);
@@ -113,11 +112,8 @@ test('dashboard metrics report file and reaction totals', function () {
             'downloaded' => 2,
             'local' => 2,
             'non_local' => 3,
-            'blacklisted' => [
-                'total' => 2,
-                'manual' => 1,
-                'auto' => 1,
-            ],
+            'blacklisted' => 2,
+            'auto_disliked' => 1,
             'not_found' => 1,
             'unreacted_not_blacklisted' => 2,
         ],

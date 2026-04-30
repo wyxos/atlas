@@ -41,7 +41,6 @@ function createItem(overrides: Partial<FeedItem> = {}): FeedItem {
         reaction: { type: 'dislike' },
         auto_disliked: true,
         blacklisted_at: '2026-03-19T00:00:00Z',
-        blacklist_type: 'auto',
         ...overrides,
     };
 }

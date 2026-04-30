@@ -22,7 +22,6 @@ type UseTabContentNotFoundReconciliationOptions = {
     tab: Ref<TabData | null>;
     masonry: Ref<BrowseFeedHandle | null>;
     hoveredItemId: Ref<number | null>;
-    cancelAutoDislikeCountdown: (fileId: number) => void;
     clearHover: () => void;
 };
 
@@ -130,9 +129,7 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
     }
 
     function markItemNotFound(item: FeedItem): void {
-        options.cancelAutoDislikeCountdown(item.id);
         item.notFound = true;
-        item.will_auto_dislike = false;
         triggerRef(options.items);
         scheduleNotFoundRemoval(item.id);
     }

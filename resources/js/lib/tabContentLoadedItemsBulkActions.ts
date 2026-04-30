@@ -19,7 +19,6 @@ type BatchBlacklistResponse = {
     results?: Array<{
         id: number;
         blacklisted_at: string;
-        blacklist_reason: string;
     }>;
 };
 
@@ -30,7 +29,6 @@ type CreateLoadedItemsBulkActionsOptions = {
     isLocal: Readonly<Ref<boolean>>;
     masonry: Ref<BrowseFeedHandle | null>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
-    cancelAutoDislikeCountdown: (fileId: number) => void;
     clearHoverForRemovedItems: (itemIds: Set<number>) => void;
     onReaction: (fileId: number, type: ReactionType) => void;
 };
@@ -86,7 +84,6 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
             const snapshots = new Map<number, LocalReactionSnapshot>();
 
             for (const item of loadedItems) {
-                options.cancelAutoDislikeCountdown(item.id);
                 snapshots.set(item.id, applyOptimisticLocalReactionState(item, type));
             }
 
@@ -117,10 +114,6 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
                 await options.masonry.value?.restore(itemsToTemporarilyRemove);
             };
         } else {
-            for (const item of loadedItems) {
-                options.cancelAutoDislikeCountdown(item.id);
-            }
-
             await removeItemsFromView(loadedItems);
 
             restoreCallback = currentTabId !== undefined
@@ -168,12 +161,11 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
                 continue;
             }
 
-            options.cancelAutoDislikeCountdown(item.id);
             item.blacklisted_at = result.blacklisted_at;
-            item.blacklist_reason = result.blacklist_reason;
-            item.blacklist_type = 'manual';
             item.blacklist_rule = null;
-            item.will_auto_dislike = false;
+            item.reaction = null;
+            item.auto_disliked = false;
+            item.auto_dislike_rule = null;
         }
 
         if (mutatedItems.length === 0) {

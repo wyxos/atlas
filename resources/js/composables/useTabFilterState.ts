@@ -157,8 +157,6 @@ export function useTabFilterState(options: UseTabFilterStateOptions) {
             return;
         }
 
-        delete form.data.serviceFilters.moderation_union;
-
         form.data.serviceFilters = {
             ...form.data.serviceFilters,
             ...preset.filters,

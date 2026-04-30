@@ -141,7 +141,7 @@ it('includes backend-owned browse payloads for supported containers', function (
         formatterContainer(),
     ]));
 
-    $items = FileItemFormatter::format([$file], 1, [], [
+    $items = FileItemFormatter::format([$file], 1, [
         'feed' => 'online',
         'service' => 'civit-ai-images',
         'limit' => '20',

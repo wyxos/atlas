@@ -122,14 +122,9 @@ defineProps<Props>();
 
                 <div v-if="file.blacklisted_at">
                     <label class="text-xs font-semibold text-smart-blue-300 uppercase tracking-wide mb-2 block">Status</label>
-                    <div class="space-y-1">
-                        <span class="px-3 py-1 rounded-sm text-xs font-medium bg-danger-300 border border-danger-600 text-danger-900">
-                            Blacklisted
-                        </span>
-                        <div v-if="file.blacklist_reason" class="text-xs text-regal-navy-100">
-                            {{ file.blacklist_reason }}
-                        </div>
-                    </div>
+                    <span class="px-3 py-1 rounded-sm text-xs font-medium bg-danger-300 border border-danger-600 text-danger-900">
+                        Blacklisted
+                    </span>
                 </div>
             </div>
         </div>

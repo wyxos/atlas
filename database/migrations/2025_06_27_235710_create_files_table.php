@@ -36,7 +36,6 @@ return new class extends Migration
             $table->timestamp('seen_at')->nullable(); // When file was viewed
             $table->unsignedInteger('seen_count')->default(0);
             $table->timestamp('blacklisted_at')->nullable(); // When file was blacklisted
-            $table->string('blacklist_reason')->nullable(); // Reason for blacklist
             $table->boolean('not_found')->default(false);
             $table->json('listing_metadata')->nullable();
             $table->json('detail_metadata')->nullable();

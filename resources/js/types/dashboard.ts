@@ -22,11 +22,8 @@ export type DashboardMetrics = {
             dislike: number;
             funny: number;
         };
-        blacklisted: {
-            total: number;
-            manual: number;
-            auto: number;
-        };
+        blacklisted: number;
+        auto_disliked: number;
         not_found: number;
         unreacted_not_blacklisted: number;
     };
@@ -51,7 +48,7 @@ export type DashboardSummaryItem = {
 };
 
 export type DashboardChartSection = {
-    key: 'overview' | 'reactions' | 'blacklist';
+    key: 'overview' | 'reactions' | 'negative';
     title: string;
     description: string;
     tooltipLabel: string;

@@ -140,7 +140,6 @@ test('batch store detaches same-reaction files from the current user tabs', func
 test('batch store clears blacklist when the same positive reaction is re-applied', function () {
     $file = File::factory()->create([
         'blacklisted_at' => now()->subMinute(),
-        'blacklist_reason' => 'Manual blacklist',
     ]);
 
     Reaction::create([
@@ -159,8 +158,7 @@ test('batch store clears blacklist when the same positive reaction is re-applied
 
     $file->refresh();
 
-    expect($file->blacklisted_at)->toBeNull()
-        ->and($file->blacklist_reason)->toBeNull();
+    expect($file->blacklisted_at)->toBeNull();
 });
 
 test('batch store removes auto_disliked flag for positive reactions', function () {

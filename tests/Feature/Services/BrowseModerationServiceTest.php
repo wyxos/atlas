@@ -21,8 +21,7 @@ beforeEach(function () {
     $this->service = app(BrowseModerationService::class);
 });
 
-test('merges flagged IDs from file and container moderation', function () {
-    // Create file moderation rule with DISLIKE action
+test('merges auto dislike actions from file and container moderation', function () {
     ModerationRule::factory()->any(['spam'])->create([
         'active' => true,
         'action_type' => ActionType::DISLIKE,
@@ -43,19 +42,20 @@ test('merges flagged IDs from file and container moderation', function () {
     ]);
     $file2->load('metadata');
 
-    // Create container with DISLIKE action type - this will flag file2
     $container = Container::factory()->create([
-        'blacklisted_at' => now(), // Container is blacklisted
-        'action_type' => ActionType::DISLIKE, // With dislike action (flags, doesn't blacklist)
+        'blacklisted_at' => now(),
+        'action_type' => ActionType::DISLIKE,
     ]);
     $file2->containers()->attach($container->id);
     $file2->load('containers');
 
     $result = $this->service->process([$file1, $file2]);
 
-    // Both files should be flagged (file1 from moderation rule, file2 from container)
-    expect($result['flaggedIds'])->toContain($file1->id)
-        ->and($result['flaggedIds'])->toContain($file2->id);
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and(collect($result['immediateActions'])->pluck('id')->all())->toContain($file1->id, $file2->id)
+        ->and(collect($result['immediateActions'])->pluck('action_type')->all())->toContain('dislike')
+        ->and($file1->fresh()->auto_disliked)->toBeTrue()
+        ->and($file2->fresh()->auto_disliked)->toBeTrue();
 });
 
 test('filters out blacklisted files from returned files', function () {

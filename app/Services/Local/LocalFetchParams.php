@@ -2,8 +2,6 @@
 
 namespace App\Services\Local;
 
-use App\Services\LocalService;
-
 class LocalFetchParams
 {
     /**
@@ -14,14 +12,12 @@ class LocalFetchParams
      *   source: ?string,
      *   downloaded: string,
      *   blacklisted: string,
-     *   blacklistType: string,
      *   sort: string,
      *   fileTypes: array<int, string>,
      *   seed: ?int,
      *   maxPreviewed: ?int,
      *   reactionMode: string,
      *   autoDisliked: string,
-     *   moderationUnion: string,
      *   reactionTypes: ?array<int, string>,
      *   includeTotal: bool,
      *   allTypes: array<int, string>,
@@ -35,7 +31,6 @@ class LocalFetchParams
         $source = is_string($params['source'] ?? null) ? (string) $params['source'] : null;
         $downloaded = is_string($params['downloaded'] ?? null) ? (string) $params['downloaded'] : 'any';
         $blacklisted = is_string($params['blacklisted'] ?? null) ? (string) $params['blacklisted'] : 'any';
-        $blacklistType = is_string($params['blacklist_type'] ?? null) ? (string) $params['blacklist_type'] : 'any';
         $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'downloaded_at';
         $fileTypes = self::normalizeFileTypes($params['file_type'] ?? ['all']);
 
@@ -51,8 +46,6 @@ class LocalFetchParams
 
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
         $autoDisliked = is_string($params['auto_disliked'] ?? null) ? (string) $params['auto_disliked'] : 'any';
-        $moderationUnion = is_string($params['moderation_union'] ?? null) ? (string) $params['moderation_union'] : 'none';
-        $localPreset = is_string($params['local_preset'] ?? null) ? (string) $params['local_preset'] : '';
         $reaction = $params['reaction'] ?? null;
         $includeTotal = filter_var($params['include_total'] ?? null, FILTER_VALIDATE_BOOLEAN);
 
@@ -67,14 +60,12 @@ class LocalFetchParams
                 'source' => $source,
                 'downloaded' => $downloaded,
                 'blacklisted' => $blacklisted,
-                'blacklistType' => $blacklistType,
                 'sort' => $sort,
                 'fileTypes' => $fileTypes,
                 'seed' => $seed,
                 'maxPreviewed' => $maxPreviewed,
                 'reactionMode' => $reactionMode,
                 'autoDisliked' => $autoDisliked,
-                'moderationUnion' => $moderationUnion,
                 'reactionTypes' => $reactionTypes,
                 'includeTotal' => $includeTotal,
                 'allTypes' => $allTypes,
@@ -82,30 +73,14 @@ class LocalFetchParams
             ];
         }
 
-        $isLegacyDislikedBlacklistedAutoIntersection = $reactionMode === 'types'
-            && is_array($reactionTypes)
-            && in_array('dislike', $reactionTypes, true)
-            && $blacklisted === 'yes'
-            && $blacklistType === 'auto';
-
-        if (
-            $moderationUnion === 'none'
-            && ($localPreset === 'disliked_blacklisted_auto' || $isLegacyDislikedBlacklistedAutoIntersection)
-        ) {
-            $moderationUnion = LocalService::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO;
-            $params['moderation_union'] = $moderationUnion;
-        }
-
         if (! $hasMaxPreviewedParam) {
             $isDislikedView = $reactionMode === 'types'
                 && is_array($reactionTypes)
                 && in_array('dislike', $reactionTypes, true);
 
-            $isBlacklistedView = $blacklisted === 'yes'
-                || in_array($blacklistType, ['manual', 'auto'], true);
+            $isBlacklistedView = $blacklisted === 'yes';
 
-            $isUnionModeratedView = $moderationUnion === LocalService::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO;
-            $maxPreviewed = ($isDislikedView || $isBlacklistedView || $isUnionModeratedView) ? 2 : null;
+            $maxPreviewed = ($isDislikedView || $isBlacklistedView) ? 2 : null;
             $params['max_previewed_count'] = $maxPreviewed;
         }
 
@@ -116,14 +91,12 @@ class LocalFetchParams
             'source' => $source,
             'downloaded' => $downloaded,
             'blacklisted' => $blacklisted,
-            'blacklistType' => $blacklistType,
             'sort' => $sort,
             'fileTypes' => $fileTypes,
             'seed' => $seed,
             'maxPreviewed' => $maxPreviewed,
             'reactionMode' => $reactionMode,
             'autoDisliked' => $autoDisliked,
-            'moderationUnion' => $moderationUnion,
             'reactionTypes' => $reactionTypes,
             'includeTotal' => $includeTotal,
             'allTypes' => $allTypes,

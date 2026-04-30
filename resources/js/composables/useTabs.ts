@@ -37,12 +37,9 @@ export type FeedItem = {
     reaction?: { type: string } | null;
     previewed_count?: number;
     seen_count?: number;
-    will_auto_dislike?: boolean;
     auto_disliked?: boolean;
     auto_dislike_rule?: { id: number; name: string } | null;
     blacklisted_at?: string | null;
-    blacklist_reason?: string | null;
-    blacklist_type?: 'manual' | 'auto' | null;
     blacklist_rule?: { id: number; name: string } | null;
     downloaded?: boolean;
     [key: string]: unknown;

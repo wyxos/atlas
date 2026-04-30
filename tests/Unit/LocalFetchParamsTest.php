@@ -1,7 +1,6 @@
 <?php
 
 use App\Services\Local\LocalFetchParams;
-use App\Services\LocalService;
 
 it('returns empty response flag for invalid reaction types filter', function () {
     $context = LocalFetchParams::normalize([
@@ -13,7 +12,7 @@ it('returns empty response flag for invalid reaction types filter', function () 
         ->and($context['reactionTypes'])->toBe([]);
 });
 
-it('normalizes legacy disliked and blacklisted auto view to moderation union', function () {
+it('does not keep removed blacklist classification parameters', function () {
     $context = LocalFetchParams::normalize([
         'reaction_mode' => 'types',
         'reaction' => ['dislike'],
@@ -21,8 +20,8 @@ it('normalizes legacy disliked and blacklisted auto view to moderation union', f
         'blacklist_type' => 'auto',
     ]);
 
-    expect($context['moderationUnion'])->toBe(LocalService::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO)
-        ->and($context['params']['moderation_union'])->toBe(LocalService::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO);
+    expect($context)->not->toHaveKey('moderationUnion')
+        ->and($context['params'])->not->toHaveKey('moderation_union');
 });
 
 it('defaults max_previewed_count to 2 for moderated views when not explicitly provided', function () {

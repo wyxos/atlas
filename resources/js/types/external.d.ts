@@ -11,7 +11,6 @@ declare module '@/actions/App/Http/Controllers/FilesController' {
     export const deleteAll: ActionHandler;
     export const incrementPreview: ActionHandler;
     export const batchIncrementPreview: ActionHandler;
-    export const batchPerformAutoDislike: ActionHandler;
     export const incrementSeen: ActionHandler;
 }
 

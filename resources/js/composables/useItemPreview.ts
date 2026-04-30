@@ -13,7 +13,7 @@ export function useItemPreview(
     const { queuePreviewIncrement } = usePreviewBatch();
 
     // Increment preview count when item comes into view (batched)
-    async function incrementPreviewCount(fileId: number): Promise<{ will_auto_dislike: boolean } | null> {
+    async function incrementPreviewCount(fileId: number): Promise<{ previewed_count: number } | null> {
         // Skip if we've already incremented preview count for this item
         // Mark as previewed IMMEDIATELY to prevent race conditions (before queueing)
         if (previewedItems.has(fileId)) {
@@ -27,11 +27,7 @@ export function useItemPreview(
             // Queue the preview increment (will be batched with other requests)
             const response = await queuePreviewIncrement(fileId);
 
-            // Get existing will_auto_dislike flag before updating (to preserve moderation flags)
             const itemIndex = items.value.findIndex((i) => i.id === fileId);
-            const existingFlag = itemIndex !== -1 ? (items.value[itemIndex].will_auto_dislike ?? false) === true : false;
-
-            const combinedWillAutoDislike = existingFlag || response.will_auto_dislike;
 
             // Update local item state
             if (itemIndex !== -1) {
@@ -39,7 +35,6 @@ export function useItemPreview(
                 // This is efficient as we're only updating properties on one object
                 const item = items.value[itemIndex];
                 item.previewed_count = response.previewed_count;
-                item.will_auto_dislike = combinedWillAutoDislike;
 
                 // Manually trigger reactivity for shallowRef
                 // shallowRef only tracks reference changes, not deep mutations
@@ -51,8 +46,7 @@ export function useItemPreview(
                 await nextTick();
             }
 
-            // Return the combined will_auto_dislike flag (existing OR response)
-            return { will_auto_dislike: combinedWillAutoDislike === true };
+            return { previewed_count: response.previewed_count };
         } catch (error) {
             console.error('Failed to increment preview count:', error);
 

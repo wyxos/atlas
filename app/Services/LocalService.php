@@ -13,8 +13,6 @@ class LocalService extends BaseService
 
     public const string LABEL = 'Local Files';
 
-    public const string MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO = 'auto_disliked_or_blacklisted_auto';
-
     public function __construct(
         private LocalBrowseTypesenseGateway $typesenseGateway,
         array $params = [],

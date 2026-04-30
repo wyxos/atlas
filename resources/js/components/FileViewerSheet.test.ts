@@ -43,7 +43,6 @@ function makeFile(overrides: Partial<File> = {}): File {
         seen_count: 0,
         auto_disliked: false,
         blacklisted_at: null,
-        blacklist_reason: null,
         downloaded: true,
         downloaded_at: null,
         download_progress: 0,

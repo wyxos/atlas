@@ -73,7 +73,7 @@ describe('browseTabLabel', () => {
             pageToken: 5,
             availableServices: [],
             localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Saved Dislikes (Manual) - 5');
+        })).toBe('Local - Saved Manual Dislikes - 5');
     });
 
     it('restores renamed unreacted preset labels for existing local tabs', () => {

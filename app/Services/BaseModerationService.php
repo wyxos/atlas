@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Auth;
 abstract class BaseModerationService
 {
     /**
-     * File IDs flagged for UI countdown.
+     * File IDs retained for legacy result shape.
      *
      * @var array<int>
      */
@@ -26,6 +26,13 @@ abstract class BaseModerationService
      * @var array<int>
      */
     protected array $autoDislikeFileIds = [];
+
+    /**
+     * Files to auto-dislike.
+     *
+     * @var array<int, File>
+     */
+    protected array $autoDislikeFiles = [];
 
     /**
      * File IDs to blacklist.
@@ -75,7 +82,6 @@ abstract class BaseModerationService
             }
 
             // If the current user already reacted to this file, do not auto-moderate it.
-            // This prevents the UI from starting an auto-dislike countdown on already-reacted items.
             if (isset($reactedFileIds[(int) $file->id])) {
                 continue;
             }
@@ -93,15 +99,19 @@ abstract class BaseModerationService
 
             $actionType = $this->getActionType($match);
 
-            if ($actionType === ActionType::BLACKLIST) {
+            if ($actionType === ActionType::DISLIKE) {
+                $this->immediateActions[$file->id] = [
+                    'file_id' => $file->id,
+                    'action_type' => $actionType,
+                ];
+            } elseif ($actionType === ActionType::BLACKLIST) {
                 $anyReactedFileIds ??= $this->resolveReactedFileIdsForAnyUser($files);
 
-                // Any existing reaction should spare the file from auto-blacklisting.
+                // Any existing reaction should spare the file from backend blacklisting.
                 if (isset($anyReactedFileIds[(int) $file->id])) {
                     continue;
                 }
 
-                // Track immediate actions (blacklist only - dislike shows countdown)
                 $this->immediateActions[$file->id] = [
                     'file_id' => $file->id,
                     'action_type' => $actionType,
@@ -131,6 +141,7 @@ abstract class BaseModerationService
     {
         $this->flaggedIds = [];
         $this->autoDislikeFileIds = [];
+        $this->autoDislikeFiles = [];
         $this->blacklistFileIds = [];
         $this->filesToClear = [];
         $this->immediateActions = [];
@@ -142,7 +153,8 @@ abstract class BaseModerationService
     protected function handleActionType(string $actionType, File $file): void
     {
         if ($actionType === ActionType::DISLIKE) {
-            $this->flaggedIds[] = $file->id;
+            $this->autoDislikeFileIds[] = $file->id;
+            $this->autoDislikeFiles[(int) $file->id] = $file;
         } elseif ($actionType === ActionType::BLACKLIST) {
             $this->blacklistFileIds[] = $file->id;
             if (
@@ -161,50 +173,16 @@ abstract class BaseModerationService
      */
     protected function processFiles(): array
     {
-        // Batch update auto-disliked files
         if (! empty($this->autoDislikeFileIds)) {
-            File::whereIn('id', $this->autoDislikeFileIds)->update(['auto_disliked' => true]);
-
-            // Batch create dislike reactions for auto-disliked files
-            $user = Auth::user();
-            if ($user) {
-                $reactionsToInsert = array_map(function ($fileId) use ($user) {
-                    return [
-                        'file_id' => $fileId,
-                        'user_id' => $user->id,
-                        'type' => 'dislike',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }, $this->autoDislikeFileIds);
-
-                // Check for existing reactions to avoid duplicates
-                $existingReactions = Reaction::whereIn('file_id', $this->autoDislikeFileIds)
-                    ->where('user_id', $user->id)
-                    ->pluck('file_id')
-                    ->toArray();
-
-                $newReactionsToInsert = array_filter($reactionsToInsert, function ($reaction) use ($existingReactions) {
-                    return ! in_array($reaction['file_id'], $existingReactions);
-                });
-
-                if (! empty($newReactionsToInsert)) {
-                    app(MetricsService::class)->applyDislikeInsert(array_map(
-                        fn ($reaction) => (int) $reaction['file_id'],
-                        $newReactionsToInsert
-                    ));
-                    Reaction::insert($newReactionsToInsert);
-                }
+            $userId = Auth::id();
+            if (is_int($userId)) {
+                app(FileAutoDislikeService::class)->apply($this->autoDislikeFiles, $userId);
             }
-
-            app(LocalBrowseIndexSyncService::class)->syncFilesByIds($this->autoDislikeFileIds);
-            app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds($this->autoDislikeFileIds);
-
         }
 
         // Batch update blacklisted files
         if (! empty($this->blacklistFileIds)) {
-            app(MetricsService::class)->applyBlacklistAdd($this->blacklistFileIds, false);
+            app(MetricsService::class)->applyBlacklistAdd($this->blacklistFileIds);
             File::whereIn('id', $this->blacklistFileIds)->update(['blacklisted_at' => now()]);
 
             $userId = Auth::id();

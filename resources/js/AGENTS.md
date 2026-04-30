@@ -469,7 +469,6 @@ See `resources/js/lib/browseCatalog.ts`:
 - `resources/js/composables/useTabs.ts` - Tab management
 - `resources/js/composables/useBrowseForm.ts` - Browse form state
 - `resources/js/composables/useModerationRules.ts` - Moderation rules
-- `resources/js/composables/useAutoDislikeQueue.ts` - Auto-dislike queue management
 
 ### Key Lib Modules
 - `resources/js/lib/browseCatalog.ts` - Browse services/sources catalog state and fetch helpers

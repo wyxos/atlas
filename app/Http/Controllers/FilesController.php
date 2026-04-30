@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Listings\FileListing;
 use App\Models\File;
-use App\Models\Reaction;
 use App\Services\DownloadedFileClearService;
 use App\Services\FileNotFoundService;
 use App\Services\FileStorageResponseService;
@@ -173,26 +172,9 @@ SVG;
         $file->refresh();
         app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
 
-        $willAutoDislike = false;
-
-        // Check if we should auto-dislike: previewed_count >= 3, no reactions exist,
-        // source is not 'local', file has no path (not on disk), and file is not blacklisted
-        if ($file->previewed_count >= 3) {
-            $hasReactions = Reaction::where('file_id', $file->id)->exists();
-            $isNotLocal = $file->source !== 'local';
-            $hasNoPath = empty($file->path);
-            $isNotBlacklisted = $file->blacklisted_at === null;
-
-            if (! $hasReactions && $isNotLocal && $hasNoPath && $isNotBlacklisted) {
-                // Flag that we will auto-dislike (UI will show countdown)
-                $willAutoDislike = true;
-            }
-        }
-
         return response()->json([
             'message' => 'Preview count incremented.',
             'previewed_count' => $file->previewed_count,
-            'will_auto_dislike' => $willAutoDislike,
         ]);
     }
 
@@ -218,35 +200,12 @@ SVG;
         app(LocalBrowseIndexSyncService::class)->syncFilesByIds(array_map('intval', $fileIds));
 
         // Refresh files to get updated counts
-        $files->each->refresh();
+        $files->each(fn (File $file) => $file->refresh());
 
-        // Check for will-auto-dislike candidates (previewed_count >= 3, no reactions, etc.)
-        $willAutoDislikeFileIds = [];
-        $candidates = $files->filter(function ($file) {
-            return $file->previewed_count >= 3
-                && $file->source !== 'local'
-                && empty($file->path)
-                && $file->blacklisted_at === null;
-        });
-
-        if ($candidates->isNotEmpty()) {
-            $candidateIds = $candidates->pluck('id')->toArray();
-
-            // Batch check which files have reactions (single query instead of N queries)
-            $filesWithReactions = Reaction::whereIn('file_id', $candidateIds)
-                ->pluck('file_id')
-                ->toArray();
-
-            // Filter candidates that don't have reactions
-            $willAutoDislikeFileIds = array_diff($candidateIds, $filesWithReactions);
-        }
-
-        // Build response with updated counts and will-auto-dislike status
-        $results = $files->map(function ($file) use ($willAutoDislikeFileIds) {
+        $results = $files->map(function ($file) {
             return [
                 'id' => $file->id,
                 'previewed_count' => $file->previewed_count,
-                'will_auto_dislike' => in_array($file->id, $willAutoDislikeFileIds),
             ];
         });
 
@@ -282,21 +241,7 @@ SVG;
             ->map(fn (mixed $fileId): int => (int) $fileId)
             ->values()
             ->all();
-        $convertToManualIds = $files
-            ->filter(function (File $file): bool {
-                if ($file->blacklisted_at === null) {
-                    return false;
-                }
-
-                $reason = is_string($file->blacklist_reason) ? trim($file->blacklist_reason) : '';
-
-                return $reason === '';
-            })
-            ->keys()
-            ->map(fn (mixed $fileId): int => (int) $fileId)
-            ->values()
-            ->all();
-        $processedIds = array_values(array_unique([...$newBlacklistIds, ...$convertToManualIds]));
+        $processedIds = $newBlacklistIds;
 
         if ($processedIds === []) {
             return response()->json([
@@ -306,26 +251,33 @@ SVG;
         }
 
         $blacklistedAt = now();
-        if ($newBlacklistIds !== []) {
-            app(MetricsService::class)->applyBlacklistAdd($newBlacklistIds, true);
+        DB::transaction(function () use ($files, $newBlacklistIds, $blacklistedAt): void {
+            if ($newBlacklistIds === []) {
+                return;
+            }
+
+            $metrics = app(MetricsService::class);
+            $metrics->applyBlacklistAdd($newBlacklistIds);
+
+            foreach ($files->only($newBlacklistIds) as $file) {
+                $metrics->applyAutoDislikeClear($file);
+
+                foreach ($file->reactions as $reaction) {
+                    $metrics->applyReactionChange($file, $reaction->type, null, false, true);
+                    $reaction->delete();
+                }
+            }
 
             File::query()
                 ->whereIn('id', $newBlacklistIds)
                 ->update([
                     'blacklisted_at' => $blacklistedAt,
-                    'blacklist_reason' => 'Manual blacklist',
+                    'auto_disliked' => false,
                 ]);
-        }
-
-        if ($convertToManualIds !== []) {
-            File::query()
-                ->whereIn('id', $convertToManualIds)
-                ->update([
-                    'blacklist_reason' => 'Manual blacklist',
-                ]);
-        }
+        });
 
         app(LocalBrowseIndexSyncService::class)->syncFilesByIds($processedIds);
+        app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds($processedIds);
 
         $user = Auth::user();
         if ($user) {
@@ -337,10 +289,7 @@ SVG;
             'results' => array_map(
                 static fn (int $fileId): array => [
                     'id' => $fileId,
-                    'blacklisted_at' => in_array($fileId, $newBlacklistIds, true)
-                        ? $blacklistedAt->toIso8601String()
-                        : $files[$fileId]?->blacklisted_at?->toIso8601String(),
-                    'blacklist_reason' => 'Manual blacklist',
+                    'blacklisted_at' => $blacklistedAt->toIso8601String(),
                 ],
                 $processedIds
             ),
@@ -376,115 +325,6 @@ SVG;
                 'id' => $file->id,
                 'previewed_count' => (int) $file->previewed_count,
             ]),
-        ]);
-    }
-
-    /**
-     * Perform auto-dislike on multiple files (called after countdown expires).
-     */
-    public function batchPerformAutoDislike(\Illuminate\Http\Request $request): JsonResponse
-    {
-        $request->validate([
-            'file_ids' => 'required|array',
-            'file_ids.*' => 'required|integer|exists:files,id',
-        ]);
-
-        $fileIds = $request->input('file_ids');
-        $user = Auth::user();
-
-        // Load files and authorize
-        $files = File::whereIn('id', $fileIds)->get();
-
-        // Filter files that still meet conditions
-        // Files can be auto-disliked via:
-        // 1. Moderation rules (flagged at load time)
-        // 2. Preview count >= 3 (flagged after previewing)
-        // We don't require preview count here since moderation-flagged files
-        // may not have been previewed 3 times yet
-        $candidates = $files->filter(static function (File $file): bool {
-            return $file->source !== 'local'
-                && $file->blacklisted_at === null
-                && ! $file->auto_disliked;
-        });
-        $candidateFileIds = $candidates->pluck('id')->all();
-        $candidateFilesById = $candidates->keyBy('id');
-
-        $validFileIds = [];
-        if ($candidateFileIds !== []) {
-            $filesWithReactions = Reaction::query()
-                ->whereIn('file_id', $candidateFileIds)
-                ->pluck('file_id')
-                ->all();
-            $filesWithReactionsLookup = array_fill_keys($filesWithReactions, true);
-
-            $validFileIds = array_values(array_filter(
-                $candidateFileIds,
-                static fn (int $fileId): bool => ! isset($filesWithReactionsLookup[$fileId]),
-            ));
-        }
-
-        if (empty($validFileIds)) {
-            return response()->json([
-                'message' => 'No files meet auto-dislike conditions.',
-                'auto_disliked_count' => 0,
-                'file_ids' => [],
-            ]);
-        }
-
-        $validFiles = collect($validFileIds)
-            ->map(fn (int $fileId): ?File => $candidateFilesById->get($fileId))
-            ->filter(fn (mixed $file): bool => $file instanceof File)
-            ->values();
-
-        DB::transaction(function () use ($user, $validFileIds, $validFiles): void {
-            // Batch update files with auto_disliked = true
-            File::query()->whereIn('id', $validFileIds)->update(['auto_disliked' => true]);
-
-            // Batch insert dislike reactions
-            $timestamp = now();
-            $reactionsToInsert = array_map(static function (int $fileId) use ($user, $timestamp): array {
-                return [
-                    'file_id' => $fileId,
-                    'user_id' => $user->id,
-                    'type' => 'dislike',
-                    'created_at' => $timestamp,
-                    'updated_at' => $timestamp,
-                ];
-            }, $validFileIds);
-
-            // Check for existing reactions to avoid duplicates
-            $existingReactionFileIds = Reaction::query()
-                ->whereIn('file_id', $validFileIds)
-                ->where('user_id', $user->id)
-                ->pluck('file_id')
-                ->all();
-            $existingReactionLookup = array_fill_keys($existingReactionFileIds, true);
-
-            $newReactionsToInsert = array_values(array_filter(
-                $reactionsToInsert,
-                static fn (array $reaction): bool => ! isset($existingReactionLookup[$reaction['file_id']]),
-            ));
-
-            if ($newReactionsToInsert !== []) {
-                app(MetricsService::class)->applyDislikeInsert(array_map(
-                    static fn (array $reaction): int => (int) $reaction['file_id'],
-                    $newReactionsToInsert
-                ));
-                Reaction::query()->insert($newReactionsToInsert);
-            }
-
-            // Detach files from all tabs belonging to this user
-            app(TabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
-
-            app(DownloadedFileClearService::class)->clearMany($validFiles, queueDelete: true);
-        });
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds(array_map('intval', $validFileIds));
-        app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds(array_map('intval', $validFileIds));
-
-        return response()->json([
-            'message' => 'Files auto-disliked successfully.',
-            'auto_disliked_count' => count($validFileIds),
-            'file_ids' => $validFileIds,
         ]);
     }
 
@@ -525,8 +365,6 @@ SVG;
      */
     public function deleteAll(): JsonResponse
     {
-        $user = Auth::user();
-
         $deletedCount = File::count();
         File::query()->delete();
         app(LocalBrowseIndexSyncService::class)->deleteAll();

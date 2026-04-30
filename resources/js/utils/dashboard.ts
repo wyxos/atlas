@@ -23,10 +23,9 @@ export const overviewChartConfig = {
     non_local: { label: 'Non-local', color: 'var(--color-twilight-indigo-300)' },
 } satisfies ChartConfig;
 
-export const blacklistChartConfig = {
-    total: { label: 'Total', color: 'var(--color-blue-slate-200)' },
-    manual: { label: 'Manual', color: 'var(--color-smart-blue-500)' },
-    auto: { label: 'Auto', color: '#6b7280' },
+export const negativeOutcomeChartConfig = {
+    blacklisted: { label: 'Blacklisted', color: 'var(--color-danger-300)' },
+    auto_disliked: { label: 'Auto disliked', color: '#6b7280' },
 } satisfies ChartConfig;
 
 export function formatDashboardCount(value: number): string {
@@ -50,7 +49,6 @@ export function buildDashboardTickValues(maxValue: number, steps = 5): number[] 
 
 export function createDashboardChartSections(metrics: DashboardMetrics | null): DashboardChartSection[] {
     const files = metrics?.files;
-    const blacklistedTotal = (files?.blacklisted.manual ?? 0) + (files?.blacklisted.auto ?? 0);
 
     return [
         {
@@ -134,21 +132,19 @@ export function createDashboardChartSections(metrics: DashboardMetrics | null): 
             ],
         },
         {
-            key: 'blacklist',
-            title: 'Blacklist breakdown',
-            description: 'Manual versus rule-driven blacklists.',
-            tooltipLabel: 'Blacklisted',
-            config: blacklistChartConfig,
-            seriesKeys: ['total', 'manual', 'auto'],
+            key: 'negative',
+            title: 'Negative outcomes',
+            description: 'Backend blacklists and auto-dislikes.',
+            tooltipLabel: 'Negative outcomes',
+            config: negativeOutcomeChartConfig,
+            seriesKeys: ['blacklisted', 'auto_disliked'],
             data: [
-                { index: 0, label: 'Total', total: blacklistedTotal, manual: 0, auto: 0 },
-                { index: 1, label: 'Manual', total: 0, manual: files?.blacklisted.manual ?? 0, auto: 0 },
-                { index: 2, label: 'Auto', total: 0, manual: 0, auto: files?.blacklisted.auto ?? 0 },
+                { index: 0, label: 'Blacklisted', blacklisted: files?.blacklisted ?? 0, auto_disliked: 0 },
+                { index: 1, label: 'Auto disliked', blacklisted: 0, auto_disliked: files?.auto_disliked ?? 0 },
             ],
             summary: [
-                { label: 'Total', value: blacklistedTotal, color: blacklistChartConfig.total.color },
-                { label: 'Manual', value: files?.blacklisted.manual ?? 0, color: blacklistChartConfig.manual.color },
-                { label: 'Auto', value: files?.blacklisted.auto ?? 0, color: blacklistChartConfig.auto.color },
+                { label: 'Blacklisted', value: files?.blacklisted ?? 0, color: negativeOutcomeChartConfig.blacklisted.color },
+                { label: 'Auto disliked', value: files?.auto_disliked ?? 0, color: negativeOutcomeChartConfig.auto_disliked.color },
             ],
         },
     ];

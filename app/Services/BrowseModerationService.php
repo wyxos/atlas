@@ -17,18 +17,16 @@ class BrowseModerationService
 
         // File moderation: apply rules based on action_type
         $fileModerationResult = app(FileModerationService::class)->moderate($files);
-        $flaggedIds = $fileModerationResult['flaggedIds']; // Files matching rules with 'dislike' action type
+        $flaggedIds = $fileModerationResult['flaggedIds'];
         $processedIds = $fileModerationResult['processedIds'];
         $immediateActions = $fileModerationResult['immediateActions'] ?? [];
 
         // Container moderation: apply container moderation rules after file moderation
         $containerModerationResult = app(ContainerModerationService::class)->moderate($files);
-        $containerFlaggedIds = $containerModerationResult['flaggedIds']; // Files matching container blacklist with 'dislike' action type
+        $containerFlaggedIds = $containerModerationResult['flaggedIds'];
         $containerProcessedIds = $containerModerationResult['processedIds'];
         $containerImmediateActions = $containerModerationResult['immediateActions'] ?? [];
 
-        // Merge flagged file IDs from both moderation rules and container blacklist rules
-        // Both include files that match rules with 'dislike' action type (will show will_auto_dislike = true in UI)
         $flaggedIds = array_merge($flaggedIds, $containerFlaggedIds);
 
         // Merge processed IDs from both moderation and container blacklist
@@ -40,9 +38,13 @@ class BrowseModerationService
         // Store files before filtering (needed for immediate actions formatting)
         $allFilesBeforeFilter = $files->keyBy('id');
 
-        // Extract file IDs that were blacklisted (not auto-disliked) from immediate actions
-        // immediateActions only contains blacklisted files (auto-disliked files are not in immediateActions)
-        $blacklistedFileIds = array_column($immediateActions, 'file_id');
+        $blacklistedFileIds = array_map(
+            static fn (array $action): int => (int) $action['file_id'],
+            array_values(array_filter(
+                $immediateActions,
+                static fn (array $action): bool => ($action['action_type'] ?? null) === 'blacklist',
+            )),
+        );
 
         $filterBlacklisted = (bool) ($context['filterBlacklisted'] ?? true);
 

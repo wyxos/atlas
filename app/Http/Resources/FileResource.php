@@ -103,30 +103,24 @@ class FileResource extends JsonResource
         $previewFileUrl = self::toRelativeInternalApiUrl($previewFileUrl, $request);
         $posterUrl = self::toRelativeInternalApiUrl($posterUrl, $request);
 
-        $blacklistType = null;
         $blacklistRule = null;
         if ($this->blacklisted_at !== null) {
-            $hasReason = is_string($this->blacklist_reason) && trim($this->blacklist_reason) !== '';
-            $blacklistType = $hasReason ? 'manual' : 'auto';
-
-            if (! $hasReason) {
-                try {
-                    if ($this->resource->relationLoaded('autoBlacklistModerationAction')) {
-                        $hit = $this->resource->getRelation('autoBlacklistModerationAction');
-                        if ($hit) {
-                            $blacklistRule = [
-                                'id' => (int) ($hit->moderation_rule_id ?? 0),
-                                'name' => (string) ($hit->moderation_rule_name ?? ''),
-                            ];
-                        }
+            try {
+                if ($this->resource->relationLoaded('autoBlacklistModerationAction')) {
+                    $hit = $this->resource->getRelation('autoBlacklistModerationAction');
+                    if ($hit) {
+                        $blacklistRule = [
+                            'id' => (int) ($hit->moderation_rule_id ?? 0),
+                            'name' => (string) ($hit->moderation_rule_name ?? ''),
+                        ];
                     }
-                } catch (\Throwable $e) {
-                    // Omit persisted details if relation isn't available or anything fails.
                 }
+            } catch (\Throwable $e) {
+                // Omit persisted details if relation isn't available or anything fails.
+            }
 
-                if ($blacklistRule && $blacklistRule['id'] <= 0 && $blacklistRule['name'] === '') {
-                    $blacklistRule = null;
-                }
+            if ($blacklistRule && $blacklistRule['id'] <= 0 && $blacklistRule['name'] === '') {
+                $blacklistRule = null;
             }
         }
 
@@ -207,8 +201,6 @@ class FileResource extends JsonResource
             'auto_disliked' => (bool) ($this->auto_disliked ?? false),
             'auto_dislike_rule' => $autoDislikeRule && ($autoDislikeRule['id'] > 0 || $autoDislikeRule['name'] !== '') ? $autoDislikeRule : null,
             'blacklisted_at' => $this->blacklisted_at?->toIso8601String(),
-            'blacklist_reason' => $this->blacklist_reason,
-            'blacklist_type' => $blacklistType,
             'blacklist_rule' => $blacklistRule,
             'downloaded' => $this->downloaded,
             'downloaded_at' => $this->downloaded_at?->toIso8601String(),

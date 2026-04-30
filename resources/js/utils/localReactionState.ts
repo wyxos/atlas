@@ -7,7 +7,6 @@ const REACTED_REACTION_TYPES: ReactionType[] = ['love', 'like', 'funny'];
 export type LocalReactionSnapshot = {
     reaction: FeedItem['reaction'];
     downloaded: boolean;
-    will_auto_dislike: boolean;
     src: FeedItem['src'];
     preview: FeedItem['preview'];
     thumbnail: FeedItem['thumbnail'];
@@ -16,8 +15,6 @@ export type LocalReactionSnapshot = {
     auto_disliked: boolean;
     auto_dislike_rule: FeedItem['auto_dislike_rule'];
     blacklisted_at: FeedItem['blacklisted_at'];
-    blacklist_reason: FeedItem['blacklist_reason'];
-    blacklist_type: FeedItem['blacklist_type'];
     blacklist_rule: FeedItem['blacklist_rule'];
 };
 
@@ -43,20 +40,6 @@ function getSelectedReactionTypes(filters: Record<string, unknown>): ReactionTyp
         .filter((value): value is ReactionType => value !== null);
 }
 
-function getBlacklistType(item: FeedItem): 'manual' | 'auto' | null {
-    if (item.blacklisted_at === null || item.blacklisted_at === undefined) {
-        return null;
-    }
-
-    if (item.blacklist_type === 'manual' || item.blacklist_type === 'auto') {
-        return item.blacklist_type;
-    }
-
-    const reason = typeof item.blacklist_reason === 'string' ? item.blacklist_reason.trim() : '';
-
-    return reason.length > 0 ? 'manual' : 'auto';
-}
-
 function hasStoredDownloadState(item: FeedItem): boolean {
     return item.downloaded === true
         || (typeof item.path === 'string' && item.path.length > 0)
@@ -70,7 +53,6 @@ function applyOptimisticDownloadedCleanup(item: FeedItem): void {
     }
 
     item.downloaded = false;
-    item.will_auto_dislike = false;
 
     if (typeof item.url !== 'string' || item.url.length === 0) {
         return;
@@ -104,7 +86,6 @@ export function createLocalReactionSnapshot(item: FeedItem): LocalReactionSnapsh
     return {
         reaction: item.reaction ? { ...item.reaction } : null,
         downloaded: item.downloaded === true,
-        will_auto_dislike: item.will_auto_dislike === true,
         src: item.src,
         preview: item.preview,
         thumbnail: item.thumbnail,
@@ -113,8 +94,6 @@ export function createLocalReactionSnapshot(item: FeedItem): LocalReactionSnapsh
         auto_disliked: item.auto_disliked === true,
         auto_dislike_rule: item.auto_dislike_rule ?? null,
         blacklisted_at: item.blacklisted_at ?? null,
-        blacklist_reason: item.blacklist_reason ?? null,
-        blacklist_type: getBlacklistType(item),
         blacklist_rule: item.blacklist_rule ?? null,
     };
 }
@@ -141,8 +120,6 @@ export function applyOptimisticLocalReactionState(
     item.auto_disliked = false;
     item.auto_dislike_rule = null;
     item.blacklisted_at = null;
-    item.blacklist_reason = null;
-    item.blacklist_type = null;
     item.blacklist_rule = null;
 
     return snapshot;
@@ -163,17 +140,7 @@ export function applyExactLocalReactionState(
     item.auto_disliked = false;
     item.auto_dislike_rule = null;
     item.blacklisted_at = null;
-    item.blacklist_reason = null;
-    item.blacklist_type = null;
     item.blacklist_rule = null;
-}
-
-export function applyLocalAutoDislikeState(item: FeedItem): void {
-    item.reaction = { type: 'dislike' };
-    item.auto_disliked = true;
-    item.will_auto_dislike = false;
-
-    applyOptimisticDownloadedCleanup(item);
 }
 
 export function restoreOptimisticLocalReactionState(
@@ -182,7 +149,6 @@ export function restoreOptimisticLocalReactionState(
 ): void {
     item.reaction = snapshot.reaction ? { ...snapshot.reaction } : null;
     item.downloaded = snapshot.downloaded;
-    item.will_auto_dislike = snapshot.will_auto_dislike;
     item.src = snapshot.src;
     item.preview = snapshot.preview;
     item.thumbnail = snapshot.thumbnail;
@@ -191,8 +157,6 @@ export function restoreOptimisticLocalReactionState(
     item.auto_disliked = snapshot.auto_disliked;
     item.auto_dislike_rule = snapshot.auto_dislike_rule ?? null;
     item.blacklisted_at = snapshot.blacklisted_at ?? null;
-    item.blacklist_reason = snapshot.blacklist_reason ?? null;
-    item.blacklist_type = snapshot.blacklist_type ?? null;
     item.blacklist_rule = snapshot.blacklist_rule ?? null;
 }
 
@@ -212,14 +176,6 @@ function matchesBlacklistedFilter(item: FeedItem, value: unknown): boolean {
     }
 
     return value === 'yes' ? isBlacklisted : !isBlacklisted;
-}
-
-function matchesBlacklistTypeFilter(item: FeedItem, value: unknown): boolean {
-    if (value !== 'manual' && value !== 'auto') {
-        return true;
-    }
-
-    return getBlacklistType(item) === value;
 }
 
 function matchesAutoDislikedFilter(item: FeedItem, value: unknown): boolean {
@@ -269,17 +225,6 @@ function matchesReactionFilter(item: FeedItem, filters: Record<string, unknown>)
     return reactionType !== null && selectedTypes.includes(reactionType);
 }
 
-function matchesModerationUnion(item: FeedItem, value: unknown): boolean {
-    if (value !== 'auto_disliked_or_blacklisted_auto') {
-        return true;
-    }
-
-    const reactionType = normalizeReactionType(item.reaction?.type);
-    const isAutoBlacklisted = getBlacklistType(item) === 'auto';
-
-    return (item.auto_disliked === true && reactionType === 'dislike') || isAutoBlacklisted;
-}
-
 export function isPositiveOnlyLocalView(filters: Record<string, unknown>): boolean {
     const reactionMode = filters.reaction_mode;
 
@@ -308,12 +253,7 @@ export function matchesLocalViewFilters(
         return false;
     }
 
-    if (filters.moderation_union === 'auto_disliked_or_blacklisted_auto') {
-        return matchesModerationUnion(item, filters.moderation_union);
-    }
-
     return matchesReactionFilter(item, filters)
         && matchesBlacklistedFilter(item, filters.blacklisted)
-        && matchesBlacklistTypeFilter(item, filters.blacklist_type)
         && matchesAutoDislikedFilter(item, filters.auto_disliked);
 }

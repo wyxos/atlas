@@ -20,9 +20,7 @@ class MetricsService
 
     public const string KEY_FILES_BLACKLISTED_TOTAL = 'files_blacklisted_total';
 
-    public const string KEY_FILES_BLACKLISTED_MANUAL = 'files_blacklisted_manual';
-
-    public const string KEY_FILES_BLACKLISTED_AUTO = 'files_blacklisted_auto';
+    public const string KEY_FILES_AUTO_DISLIKED = 'files_auto_disliked';
 
     public const string KEY_FILES_UNREACTED_NOT_BLACKLISTED = 'files_unreacted_not_blacklisted';
 
@@ -326,11 +324,43 @@ class MetricsService
     }
 
     /**
+     * Apply metrics for bulk auto-dislike marking (before updating files).
+     *
+     * @param  array<int>  $fileIds
+     */
+    public function applyAutoDislikeAdd(array $fileIds): void
+    {
+        if (empty($fileIds)) {
+            return;
+        }
+
+        $eligibleIds = File::query()
+            ->whereIn('id', $fileIds)
+            ->where('auto_disliked', false)
+            ->pluck('id')
+            ->map(fn ($value) => (int) $value)
+            ->all();
+
+        if ($eligibleIds !== []) {
+            $this->incrementMetric(self::KEY_FILES_AUTO_DISLIKED, count($eligibleIds));
+        }
+    }
+
+    public function applyAutoDislikeClear(File $file): void
+    {
+        if (! (bool) $file->auto_disliked) {
+            return;
+        }
+
+        $this->incrementMetric(self::KEY_FILES_AUTO_DISLIKED, -1);
+    }
+
+    /**
      * Apply metrics for bulk blacklisting (before updating files).
      *
      * @param  array<int>  $fileIds
      */
-    public function applyBlacklistAdd(array $fileIds, bool $manual): void
+    public function applyBlacklistAdd(array $fileIds): void
     {
         if (empty($fileIds)) {
             return;
@@ -348,7 +378,6 @@ class MetricsService
         }
 
         $this->incrementMetric(self::KEY_FILES_BLACKLISTED_TOTAL, count($eligibleIds));
-        $this->incrementMetric($manual ? self::KEY_FILES_BLACKLISTED_MANUAL : self::KEY_FILES_BLACKLISTED_AUTO, count($eligibleIds));
 
         $filesWithoutReactions = DB::table('files')
             ->whereIn('id', $eligibleIds)
@@ -371,10 +400,9 @@ class MetricsService
     /**
      * Apply metrics for clearing a blacklist on a single file.
      */
-    public function applyBlacklistClear(File $file, bool $wasManual, bool $adjustUnreacted = true): void
+    public function applyBlacklistClear(File $file, bool $adjustUnreacted = true): void
     {
         $this->incrementMetric(self::KEY_FILES_BLACKLISTED_TOTAL, -1);
-        $this->incrementMetric($wasManual ? self::KEY_FILES_BLACKLISTED_MANUAL : self::KEY_FILES_BLACKLISTED_AUTO, -1);
 
         if ($adjustUnreacted) {
             $hasReactions = Reaction::where('file_id', $file->id)->exists();
@@ -429,8 +457,7 @@ class MetricsService
             ->selectRaw('SUM(CASE WHEN downloaded = 1 THEN 1 ELSE 0 END) as downloaded_total')
             ->selectRaw("SUM(CASE WHEN source IN ('local', 'Local') THEN 1 ELSE 0 END) as local_total")
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL THEN 1 ELSE 0 END) as blacklisted_total')
-            ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND blacklist_reason IS NOT NULL AND blacklist_reason <> "" THEN 1 ELSE 0 END) as blacklisted_manual')
-            ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND (blacklist_reason IS NULL OR blacklist_reason = "") THEN 1 ELSE 0 END) as blacklisted_auto')
+            ->selectRaw('SUM(CASE WHEN auto_disliked = 1 THEN 1 ELSE 0 END) as auto_disliked_total')
             ->first();
 
         $unreactedNotBlacklisted = File::query()
@@ -454,8 +481,7 @@ class MetricsService
         $this->setMetric(self::KEY_FILES_LOCAL, (int) ($fileCounts->local_total ?? 0), 'Local files');
         $this->setMetric(self::KEY_FILES_NOT_FOUND, (int) ($fileCounts->not_found_total ?? 0), 'Not found files');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_TOTAL, (int) ($fileCounts->blacklisted_total ?? 0), 'Blacklisted files');
-        $this->setMetric(self::KEY_FILES_BLACKLISTED_MANUAL, (int) ($fileCounts->blacklisted_manual ?? 0), 'Manually blacklisted files');
-        $this->setMetric(self::KEY_FILES_BLACKLISTED_AUTO, (int) ($fileCounts->blacklisted_auto ?? 0), 'Auto blacklisted files');
+        $this->setMetric(self::KEY_FILES_AUTO_DISLIKED, (int) ($fileCounts->auto_disliked_total ?? 0), 'Auto disliked files');
         $this->setMetric(self::KEY_FILES_UNREACTED_NOT_BLACKLISTED, (int) $unreactedNotBlacklisted, 'Unreacted, not blacklisted');
         $this->setMetric(self::KEY_REACTIONS_LOVE, (int) ($reactionCounts['love'] ?? 0), 'Files with love reactions');
         $this->setMetric(self::KEY_REACTIONS_LIKE, (int) ($reactionCounts['like'] ?? 0), 'Files with like reactions');

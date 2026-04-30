@@ -302,20 +302,19 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="dislike">
-                                                Dislike (5s countdown)
+                                                Dislike
                                             </SelectItem>
                                             <SelectItem value="blacklist">
-                                                Immediate Blacklist
+                                                Blacklist
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <p class="text-xs text-twilight-indigo-400">
                                         <span v-if="ruleForm.action_type === 'dislike'">
-                                            Files matching this rule will show a 5-second countdown before being
-                                            disliked.
+                                            Files matching this rule will be auto-disliked during browse.
                                         </span>
                                         <span v-else>
-                                            Files matching this rule will be immediately blacklisted and removed from
+                                            Files matching this rule will be blacklisted during browse and removed from
                                             results.
                                         </span>
                                     </p>

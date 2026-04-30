@@ -18,7 +18,7 @@ beforeEach(function () {
     $this->service = app(FileModerationService::class);
 });
 
-test('files with matching prompts are flagged for auto-dislike', function () {
+test('files with matching prompts are immediately auto disliked', function () {
     // Create an active moderation rule with DISLIKE action type
     $rule = ModerationRule::factory()->any(['spam', 'advertisement'])->create([
         'name' => 'Block spam',
@@ -51,12 +51,16 @@ test('files with matching prompts are flagged for auto-dislike', function () {
     // Call moderate directly
     $result = $this->service->moderate(collect([$file1, $file2]));
 
-    // Assert file1 is flagged (but NOT auto-disliked in DB - that happens later via UI)
-    expect($result['flaggedIds'])->toContain($file1->id)
-        ->and($result['flaggedIds'])->not->toContain($file2->id);
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->toContain($file1->id)
+        ->and($result['processedIds'])->not->toContain($file2->id);
 
-    // Assert file is NOT auto-disliked in database (new behavior)
-    expect($file1->fresh()->auto_disliked)->toBeFalse();
+    expect($file1->fresh()->auto_disliked)->toBeTrue();
+    $this->assertDatabaseHas('reactions', [
+        'file_id' => $file1->id,
+        'user_id' => $this->user->id,
+        'type' => 'dislike',
+    ]);
 });
 
 test('persist the moderation rule that flagged a file for auto-dislike', function () {
@@ -77,7 +81,8 @@ test('persist the moderation rule that flagged a file for auto-dislike', functio
     $file = $file->fresh()->load('metadata');
 
     $result = $this->service->moderate(collect([$file]));
-    expect($result['flaggedIds'])->toContain($file->id);
+    expect($result['flaggedIds'])->toBeEmpty();
+    expect($result['processedIds'])->toContain($file->id);
 
     $this->assertDatabaseHas('file_moderation_actions', [
         'file_id' => $file->id,
@@ -89,7 +94,7 @@ test('persist the moderation rule that flagged a file for auto-dislike', functio
     $response = $this->actingAs($this->user)->getJson("/api/files/{$file->id}");
     $response
         ->assertOk()
-        ->assertJsonPath('file.auto_disliked', false)
+        ->assertJsonPath('file.auto_disliked', true)
         ->assertJsonPath('file.auto_dislike_rule.id', $rule->id)
         ->assertJsonPath('file.auto_dislike_rule.name', $rule->name);
 });
@@ -185,9 +190,11 @@ test('multiple active rules are checked', function () {
     // Call moderate directly
     $result = $this->service->moderate(collect([$file1, $file2]));
 
-    // Assert both files are flagged
-    expect($result['flaggedIds'])->toContain($file1->id)
-        ->and($result['flaggedIds'])->toContain($file2->id);
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->toContain($file1->id)
+        ->and($result['processedIds'])->toContain($file2->id);
+    expect($file1->fresh()->auto_disliked)->toBeTrue();
+    expect($file2->fresh()->auto_disliked)->toBeTrue();
 });
 
 test('files already auto-disliked are skipped', function () {
@@ -272,7 +279,8 @@ test('moderation result includes correct structure', function () {
 
     // Assert result structure
     expect($result)->toHaveKeys(['flaggedIds', 'processedIds'])
-        ->and($result['flaggedIds'])->toContain($file->id);
+        ->and($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->toContain($file->id);
 });
 
 test('batch flagging works correctly for multiple files', function () {
@@ -300,19 +308,18 @@ test('batch flagging works correctly for multiple files', function () {
     // Call moderate directly
     $result = $this->service->moderate($files);
 
-    // Assert all files are flagged
-    expect(count($result['flaggedIds']))->toBe(5);
+    expect($result['flaggedIds'])->toBeEmpty();
+    expect(count($result['processedIds']))->toBe(5);
     foreach ($files as $file) {
-        expect($result['flaggedIds'])->toContain($file->id);
+        expect($result['processedIds'])->toContain($file->id);
     }
 
-    // Assert none are auto-disliked in DB (new behavior)
     foreach ($files as $file) {
-        expect($file->fresh()->auto_disliked)->toBeFalse();
+        expect($file->fresh()->auto_disliked)->toBeTrue();
     }
 });
 
-test('auto-dislike still skips only the current users reacted files', function () {
+test('auto dislike skips only the current users reacted files', function () {
     ModerationRule::factory()->any(['spam'])->create([
         'active' => true,
         'action_type' => ActionType::DISLIKE,
@@ -352,8 +359,11 @@ test('auto-dislike still skips only the current users reacted files', function (
         $otherUserReactedFile->fresh()->load('metadata'),
     ]));
 
-    expect($result['flaggedIds'])->not->toContain($currentUserReactedFile->id)
-        ->and($result['flaggedIds'])->toContain($otherUserReactedFile->id);
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->not->toContain($currentUserReactedFile->id)
+        ->and($result['processedIds'])->toContain($otherUserReactedFile->id)
+        ->and($currentUserReactedFile->fresh()->auto_disliked)->toBeFalse()
+        ->and($otherUserReactedFile->fresh()->auto_disliked)->toBeTrue();
 });
 
 test('empty file collection returns empty results', function () {
@@ -420,7 +430,7 @@ test('immediate blacklist updates file', function () {
     Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
 });
 
-test('auto-blacklist skips files that already have any reaction', function () {
+test('blacklist skips files that already have any reaction', function () {
     Bus::fake();
 
     ModerationRule::factory()->any(['spam'])->create([
@@ -460,7 +470,7 @@ test('auto-blacklist skips files that already have any reaction', function () {
     Bus::assertNothingDispatched();
 });
 
-test('persist the moderation rule that auto-blacklisted a file (no inference)', function () {
+test('persist the moderation rule that blacklisted a file without classification', function () {
     Bus::fake();
 
     $rule = ModerationRule::factory()->any(['spam'])->create([
@@ -473,7 +483,6 @@ test('persist the moderation rule that auto-blacklisted a file (no inference)', 
         'referrer_url' => 'https://example.com/file-blacklist-hit.jpg',
         'auto_disliked' => false,
         'blacklisted_at' => null,
-        'blacklist_reason' => null,
         'path' => 'downloads/test-blacklist-hit.jpg',
     ]);
     FileMetadata::factory()->create([
@@ -496,7 +505,8 @@ test('persist the moderation rule that auto-blacklisted a file (no inference)', 
     $response = $this->actingAs($this->user)->getJson("/api/files/{$file->id}");
     $response
         ->assertOk()
-        ->assertJsonPath('file.blacklist_type', 'auto')
+        ->assertJsonMissingPath('file.blacklist_type')
+        ->assertJsonMissingPath('file.blacklist_reason')
         ->assertJsonPath('file.blacklist_rule.id', $rule->id)
         ->assertJsonPath('file.blacklist_rule.name', $rule->name);
 });

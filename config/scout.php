@@ -212,8 +212,6 @@ return [
                         ['name' => 'seen_count', 'type' => 'int32', 'optional' => true],
                         ['name' => 'blacklisted_at', 'type' => 'int64', 'optional' => true],
                         ['name' => 'blacklisted', 'type' => 'bool', 'optional' => true, 'facet' => true],
-                        ['name' => 'blacklist_reason', 'type' => 'string', 'optional' => true],
-                        ['name' => 'blacklist_type', 'type' => 'string', 'optional' => true, 'facet' => true],
                         ['name' => 'downloaded', 'type' => 'bool', 'optional' => true, 'facet' => true],
                         ['name' => 'download_progress', 'type' => 'int32', 'optional' => true],
                         ['name' => 'downloaded_at', 'type' => 'int64', 'optional' => true],

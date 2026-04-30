@@ -62,7 +62,6 @@ class FileFactory extends Factory
             'seen_at' => null,
             'seen_count' => 0,
             'blacklisted_at' => null,
-            'blacklist_reason' => null,
             'not_found' => false,
             'listing_metadata' => null,
             'detail_metadata' => null,

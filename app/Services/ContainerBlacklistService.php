@@ -16,7 +16,35 @@ class ContainerBlacklistService
      */
     public function apply(Container $container, ?int $userId = null): array
     {
-        if ($container->blacklisted_at === null || $container->action_type !== ActionType::BLACKLIST) {
+        if ($container->blacklisted_at === null) {
+            return [];
+        }
+
+        if ($container->action_type === ActionType::DISLIKE) {
+            if (! is_int($userId)) {
+                return [];
+            }
+
+            $files = $container->files()
+                ->select([
+                    'files.id',
+                    'files.path',
+                    'files.preview_path',
+                    'files.poster_path',
+                    'files.downloaded',
+                    'files.downloaded_at',
+                    'files.download_progress',
+                    'files.blacklisted_at',
+                    'files.auto_disliked',
+                ])
+                ->whereNull('files.blacklisted_at')
+                ->whereDoesntHave('reactions', fn ($query) => $query->where('user_id', $userId))
+                ->get();
+
+            return app(FileAutoDislikeService::class)->apply($files, $userId);
+        }
+
+        if ($container->action_type !== ActionType::BLACKLIST) {
             return [];
         }
 
@@ -57,7 +85,7 @@ class ContainerBlacklistService
             return [];
         }
 
-        app(MetricsService::class)->applyBlacklistAdd($newlyBlacklistedIds, false);
+        app(MetricsService::class)->applyBlacklistAdd($newlyBlacklistedIds);
 
         File::query()
             ->whereIn('id', $newlyBlacklistedIds)

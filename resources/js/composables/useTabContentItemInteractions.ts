@@ -2,7 +2,6 @@ import { computed, nextTick, onUnmounted, ref, triggerRef, type Ref, type Shallo
 import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import type { DownloadedReactionChoice } from './useDownloadedReactionPrompt';
 import { useMasonryReactionHandler } from './useMasonryReactionHandler';
-import { useAutoDislikeQueue } from './useAutoDislikeQueue';
 import type { BrowseFormInstance } from './useBrowseForm';
 import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
@@ -26,7 +25,7 @@ type UseTabContentItemInteractionsOptions = {
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     isPositiveOnlyLocalView?: () => boolean;
     itemPreview: {
-        incrementPreviewCount: (fileId: number) => Promise<{ will_auto_dislike: boolean } | null>;
+        incrementPreviewCount: (fileId: number) => Promise<{ previewed_count: number } | null>;
         clearPreviewedItems: (fileIds?: number[]) => void;
         markPreviewedItems: (fileIds: number[]) => void;
     };
@@ -144,19 +143,11 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         }
     }
 
-    const autoDislikeQueue = useAutoDislikeQueue({
-        items: options.items,
-        masonry: options.masonry,
-        isLocal: options.form.isLocal,
-        matchesActiveLocalFilters: options.matchesActiveLocalFilters,
-    });
-
     const notFoundReconciliation = useTabContentNotFoundReconciliation({
         items: options.items,
         tab: options.tab,
         masonry: options.masonry,
         hoveredItemId,
-        cancelAutoDislikeCountdown: autoDislikeQueue.cancelAutoDislikeCountdown,
         clearHover: clearHoverState,
     });
 
@@ -196,16 +187,9 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     };
 
     function clearHoverState(): void {
-        const itemId = hoveredItemId.value;
-        const wasHoveringCountdown = itemId !== null && autoDislikeQueue.hasActiveCountdown(itemId);
-
         hoveredItemIndex.value = null;
         hoveredItemId.value = null;
         options.clearHoveredContainer();
-
-        if (wasHoveringCountdown) {
-            autoDislikeQueue.unfreezeAll();
-        }
     }
 
     function getLoadedItems(): FeedItem[] {
@@ -221,7 +205,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         isLocal: options.form.isLocal,
         masonry: options.masonry,
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
-        cancelAutoDislikeCountdown: autoDislikeQueue.cancelAutoDislikeCountdown,
         clearHoverForRemovedItems: (removedItemIds) => {
             if (hoveredItemId.value !== null && removedItemIds.has(hoveredItemId.value)) {
                 clearHoverState();
@@ -269,9 +252,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
                 }
             }
 
-            if (autoDislikeQueue.hasActiveCountdown(itemId)) {
-                autoDislikeQueue.freezeAll();
-            }
         },
         onMouseLeave(event: MouseEvent, item: FeedItem): void {
             clearHoverState();
@@ -292,16 +272,7 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             return;
         }
 
-        const result = await options.itemPreview.incrementPreviewCount(itemId);
-        const isModerationFlagged = item.will_auto_dislike === true;
-        const alreadyReacted = Boolean(item.reaction?.type);
-        const shouldAutoDislike = !alreadyReacted && (isModerationFlagged || result?.will_auto_dislike === true);
-
-        if (shouldAutoDislike) {
-            autoDislikeQueue.startAutoDislikeCountdown(itemId, item);
-            triggerRef(options.items);
-            await nextTick();
-        }
+        await options.itemPreview.incrementPreviewCount(itemId);
     }
 
     async function resetPreviewedState(): Promise<number> {
@@ -318,12 +289,10 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
             file_ids: fileIds,
         });
 
-        autoDislikeQueue.clearAutoDislikeCountdowns();
         options.itemPreview.clearPreviewedItems(fileIds);
 
         for (const item of resettableItems) {
             item.previewed_count = 0;
-            item.will_auto_dislike = false;
         }
 
         triggerRef(options.items);
@@ -353,7 +322,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     const reactionHandlers = {
         hasActiveReaction,
         onFileReaction(item: FeedItem, type: ReactionType): void {
-            autoDislikeQueue.cancelAutoDislikeCountdown(item.id);
             void handleMasonryReaction(item, type);
         },
         onFileViewerReaction(itemId: number, type: ReactionType): void {
@@ -366,12 +334,8 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     };
 
     const viewerHandlers = {
-        onOpen(): void {
-            autoDislikeQueue.freezeAutoDislikeOnly();
-        },
-        onClose(): void {
-            autoDislikeQueue.unfreezeAutoDislikeOnly();
-        },
+        onOpen(): void {},
+        onClose(): void {},
         onReaction: reactionHandlers.onFileViewerReaction,
         onPreviewFailure(item: FeedItem): void {
             notFoundReconciliation.reportItem(item);
@@ -380,7 +344,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
     onUnmounted(() => {
         options.masonry.value?.cancel?.();
-        autoDislikeQueue.clearAutoDislikeCountdowns();
     });
 
     return {
@@ -395,7 +358,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         preload: preloadHandlers,
         reactions: reactionHandlers,
         viewer: viewerHandlers,
-        autoDislikeQueue,
         resetPreviewedState,
         performLoadedItemsBulkAction: loadedItemsBulkActions.performLoadedItemsBulkAction,
     };

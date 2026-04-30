@@ -177,11 +177,11 @@ class FileReactionService
         if (in_array($type, ['love', 'like', 'funny'], true)) {
             $updates = ['auto_disliked' => false];
 
+            $metrics->applyAutoDislikeClear($file);
+
             if ($file->blacklisted_at !== null) {
-                $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
-                $metrics->applyBlacklistClear($file, $wasManual, false);
+                $metrics->applyBlacklistClear($file, false);
                 $updates['blacklisted_at'] = null;
-                $updates['blacklist_reason'] = null;
                 $isBlacklisted = false;
             }
 

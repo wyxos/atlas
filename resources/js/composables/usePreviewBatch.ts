@@ -3,13 +3,12 @@ import { batchIncrementPreview } from '@/actions/App/Http/Controllers/FilesContr
 type PreviewBatchResult = {
     id: number;
     previewed_count: number;
-    will_auto_dislike: boolean;
 };
 
 interface PendingPreview {
-    promise: Promise<{ previewed_count: number; will_auto_dislike: boolean }>;
+    promise: Promise<{ previewed_count: number }>;
     reject: (error: unknown) => void;
-    resolve: (value: { previewed_count: number; will_auto_dislike: boolean }) => void;
+    resolve: (value: { previewed_count: number }) => void;
 }
 
 const BATCH_DELAY_MS = 300;
@@ -30,7 +29,6 @@ async function executeBatchIncrementPreview(fileIds: number[]): Promise<PreviewB
     return data.results.map((result) => ({
         id: result.id,
         previewed_count: result.previewed_count,
-        will_auto_dislike: result.will_auto_dislike ?? false,
     }));
 }
 
@@ -71,7 +69,6 @@ async function processChunk(fileIds: number[], previews: Map<number, PendingPrev
 
             pending.resolve({
                 previewed_count: result.previewed_count,
-                will_auto_dislike: result.will_auto_dislike,
             });
         }
     } catch (error) {
@@ -113,7 +110,7 @@ async function flushBatch(): Promise<void> {
 }
 
 export function usePreviewBatch() {
-    function queuePreviewIncrement(fileId: number): Promise<{ previewed_count: number; will_auto_dislike: boolean }> {
+    function queuePreviewIncrement(fileId: number): Promise<{ previewed_count: number }> {
         const existing = pendingPreviews.get(fileId);
         if (existing) {
             return existing.promise;
@@ -122,7 +119,7 @@ export function usePreviewBatch() {
         let resolve!: PendingPreview['resolve'];
         let reject!: PendingPreview['reject'];
 
-        const promise = new Promise<{ previewed_count: number; will_auto_dislike: boolean }>((resolvePromise, rejectPromise) => {
+        const promise = new Promise<{ previewed_count: number }>((resolvePromise, rejectPromise) => {
             resolve = resolvePromise;
             reject = rejectPromise;
         });

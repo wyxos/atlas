@@ -251,10 +251,12 @@ describe('TabFilter', () => {
         expect(wrapper.text()).toContain('Funny (Random)');
         expect(wrapper.text()).toContain('Moderation');
         expect(wrapper.text()).toContain('Anomalies');
-        expect(wrapper.text()).toContain('Disliked (Any)');
-        expect(wrapper.text()).toContain('Saved Dislikes (Manual)');
-        expect(wrapper.text()).toContain('Saved Dislikes (Auto)');
-        expect(wrapper.text()).toContain('Saved Blacklist (Manual)');
-        expect(wrapper.text()).toContain('Saved Blacklist (Auto)');
+        expect(wrapper.text()).toContain('Disliked');
+        expect(wrapper.text()).toContain('Manual Dislikes');
+        expect(wrapper.text()).toContain('Auto Disliked');
+        expect(wrapper.text()).toContain('Blacklisted');
+        expect(wrapper.text()).toContain('Saved Manual Dislikes');
+        expect(wrapper.text()).toContain('Saved Auto Disliked');
+        expect(wrapper.text()).toContain('Saved Blacklisted');
     });
 });

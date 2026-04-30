@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { Info, Trash2 } from 'lucide-vue-next';
 import type { VibeViewerItem } from '@wyxos/vibe';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
@@ -9,7 +9,6 @@ import type { TabContentPromptDialog } from '@/composables/useTabContentPromptDi
 import type { FeedItem } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
 import { Button } from '@/components/ui/button';
-import DislikeProgressBar from './DislikeProgressBar.vue';
 import FileReactions from './FileReactions.vue';
 import Pill from './ui/Pill.vue';
 
@@ -40,44 +39,6 @@ const showReactions = computed(() => (
     (props.hovered || props.active || props.itemInteractions.reactions.hasActiveReaction(props.item))
     && isPreloaded.value
 ));
-const showDislikeProgress = computed(() => (
-    props.item.will_auto_dislike === true
-    && props.itemInteractions.autoDislikeQueue.hasActiveCountdown(props.item.id)
-));
-const countdownLabel = computed(() => props.itemInteractions.autoDislikeQueue.formatCountdown(
-    props.itemInteractions.autoDislikeQueue.getCountdownRemainingTime(props.item.id),
-));
-const pausedByHover = ref(false);
-
-function syncHoverPauseState(hovered: boolean): void {
-    const hasActiveCountdown = props.itemInteractions.autoDislikeQueue.hasActiveCountdown(props.item.id);
-
-    if (hovered && hasActiveCountdown) {
-        pausedByHover.value = true;
-        props.itemInteractions.autoDislikeQueue.freezeAll();
-        return;
-    }
-
-    if (pausedByHover.value) {
-        pausedByHover.value = false;
-        props.itemInteractions.autoDislikeQueue.unfreezeAll();
-    }
-}
-
-watch(
-    () => props.hovered,
-    (hovered) => {
-        syncHoverPauseState(hovered);
-    },
-    { immediate: true },
-);
-
-onUnmounted(() => {
-    if (pausedByHover.value) {
-        pausedByHover.value = false;
-        props.itemInteractions.autoDislikeQueue.unfreezeAll();
-    }
-});
 </script>
 
 <template>
@@ -153,13 +114,5 @@ onUnmounted(() => {
                 />
             </div>
         </div>
-
-        <DislikeProgressBar
-            v-if="showDislikeProgress"
-            :progress="itemInteractions.autoDislikeQueue.getCountdownProgress(item.id)"
-            :countdown="countdownLabel"
-            :is-frozen="itemInteractions.autoDislikeQueue.isFrozen.value"
-            :is-hovered="hovered"
-        />
     </div>
 </template>

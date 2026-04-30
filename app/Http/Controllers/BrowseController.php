@@ -104,7 +104,6 @@ class BrowseController extends Controller
                         // Tri-state selects.
                         'downloaded' => 'any',
                         'blacklisted' => 'any',
-                        'blacklist_type' => 'any',
                         'auto_disliked' => 'any',
                         'sort' => 'downloaded_at',
                         'seed' => null,
@@ -179,16 +178,6 @@ class BrowseController extends Controller
                                 ['label' => 'Any', 'value' => 'any'],
                                 ['label' => 'Yes', 'value' => 'yes'],
                                 ['label' => 'No', 'value' => 'no'],
-                            ],
-                            'default' => 'any',
-                        ]),
-                        $localSchema->field('blacklist_type', [
-                            'type' => 'select',
-                            'description' => 'Filter blacklisted files by how they were blacklisted.',
-                            'options' => [
-                                ['label' => 'Any', 'value' => 'any'],
-                                ['label' => 'Manual', 'value' => 'manual'],
-                                ['label' => 'Auto', 'value' => 'auto'],
                             ],
                             'default' => 'any',
                         ]),

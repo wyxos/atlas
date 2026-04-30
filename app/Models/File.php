@@ -58,7 +58,6 @@ class File extends Model
         'seen_at',
         'seen_count',
         'blacklisted_at',
-        'blacklist_reason',
         'not_found',
         'listing_metadata',
         'detail_metadata',

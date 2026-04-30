@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import TabContentV2GridOverlay from './TabContentV2GridOverlay.vue';
 import type { FeedItem } from '@/composables/useTabs';
@@ -20,24 +20,21 @@ function createFeedItem(): FeedItem {
         key: '1-42',
         index: 0,
         src: 'https://example.com/image-42.jpg',
-        will_auto_dislike: true,
     } as FeedItem;
 }
 
-function createProps(overrides: Partial<{ hovered: boolean; hasActiveCountdown: boolean }> = {}) {
-    const freezeAll = vi.fn();
-    const unfreezeAll = vi.fn();
-    const hasActiveCountdown = vi.fn().mockReturnValue(overrides.hasActiveCountdown ?? true);
+function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
+    const item = createFeedItem();
 
     return {
         active: false,
         hovered: overrides.hovered ?? false,
         index: 0,
-        item: createFeedItem(),
+        item,
         totalItems: 1,
         vibeItem: {
             fileId: 42,
-            feedItem: createFeedItem(),
+            feedItem: item,
         } as any,
         containers: {
             badges: {
@@ -64,15 +61,6 @@ function createProps(overrides: Partial<{ hovered: boolean; hasActiveCountdown: 
             reactions: {
                 hasActiveReaction: vi.fn().mockReturnValue(false),
             },
-            autoDislikeQueue: {
-                hasActiveCountdown,
-                formatCountdown: vi.fn().mockReturnValue('00:00'),
-                getCountdownRemainingTime: vi.fn().mockReturnValue(0),
-                getCountdownProgress: vi.fn().mockReturnValue(0),
-                freezeAll,
-                unfreezeAll,
-                isFrozen: ref(false),
-            },
         } as any,
         promptDialog: {
             open: vi.fn(),
@@ -84,71 +72,24 @@ function createProps(overrides: Partial<{ hovered: boolean; hasActiveCountdown: 
             },
         } as any,
         onReaction: vi.fn(),
-        freezeAll,
-        unfreezeAll,
     };
 }
 
 describe('TabContentV2GridOverlay', () => {
-    it('pauses all countdown queues when hovering an item with active auto-dislike countdown', async () => {
-        const props = createProps({ hovered: true, hasActiveCountdown: true });
+it('renders hover actions without preview-side dependencies', () => {
+        const props = createProps({ hovered: true });
+
         const wrapper = mount(TabContentV2GridOverlay, {
             props,
             global: {
                 stubs: {
                     Button: testStub,
-                    DislikeProgressBar: testStub,
                     FileReactions: testStub,
                     Pill: testStub,
                 },
             },
         });
 
-        expect(props.freezeAll).toHaveBeenCalledTimes(1);
-
-        await wrapper.setProps({ hovered: false });
-
-        expect(props.unfreezeAll).toHaveBeenCalledTimes(1);
+        expect(wrapper.exists()).toBe(true);
     });
-
-    it('does not pause queues on hover when no active countdown exists for the item', () => {
-        const props = createProps({ hovered: true, hasActiveCountdown: false });
-
-        mount(TabContentV2GridOverlay, {
-            props,
-            global: {
-                stubs: {
-                    Button: testStub,
-                    DislikeProgressBar: testStub,
-                    FileReactions: testStub,
-                    Pill: testStub,
-                },
-            },
-        });
-
-        expect(props.freezeAll).not.toHaveBeenCalled();
-        expect(props.unfreezeAll).not.toHaveBeenCalled();
-    });
-
-    it('resumes queues on unmount when hover-paused countdowns were active', () => {
-        const props = createProps({ hovered: true, hasActiveCountdown: true });
-        const wrapper = mount(TabContentV2GridOverlay, {
-            props,
-            global: {
-                stubs: {
-                    Button: testStub,
-                    DislikeProgressBar: testStub,
-                    FileReactions: testStub,
-                    Pill: testStub,
-                },
-            },
-        });
-
-        expect(props.freezeAll).toHaveBeenCalledTimes(1);
-
-        wrapper.unmount();
-
-        expect(props.unfreezeAll).toHaveBeenCalledTimes(1);
-    });
-
 });

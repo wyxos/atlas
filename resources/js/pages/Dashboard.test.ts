@@ -15,11 +15,8 @@ type DashboardMetrics = {
             dislike: number;
             funny: number;
         };
-        blacklisted: {
-            total: number;
-            manual: number;
-            auto: number;
-        };
+        blacklisted: number;
+        auto_disliked: number;
         not_found: number;
         unreacted_not_blacklisted: number;
     };
@@ -77,11 +74,8 @@ const createMetrics = (): DashboardMetrics => ({
             dislike: 0,
             funny: 0,
         },
-        blacklisted: {
-            total: 0,
-            manual: 0,
-            auto: 0,
-        },
+        blacklisted: 0,
+        auto_disliked: 0,
         not_found: 0,
         unreacted_not_blacklisted: 0,
     },
@@ -156,7 +150,7 @@ describe('Dashboard', () => {
         });
 
         expect(wrapper.text()).toContain('Reactions');
-        expect(wrapper.text()).toContain('Blacklist breakdown');
+        expect(wrapper.text()).toContain('Negative outcomes');
     });
 
     it('shows container actions for supported sources', async () => {

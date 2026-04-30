@@ -8,12 +8,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('file show includes blacklist type and persisted rule for auto-blacklisted files', function () {
+test('file show includes persisted rule for rule-blacklisted files without blacklist classification', function () {
     $user = User::factory()->create();
 
     $file = File::factory()->create([
         'blacklisted_at' => null,
-        'blacklist_reason' => null,
         'auto_disliked' => false,
         'path' => null,
     ]);
@@ -36,22 +35,9 @@ test('file show includes blacklist type and persisted rule for auto-blacklisted 
 
     $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
 
-    $response->assertSuccessful();
-    $response->assertJsonPath('file.blacklist_type', 'auto');
+    $response->assertSuccessful()
+        ->assertJsonMissingPath('file.blacklist_type')
+        ->assertJsonMissingPath('file.blacklist_reason');
     $response->assertJsonPath('file.blacklist_rule.id', $rule->id);
     $response->assertJsonPath('file.blacklist_rule.name', $rule->name);
-});
-
-test('file show includes manual blacklist type when reason is present', function () {
-    $user = User::factory()->create();
-
-    $file = File::factory()->create([
-        'blacklisted_at' => now(),
-        'blacklist_reason' => 'manual note',
-    ]);
-
-    $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
-
-    $response->assertSuccessful();
-    $response->assertJsonPath('file.blacklist_type', 'manual');
 });

@@ -237,6 +237,9 @@ describe('useTabContentItemInteractions', () => {
                 key: `1-${index + 1}`,
                 index,
                 src: `https://example.com/image${index + 1}.jpg`,
+                reaction: { type: 'dislike' },
+                auto_disliked: true,
+                auto_dislike_rule: { id: 1, name: 'Legacy rule' },
             } as FeedItem)),
         );
         const loadedItems = ref(items.value);
@@ -248,7 +251,6 @@ describe('useTabContentItemInteractions', () => {
                     results: payload.file_ids.map((fileId) => ({
                         id: fileId,
                         blacklisted_at: '2026-04-14T00:00:00Z',
-                        blacklist_reason: 'Manual blacklist',
                     })),
                 },
             });
@@ -291,5 +293,9 @@ describe('useTabContentItemInteractions', () => {
         });
         expect(remove).toHaveBeenCalledTimes(1);
         expect(remove).toHaveBeenCalledWith(items.value);
+        expect(items.value[0].reaction).toBeNull();
+        expect(items.value[0].auto_disliked).toBe(false);
+        expect(items.value[0].auto_dislike_rule).toBeNull();
+        expect(items.value[0].blacklisted_at).toBe('2026-04-14T00:00:00Z');
     });
 });
