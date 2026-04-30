@@ -54,7 +54,6 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'auto_disliked',
         'sort',
         'seed',
-        'max_previewed_count',
     ]);
 
     $localLimit = collect($localFields)->firstWhere('uiKey', 'limit');

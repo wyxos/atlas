@@ -3,12 +3,15 @@ import { batchIncrementPreview } from '@/actions/App/Http/Controllers/FilesContr
 type PreviewBatchResult = {
     id: number;
     previewed_count: number;
+    reaction?: { type: string } | null;
+    auto_disliked?: boolean;
+    blacklisted_at?: string | null;
 };
 
 interface PendingPreview {
-    promise: Promise<{ previewed_count: number }>;
+    promise: Promise<PreviewBatchResult>;
     reject: (error: unknown) => void;
-    resolve: (value: { previewed_count: number }) => void;
+    resolve: (value: PreviewBatchResult) => void;
 }
 
 const BATCH_DELAY_MS = 300;
@@ -29,6 +32,9 @@ async function executeBatchIncrementPreview(fileIds: number[]): Promise<PreviewB
     return data.results.map((result) => ({
         id: result.id,
         previewed_count: result.previewed_count,
+        reaction: result.reaction ?? null,
+        auto_disliked: result.auto_disliked,
+        blacklisted_at: result.blacklisted_at ?? null,
     }));
 }
 
@@ -67,9 +73,7 @@ async function processChunk(fileIds: number[], previews: Map<number, PendingPrev
                 continue;
             }
 
-            pending.resolve({
-                previewed_count: result.previewed_count,
-            });
+            pending.resolve(result);
         }
     } catch (error) {
         console.error('Failed to batch increment preview counts:', error);
@@ -110,7 +114,7 @@ async function flushBatch(): Promise<void> {
 }
 
 export function usePreviewBatch() {
-    function queuePreviewIncrement(fileId: number): Promise<{ previewed_count: number }> {
+    function queuePreviewIncrement(fileId: number): Promise<PreviewBatchResult> {
         const existing = pendingPreviews.get(fileId);
         if (existing) {
             return existing.promise;
@@ -119,7 +123,7 @@ export function usePreviewBatch() {
         let resolve!: PendingPreview['resolve'];
         let reject!: PendingPreview['reject'];
 
-        const promise = new Promise<{ previewed_count: number }>((resolvePromise, rejectPromise) => {
+        const promise = new Promise<PreviewBatchResult>((resolvePromise, rejectPromise) => {
             resolve = resolvePromise;
             reject = rejectPromise;
         });

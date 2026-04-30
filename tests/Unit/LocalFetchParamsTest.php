@@ -24,14 +24,14 @@ it('does not keep removed blacklist classification parameters', function () {
         ->and($context['params'])->not->toHaveKey('moderation_union');
 });
 
-it('defaults max_previewed_count to 2 for moderated views when not explicitly provided', function () {
+it('does not default max_previewed_count for moderated views when not explicitly provided', function () {
     $context = LocalFetchParams::normalize([
         'reaction_mode' => 'types',
         'reaction' => ['dislike'],
     ]);
 
-    expect($context['maxPreviewed'])->toBe(2)
-        ->and($context['params']['max_previewed_count'])->toBe(2);
+    expect($context['maxPreviewed'])->toBeNull()
+        ->and($context['params']['max_previewed_count'])->toBeNull();
 });
 
 it('keeps explicit max_previewed_count untouched', function () {

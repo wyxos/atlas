@@ -74,13 +74,7 @@ class LocalFetchParams
         }
 
         if (! $hasMaxPreviewedParam) {
-            $isDislikedView = $reactionMode === 'types'
-                && is_array($reactionTypes)
-                && in_array('dislike', $reactionTypes, true);
-
-            $isBlacklistedView = $blacklisted === 'yes';
-
-            $maxPreviewed = ($isDislikedView || $isBlacklistedView) ? 2 : null;
+            $maxPreviewed = null;
             $params['max_previewed_count'] = $maxPreviewed;
         }
 

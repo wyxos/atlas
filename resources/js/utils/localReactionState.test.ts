@@ -79,6 +79,48 @@ describe('localReactionState', () => {
         }), favoriteFilters)).toBe(false);
     });
 
+    it('applies preview count only when a filter explicitly sets a limit', () => {
+        const item = createItem({
+            reaction: { type: 'dislike' },
+            previewed_count: 8,
+        });
+
+        expect(matchesLocalViewFilters(item, {
+            reaction_mode: 'types',
+            reaction: ['dislike'],
+            blacklisted: 'no',
+            auto_disliked: 'any',
+            max_previewed_count: null,
+        })).toBe(true);
+
+        expect(matchesLocalViewFilters(item, {
+            reaction_mode: 'types',
+            reaction: ['dislike'],
+            blacklisted: 'no',
+            auto_disliked: 'any',
+            max_previewed_count: 3,
+        })).toBe(false);
+    });
+
+    it('limits blacklist review filters to previewed count three or lower', () => {
+        const filters = {
+            reaction_mode: 'any',
+            blacklisted: 'yes',
+            auto_disliked: 'any',
+            max_previewed_count: 3,
+        };
+
+        expect(matchesLocalViewFilters(createItem({
+            blacklisted_at: '2026-04-30T00:00:00Z',
+            previewed_count: 3,
+        }), filters)).toBe(true);
+
+        expect(matchesLocalViewFilters(createItem({
+            blacklisted_at: '2026-04-30T00:00:00Z',
+            previewed_count: 4,
+        }), filters)).toBe(false);
+    });
+
     it('treats reacted mode as a positive-only local view', () => {
         expect(isPositiveOnlyLocalView({
             reaction_mode: 'reacted',

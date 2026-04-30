@@ -214,12 +214,6 @@ class BrowseController extends Controller
                             'description' => 'Random seed (positive integer). Only used when sort is Random.',
                             'default' => null,
                         ]),
-                        $localSchema->field('max_previewed_count', [
-                            'type' => 'number',
-                            'description' => 'Hide files with previewed_count above this value. Leave blank to disable (typical: 2).',
-                            'min' => 0,
-                            'default' => null,
-                        ]),
                     ]),
                 ],
             ],

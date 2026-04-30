@@ -7,6 +7,7 @@ use App\Models\File;
 use App\Services\DownloadedFileClearService;
 use App\Services\FileBlacklistService;
 use App\Services\FileNotFoundService;
+use App\Services\FilePreviewService;
 use App\Services\FileStorageResponseService;
 use App\Services\Local\LocalBrowseIndexSyncService;
 use Illuminate\Http\JsonResponse;
@@ -163,23 +164,21 @@ SVG;
     /**
      * Increment the preview count for a file.
      */
-    public function incrementPreview(File $file): JsonResponse
+    public function incrementPreview(File $file, FilePreviewService $filePreviewService): JsonResponse
     {
-        $file->increment('previewed_count');
-        $file->touch('previewed_at');
-        $file->refresh();
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
+        $userId = Auth::id();
+        abort_unless(is_int($userId), 403);
 
         return response()->json([
             'message' => 'Preview count incremented.',
-            'previewed_count' => $file->previewed_count,
+            ...$filePreviewService->increment($file, $userId),
         ]);
     }
 
     /**
      * Batch increment preview counts for multiple files.
      */
-    public function batchIncrementPreview(\Illuminate\Http\Request $request): JsonResponse
+    public function batchIncrementPreview(\Illuminate\Http\Request $request, FilePreviewService $filePreviewService): JsonResponse
     {
         $request->validate([
             'file_ids' => 'required|array',
@@ -187,29 +186,21 @@ SVG;
             'increments' => 'nullable|integer|min:1|max:50',
         ]);
 
-        $fileIds = $request->input('file_ids');
+        $fileIds = collect($request->input('file_ids'))
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->unique()
+            ->values()
+            ->all();
         $increments = (int) $request->input('increments', 1);
-        // Load files and authorize
-        $files = File::whereIn('id', $fileIds)->get();
-
-        // Batch increment preview counts
-        File::whereIn('id', $fileIds)->increment('previewed_count', $increments);
-        File::whereIn('id', $fileIds)->update(['previewed_at' => now()]);
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds(array_map('intval', $fileIds));
-
-        // Refresh files to get updated counts
-        $files->each(fn (File $file) => $file->refresh());
-
-        $results = $files->map(function ($file) {
-            return [
-                'id' => $file->id,
-                'previewed_count' => $file->previewed_count,
-            ];
-        });
+        $userId = Auth::id();
+        abort_unless(is_int($userId), 403);
+        $files = File::query()
+            ->whereIn('id', $fileIds)
+            ->get();
 
         return response()->json([
             'message' => 'Preview counts incremented.',
-            'results' => $results,
+            'results' => $filePreviewService->incrementMany($files, $userId, $increments),
         ]);
     }
 
@@ -237,6 +228,7 @@ SVG;
         $processedIds = $fileBlacklistService->apply(
             $files->values(),
             is_int($userId) ? $userId : null,
+            minimumPreviewedCount: 4,
         );
 
         if ($processedIds === []) {
@@ -248,7 +240,7 @@ SVG;
 
         $resultFiles = File::query()
             ->whereIn('id', $processedIds)
-            ->get(['id', 'blacklisted_at'])
+            ->get(['id', 'blacklisted_at', 'previewed_count'])
             ->keyBy('id');
 
         return response()->json([
@@ -257,6 +249,7 @@ SVG;
                 ->map(static fn (int $fileId): array => [
                     'id' => $fileId,
                     'blacklisted_at' => $resultFiles->get($fileId)?->blacklisted_at?->toIso8601String(),
+                    'previewed_count' => (int) ($resultFiles->get($fileId)?->previewed_count ?? 0),
                 ])
                 ->all(),
         ]);

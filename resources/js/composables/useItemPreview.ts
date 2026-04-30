@@ -35,6 +35,23 @@ export function useItemPreview(
                 // This is efficient as we're only updating properties on one object
                 const item = items.value[itemIndex];
                 item.previewed_count = response.previewed_count;
+                item.reaction = response.reaction ?? null;
+
+                if (typeof response.auto_disliked === 'boolean') {
+                    item.auto_disliked = response.auto_disliked;
+                }
+
+                if ('blacklisted_at' in response) {
+                    item.blacklisted_at = response.blacklisted_at ?? null;
+                }
+
+                if (item.auto_disliked !== true) {
+                    item.auto_dislike_rule = null;
+                }
+
+                if (item.blacklisted_at === null || item.blacklisted_at === undefined) {
+                    item.blacklist_rule = null;
+                }
 
                 // Manually trigger reactivity for shallowRef
                 // shallowRef only tracks reference changes, not deep mutations

@@ -12,8 +12,8 @@ uses(RefreshDatabase::class);
 
 test('batch blacklists loaded files and detaches them from the current users tabs', function () {
     $admin = User::factory()->admin()->create();
-    $file1 = File::factory()->create(['blacklisted_at' => null]);
-    $file2 = File::factory()->create(['blacklisted_at' => null]);
+    $file1 = File::factory()->create(['blacklisted_at' => null, 'previewed_count' => 0]);
+    $file2 = File::factory()->create(['blacklisted_at' => null, 'previewed_count' => 2]);
     $tab = Tab::factory()
         ->for($admin)
         ->withFiles([$file1->id, $file2->id])
@@ -27,7 +27,7 @@ test('batch blacklists loaded files and detaches them from the current users tab
         ->assertJsonStructure([
             'message',
             'results' => [
-                '*' => ['id', 'blacklisted_at'],
+                '*' => ['id', 'blacklisted_at', 'previewed_count'],
             ],
         ])
         ->assertJsonMissingPath('results.0.blacklist_reason');
@@ -38,6 +38,8 @@ test('batch blacklists loaded files and detaches them from the current users tab
 
     expect($file1->blacklisted_at)->not->toBeNull()
         ->and($file2->blacklisted_at)->not->toBeNull()
+        ->and($file1->previewed_count)->toBe(4)
+        ->and($file2->previewed_count)->toBe(4)
         ->and($tab->files()->count())->toBe(0);
 });
 
@@ -47,6 +49,7 @@ test('batch blacklist normalizes files that are already blacklisted', function (
     $admin = User::factory()->admin()->create();
     $alreadyBlacklisted = File::factory()->create([
         'blacklisted_at' => now()->subHour(),
+        'previewed_count' => 1,
         'path' => 'downloads/already-blacklisted.jpg',
         'preview_path' => null,
         'poster_path' => null,
@@ -64,6 +67,7 @@ test('batch blacklist normalizes files that are already blacklisted', function (
     $alreadyBlacklisted->refresh();
 
     expect($alreadyBlacklisted->blacklisted_at)->not->toBeNull()
+        ->and($alreadyBlacklisted->previewed_count)->toBe(4)
         ->and($alreadyBlacklisted->path)->toBeNull()
         ->and($alreadyBlacklisted->downloaded)->toBeFalse()
         ->and($alreadyBlacklisted->downloaded_at)->toBeNull();
@@ -79,6 +83,7 @@ test('batch blacklist clears auto-disliked marker and removes existing reactions
     $file = File::factory()->create([
         'auto_disliked' => true,
         'blacklisted_at' => null,
+        'previewed_count' => 3,
         'path' => 'downloads/reacted-file.jpg',
         'preview_path' => 'thumbnails/reacted-file.jpg',
         'poster_path' => 'posters/reacted-file.jpg',
@@ -106,6 +111,7 @@ test('batch blacklist clears auto-disliked marker and removes existing reactions
 
     expect($file->blacklisted_at)->not->toBeNull()
         ->and($file->auto_disliked)->toBeFalse()
+        ->and($file->previewed_count)->toBe(4)
         ->and($file->path)->toBeNull()
         ->and($file->preview_path)->toBeNull()
         ->and($file->poster_path)->toBeNull()

@@ -26,6 +26,7 @@ class FileBlacklistService
         ?int $userId = null,
         bool $detachFromTabs = true,
         bool $queueDelete = true,
+        ?int $minimumPreviewedCount = null,
     ): array {
         $files = collect($files)
             ->filter(fn (mixed $file): bool => $file instanceof File)
@@ -42,7 +43,7 @@ class FileBlacklistService
             ->all();
         $blacklistedAt = now();
 
-        DB::transaction(function () use ($files, $fileIds, $blacklistedAt): void {
+        DB::transaction(function () use ($files, $fileIds, $blacklistedAt, $minimumPreviewedCount): void {
             $newBlacklistIds = $files
                 ->filter(fn (File $file): bool => $file->blacklisted_at === null)
                 ->pluck('id')
@@ -82,6 +83,16 @@ class FileBlacklistService
                     'auto_disliked' => false,
                     'updated_at' => now(),
                 ]);
+
+            if (is_int($minimumPreviewedCount) && $minimumPreviewedCount >= 0) {
+                File::query()
+                    ->whereIn('id', $fileIds)
+                    ->where('previewed_count', '<', $minimumPreviewedCount)
+                    ->update([
+                        'previewed_count' => $minimumPreviewedCount,
+                        'updated_at' => now(),
+                    ]);
+            }
         });
 
         if ($detachFromTabs && is_int($userId)) {

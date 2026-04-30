@@ -19,6 +19,7 @@ type BatchBlacklistResponse = {
     results?: Array<{
         id: number;
         blacklisted_at: string;
+        previewed_count?: number;
     }>;
 };
 
@@ -52,18 +53,6 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
         options.clearHoverForRemovedItems(new Set(itemsToRemove.map((item) => item.id)));
 
         await options.masonry.value?.remove(itemsToRemove);
-    }
-
-    async function syncLocalMutationView(changedItems: FeedItem[]): Promise<void> {
-        const itemsToRemove = getItemsToRemoveAfterLocalMutation(changedItems);
-
-        if (itemsToRemove.length > 0) {
-            await removeItemsFromView(itemsToRemove);
-        } else {
-            triggerRef(options.items);
-        }
-
-        await nextTick();
     }
 
     async function applyBatchReaction(type: ReactionType): Promise<number> {
@@ -165,17 +154,14 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
             item.reaction = null;
             item.auto_disliked = false;
             item.auto_dislike_rule = null;
+            item.previewed_count = Math.max(Number(item.previewed_count ?? 0), Number(result.previewed_count ?? 0), 4);
         }
 
         if (confirmedBlacklistedItems.length === 0) {
             return 0;
         }
 
-        if (options.isLocal.value) {
-            await syncLocalMutationView(confirmedBlacklistedItems);
-        } else {
-            await removeItemsFromView(confirmedBlacklistedItems);
-        }
+        await removeItemsFromView(confirmedBlacklistedItems);
 
         return confirmedBlacklistedItems.length;
     }

@@ -260,6 +260,7 @@ describe('useTabContentItemInteractions', () => {
         expect(items.value[0].auto_disliked).toBe(false);
         expect(items.value[0].auto_dislike_rule).toBeNull();
         expect(items.value[0].blacklisted_at).toBe('2026-04-14T00:00:00Z');
+        expect(items.value[0].previewed_count).toBe(4);
     });
 
     it('blacklists a single item through the shared blacklist action', async () => {
@@ -323,5 +324,79 @@ describe('useTabContentItemInteractions', () => {
         expect(item.auto_disliked).toBe(false);
         expect(item.auto_dislike_rule).toBeNull();
         expect(item.blacklist_rule).toBeNull();
+        expect(item.previewed_count).toBe(4);
+    });
+
+    it('removes all locally loaded items after blacklist even when active filters still match', async () => {
+        const items = shallowRef<FeedItem[]>([
+            {
+                id: 1,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-1',
+                index: 0,
+                src: 'https://example.com/image1.jpg',
+                blacklisted_at: '2026-04-29T00:00:00Z',
+                previewed_count: 1,
+            } as FeedItem,
+            {
+                id: 2,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-2',
+                index: 1,
+                src: 'https://example.com/image2.jpg',
+                previewed_count: 0,
+            } as FeedItem,
+        ]);
+        const remove = vi.fn().mockResolvedValue(undefined);
+
+        window.axios.post = vi.fn().mockResolvedValue({
+            data: {
+                results: [
+                    {
+                        id: 1,
+                        blacklisted_at: '2026-04-29T00:00:00Z',
+                        previewed_count: 4,
+                    },
+                    {
+                        id: 2,
+                        blacklisted_at: '2026-04-30T00:00:00Z',
+                        previewed_count: 4,
+                    },
+                ],
+            },
+        }) as typeof window.axios.post;
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            loadedItems: ref(items.value),
+            tab: ref(null),
+            form: {
+                isLocal: ref(true),
+                data: {
+                    feed: 'local',
+                },
+            } as any,
+            masonry: ref({ remove } as any),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+            matchesActiveLocalFilters: vi.fn(() => true),
+        });
+
+        const count = await interactions.performLoadedItemsBulkAction('blacklist');
+
+        expect(count).toBe(2);
+        expect(remove).toHaveBeenCalledWith(items.value);
+        expect(items.value.map((item) => item.previewed_count)).toEqual([4, 4]);
     });
 });
