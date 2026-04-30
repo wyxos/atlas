@@ -23,3 +23,23 @@ test('icon endpoint returns an svg for non-image/video files', function () {
     $response->assertHeader('Content-Type', 'image/svg+xml; charset=utf-8');
     expect($response->getContent())->toContain('<svg');
 });
+
+test('icon endpoint does not bake a rounded outer frame into the svg', function () {
+    /** @var \Tests\TestCase $this */
+    $admin = User::factory()->admin()->create();
+
+    $file = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'ext' => 'mp3',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/test.mp3',
+    ]);
+
+    $response = $this->actingAs($admin)->get("/api/files/{$file->id}/icon");
+
+    $response->assertOk();
+    expect($response->getContent())
+        ->toContain('<rect width="96" height="96" fill="url(#bg)"/>')
+        ->not->toContain('rx="18"')
+        ->not->toContain('stroke="rgba(148,163,184,0.25)"');
+});

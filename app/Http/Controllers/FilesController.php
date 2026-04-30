@@ -112,7 +112,7 @@ class FilesController extends Controller
       <stop offset="1" stop-color="#0f172a"/>
     </linearGradient>
   </defs>
-  <rect x="4" y="4" width="88" height="88" rx="18" fill="url(#bg)" stroke="rgba(148,163,184,0.25)" stroke-width="2"/>
+  <rect width="96" height="96" fill="url(#bg)"/>
   <path d="M34 24h20l8 8v34a6 6 0 0 1-6 6H34a6 6 0 0 1-6-6V30a6 6 0 0 1 6-6z" fill="rgba(148,163,184,0.10)" stroke="rgba(226,232,240,0.55)" stroke-width="2" stroke-linejoin="round"/>
   <path d="M54 24v10h10" fill="none" stroke="rgba(226,232,240,0.55)" stroke-width="2" stroke-linejoin="round"/>
   <text x="48" y="62" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" font-size="12" font-weight="700" fill="#e2e8f0" letter-spacing="0.08em">{$label}</text>
