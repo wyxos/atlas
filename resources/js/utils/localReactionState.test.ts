@@ -102,22 +102,22 @@ describe('localReactionState', () => {
         })).toBe(false);
     });
 
-    it('limits blacklist review filters to previewed count three or lower', () => {
+    it('keeps feed-removed blacklisted items out of blacklist review filters', () => {
         const filters = {
             reaction_mode: 'any',
             blacklisted: 'yes',
             auto_disliked: 'any',
-            max_previewed_count: 3,
+            max_previewed_count: 99998,
         };
 
         expect(matchesLocalViewFilters(createItem({
             blacklisted_at: '2026-04-30T00:00:00Z',
-            previewed_count: 3,
+            previewed_count: 99998,
         }), filters)).toBe(true);
 
         expect(matchesLocalViewFilters(createItem({
             blacklisted_at: '2026-04-30T00:00:00Z',
-            previewed_count: 4,
+            previewed_count: 99999,
         }), filters)).toBe(false);
     });
 

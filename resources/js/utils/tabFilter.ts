@@ -1,5 +1,6 @@
 import type { BrowseFormData } from '@/composables/useBrowseForm';
 import type { ServiceFilterField, ServiceFilterSchema } from '@/lib/browseCatalog';
+import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT } from '@/lib/feedModeration';
 
 export type LocalPreset = {
     label: string;
@@ -220,7 +221,7 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
                     reaction_mode: 'any',
                     blacklisted: 'yes',
                     auto_disliked: 'any',
-                    max_previewed_count: 3,
+                    max_previewed_count: FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT,
                     sort: 'blacklisted_at',
                 },
             },

@@ -3,6 +3,7 @@ import type { FeedItem, TabData } from '@/composables/useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { BrowseFeedHandle } from '@/types/browse';
 import type { ReactionType } from '@/types/reaction';
+import { FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 import {
     applyOptimisticLocalReactionState,
     restoreOptimisticLocalReactionState,
@@ -154,7 +155,11 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
             item.reaction = null;
             item.auto_disliked = false;
             item.auto_dislike_rule = null;
-            item.previewed_count = Math.max(Number(item.previewed_count ?? 0), Number(result.previewed_count ?? 0), 4);
+            item.previewed_count = Math.max(
+                Number(item.previewed_count ?? 0),
+                Number(result.previewed_count ?? 0),
+                FEED_REMOVED_PREVIEW_COUNT,
+            );
         }
 
         if (confirmedBlacklistedItems.length === 0) {

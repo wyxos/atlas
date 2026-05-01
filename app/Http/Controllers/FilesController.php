@@ -228,7 +228,7 @@ SVG;
         $processedIds = $fileBlacklistService->apply(
             $files->values(),
             is_int($userId) ? $userId : null,
-            minimumPreviewedCount: 4,
+            minimumPreviewedCount: FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
         );
 
         if ($processedIds === []) {

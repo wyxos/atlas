@@ -260,7 +260,7 @@ describe('useTabContentItemInteractions', () => {
         expect(items.value[0].auto_disliked).toBe(false);
         expect(items.value[0].auto_dislike_rule).toBeNull();
         expect(items.value[0].blacklisted_at).toBe('2026-04-14T00:00:00Z');
-        expect(items.value[0].previewed_count).toBe(4);
+        expect(items.value[0].previewed_count).toBe(99999);
     });
 
     it('blacklists a single item through the shared blacklist action', async () => {
@@ -324,7 +324,7 @@ describe('useTabContentItemInteractions', () => {
         expect(item.auto_disliked).toBe(false);
         expect(item.auto_dislike_rule).toBeNull();
         expect(item.blacklist_rule).toBeNull();
-        expect(item.previewed_count).toBe(4);
+        expect(item.previewed_count).toBe(99999);
     });
 
     it('removes all locally loaded items after blacklist even when active filters still match', async () => {
@@ -359,12 +359,12 @@ describe('useTabContentItemInteractions', () => {
                     {
                         id: 1,
                         blacklisted_at: '2026-04-29T00:00:00Z',
-                        previewed_count: 4,
+                        previewed_count: 99999,
                     },
                     {
                         id: 2,
                         blacklisted_at: '2026-04-30T00:00:00Z',
-                        previewed_count: 4,
+                        previewed_count: 99999,
                     },
                 ],
             },
@@ -397,6 +397,6 @@ describe('useTabContentItemInteractions', () => {
 
         expect(count).toBe(2);
         expect(remove).toHaveBeenCalledWith(items.value);
-        expect(items.value.map((item) => item.previewed_count)).toEqual([4, 4]);
+        expect(items.value.map((item) => item.previewed_count)).toEqual([99999, 99999]);
     });
 });

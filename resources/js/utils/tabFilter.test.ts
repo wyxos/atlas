@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getTabFilterLimitOptions } from '@/utils/tabFilter';
+import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT } from '@/lib/feedModeration';
+import { getTabFilterLimitOptions, LOCAL_TAB_FILTER_PRESET_GROUPS } from '@/utils/tabFilter';
 
 describe('getTabFilterLimitOptions', () => {
     it('uses schema-defined local limit options when present', () => {
@@ -22,5 +23,15 @@ describe('getTabFilterLimitOptions', () => {
 
     it('falls back to online defaults when schema options are absent', () => {
         expect(getTabFilterLimitOptions('online', null)).toEqual(['20', '40', '60', '80', '100', '200']);
+    });
+});
+
+describe('LOCAL_TAB_FILTER_PRESET_GROUPS', () => {
+    it('keeps fully removed blacklisted items out of the blacklist preset', () => {
+        const blacklistedPreset = LOCAL_TAB_FILTER_PRESET_GROUPS
+            .flatMap((group) => group.presets)
+            .find((preset) => preset.value === 'blacklisted_any');
+
+        expect(blacklistedPreset?.filters.max_previewed_count).toBe(FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT);
     });
 });

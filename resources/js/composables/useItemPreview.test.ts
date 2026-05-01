@@ -69,7 +69,7 @@ describe('useItemPreview', () => {
         const items = shallowRef<FeedItem[]>([item]);
         mockQueuePreviewIncrement.mockResolvedValue({
             id: 2,
-            previewed_count: 4,
+            previewed_count: 99999,
             reaction: null,
             auto_disliked: false,
             blacklisted_at: '2026-04-30T00:00:00Z',
@@ -79,7 +79,7 @@ describe('useItemPreview', () => {
 
         await preview.incrementPreviewCount(2);
 
-        expect(item.previewed_count).toBe(4);
+        expect(item.previewed_count).toBe(99999);
         expect(item.reaction).toBeNull();
         expect(item.auto_disliked).toBe(false);
         expect(item.auto_dislike_rule).toBeNull();

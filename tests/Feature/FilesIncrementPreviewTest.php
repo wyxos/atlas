@@ -62,9 +62,9 @@ test('auto dislikes unreacted item on second preview', function () {
         ->and(Reaction::where('file_id', $file->id)->where('user_id', $admin->id)->value('type'))->toBe('dislike');
 });
 
-test('blacklists manual disliked item on third preview', function () {
+test('blacklists manual disliked item on next preview', function () {
     $admin = User::factory()->admin()->create();
-    $file = previewTestFile(['previewed_count' => 2]);
+    $file = previewTestFile(['previewed_count' => 1]);
     Reaction::create([
         'file_id' => $file->id,
         'user_id' => $admin->id,
@@ -75,13 +75,13 @@ test('blacklists manual disliked item on third preview', function () {
 
     $response->assertSuccessful()
         ->assertJson([
-            'previewed_count' => 4,
+            'previewed_count' => 99999,
             'reaction' => null,
             'auto_disliked' => false,
         ]);
 
     $file->refresh();
-    expect($file->previewed_count)->toBe(4)
+    expect($file->previewed_count)->toBe(99999)
         ->and($file->blacklisted_at)->not->toBeNull()
         ->and($file->auto_disliked)->toBeFalse()
         ->and(Reaction::where('file_id', $file->id)->count())->toBe(0)
@@ -104,13 +104,13 @@ test('blacklists auto disliked item on next preview', function () {
 
     $response->assertSuccessful()
         ->assertJson([
-            'previewed_count' => 4,
+            'previewed_count' => 99999,
             'reaction' => null,
             'auto_disliked' => false,
         ]);
 
     $file->refresh();
-    expect($file->previewed_count)->toBe(4)
+    expect($file->previewed_count)->toBe(99999)
         ->and($file->blacklisted_at)->not->toBeNull()
         ->and($file->auto_disliked)->toBeFalse()
         ->and(Reaction::where('file_id', $file->id)->count())->toBe(0);
@@ -127,12 +127,12 @@ test('previewing blacklisted item moves it beyond blacklist review threshold', f
 
     $response->assertSuccessful()
         ->assertJson([
-            'previewed_count' => 4,
+            'previewed_count' => 99999,
             'reaction' => null,
             'auto_disliked' => false,
         ]);
 
     $file->refresh();
-    expect($file->previewed_count)->toBe(4)
+    expect($file->previewed_count)->toBe(99999)
         ->and($file->blacklisted_at)->not->toBeNull();
 });

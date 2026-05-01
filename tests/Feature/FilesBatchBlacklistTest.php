@@ -38,8 +38,8 @@ test('batch blacklists loaded files and detaches them from the current users tab
 
     expect($file1->blacklisted_at)->not->toBeNull()
         ->and($file2->blacklisted_at)->not->toBeNull()
-        ->and($file1->previewed_count)->toBe(4)
-        ->and($file2->previewed_count)->toBe(4)
+        ->and($file1->previewed_count)->toBe(99999)
+        ->and($file2->previewed_count)->toBe(99999)
         ->and($tab->files()->count())->toBe(0);
 });
 
@@ -67,7 +67,7 @@ test('batch blacklist normalizes files that are already blacklisted', function (
     $alreadyBlacklisted->refresh();
 
     expect($alreadyBlacklisted->blacklisted_at)->not->toBeNull()
-        ->and($alreadyBlacklisted->previewed_count)->toBe(4)
+        ->and($alreadyBlacklisted->previewed_count)->toBe(99999)
         ->and($alreadyBlacklisted->path)->toBeNull()
         ->and($alreadyBlacklisted->downloaded)->toBeFalse()
         ->and($alreadyBlacklisted->downloaded_at)->toBeNull();
@@ -111,7 +111,7 @@ test('batch blacklist clears auto-disliked marker and removes existing reactions
 
     expect($file->blacklisted_at)->not->toBeNull()
         ->and($file->auto_disliked)->toBeFalse()
-        ->and($file->previewed_count)->toBe(4)
+        ->and($file->previewed_count)->toBe(99999)
         ->and($file->path)->toBeNull()
         ->and($file->preview_path)->toBeNull()
         ->and($file->poster_path)->toBeNull()

@@ -53,7 +53,7 @@ test('batch increments preview counts and returns moderation state', function ()
 
 test('batch preview blacklists manual disliked auto disliked and already blacklisted items', function () {
     $admin = User::factory()->admin()->create();
-    $manualDisliked = previewBatchTestFile(['previewed_count' => 2]);
+    $manualDisliked = previewBatchTestFile(['previewed_count' => 1]);
     $autoDisliked = previewBatchTestFile([
         'previewed_count' => 0,
         'auto_disliked' => true,
@@ -83,7 +83,7 @@ test('batch preview blacklists manual disliked auto disliked and already blackli
     foreach ([$manualDisliked, $autoDisliked, $alreadyBlacklisted] as $file) {
         $file->refresh();
 
-        expect($file->previewed_count)->toBe(4)
+        expect($file->previewed_count)->toBe(99999)
             ->and($file->blacklisted_at)->not->toBeNull()
             ->and($file->auto_disliked)->toBeFalse()
             ->and($results[$file->id]['reaction'])->toBeNull()

@@ -9,11 +9,9 @@ use Illuminate\Support\Collection;
 
 class FilePreviewService
 {
+    public const int FEED_REMOVED_PREVIEW_COUNT = 99999;
+
     private const int AUTO_DISLIKE_PREVIEW_COUNT = 2;
-
-    private const int BLACKLIST_PREVIEW_COUNT = 3;
-
-    private const int BLACKLIST_REVIEW_EXIT_PREVIEW_COUNT = 4;
 
     public function __construct(
         private readonly FileAutoDislikeService $fileAutoDislikeService,
@@ -88,7 +86,7 @@ class FilePreviewService
             $reaction = $currentUserReactions->get($fileId);
             $reactionType = $reaction?->type;
 
-            if ($reactionType === 'dislike' && (int) $file->previewed_count >= self::BLACKLIST_PREVIEW_COUNT) {
+            if ($reactionType === 'dislike') {
                 $filesToBlacklist[] = $file;
 
                 continue;
@@ -107,7 +105,7 @@ class FilePreviewService
             $this->fileBlacklistService->apply(
                 $filesToBlacklist,
                 $userId,
-                minimumPreviewedCount: self::BLACKLIST_REVIEW_EXIT_PREVIEW_COUNT,
+                minimumPreviewedCount: self::FEED_REMOVED_PREVIEW_COUNT,
             );
         }
 
