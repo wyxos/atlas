@@ -109,6 +109,14 @@ test('converts auto-blacklisted files and legacy dislike reactions to blacklist-
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+    DB::table('file_moderation_actions')->insert([
+        'file_id' => $autoFile->id,
+        'action_type' => 'blacklist',
+        'moderation_rule_id' => $rule->id,
+        'moderation_rule_name' => $rule->name,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
     $this->artisan('atlas:cutover-blacklist-only --chunk=1 --skip-ddl')
         ->assertExitCode(0);
@@ -128,6 +136,8 @@ test('converts auto-blacklisted files and legacy dislike reactions to blacklist-
     expect($rule->fresh()->action_type)->toBe('blacklist')
         ->and($container->fresh()->action_type)->toBe('blacklist')
         ->and(DB::table('file_moderation_actions')->where('file_id', $autoFile->id)->value('action_type'))->toBe('blacklist');
+    expect(DB::table('file_moderation_actions')->where('file_id', $autoFile->id)->where('action_type', 'blacklist')->count())->toBe(1)
+        ->and(DB::table('file_moderation_actions')->where('file_id', $autoFile->id)->where('action_type', 'dislike')->exists())->toBeFalse();
 
     $metrics = app(MetricsService::class)->getMetrics([
         MetricsService::KEY_FILES_BLACKLISTED_TOTAL,

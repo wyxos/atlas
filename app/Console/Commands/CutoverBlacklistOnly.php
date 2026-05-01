@@ -89,6 +89,8 @@ class CutoverBlacklistOnly extends Command
     {
         $now = now();
 
+        $this->deleteDuplicateFileModerationActionRows();
+
         foreach (['moderation_rules', 'containers', 'file_moderation_actions'] as $table) {
             if (! Schema::hasTable($table)) {
                 continue;
@@ -100,6 +102,35 @@ class CutoverBlacklistOnly extends Command
                     'action_type' => 'blacklist',
                     'updated_at' => $now,
                 ]);
+        }
+    }
+
+    private function deleteDuplicateFileModerationActionRows(): void
+    {
+        if (! Schema::hasTable('file_moderation_actions')) {
+            return;
+        }
+
+        while (true) {
+            /** @var Collection<int, int> $duplicateIds */
+            $duplicateIds = DB::table('file_moderation_actions as dislike')
+                ->join('file_moderation_actions as blacklist', function ($join): void {
+                    $join->on('blacklist.file_id', '=', 'dislike.file_id')
+                        ->where('blacklist.action_type', '=', 'blacklist');
+                })
+                ->where('dislike.action_type', 'dislike')
+                ->orderBy('dislike.id')
+                ->limit(1000)
+                ->pluck('dislike.id')
+                ->map(fn (mixed $id): int => (int) $id);
+
+            if ($duplicateIds->isEmpty()) {
+                return;
+            }
+
+            DB::table('file_moderation_actions')
+                ->whereIn('id', $duplicateIds->all())
+                ->delete();
         }
     }
 
