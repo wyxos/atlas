@@ -15,8 +15,13 @@ type ContainerTabPayload = {
 };
 
 type DropIndicator = 'before' | 'after';
+type TabContentV2Handle = {
+    cancelFill?: () => void;
+    stopAutoScroll?: () => void;
+};
 
 const isPanelMinimized = ref(false);
+const activeTabContentRef = ref<TabContentV2Handle | null>(null);
 const draggedTabId = ref<number | null>(null);
 const dropTargetTabId = ref<number | null>(null);
 const dropIndicator = ref<DropIndicator | null>(null);
@@ -34,6 +39,11 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
     }
 
     const previousActiveTabId = activeTabId.value;
+    if (previousActiveTabId !== null && previousActiveTabId !== tabId) {
+        activeTabContentRef.value?.cancelFill?.();
+        activeTabContentRef.value?.stopAutoScroll?.();
+    }
+
     activeTabId.value = tabId;
 
     if (!tab.isActive) {
@@ -351,6 +361,7 @@ onUnmounted(() => {
                 <TabContentV2
                     v-if="activeTab"
                     :key="activeTab.id"
+                    ref="activeTabContentRef"
                     :tab-id="activeTab.id"
                     :available-services="[]"
                     :on-reaction="handleReaction"

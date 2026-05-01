@@ -47,6 +47,10 @@ type MouseShortcutHandlers = ReturnType<typeof import('@/lib/tabContentV2MouseSh
 
 const props = defineProps<{
     activeIndex: number;
+    autoScrollActive?: boolean;
+    autoScrollMax?: number;
+    autoScrollMin?: number;
+    autoScrollSpeed?: number;
     availableServices: ServiceOption[];
     availableSources: ServiceOption[];
     applyFilters: () => Promise<void>;
@@ -60,6 +64,12 @@ const props = defineProps<{
     fileSheetState: FileSheetState;
     fileViewerData: FileViewerDataShape;
     form: BrowseFormInstance;
+    fillActionsDisabled?: boolean;
+    fillCallCount?: number;
+    fillCallCountMax?: number;
+    fillCallCountMin?: number;
+    fillUntilCount?: () => void;
+    fillUntilEnd?: () => void;
     goToFirstPage: () => Promise<void>;
     handleAssetErrors: (errors: VibeAssetErrorEvent[]) => void;
     handleAssetLoads: (loads: VibeAssetLoadEvent[]) => void;
@@ -77,6 +87,8 @@ const props = defineProps<{
     openFileSheet: () => void;
     promptDialog: TabContentPromptDialogHandle;
     resolve: (params: { cursor: string | null; pageSize: number; signal?: AbortSignal }) => Promise<VibeResolveResult>;
+    setAutoScrollSpeed?: (value: number) => void;
+    setFillCallCount?: (value: number) => void;
     setFilterSheetOpen: (value: boolean) => void;
     setLocalMode: (value: boolean) => void;
     setVibeHandle: (value: VibeHandle | null) => void;
@@ -89,6 +101,7 @@ const props = defineProps<{
     updateSurfaceMode: (value: 'fullscreen' | 'list') => void;
     updateService: (value: string) => void | Promise<void>;
     surfaceMode: 'fullscreen' | 'list';
+    toggleAutoScroll?: () => void;
     vibeInitialCursor: string | null;
     vibeInitialState: VibeInitialState | undefined;
     vibeStatus: VibeStatus;
@@ -230,11 +243,24 @@ useEventListener(document, 'pointermove', (event) => {
                             <BrowseV2StatusBar
                                 :status="vibeStatus"
                                 :total-available="totalAvailable"
+                                :auto-scroll-active="autoScrollActive"
+                                :auto-scroll-max="autoScrollMax"
+                                :auto-scroll-min="autoScrollMin"
+                                :auto-scroll-speed="autoScrollSpeed"
                                 :bulk-actions-disabled="Boolean(headerMasonry?.isLoading) || vibeStatus.itemCount === 0"
                                 :cancel-fill="cancelFill"
                                 :can-toggle-page-loading-lock="Boolean(headerMasonry?.lockPageLoading && headerMasonry?.unlockPageLoading)"
+                                :fill-actions-disabled="fillActionsDisabled"
+                                :fill-call-count="fillCallCount"
+                                :fill-call-count-max="fillCallCountMax"
+                                :fill-call-count-min="fillCallCountMin"
+                                :fill-until-count="fillUntilCount"
+                                :fill-until-end="fillUntilEnd"
                                 :page-loading-locked="Boolean(headerMasonry?.pageLoadingLocked)"
                                 :perform-loaded-items-bulk-action="itemInteractions.performLoadedItemsBulkAction"
+                                :set-auto-scroll-speed="setAutoScrollSpeed"
+                                :set-fill-call-count="setFillCallCount"
+                                :toggle-auto-scroll="toggleAutoScroll"
                                 :toggle-page-loading-lock="togglePageLoadingLock"
                             />
                         </div>

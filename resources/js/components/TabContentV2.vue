@@ -15,6 +15,7 @@ import { useTabContentContainerInteractions } from '@/composables/useTabContentC
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
 import { useTabContentV2ContainerBlacklists } from '@/composables/useTabContentV2ContainerBlacklists';
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
+import { AUTO_SCROLL_SPEED_MAX, AUTO_SCROLL_SPEED_MIN, FILL_CALL_COUNT_MAX, FILL_CALL_COUNT_MIN, useVibeFillControls } from '@/composables/useVibeFillControls';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import { createBrowseCatalog } from '@/lib/browseCatalog';
 import { loadBrowseV2StandaloneFileItem } from '@/lib/browseV2StandaloneItem';
@@ -121,7 +122,15 @@ const vibeMasonry = computed<BrowseFeedHandle | null>(() => {
     }
 
     return {
+        autoScroll: (speedPxPerSecond: number) => handle.autoScroll(speedPxPerSecond),
         cancel: () => handle.cancel(),
+        cancelFill: () => handle.cancelFill(),
+        fillUntil: async (count: number) => {
+            await handle.fillUntil(count);
+        },
+        fillUntilEnd: async () => {
+            await handle.fillUntilEnd();
+        },
         isLoading: isVibeLoading.value,
         lockPageLoading: () => handle.lockPageLoading(),
         loadNextPage: async () => {
@@ -254,6 +263,12 @@ const currentVisibleItem = computed(() => {
     return sessionItems.value[safeIndex] ?? null;
 });
 const headerMasonry = vibeMasonry;
+const fillControls = useVibeFillControls({
+    getVibeHandle: () => vibeRef.value,
+    status: vibeStatus,
+    surfaceMode,
+});
+const { autoScrollActive, autoScrollSpeed, fillActionsDisabled, fillCallCount } = fillControls;
 
 function setTabDataLoading(isLoading: boolean): void {
     isTabDataLoading.value = isLoading;
@@ -343,6 +358,9 @@ function getCurrentVibeFeedItems(): FeedItem[] {
 function getFeedItemFromShortcutTarget(target: EventTarget | null): FeedItem | null {
     return getFeedItemFromVibeOccurrenceTarget(vibeRef.value, target);
 }
+function cancelActiveVibeFill(): void { fillControls.cancelFill(); }
+function stopActiveAutoScroll(): void { fillControls.stopAutoScroll(); }
+function stopActiveVibeAutomation(): void { cancelActiveVibeFill(); stopActiveAutoScroll(); }
 function handleAssetLoads(loads: VibeAssetLoadEvent[]): void { const batch = loads.map((load) => getFeedItemFromVibeItem(load.item)).filter((item): item is FeedItem => item !== null); if (batch.length > 0) itemInteractions.preload.onBatchPreloaded(batch); }
 function handleAssetErrors(errors: VibeAssetErrorEvent[]): void { itemInteractions.preload.onBatchFailures(errors.map((error) => ({ item: error.item.feedItem as FeedItem, error }))); }
 async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> { const feedItem = getFeedItemFromVibeItem(item); if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type); }
@@ -383,9 +401,9 @@ const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
     },
 });
 
-async function applyFilters(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.applyFilters(); }
-async function applyService(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.applyService(); }
-async function goToFirstPage(): Promise<void> { hydratedInitialState.value = undefined; await browseActions.goToFirstPage(); }
+async function applyFilters(): Promise<void> { stopActiveVibeAutomation(); hydratedInitialState.value = undefined; await browseActions.applyFilters(); }
+async function applyService(): Promise<void> { stopActiveVibeAutomation(); hydratedInitialState.value = undefined; await browseActions.applyService(); }
+async function goToFirstPage(): Promise<void> { stopActiveVibeAutomation(); hydratedInitialState.value = undefined; await browseActions.goToFirstPage(); }
 async function retryTabBootstrap(): Promise<void> { await browseActions.initialize(); }
 
 watch(
@@ -440,6 +458,8 @@ watchEffect(() => {
     fullscreenOverlayState.isClosing = false;
 });
 
+defineExpose({ cancelFill: cancelActiveVibeFill, stopAutoScroll: stopActiveAutoScroll });
+
 watch(
     () => tab.value?.id ?? null,
     () => {
@@ -470,9 +490,22 @@ watch(
         :apply-service="applyService"
         :apply-filters="applyFilters"
         :go-to-first-page="goToFirstPage"
-        :cancel-fill="() => vibeRef?.cancelFill()"
+        :auto-scroll-active="autoScrollActive"
+        :auto-scroll-max="AUTO_SCROLL_SPEED_MAX"
+        :auto-scroll-min="AUTO_SCROLL_SPEED_MIN"
+        :auto-scroll-speed="autoScrollSpeed"
+        :cancel-fill="cancelActiveVibeFill"
         :cancel-load="() => vibeRef?.cancel()"
+        :fill-actions-disabled="fillActionsDisabled"
+        :fill-call-count="fillCallCount"
+        :fill-call-count-max="FILL_CALL_COUNT_MAX"
+        :fill-call-count-min="FILL_CALL_COUNT_MIN"
+        :fill-until-count="fillControls.fillUntilCount"
+        :fill-until-end="fillControls.fillUntilEnd"
         :load-next="() => vibeRef?.loadNext()"
+        :set-auto-scroll-speed="fillControls.setAutoScrollSpeed"
+        :set-fill-call-count="fillControls.setFillCallCount"
+        :toggle-auto-scroll="fillControls.toggleAutoScroll"
         :vibe-status="vibeStatus"
         :set-vibe-handle="setVibeHandle"
         :masonry-render-key="masonryRenderKey"

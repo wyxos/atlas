@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { defineComponent, h } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import BrowseV2 from './BrowseV2.vue';
 
@@ -10,6 +11,8 @@ const {
     loadTabsMock,
     reorderTabsMock,
     setActiveTabMock,
+    tabContentCancelFillMock,
+    tabContentStopAutoScrollMock,
     tabsRef,
     updateTabCustomLabelMock,
     updateTabLabelMock,
@@ -31,6 +34,8 @@ const {
     updateTabCustomLabelMock: vi.fn(),
     setActiveTabMock: vi.fn(),
     loadTabsMock: vi.fn(() => Promise.resolve()),
+    tabContentCancelFillMock: vi.fn(),
+    tabContentStopAutoScrollMock: vi.fn(),
 }));
 
 vi.mock('../components/ui/TabPanel.vue', () => ({
@@ -79,9 +84,8 @@ vi.mock('../components/Tab.vue', () => ({
 }));
 
 vi.mock('../components/TabContentV2.vue', () => ({
-    default: {
+    default: defineComponent({
         name: 'TabContentV2',
-        template: '<div data-test="tab-content-stub"></div>',
         props: [
             'tabId',
             'availableServices',
@@ -91,7 +95,15 @@ vi.mock('../components/TabContentV2.vue', () => ({
             'onUpdateTabLabel',
             'onOpenContainerTab',
         ],
-    },
+        setup(_, { expose }) {
+            expose({
+                cancelFill: tabContentCancelFillMock,
+                stopAutoScroll: tabContentStopAutoScrollMock,
+            });
+
+            return () => h('div', { 'data-test': 'tab-content-stub' });
+        },
+    }),
 }));
 
 vi.mock('@/composables/useTabs', async () => {
@@ -141,6 +153,8 @@ beforeEach(async () => {
     ];
     mockedTabsModule.__activeTabIdRef.value = 1;
     loadTabsMock.mockResolvedValue(undefined);
+    tabContentCancelFillMock.mockClear();
+    tabContentStopAutoScrollMock.mockClear();
 });
 
 describe('Browse actions', () => {
@@ -161,5 +175,17 @@ describe('Browse actions', () => {
 
         expect(wrapper.find('[data-test="browse-page-actions"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="browse-first-page-action"]').exists()).toBe(false);
+    });
+
+    it('cancels active Vibe filling and auto-scroll before switching tabs', async () => {
+        const wrapper = mount(BrowseV2);
+
+        await flushPromises();
+        await wrapper.get('[data-test="browse-tab-2"]').trigger('click');
+
+        expect(tabContentCancelFillMock).toHaveBeenCalledTimes(1);
+        expect(tabContentStopAutoScrollMock).toHaveBeenCalledTimes(1);
+        expect(setActiveTabMock).toHaveBeenCalledWith(2);
+        expect(tabContentCancelFillMock.mock.invocationCallOrder[0]).toBeLessThan(setActiveTabMock.mock.invocationCallOrder[0]);
     });
 });

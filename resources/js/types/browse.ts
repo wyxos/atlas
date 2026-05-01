@@ -9,7 +9,11 @@ export type BrowseFeedMutationResult = {
 } | void;
 
 export interface BrowseFeedHandle {
+    autoScroll?: (speedPxPerSecond: number) => void;
     cancel: () => void;
+    cancelFill?: () => void;
+    fillUntil?: (count: number) => Promise<void> | void;
+    fillUntilEnd?: () => Promise<void> | void;
     getItemByOccurrenceKey?: (occurrenceKey: string) => FeedItem | null;
     getItems?: () => FeedItem[];
     isLoading: boolean;

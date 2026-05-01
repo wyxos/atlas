@@ -10,10 +10,22 @@ vi.mock('lucide-vue-next', () => ({
             return h('div', { 'data-testid': 'ban-icon' });
         },
     }),
+    ChevronsDown: defineComponent({
+        name: 'MockChevronsDownIcon',
+        render() {
+            return h('div', { 'data-testid': 'chevrons-down-icon' });
+        },
+    }),
     Heart: defineComponent({
         name: 'MockHeartIcon',
         render() {
             return h('div', { 'data-testid': 'heart-icon' });
+        },
+    }),
+    ListPlus: defineComponent({
+        name: 'MockListPlusIcon',
+        render() {
+            return h('div', { 'data-testid': 'list-plus-icon' });
         },
     }),
     Loader2: defineComponent({
@@ -32,6 +44,30 @@ vi.mock('lucide-vue-next', () => ({
         name: 'MockLockKeyholeOpenIcon',
         render() {
             return h('div', { 'data-testid': 'lock-keyhole-open-icon' });
+        },
+    }),
+    Pause: defineComponent({
+        name: 'MockPauseIcon',
+        render() {
+            return h('div', { 'data-testid': 'pause-icon' });
+        },
+    }),
+    Minus: defineComponent({
+        name: 'MockMinusIcon',
+        render() {
+            return h('div', { 'data-testid': 'minus-icon' });
+        },
+    }),
+    Play: defineComponent({
+        name: 'MockPlayIcon',
+        render() {
+            return h('div', { 'data-testid': 'play-icon' });
+        },
+    }),
+    Plus: defineComponent({
+        name: 'MockPlusIcon',
+        render() {
+            return h('div', { 'data-testid': 'plus-icon' });
         },
     }),
     ThumbsDown: defineComponent({
@@ -233,6 +269,89 @@ describe('BrowseV2StatusBar', () => {
 
         expect(cancelFill).toHaveBeenCalledTimes(1);
         expect(wrapper.find('[data-testid="x-icon"]').exists()).toBe(true);
+    });
+
+    it('routes fill controls through Vibe handlers and clamps count input', async () => {
+        const fillUntilCount = vi.fn();
+        const fillUntilEnd = vi.fn();
+        const setFillCallCount = vi.fn();
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                fillCallCount: 10,
+                fillCallCountMax: 25,
+                fillCallCountMin: 1,
+                fillUntilCount,
+                fillUntilEnd,
+                setFillCallCount,
+                status: createStatus(),
+            },
+        });
+
+        await wrapper.get('[data-test="fill-call-count-input"]').setValue('30');
+        expect(setFillCallCount).not.toHaveBeenCalled();
+
+        await wrapper.get('[data-test="fill-call-count-input"]').trigger('blur');
+        await wrapper.get('[data-test="fill-count-button"]').trigger('click');
+        await wrapper.get('[data-test="fill-until-end-button"]').trigger('click');
+
+        expect(setFillCallCount).toHaveBeenCalledWith(25);
+        expect(wrapper.get('[data-test="fill-call-count-input"]').attributes('type')).toBe('text');
+        expect(fillUntilCount).toHaveBeenCalledTimes(1);
+        expect(fillUntilEnd).toHaveBeenCalledTimes(1);
+        expect(wrapper.find('[data-testid="list-plus-icon"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="chevrons-down-icon"]').exists()).toBe(true);
+    });
+
+    it('routes auto-scroll controls through Vibe handlers and clamps speed input', async () => {
+        const setAutoScrollSpeed = vi.fn();
+        const toggleAutoScroll = vi.fn();
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                autoScrollMax: 150,
+                autoScrollMin: 20,
+                autoScrollSpeed: 50,
+                setAutoScrollSpeed,
+                status: createStatus(),
+                toggleAutoScroll,
+            },
+        });
+
+        await wrapper.get('[data-test="auto-scroll-speed-input"]').setValue('8');
+        expect(setAutoScrollSpeed).not.toHaveBeenCalled();
+
+        await wrapper.get('[data-test="auto-scroll-speed-input"]').trigger('blur');
+        await wrapper.get('[data-test="auto-scroll-toggle-button"]').trigger('click');
+
+        expect(setAutoScrollSpeed).toHaveBeenCalledWith(20);
+        expect(wrapper.get('[data-test="auto-scroll-speed-input"]').attributes('type')).toBe('text');
+        expect(toggleAutoScroll).toHaveBeenCalledTimes(1);
+        expect(wrapper.get('[data-test="auto-scroll-toggle-button"]').attributes('aria-pressed')).toBe('false');
+        expect(wrapper.find('[data-testid="play-icon"]').exists()).toBe(true);
+
+        await wrapper.setProps({ autoScrollActive: true });
+
+        expect(wrapper.get('[data-test="auto-scroll-toggle-button"]').attributes('aria-pressed')).toBe('true');
+        expect(wrapper.find('[data-testid="pause-icon"]').exists()).toBe(true);
+    });
+
+    it('disables fill controls while Vibe is filling', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                fillUntilCount: vi.fn(),
+                fillUntilEnd: vi.fn(),
+                setFillCallCount: vi.fn(),
+                status: createStatus({
+                    fillMode: 'count',
+                    loadState: 'loading',
+                    pageLoadingLocked: true,
+                    phase: 'filling',
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-test="fill-call-count-input"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[data-test="fill-count-button"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[data-test="fill-until-end-button"]').attributes('disabled')).toBeDefined();
     });
 
     it('shows fillUntilEnd loaded total progress when Vibe receives resolver totals', () => {

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Ban, Heart, Loader2, LockKeyhole, LockKeyholeOpen, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next'
+import { Ban, ChevronsDown, Heart, ListPlus, Loader2, LockKeyhole, LockKeyholeOpen, Pause, Play, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
 import type { LoadedItemsBulkAction } from '@/composables/useTabContentItemInteractions'
+import BrowseV2NumberField from './BrowseV2NumberField.vue'
 import Pill from './ui/Pill.vue'
 
 const bulkActionButtons: Array<{
@@ -73,21 +74,47 @@ type VibeStatusLike = {
 interface Props {
   status: VibeStatusLike
   totalAvailable?: number | null
+  autoScrollActive?: boolean
+  autoScrollMax?: number
+  autoScrollMin?: number
+  autoScrollSpeed?: number
   bulkActionsDisabled?: boolean
   cancelFill?: (() => void) | null
   canTogglePageLoadingLock?: boolean
+  fillActionsDisabled?: boolean
+  fillCallCount?: number
+  fillCallCountMax?: number
+  fillCallCountMin?: number
+  fillUntilCount?: (() => void) | null
+  fillUntilEnd?: (() => void) | null
   pageLoadingLocked?: boolean
   performLoadedItemsBulkAction?: ((action: LoadedItemsBulkAction) => void | Promise<number>) | null
+  setAutoScrollSpeed?: ((value: number) => void) | null
+  setFillCallCount?: ((value: number) => void) | null
+  toggleAutoScroll?: (() => void) | null
   togglePageLoadingLock?: (() => void) | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   totalAvailable: null,
+  autoScrollActive: false,
+  autoScrollMax: 150,
+  autoScrollMin: 20,
+  autoScrollSpeed: 50,
   bulkActionsDisabled: true,
   cancelFill: null,
   canTogglePageLoadingLock: false,
+  fillActionsDisabled: false,
+  fillCallCount: 10,
+  fillCallCountMax: 999,
+  fillCallCountMin: 1,
+  fillUntilCount: null,
+  fillUntilEnd: null,
   pageLoadingLocked: false,
   performLoadedItemsBulkAction: null,
+  setAutoScrollSpeed: null,
+  setFillCallCount: null,
+  toggleAutoScroll: null,
   togglePageLoadingLock: null,
 })
 
@@ -101,7 +128,15 @@ const nextLabel = computed(() => {
   return props.status.nextCursor ?? 'N/A'
 })
 const previousLabel = computed(() => props.status.previousCursor ?? 'N/A')
-const showActionRail = computed(() => canCancelFill.value || props.performLoadedItemsBulkAction !== null || props.canTogglePageLoadingLock)
+const showAutoScrollControls = computed(() => props.toggleAutoScroll !== null || props.setAutoScrollSpeed !== null)
+const showFillControls = computed(() => props.fillUntilCount !== null || props.fillUntilEnd !== null)
+const showActionRail = computed(() => (
+  canCancelFill.value
+  || showAutoScrollControls.value
+  || showFillControls.value
+  || props.performLoadedItemsBulkAction !== null
+  || props.canTogglePageLoadingLock
+))
 const nextBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.nextBoundaryLoadProgress) * 100))
 const previousBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.previousBoundaryLoadProgress) * 100))
 
@@ -188,6 +223,12 @@ const isPending = computed(() => (
   || props.status.phase === 'loading'
   || props.status.phase === 'refreshing'
 ))
+const fillControlsDisabled = computed(() => (
+  props.fillActionsDisabled
+  || props.status.fillMode !== 'idle'
+  || props.status.pageLoadingLocked === true
+  || isPending.value
+))
 
 function handleLoadedItemsBulkAction(action: LoadedItemsBulkAction): void {
   if (!props.performLoadedItemsBulkAction) {
@@ -209,6 +250,34 @@ function handleCancelFill(): void {
   props.cancelFill?.()
 }
 
+function handleFillCallCountInput(value: number): void {
+  props.setFillCallCount?.(value)
+}
+
+function handleFillUntilCount(): void {
+  if (fillControlsDisabled.value) {
+    return
+  }
+
+  props.fillUntilCount?.()
+}
+
+function handleFillUntilEnd(): void {
+  if (fillControlsDisabled.value) {
+    return
+  }
+
+  props.fillUntilEnd?.()
+}
+
+function handleAutoScrollSpeedInput(value: number): void {
+  props.setAutoScrollSpeed?.(value)
+}
+
+function handleToggleAutoScroll(): void {
+  props.toggleAutoScroll?.()
+}
+
 function clampProgress(value: unknown): number {
   const numeric = Number(value)
 
@@ -218,6 +287,7 @@ function clampProgress(value: unknown): number {
 
   return Math.min(Math.max(numeric, 0), 1)
 }
+
 </script>
 
 <template>
@@ -319,6 +389,76 @@ function clampProgress(value: unknown): number {
       class="flex items-center justify-center lg:justify-end"
     >
       <div class="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 shadow-[0_18px_60px_-38px_rgba(0,0,0,0.95)]">
+        <div
+          v-if="showFillControls"
+          class="flex items-center gap-1 border-r border-white/10 pr-1"
+        >
+          <BrowseV2NumberField
+            aria-label="Fill call count"
+            input-test="fill-call-count-input"
+            title="Fill call count"
+            :max="props.fillCallCountMax"
+            :min="props.fillCallCountMin"
+            :model-value="props.fillCallCount"
+            :disabled="fillControlsDisabled || !props.setFillCallCount"
+            @update:model-value="handleFillCallCountInput"
+          />
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            data-test="fill-count-button"
+            aria-label="Fill selected call count"
+            title="Fill selected call count"
+            :disabled="fillControlsDisabled || !props.fillUntilCount"
+            @click="handleFillUntilCount"
+          >
+            <ListPlus :size="14" />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            data-test="fill-until-end-button"
+            aria-label="Fill to end"
+            title="Fill to end"
+            :disabled="fillControlsDisabled || !props.fillUntilEnd"
+            @click="handleFillUntilEnd"
+          >
+            <ChevronsDown :size="14" />
+          </Button>
+        </div>
+
+        <div
+          v-if="showAutoScrollControls"
+          class="flex items-center gap-1 border-r border-white/10 pr-1"
+        >
+          <BrowseV2NumberField
+            aria-label="Auto scroll speed"
+            input-test="auto-scroll-speed-input"
+            title="Auto scroll speed"
+            :max="props.autoScrollMax"
+            :min="props.autoScrollMin"
+            :model-value="props.autoScrollSpeed"
+            :disabled="!props.setAutoScrollSpeed"
+            @update:model-value="handleAutoScrollSpeedInput"
+          />
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            :class="props.autoScrollActive ? 'border-sky-300/55 bg-sky-500/18 text-sky-50 hover:border-sky-200/70 hover:bg-sky-500/28 hover:text-white' : ''"
+            data-test="auto-scroll-toggle-button"
+            :aria-label="props.autoScrollActive ? 'Stop auto scroll' : 'Start auto scroll'"
+            :aria-pressed="props.autoScrollActive ? 'true' : 'false'"
+            :title="props.autoScrollActive ? 'Stop auto scroll' : 'Start auto scroll'"
+            :disabled="!props.toggleAutoScroll"
+            @click="handleToggleAutoScroll"
+          >
+            <component :is="props.autoScrollActive ? Pause : Play" :size="14" />
+          </Button>
+        </div>
+
         <Button
           v-if="canCancelFill"
           size="icon-sm"
