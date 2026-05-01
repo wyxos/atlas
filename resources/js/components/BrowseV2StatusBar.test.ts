@@ -310,6 +310,14 @@ describe('BrowseV2StatusBar', () => {
             },
         });
 
+        await wrapper.get('button[aria-label="Increase Auto scroll speed"]').trigger('click');
+        await wrapper.get('button[aria-label="Decrease Auto scroll speed"]').trigger('click');
+
+        expect(setAutoScrollSpeed).toHaveBeenNthCalledWith(1, 60);
+        expect(setAutoScrollSpeed).toHaveBeenNthCalledWith(2, 40);
+
+        setAutoScrollSpeed.mockClear();
+
         await wrapper.get('[data-test="auto-scroll-speed-input"]').setValue('8');
         expect(setAutoScrollSpeed).not.toHaveBeenCalled();
 

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe';
 import { useToast } from '@/components/ui/toast/use-toast';
 import { useBrowseV2SurfaceRouteSync } from '@/composables/useBrowseV2SurfaceRouteSync';
+import { useBrowseGridAutoScrollShortcut } from '@/composables/useBrowseGridAutoScrollShortcut';
 import { createBrowseForm, BrowseFormKey } from '@/composables/useBrowseForm';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useFileViewerData } from '@/composables/useFileViewerData';
@@ -263,12 +264,10 @@ const currentVisibleItem = computed(() => {
     return sessionItems.value[safeIndex] ?? null;
 });
 const headerMasonry = vibeMasonry;
-const fillControls = useVibeFillControls({
-    getVibeHandle: () => vibeRef.value,
-    status: vibeStatus,
-    surfaceMode,
-});
+const fillControls = useVibeFillControls({ getVibeHandle: () => vibeRef.value, status: vibeStatus, surfaceMode });
 const { autoScrollActive, autoScrollSpeed, fillActionsDisabled, fillCallCount } = fillControls;
+
+useBrowseGridAutoScrollShortcut({ surfaceMode, toggleAutoScroll: fillControls.toggleAutoScroll });
 
 function setTabDataLoading(isLoading: boolean): void {
     isTabDataLoading.value = isLoading;

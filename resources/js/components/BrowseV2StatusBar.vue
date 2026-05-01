@@ -432,6 +432,7 @@ function clampProgress(value: unknown): number {
             :max="props.autoScrollMax"
             :min="props.autoScrollMin"
             :model-value="props.autoScrollSpeed"
+            :step="10"
             :disabled="!props.setAutoScrollSpeed"
             @update:model-value="handleAutoScrollSpeedInput"
           />
