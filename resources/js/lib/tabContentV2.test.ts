@@ -65,6 +65,7 @@ describe('tabContentV2 resolve', () => {
 
         expect(totalAvailable.value).toBe(381);
         expect(result.nextPage).toBe('2');
+        expect(result.total).toBe(381);
         expect(result.items).toHaveLength(2);
     });
 
@@ -110,6 +111,7 @@ describe('tabContentV2 resolve', () => {
         expect(decodeURIComponent(requestedUrl)).toContain('service=civit-ai-images');
         expect(decodeURIComponent(requestedUrl)).toContain('modelId=1894057');
         expect(decodeURIComponent(requestedUrl)).toContain('modelVersionId=2457413');
+        expect(result.total).toBeNull();
         expect(result.items).toHaveLength(1);
     });
 

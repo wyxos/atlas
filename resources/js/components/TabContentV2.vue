@@ -470,6 +470,7 @@ watch(
         :apply-service="applyService"
         :apply-filters="applyFilters"
         :go-to-first-page="goToFirstPage"
+        :cancel-fill="() => vibeRef?.cancelFill()"
         :cancel-load="() => vibeRef?.cancel()"
         :load-next="() => vibeRef?.loadNext()"
         :vibe-status="vibeStatus"

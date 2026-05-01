@@ -37,9 +37,15 @@ export function createTabContentV2EmptyStatus(): VibeStatus {
         currentCursor: null,
         errorMessage: null,
         fillCollectedCount: null,
+        fillCompletedCalls: 0,
         fillCursor: null,
         fillDelayRemainingMs: null,
+        fillLoadedCount: 0,
+        fillMode: 'idle',
+        fillProgress: null,
+        fillTargetCalls: null,
         fillTargetCount: null,
+        fillTotalCount: null,
         hasNextPage: false,
         hasPreviousPage: false,
         itemCount: 0,
@@ -83,13 +89,21 @@ export function createRemovedItemIdSet(ids: readonly string[]): Set<number> {
 }
 
 function normalizeTotal(value: unknown): number | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
     if (typeof value === 'number') {
-        return value;
+        return Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
+    }
+
+    if (typeof value === 'string' && value.trim() === '') {
+        return null;
     }
 
     const parsed = Number(value);
 
-    return Number.isFinite(parsed) ? parsed : null;
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : null;
 }
 
 function normalizeUrl(value: unknown): string | null {
@@ -180,8 +194,10 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
                 signal: params.signal,
             });
 
+            const total = normalizeTotal(data.total);
+
             if (args.totalAvailable) {
-                args.totalAvailable.value = normalizeTotal(data.total);
+                args.totalAvailable.value = total;
             }
 
             const receivedItems = Array.isArray(data.items) ? data.items as FeedItem[] : [];
@@ -197,6 +213,7 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
                 items: nextItems.map(mapFeedItemToVibeItem),
                 nextPage: nextCursor,
                 previousPage: previousCursor ?? undefined,
+                total,
             };
         } catch (error) {
             const err = error as { message?: unknown; response?: { data?: { message?: unknown } } };

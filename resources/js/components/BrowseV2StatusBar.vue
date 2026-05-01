@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Ban, Heart, Loader2, LockKeyhole, LockKeyholeOpen, ThumbsDown, ThumbsUp } from 'lucide-vue-next'
+import { Ban, Heart, Loader2, LockKeyhole, LockKeyholeOpen, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
 import type { LoadedItemsBulkAction } from '@/composables/useTabContentItemInteractions'
@@ -50,9 +50,15 @@ type VibeStatusLike = {
   currentCursor: string | null
   errorMessage: string | null
   fillCollectedCount: number | null
+  fillCompletedCalls: number
   fillCursor?: string | null
   fillDelayRemainingMs: number | null
+  fillLoadedCount: number
+  fillMode: 'count' | 'cursor' | 'end' | 'idle'
+  fillProgress: number | null
+  fillTargetCalls: number | null
   fillTargetCount: number | null
+  fillTotalCount: number | null
   hasNextPage: boolean
   itemCount: number
   loadState: 'failed' | 'loaded' | 'loading'
@@ -68,6 +74,7 @@ interface Props {
   status: VibeStatusLike
   totalAvailable?: number | null
   bulkActionsDisabled?: boolean
+  cancelFill?: (() => void) | null
   canTogglePageLoadingLock?: boolean
   pageLoadingLocked?: boolean
   performLoadedItemsBulkAction?: ((action: LoadedItemsBulkAction) => void | Promise<number>) | null
@@ -77,6 +84,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   totalAvailable: null,
   bulkActionsDisabled: true,
+  cancelFill: null,
   canTogglePageLoadingLock: false,
   pageLoadingLocked: false,
   performLoadedItemsBulkAction: null,
@@ -84,6 +92,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const currentLabel = computed(() => props.status.currentCursor ?? 'N/A')
+const canCancelFill = computed(() => props.status.fillMode !== 'idle' && props.cancelFill !== null)
 const nextLabel = computed(() => {
   if (props.status.phase === 'filling' && props.status.fillCursor) {
     return props.status.fillCursor
@@ -92,7 +101,7 @@ const nextLabel = computed(() => {
   return props.status.nextCursor ?? 'N/A'
 })
 const previousLabel = computed(() => props.status.previousCursor ?? 'N/A')
-const showActionRail = computed(() => props.performLoadedItemsBulkAction !== null || props.canTogglePageLoadingLock)
+const showActionRail = computed(() => canCancelFill.value || props.performLoadedItemsBulkAction !== null || props.canTogglePageLoadingLock)
 const nextBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.nextBoundaryLoadProgress) * 100))
 const previousBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.previousBoundaryLoadProgress) * 100))
 
@@ -102,11 +111,25 @@ const statusLabel = computed(() => {
   }
 
   if (props.status.phase === 'filling') {
-    if (props.status.fillCollectedCount !== null && props.status.fillTargetCount !== null) {
-      const delaySeconds = props.status.fillDelayRemainingMs !== null
-        ? ` · ${Math.max(0, props.status.fillDelayRemainingMs / 1000).toFixed(1)}s`
-        : ''
+    const delaySeconds = props.status.fillDelayRemainingMs !== null
+      ? ` · ${Math.max(0, props.status.fillDelayRemainingMs / 1000).toFixed(1)}s`
+      : ''
 
+    if (props.status.fillMode === 'count' && props.status.fillTargetCalls !== null) {
+      return `Filling ${props.status.fillCompletedCalls}/${props.status.fillTargetCalls} calls${delaySeconds}`
+    }
+
+    if (props.status.fillMode === 'end') {
+      if (props.status.fillTotalCount !== null) {
+        return `Filling ${props.status.fillLoadedCount}/${props.status.fillTotalCount}${delaySeconds}`
+      }
+
+      if (props.status.fillCompletedCalls > 0) {
+        return `Filling ${props.status.fillLoadedCount} loaded · ${props.status.fillCompletedCalls} calls${delaySeconds}`
+      }
+    }
+
+    if (props.status.fillCollectedCount !== null && props.status.fillTargetCount !== null) {
       return `Filling ${props.status.fillCollectedCount}/${props.status.fillTargetCount}${delaySeconds}`
     }
 
@@ -180,6 +203,10 @@ function handleTogglePageLoadingLock(): void {
   }
 
   props.togglePageLoadingLock()
+}
+
+function handleCancelFill(): void {
+  props.cancelFill?.()
 }
 
 function clampProgress(value: unknown): number {
@@ -292,6 +319,19 @@ function clampProgress(value: unknown): number {
       class="flex items-center justify-center lg:justify-end"
     >
       <div class="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 shadow-[0_18px_60px_-38px_rgba(0,0,0,0.95)]">
+        <Button
+          v-if="canCancelFill"
+          size="icon-sm"
+          variant="ghost"
+          class="rounded-full border-danger-400/60 bg-danger-500/18 text-danger-100 hover:border-danger-300 hover:bg-danger-500/28 hover:text-white"
+          data-test="cancel-fill-button"
+          aria-label="Cancel fill"
+          title="Cancel Vibe fill"
+          @click="handleCancelFill"
+        >
+          <X :size="14" />
+        </Button>
+
         <Button
           size="icon-sm"
           variant="ghost"

@@ -51,6 +51,7 @@ const props = defineProps<{
     availableSources: ServiceOption[];
     applyFilters: () => Promise<void>;
     applyService: () => Promise<void>;
+    cancelFill: () => void;
     cancelLoad: () => void;
     closeFileSheet: () => void;
     containerInteractions: TabContentContainerInteractions;
@@ -230,6 +231,7 @@ useEventListener(document, 'pointermove', (event) => {
                                 :status="vibeStatus"
                                 :total-available="totalAvailable"
                                 :bulk-actions-disabled="Boolean(headerMasonry?.isLoading) || vibeStatus.itemCount === 0"
+                                :cancel-fill="cancelFill"
                                 :can-toggle-page-loading-lock="Boolean(headerMasonry?.lockPageLoading && headerMasonry?.unlockPageLoading)"
                                 :page-loading-locked="Boolean(headerMasonry?.pageLoadingLocked)"
                                 :perform-loaded-items-bulk-action="itemInteractions.performLoadedItemsBulkAction"

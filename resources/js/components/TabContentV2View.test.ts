@@ -32,6 +32,7 @@ const browseV2StatusBarStub = defineComponent({
         status: { type: Object, required: true },
         totalAvailable: { default: null },
         bulkActionsDisabled: { type: Boolean, default: true },
+        cancelFill: { type: Function, default: null },
         canTogglePageLoadingLock: { type: Boolean, default: false },
         pageLoadingLocked: { type: Boolean, default: false },
         performLoadedItemsBulkAction: { type: Function, default: null },
@@ -115,7 +116,7 @@ function createProps() {
         availableSources: [],
         applyFilters: vi.fn(async () => undefined),
         applyService: vi.fn(async () => undefined),
-        cancelLoad: vi.fn(),
+        cancelFill: vi.fn(), cancelLoad: vi.fn(),
         closeFileSheet: vi.fn(),
         containerInteractions: {
             managerRef: ref(null),
@@ -221,8 +222,14 @@ function createProps() {
             currentCursor: '1',
             errorMessage: null,
             fillCollectedCount: null,
+            fillCompletedCalls: 0,
             fillDelayRemainingMs: null,
+            fillLoadedCount: 0,
+            fillMode: 'idle' as const,
+            fillProgress: null,
+            fillTargetCalls: null,
             fillTargetCount: null,
+            fillTotalCount: null,
             hasNextPage: true,
             hasPreviousPage: false,
             itemCount: 20,
@@ -419,6 +426,7 @@ describe('TabContentV2View', () => {
         const statusBarProps = browseV2StatusBarSpy.mock.calls[0][0];
 
         expect(statusBarProps.bulkActionsDisabled).toBe(false);
+        expect(statusBarProps.cancelFill).toBe(props.cancelFill);
         expect(statusBarProps.canTogglePageLoadingLock).toBe(true);
         expect(statusBarProps.pageLoadingLocked).toBe(false);
         expect(statusBarProps.performLoadedItemsBulkAction).toBe(props.itemInteractions.performLoadedItemsBulkAction);

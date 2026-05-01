@@ -249,7 +249,7 @@ vi.mock('./TabContentV2View.vue', () => ({
         },
         setup(props) {
             const handle = {
-                cancel: vi.fn(), clearRemoved: vi.fn(), getRemovedIds: () => [...status.removedIds],
+                cancel: vi.fn(), cancelFill: vi.fn(), clearRemoved: vi.fn(), getRemovedIds: () => [...status.removedIds],
                 loadNext: vi.fn(async () => undefined), loadPrevious: vi.fn(async () => undefined),
                 remove(target: string | string[]) {
                     const ids = Array.isArray(target) ? target : [target];
@@ -295,7 +295,8 @@ vi.mock('./TabContentV2View.vue', () => ({
 }));
 
 const status = reactive({
-    activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillDelayRemainingMs: null, fillTargetCount: null,
+    activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillCompletedCalls: 0, fillDelayRemainingMs: null,
+    fillLoadedCount: 0, fillMode: 'idle' as const, fillProgress: null, fillTargetCalls: null, fillTargetCount: null, fillTotalCount: null,
     hasNextPage: true, hasPreviousPage: false, itemCount: 0, loadState: 'loaded' as const, nextCursor: '2', phase: 'idle' as const,
     previousCursor: null, removedCount: 0, removedIds: [] as string[], surfaceMode: 'list' as const,
 });

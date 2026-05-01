@@ -46,6 +46,12 @@ vi.mock('lucide-vue-next', () => ({
             return h('div', { 'data-testid': 'thumbs-up-icon' });
         },
     }),
+    X: defineComponent({
+        name: 'MockXIcon',
+        render() {
+            return h('div', { 'data-testid': 'x-icon' });
+        },
+    }),
 }));
 
 vi.mock('@/components/ui/button', () => ({
@@ -85,9 +91,15 @@ function createStatus(overrides: Partial<InstanceType<typeof BrowseV2StatusBar>[
         currentCursor: '1',
         errorMessage: null,
         fillCollectedCount: null,
+        fillCompletedCalls: 0,
         fillCursor: null,
         fillDelayRemainingMs: null,
+        fillLoadedCount: 20,
+        fillMode: 'idle' as const,
+        fillProgress: null,
+        fillTargetCalls: null,
         fillTargetCount: null,
+        fillTotalCount: null,
         hasNextPage: true,
         itemCount: 20,
         loadState: 'loaded' as const,
@@ -186,6 +198,73 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 0/8');
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).not.toContain('No items available');
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
+    });
+
+    it('shows fillUntil count progress when Vibe exposes a target call count', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    phase: 'filling',
+                    fillCompletedCalls: 1,
+                    fillMode: 'count',
+                    fillTargetCalls: 2,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 1/2 calls');
+    });
+
+    it('routes the cancel fill action through the provided handler while a fill is active', async () => {
+        const cancelFill = vi.fn();
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                cancelFill,
+                status: createStatus({
+                    phase: 'filling',
+                    fillCompletedCalls: 1,
+                    fillMode: 'count',
+                    fillTargetCalls: 2,
+                }),
+            },
+        });
+
+        await wrapper.get('[data-test="cancel-fill-button"]').trigger('click');
+
+        expect(cancelFill).toHaveBeenCalledTimes(1);
+        expect(wrapper.find('[data-testid="x-icon"]').exists()).toBe(true);
+    });
+
+    it('shows fillUntilEnd loaded total progress when Vibe receives resolver totals', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    phase: 'filling',
+                    fillCompletedCalls: 3,
+                    fillLoadedCount: 75,
+                    fillMode: 'end',
+                    fillTotalCount: 381,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 75/381');
+    });
+
+    it('shows fillUntilEnd loaded count and call count when no total is available', () => {
+        const wrapper = mount(BrowseV2StatusBar, {
+            props: {
+                status: createStatus({
+                    phase: 'filling',
+                    fillCompletedCalls: 3,
+                    fillLoadedCount: 75,
+                    fillMode: 'end',
+                    fillTotalCount: null,
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 75 loaded · 3 calls');
     });
 
     it('shows the in-flight fill cursor in the next pill while refilling', () => {
