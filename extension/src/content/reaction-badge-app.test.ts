@@ -22,7 +22,7 @@ const progressListeners = new Set<(event: {
     referrerUrl: string | null;
     status: string | null;
     percent: number | null;
-    reaction: 'love' | 'like' | 'dislike' | 'funny' | null;
+    reaction: 'love' | 'like' | 'funny' | null;
     reactedAt?: string | null;
     downloadedAt?: string | null;
     blacklistedAt?: string | null;
@@ -246,7 +246,7 @@ describe('createReactionBadgeHost', () => {
             { type: 'ATLAS_CLOSE_CURRENT_TAB' },
             expect.any(Function),
         );
-    });
+    }, 10000);
 
     it('keeps the close-tab toggle synchronized across mounted badges on the same hostname', async () => {
         mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue('off');

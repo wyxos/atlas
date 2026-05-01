@@ -30,11 +30,13 @@ describe('tabContentV2MouseShortcuts', () => {
     it('does not open the original item when middle-clicking a container pill', () => {
         const item = createFeedItem(1);
         const onReaction = vi.fn();
+        const onBlacklist = vi.fn();
         const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
         const handlers = createBrowseV2MouseShortcutHandlers({
             getCurrentItem: () => item,
             getItemFromTarget: () => item,
             getSurfaceMode: () => 'list',
+            onBlacklist,
             onReaction,
         });
 
@@ -53,6 +55,7 @@ describe('tabContentV2MouseShortcuts', () => {
         handlers.handleAuxClickCapture(event);
 
         expect(openSpy).not.toHaveBeenCalled();
+        expect(onBlacklist).not.toHaveBeenCalled();
         expect(onReaction).not.toHaveBeenCalled();
     });
 
@@ -63,6 +66,7 @@ describe('tabContentV2MouseShortcuts', () => {
             getCurrentItem: () => item,
             getItemFromTarget: () => item,
             getSurfaceMode: () => 'list',
+            onBlacklist: vi.fn(),
             onReaction: vi.fn(),
         });
 
@@ -85,11 +89,13 @@ describe('tabContentV2MouseShortcuts', () => {
         const firstDuplicate = createFeedItem(1);
         const secondDuplicate = createFeedItem(1);
         secondDuplicate.key = '1-1-duplicate';
+        const onBlacklist = vi.fn();
         const onReaction = vi.fn();
         const handlers = createBrowseV2MouseShortcutHandlers({
             getCurrentItem: () => firstDuplicate,
             getItemFromTarget: () => secondDuplicate,
             getSurfaceMode: () => 'list',
+            onBlacklist,
             onReaction,
         });
 
@@ -105,6 +111,7 @@ describe('tabContentV2MouseShortcuts', () => {
 
         handlers.handleContextMenuCapture(event);
 
-        expect(onReaction).toHaveBeenCalledWith(secondDuplicate, 'dislike');
+        expect(onBlacklist).toHaveBeenCalledWith(secondDuplicate);
+        expect(onReaction).not.toHaveBeenCalled();
     });
 });

@@ -12,11 +12,10 @@ type DashboardMetrics = {
         reactions: {
             love: number;
             like: number;
-            dislike: number;
             funny: number;
         };
         blacklisted: number;
-        auto_disliked: number;
+        auto_blacklisted: number;
         not_found: number;
         unreacted_not_blacklisted: number;
     };
@@ -71,11 +70,10 @@ const createMetrics = (): DashboardMetrics => ({
         reactions: {
             love: 0,
             like: 0,
-            dislike: 0,
             funny: 0,
         },
         blacklisted: 0,
-        auto_disliked: 0,
+        auto_blacklisted: 0,
         not_found: 0,
         unreacted_not_blacklisted: 0,
     },

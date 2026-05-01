@@ -10,13 +10,13 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Delete local file from disk after it has been auto-disliked or blacklisted.
+ * Delete local file from disk after it has been auto-blacklisted or blacklisted.
  * Only deletes files that have a local path (downloaded files).
  * File records are preserved in the database.
  *
  * This job runs asynchronously to avoid blocking the browse response.
  */
-class DeleteAutoDislikedFileJob implements ShouldQueue
+class DeleteStoredFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -67,7 +67,7 @@ class DeleteAutoDislikedFileJob implements ShouldQueue
                 } catch (\Throwable $e) {
                     // Log but don't fail the job - file might already be deleted
                     // or disk might not be configured
-                    \Illuminate\Support\Facades\Log::debug("DeleteAutoDislikedFileJob: Could not delete file on disk {$diskName}: {$e->getMessage()}");
+                    \Illuminate\Support\Facades\Log::debug("DeleteStoredFileJob: Could not delete file on disk {$diskName}: {$e->getMessage()}");
                 }
             }
         }

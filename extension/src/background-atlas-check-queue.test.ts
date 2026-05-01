@@ -261,7 +261,7 @@ describe('background-atlas-check-queue', () => {
                 (body.items ?? []).map((item) => ({
                     request_id: item.request_id,
                     exists: true,
-                    reaction: endpoint.includes('referrer-checks') ? 'funny' : 'dislike',
+                    reaction: endpoint.includes('referrer-checks') ? 'funny' : 'like',
                 })),
             ));
         });
@@ -285,7 +285,7 @@ describe('background-atlas-check-queue', () => {
         });
         const [badgeResponse, referrerResponse] = await Promise.all([badgePromise, referrerPromise]);
 
-        expect(badgeResponse.payload.reaction).toBe('dislike');
+        expect(badgeResponse.payload.reaction).toBe('like');
         expect(referrerResponse.payload.reaction).toBe('funny');
     });
 });

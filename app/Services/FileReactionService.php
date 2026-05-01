@@ -10,10 +10,6 @@ use App\Services\Local\LocalBrowseIndexSyncService;
 
 class FileReactionService
 {
-    public function __construct(
-        private DownloadedFileClearService $downloadedFileClearService,
-    ) {}
-
     /**
      * Set a reaction for a file (idempotent).
      *
@@ -55,21 +51,8 @@ class FileReactionService
             ->first();
 
         if ($existingReaction && $existingReaction->type === $type) {
-            if ($type === 'dislike') {
-                $this->clearDownloadedAssetsForDislike($file);
-                if ($detachFromTabsOnNoop) {
-                    app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
-                }
-
-                return [
-                    'reaction' => ['type' => $existingReaction->type],
-                    'reacted_at' => $existingReaction->created_at?->toIso8601String(),
-                    'changed' => false,
-                ];
-            }
-
             $shouldNormalizePositiveState = in_array($type, ['love', 'like', 'funny'], true)
-                && ($file->auto_disliked || $file->blacklisted_at !== null);
+                && ($file->auto_blacklisted || $file->blacklisted_at !== null);
 
             if (! $shouldNormalizePositiveState) {
                 if ($queueDownload) {
@@ -140,10 +123,6 @@ class FileReactionService
         $isBlacklisted = $wasBlacklisted;
 
         if ($existingReaction && $existingReaction->type === $type) {
-            if ($type === 'dislike' && $this->clearDownloadedAssetsForDislike($file)) {
-                return ['reaction' => ['type' => $existingReaction->type]];
-            }
-
             $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
             $existingReaction->delete();
             app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
@@ -173,11 +152,11 @@ class FileReactionService
         $wasBlacklisted = $file->blacklisted_at !== null;
         $isBlacklisted = $wasBlacklisted;
 
-        // Positive reactions clear auto_disliked and also clear blacklist flags.
+        // Positive reactions recover a blacklisted file and queue/download as normal.
         if (in_array($type, ['love', 'like', 'funny'], true)) {
-            $updates = ['auto_disliked' => false];
+            $updates = ['auto_blacklisted' => false];
 
-            $metrics->applyAutoDislikeClear($file);
+            $metrics->applyAutoBlacklistClear($file);
 
             if ($file->blacklisted_at !== null) {
                 $metrics->applyBlacklistClear($file, false);
@@ -200,12 +179,8 @@ class FileReactionService
             ]
         );
 
-        if ($type !== 'dislike' && $queueDownload) {
+        if ($queueDownload) {
             $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);
-        }
-
-        if ($type === 'dislike') {
-            $this->downloadedFileClearService->clear($file);
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
@@ -213,15 +188,6 @@ class FileReactionService
         app(LocalBrowseIndexSyncService::class)->syncReactionsForFileIds([$file->id]);
 
         return $reaction;
-    }
-
-    private function clearDownloadedAssetsForDislike(File $file): bool
-    {
-        if (! $this->downloadedFileClearService->clear($file)) {
-            return false;
-        }
-
-        return true;
     }
 
     /**

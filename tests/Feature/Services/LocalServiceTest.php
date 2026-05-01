@@ -32,7 +32,7 @@ test('fetch delegates normalized params to the typesense gateway', function () {
                 ->and($context['downloaded'])->toBe('no')
                 ->and($context['fileTypes'])->toBe(['video'])
                 ->and($context['reactionMode'])->toBe('types')
-                ->and($context['reactionTypes'])->toBe(['dislike'])
+                ->and($context['reactionTypes'])->toBe(['funny'])
                 ->and($context['sort'])->toBe('reaction_at');
 
             return true;
@@ -52,7 +52,7 @@ test('fetch delegates normalized params to the typesense gateway', function () {
         'downloaded' => 'no',
         'file_type' => ['video'],
         'reaction_mode' => 'types',
-        'reaction' => ['dislike'],
+        'reaction' => ['funny'],
         'sort' => 'reaction_at',
     ]);
 

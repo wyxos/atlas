@@ -20,20 +20,6 @@ abstract class BaseModerationService
     protected array $flaggedIds = [];
 
     /**
-     * File IDs to auto-dislike.
-     *
-     * @var array<int>
-     */
-    protected array $autoDislikeFileIds = [];
-
-    /**
-     * Files to auto-dislike.
-     *
-     * @var array<int, File>
-     */
-    protected array $autoDislikeFiles = [];
-
-    /**
      * File IDs to blacklist.
      *
      * @var array<int>
@@ -41,7 +27,7 @@ abstract class BaseModerationService
     protected array $blacklistFileIds = [];
 
     /**
-     * Immediate actions (auto_dislike/blacklist) tracked for toast notification.
+     * Immediate blacklist actions tracked for toast notification.
      *
      * @var array<int, array{file_id:int, action_type:string}>
      */
@@ -68,8 +54,8 @@ abstract class BaseModerationService
         $anyReactedFileIds = null;
 
         foreach ($files as $file) {
-            // Skip files already auto-disliked or blacklisted
-            if ($file->auto_disliked || $file->blacklisted_at !== null) {
+            // Skip files already blacklisted.
+            if ($file->blacklisted_at !== null) {
                 continue;
             }
 
@@ -91,12 +77,7 @@ abstract class BaseModerationService
 
             $actionType = $this->getActionType($match);
 
-            if ($actionType === ActionType::DISLIKE) {
-                $this->immediateActions[$file->id] = [
-                    'file_id' => $file->id,
-                    'action_type' => $actionType,
-                ];
-            } elseif ($actionType === ActionType::BLACKLIST) {
+            if ($actionType === ActionType::BLACKLIST) {
                 $anyReactedFileIds ??= $this->resolveReactedFileIdsForAnyUser($files);
 
                 // Any existing reaction should spare the file from backend blacklisting.
@@ -132,8 +113,6 @@ abstract class BaseModerationService
     protected function resetState(): void
     {
         $this->flaggedIds = [];
-        $this->autoDislikeFileIds = [];
-        $this->autoDislikeFiles = [];
         $this->blacklistFileIds = [];
         $this->immediateActions = [];
     }
@@ -143,27 +122,16 @@ abstract class BaseModerationService
      */
     protected function handleActionType(string $actionType, File $file): void
     {
-        if ($actionType === ActionType::DISLIKE) {
-            $this->autoDislikeFileIds[] = $file->id;
-            $this->autoDislikeFiles[(int) $file->id] = $file;
-        } elseif ($actionType === ActionType::BLACKLIST) {
+        if ($actionType === ActionType::BLACKLIST) {
             $this->blacklistFileIds[] = $file->id;
         }
     }
 
     /**
-     * Process files with auto-dislike and blacklist actions.
+     * Process files with backend-owned blacklist actions.
      */
     protected function processFiles(): array
     {
-        if (! empty($this->autoDislikeFileIds)) {
-            $userId = Auth::id();
-            if (is_int($userId)) {
-                app(FileAutoDislikeService::class)->apply($this->autoDislikeFiles, $userId);
-            }
-        }
-
-        // Batch update blacklisted files
         if (! empty($this->blacklistFileIds)) {
             $userId = Auth::id();
             app(FileBlacklistService::class)->apply(
@@ -171,10 +139,11 @@ abstract class BaseModerationService
                     ->whereIn('id', $this->blacklistFileIds)
                     ->get(),
                 is_int($userId) ? $userId : null,
+                autoBlacklisted: true,
             );
         }
 
-        return array_merge($this->autoDislikeFileIds, $this->blacklistFileIds);
+        return $this->blacklistFileIds;
     }
 
     /**
@@ -202,7 +171,7 @@ abstract class BaseModerationService
             }
 
             // Keep this consistent with process() where already-processed files are skipped.
-            if ($file->auto_disliked || $file->blacklisted_at !== null) {
+            if ($file->blacklisted_at !== null) {
                 continue;
             }
 
@@ -248,7 +217,7 @@ abstract class BaseModerationService
                 continue;
             }
 
-            if ($file->auto_disliked || $file->blacklisted_at !== null) {
+            if ($file->blacklisted_at !== null) {
                 continue;
             }
 
@@ -312,7 +281,7 @@ abstract class BaseModerationService
     abstract protected function getActionType(object $match): string;
 
     /**
-     * Record match metadata (e.g. to show which rule flagged a file for auto-dislike).
+     * Record match metadata (e.g. to show which rule flagged a file for auto-blacklist).
      */
     protected function recordMatch(File $file, object $match, string $actionType): void
     {

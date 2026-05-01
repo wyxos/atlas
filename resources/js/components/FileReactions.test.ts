@@ -12,7 +12,6 @@ describe('FileReactions', () => {
 
         expect(wrapper.find('button[aria-label="Favorite"]').exists()).toBe(true);
         expect(wrapper.find('button[aria-label="Like"]').exists()).toBe(true);
-        expect(wrapper.find('button[aria-label="Dislike"]').exists()).toBe(true);
         expect(wrapper.find('button[aria-label="Blacklist"]').exists()).toBe(true);
         expect(wrapper.find('button[aria-label="Funny"]').exists()).toBe(true);
     });
@@ -81,18 +80,6 @@ describe('FileReactions', () => {
 
         const vm = wrapper.vm as any;
         expect(vm.like).toBe(true);
-    });
-
-    it('displays dislike reaction as active', () => {
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-                reaction: { type: 'dislike' },
-            },
-        });
-
-        const vm = wrapper.vm as any;
-        expect(vm.dislike).toBe(true);
     });
 
     it('displays funny reaction as active', () => {

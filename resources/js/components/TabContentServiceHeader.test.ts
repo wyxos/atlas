@@ -76,7 +76,6 @@ describe('TabContentServiceHeader', () => {
         expect(wrapper.find('[data-test="loaded-items-preview-to-four-button"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="loaded-items-like-button"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="loaded-items-love-button"]').exists()).toBe(false);
-        expect(wrapper.find('[data-test="loaded-items-dislike-button"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="loaded-items-blacklist-button"]').exists()).toBe(false);
         expect(wrapper.get('[data-test="apply-service-button"]').exists()).toBe(true);
     });

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\ActionType;
 use App\Models\Container;
 
 class ContainerBlacklistService
@@ -18,34 +17,6 @@ class ContainerBlacklistService
             return [];
         }
 
-        if ($container->action_type === ActionType::DISLIKE) {
-            if (! is_int($userId)) {
-                return [];
-            }
-
-            $files = $container->files()
-                ->select([
-                    'files.id',
-                    'files.path',
-                    'files.preview_path',
-                    'files.poster_path',
-                    'files.downloaded',
-                    'files.downloaded_at',
-                    'files.download_progress',
-                    'files.blacklisted_at',
-                    'files.auto_disliked',
-                ])
-                ->whereNull('files.blacklisted_at')
-                ->whereDoesntHave('reactions', fn ($query) => $query->where('user_id', $userId))
-                ->get();
-
-            return app(FileAutoDislikeService::class)->apply($files, $userId);
-        }
-
-        if ($container->action_type !== ActionType::BLACKLIST) {
-            return [];
-        }
-
         $files = $container->files()
             ->select([
                 'files.id',
@@ -56,11 +27,11 @@ class ContainerBlacklistService
                 'files.downloaded_at',
                 'files.download_progress',
                 'files.blacklisted_at',
-                'files.auto_disliked',
+                'files.auto_blacklisted',
             ])
             ->whereDoesntHave('reactions')
             ->get();
 
-        return app(FileBlacklistService::class)->apply($files, $userId);
+        return app(FileBlacklistService::class)->apply($files, $userId, autoBlacklisted: true);
     }
 }

@@ -45,6 +45,7 @@ if (changed.size === 0) {
 }
 
 const allowedFilesCreateMigration = 'database/migrations/2025_06_27_235710_create_files_table.php';
+const allowedAutoBlacklistMigration = 'database/migrations/2025_12_12_045856_add_auto_disliked_to_files_table.php';
 const filesCreatePattern = /Schema::create\(\s*['"]files['"]/i;
 const filesTableTouchPatterns = [
   filesCreatePattern,
@@ -73,8 +74,17 @@ for (const file of changed) {
     !/CREATE\s+(?:UNIQUE\s+)?INDEX[\s\S]*?\s+ON\s+`?files`?/i.test(content) &&
     !/DROP\s+INDEX[\s\S]*?\s+ON\s+`?files`?/i.test(content) &&
     !/rename\(\s*['"]files['"]/i.test(content);
+  const isAllowedHistoricalAutoBlacklistRename =
+    normalizedFile === allowedAutoBlacklistMigration &&
+    /Schema::table\(\s*['"]files['"]/i.test(content) &&
+    /auto_blacklisted/.test(content) &&
+    !/auto_disliked/.test(content) &&
+    !/ALTER\s+TABLE\s+`?files`?/i.test(content) &&
+    !/CREATE\s+(?:UNIQUE\s+)?INDEX[\s\S]*?\s+ON\s+`?files`?/i.test(content) &&
+    !/DROP\s+INDEX[\s\S]*?\s+ON\s+`?files`?/i.test(content) &&
+    !/rename\(\s*['"]files['"]/i.test(content);
 
-  if (touchesFilesTable && !isAllowedBaselineCreate) {
+  if (touchesFilesTable && !isAllowedBaselineCreate && !isAllowedHistoricalAutoBlacklistRename) {
     offenders.push(file);
   }
 }

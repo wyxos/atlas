@@ -12,9 +12,9 @@ beforeEach(function () {
     Bus::fake();
 });
 
-test('removes auto_disliked flag when user reacts with like', function () {
+test('removes auto_blacklisted flag when user reacts with like', function () {
     $admin = User::factory()->admin()->create();
-    $file = File::factory()->create(['auto_disliked' => true]);
+    $file = File::factory()->create(['auto_blacklisted' => true]);
 
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
         'type' => 'like',
@@ -22,7 +22,7 @@ test('removes auto_disliked flag when user reacts with like', function () {
 
     $response->assertSuccessful();
     $file->refresh();
-    expect($file->auto_disliked)->toBeFalse();
+    expect($file->auto_blacklisted)->toBeFalse();
 
     $reaction = Reaction::where('file_id', $file->id)
         ->where('user_id', $admin->id)
@@ -31,9 +31,9 @@ test('removes auto_disliked flag when user reacts with like', function () {
     expect($reaction->type)->toBe('like');
 });
 
-test('removes auto_disliked flag when user reacts with funny', function () {
+test('removes auto_blacklisted flag when user reacts with funny', function () {
     $admin = User::factory()->admin()->create();
-    $file = File::factory()->create(['auto_disliked' => true]);
+    $file = File::factory()->create(['auto_blacklisted' => true]);
 
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
         'type' => 'funny',
@@ -41,12 +41,12 @@ test('removes auto_disliked flag when user reacts with funny', function () {
 
     $response->assertSuccessful();
     $file->refresh();
-    expect($file->auto_disliked)->toBeFalse();
+    expect($file->auto_blacklisted)->toBeFalse();
 });
 
-test('removes auto_disliked flag when user reacts with favorite', function () {
+test('removes auto_blacklisted flag when user reacts with favorite', function () {
     $admin = User::factory()->admin()->create();
-    $file = File::factory()->create(['auto_disliked' => true]);
+    $file = File::factory()->create(['auto_blacklisted' => true]);
 
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
         'type' => 'love',
@@ -54,20 +54,20 @@ test('removes auto_disliked flag when user reacts with favorite', function () {
 
     $response->assertSuccessful();
     $file->refresh();
-    expect($file->auto_disliked)->toBeFalse();
+    expect($file->auto_blacklisted)->toBeFalse();
 });
 
-test('keeps auto_disliked flag when user manually dislikes', function () {
+test('rejects removed dislike reaction type', function () {
     $admin = User::factory()->admin()->create();
-    $file = File::factory()->create(['auto_disliked' => true]);
+    $file = File::factory()->create(['auto_blacklisted' => true]);
 
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
         'type' => 'dislike',
     ]);
 
-    $response->assertSuccessful();
+    $response->assertUnprocessable();
     $file->refresh();
-    expect($file->auto_disliked)->toBeTrue();
+    expect($file->auto_blacklisted)->toBeTrue();
 });
 
 test('removes blacklist flags when user reacts with like on blacklisted file', function () {
@@ -113,19 +113,4 @@ test('removes blacklist flags when user reacts with funny on blacklisted file', 
     $response->assertSuccessful();
     $file->refresh();
     expect($file->blacklisted_at)->toBeNull();
-});
-
-test('keeps blacklist flags when user reacts with dislike on blacklisted file', function () {
-    $admin = User::factory()->admin()->create();
-    $file = File::factory()->create([
-        'blacklisted_at' => now(),
-    ]);
-
-    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
-        'type' => 'dislike',
-    ]);
-
-    $response->assertSuccessful();
-    $file->refresh();
-    expect($file->blacklisted_at)->not->toBeNull();
 });

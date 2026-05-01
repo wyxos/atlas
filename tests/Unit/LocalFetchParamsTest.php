@@ -15,7 +15,7 @@ it('returns empty response flag for invalid reaction types filter', function () 
 it('does not keep removed blacklist classification parameters', function () {
     $context = LocalFetchParams::normalize([
         'reaction_mode' => 'types',
-        'reaction' => ['dislike'],
+        'reaction' => ['funny'],
         'blacklisted' => 'yes',
         'blacklist_type' => 'auto',
     ]);
@@ -27,7 +27,7 @@ it('does not keep removed blacklist classification parameters', function () {
 it('does not default max_previewed_count for moderated views when not explicitly provided', function () {
     $context = LocalFetchParams::normalize([
         'reaction_mode' => 'types',
-        'reaction' => ['dislike'],
+        'reaction' => ['funny'],
     ]);
 
     expect($context['maxPreviewed'])->toBeNull()
@@ -37,7 +37,7 @@ it('does not default max_previewed_count for moderated views when not explicitly
 it('keeps explicit max_previewed_count untouched', function () {
     $context = LocalFetchParams::normalize([
         'reaction_mode' => 'types',
-        'reaction' => ['dislike'],
+        'reaction' => ['funny'],
         'max_previewed_count' => 0,
     ]);
 

@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('file_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('type'); // 'love' | 'like' | 'dislike' | 'funny'
+            $table->string('type'); // 'love' | 'like' | 'funny'
             $table->timestamps();
 
             $table->unique(['user_id', 'file_id']);

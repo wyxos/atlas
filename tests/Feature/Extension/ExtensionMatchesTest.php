@@ -180,7 +180,7 @@ test('extension referrer checks prefer the latest updated row for duplicate refe
     Reaction::query()->create([
         'file_id' => $newerRow->id,
         'user_id' => $user->id,
-        'type' => 'dislike',
+        'type' => 'like',
     ]);
 
     $response = $this->withHeaders([
@@ -223,7 +223,7 @@ test('extension matches prefers media url match over referrer fallback for same 
     Reaction::query()->create([
         'file_id' => $referrerMatch->id,
         'user_id' => $user->id,
-        'type' => 'dislike',
+        'type' => 'funny',
     ]);
 
     $response = $this->withHeaders([

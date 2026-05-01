@@ -64,7 +64,7 @@ class File extends Model
         'downloaded',
         'downloaded_at',
         'download_progress',
-        'auto_disliked',
+        'auto_blacklisted',
     ];
 
     /**
@@ -82,7 +82,7 @@ class File extends Model
             'downloaded_at' => 'datetime',
             'not_found' => 'boolean',
             'downloaded' => 'boolean',
-            'auto_disliked' => 'boolean',
+            'auto_blacklisted' => 'boolean',
         ];
     }
 
@@ -166,12 +166,6 @@ class File extends Model
     public function moderationActions(): HasMany
     {
         return $this->hasMany(FileModerationAction::class);
-    }
-
-    public function autoDislikeModerationAction(): HasOne
-    {
-        return $this->hasOne(FileModerationAction::class)
-            ->where('action_type', ActionType::DISLIKE);
     }
 
     public function autoBlacklistModerationAction(): HasOne

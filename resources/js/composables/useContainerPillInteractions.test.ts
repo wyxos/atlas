@@ -3,7 +3,8 @@ import { ref, computed } from 'vue';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { FeedItem } from './useTabs';
 
-const { mockQueueBatchReaction } = vi.hoisted(() => ({
+const { mockAxiosPost, mockQueueBatchReaction } = vi.hoisted(() => ({
+    mockAxiosPost: vi.fn(),
     mockQueueBatchReaction: vi.fn(),
 }));
 
@@ -24,6 +25,15 @@ describe('useContainerPillInteractions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockRemove.mockResolvedValue(undefined);
+        (window as any).axios = { post: mockAxiosPost };
+        mockAxiosPost.mockResolvedValue({
+            data: {
+                results: [
+                    { id: 1, blacklisted_at: '2026-05-01T00:00:00Z', previewed_count: 99999 },
+                    { id: 2, blacklisted_at: '2026-05-01T00:00:00Z', previewed_count: 99999 },
+                ],
+            },
+        });
     });
 
     it('uses remove when batch reacting to multiple siblings', async () => {
@@ -251,7 +261,7 @@ describe('useContainerPillInteractions', () => {
         vi.useRealTimers();
     });
 
-    it('handles alt + right click to dislike all siblings', async () => {
+    it('handles alt + right click to blacklist all siblings', async () => {
         const items = ref<FeedItem[]>([
             {
                 id: 1,
@@ -299,14 +309,17 @@ describe('useContainerPillInteractions', () => {
 
         handlePillClick(1, mockEvent);
 
-        // Wait for async batchReactToSiblings to complete
+        // Wait for async blacklistSiblings to complete
+        await Promise.resolve();
         await Promise.resolve();
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
         expect(mockEvent.stopPropagation).toHaveBeenCalled();
 
-        // Verify removeMany was called (indicating batchReactToSiblings was called with 'dislike')
+        expect(mockAxiosPost).toHaveBeenCalledWith('/api/files/blacklist/batch', {
+            file_ids: [1, 2],
+        });
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 
@@ -369,7 +382,7 @@ describe('useContainerPillInteractions', () => {
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 
-    it('handles double right click (without alt) to dislike all siblings', async () => {
+    it('handles double right click (without alt) to blacklist all siblings', async () => {
         const items = ref<FeedItem[]>([
             {
                 id: 1,
@@ -429,10 +442,13 @@ describe('useContainerPillInteractions', () => {
 
         handlePillClick(1, secondClick, true); // isDoubleClick = true
 
-        // Wait for async batchReactToSiblings to complete
+        // Wait for async blacklistSiblings to complete
+        await Promise.resolve();
         await Promise.resolve();
 
-        // Verify removeMany was called (indicating batchReactToSiblings was called with 'dislike')
+        expect(mockAxiosPost).toHaveBeenCalledWith('/api/files/blacklist/batch', {
+            file_ids: [1, 2],
+        });
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 

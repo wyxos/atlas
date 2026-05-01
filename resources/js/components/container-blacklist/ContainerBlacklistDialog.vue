@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue';
 import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -146,7 +145,7 @@ function handleCancel(): void {
                         This container is currently blacklisted.
                     </span>
                     <span v-else>
-                        Choose the type of ban action for this container.
+                        Confirm this container should be blacklisted.
                     </span>
                 </DialogDescription>
             </DialogHeader>
@@ -202,7 +201,7 @@ function handleCancel(): void {
                         <Loader2 :size="16" class="animate-spin" />
                         Loading container stats...
                     </div>
-                    <div v-else-if="fileStats" class="grid gap-2 sm:grid-cols-4">
+                    <div v-else-if="fileStats" class="grid gap-2 sm:grid-cols-3">
                         <div
                             data-test="container-stat-unreacted"
                             class="rounded-lg border border-twilight-indigo-500/40 bg-twilight-indigo-500/10 p-3"
@@ -218,13 +217,6 @@ function handleCancel(): void {
                             <p class="mt-1 text-xl font-semibold text-danger-200">{{ fileStats.blacklisted }}</p>
                         </div>
                         <div
-                            data-test="container-stat-disliked"
-                            class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"
-                        >
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-amber-300">Disliked</p>
-                            <p class="mt-1 text-xl font-semibold text-amber-200">{{ fileStats.disliked }}</p>
-                        </div>
-                        <div
                             data-test="container-stat-positive"
                             class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3"
                         >
@@ -237,31 +229,9 @@ function handleCancel(): void {
                     </p>
                 </div>
 
-                <!-- Action Type Selection -->
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-regal-navy-100">Ban Type</label>
-                    <Select v-model="actionType">
-                        <SelectTrigger class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="dislike">
-                                Dislike
-                            </SelectItem>
-                            <SelectItem value="blacklist">
-                                Blacklist
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <p class="text-xs text-twilight-indigo-400">
-                        <span v-if="actionType === 'dislike'">
-                            Files in this container will be auto-disliked during browse.
-                        </span>
-                        <span v-else>
-                            Files in this container will be blacklisted during browse and removed from results.
-                        </span>
-                    </p>
-                </div>
+                <p class="rounded-lg border border-danger-500/30 bg-danger-500/10 p-3 text-xs text-danger-100">
+                    Files in this container will be blacklisted during browse and removed from results.
+                </p>
             </div>
 
             <DialogFooter class="flex items-center justify-between">

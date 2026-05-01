@@ -190,7 +190,7 @@ describe('reactionQueue', () => {
         });
 
         it('handles different reaction types', () => {
-            const types: ReactionType[] = ['like', 'dislike', 'love', 'funny'];
+            const types: ReactionType[] = ['like', 'love', 'funny'];
 
             types.forEach((type) => {
                 queueReaction(123, type);
@@ -289,13 +289,13 @@ describe('reactionQueue', () => {
         it('passes correct props to batch toast component', () => {
             const fileIds = [1, 2, 3, 4, 5, 6];
             const previews = fileIds.map((id) => ({ fileId: id, thumbnail: `thumb${id}.jpg` }));
-            queueBatchReaction(fileIds, 'dislike', previews);
+            queueBatchReaction(fileIds, 'funny', previews);
 
             const toastCall = mockToast.mock.calls[0];
             expect(toastCall[0].props.totalCount).toBe(6);
             // Component receives all previews, but only shows first 5
             expect(toastCall[0].props.previews).toHaveLength(6);
-            expect(toastCall[0].props.reactionType).toBe('dislike');
+            expect(toastCall[0].props.reactionType).toBe('funny');
         });
 
         it('uses the batch callback when countdown expires for small batches too', async () => {
@@ -312,12 +312,12 @@ describe('reactionQueue', () => {
 
         it('uses batch callback for large reactions', async () => {
             const fileIds = Array.from({ length: 30 }, (_, index) => index + 1);
-            queueBatchReaction(fileIds, 'dislike', []);
+            queueBatchReaction(fileIds, 'funny', []);
 
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
-            expect(mockBatchReactionCallback).toHaveBeenCalledWith(fileIds, 'dislike');
+            expect(mockBatchReactionCallback).toHaveBeenCalledWith(fileIds, 'funny');
             expect(mockReactionCallback).not.toHaveBeenCalled();
         });
 
@@ -331,7 +331,7 @@ describe('reactionQueue', () => {
                     })
             );
 
-            queueBatchReaction(fileIds, 'dislike', []);
+            queueBatchReaction(fileIds, 'funny', []);
 
             const items = queue.collection.getAll();
             const queueId = items[0]?.id;
@@ -409,19 +409,19 @@ describe('reactionQueue', () => {
                 { fileId: 789 },
             ];
             const restoreCallback = vi.fn();
-            queueBatchReaction(fileIds, 'dislike', previews, restoreCallback);
+            queueBatchReaction(fileIds, 'funny', previews, restoreCallback);
 
             const items = queue.collection.getAll();
             expect(items[0]?.metadata).toMatchObject({
                 fileIds,
-                reactionType: 'dislike',
+                reactionType: 'funny',
                 previews,
                 restoreCallback,
             });
         });
 
         it('handles different reaction types', () => {
-            const types: ReactionType[] = ['like', 'dislike', 'love', 'funny'];
+            const types: ReactionType[] = ['like', 'love', 'funny'];
             const fileIds = [123, 456];
 
             types.forEach((type) => {
@@ -435,12 +435,12 @@ describe('reactionQueue', () => {
             const fileIds = [123, 456];
             const items = ref([{ id: 123 }, { id: 456 }] as any[]);
 
-            queueBatchReaction(fileIds, 'dislike', [], undefined, items, { updateLocalState: true });
+            queueBatchReaction(fileIds, 'funny', [], undefined, items, { updateLocalState: true });
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
-            expect(mockUpdateReactionState).toHaveBeenNthCalledWith(1, items, 123, 'dislike');
-            expect(mockUpdateReactionState).toHaveBeenNthCalledWith(2, items, 456, 'dislike');
+            expect(mockUpdateReactionState).toHaveBeenNthCalledWith(1, items, 123, 'funny');
+            expect(mockUpdateReactionState).toHaveBeenNthCalledWith(2, items, 456, 'funny');
         });
     });
 
@@ -519,9 +519,9 @@ describe('reactionQueue', () => {
 
         it('undos the most recently queued batch reaction', () => {
             queueReaction(123, 'like');
-            queueBatchReaction([456, 789], 'dislike', []);
+            queueBatchReaction([456, 789], 'funny', []);
 
-            const batchQueueId = queue.collection.getAll().find((item) => item.id.startsWith('batch-dislike-'))?.id;
+            const batchQueueId = queue.collection.getAll().find((item) => item.id.startsWith('batch-funny-'))?.id;
             expect(batchQueueId).toBeDefined();
 
             expect(undoLatestQueuedReaction()).toBe(true);
@@ -533,7 +533,7 @@ describe('reactionQueue', () => {
         it('skips non-reaction queue items when undoing the latest reaction', () => {
             queueReaction(123, 'like');
             queue.collection.add({
-                id: 'auto-dislike-999',
+                id: 'auto-blacklist-999',
                 duration: 5000,
                 onComplete: vi.fn(),
                 metadata: { fileId: 999 },
@@ -541,7 +541,7 @@ describe('reactionQueue', () => {
 
             expect(undoLatestQueuedReaction()).toBe(true);
             expect(queue.collection.has('like-123')).toBe(false);
-            expect(queue.collection.has('auto-dislike-999')).toBe(true);
+            expect(queue.collection.has('auto-blacklist-999')).toBe(true);
         });
     });
 });

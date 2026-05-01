@@ -35,7 +35,6 @@ export class OverlayManager {
         media.removeAttribute(APPLIED_ATTR);
         if (this.activeMedia.size === 0 && this.isGlobalShortcutBound) {
             window.removeEventListener('click', this.handleGlobalClick, true);
-            window.removeEventListener('contextmenu', this.handleGlobalContextmenu, true);
             window.removeEventListener('mousedown', this.handleGlobalMousedown, true);
             this.isGlobalShortcutBound = false;
         }
@@ -80,17 +79,12 @@ export class OverlayManager {
             return;
         }
         window.addEventListener('click', this.handleGlobalClick, true);
-        window.addEventListener('contextmenu', this.handleGlobalContextmenu, true);
         window.addEventListener('mousedown', this.handleGlobalMousedown, true);
         this.isGlobalShortcutBound = true;
     }
 
     private readonly handleGlobalClick = (event: MouseEvent): void => {
         this.handleGlobalMouseShortcut(event, 'like', 0);
-    };
-
-    private readonly handleGlobalContextmenu = (event: MouseEvent): void => {
-        this.handleGlobalMouseShortcut(event, 'dislike');
     };
 
     private readonly handleGlobalMousedown = (event: MouseEvent): void => {
@@ -185,6 +179,10 @@ export class OverlayManager {
     }
 
     private findActiveMediaAtPoint(x: number, y: number): MediaElement | null {
+        if (typeof document.elementsFromPoint !== 'function') {
+            return null;
+        }
+
         const directMedia = document.elementsFromPoint(x, y)
             .find((element) => this.isActiveConnectedMedia(element));
         if (directMedia && (directMedia instanceof HTMLImageElement || directMedia instanceof HTMLVideoElement)) {

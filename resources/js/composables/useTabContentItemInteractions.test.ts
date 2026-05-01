@@ -200,9 +200,9 @@ describe('useTabContentItemInteractions', () => {
                 key: `1-${index + 1}`,
                 index,
                 src: `https://example.com/image${index + 1}.jpg`,
-                reaction: { type: 'dislike' },
-                auto_disliked: true,
-                auto_dislike_rule: { id: 1, name: 'Legacy rule' },
+                reaction: { type: 'like' },
+                auto_blacklisted: true,
+                auto_blacklist_rule: { id: 1, name: 'Legacy rule' },
             } as FeedItem)),
         );
         const loadedItems = ref(items.value);
@@ -257,8 +257,8 @@ describe('useTabContentItemInteractions', () => {
         expect(remove).toHaveBeenCalledTimes(1);
         expect(remove).toHaveBeenCalledWith(items.value);
         expect(items.value[0].reaction).toBeNull();
-        expect(items.value[0].auto_disliked).toBe(false);
-        expect(items.value[0].auto_dislike_rule).toBeNull();
+        expect(items.value[0].auto_blacklisted).toBe(false);
+        expect(items.value[0].auto_blacklist_rule).toBeNull();
         expect(items.value[0].blacklisted_at).toBe('2026-04-14T00:00:00Z');
         expect(items.value[0].previewed_count).toBe(99999);
     });
@@ -272,9 +272,9 @@ describe('useTabContentItemInteractions', () => {
             key: '1-42',
             index: 0,
             src: 'https://example.com/image42.jpg',
-            reaction: { type: 'dislike' },
-            auto_disliked: true,
-            auto_dislike_rule: { id: 7, name: 'Auto dislike' },
+            reaction: { type: 'like' },
+            auto_blacklisted: true,
+            auto_blacklist_rule: { id: 7, name: 'Auto blacklist' },
             blacklist_rule: { id: 8, name: 'Container rule' },
         } as FeedItem;
         const items = shallowRef<FeedItem[]>([item]);
@@ -321,8 +321,8 @@ describe('useTabContentItemInteractions', () => {
         expect(remove).toHaveBeenCalledWith([item]);
         expect(item.blacklisted_at).toBe('2026-04-30T00:00:00Z');
         expect(item.reaction).toBeNull();
-        expect(item.auto_disliked).toBe(false);
-        expect(item.auto_dislike_rule).toBeNull();
+        expect(item.auto_blacklisted).toBe(false);
+        expect(item.auto_blacklist_rule).toBeNull();
         expect(item.blacklist_rule).toBeNull();
         expect(item.previewed_count).toBe(99999);
     });

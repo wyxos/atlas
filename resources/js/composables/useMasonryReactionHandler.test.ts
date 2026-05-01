@@ -38,8 +38,8 @@ function createItem(overrides: Partial<FeedItem> = {}): FeedItem {
         index: 0,
         src: 'https://example.com/preview.jpg',
         preview: 'https://example.com/preview.jpg',
-        reaction: { type: 'dislike' },
-        auto_disliked: true,
+        reaction: { type: 'like' },
+        auto_blacklisted: true,
         blacklisted_at: '2026-03-19T00:00:00Z',
         ...overrides,
     };
@@ -79,7 +79,7 @@ describe('useMasonryReactionHandler', () => {
         await handleMasonryReaction(item, 'love');
 
         expect(item.reaction).toEqual({ type: 'love' });
-        expect(item.auto_disliked).toBe(false);
+        expect(item.auto_blacklisted).toBe(false);
         expect(item.blacklisted_at).toBeNull();
         expect(masonry.value.remove).toHaveBeenCalledWith(item);
         expect(mockQueueReaction).toHaveBeenCalledWith(
@@ -100,8 +100,8 @@ describe('useMasonryReactionHandler', () => {
 
         await restoreCallback?.();
 
-        expect(item.reaction).toEqual({ type: 'dislike' });
-        expect(item.auto_disliked).toBe(true);
+        expect(item.reaction).toEqual({ type: 'like' });
+        expect(item.auto_blacklisted).toBe(true);
         expect(item.blacklisted_at).toBe('2026-03-19T00:00:00Z');
         expect(masonry.value.restore).toHaveBeenCalledWith(item);
     });
@@ -133,7 +133,7 @@ describe('useMasonryReactionHandler', () => {
 
         await restoreCallback?.();
 
-        expect(second.reaction).toEqual({ type: 'dislike' });
+        expect(second.reaction).toEqual({ type: 'like' });
         expect(items.value.map((item) => item.id)).toEqual([1, 2, 3]);
         expect(onReaction).toHaveBeenCalledWith(2, 'love');
     });
@@ -278,33 +278,6 @@ describe('useMasonryReactionHandler', () => {
         );
     });
 
-    it('removes items from masonry before queueing a dislike that falls out of a positive-only local view', async () => {
-        const item = createItem({
-            reaction: { type: 'like' },
-        });
-        const items = ref([item]);
-        const masonry = ref({
-            remove: vi.fn().mockResolvedValue(undefined),
-            restore: vi.fn().mockResolvedValue(undefined),
-        } as any);
-
-        const { handleMasonryReaction } = useMasonryReactionHandler({
-            items,
-            masonry,
-            tab: ref({ id: 5 } as any),
-            isLocal: ref(true),
-            matchesActiveLocalFilters: () => false,
-            isPositiveOnlyLocalView: () => true,
-            onReaction: vi.fn(),
-        });
-
-        await handleMasonryReaction(item, 'dislike');
-
-        expect(masonry.value.remove).toHaveBeenCalledWith(item);
-        expect(mockQueueReaction).toHaveBeenCalledTimes(1);
-        expect(masonry.value.remove.mock.invocationCallOrder[0]).toBeLessThan(mockQueueReaction.mock.invocationCallOrder[0]);
-    });
-
     it('does not queue an online reaction when Vibe reports the item was already removed', async () => {
         const item = createItem();
         const items = ref([item]);
@@ -322,7 +295,7 @@ describe('useMasonryReactionHandler', () => {
             onReaction,
         });
 
-        await handleMasonryReaction(item, 'dislike');
+        await handleMasonryReaction(item, 'funny');
 
         expect(masonry.value.remove).toHaveBeenCalledWith(item);
         expect(mockQueueReaction).not.toHaveBeenCalled();
@@ -355,56 +328,4 @@ describe('useMasonryReactionHandler', () => {
         expect(item.reaction).toEqual({ type: 'like' });
     });
 
-    it('keeps the dislike while clearing downloaded local state when a downloaded disliked item is disliked again', async () => {
-        const item = createItem({
-            downloaded: true,
-            type: 'image',
-            url: 'https://example.com/original.jpg',
-            src: '/api/files/1/preview',
-            preview: '/api/files/1/preview',
-            thumbnail: '/api/files/1/preview',
-            original: '/api/files/1/downloaded',
-            originalUrl: '/api/files/1/downloaded',
-        });
-        const items = ref([item]);
-        const masonry = ref({
-            remove: vi.fn().mockResolvedValue(undefined),
-            restore: vi.fn().mockResolvedValue(undefined),
-        } as any);
-
-        const { handleMasonryReaction } = useMasonryReactionHandler({
-            items,
-            masonry,
-            tab: ref({ id: 5 } as any),
-            isLocal: ref(true),
-            matchesActiveLocalFilters: (candidate) => candidate.downloaded === true,
-            isPositiveOnlyLocalView: () => false,
-            onReaction: vi.fn(),
-        });
-
-        await handleMasonryReaction(item, 'dislike');
-
-        expect(item.reaction).toEqual({ type: 'dislike' });
-        expect(item.downloaded).toBe(false);
-        expect(item.src).toBe('https://example.com/original.jpg');
-        expect(item.preview).toBe('https://example.com/original.jpg');
-        expect(item.thumbnail).toBe('https://example.com/original.jpg');
-        expect(item.original).toBe('https://example.com/original.jpg');
-        expect(item.originalUrl).toBe('https://example.com/original.jpg');
-        expect(masonry.value.remove).toHaveBeenCalledWith(item);
-
-        const restoreCallback = mockQueueReaction.mock.calls.at(-1)?.[3] as (() => Promise<void>) | undefined;
-        expect(restoreCallback).toBeTypeOf('function');
-
-        await restoreCallback?.();
-
-        expect(item.reaction).toEqual({ type: 'dislike' });
-        expect(item.downloaded).toBe(true);
-        expect(item.src).toBe('/api/files/1/preview');
-        expect(item.preview).toBe('/api/files/1/preview');
-        expect(item.thumbnail).toBe('/api/files/1/preview');
-        expect(item.original).toBe('/api/files/1/downloaded');
-        expect(item.originalUrl).toBe('/api/files/1/downloaded');
-        expect(masonry.value.restore).toHaveBeenCalledWith(item);
-    });
 });

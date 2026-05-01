@@ -1,6 +1,6 @@
 <?php
 
-use App\Jobs\DeleteAutoDislikedFileJob;
+use App\Jobs\DeleteStoredFileJob;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\Tab;
@@ -72,16 +72,16 @@ test('batch blacklist normalizes files that are already blacklisted', function (
         ->and($alreadyBlacklisted->downloaded)->toBeFalse()
         ->and($alreadyBlacklisted->downloaded_at)->toBeNull();
 
-    Queue::assertPushed(DeleteAutoDislikedFileJob::class, fn (DeleteAutoDislikedFileJob $job) => $job->filePath === 'downloads/already-blacklisted.jpg');
+    Queue::assertPushed(DeleteStoredFileJob::class, fn (DeleteStoredFileJob $job) => $job->filePath === 'downloads/already-blacklisted.jpg');
 });
 
-test('batch blacklist clears auto-disliked marker and removes existing reactions because blacklist is plain blacklist', function () {
+test('batch blacklist clears auto-blacklisted marker and removes existing reactions because blacklist is plain blacklist', function () {
     Queue::fake();
 
     $admin = User::factory()->admin()->create();
     $otherUser = User::factory()->create();
     $file = File::factory()->create([
-        'auto_disliked' => true,
+        'auto_blacklisted' => true,
         'blacklisted_at' => null,
         'previewed_count' => 3,
         'path' => 'downloads/reacted-file.jpg',
@@ -93,7 +93,7 @@ test('batch blacklist clears auto-disliked marker and removes existing reactions
     Reaction::create([
         'file_id' => $file->id,
         'user_id' => $admin->id,
-        'type' => 'dislike',
+        'type' => 'like',
     ]);
     Reaction::create([
         'file_id' => $file->id,
@@ -110,7 +110,7 @@ test('batch blacklist clears auto-disliked marker and removes existing reactions
     $file->refresh();
 
     expect($file->blacklisted_at)->not->toBeNull()
-        ->and($file->auto_disliked)->toBeFalse()
+        ->and($file->auto_blacklisted)->toBeFalse()
         ->and($file->previewed_count)->toBe(99999)
         ->and($file->path)->toBeNull()
         ->and($file->preview_path)->toBeNull()
@@ -119,7 +119,7 @@ test('batch blacklist clears auto-disliked marker and removes existing reactions
         ->and($file->downloaded_at)->toBeNull()
         ->and(Reaction::where('file_id', $file->id)->count())->toBe(0);
 
-    Queue::assertPushed(DeleteAutoDislikedFileJob::class, function (DeleteAutoDislikedFileJob $job): bool {
+    Queue::assertPushed(DeleteStoredFileJob::class, function (DeleteStoredFileJob $job): bool {
         if (! is_array($job->filePath)) {
             return false;
         }

@@ -113,10 +113,26 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         },
     });
 
+    const loadedItemsBulkActions = createLoadedItemsBulkActions({
+        getLoadedItems,
+        items: options.items,
+        tab: options.tab,
+        isLocal: options.form.isLocal,
+        masonry: options.masonry,
+        matchesActiveLocalFilters: options.matchesActiveLocalFilters,
+        clearHoverForRemovedItems: (removedItemIds) => {
+            if (hoveredItemId.value !== null && removedItemIds.has(hoveredItemId.value)) {
+                clearHoverState();
+            }
+        },
+        onReaction: options.onReaction,
+    });
+
     const masonryInteractions = createMasonryInteractions(
-        options.items,
-        options.masonry,
         handleMasonryReaction,
+        async (item) => {
+            await loadedItemsBulkActions.blacklistItems([item]);
+        },
     );
 
     function cancelLoad(): void {
@@ -176,21 +192,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     function getLoadedItems(): FeedItem[] {
         return options.loadedItems?.value ?? options.items.value;
     }
-
-    const loadedItemsBulkActions = createLoadedItemsBulkActions({
-        getLoadedItems,
-        items: options.items,
-        tab: options.tab,
-        isLocal: options.form.isLocal,
-        masonry: options.masonry,
-        matchesActiveLocalFilters: options.matchesActiveLocalFilters,
-        clearHoverForRemovedItems: (removedItemIds) => {
-            if (hoveredItemId.value !== null && removedItemIds.has(hoveredItemId.value)) {
-                clearHoverState();
-            }
-        },
-        onReaction: options.onReaction,
-    });
 
     const itemHandlers = {
         onClick(event: MouseEvent, item: FeedItem): void {

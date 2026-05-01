@@ -27,6 +27,7 @@ class FileBlacklistService
         bool $detachFromTabs = true,
         bool $queueDelete = true,
         ?int $minimumPreviewedCount = null,
+        bool $autoBlacklisted = false,
     ): array {
         $files = collect($files)
             ->filter(fn (mixed $file): bool => $file instanceof File)
@@ -43,7 +44,7 @@ class FileBlacklistService
             ->all();
         $blacklistedAt = now();
 
-        DB::transaction(function () use ($files, $fileIds, $blacklistedAt, $minimumPreviewedCount): void {
+        DB::transaction(function () use ($files, $fileIds, $blacklistedAt, $minimumPreviewedCount, $autoBlacklisted): void {
             $newBlacklistIds = $files
                 ->filter(fn (File $file): bool => $file->blacklisted_at === null)
                 ->pluck('id')
@@ -52,8 +53,16 @@ class FileBlacklistService
 
             $this->metricsService->applyBlacklistAdd($newBlacklistIds);
 
+            $autoBlacklistAddIds = [];
+
             foreach ($files as $file) {
-                $this->metricsService->applyAutoDislikeClear($file);
+                if ($autoBlacklisted && ! (bool) $file->auto_blacklisted) {
+                    $autoBlacklistAddIds[] = (int) $file->id;
+                }
+
+                if (! $autoBlacklisted) {
+                    $this->metricsService->applyAutoBlacklistClear($file);
+                }
 
                 foreach ($this->reactionsForFile($file) as $reaction) {
                     $this->metricsService->applyReactionChange(
@@ -67,6 +76,8 @@ class FileBlacklistService
                 }
             }
 
+            $this->metricsService->applyAutoBlacklistAdd($autoBlacklistAddIds);
+
             if ($newBlacklistIds !== []) {
                 File::query()
                     ->whereIn('id', $newBlacklistIds)
@@ -78,9 +89,8 @@ class FileBlacklistService
 
             File::query()
                 ->whereIn('id', $fileIds)
-                ->where('auto_disliked', true)
                 ->update([
-                    'auto_disliked' => false,
+                    'auto_blacklisted' => $autoBlacklisted,
                     'updated_at' => now(),
                 ]);
 

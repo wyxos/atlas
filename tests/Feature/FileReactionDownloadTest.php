@@ -59,7 +59,7 @@ test('dispatches download job when user reacts with funny', function () {
     });
 });
 
-test('does not dispatch download job when user reacts with dislike', function () {
+test('rejects removed dislike reaction type without dispatching download job', function () {
     Queue::fake();
 
     $admin = User::factory()->admin()->create();
@@ -69,7 +69,7 @@ test('does not dispatch download job when user reacts with dislike', function ()
         'type' => 'dislike',
     ]);
 
-    $response->assertSuccessful();
+    $response->assertUnprocessable();
 
     Queue::assertNotPushed(DownloadFile::class);
 });

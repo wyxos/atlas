@@ -124,21 +124,6 @@ class FileResource extends JsonResource
             }
         }
 
-        $autoDislikeRule = null;
-        try {
-            if ($this->resource->relationLoaded('autoDislikeModerationAction')) {
-                $hit = $this->resource->getRelation('autoDislikeModerationAction');
-                if ($hit) {
-                    $autoDislikeRule = [
-                        'id' => (int) ($hit->moderation_rule_id ?? 0),
-                        'name' => (string) ($hit->moderation_rule_name ?? ''),
-                    ];
-                }
-            }
-        } catch (\Throwable $e) {
-            // Omit persisted details if relation isn't available or anything fails.
-        }
-
         $containers = $this->resource->relationLoaded('containers')
             ? $this->resource->getRelation('containers')->map(function ($container): array {
                 return [
@@ -159,7 +144,6 @@ class FileResource extends JsonResource
                     'file_stats' => [
                         'unreacted' => (int) ($container->unreacted_files_count ?? 0),
                         'blacklisted' => (int) ($container->blacklisted_files_count ?? 0),
-                        'disliked' => (int) ($container->disliked_files_count ?? 0),
                         'positive' => (int) ($container->positive_files_count ?? 0),
                     ],
                 ];
@@ -198,8 +182,8 @@ class FileResource extends JsonResource
             'previewed_count' => $this->previewed_count,
             'seen_at' => $this->seen_at?->toIso8601String(),
             'seen_count' => $this->seen_count,
-            'auto_disliked' => (bool) ($this->auto_disliked ?? false),
-            'auto_dislike_rule' => $autoDislikeRule && ($autoDislikeRule['id'] > 0 || $autoDislikeRule['name'] !== '') ? $autoDislikeRule : null,
+            'auto_blacklisted' => (bool) ($this->auto_blacklisted ?? false),
+            'auto_blacklist_rule' => $this->auto_blacklisted ? $blacklistRule : null,
             'blacklisted_at' => $this->blacklisted_at?->toIso8601String(),
             'blacklist_rule' => $blacklistRule,
             'downloaded' => $this->downloaded,

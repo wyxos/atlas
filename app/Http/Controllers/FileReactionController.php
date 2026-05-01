@@ -20,7 +20,7 @@ class FileReactionController extends Controller
     public function store(Request $request, File $file): JsonResponse
     {
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:love,like,dislike,funny'],
+            'type' => ['required', 'string', 'in:love,like,funny'],
             'force_download' => ['nullable', 'boolean'],
         ]);
 
@@ -39,7 +39,7 @@ class FileReactionController extends Controller
             ->where('file_id', $file->id)
             ->exists();
 
-        if ($forceDownload && $type !== 'dislike') {
+        if ($forceDownload) {
             app(DownloadedFileResetService::class)->reset($file);
             $file = $file->refresh();
         }
@@ -50,7 +50,6 @@ class FileReactionController extends Controller
             'message' => 'Reaction updated.',
             'reaction' => $result['reaction'],
             'should_prompt_redownload' => ! $forceDownload
-                && $type !== 'dislike'
                 && $hasDownloadedFile
                 && $hasUrl
                 && $hadReactionBefore,
@@ -119,7 +118,7 @@ class FileReactionController extends Controller
         $validated = $request->validate([
             'reactions' => 'required|array',
             'reactions.*.file_id' => 'required|integer|exists:files,id',
-            'reactions.*.type' => 'required|string|in:love,like,dislike,funny',
+            'reactions.*.type' => 'required|string|in:love,like,funny',
         ]);
 
         $user = Auth::user();

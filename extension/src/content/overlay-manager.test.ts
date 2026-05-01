@@ -116,7 +116,7 @@ describe('OverlayManager', () => {
         manager.remove(image);
     });
 
-    it('keeps Alt+contextmenu and Alt+middle-click reactions working', async () => {
+    it('ignores Alt+contextmenu while keeping Alt+middle-click reactions working', async () => {
         const { OverlayManager } = await import('./overlay-manager');
         const manager = new OverlayManager();
         const { image } = appendTrackedImage();
@@ -142,10 +142,10 @@ describe('OverlayManager', () => {
         });
         image.dispatchEvent(middleClickEvent);
 
-        expect(contextmenuEvent.defaultPrevented).toBe(true);
+        expect(contextmenuEvent.defaultPrevented).toBe(false);
         expect(middleClickEvent.defaultPrevented).toBe(true);
-        expect(triggerReaction).toHaveBeenNthCalledWith(1, 'dislike');
-        expect(triggerReaction).toHaveBeenNthCalledWith(2, 'love');
+        expect(triggerReaction).toHaveBeenCalledTimes(1);
+        expect(triggerReaction).toHaveBeenNthCalledWith(1, 'love');
 
         manager.remove(image);
     });

@@ -35,7 +35,7 @@ function createFile(overrides: Partial<File> = {}): File {
         previewed_count: 0,
         seen_at: null,
         seen_count: 0,
-        auto_disliked: false,
+        auto_blacklisted: false,
         blacklisted_at: null,
         downloaded: false,
         downloaded_at: null,

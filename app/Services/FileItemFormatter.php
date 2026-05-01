@@ -190,7 +190,7 @@ class FileItemFormatter
                 'previewed_count' => $file->previewed_count ?? 0,
                 'seen_count' => $file->seen_count ?? 0,
                 'downloaded' => (bool) $file->downloaded,
-                'auto_disliked' => $file->auto_disliked ?? false,
+                'auto_blacklisted' => $file->auto_blacklisted ?? false,
                 'reaction' => $reaction, // Current user's reaction for this file
                 // Include metadata with prompt if available - full metadata loaded on-demand
                 'metadata' => $prompt ? ['prompt' => $prompt] : null,

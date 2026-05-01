@@ -41,7 +41,6 @@ export function useMasonryReactionHandler(
     function shouldPromptDownloadedReaction(item: FeedItem, type: ReactionType): boolean {
         return options.isLocal.value
             && options.promptDownloadedReaction !== undefined
-            && type !== 'dislike'
             && item.downloaded === true
             && hasDownloadSource(item)
             && typeof item.reaction?.type === 'string'

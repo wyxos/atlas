@@ -51,8 +51,8 @@ function isTerminalTransferStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
 }
 
-function parseKnownReaction(value: string | null): 'love' | 'like' | 'dislike' | 'funny' | null {
-    return value === 'love' || value === 'like' || value === 'dislike' || value === 'funny'
+function parseKnownReaction(value: string | null): 'love' | 'like' | 'funny' | null {
+    return value === 'love' || value === 'like' || value === 'funny'
         ? value
         : null;
 }
@@ -96,7 +96,6 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
     function applyAnchorMediaMatch(media: MediaElement, result: AnchorMediaMatchResult): void {
         const reaction = result.reaction === 'love'
             || result.reaction === 'like'
-            || result.reaction === 'dislike'
             || result.reaction === 'funny'
             ? result.reaction
             : null;
@@ -340,7 +339,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
 
     function applyReactionForReferrerUrl(
         referrerUrl: string,
-        reaction: 'love' | 'like' | 'dislike' | 'funny' | null | undefined,
+        reaction: 'love' | 'like' | 'funny' | null | undefined,
         downloadedAt: string | null | undefined,
         blacklistedAt: string | null | undefined,
     ): void {

@@ -14,7 +14,7 @@ describe('submitBadgeReaction close-tab behavior', () => {
         history.replaceState({}, '', '/extension-test/reaction-submit-close-tab');
     });
 
-    it('keeps close-tab enabled for successful dislikes even without download queueing', async () => {
+    it('does not enable close-tab for positive reactions without download queueing', async () => {
         mockGetStoredOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
@@ -34,7 +34,7 @@ describe('submitBadgeReaction close-tab behavior', () => {
                     ok: true,
                     status: 200,
                     payload: {
-                        reaction: 'dislike',
+                        reaction: 'like',
                         exists: true,
                         download: {
                             requested: false,
@@ -60,10 +60,10 @@ describe('submitBadgeReaction close-tab behavior', () => {
         const image = document.createElement('img');
         image.src = 'https://images.example.com/direct-image-1.jpg';
 
-        const result = await submitBadgeReaction(image, 'dislike');
+        const result = await submitBadgeReaction(image, 'like');
 
         expect(result.ok).toBe(true);
         expect(result.downloadRequested).toBe(false);
-        expect(result.shouldCloseTabAfterQueue).toBe(true);
+        expect(result.shouldCloseTabAfterQueue).toBe(false);
     });
 });

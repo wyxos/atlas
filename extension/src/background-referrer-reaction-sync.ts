@@ -1,6 +1,6 @@
 import { primeGlobalReferrerCheckCache } from './background-referrer-check-cache';
 
-export type KnownReactionType = 'love' | 'like' | 'dislike' | 'funny';
+export type KnownReactionType = 'love' | 'like' | 'funny';
 
 export type ReferrerReactionSyncMessage = {
     type: 'ATLAS_REFERRER_REACTION_SYNC';
@@ -21,7 +21,7 @@ function stringOrNull(value: unknown): string | null {
 }
 
 export function parseReactionType(value: unknown): KnownReactionType | null {
-    return value === 'love' || value === 'like' || value === 'dislike' || value === 'funny'
+    return value === 'love' || value === 'like' || value === 'funny'
         ? value
         : null;
 }

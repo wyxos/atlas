@@ -1,12 +1,9 @@
-import type { Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
-import type { BrowseFeedHandle } from '@/types/browse';
 
 export function createMasonryInteractions(
-    items: Ref<FeedItem[]>,
-    masonry: Ref<BrowseFeedHandle | null>,
-    handleMasonryReaction: (item: FeedItem, type: ReactionType, index?: number) => Promise<void>
+    handleMasonryReaction: (item: FeedItem, type: ReactionType, index?: number) => Promise<void>,
+    handleMasonryBlacklist: (item: FeedItem, index?: number) => Promise<void> | void,
 ) {
     function handleAltClickReaction(e: MouseEvent, item: FeedItem, index?: number): void {
         e.preventDefault();
@@ -17,7 +14,9 @@ export function createMasonryInteractions(
         if (e.button === 0 || (e.type === 'click' && e.button === 0)) {
             reactionType = 'like';
         } else if (e.button === 2 || e.type === 'contextmenu') {
-            reactionType = 'dislike';
+            void handleMasonryBlacklist(item, index);
+
+            return;
         } else if (e.button === 1) {
             reactionType = 'love';
         }

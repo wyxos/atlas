@@ -4,7 +4,7 @@ type PreviewBatchResult = {
     id: number;
     previewed_count: number;
     reaction?: { type: string } | null;
-    auto_disliked?: boolean;
+    auto_blacklisted?: boolean;
     blacklisted_at?: string | null;
 };
 
@@ -15,8 +15,8 @@ function createBatchResponse(fileIds: number[]) {
             results: fileIds.map((fileId) => ({
                 id: fileId,
                 previewed_count: fileId * 10,
-                reaction: fileId === 2 ? { type: 'dislike' } : null,
-                auto_disliked: fileId === 2,
+                reaction: null,
+                auto_blacklisted: fileId === 2,
                 blacklisted_at: fileId === 3 ? '2026-04-30T00:00:00Z' : null,
             })),
         },
@@ -91,9 +91,9 @@ describe('usePreviewBatch', () => {
                 file_ids: [1, 2, 3],
             });
             await expect(Promise.all([first, second, third])).resolves.toEqual([
-                { id: 1, previewed_count: 10, reaction: null, auto_disliked: false, blacklisted_at: null },
-                { id: 2, previewed_count: 20, reaction: { type: 'dislike' }, auto_disliked: true, blacklisted_at: null },
-                { id: 3, previewed_count: 30, reaction: null, auto_disliked: false, blacklisted_at: '2026-04-30T00:00:00Z' },
+                { id: 1, previewed_count: 10, reaction: null, auto_blacklisted: false, blacklisted_at: null },
+                { id: 2, previewed_count: 20, reaction: null, auto_blacklisted: true, blacklisted_at: null },
+                { id: 3, previewed_count: 30, reaction: null, auto_blacklisted: false, blacklisted_at: '2026-04-30T00:00:00Z' },
             ]);
         } finally {
             vi.useRealTimers();
@@ -149,9 +149,9 @@ describe('usePreviewBatch', () => {
                 file_ids: [2, 3],
             });
             await expect(Promise.all([first, second, third])).resolves.toEqual([
-                { id: 1, previewed_count: 10, reaction: null, auto_disliked: false, blacklisted_at: null },
-                { id: 2, previewed_count: 20, reaction: { type: 'dislike' }, auto_disliked: true, blacklisted_at: null },
-                { id: 3, previewed_count: 30, reaction: null, auto_disliked: false, blacklisted_at: '2026-04-30T00:00:00Z' },
+                { id: 1, previewed_count: 10, reaction: null, auto_blacklisted: false, blacklisted_at: null },
+                { id: 2, previewed_count: 20, reaction: null, auto_blacklisted: true, blacklisted_at: null },
+                { id: 3, previewed_count: 30, reaction: null, auto_blacklisted: false, blacklisted_at: '2026-04-30T00:00:00Z' },
             ]);
         } finally {
             vi.useRealTimers();

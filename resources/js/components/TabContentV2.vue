@@ -399,6 +399,9 @@ const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
     onReaction: async (item, type) => {
         itemInteractions.reactions.onFileReaction(item, type);
     },
+    onBlacklist: async (item) => {
+        await itemInteractions.reactions.onFileBlacklist(item);
+    },
 });
 
 async function applyFilters(): Promise<void> { stopActiveVibeAutomation(); hydratedInitialState.value = undefined; await browseActions.applyFilters(); }

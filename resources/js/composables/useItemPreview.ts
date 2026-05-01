@@ -37,16 +37,16 @@ export function useItemPreview(
                 item.previewed_count = response.previewed_count;
                 item.reaction = response.reaction ?? null;
 
-                if (typeof response.auto_disliked === 'boolean') {
-                    item.auto_disliked = response.auto_disliked;
+                if (typeof response.auto_blacklisted === 'boolean') {
+                    item.auto_blacklisted = response.auto_blacklisted;
                 }
 
                 if ('blacklisted_at' in response) {
                     item.blacklisted_at = response.blacklisted_at ?? null;
                 }
 
-                if (item.auto_disliked !== true) {
-                    item.auto_dislike_rule = null;
+                if (item.auto_blacklisted !== true) {
+                    item.auto_blacklist_rule = null;
                 }
 
                 if (item.blacklisted_at === null || item.blacklisted_at === undefined) {

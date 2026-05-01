@@ -4,7 +4,7 @@ type PreviewBatchResult = {
     id: number;
     previewed_count: number;
     reaction?: { type: string } | null;
-    auto_disliked?: boolean;
+    auto_blacklisted?: boolean;
     blacklisted_at?: string | null;
 };
 
@@ -33,7 +33,7 @@ async function executeBatchIncrementPreview(fileIds: number[]): Promise<PreviewB
         id: result.id,
         previewed_count: result.previewed_count,
         reaction: result.reaction ?? null,
-        auto_disliked: result.auto_disliked,
+        auto_blacklisted: result.auto_blacklisted,
         blacklisted_at: result.blacklisted_at ?? null,
     }));
 }

@@ -174,7 +174,7 @@ class ExtensionApiController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:love,like,dislike,funny'],
+            'type' => ['required', 'string', 'in:love,like,funny'],
             'url' => ['required', 'string', 'max:4096'],
             'download_behavior' => ['nullable', 'string', 'in:queue,skip,force'],
             'referrer_url' => ['nullable', 'string', 'max:4096'],
@@ -247,7 +247,7 @@ class ExtensionApiController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:love,like,dislike,funny'],
+            'type' => ['required', 'string', 'in:love,like,funny'],
             'download_behavior' => ['nullable', 'string', 'in:queue,skip,force'],
             'primary_candidate_id' => ['required', 'string', 'max:128'],
             'items' => ['required', 'array', 'min:2', 'max:300'],

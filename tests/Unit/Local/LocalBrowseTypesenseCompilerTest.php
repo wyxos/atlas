@@ -23,7 +23,7 @@ test('compiler builds default browse query', function () {
         'reactionTypes' => null,
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'autoDisliked' => 'any',
+        'autoBlacklisted' => 'any',
     ], 7);
 
     expect($compiled['mode'])->toBe('files')
@@ -47,7 +47,7 @@ test('compiler builds source downloaded file-type and random filters', function 
         'reactionMode' => 'any',
         'reactionTypes' => null,
         'blacklisted' => 'any',
-        'autoDisliked' => 'any',
+        'autoBlacklisted' => 'any',
     ], 7);
 
     expect($compiled['options']['filter_by'])->toContain('source:=`Wallhaven`')
@@ -58,12 +58,12 @@ test('compiler builds source downloaded file-type and random filters', function 
         ->and($compiled['options']['sort_by'])->toBe('_rand(123):desc,sort_id:desc');
 });
 
-test('compiler builds blacklisted and auto disliked filters', function () {
+test('compiler builds blacklisted and Auto blacklisted filters', function () {
     $compiler = app(LocalBrowseTypesenseCompiler::class);
 
     $filter = $compiler->compileFileFilter([
         'blacklisted' => 'yes',
-        'autoDisliked' => 'yes',
+        'autoBlacklisted' => 'yes',
         'reactionMode' => 'any',
         'reactionTypes' => null,
         'fileTypes' => ['all'],
@@ -72,7 +72,7 @@ test('compiler builds blacklisted and auto disliked filters', function () {
 
     expect($filter)->toContain('blacklisted:=true')
         ->and($filter)->toContain('not_found:=false')
-        ->and($filter)->toContain('auto_disliked:=true');
+        ->and($filter)->toContain('auto_blacklisted:=true');
 });
 
 test('compiler builds reacted types and unreacted filters', function () {
@@ -84,16 +84,16 @@ test('compiler builds reacted types and unreacted filters', function () {
         'fileTypes' => ['all'],
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'autoDisliked' => 'any',
+        'autoBlacklisted' => 'any',
     ], 9);
 
     $typed = $compiler->compileFileFilter([
         'reactionMode' => 'types',
-        'reactionTypes' => ['dislike', 'funny'],
+        'reactionTypes' => ['like', 'funny'],
         'fileTypes' => ['all'],
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'autoDisliked' => 'any',
+        'autoBlacklisted' => 'any',
     ], 9);
 
     $unreacted = $compiler->compileFileFilter([
@@ -102,7 +102,7 @@ test('compiler builds reacted types and unreacted filters', function () {
         'fileTypes' => ['all'],
         'downloaded' => 'any',
         'blacklisted' => 'any',
-        'autoDisliked' => 'any',
+        'autoBlacklisted' => 'any',
     ], 9);
 
     expect($reacted)->toContain('love_user_ids:=[9]')
@@ -110,7 +110,7 @@ test('compiler builds reacted types and unreacted filters', function () {
         ->and($reacted)->toContain('like_user_ids:=[9]')
         ->and($reacted)->toContain('funny_user_ids:=[9]')
         ->and($typed)->toContain('not_found:=false')
-        ->and($typed)->toContain('dislike_user_ids:=[9]')
+        ->and($typed)->toContain('like_user_ids:=[9]')
         ->and($typed)->toContain('funny_user_ids:=[9]')
         ->and($unreacted)->toContain('not_found:=false')
         ->and($unreacted)->toContain('reacted_user_ids:!=[9]');
@@ -130,8 +130,8 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'fileTypes' => ['image', 'video'],
         'reactionMode' => 'reacted',
         'reactionTypes' => null,
-        'autoDisliked' => 'no',
-        'allTypes' => ['love', 'like', 'dislike', 'funny'],
+        'autoBlacklisted' => 'no',
+        'allTypes' => ['love', 'like', 'funny'],
     ], 5, 'atlas_local_local_browse_files__v20260331_000000');
 
     $asc = $compiler->compile([
@@ -144,9 +144,9 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'maxPreviewed' => 1,
         'fileTypes' => ['image', 'video'],
         'reactionMode' => 'types',
-        'reactionTypes' => ['dislike'],
-        'autoDisliked' => 'no',
-        'allTypes' => ['love', 'like', 'dislike', 'funny'],
+        'reactionTypes' => ['funny'],
+        'autoBlacklisted' => 'no',
+        'allTypes' => ['love', 'like', 'funny'],
     ], 5, 'atlas_local_local_browse_files__v20260331_000000');
 
     expect($desc['mode'])->toBe('reactions')
@@ -160,8 +160,8 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         ->and($desc['options']['filter_by'])->toContain('blacklisted:=false')
         ->and($desc['options']['filter_by'])->toContain('previewed_count:<=1')
         ->and($desc['options']['filter_by'])->toContain('mime_group:=[`image`, `video`]')
-        ->and($desc['options']['filter_by'])->toContain('auto_disliked:=false')
+        ->and($desc['options']['filter_by'])->toContain('auto_blacklisted:=false')
         ->and($desc['options']['sort_by'])->toBe('created_at:desc,sort_id:desc')
-        ->and($asc['options']['filter_by'])->toContain('type:=[`dislike`]')
+        ->and($asc['options']['filter_by'])->toContain('type:=[`funny`]')
         ->and($asc['options']['sort_by'])->toBe('created_at:asc,sort_id:asc');
 });

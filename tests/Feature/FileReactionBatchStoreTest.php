@@ -23,7 +23,7 @@ test('batch store reactions for multiple files', function () {
     $response = $this->postJson('/api/files/reactions/batch/store', [
         'reactions' => [
             ['file_id' => $files[0]->id, 'type' => 'like'],
-            ['file_id' => $files[1]->id, 'type' => 'dislike'],
+            ['file_id' => $files[1]->id, 'type' => 'funny'],
             ['file_id' => $files[2]->id, 'type' => 'love'],
         ],
     ]);
@@ -42,7 +42,7 @@ test('batch store reactions for multiple files', function () {
     // Verify reactions were created
     expect(Reaction::where('user_id', $this->user->id)->count())->toBe(3);
     expect(Reaction::where('file_id', $files[0]->id)->where('type', 'like')->exists())->toBeTrue();
-    expect(Reaction::where('file_id', $files[1]->id)->where('type', 'dislike')->exists())->toBeTrue();
+    expect(Reaction::where('file_id', $files[1]->id)->where('type', 'funny')->exists())->toBeTrue();
     expect(Reaction::where('file_id', $files[2]->id)->where('type', 'love')->exists())->toBeTrue();
 });
 
@@ -58,7 +58,7 @@ test('batch store removes existing reactions before creating new ones', function
 
     $response = $this->postJson('/api/files/reactions/batch/store', [
         'reactions' => [
-            ['file_id' => $file->id, 'type' => 'dislike'],
+            ['file_id' => $file->id, 'type' => 'funny'],
         ],
     ]);
 
@@ -73,7 +73,7 @@ test('batch store removes existing reactions before creating new ones', function
     $this->assertDatabaseHas('reactions', [
         'file_id' => $file->id,
         'user_id' => $this->user->id,
-        'type' => 'dislike',
+        'type' => 'funny',
     ]);
 });
 
@@ -161,10 +161,10 @@ test('batch store clears blacklist when the same positive reaction is re-applied
     expect($file->blacklisted_at)->toBeNull();
 });
 
-test('batch store removes auto_disliked flag for positive reactions', function () {
+test('batch store removes auto_blacklisted flag for positive reactions', function () {
     Bus::fake();
 
-    $file = File::factory()->create(['auto_disliked' => true]);
+    $file = File::factory()->create(['auto_blacklisted' => true]);
 
     $response = $this->postJson('/api/files/reactions/batch/store', [
         'reactions' => [
@@ -175,7 +175,7 @@ test('batch store removes auto_disliked flag for positive reactions', function (
     $response->assertSuccessful();
 
     $file->refresh();
-    $this->assertFalse($file->auto_disliked);
+    $this->assertFalse($file->auto_blacklisted);
 });
 
 test('batch store validates required fields', function () {

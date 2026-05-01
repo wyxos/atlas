@@ -13,7 +13,6 @@ import {
 export type LoadedItemsBulkAction =
     | 'love'
     | 'like'
-    | 'dislike'
     | 'blacklist';
 
 type BatchBlacklistResponse = {
@@ -153,8 +152,8 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
             item.blacklisted_at = result.blacklisted_at;
             item.blacklist_rule = null;
             item.reaction = null;
-            item.auto_disliked = false;
-            item.auto_dislike_rule = null;
+            item.auto_blacklisted = false;
+            item.auto_blacklist_rule = null;
             item.previewed_count = Math.max(
                 Number(item.previewed_count ?? 0),
                 Number(result.previewed_count ?? 0),

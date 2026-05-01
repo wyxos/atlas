@@ -28,13 +28,13 @@ test('local service hydrates typesense file hits in returned order and uses foun
         'downloaded' => true,
         'downloaded_at' => now()->subDay(),
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     $newer = File::factory()->create([
         'downloaded' => true,
         'downloaded_at' => now()->subHour(),
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
 
     $names = fakeLocalBrowseNames();
@@ -113,12 +113,12 @@ test('local service hydrates reaction timestamp hits from file ids', function ()
     $older = File::factory()->create([
         'downloaded' => true,
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     $newer = File::factory()->create([
         'downloaded' => true,
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
 
     $names = fakeLocalBrowseNames();
@@ -161,7 +161,7 @@ test('local service keeps seeded random sort when using typesense', function () 
     File::factory()->create([
         'downloaded' => true,
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
 
     $names = fakeLocalBrowseNames();

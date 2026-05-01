@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Jobs\DeleteAutoDislikedFileJob;
+use App\Jobs\DeleteStoredFileJob;
 use App\Models\File;
 use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Support\AtlasPathResolver;
@@ -30,7 +30,7 @@ class DownloadedFileClearService
      * @param  iterable<int, File>  $files
      * @return array<int>
      */
-    public function clearMany(iterable $files, bool $queueDelete = false): array
+    public function clearMany(iterable $files, bool $queueDelete = false, bool $syncIndex = true): array
     {
         $files = collect($files)
             ->filter(fn (mixed $file): bool => $file instanceof File)
@@ -65,7 +65,9 @@ class DownloadedFileClearService
         }
 
         $this->clearStateByIds($fileIds);
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds($fileIds);
+        if ($syncIndex) {
+            app(LocalBrowseIndexSyncService::class)->syncFilesByIds($fileIds);
+        }
 
         if ($queueDelete) {
             $this->dispatchDeleteJobs($paths);
@@ -121,7 +123,7 @@ class DownloadedFileClearService
         }
 
         foreach (array_chunk($paths, self::DELETE_JOB_CHUNK_SIZE) as $chunk) {
-            DeleteAutoDislikedFileJob::dispatch(count($chunk) === 1 ? $chunk[0] : $chunk);
+            DeleteStoredFileJob::dispatch(count($chunk) === 1 ? $chunk[0] : $chunk);
         }
     }
 

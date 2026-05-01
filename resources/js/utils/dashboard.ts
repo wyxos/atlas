@@ -10,7 +10,6 @@ import type {
 export const reactionChartConfig = {
     love: { label: 'Favorite', color: '#ef4444' },
     like: { label: 'Like', color: 'var(--color-smart-blue-500)' },
-    dislike: { label: 'Dislike', color: '#6b7280' },
     funny: { label: 'Funny', color: '#eab308' },
     unreacted: { label: 'Unreacted', color: 'var(--color-blue-slate-400)' },
 } satisfies ChartConfig;
@@ -25,7 +24,7 @@ export const overviewChartConfig = {
 
 export const negativeOutcomeChartConfig = {
     blacklisted: { label: 'Blacklisted', color: 'var(--color-danger-300)' },
-    auto_disliked: { label: 'Auto disliked', color: '#6b7280' },
+    auto_blacklisted: { label: 'Auto blacklisted', color: '#6b7280' },
 } satisfies ChartConfig;
 
 export function formatDashboardCount(value: number): string {
@@ -103,18 +102,16 @@ export function createDashboardChartSections(metrics: DashboardMetrics | null): 
             description: 'Files with at least one reaction by type.',
             tooltipLabel: 'Reactions',
             config: reactionChartConfig,
-            seriesKeys: ['love', 'like', 'dislike', 'funny', 'unreacted'],
+            seriesKeys: ['love', 'like', 'funny', 'unreacted'],
             data: [
-                { index: 0, label: 'Favorite', love: files?.reactions.love ?? 0, like: 0, dislike: 0, funny: 0, unreacted: 0 },
-                { index: 1, label: 'Like', love: 0, like: files?.reactions.like ?? 0, dislike: 0, funny: 0, unreacted: 0 },
-                { index: 2, label: 'Dislike', love: 0, like: 0, dislike: files?.reactions.dislike ?? 0, funny: 0, unreacted: 0 },
-                { index: 3, label: 'Funny', love: 0, like: 0, dislike: 0, funny: files?.reactions.funny ?? 0, unreacted: 0 },
+                { index: 0, label: 'Favorite', love: files?.reactions.love ?? 0, like: 0, funny: 0, unreacted: 0 },
+                { index: 1, label: 'Like', love: 0, like: files?.reactions.like ?? 0, funny: 0, unreacted: 0 },
+                { index: 2, label: 'Funny', love: 0, like: 0, funny: files?.reactions.funny ?? 0, unreacted: 0 },
                 {
-                    index: 4,
+                    index: 3,
                     label: 'Unreacted',
                     love: 0,
                     like: 0,
-                    dislike: 0,
                     funny: 0,
                     unreacted: files?.unreacted_not_blacklisted ?? 0,
                 },
@@ -122,7 +119,6 @@ export function createDashboardChartSections(metrics: DashboardMetrics | null): 
             summary: [
                 { label: 'Favorite', value: files?.reactions.love ?? 0, color: reactionChartConfig.love.color },
                 { label: 'Like', value: files?.reactions.like ?? 0, color: reactionChartConfig.like.color },
-                { label: 'Dislike', value: files?.reactions.dislike ?? 0, color: reactionChartConfig.dislike.color },
                 { label: 'Funny', value: files?.reactions.funny ?? 0, color: reactionChartConfig.funny.color },
                 {
                     label: 'Unreacted',
@@ -134,17 +130,17 @@ export function createDashboardChartSections(metrics: DashboardMetrics | null): 
         {
             key: 'negative',
             title: 'Negative outcomes',
-            description: 'Backend blacklists and auto-dislikes.',
+            description: 'Backend blacklists and auto-blacklists.',
             tooltipLabel: 'Negative outcomes',
             config: negativeOutcomeChartConfig,
-            seriesKeys: ['blacklisted', 'auto_disliked'],
+            seriesKeys: ['blacklisted', 'auto_blacklisted'],
             data: [
-                { index: 0, label: 'Blacklisted', blacklisted: files?.blacklisted ?? 0, auto_disliked: 0 },
-                { index: 1, label: 'Auto disliked', blacklisted: 0, auto_disliked: files?.auto_disliked ?? 0 },
+                { index: 0, label: 'Blacklisted', blacklisted: files?.blacklisted ?? 0, auto_blacklisted: 0 },
+                { index: 1, label: 'Auto blacklisted', blacklisted: 0, auto_blacklisted: files?.auto_blacklisted ?? 0 },
             ],
             summary: [
                 { label: 'Blacklisted', value: files?.blacklisted ?? 0, color: negativeOutcomeChartConfig.blacklisted.color },
-                { label: 'Auto disliked', value: files?.auto_disliked ?? 0, color: negativeOutcomeChartConfig.auto_disliked.color },
+                { label: 'Auto blacklisted', value: files?.auto_blacklisted ?? 0, color: negativeOutcomeChartConfig.auto_blacklisted.color },
             ],
         },
     ];

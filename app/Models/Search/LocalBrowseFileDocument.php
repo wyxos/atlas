@@ -33,7 +33,7 @@ class LocalBrowseFileDocument extends File
             ? $this->getRelation('reactions')
             : $this->reactions()->get(['file_id', 'user_id', 'type']);
 
-        [$loveUserIds, $likeUserIds, $dislikeUserIds, $funnyUserIds, $reactedUserIds] = $this->collectReactionUserIds($reactions);
+        [$loveUserIds, $likeUserIds, $funnyUserIds, $reactedUserIds] = $this->collectReactionUserIds($reactions);
 
         return [
             'id' => (string) $this->id,
@@ -47,10 +47,9 @@ class LocalBrowseFileDocument extends File
             'downloaded' => (bool) $this->downloaded,
             'downloaded_at' => $this->timestampOrNull($this->downloaded_at),
             'not_found' => (bool) $this->not_found,
-            'auto_disliked' => (bool) $this->auto_disliked,
+            'auto_blacklisted' => (bool) $this->auto_blacklisted,
             'love_user_ids' => $loveUserIds,
             'like_user_ids' => $likeUserIds,
-            'dislike_user_ids' => $dislikeUserIds,
             'funny_user_ids' => $funnyUserIds,
             'reacted_user_ids' => $reactedUserIds,
             'created_at' => $this->timestampOrZero($this->created_at),
@@ -84,14 +83,13 @@ class LocalBrowseFileDocument extends File
     }
 
     /**
-     * @return array{0: array<int, string>, 1: array<int, string>, 2: array<int, string>, 3: array<int, string>, 4: array<int, string>}
+     * @return array{0: array<int, string>, 1: array<int, string>, 2: array<int, string>, 3: array<int, string>}
      */
     private function collectReactionUserIds(Collection $reactions): array
     {
         $userIdsByType = [
             'love' => [],
             'like' => [],
-            'dislike' => [],
             'funny' => [],
         ];
         $reactedUserIds = [];
@@ -112,7 +110,6 @@ class LocalBrowseFileDocument extends File
         return [
             array_map('strval', array_keys($userIdsByType['love'])),
             array_map('strval', array_keys($userIdsByType['like'])),
-            array_map('strval', array_keys($userIdsByType['dislike'])),
             array_map('strval', array_keys($userIdsByType['funny'])),
             array_map('strval', array_keys($reactedUserIds)),
         ];

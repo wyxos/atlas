@@ -147,7 +147,7 @@ class BrowsePersister
                 && ! $file->previewed_at
                 && ! $file->blacklisted_at
                 && ! $file->not_found
-                && ! $file->auto_disliked;
+                && ! $file->auto_blacklisted;
         })->values()->all();
     }
 

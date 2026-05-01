@@ -10,8 +10,9 @@ uses(RefreshDatabase::class);
 function previewBatchTestFile(array $attributes = []): File
 {
     return File::factory()->create(array_merge([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
+        'source' => 'Booru',
         'downloaded' => false,
         'downloaded_at' => null,
         'path' => null,
@@ -34,63 +35,61 @@ test('batch increments preview counts and returns moderation state', function ()
         ->assertJsonStructure([
             'message',
             'results' => [
-                '*' => ['id', 'previewed_count', 'reaction', 'auto_disliked', 'blacklisted_at'],
+                '*' => ['id', 'previewed_count', 'reaction', 'auto_blacklisted', 'blacklisted_at'],
             ],
         ]);
 
     $results = collect($response->json('results'))->keyBy('id');
 
     expect($file1->fresh()->previewed_count)->toBe(1)
-        ->and($file1->fresh()->auto_disliked)->toBeFalse()
+        ->and($file1->fresh()->auto_blacklisted)->toBeFalse()
         ->and($results[$file1->id]['reaction'])->toBeNull()
         ->and($file2->fresh()->previewed_count)->toBe(2)
-        ->and($file2->fresh()->auto_disliked)->toBeTrue()
-        ->and($results[$file2->id]['reaction'])->toBe(['type' => 'dislike'])
+        ->and($file2->fresh()->auto_blacklisted)->toBeTrue()
+        ->and($file2->fresh()->blacklisted_at)->not->toBeNull()
+        ->and($results[$file2->id]['reaction'])->toBeNull()
         ->and($file3->fresh()->previewed_count)->toBe(3)
-        ->and($file3->fresh()->auto_disliked)->toBeTrue()
-        ->and($results[$file3->id]['reaction'])->toBe(['type' => 'dislike']);
+        ->and($file3->fresh()->auto_blacklisted)->toBeTrue()
+        ->and($file3->fresh()->blacklisted_at)->not->toBeNull()
+        ->and($results[$file3->id]['reaction'])->toBeNull();
 });
 
-test('batch preview blacklists manual disliked auto disliked and already blacklisted items', function () {
+test('batch preview moves blacklisted items beyond blacklist review threshold', function () {
     $admin = User::factory()->admin()->create();
-    $manualDisliked = previewBatchTestFile(['previewed_count' => 1]);
-    $autoDisliked = previewBatchTestFile([
+    $manualBlacklisted = previewBatchTestFile([
+        'previewed_count' => 1,
+        'blacklisted_at' => now()->subHour(),
+    ]);
+    $autoBlacklisted = previewBatchTestFile([
         'previewed_count' => 0,
-        'auto_disliked' => true,
+        'auto_blacklisted' => true,
+        'blacklisted_at' => now()->subHour(),
     ]);
     $alreadyBlacklisted = previewBatchTestFile([
         'previewed_count' => 1,
         'blacklisted_at' => now()->subHour(),
     ]);
-    Reaction::create([
-        'file_id' => $manualDisliked->id,
-        'user_id' => $admin->id,
-        'type' => 'dislike',
-    ]);
-    Reaction::create([
-        'file_id' => $autoDisliked->id,
-        'user_id' => $admin->id,
-        'type' => 'dislike',
-    ]);
 
     $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
-        'file_ids' => [$manualDisliked->id, $autoDisliked->id, $alreadyBlacklisted->id],
+        'file_ids' => [$manualBlacklisted->id, $autoBlacklisted->id, $alreadyBlacklisted->id],
     ]);
 
     $response->assertSuccessful();
     $results = collect($response->json('results'))->keyBy('id');
 
-    foreach ([$manualDisliked, $autoDisliked, $alreadyBlacklisted] as $file) {
+    foreach ([$manualBlacklisted, $autoBlacklisted, $alreadyBlacklisted] as $file) {
         $file->refresh();
 
         expect($file->previewed_count)->toBe(99999)
             ->and($file->blacklisted_at)->not->toBeNull()
-            ->and($file->auto_disliked)->toBeFalse()
             ->and($results[$file->id]['reaction'])->toBeNull()
             ->and($results[$file->id]['blacklisted_at'])->not->toBeNull();
     }
 
-    expect(Reaction::whereIn('file_id', [$manualDisliked->id, $autoDisliked->id, $alreadyBlacklisted->id])->count())->toBe(0);
+    expect($manualBlacklisted->fresh()->auto_blacklisted)->toBeFalse()
+        ->and($autoBlacklisted->fresh()->auto_blacklisted)->toBeTrue()
+        ->and($alreadyBlacklisted->fresh()->auto_blacklisted)->toBeFalse()
+        ->and(Reaction::whereIn('file_id', [$manualBlacklisted->id, $autoBlacklisted->id, $alreadyBlacklisted->id])->count())->toBe(0);
 });
 
 test('batch increment preserves positive reactions without preview moderation', function () {
@@ -109,13 +108,13 @@ test('batch increment preserves positive reactions without preview moderation', 
     $response->assertSuccessful()
         ->assertJsonPath('results.0.previewed_count', 3)
         ->assertJsonPath('results.0.reaction.type', 'love')
-        ->assertJsonPath('results.0.auto_disliked', false)
+        ->assertJsonPath('results.0.auto_blacklisted', false)
         ->assertJsonPath('results.0.blacklisted_at', null);
 
     $file->refresh();
     expect($file->previewed_count)->toBe(3)
         ->and($file->blacklisted_at)->toBeNull()
-        ->and($file->auto_disliked)->toBeFalse();
+        ->and($file->auto_blacklisted)->toBeFalse();
 });
 
 test('batch increments preview count by a custom amount', function () {
@@ -131,9 +130,9 @@ test('batch increments preview count by a custom amount', function () {
     $response->assertSuccessful();
 
     expect($file1->fresh()->previewed_count)->toBe(4)
-        ->and($file1->fresh()->auto_disliked)->toBeTrue()
+        ->and($file1->fresh()->auto_blacklisted)->toBeTrue()
         ->and($file2->fresh()->previewed_count)->toBe(6)
-        ->and($file2->fresh()->auto_disliked)->toBeTrue();
+        ->and($file2->fresh()->auto_blacklisted)->toBeTrue();
 });
 
 test('batch validates file_ids array', function () {

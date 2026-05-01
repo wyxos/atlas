@@ -44,8 +44,8 @@ export interface File {
     previewed_count: number;
     seen_at: string | null;
     seen_count: number;
-    auto_disliked: boolean;
-    auto_dislike_rule?: { id: number; name: string } | null;
+    auto_blacklisted: boolean;
+    auto_blacklist_rule?: { id: number; name: string } | null;
     blacklisted_at: string | null;
     blacklist_rule?: { id: number; name: string } | null;
     downloaded: boolean;

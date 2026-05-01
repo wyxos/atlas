@@ -37,7 +37,7 @@ class BrowseController extends Controller
             'total' => $payload['meta']['total'] ?? null,
             'services' => $payload['services'] ?? [], // Return available services
             'moderation' => $payload['moderation'] ?? [ // Include moderation data
-                'toDislike' => [],
+                'toBlacklist' => [],
                 'moderatedOut' => [],
             ],
         ], headers: self::NO_STORE_HEADERS);
@@ -96,15 +96,15 @@ class BrowseController extends Controller
                         'file_type' => ['all'],
                         // Reaction filtering:
                         // - any: ignore reactions entirely (show all files)
-                        // - reacted: positive reactions (love/like/funny), excludes dislikes
+                        // - reacted: positive reactions (love/like/funny)
                         // - unreacted: files you have not reacted to
                         // - types: only selected reaction types
                         'reaction_mode' => 'any',
-                        'reaction' => ['love', 'like', 'dislike', 'funny'],
+                        'reaction' => ['love', 'like', 'funny'],
                         // Tri-state selects.
                         'downloaded' => 'any',
                         'blacklisted' => 'any',
-                        'auto_disliked' => 'any',
+                        'auto_blacklisted' => 'any',
                         'sort' => 'downloaded_at',
                         'seed' => null,
                         'max_previewed_count' => null,
@@ -156,10 +156,9 @@ class BrowseController extends Controller
                             'options' => [
                                 ['label' => 'Favorite', 'value' => 'love'],
                                 ['label' => 'Like', 'value' => 'like'],
-                                ['label' => 'Dislike', 'value' => 'dislike'],
                                 ['label' => 'Funny', 'value' => 'funny'],
                             ],
-                            'default' => ['love', 'like', 'dislike', 'funny'],
+                            'default' => ['love', 'like', 'funny'],
                         ]),
                         $localSchema->field('downloaded', [
                             'type' => 'radio',
@@ -181,9 +180,9 @@ class BrowseController extends Controller
                             ],
                             'default' => 'any',
                         ]),
-                        $localSchema->field('auto_disliked', [
+                        $localSchema->field('auto_blacklisted', [
                             'type' => 'radio',
-                            'description' => 'Whether the file was auto-disliked.',
+                            'description' => 'Whether the file was auto-blacklisted.',
                             'options' => [
                                 ['label' => 'Any', 'value' => 'any'],
                                 ['label' => 'Yes', 'value' => 'yes'],

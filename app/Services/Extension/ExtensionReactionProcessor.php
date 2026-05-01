@@ -405,7 +405,7 @@ class ExtensionReactionProcessor
 
     private function shouldQueueExtensionDownload(string $reactionType, string $downloadBehavior): bool
     {
-        return $reactionType !== 'dislike' && $downloadBehavior !== 'skip';
+        return $downloadBehavior !== 'skip';
     }
 
     private function shouldForceExtensionDownload(string $downloadBehavior): bool

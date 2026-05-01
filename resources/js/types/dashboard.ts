@@ -19,11 +19,10 @@ export type DashboardMetrics = {
         reactions: {
             love: number;
             like: number;
-            dislike: number;
             funny: number;
         };
         blacklisted: number;
-        auto_disliked: number;
+        auto_blacklisted: number;
         not_found: number;
         unreacted_not_blacklisted: number;
     };

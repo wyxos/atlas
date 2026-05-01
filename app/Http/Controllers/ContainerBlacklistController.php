@@ -11,8 +11,6 @@ use Illuminate\Http\Request;
 
 class ContainerBlacklistController extends Controller
 {
-    private const DISLIKE_REACTION_TYPES = ['dislike'];
-
     private const POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
 
     /**
@@ -37,7 +35,7 @@ class ContainerBlacklistController extends Controller
     {
         $validated = $request->validate([
             'container_id' => ['required', 'integer', 'exists:containers,id'],
-            'action_type' => ['required', 'string', 'in:dislike,blacklist'],
+            'action_type' => ['required', 'string', 'in:blacklist'],
         ]);
 
         $container = Container::findOrFail($validated['container_id']);
@@ -82,9 +80,6 @@ class ContainerBlacklistController extends Controller
                 ->where('files.not_found', false)
                 ->whereDoesntHave('reactions', fn ($reactionQuery) => $reactionQuery->where('user_id', $userId)),
             'files as blacklisted_files_count' => fn ($query) => $query->whereNotNull('files.blacklisted_at'),
-            'files as disliked_files_count' => fn ($query) => $query->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
-                ->where('user_id', $userId)
-                ->whereIn('type', self::DISLIKE_REACTION_TYPES)),
             'files as positive_files_count' => fn ($query) => $query->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
                 ->where('user_id', $userId)
                 ->whereIn('type', self::POSITIVE_REACTION_TYPES)),
@@ -97,7 +92,6 @@ class ContainerBlacklistController extends Controller
             'file_stats' => [
                 'unreacted' => (int) ($container->unreacted_files_count ?? 0),
                 'blacklisted' => (int) ($container->blacklisted_files_count ?? 0),
-                'disliked' => (int) ($container->disliked_files_count ?? 0),
                 'positive' => (int) ($container->positive_files_count ?? 0),
             ],
         ]);

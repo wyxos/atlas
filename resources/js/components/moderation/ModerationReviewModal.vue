@@ -48,7 +48,7 @@ function handleFileReaction(fileId: number, type: ReactionType): void {
 const filesByAction = computed(() => {
     const grouped: Record<string, ModeratedFile[]> = {};
     for (const file of props.files) {
-        const action = file.action_type || 'dislike';
+        const action = file.action_type || 'blacklist';
         if (!grouped[action]) {
             grouped[action] = [];
         }
@@ -60,7 +60,6 @@ const filesByAction = computed(() => {
 // Format action type for display
 function formatActionType(actionType: string): string {
     const labels: Record<string, string> = {
-        dislike: 'Disliked',
         blacklist: 'Blacklisted',
     };
     return labels[actionType] || actionType.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());

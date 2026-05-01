@@ -4,7 +4,6 @@ import { Shield, Plus, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -72,7 +71,7 @@ function defaultRuleForm(): ModerationRuleForm {
         name: '',
         active: true,
         nsfw: false,
-        action_type: 'dislike',
+        action_type: 'blacklist',
         op: 'any',
         terms: [],
         min: null,
@@ -87,7 +86,7 @@ function ruleToForm(rule: ModerationRule): ModerationRuleForm {
         name: rule.name ?? '',
         active: rule.active,
         nsfw: rule.nsfw,
-        action_type: rule.action_type ?? 'dislike',
+        action_type: 'blacklist',
         op: rule.op,
         terms: rule.terms ?? [],
         min: rule.min,
@@ -292,33 +291,9 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                     </label>
                                 </div>
 
-                                <!-- Action Type -->
-                                <div class="space-y-2">
-                                    <label class="text-sm font-medium text-regal-navy-100">Action Type</label>
-                                    <Select v-model="ruleForm.action_type">
-                                        <SelectTrigger
-                                            class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="dislike">
-                                                Dislike
-                                            </SelectItem>
-                                            <SelectItem value="blacklist">
-                                                Blacklist
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <p class="text-xs text-twilight-indigo-400">
-                                        <span v-if="ruleForm.action_type === 'dislike'">
-                                            Files matching this rule will be auto-disliked during browse.
-                                        </span>
-                                        <span v-else>
-                                            Files matching this rule will be blacklisted during browse and removed from
-                                            results.
-                                        </span>
-                                    </p>
-                                </div>
+                                <p class="rounded-lg border border-danger-500/30 bg-danger-500/10 p-3 text-xs text-danger-100">
+                                    Files matching this rule will be blacklisted during browse and removed from results.
+                                </p>
 
                                 <!-- Rule Editor -->
                                 <div class="pt-4 border-t border-twilight-indigo-500/30">

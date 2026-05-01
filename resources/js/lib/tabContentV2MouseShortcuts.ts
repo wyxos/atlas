@@ -6,6 +6,7 @@ type BrowseV2MouseShortcutOptions = {
     getItemFromTarget: (target: EventTarget | null) => FeedItem | null;
     getSurfaceMode: () => 'fullscreen' | 'list';
     onReaction: (item: FeedItem, type: ReactionType) => void | Promise<void>;
+    onBlacklist: (item: FeedItem) => void | Promise<void>;
 };
 
 export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortcutOptions) {
@@ -77,7 +78,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
 
         event.preventDefault();
         event.stopPropagation();
-        void options.onReaction(item, 'dislike');
+        void options.onBlacklist(item);
     }
 
     function handleMouseDownCapture(event: MouseEvent): void {

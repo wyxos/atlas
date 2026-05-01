@@ -17,7 +17,7 @@ class LocalFetchParams
      *   seed: ?int,
      *   maxPreviewed: ?int,
      *   reactionMode: string,
-     *   autoDisliked: string,
+     *   autoBlacklisted: string,
      *   reactionTypes: ?array<int, string>,
      *   includeTotal: bool,
      *   allTypes: array<int, string>,
@@ -45,11 +45,11 @@ class LocalFetchParams
         }
 
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
-        $autoDisliked = is_string($params['auto_disliked'] ?? null) ? (string) $params['auto_disliked'] : 'any';
+        $autoBlacklisted = is_string($params['auto_blacklisted'] ?? null) ? (string) $params['auto_blacklisted'] : 'any';
         $reaction = $params['reaction'] ?? null;
         $includeTotal = filter_var($params['include_total'] ?? null, FILTER_VALIDATE_BOOLEAN);
 
-        $allTypes = ['love', 'like', 'dislike', 'funny'];
+        $allTypes = ['love', 'like', 'funny'];
         $reactionTypes = self::normalizeReactionTypes($reaction, $allTypes);
 
         if ($reactionMode === 'types' && ($reactionTypes === null || count($reactionTypes) === 0)) {
@@ -65,7 +65,7 @@ class LocalFetchParams
                 'seed' => $seed,
                 'maxPreviewed' => $maxPreviewed,
                 'reactionMode' => $reactionMode,
-                'autoDisliked' => $autoDisliked,
+                'autoBlacklisted' => $autoBlacklisted,
                 'reactionTypes' => $reactionTypes,
                 'includeTotal' => $includeTotal,
                 'allTypes' => $allTypes,
@@ -90,7 +90,7 @@ class LocalFetchParams
             'seed' => $seed,
             'maxPreviewed' => $maxPreviewed,
             'reactionMode' => $reactionMode,
-            'autoDisliked' => $autoDisliked,
+            'autoBlacklisted' => $autoBlacklisted,
             'reactionTypes' => $reactionTypes,
             'includeTotal' => $includeTotal,
             'allTypes' => $allTypes,

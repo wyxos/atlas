@@ -13,7 +13,7 @@ test('file show includes persisted rule for rule-blacklisted files without black
 
     $file = File::factory()->create([
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'path' => null,
     ]);
 

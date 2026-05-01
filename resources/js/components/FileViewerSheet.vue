@@ -243,15 +243,15 @@ const emit = defineEmits<{
                         <div class="font-semibold text-white mb-1">Seen</div>
                         <div>{{ fileData.seen_count }} times</div>
                     </div>
-                    <div v-if="fileData.auto_disliked || fileData.auto_dislike_rule" class="space-y-2">
-                        <div class="font-semibold text-white mb-1">Auto Dislike</div>
+                    <div v-if="fileData.auto_blacklisted || fileData.auto_blacklist_rule" class="space-y-2">
+                        <div class="font-semibold text-white mb-1">Auto Blacklist</div>
                         <div class="uppercase tracking-wide text-xs text-twilight-indigo-100">
-                            {{ fileData.auto_disliked ? 'applied' : 'flagged' }}
+                            {{ fileData.auto_blacklisted ? 'applied' : 'flagged' }}
                         </div>
-                        <div v-if="fileData.auto_dislike_rule">
+                        <div v-if="fileData.auto_blacklist_rule">
                             <div class="font-semibold text-white mb-1">Moderation Rule (Flagged)</div>
                             <div class="wrap-break-word">
-                                #{{ fileData.auto_dislike_rule.id }} {{ fileData.auto_dislike_rule.name }}
+                                #{{ fileData.auto_blacklist_rule.id }} {{ fileData.auto_blacklist_rule.name }}
                             </div>
                         </div>
                     </div>
@@ -298,7 +298,7 @@ const emit = defineEmits<{
                                         {{ container.referrer }}
                                     </a>
                                 </div>
-                                <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
                                     <div class="rounded bg-prussian-blue-700/60 p-2">
                                         <div class="font-semibold text-white">Unreacted</div>
                                         <div>{{ container.file_stats.unreacted }}</div>
@@ -306,10 +306,6 @@ const emit = defineEmits<{
                                     <div class="rounded bg-prussian-blue-700/60 p-2">
                                         <div class="font-semibold text-white">Blacklisted</div>
                                         <div>{{ container.file_stats.blacklisted }}</div>
-                                    </div>
-                                    <div class="rounded bg-prussian-blue-700/60 p-2">
-                                        <div class="font-semibold text-white">Disliked</div>
-                                        <div>{{ container.file_stats.disliked }}</div>
                                     </div>
                                     <div class="rounded bg-prussian-blue-700/60 p-2">
                                         <div class="font-semibold text-white">Positive</div>

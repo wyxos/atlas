@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('files', function (Blueprint $table) {
-            $table->boolean('auto_disliked')->default(false)->after('seen_count');
+            $table->boolean('auto_blacklisted')->default(false)->after('seen_count');
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('files', function (Blueprint $table) {
-            $table->dropColumn('auto_disliked');
+            $table->dropColumn('auto_blacklisted');
         });
     }
 };

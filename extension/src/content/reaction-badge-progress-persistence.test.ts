@@ -12,7 +12,7 @@ const progressListeners = new Set<(event: {
     referrerUrl: string | null;
     status: string | null;
     percent: number | null;
-    reaction: 'love' | 'like' | 'dislike' | 'funny' | null;
+    reaction: 'love' | 'like' | 'funny' | null;
     reactedAt?: string | null;
     downloadedAt?: string | null;
     blacklistedAt?: string | null;

@@ -41,7 +41,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         previewed_count: 0,
         seen_at: null,
         seen_count: 0,
-        auto_disliked: false,
+        auto_blacklisted: false,
         blacklisted_at: null,
         downloaded: true,
         downloaded_at: null,
@@ -109,7 +109,6 @@ describe('FileViewerSheet', () => {
                             file_stats: {
                                 unreacted: 12,
                                 blacklisted: 9,
-                                disliked: 3,
                                 positive: 4,
                             },
                         },
@@ -130,8 +129,6 @@ describe('FileViewerSheet', () => {
         expect(text).toContain('12');
         expect(text).toContain('Blacklisted');
         expect(text).toContain('9');
-        expect(text).toContain('Disliked');
-        expect(text).toContain('3');
         expect(text).toContain('Positive');
         expect(text).toContain('4');
     });

@@ -17,18 +17,18 @@ test('authenticated user can create container blacklist', function () {
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
     expect($data['id'])->toBe($container->id);
-    expect($data['action_type'])->toBe('dislike');
+    expect($data['action_type'])->toBe('blacklist');
     expect($data['blacklisted_at'])->not->toBeNull();
 
     $this->assertDatabaseHas('containers', [
         'id' => $container->id,
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $container->refresh();
@@ -84,7 +84,7 @@ test('validates container_id is required', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $response->assertStatus(422);
@@ -96,7 +96,7 @@ test('validates container_id exists', function () {
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => 99999,
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $response->assertStatus(422);
@@ -138,7 +138,7 @@ test('rejects non-blacklistable container types', function () {
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $response->assertStatus(422);
@@ -152,7 +152,7 @@ test('updates existing container blacklist', function () {
     $container = Container::factory()->create([
         'type' => 'User',
         'source' => 'CivitAI',
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
         'blacklisted_at' => now()->subDays(1),
     ]);
 
@@ -172,7 +172,7 @@ test('guest cannot create container blacklist', function () {
 
     $response = $this->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $response->assertUnauthorized();

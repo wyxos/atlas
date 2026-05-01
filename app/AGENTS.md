@@ -80,7 +80,7 @@ php artisan test --filter=FeatureName
 - **Services**: `{Purpose}Service.php` (e.g., `BrowseModerationService.php`)
 - **Form Requests**: `{Action}{Resource}Request.php` (e.g., `StoreTabRequest.php`)
 - **Policies**: `{Model}Policy.php` (e.g., `FilePolicy.php`)
-- **Jobs**: `{Action}{Resource}Job.php` (e.g., `DeleteAutoDislikedFileJob.php`)
+- **Jobs**: `{Action}{Resource}Job.php` (e.g., `DeleteStoredFileJob.php`)
 
 ### Laravel 12 Specifics
 

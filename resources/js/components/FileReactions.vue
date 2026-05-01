@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Ban, Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
+import { Ban, Heart, ThumbsUp, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
 import type { ReactionType } from '@/types/reaction';
 
 interface Props {
@@ -13,7 +13,6 @@ interface Props {
     totalItems?: number;
     variant?: 'default' | 'small';
     mode?: 'default' | 'reaction-only';
-    hideDislike?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -26,7 +25,6 @@ const props = withDefaults(defineProps<Props>(), {
     totalItems: undefined,
     variant: 'default',
     mode: 'default',
-    hideDislike: false,
 });
 
 const emit = defineEmits<{
@@ -37,7 +35,6 @@ const emit = defineEmits<{
 // Computed properties for each reaction type
 const favorite = computed(() => props.reaction?.type === 'love');
 const like = computed(() => props.reaction?.type === 'like');
-const dislike = computed(() => props.reaction?.type === 'dislike');
 const funny = computed(() => props.reaction?.type === 'funny');
 const blacklisted = computed(() => Boolean(props.blacklistedAt));
 
@@ -57,10 +54,6 @@ function handleFavoriteClick(): void {
 
 function handleLikeClick(): void {
     handleReactionClick('like');
-}
-
-function handleDislikeClick(): void {
-    handleReactionClick('dislike');
 }
 
 function handleFunnyClick(): void {
@@ -122,18 +115,9 @@ const indexDisplay = computed(() => {
                 <ThumbsUp :size="18" />
             </button>
 
-            <!-- Dislike -->
-            <button v-if="!hideDislike && !isReactionOnly" @click="handleDislikeClick" :class="[
-                'rounded transition-colors',
-                isSmall ? 'p-1' : 'p-2',
-                dislike ? 'bg-gray-500 text-white' : 'text-white hover:text-gray-400'
-            ]" aria-label="Dislike">
-                <ThumbsDown :size="18" />
-            </button>
-
             <!-- Blacklist -->
             <button
-                v-if="!hideDislike && !isReactionOnly"
+                v-if="!isReactionOnly"
                 @click="handleBlacklistClick"
                 :disabled="blacklisted"
                 :aria-pressed="blacklisted"

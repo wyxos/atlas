@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('moderation_rules', function (Blueprint $table) {
-            $table->string('action_type')->default('ui_countdown')->after('nsfw');
+            $table->string('action_type')->default('blacklist')->after('nsfw');
         });
     }
 

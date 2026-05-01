@@ -6,7 +6,5 @@ namespace App\Enums;
 
 final class ActionType
 {
-    public const DISLIKE = 'dislike';
-
     public const BLACKLIST = 'blacklist';
 }

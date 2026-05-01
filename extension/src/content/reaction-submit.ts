@@ -50,7 +50,7 @@ type SubmitBadgeReactionOptions = {
 };
 
 function parseReactionType(value: unknown): BadgeReactionType | null {
-    if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
+    if (value === 'love' || value === 'like' || value === 'funny') {
         return value;
     }
 
@@ -493,8 +493,7 @@ export async function submitBadgeReaction(
         const downloadRequested = downloadPayload.requested === true;
         // Keep both checks while older Atlas deployments may omit the aggregated
         // batch.download_requested flag and only report queueing per item.
-        const shouldCloseTabAfterQueue = reactionType === 'dislike'
-            || downloadRequested
+        const shouldCloseTabAfterQueue = downloadRequested
             || batchDownloadRequested(payload)
             || batchQueuedDownloadRequested(payload);
         const downloadTransferId = numberOrNull(downloadPayload.transfer_id);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Ban, ChevronsDown, Heart, ListPlus, Loader2, LockKeyhole, LockKeyholeOpen, Pause, Play, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next'
+import { Ban, ChevronsDown, Heart, ListPlus, Loader2, LockKeyhole, LockKeyholeOpen, Pause, Play, ThumbsUp, X } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
 import type { LoadedItemsBulkAction } from '@/composables/useTabContentItemInteractions'
@@ -28,14 +28,6 @@ const bulkActionButtons: Array<{
     icon: Heart,
     label: 'Love all',
     title: 'Run the ALT + middle click reaction on all loaded items',
-  },
-  {
-    action: 'dislike',
-    color: 'danger',
-    dataTest: 'loaded-items-dislike-button',
-    icon: ThumbsDown,
-    label: 'Dislike all',
-    title: 'Run the ALT + right click reaction on all loaded items',
   },
   {
     action: 'blacklist',

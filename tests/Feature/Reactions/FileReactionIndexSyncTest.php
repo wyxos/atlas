@@ -15,7 +15,7 @@ it('syncs browse file and reaction projections when a reaction is added', functi
     $file = File::factory()->create([
         'downloaded' => true,
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
 
     $this->actingAs($user);
@@ -38,7 +38,7 @@ it('syncs browse file and reaction projections when a reaction is removed', func
     $file = File::factory()->create([
         'downloaded' => true,
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
 
     $this->actingAs($user);

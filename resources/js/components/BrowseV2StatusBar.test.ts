@@ -70,12 +70,6 @@ vi.mock('lucide-vue-next', () => ({
             return h('div', { 'data-testid': 'plus-icon' });
         },
     }),
-    ThumbsDown: defineComponent({
-        name: 'MockThumbsDownIcon',
-        render() {
-            return h('div', { 'data-testid': 'thumbs-down-icon' });
-        },
-    }),
     ThumbsUp: defineComponent({
         name: 'MockThumbsUpIcon',
         render() {
@@ -472,7 +466,6 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-test="page-loading-lock-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="loaded-items-like-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="loaded-items-love-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-dislike-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').exists()).toBe(true);
         expect(wrapper.text()).not.toContain('Like all');
         expect(wrapper.text()).not.toContain('Lock paging');
@@ -526,14 +519,12 @@ describe('BrowseV2StatusBar', () => {
 
         await wrapper.get('[data-test="loaded-items-like-button"]').trigger('click');
         await wrapper.get('[data-test="loaded-items-love-button"]').trigger('click');
-        await wrapper.get('[data-test="loaded-items-dislike-button"]').trigger('click');
         await wrapper.get('[data-test="loaded-items-blacklist-button"]').trigger('click');
         await wrapper.get('[data-test="page-loading-lock-button"]').trigger('click');
 
         expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(1, 'like');
         expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(2, 'love');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(3, 'dislike');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(4, 'blacklist');
+        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(3, 'blacklist');
         expect(togglePageLoadingLock).toHaveBeenCalledTimes(1);
     });
 

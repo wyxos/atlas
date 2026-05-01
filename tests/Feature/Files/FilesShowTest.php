@@ -78,7 +78,7 @@ test('file show includes container state and stats for the current user', functi
     $notFoundFile = File::factory()->create([
         'not_found' => true,
     ]);
-    $dislikedFile = File::factory()->create();
+    $funnyFile = File::factory()->create();
     $positiveFile = File::factory()->create();
 
     $container->files()->attach([
@@ -86,14 +86,14 @@ test('file show includes container state and stats for the current user', functi
         $unreactedFile->id,
         $blacklistedFile->id,
         $notFoundFile->id,
-        $dislikedFile->id,
+        $funnyFile->id,
         $positiveFile->id,
     ]);
 
     Reaction::create([
-        'file_id' => $dislikedFile->id,
+        'file_id' => $funnyFile->id,
         'user_id' => $user->id,
-        'type' => 'dislike',
+        'type' => 'funny',
     ]);
 
     Reaction::create([
@@ -114,6 +114,5 @@ test('file show includes container state and stats for the current user', functi
     $response->assertJsonPath('file.containers.0.action_type', 'blacklist');
     $response->assertJsonPath('file.containers.0.file_stats.unreacted', 2);
     $response->assertJsonPath('file.containers.0.file_stats.blacklisted', 1);
-    $response->assertJsonPath('file.containers.0.file_stats.disliked', 1);
-    $response->assertJsonPath('file.containers.0.file_stats.positive', 1);
+    $response->assertJsonPath('file.containers.0.file_stats.positive', 2);
 });

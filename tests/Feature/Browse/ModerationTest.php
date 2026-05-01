@@ -18,18 +18,17 @@ beforeEach(function () {
     $this->service = app(FileModerationService::class);
 });
 
-test('files with matching prompts are immediately auto disliked', function () {
-    // Create an active moderation rule with DISLIKE action type
+test('files with matching prompts are immediately Auto blacklisted', function () {
     $rule = ModerationRule::factory()->any(['spam', 'advertisement'])->create([
         'name' => 'Block spam',
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create files with prompts
     $file1 = File::factory()->create([
         'referrer_url' => 'https://example.com/file1.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'path' => 'test/path1.jpg',
     ]);
     FileMetadata::factory()->create([
@@ -40,7 +39,7 @@ test('files with matching prompts are immediately auto disliked', function () {
 
     $file2 = File::factory()->create([
         'referrer_url' => 'https://example.com/file2.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file2->id,
@@ -55,24 +54,21 @@ test('files with matching prompts are immediately auto disliked', function () {
         ->and($result['processedIds'])->toContain($file1->id)
         ->and($result['processedIds'])->not->toContain($file2->id);
 
-    expect($file1->fresh()->auto_disliked)->toBeTrue();
-    $this->assertDatabaseHas('reactions', [
-        'file_id' => $file1->id,
-        'user_id' => $this->user->id,
-        'type' => 'dislike',
-    ]);
+    expect($file1->fresh()->auto_blacklisted)->toBeTrue();
+    expect($file1->fresh()->blacklisted_at)->not->toBeNull();
+    expect(Reaction::where('file_id', $file1->id)->exists())->toBeFalse();
 });
 
-test('persist the moderation rule that flagged a file for auto-dislike', function () {
+test('persist the moderation rule that flagged a file for auto-blacklist', function () {
     $rule = ModerationRule::factory()->any(['spam', 'advertisement'])->create([
         'name' => 'Block spam',
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file-rule-hit.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file->id,
@@ -86,7 +82,7 @@ test('persist the moderation rule that flagged a file for auto-dislike', functio
 
     $this->assertDatabaseHas('file_moderation_actions', [
         'file_id' => $file->id,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
         'moderation_rule_id' => $rule->id,
         'moderation_rule_name' => $rule->name,
     ]);
@@ -94,9 +90,9 @@ test('persist the moderation rule that flagged a file for auto-dislike', functio
     $response = $this->actingAs($this->user)->getJson("/api/files/{$file->id}");
     $response
         ->assertOk()
-        ->assertJsonPath('file.auto_disliked', true)
-        ->assertJsonPath('file.auto_dislike_rule.id', $rule->id)
-        ->assertJsonPath('file.auto_dislike_rule.name', $rule->name);
+        ->assertJsonPath('file.auto_blacklisted', true)
+        ->assertJsonPath('file.auto_blacklist_rule.id', $rule->id)
+        ->assertJsonPath('file.auto_blacklist_rule.name', $rule->name);
 });
 
 test('files without matching prompts are not flagged', function () {
@@ -108,7 +104,7 @@ test('files without matching prompts are not flagged', function () {
     // Create file with non-matching prompt
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file->id,
@@ -122,8 +118,8 @@ test('files without matching prompts are not flagged', function () {
     // Assert file is not flagged
     expect($result['flaggedIds'])->toBeEmpty();
 
-    // Assert file is not auto-disliked
-    expect($file->fresh()->auto_disliked)->toBeFalse();
+    // Assert file is not auto-blacklisted
+    expect($file->fresh()->auto_blacklisted)->toBeFalse();
 });
 
 test('inactive rules are ignored', function () {
@@ -135,7 +131,7 @@ test('inactive rules are ignored', function () {
     // Create file with matching prompt
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file->id,
@@ -151,22 +147,21 @@ test('inactive rules are ignored', function () {
 });
 
 test('multiple active rules are checked', function () {
-    // Create multiple active rules with DISLIKE action type
     $rule1 = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
     $rule2 = ModerationRule::factory()->any(['advertisement'])->create([
         'name' => 'Ad rule',
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create file matching first rule
     $file1 = File::factory()->create([
         'referrer_url' => 'https://example.com/file1.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'path' => 'test/path1.jpg',
     ]);
     FileMetadata::factory()->create([
@@ -178,7 +173,7 @@ test('multiple active rules are checked', function () {
     // Create file matching second rule
     $file2 = File::factory()->create([
         'referrer_url' => 'https://example.com/file2.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'path' => 'test/path2.jpg',
     ]);
     FileMetadata::factory()->create([
@@ -193,21 +188,22 @@ test('multiple active rules are checked', function () {
     expect($result['flaggedIds'])->toBeEmpty()
         ->and($result['processedIds'])->toContain($file1->id)
         ->and($result['processedIds'])->toContain($file2->id);
-    expect($file1->fresh()->auto_disliked)->toBeTrue();
-    expect($file2->fresh()->auto_disliked)->toBeTrue();
+    expect($file1->fresh()->auto_blacklisted)->toBeTrue();
+    expect($file2->fresh()->auto_blacklisted)->toBeTrue();
 });
 
-test('files already auto-disliked are skipped', function () {
+test('files already blacklisted are skipped', function () {
     // Create an active moderation rule
     ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
     ]);
 
-    // Create file already auto-disliked
+    // Create file already auto-blacklisted
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
-        'auto_disliked' => true,
+        'auto_blacklisted' => true,
+        'blacklisted_at' => now(),
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file->id,
@@ -231,7 +227,7 @@ test('files without prompts are skipped', function () {
     // Create file without prompt
     $file1 = File::factory()->create([
         'referrer_url' => 'https://example.com/file1.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file1->id,
@@ -242,7 +238,7 @@ test('files without prompts are skipped', function () {
     // Create file without metadata
     $file2 = File::factory()->create([
         'referrer_url' => 'https://example.com/file2.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
 
     // Call moderate directly
@@ -253,17 +249,16 @@ test('files without prompts are skipped', function () {
 });
 
 test('moderation result includes correct structure', function () {
-    // Create an active moderation rule with DISLIKE action type
     $rule = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create file with matching prompt
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'preview_url' => 'https://example.com/thumb.jpg',
         'filename' => 'test.jpg',
         'path' => 'test/path.jpg',
@@ -284,17 +279,16 @@ test('moderation result includes correct structure', function () {
 });
 
 test('batch flagging works correctly for multiple files', function () {
-    // Create an active moderation rule with DISLIKE action type
     ModerationRule::factory()->any(['spam'])->create([
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create multiple files with matching prompts
     $files = collect(range(1, 5))->map(function ($i) {
         $file = File::factory()->create([
             'referrer_url' => "https://example.com/file{$i}.jpg",
-            'auto_disliked' => false,
+            'auto_blacklisted' => false,
             'path' => "test/path{$i}.jpg",
         ]);
         FileMetadata::factory()->create([
@@ -315,19 +309,19 @@ test('batch flagging works correctly for multiple files', function () {
     }
 
     foreach ($files as $file) {
-        expect($file->fresh()->auto_disliked)->toBeTrue();
+        expect($file->fresh()->auto_blacklisted)->toBeTrue();
     }
 });
 
-test('auto dislike skips only the current users reacted files', function () {
+test('auto blacklist skips files that already have any reaction', function () {
     ModerationRule::factory()->any(['spam'])->create([
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     $currentUserReactedFile = File::factory()->create([
         'referrer_url' => 'https://example.com/current-user-reacted.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $currentUserReactedFile->id,
@@ -342,7 +336,7 @@ test('auto dislike skips only the current users reacted files', function () {
     $otherUser = User::factory()->create();
     $otherUserReactedFile = File::factory()->create([
         'referrer_url' => 'https://example.com/other-user-reacted.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $otherUserReactedFile->id,
@@ -361,9 +355,9 @@ test('auto dislike skips only the current users reacted files', function () {
 
     expect($result['flaggedIds'])->toBeEmpty()
         ->and($result['processedIds'])->not->toContain($currentUserReactedFile->id)
-        ->and($result['processedIds'])->toContain($otherUserReactedFile->id)
-        ->and($currentUserReactedFile->fresh()->auto_disliked)->toBeFalse()
-        ->and($otherUserReactedFile->fresh()->auto_disliked)->toBeTrue();
+        ->and($result['processedIds'])->not->toContain($otherUserReactedFile->id)
+        ->and($currentUserReactedFile->fresh()->auto_blacklisted)->toBeFalse()
+        ->and($otherUserReactedFile->fresh()->auto_blacklisted)->toBeFalse();
 });
 
 test('empty file collection returns empty results', function () {
@@ -380,7 +374,7 @@ test('empty file collection returns empty results', function () {
 test('no active rules returns empty results', function () {
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file->id,
@@ -406,7 +400,7 @@ test('immediate blacklist updates file', function () {
     // Create file with matching prompt
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/test.jpg',
     ]);
@@ -427,7 +421,7 @@ test('immediate blacklist updates file', function () {
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
 
     // Verify delete job was dispatched
-    Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
+    Bus::assertDispatched(\App\Jobs\DeleteStoredFileJob::class);
 });
 
 test('blacklist skips files that already have any reaction', function () {
@@ -442,7 +436,7 @@ test('blacklist skips files that already have any reaction', function () {
     $reactionUser = User::factory()->create();
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/reacted-blacklist-skip.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/reacted-blacklist-skip.jpg',
     ]);
@@ -453,7 +447,7 @@ test('blacklist skips files that already have any reaction', function () {
     Reaction::create([
         'file_id' => $file->id,
         'user_id' => $reactionUser->id,
-        'type' => 'dislike',
+        'type' => 'like',
     ]);
 
     $result = $this->service->moderate(collect([$file->fresh()->load('metadata')]));
@@ -481,7 +475,7 @@ test('persist the moderation rule that blacklisted a file without classification
 
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file-blacklist-hit.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/test-blacklist-hit.jpg',
     ]);
@@ -535,7 +529,7 @@ test('blacklist rules match buzz in underscores, quotes, and different casing', 
     $files = collect($prompts)->map(function (string $prompt, int $index) {
         $file = File::factory()->create([
             'referrer_url' => "https://example.com/file{$index}.jpg",
-            'auto_disliked' => false,
+            'auto_blacklisted' => false,
             'blacklisted_at' => null,
             'path' => "downloads/test{$index}.jpg",
         ]);
@@ -572,7 +566,7 @@ test('blacklist rules use detail_metadata prompt when metadata payload is missin
     ]);
 
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/buzz-detail.jpg',
         'detail_metadata' => [

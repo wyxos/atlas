@@ -11,16 +11,15 @@ class FilePreviewService
 {
     public const int FEED_REMOVED_PREVIEW_COUNT = 99999;
 
-    private const int AUTO_DISLIKE_PREVIEW_COUNT = 2;
+    private const int AUTO_BLACKLIST_PREVIEW_COUNT = 2;
 
     public function __construct(
-        private readonly FileAutoDislikeService $fileAutoDislikeService,
         private readonly FileBlacklistService $fileBlacklistService,
         private readonly LocalBrowseIndexSyncService $localBrowseIndexSyncService,
     ) {}
 
     /**
-     * @return array{id: int, previewed_count: int, reaction: array{type: string}|null, auto_disliked: bool, blacklisted_at: string|null}
+     * @return array{id: int, previewed_count: int, reaction: array{type: string}|null, auto_blacklisted: bool, blacklisted_at: string|null}
      */
     public function increment(File $file, int $userId, int $increments = 1): array
     {
@@ -29,7 +28,7 @@ class FilePreviewService
 
     /**
      * @param  iterable<int, File>  $files
-     * @return array<int, array{id: int, previewed_count: int, reaction: array{type: string}|null, auto_disliked: bool, blacklisted_at: string|null}>
+     * @return array<int, array{id: int, previewed_count: int, reaction: array{type: string}|null, auto_blacklisted: bool, blacklisted_at: string|null}>
      */
     public function incrementMany(iterable $files, int $userId, int $increments = 1): array
     {
@@ -66,8 +65,8 @@ class FilePreviewService
             ->get()
             ->keyBy('file_id');
 
-        $filesToAutoDislike = [];
-        $filesToBlacklist = [];
+        $filesToAutoBlacklist = [];
+        $blacklistedFileIdsToMarkRemoved = [];
 
         foreach ($fileIds as $fileId) {
             /** @var File|null $file */
@@ -76,8 +75,8 @@ class FilePreviewService
                 continue;
             }
 
-            if ($file->blacklisted_at !== null || $file->auto_disliked === true) {
-                $filesToBlacklist[] = $file;
+            if ($file->blacklisted_at !== null) {
+                $blacklistedFileIdsToMarkRemoved[] = (int) $file->id;
 
                 continue;
             }
@@ -86,27 +85,31 @@ class FilePreviewService
             $reaction = $currentUserReactions->get($fileId);
             $reactionType = $reaction?->type;
 
-            if ($reactionType === 'dislike') {
-                $filesToBlacklist[] = $file;
-
-                continue;
-            }
-
-            if ($reactionType === null && (int) $file->previewed_count >= self::AUTO_DISLIKE_PREVIEW_COUNT) {
-                $filesToAutoDislike[] = $file;
+            if (
+                $reactionType === null
+                && ! $this->isLocalSource($file)
+                && (int) $file->previewed_count >= self::AUTO_BLACKLIST_PREVIEW_COUNT
+            ) {
+                $filesToAutoBlacklist[] = $file;
             }
         }
 
-        if ($filesToAutoDislike !== []) {
-            $this->fileAutoDislikeService->apply($filesToAutoDislike, $userId);
-        }
-
-        if ($filesToBlacklist !== []) {
+        if ($filesToAutoBlacklist !== []) {
             $this->fileBlacklistService->apply(
-                $filesToBlacklist,
+                $filesToAutoBlacklist,
                 $userId,
-                minimumPreviewedCount: self::FEED_REMOVED_PREVIEW_COUNT,
+                autoBlacklisted: true,
             );
+        }
+
+        if ($blacklistedFileIdsToMarkRemoved !== []) {
+            File::query()
+                ->whereIn('id', $blacklistedFileIdsToMarkRemoved)
+                ->where('previewed_count', '<', self::FEED_REMOVED_PREVIEW_COUNT)
+                ->update([
+                    'previewed_count' => self::FEED_REMOVED_PREVIEW_COUNT,
+                    'updated_at' => now(),
+                ]);
         }
 
         $this->localBrowseIndexSyncService->syncFilesByIds($fileIds);
@@ -117,7 +120,7 @@ class FilePreviewService
 
     /**
      * @param  array<int>  $fileIds
-     * @return array<int, array{id: int, previewed_count: int, reaction: array{type: string}|null, auto_disliked: bool, blacklisted_at: string|null}>
+     * @return array<int, array{id: int, previewed_count: int, reaction: array{type: string}|null, auto_blacklisted: bool, blacklisted_at: string|null}>
      */
     private function formatResults(array $fileIds, int $userId): array
     {
@@ -144,11 +147,16 @@ class FilePreviewService
                     'id' => (int) $file->id,
                     'previewed_count' => (int) $file->previewed_count,
                     'reaction' => $reaction ? ['type' => $reaction->type] : null,
-                    'auto_disliked' => (bool) $file->auto_disliked,
+                    'auto_blacklisted' => (bool) $file->auto_blacklisted,
                     'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
                 ];
             })
             ->values()
             ->all();
+    }
+
+    private function isLocalSource(File $file): bool
+    {
+        return strtolower(trim((string) $file->source)) === 'local';
     }
 }

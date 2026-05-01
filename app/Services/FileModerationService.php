@@ -107,7 +107,7 @@ final class FileModerationService extends BaseModerationService
 
     protected function getActionType(object $match): string
     {
-        return $match->action_type ?? ActionType::DISLIKE;
+        return ActionType::BLACKLIST;
     }
 
     protected function resetState(): void
@@ -118,7 +118,7 @@ final class FileModerationService extends BaseModerationService
 
     protected function recordMatch(File $file, object $match, string $actionType): void
     {
-        if (! in_array($actionType, [ActionType::DISLIKE, ActionType::BLACKLIST], true)) {
+        if ($actionType !== ActionType::BLACKLIST) {
             return;
         }
 

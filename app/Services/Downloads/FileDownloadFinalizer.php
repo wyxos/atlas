@@ -38,6 +38,7 @@ class FileDownloadFinalizer
     ): void {
         $wasDownloaded = (bool) $file->downloaded;
         $wasBlacklisted = $file->blacklisted_at !== null;
+        $wasAutoBlacklisted = (bool) $file->auto_blacklisted;
 
         $disk = Storage::disk(config('downloads.disk'));
 
@@ -110,10 +111,18 @@ class FileDownloadFinalizer
             $updates['blacklisted_at'] = null;
         }
 
+        if ($wasAutoBlacklisted) {
+            $updates['auto_blacklisted'] = false;
+        }
+
+        $metrics = app(MetricsService::class);
+        if ($wasAutoBlacklisted) {
+            $metrics->applyAutoBlacklistClear($file);
+        }
+
         $file->update($updates);
         app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
 
-        $metrics = app(MetricsService::class);
         $metrics->applyDownload($file, $wasDownloaded);
         if ($wasBlacklisted) {
             $metrics->applyBlacklistClear($file);

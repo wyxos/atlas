@@ -41,7 +41,7 @@ test('blacklist rules match terms followed by punctuation (comma)', function () 
     $files = collect($prompts)->map(function (string $prompt, int $index) {
         $file = File::factory()->create([
             'referrer_url' => "https://example.com/file-papaya{$index}.jpg",
-            'auto_disliked' => false,
+            'auto_blacklisted' => false,
             'blacklisted_at' => null,
             'path' => "downloads/papaya{$index}.jpg",
         ]);
@@ -77,7 +77,7 @@ test('immediate blacklist updates file but does not create reaction', function (
     // Create file with matching prompt
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/test.jpg',
     ]);
@@ -97,15 +97,14 @@ test('immediate blacklist updates file but does not create reaction', function (
     // Assert file is blacklisted in database
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
 
-    // Verify NO dislike reaction was created (blacklist does not create reactions)
+    // Verify no reaction was created (blacklist does not create reactions)
     $reaction = Reaction::where('file_id', $file->id)
         ->where('user_id', $this->user->id)
-        ->where('type', 'dislike')
         ->first();
     expect($reaction)->toBeNull();
 
     // Verify delete job was dispatched
-    Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
+    Bus::assertDispatched(\App\Jobs\DeleteStoredFileJob::class);
 });
 
 test('batch processing uses single query for multiple files', function () {
@@ -122,7 +121,7 @@ test('batch processing uses single query for multiple files', function () {
     $files = collect(range(1, 3))->map(function ($i) {
         $file = File::factory()->create([
             'referrer_url' => "https://example.com/file{$i}.jpg",
-            'auto_disliked' => false,
+            'auto_blacklisted' => false,
             'blacklisted_at' => null,
         ]);
         FileMetadata::factory()->create([

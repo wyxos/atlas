@@ -33,7 +33,7 @@ it('deletes local assets but keeps the file record by default when requested', f
     Reaction::query()->create([
         'file_id' => $file->id,
         'user_id' => $reactionUser->id,
-        'type' => 'dislike',
+        'type' => 'funny',
     ]);
 
     Storage::disk(config('downloads.disk'))->put($file->path, 'file');

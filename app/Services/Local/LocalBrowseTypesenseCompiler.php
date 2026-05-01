@@ -58,7 +58,7 @@ class LocalBrowseTypesenseCompiler
 
         $reactionMode = (string) ($context['reactionMode'] ?? 'any');
         $reactionTypes = $context['reactionTypes'] ?? null;
-        $allTypes = $context['allTypes'] ?? ['love', 'like', 'dislike', 'funny'];
+        $allTypes = $context['allTypes'] ?? ['love', 'like', 'funny'];
 
         if ($reactionMode !== 'types' && $reactionMode !== 'reacted') {
             $reactionMode = 'reacted';
@@ -161,11 +161,11 @@ class LocalBrowseTypesenseCompiler
             }
         }
 
-        $autoDisliked = (string) ($context['autoDisliked'] ?? 'any');
-        if ($autoDisliked === 'yes') {
-            $filters[] = 'auto_disliked:=true';
-        } elseif ($autoDisliked === 'no') {
-            $filters[] = 'auto_disliked:=false';
+        $autoBlacklisted = (string) ($context['autoBlacklisted'] ?? 'any');
+        if ($autoBlacklisted === 'yes') {
+            $filters[] = 'auto_blacklisted:=true';
+        } elseif ($autoBlacklisted === 'no') {
+            $filters[] = 'auto_blacklisted:=false';
         }
 
         $reactionMode = (string) ($context['reactionMode'] ?? 'any');
@@ -186,7 +186,7 @@ class LocalBrowseTypesenseCompiler
                 fn ($type) => $type.'_user_ids:=['.$userId.']',
                 array_values(array_filter(
                     $reactionTypes,
-                    fn ($type) => is_string($type) && in_array($type, ['love', 'like', 'dislike', 'funny'], true),
+                    fn ($type) => is_string($type) && in_array($type, ['love', 'like', 'funny'], true),
                 )),
             );
 

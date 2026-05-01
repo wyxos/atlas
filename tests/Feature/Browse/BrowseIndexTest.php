@@ -266,36 +266,36 @@ test('browse excludes files already marked as not found', function () {
     expect($response->json('items'))->toBe([]);
 });
 
-test('online browse excludes auto disliked files and current user reacted files', function () {
+test('online browse excludes Auto blacklisted files and current user reacted files', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
-    $autoDisliked = File::factory()->create([
+    $AutoBlacklisted = File::factory()->create([
         'source' => 'CivitAI',
-        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/auto-disliked-guid/original=true/auto-disliked-guid.jpeg',
-        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/auto-disliked-guid/width=1216/auto-disliked-guid.jpeg',
-        'auto_disliked' => true,
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/auto-blacklisted-guid/original=true/auto-blacklisted-guid.jpeg',
+        'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/auto-blacklisted-guid/width=1216/auto-blacklisted-guid.jpeg',
+        'auto_blacklisted' => true,
         'downloaded' => false,
     ]);
     $currentUserReacted = File::factory()->create([
         'source' => 'CivitAI',
         'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/current-user-reacted-guid/original=true/current-user-reacted-guid.jpeg',
         'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/current-user-reacted-guid/width=1216/current-user-reacted-guid.jpeg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'downloaded' => false,
     ]);
     $otherUserReacted = File::factory()->create([
         'source' => 'CivitAI',
         'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/other-user-reacted-guid/original=true/other-user-reacted-guid.jpeg',
         'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/other-user-reacted-guid/width=1216/other-user-reacted-guid.jpeg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'downloaded' => false,
     ]);
     $visible = File::factory()->create([
         'source' => 'CivitAI',
         'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/visible-guid/original=true/visible-guid.jpeg',
         'preview_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/visible-guid/width=1216/visible-guid.jpeg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'downloaded' => false,
     ]);
 
@@ -315,8 +315,8 @@ test('online browse excludes auto disliked files and current user reacted files'
             'items' => [
                 [
                     'id' => 1001,
-                    'url' => $autoDisliked->url,
-                    'thumbnailUrl' => $autoDisliked->preview_url,
+                    'url' => $AutoBlacklisted->url,
+                    'thumbnailUrl' => $AutoBlacklisted->preview_url,
                     'width' => 512,
                     'height' => 768,
                     'mimeType' => 'image/jpeg',
@@ -370,14 +370,14 @@ test('browse uses LocalService when feed is local', function () {
         'downloaded' => true,
         'downloaded_at' => now()->subDay(),
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'source' => 'CivitAI',
     ]);
     $file2 = \App\Models\File::factory()->create([
         'downloaded' => true,
         'downloaded_at' => now()->subHours(12),
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'source' => 'Wallhaven',
     ]);
 
@@ -408,14 +408,14 @@ test('browse filters by source in local mode', function () {
         'downloaded' => true,
         'downloaded_at' => now()->subDay(),
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'source' => 'CivitAI',
     ]);
     $file2 = \App\Models\File::factory()->create([
         'downloaded' => true,
         'downloaded_at' => now()->subHours(12),
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'source' => 'Wallhaven',
     ]);
 
@@ -441,14 +441,14 @@ test('local browse can return blacklisted files when blacklisted filter is yes',
         'downloaded' => true,
         'downloaded_at' => now()->subDay(),
         'blacklisted_at' => now(),
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'source' => 'CivitAI',
     ]);
     $notBlacklisted = \App\Models\File::factory()->create([
         'downloaded' => true,
         'downloaded_at' => now()->subHours(12),
         'blacklisted_at' => null,
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'source' => 'Wallhaven',
     ]);
 

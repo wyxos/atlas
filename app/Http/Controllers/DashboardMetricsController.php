@@ -27,11 +27,10 @@ class DashboardMetricsController extends Controller
             MetricsService::KEY_FILES_LOCAL,
             MetricsService::KEY_FILES_NOT_FOUND,
             MetricsService::KEY_FILES_BLACKLISTED_TOTAL,
-            MetricsService::KEY_FILES_AUTO_DISLIKED,
+            MetricsService::KEY_FILES_AUTO_BLACKLISTED,
             MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED,
             MetricsService::KEY_REACTIONS_LOVE,
             MetricsService::KEY_REACTIONS_LIKE,
-            MetricsService::KEY_REACTIONS_DISLIKE,
             MetricsService::KEY_REACTIONS_FUNNY,
             MetricsService::KEY_CONTAINERS_TOTAL,
             MetricsService::KEY_CONTAINERS_BLACKLISTED,
@@ -40,7 +39,6 @@ class DashboardMetricsController extends Controller
         $reactions = [
             'love' => $metrics[MetricsService::KEY_REACTIONS_LOVE] ?? 0,
             'like' => $metrics[MetricsService::KEY_REACTIONS_LIKE] ?? 0,
-            'dislike' => $metrics[MetricsService::KEY_REACTIONS_DISLIKE] ?? 0,
             'funny' => $metrics[MetricsService::KEY_REACTIONS_FUNNY] ?? 0,
         ];
 
@@ -52,7 +50,7 @@ class DashboardMetricsController extends Controller
                 'non_local' => max(0, ($metrics[MetricsService::KEY_FILES_TOTAL] ?? 0) - ($metrics[MetricsService::KEY_FILES_LOCAL] ?? 0)),
                 'reactions' => $reactions,
                 'blacklisted' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_TOTAL] ?? 0,
-                'auto_disliked' => $metrics[MetricsService::KEY_FILES_AUTO_DISLIKED] ?? 0,
+                'auto_blacklisted' => $metrics[MetricsService::KEY_FILES_AUTO_BLACKLISTED] ?? 0,
                 'not_found' => $metrics[MetricsService::KEY_FILES_NOT_FOUND] ?? 0,
                 'unreacted_not_blacklisted' => $metrics[MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED] ?? 0,
             ],

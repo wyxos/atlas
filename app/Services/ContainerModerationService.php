@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\ActionType;
 use App\Models\Container;
 use App\Models\File;
 use Illuminate\Support\Collection;
@@ -64,6 +65,6 @@ final class ContainerModerationService extends BaseModerationService
 
     protected function getActionType(object $match): string
     {
-        return $match->action_type;
+        return ActionType::BLACKLIST;
     }
 }

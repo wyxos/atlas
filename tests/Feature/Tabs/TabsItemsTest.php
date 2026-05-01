@@ -262,7 +262,7 @@ test('tab show keeps reacted files from blacklisted containers when the file its
     Reaction::create([
         'file_id' => $reactedContainerFile->id,
         'user_id' => $reactionUser->id,
-        'type' => 'dislike',
+        'type' => 'like',
     ]);
 
     $tab = Tab::factory()
@@ -278,28 +278,28 @@ test('tab show keeps reacted files from blacklisted containers when the file its
     expect($reactedContainerFile->fresh()->blacklisted_at)->toBeNull();
 });
 
-test('tab show excludes auto disliked files and current user reacted files from online tabs', function () {
+test('tab show excludes Auto blacklisted files and current user reacted files from online tabs', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
     $currentUserReacted = File::factory()->create([
         'referrer_url' => 'https://example.com/current-user-reacted.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
     ]);
-    $autoDisliked = File::factory()->create([
-        'referrer_url' => 'https://example.com/auto-disliked.jpg',
-        'auto_disliked' => true,
-        'blacklisted_at' => null,
+    $AutoBlacklisted = File::factory()->create([
+        'referrer_url' => 'https://example.com/auto-blacklisted.jpg',
+        'auto_blacklisted' => true,
+        'blacklisted_at' => now(),
     ]);
     $otherUserReacted = File::factory()->create([
         'referrer_url' => 'https://example.com/other-user-reacted.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
     ]);
     $visible = File::factory()->create([
         'referrer_url' => 'https://example.com/visible.jpg',
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
     ]);
 
@@ -316,7 +316,7 @@ test('tab show excludes auto disliked files and current user reacted files from 
 
     $tab = Tab::factory()
         ->for($user)
-        ->withFiles([$currentUserReacted->id, $autoDisliked->id, $otherUserReacted->id, $visible->id])
+        ->withFiles([$currentUserReacted->id, $AutoBlacklisted->id, $otherUserReacted->id, $visible->id])
         ->create([
             'params' => ['service' => 'civit-ai-images'],
         ]);

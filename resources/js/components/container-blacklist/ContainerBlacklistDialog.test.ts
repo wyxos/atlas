@@ -38,11 +38,10 @@ describe('ContainerBlacklistDialog', () => {
         checkBlacklist.mockResolvedValue({
             blacklisted: true,
             blacklisted_at: '2024-01-15T10:00:00Z',
-            action_type: 'dislike',
+            action_type: 'blacklist',
             file_stats: {
                 unreacted: 12,
                 blacklisted: 8,
-                disliked: 5,
                 positive: 3,
             },
         });
@@ -82,10 +81,8 @@ describe('ContainerBlacklistDialog', () => {
         expect(wrapper.text()).toContain('Container Signal');
         expect(wrapper.get('[data-test="container-stat-unreacted"]').text()).toContain('12');
         expect(wrapper.get('[data-test="container-stat-blacklisted"]').text()).toContain('8');
-        expect(wrapper.get('[data-test="container-stat-disliked"]').text()).toContain('5');
         expect(wrapper.get('[data-test="container-stat-positive"]').text()).toContain('3');
         expect(wrapper.get('[data-test="container-stat-blacklisted"]').classes()).toContain('border-danger-500/40');
-        expect(wrapper.get('[data-test="container-stat-disliked"]').classes()).toContain('border-amber-500/40');
         expect(wrapper.get('[data-test="container-stat-positive"]').classes()).toContain('border-emerald-500/40');
     });
 });

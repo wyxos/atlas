@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\ActionType;
-use App\Jobs\DeleteAutoDislikedFileJob;
+use App\Jobs\DeleteStoredFileJob;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
@@ -21,21 +21,21 @@ beforeEach(function () {
     $this->service = app(BrowseModerationService::class);
 });
 
-test('merges auto dislike actions from file and container moderation', function () {
+test('merges auto blacklist actions from file and container moderation', function () {
     ModerationRule::factory()->any(['spam'])->create([
         'active' => true,
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create files
-    $file1 = File::factory()->create(['auto_disliked' => false]);
+    $file1 = File::factory()->create(['auto_blacklisted' => false]);
     FileMetadata::factory()->create([
         'file_id' => $file1->id,
         'payload' => ['prompt' => 'This is spam content'],
     ]);
     $file1->load('metadata');
 
-    $file2 = File::factory()->create(['auto_disliked' => false]);
+    $file2 = File::factory()->create(['auto_blacklisted' => false]);
     FileMetadata::factory()->create([
         'file_id' => $file2->id,
         'payload' => ['prompt' => 'Beautiful landscape'],
@@ -44,7 +44,7 @@ test('merges auto dislike actions from file and container moderation', function 
 
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => ActionType::DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
     $file2->containers()->attach($container->id);
     $file2->load('containers');
@@ -53,9 +53,11 @@ test('merges auto dislike actions from file and container moderation', function 
 
     expect($result['flaggedIds'])->toBeEmpty()
         ->and(collect($result['immediateActions'])->pluck('id')->all())->toContain($file1->id, $file2->id)
-        ->and(collect($result['immediateActions'])->pluck('action_type')->all())->toContain('dislike')
-        ->and($file1->fresh()->auto_disliked)->toBeTrue()
-        ->and($file2->fresh()->auto_disliked)->toBeTrue();
+        ->and(collect($result['immediateActions'])->pluck('action_type')->all())->toContain('blacklist')
+        ->and($file1->fresh()->blacklisted_at)->not->toBeNull()
+        ->and($file2->fresh()->blacklisted_at)->not->toBeNull()
+        ->and($file1->fresh()->auto_blacklisted)->toBeTrue()
+        ->and($file2->fresh()->auto_blacklisted)->toBeTrue();
 });
 
 test('filters out blacklisted files from returned files', function () {
@@ -68,7 +70,7 @@ test('filters out blacklisted files from returned files', function () {
     ]);
 
     $file1 = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
     ]);
     FileMetadata::factory()->create([
@@ -78,7 +80,7 @@ test('filters out blacklisted files from returned files', function () {
     $file1->load('metadata');
 
     $file2 = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
     ]);
     FileMetadata::factory()->create([
@@ -104,7 +106,7 @@ test('blacklisting from moderation detaches the auth user tabs and clears stored
     ]);
 
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/moderated.jpg',
         'preview_path' => 'thumbnails/moderated.jpg',
@@ -139,7 +141,7 @@ test('blacklisting from moderation detaches the auth user tabs and clears stored
         ->and($otherUserTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeFalse()
         ->and($foreignTab->fresh()->files()->where('file_id', $file->id)->exists())->toBeTrue();
 
-    Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function (DeleteAutoDislikedFileJob $job) {
+    Bus::assertDispatched(DeleteStoredFileJob::class, function (DeleteStoredFileJob $job) {
         if (! is_array($job->filePath)) {
             return false;
         }
@@ -165,7 +167,7 @@ test('keeps reacted files from blacklisted containers in returned files', functi
     ]);
 
     $reactedFile = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/reacted-container-browse.jpg',
     ]);
@@ -173,12 +175,12 @@ test('keeps reacted files from blacklisted containers in returned files', functi
     Reaction::create([
         'file_id' => $reactedFile->id,
         'user_id' => $reactionUser->id,
-        'type' => 'dislike',
+        'type' => 'like',
     ]);
     $reactedFile->load('containers');
 
     $neutralFile = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/neutral-container-browse.jpg',
     ]);
@@ -218,7 +220,7 @@ test('formats immediate actions correctly', function () {
     ]);
 
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'preview_url' => 'https://example.com/thumb.jpg',
     ]);
@@ -241,7 +243,7 @@ test('formats immediate actions correctly', function () {
 
 test('returns empty immediate actions when no files are processed', function () {
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
     ]);
     FileMetadata::factory()->create([
@@ -268,26 +270,16 @@ test('handles empty file collection', function () {
         ->and($result['immediateActions'])->toBeEmpty();
 });
 
-test('does not filter auto-disliked files', function () {
-    // Create dislike moderation rule
-    ModerationRule::factory()->any(['spam'])->create([
-        'active' => true,
-        'action_type' => ActionType::DISLIKE,
-    ]);
-
+test('filters already auto-blacklisted files', function () {
     $file = File::factory()->create([
-        'auto_disliked' => true, // Already auto-disliked
+        'auto_blacklisted' => true,
+        'blacklisted_at' => now(),
     ]);
-    FileMetadata::factory()->create([
-        'file_id' => $file->id,
-        'payload' => ['prompt' => 'This is spam content'],
-    ]);
-    $file->load('metadata');
 
     $result = $this->service->process([$file]);
 
-    // Auto-disliked files should still be returned (not filtered)
-    expect($result['files'])->toContain($file);
+    expect($result['files'])->not->toContain($file)
+        ->and($result['immediateActions'])->toBeEmpty();
 });
 
 test('merges immediate actions from file and container moderation', function () {
@@ -300,7 +292,7 @@ test('merges immediate actions from file and container moderation', function () 
     ]);
 
     $file1 = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'preview_url' => 'https://example.com/thumb1.jpg',
     ]);
@@ -311,7 +303,7 @@ test('merges immediate actions from file and container moderation', function () 
     $file1->load('metadata');
 
     $file2 = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'preview_url' => 'https://example.com/thumb2.jpg',
     ]);

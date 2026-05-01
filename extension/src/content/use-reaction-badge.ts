@@ -410,7 +410,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
             const usesBatchEndpoint = (batchItems?.length ?? 0) >= 2;
             let downloadBehavior: SubmitDownloadBehavior | undefined;
-            if (!usesBatchEndpoint && type !== 'dislike' && matchResult.value.downloadedAt !== null) {
+            if (!usesBatchEndpoint && matchResult.value.downloadedAt !== null) {
                 const choice = await downloadedReactionDialog.prompt();
                 if (choice === 'cancel') {
                     return;
@@ -433,7 +433,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             // badge instance before the batch submit resolves. The tab-close side effect still
             // belongs to the successful submit, even if this component instance is now stale.
             if (shouldAutoCloseCurrentTab) {
-                if (type === 'dislike' || closeTabAfterQueueMode === 'queued') {
+                if (closeTabAfterQueueMode === 'queued') {
                     void requestCloseCurrentTab();
                 } else {
                     queueCloseCurrentTabAfterDownloadComplete(result.downloadCloseTargets);

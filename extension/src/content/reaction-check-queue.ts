@@ -6,7 +6,7 @@ import { atlasLoggedRuntimeRequest } from './atlas-request-log';
 import { normalizeUrl, shouldExcludeMediaOrAnchorUrl, type MediaElement } from './media-utils';
 import { applyMediaCleaner } from './media-cleaner';
 
-export type BadgeReactionType = 'love' | 'like' | 'dislike' | 'funny';
+export type BadgeReactionType = 'love' | 'like' | 'funny';
 
 export type BadgeMatchResult = {
     exists: boolean;
@@ -32,7 +32,7 @@ function emptyResult(): BadgeMatchResult {
 }
 
 function normalizeReaction(value: unknown): BadgeReactionType | null {
-    return value === 'love' || value === 'like' || value === 'dislike' || value === 'funny'
+    return value === 'love' || value === 'like' || value === 'funny'
         ? value
         : null;
 }

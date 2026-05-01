@@ -36,7 +36,7 @@ export interface ModerationRuleNode {
 /**
  * Action type for moderation rules.
  */
-export type ModerationRuleActionType = 'dislike' | 'blacklist';
+export type ModerationRuleActionType = 'blacklist';
 
 /**
  * The main ModerationRule interface representing a database record.
@@ -118,4 +118,3 @@ export function operationUsesChildren(op: ModerationRuleOp): boolean {
 export function operationRequiresMin(op: ModerationRuleOp): boolean {
     return op === 'at_least';
 }
-

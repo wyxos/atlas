@@ -12,8 +12,6 @@ use Illuminate\Support\Facades\Storage;
 
 class FileStorageResponseService
 {
-    private const DISLIKE_REACTION_TYPES = ['dislike'];
-
     private const POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
 
     public function loadViewerRelations(File $file): void
@@ -22,7 +20,6 @@ class FileStorageResponseService
 
         $file->load([
             'metadata',
-            'autoDislikeModerationAction',
             'autoBlacklistModerationAction',
             'containers' => function ($query) use ($userId) {
                 $query->withCount([
@@ -40,17 +37,6 @@ class FileStorageResponseService
                         $containerFilesQuery->whereDoesntHave('reactions');
                     },
                     'files as blacklisted_files_count' => fn ($containerFilesQuery) => $containerFilesQuery->whereNotNull('files.blacklisted_at'),
-                    'files as disliked_files_count' => function ($containerFilesQuery) use ($userId) {
-                        if (! is_int($userId)) {
-                            $containerFilesQuery->whereRaw('0 = 1');
-
-                            return;
-                        }
-
-                        $containerFilesQuery->whereHas('reactions', fn ($reactionQuery) => $reactionQuery
-                            ->where('user_id', $userId)
-                            ->whereIn('type', self::DISLIKE_REACTION_TYPES));
-                    },
                     'files as positive_files_count' => function ($containerFilesQuery) use ($userId) {
                         if (! is_int($userId)) {
                             $containerFilesQuery->whereRaw('0 = 1');

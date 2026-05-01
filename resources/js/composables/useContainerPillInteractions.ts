@@ -3,6 +3,7 @@ import type { FeedItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import type { BrowseFeedHandle } from '@/types/browse';
+import { FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 import {
     applyOptimisticLocalReactionState,
     restoreOptimisticLocalReactionState,
@@ -52,6 +53,14 @@ type UseContainerPillInteractionsOptions = {
     onReaction: (fileId: number, type: ReactionType) => void;
     onOpenContainerTab?: OpenContainerTabHandler;
     onPlainLeftClick?: ContainerDrawerToggleHandler;
+};
+
+type BatchBlacklistResponse = {
+    results?: Array<{
+        id: number;
+        blacklisted_at: string;
+        previewed_count?: number;
+    }>;
 };
 
 export function useContainerPillInteractions(
@@ -202,6 +211,41 @@ export function useContainerPillInteractions(
         }
     }
 
+    async function blacklistSiblings(containerId: number): Promise<void> {
+        const siblings = getSiblingItems(containerId);
+        if (siblings.length === 0) {
+            return;
+        }
+
+        const { data } = await window.axios.post<BatchBlacklistResponse>('/api/files/blacklist/batch', {
+            file_ids: siblings.map((item) => item.id),
+        });
+        const resultMap = new Map((data.results ?? []).map((result) => [result.id, result]));
+        const confirmed = siblings.filter((item) => resultMap.has(item.id));
+
+        for (const item of confirmed) {
+            const result = resultMap.get(item.id);
+            if (!result) {
+                continue;
+            }
+
+            item.blacklisted_at = result.blacklisted_at;
+            item.blacklist_rule = null;
+            item.reaction = null;
+            item.auto_blacklisted = false;
+            item.auto_blacklist_rule = null;
+            item.previewed_count = Math.max(
+                Number(item.previewed_count ?? 0),
+                Number(result.previewed_count ?? 0),
+                FEED_REMOVED_PREVIEW_COUNT,
+            );
+        }
+
+        if (confirmed.length > 0) {
+            await options.masonry.value?.remove(confirmed);
+        }
+    }
+
     /**
      * Handle middle click to open container URL in new tab without focus.
      */
@@ -339,9 +383,13 @@ export function useContainerPillInteractions(
             if (buttonToCheck === 0) {
                 reactionType = 'like';
             }
-            // Alt + Right Click or Double Right Click = Dislike
+            // Alt + Right Click or Double Right Click = Blacklist
             else if (buttonToCheck === 2 || e.type === 'contextmenu') {
-                reactionType = 'dislike';
+                cancelPendingMiddleClick();
+                e.preventDefault();
+                void blacklistSiblings(containerId);
+
+                return;
             }
             // Alt + Middle Click or Double Middle Click = Favorite (Love)
             else if (buttonToCheck === 1) {

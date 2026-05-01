@@ -37,7 +37,7 @@ describe('useContainerBlacklists', () => {
                 type: 'User',
                 source: 'CivitAI',
                 source_id: '123',
-                action_type: 'dislike',
+                action_type: 'blacklist',
                 blacklisted_at: '2024-01-15T10:00:00Z',
             },
             {
@@ -81,7 +81,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'dislike',
+            action_type: 'blacklist',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 
@@ -89,11 +89,11 @@ describe('useContainerBlacklists', () => {
 
         const { createBlacklist, blacklists } = useContainerBlacklists();
 
-        const result = await createBlacklist(1, 'dislike');
+        const result = await createBlacklist(1, 'blacklist');
 
         expect(mockAxios.post).toHaveBeenCalledWith('/api/container-blacklists', {
             container_id: 1,
-            action_type: 'dislike',
+            action_type: 'blacklist',
         });
         expect(result).toEqual(mockContainer);
         expect(blacklists.value.length).toBeGreaterThan(0);
@@ -106,7 +106,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'dislike',
+            action_type: 'blacklist',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
         const updated = {
@@ -139,7 +139,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'dislike',
+            action_type: 'blacklist',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 
@@ -172,11 +172,10 @@ describe('useContainerBlacklists', () => {
         const mockStatus = {
             blacklisted: true,
             blacklisted_at: '2024-01-15T10:00:00Z',
-            action_type: 'dislike',
+            action_type: 'blacklist',
             file_stats: {
                 unreacted: 12,
                 blacklisted: 8,
-                disliked: 5,
                 positive: 3,
             },
         };
@@ -207,7 +206,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'dislike',
+            action_type: 'blacklist',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 

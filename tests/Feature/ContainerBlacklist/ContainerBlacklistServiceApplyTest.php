@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\ActionType;
-use App\Jobs\DeleteAutoDislikedFileJob;
+use App\Jobs\DeleteStoredFileJob;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
@@ -41,9 +41,9 @@ it('skips reacted files when applying a container blacklist', function () {
         'blacklisted_at' => null,
         'path' => 'downloads/funny-file.jpg',
     ]);
-    $dislikedFile = File::factory()->create([
+    $extraReactedFile = File::factory()->create([
         'blacklisted_at' => null,
-        'path' => 'downloads/disliked-file.jpg',
+        'path' => 'downloads/extra-reacted-file.jpg',
     ]);
     $neutralFile = File::factory()->create([
         'blacklisted_at' => null,
@@ -65,7 +65,7 @@ it('skips reacted files when applying a container blacklist', function () {
         $likedFile->id,
         $lovedFile->id,
         $funnyFile->id,
-        $dislikedFile->id,
+        $extraReactedFile->id,
         $neutralFile->id,
         $alreadyBlacklistedFile->id,
     ]);
@@ -86,9 +86,9 @@ it('skips reacted files when applying a container blacklist', function () {
         'type' => 'funny',
     ]);
     Reaction::query()->create([
-        'file_id' => $dislikedFile->id,
+        'file_id' => $extraReactedFile->id,
         'user_id' => $reactionUser->id,
-        'type' => 'dislike',
+        'type' => 'like',
     ]);
 
     $currentTab = Tab::factory()->for($actingUser)->create();
@@ -109,7 +109,7 @@ it('skips reacted files when applying a container blacklist', function () {
     expect($likedFile->fresh()->blacklisted_at)->toBeNull();
     expect($lovedFile->fresh()->blacklisted_at)->toBeNull();
     expect($funnyFile->fresh()->blacklisted_at)->toBeNull();
-    expect($dislikedFile->fresh()->blacklisted_at)->toBeNull();
+    expect($extraReactedFile->fresh()->blacklisted_at)->toBeNull();
     expect($neutralFile->fresh()->blacklisted_at)->not->toBeNull();
     expect($neutralFile->fresh()->path)->toBeNull();
     expect($neutralFile->fresh()->downloaded)->toBeFalse();
@@ -123,8 +123,8 @@ it('skips reacted files when applying a container blacklist', function () {
     expect($foreignTab->fresh()->files()->where('file_id', $neutralFile->id)->exists())->toBeTrue();
     expect($foreignTab->fresh()->files()->where('file_id', $alreadyBlacklistedFile->id)->exists())->toBeTrue();
 
-    Queue::assertPushed(DeleteAutoDislikedFileJob::class, 1);
-    Queue::assertPushed(DeleteAutoDislikedFileJob::class, function (DeleteAutoDislikedFileJob $job): bool {
+    Queue::assertPushed(DeleteStoredFileJob::class, 1);
+    Queue::assertPushed(DeleteStoredFileJob::class, function (DeleteStoredFileJob $job): bool {
         if (! is_array($job->filePath)) {
             return false;
         }
@@ -137,10 +137,10 @@ it('skips reacted files when applying a container blacklist', function () {
             'downloads/neutral-file.jpg',
         ];
     });
-    Queue::assertNotPushed(DeleteAutoDislikedFileJob::class, fn (DeleteAutoDislikedFileJob $job) => is_string($job->filePath) && in_array($job->filePath, [
+    Queue::assertNotPushed(DeleteStoredFileJob::class, fn (DeleteStoredFileJob $job) => is_string($job->filePath) && in_array($job->filePath, [
         'downloads/liked-file.jpg',
         'downloads/loved-file.jpg',
         'downloads/funny-file.jpg',
-        'downloads/disliked-file.jpg',
+        'downloads/extra-reacted-file.jpg',
     ], true));
 });

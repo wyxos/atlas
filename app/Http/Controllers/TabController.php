@@ -251,7 +251,7 @@ class TabController extends Controller
                 'files.listing_metadata',
                 'files.previewed_count',
                 'files.seen_count',
-                'files.auto_disliked',
+                'files.auto_blacklisted',
                 'files.not_found',
             ])
             ->with([
@@ -283,7 +283,6 @@ class TabController extends Controller
         // as live browse results, including spared reacted files from blacklisted containers.
         $moderationResult = app(BrowseModerationService::class)->process($files, [
             'filterBlacklisted' => $shouldFilterBlacklisted,
-            'filterAutoDisliked' => ! $isLocalMode,
             'filterCurrentUserReacted' => ! $isLocalMode,
         ]);
         $files = collect($moderationResult['files']);

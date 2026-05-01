@@ -83,7 +83,7 @@ function emptyReferrerCheckResult(): ReferrerMatchResult {
 }
 
 function normalizeReaction(value: unknown): BadgeReactionType | null {
-    return value === 'love' || value === 'like' || value === 'dislike' || value === 'funny'
+    return value === 'love' || value === 'like' || value === 'funny'
         ? value
         : null;
 }

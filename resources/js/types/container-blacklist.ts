@@ -19,7 +19,6 @@ export interface ContainerBlacklist {
 export interface ContainerBlacklistFileStats {
     unreacted: number;
     blacklisted: number;
-    disliked: number;
     positive: number;
 }
 

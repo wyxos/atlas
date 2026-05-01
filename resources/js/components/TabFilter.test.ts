@@ -175,7 +175,7 @@ describe('TabFilter', () => {
         expect(form.data.serviceFilters.local_preset).toBe('inbox_newest');
     });
 
-    it('includes disliked any preset option', async () => {
+    it('includes blacklist-only local preset options', async () => {
         const form = createBrowseForm();
         form.syncFromTab({
             id: 12,
@@ -251,12 +251,9 @@ describe('TabFilter', () => {
         expect(wrapper.text()).toContain('Funny (Random)');
         expect(wrapper.text()).toContain('Moderation');
         expect(wrapper.text()).toContain('Anomalies');
-        expect(wrapper.text()).toContain('Disliked');
-        expect(wrapper.text()).toContain('Manual Dislikes');
-        expect(wrapper.text()).toContain('Auto Disliked');
         expect(wrapper.text()).toContain('Blacklisted');
-        expect(wrapper.text()).toContain('Saved Manual Dislikes');
-        expect(wrapper.text()).toContain('Saved Auto Disliked');
         expect(wrapper.text()).toContain('Saved Blacklisted');
+        expect(wrapper.text()).not.toContain('Auto blacklisted');
+        expect(wrapper.text()).not.toContain('Saved Auto blacklisted');
     });
 });

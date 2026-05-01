@@ -4,7 +4,7 @@ import { useToast } from '@/components/ui/toast/use-toast';
 import { queueManager } from '@/composables/useQueue';
 import { cancelBatchQueuedReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
-import { Heart, ThumbsUp, ThumbsDown, Smile, Undo2 } from 'lucide-vue-next';
+import { Heart, ThumbsUp, Smile, Undo2 } from 'lucide-vue-next';
 import ToastPreviewStrip from './ToastPreviewStrip.vue';
 
 const toast = useToast();
@@ -39,103 +39,20 @@ const reactionConfig = computed(() => {
     const configs: Record<ReactionType, { label: string; icon: typeof Heart; color: string }> = {
         love: { label: 'Loved', icon: Heart, color: 'text-red-500' },
         like: { label: 'Liked', icon: ThumbsUp, color: 'text-blue-500' },
-        dislike: { label: 'Disliked', icon: ThumbsDown, color: 'text-danger-400' },
         funny: { label: 'Funny', icon: Smile, color: 'text-yellow-500' },
     };
     return configs[props.reactionType];
 });
 
 const Icon = computed(() => reactionConfig.value.icon);
-
-/**
- * Check if this is a dislike reaction (for danger theme).
- */
-const isDislike = computed(() => props.reactionType === 'dislike');
-
-/**
- * Toast container classes - danger theme for dislike, default for others.
- */
-const toastClasses = computed(() => {
-    if (isDislike.value) {
-        return 'batch-reaction-queue-toast group relative flex items-center gap-3 rounded-lg border border-danger-500/50 bg-danger-600 p-4 shadow-xl';
-    }
-    return 'batch-reaction-queue-toast group relative flex items-center gap-3 rounded-lg border border-twilight-indigo-500/50 bg-prussian-blue-600 p-4 shadow-xl';
-});
-
-/**
- * Text color classes - danger theme for dislike.
- */
-const textColor = computed(() => {
-    if (isDislike.value) {
-        return 'text-danger-100';
-    }
-    return 'text-twilight-indigo-100';
-});
-
-/**
- * Secondary text color classes - danger theme for dislike.
- * Use white for better visibility on red background.
- */
-const secondaryTextColor = computed(() => {
-    if (isDislike.value) {
-        return 'text-white';
-    }
-    return 'text-twilight-indigo-300';
-});
-
-/**
- * Icon color classes - danger theme for dislike.
- * Use white for better visibility on red background.
- */
-const iconColor = computed(() => {
-    if (isDislike.value) {
-        return 'text-white';
-    }
-    return reactionConfig.value.color;
-});
-
-/**
- * Progress bar background classes - danger theme for dislike.
- * Use white with opacity for better visibility on red background.
- */
-const progressBarBg = computed(() => {
-    if (isDislike.value) {
-        return 'bg-white/20';
-    }
-    return 'bg-twilight-indigo-500/20';
-});
-
-/**
- * Progress bar fill classes - danger theme for dislike.
- * Use white for better visibility on red background.
- */
-const progressBarFill = computed(() => {
-    if (isDislike.value) {
-        return 'bg-white';
-    }
-    return 'bg-smart-blue-400';
-});
-
-/**
- * Dismiss button classes - danger theme for dislike.
- */
-const dismissButtonClasses = computed(() => {
-    if (isDislike.value) {
-        return 'shrink-0 rounded p-1 text-white transition-colors hover:bg-white/20 hover:text-white';
-    }
-    return 'shrink-0 rounded p-1 text-twilight-indigo-300 transition-colors hover:bg-twilight-indigo-500/20 hover:text-twilight-indigo-100';
-});
-
-/**
- * Undo button classes - danger theme for dislike.
- * Use white text for better visibility on red background.
- */
-const undoButtonClasses = computed(() => {
-    if (isDislike.value) {
-        return 'flex items-center gap-1 rounded bg-white/20 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-white/30 hover:text-white';
-    }
-    return 'flex items-center gap-1 rounded bg-twilight-indigo-500/20 px-2 py-1 text-xs font-medium text-twilight-indigo-200 transition-colors hover:bg-twilight-indigo-500/30 hover:text-twilight-indigo-100';
-});
+const toastClasses = 'batch-reaction-queue-toast group relative flex items-center gap-3 rounded-lg border border-twilight-indigo-500/50 bg-prussian-blue-600 p-4 shadow-xl';
+const textColor = 'text-twilight-indigo-100';
+const secondaryTextColor = 'text-twilight-indigo-300';
+const iconColor = computed(() => reactionConfig.value.color);
+const progressBarBg = 'bg-twilight-indigo-500/20';
+const progressBarFill = 'bg-smart-blue-400';
+const dismissButtonClasses = 'shrink-0 rounded p-1 text-twilight-indigo-300 transition-colors hover:bg-twilight-indigo-500/20 hover:text-twilight-indigo-100';
+const undoButtonClasses = 'flex items-center gap-1 rounded bg-twilight-indigo-500/20 px-2 py-1 text-xs font-medium text-twilight-indigo-200 transition-colors hover:bg-twilight-indigo-500/30 hover:text-twilight-indigo-100';
 
 /**
  * Format remaining time as ss:mm (seconds:centiseconds).
@@ -164,7 +81,7 @@ function handleDismiss(): void {
         @mouseleave="queueFreeze.unfreezeAll()"
         class="flex! gap-4!"
     >
-        <ToastPreviewStrip :items="previewItems" :total-count="totalCount" :danger="isDislike" />
+        <ToastPreviewStrip :items="previewItems" :total-count="totalCount" />
 
         <!-- Content -->
         <div class="flex-1 min-w-0">

@@ -1,6 +1,6 @@
 <?php
 
-use App\Jobs\DeleteAutoDislikedFileJob;
+use App\Jobs\DeleteStoredFileJob;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
@@ -32,17 +32,17 @@ test('returns empty arrays when no blacklisted containers exist', function () {
     expect($result['processedIds'])->toBeEmpty();
 });
 
-test('auto dislikes files for dislike action type', function () {
+test('auto blacklists files from blacklisted containers', function () {
     Bus::fake();
     $user = User::factory()->create();
     $this->actingAs($user);
 
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => null,
         'preview_path' => null,
@@ -56,13 +56,9 @@ test('auto dislikes files for dislike action type', function () {
 
     expect($result['flaggedIds'])->toBeEmpty();
     expect($result['processedIds'])->toContain($file->id);
-    expect($file->fresh()->auto_disliked)->toBeTrue();
-    expect($file->fresh()->blacklisted_at)->toBeNull();
-    $this->assertDatabaseHas('reactions', [
-        'file_id' => $file->id,
-        'user_id' => $user->id,
-        'type' => 'dislike',
-    ]);
+    expect($file->fresh()->auto_blacklisted)->toBeTrue();
+    expect($file->fresh()->blacklisted_at)->not->toBeNull();
+    expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
     Bus::assertNothingDispatched();
 });
 
@@ -76,7 +72,7 @@ test('blacklists files for blacklist action type', function () {
         'action_type' => 'blacklist',
     ]);
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/ab/cd/test.jpg',
         'preview_path' => null,
@@ -92,26 +88,21 @@ test('blacklists files for blacklist action type', function () {
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
 
-    // Verify NO dislike reaction was created (blacklist does not create reactions)
-    $reaction = Reaction::where('file_id', $file->id)
-        ->where('user_id', $user->id)
-        ->where('type', 'dislike')
-        ->first();
-    expect($reaction)->toBeNull();
+    expect(Reaction::where('file_id', $file->id)->exists())->toBeFalse();
 
-    Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function ($job) use ($file) {
+    Bus::assertDispatched(DeleteStoredFileJob::class, function ($job) use ($file) {
         return $job->filePath === $file->path;
     });
 });
 
-test('skips files already auto-disliked', function () {
+test('skips files already auto-blacklisted', function () {
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
     $file = File::factory()->create([
-        'auto_disliked' => true,
-        'blacklisted_at' => null,
+        'auto_blacklisted' => true,
+        'blacklisted_at' => now(),
     ]);
     $file->containers()->attach($container->id);
 
@@ -124,10 +115,10 @@ test('skips files already auto-disliked', function () {
 test('skips files already blacklisted', function () {
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => now(),
     ]);
     $file->containers()->attach($container->id);
@@ -141,10 +132,10 @@ test('skips files already blacklisted', function () {
 test('skips files without containers', function () {
     Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
     ]);
 
@@ -162,7 +153,7 @@ test('does not dispatch delete job when file has no path', function () {
         'action_type' => 'blacklist',
     ]);
     $file = File::factory()->create([
-        'auto_disliked' => false,
+        'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => null,
         'preview_path' => null,
@@ -186,7 +177,7 @@ test('handles multiple files with different action types', function () {
 
     $container1 = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
     $container2 = Container::factory()->create([
         'blacklisted_at' => now(),
@@ -197,13 +188,13 @@ test('handles multiple files with different action types', function () {
         'action_type' => 'blacklist',
     ]);
 
-    $file1 = File::factory()->create(['auto_disliked' => false, 'blacklisted_at' => null]);
+    $file1 = File::factory()->create(['auto_blacklisted' => false, 'blacklisted_at' => null]);
     $file1->containers()->attach($container1->id);
 
-    $file2 = File::factory()->create(['auto_disliked' => false, 'blacklisted_at' => null, 'path' => 'downloads/test2.jpg']);
+    $file2 = File::factory()->create(['auto_blacklisted' => false, 'blacklisted_at' => null, 'path' => 'downloads/test2.jpg']);
     $file2->containers()->attach($container2->id);
 
-    $file3 = File::factory()->create(['auto_disliked' => false, 'blacklisted_at' => null, 'path' => 'downloads/test3.jpg']);
+    $file3 = File::factory()->create(['auto_blacklisted' => false, 'blacklisted_at' => null, 'path' => 'downloads/test3.jpg']);
     $file3->containers()->attach($container3->id);
 
     $result = $this->service->moderate(collect([$file1, $file2, $file3]));
@@ -212,7 +203,8 @@ test('handles multiple files with different action types', function () {
     expect($result['processedIds'])->toContain($file1->id);
     expect($result['processedIds'])->toContain($file2->id);
     expect($result['processedIds'])->toContain($file3->id);
-    expect($file1->fresh()->auto_disliked)->toBeTrue();
+    expect($file1->fresh()->auto_blacklisted)->toBeTrue();
+    expect($file1->fresh()->blacklisted_at)->not->toBeNull();
     expect($file2->fresh()->blacklisted_at)->not->toBeNull();
     expect($file3->fresh()->blacklisted_at)->not->toBeNull();
 });
@@ -224,18 +216,19 @@ test('handles files with multiple containers', function () {
 
     $container1 = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
     $container2 = Container::factory()->create([
         'blacklisted_at' => null,
     ]);
 
-    $file = File::factory()->create(['auto_disliked' => false, 'blacklisted_at' => null]);
+    $file = File::factory()->create(['auto_blacklisted' => false, 'blacklisted_at' => null]);
     $file->containers()->attach([$container1->id, $container2->id]);
 
     $result = $this->service->moderate(collect([$file]));
 
     expect($result['flaggedIds'])->toBeEmpty();
     expect($result['processedIds'])->toContain($file->id);
-    expect($file->fresh()->auto_disliked)->toBeTrue();
+    expect($file->fresh()->auto_blacklisted)->toBeTrue();
+    expect($file->fresh()->blacklisted_at)->not->toBeNull();
 });

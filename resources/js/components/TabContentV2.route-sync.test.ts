@@ -314,8 +314,8 @@ function createFilePayload(id: number) {
         file: {
             absolute_path: null,
             absolute_preview_path: null,
-            auto_dislike_rule: null,
-            auto_disliked: false,
+            auto_blacklist_rule: null,
+            auto_blacklisted: false,
             blacklisted_at: null,
             blacklist_rule: null,
             chapter: null,

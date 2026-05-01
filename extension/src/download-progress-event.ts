@@ -39,7 +39,7 @@ function asString(value: unknown): string | null {
 }
 
 function asReaction(value: unknown): BadgeReactionType | null {
-    if (value === 'love' || value === 'like' || value === 'dislike' || value === 'funny') {
+    if (value === 'love' || value === 'like' || value === 'funny') {
         return value;
     }
 

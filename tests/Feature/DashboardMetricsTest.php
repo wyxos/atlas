@@ -22,9 +22,9 @@ test('dashboard metrics report file and reaction totals', function () {
         'source' => 'local',
     ]);
 
-    $autoDisliked = File::factory()->create([
+    $AutoBlacklisted = File::factory()->create([
         'blacklisted_at' => now(),
-        'auto_disliked' => true,
+        'auto_blacklisted' => true,
         'downloaded' => false,
         'source' => 'NAS',
     ]);
@@ -62,7 +62,7 @@ test('dashboard metrics report file and reaction totals', function () {
     ]);
 
     $containerUser->files()->attach([$manualBlacklisted->id, $unblacklisted->id]);
-    $containerGallery->files()->attach([$autoDisliked->id, $notFound->id]);
+    $containerGallery->files()->attach([$AutoBlacklisted->id, $notFound->id]);
     $containerPost->files()->attach([$unreacted->id]);
 
     Reaction::create([
@@ -78,7 +78,7 @@ test('dashboard metrics report file and reaction totals', function () {
     ]);
 
     Reaction::create([
-        'file_id' => $autoDisliked->id,
+        'file_id' => $AutoBlacklisted->id,
         'user_id' => $user->id,
         'type' => 'like',
     ]);
@@ -87,12 +87,6 @@ test('dashboard metrics report file and reaction totals', function () {
         'file_id' => $unblacklisted->id,
         'user_id' => $user->id,
         'type' => 'funny',
-    ]);
-
-    Reaction::create([
-        'file_id' => $unblacklisted->id,
-        'user_id' => $otherUser->id,
-        'type' => 'dislike',
     ]);
 
     app(MetricsService::class)->syncAll();
@@ -106,14 +100,13 @@ test('dashboard metrics report file and reaction totals', function () {
             'reactions' => [
                 'love' => 1,
                 'like' => 1,
-                'dislike' => 1,
                 'funny' => 1,
             ],
             'downloaded' => 2,
             'local' => 2,
             'non_local' => 3,
             'blacklisted' => 2,
-            'auto_disliked' => 1,
+            'auto_blacklisted' => 1,
             'not_found' => 1,
             'unreacted_not_blacklisted' => 2,
         ],

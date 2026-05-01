@@ -1,5 +1,5 @@
 import { h, type VNode } from 'vue';
-import { Ban, Download, Heart, Loader2, Smile, ThumbsDown, ThumbsUp } from 'lucide-vue-next';
+import { Ban, Download, Heart, Loader2, Smile, ThumbsUp } from 'lucide-vue-next';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { CloseTabAfterQueueMode } from '../atlas-options';
 import { formatTabCountSummary } from '../tab-counts';
@@ -35,12 +35,11 @@ type BadgeViewHandlers = {
     onReactAllItemsInPostToggle: () => void;
 };
 
-const reactionOrder: BadgeReactionType[] = ['love', 'like', 'dislike', 'funny'];
+const reactionOrder: BadgeReactionType[] = ['love', 'like', 'funny'];
 
 const reactionIconByType = {
     love: Heart,
     like: ThumbsUp,
-    dislike: ThumbsDown,
     funny: Smile,
 } as const;
 
@@ -80,10 +79,6 @@ const reactionPalette: Record<BadgeReactionType, { activeBackground: string; hov
     like: {
         activeBackground: '#0466c8',
         hoverColor: '#0f85fa',
-    },
-    dislike: {
-        activeBackground: '#6b7280',
-        hoverColor: '#9ca3af',
     },
     funny: {
         activeBackground: '#eab308',

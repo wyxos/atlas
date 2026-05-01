@@ -13,7 +13,7 @@ const toast = useToast();
 const queue = queueManager;
 const queueCollection = queue.collection;
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
-const REACTION_TYPES: ReactionType[] = ['love', 'like', 'dislike', 'funny'];
+const REACTION_TYPES: ReactionType[] = ['love', 'like', 'funny'];
 type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
     items?: Ref<FeedItem[]>;

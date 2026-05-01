@@ -71,7 +71,6 @@ class BrowseModerationService
             );
         }
 
-        $filterAutoDisliked = (bool) ($context['filterAutoDisliked'] ?? false);
         $filterCurrentUserReacted = (bool) ($context['filterCurrentUserReacted'] ?? false);
         $currentUserReactedIdSet = $filterCurrentUserReacted
             ? $this->resolveCurrentUserReactedFileIds($files)
@@ -79,16 +78,12 @@ class BrowseModerationService
 
         // Filter out permanently unavailable files and blacklisted files from browse/tab responses.
         $filteredFiles = $files
-            ->reject(function ($file) use ($blacklistedIdSet, $currentUserReactedIdSet, $filterAutoDisliked, $filterBlacklisted, $filterCurrentUserReacted) {
+            ->reject(function ($file) use ($blacklistedIdSet, $currentUserReactedIdSet, $filterBlacklisted, $filterCurrentUserReacted) {
                 if ((bool) ($file->not_found ?? false)) {
                     return true;
                 }
 
                 if ($filterBlacklisted && isset($blacklistedIdSet[(int) $file->id])) {
-                    return true;
-                }
-
-                if ($filterAutoDisliked && (bool) ($file->auto_disliked ?? false)) {
                     return true;
                 }
 
@@ -101,7 +96,7 @@ class BrowseModerationService
             ->values()
             ->all();
 
-        // Format immediately processed files (auto-disliked/blacklisted) for frontend toast notifications
+        // Format immediately processed files (auto-blacklisted/blacklisted) for frontend toast notifications
         // These are files that were immediately processed (before they were filtered out)
         $immediatelyProcessedFiles = [];
         if (! empty($immediateActions)) {
@@ -114,7 +109,7 @@ class BrowseModerationService
                 ->only($immediateFileIds)
                 ->map(fn ($file) => [
                     'id' => $file->id,
-                    'action_type' => $actionTypeMap[$file->id] ?? 'dislike',
+                    'action_type' => $actionTypeMap[$file->id] ?? 'blacklist',
                     'thumbnail' => $file->preview_url ?? $file->url,
                 ])
                 ->values()

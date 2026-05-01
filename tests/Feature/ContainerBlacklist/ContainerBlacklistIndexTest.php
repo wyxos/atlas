@@ -10,7 +10,7 @@ test('authenticated user can view blacklisted containers', function () {
     $user = User::factory()->create();
     $container1 = Container::factory()->create([
         'blacklisted_at' => now()->subDays(2),
-        'action_type' => 'dislike',
+        'action_type' => 'blacklist',
     ]);
     $container2 = Container::factory()->create([
         'blacklisted_at' => now()->subDays(1),

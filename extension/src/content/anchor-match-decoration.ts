@@ -1,6 +1,6 @@
 import type { MediaElement } from './media-utils';
 
-type ReactionType = 'love' | 'like' | 'dislike' | 'funny' | null;
+type ReactionType = 'love' | 'like' | 'funny' | null;
 type AnchorDecorationKind = 'checking' | 'reaction' | 'opened';
 
 const BADGE_ATTR = 'data-atlas-anchor-reaction-badge';
@@ -9,7 +9,6 @@ const badgeByMedia = new WeakMap<MediaElement, HTMLDivElement>();
 const paletteByReaction: Record<Exclude<ReactionType, null>, { color: string }> = {
     love: { color: '#ef4444' },
     like: { color: '#0466c8' },
-    dislike: { color: '#6b7280' },
     funny: { color: '#eab308' },
 };
 
@@ -36,10 +35,6 @@ function iconMarkup(reaction: ReactionType, kind: AnchorDecorationKind): string 
 
     if (reaction === 'like') {
         return '<path d="M7 10v12"></path><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.94 2.5l-1.46 5A2 2 0 0 1 18.4 19H7a2 2 0 0 1-2-2v-7.31a2 2 0 0 1 .59-1.42l3.7-3.7a1 1 0 0 1 1.71.71V10"></path>';
-    }
-
-    if (reaction === 'dislike') {
-        return '<path d="M17 14V2"></path><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.94-2.5l1.46-5A2 2 0 0 1 5.6 5H17a2 2 0 0 1 2 2v7.31a2 2 0 0 1-.59 1.42l-3.7 3.7a1 1 0 0 1-1.71-.71V14"></path>';
     }
 
     if (reaction === 'funny') {
