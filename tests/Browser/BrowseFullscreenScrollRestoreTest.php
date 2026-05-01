@@ -32,8 +32,8 @@ function browseSurfaceState($page): array
                         label: button.getAttribute('aria-label'),
                         visible: rect.width > 50
                             && rect.height > 50
-                            && rect.top >= 40
-                            && rect.bottom <= window.innerHeight - 40,
+                            && rect.bottom > 80
+                            && rect.top < window.innerHeight - 80,
                     };
                 })
                 .filter((entry) => entry.visible)
