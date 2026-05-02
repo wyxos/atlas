@@ -3,6 +3,7 @@
 namespace App\Services\Downloads;
 
 use App\Models\File;
+use App\Services\FilePreviewService;
 use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Services\MetricsService;
 use App\Support\FileMimeType;
@@ -39,6 +40,7 @@ class FileDownloadFinalizer
         $wasDownloaded = (bool) $file->downloaded;
         $wasBlacklisted = $file->blacklisted_at !== null;
         $wasAutoBlacklisted = (bool) $file->auto_blacklisted;
+        $hasTerminalPreviewCount = (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT;
 
         $disk = Storage::disk(config('downloads.disk'));
 
@@ -113,6 +115,10 @@ class FileDownloadFinalizer
 
         if ($wasAutoBlacklisted) {
             $updates['auto_blacklisted'] = false;
+        }
+
+        if ($wasBlacklisted || $hasTerminalPreviewCount) {
+            $updates['previewed_count'] = FilePreviewService::RECOVERED_PREVIEW_COUNT;
         }
 
         $metrics = app(MetricsService::class);

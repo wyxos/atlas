@@ -8,6 +8,7 @@ use App\Models\File;
 use App\Models\FileMetadata;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\FileDownloadFinalizer;
+use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -247,6 +248,7 @@ test('clears blacklist flags when finalizing a downloaded file', function () {
         'downloaded' => false,
         'path' => null,
         'blacklisted_at' => now(),
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
@@ -262,6 +264,30 @@ test('clears blacklist flags when finalizing a downloaded file', function () {
     // Path should be segmented
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
     expect($file->blacklisted_at)->toBeNull();
+    expect($file->previewed_count)->toBe(FilePreviewService::RECOVERED_PREVIEW_COUNT);
+});
+
+test('resets terminal preview count when finalizing a non blacklisted downloaded file', function () {
+    $file = File::factory()->create([
+        'url' => 'https://example.com/test-image.jpg',
+        'filename' => 'test-image.jpg',
+        'ext' => 'jpg',
+        'downloaded' => false,
+        'path' => null,
+        'blacklisted_at' => null,
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+    ]);
+
+    $tmpPath = 'downloads/.tmp/transfer-1/non-blacklisted.tmp';
+    Storage::disk('atlas-app')->put($tmpPath, 'fake image content');
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
+
+    $file->refresh();
+
+    expect($file->downloaded)->toBeTrue();
+    expect($file->blacklisted_at)->toBeNull();
+    expect($file->previewed_count)->toBe(FilePreviewService::RECOVERED_PREVIEW_COUNT);
 });
 
 test('determines extension from MIME type when URL has no extension (finalizer)', function () {

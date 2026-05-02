@@ -52,7 +52,11 @@ class FileReactionService
 
         if ($existingReaction && $existingReaction->type === $type) {
             $shouldNormalizePositiveState = in_array($type, ['love', 'like', 'funny'], true)
-                && ($file->auto_blacklisted || $file->blacklisted_at !== null);
+                && (
+                    $file->auto_blacklisted
+                    || $file->blacklisted_at !== null
+                    || (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
+                );
 
             if (! $shouldNormalizePositiveState) {
                 if ($queueDownload) {
@@ -151,6 +155,7 @@ class FileReactionService
         $oldType = $existingReaction?->type;
         $wasBlacklisted = $file->blacklisted_at !== null;
         $isBlacklisted = $wasBlacklisted;
+        $hasTerminalPreviewCount = (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT;
 
         // Positive reactions recover a blacklisted file and queue/download as normal.
         if (in_array($type, ['love', 'like', 'funny'], true)) {
@@ -162,6 +167,10 @@ class FileReactionService
                 $metrics->applyBlacklistClear($file, false);
                 $updates['blacklisted_at'] = null;
                 $isBlacklisted = false;
+            }
+
+            if ($wasBlacklisted || $hasTerminalPreviewCount) {
+                $updates['previewed_count'] = FilePreviewService::RECOVERED_PREVIEW_COUNT;
             }
 
             $file->update($updates);

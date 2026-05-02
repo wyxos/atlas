@@ -3,6 +3,7 @@
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
@@ -74,6 +75,7 @@ test('removes blacklist flags when user reacts with like on blacklisted file', f
     $admin = User::factory()->admin()->create();
     $file = File::factory()->create([
         'blacklisted_at' => now(),
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
     ]);
 
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
@@ -82,7 +84,31 @@ test('removes blacklist flags when user reacts with like on blacklisted file', f
 
     $response->assertSuccessful();
     $file->refresh();
-    expect($file->blacklisted_at)->toBeNull();
+    expect($file->blacklisted_at)->toBeNull()
+        ->and($file->previewed_count)->toBe(FilePreviewService::RECOVERED_PREVIEW_COUNT);
+});
+
+test('normalizes terminal preview count when reapplying an existing positive reaction', function () {
+    $admin = User::factory()->admin()->create();
+    $file = File::factory()->create([
+        'blacklisted_at' => null,
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+    ]);
+    Reaction::create([
+        'file_id' => $file->id,
+        'user_id' => $admin->id,
+        'type' => 'like',
+    ]);
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
+        'type' => 'like',
+    ]);
+
+    $response->assertSuccessful();
+    $file->refresh();
+    expect($file->blacklisted_at)->toBeNull()
+        ->and($file->previewed_count)->toBe(FilePreviewService::RECOVERED_PREVIEW_COUNT)
+        ->and($file->reactions()->where('user_id', $admin->id)->value('type'))->toBe('like');
 });
 
 test('removes blacklist flags when user reacts with love on blacklisted file', function () {

@@ -11,6 +11,8 @@ class FilePreviewService
 {
     public const int FEED_REMOVED_PREVIEW_COUNT = 99999;
 
+    public const int RECOVERED_PREVIEW_COUNT = 4;
+
     private const int AUTO_BLACKLIST_PREVIEW_COUNT = 2;
 
     public function __construct(
