@@ -95,10 +95,10 @@ describe('useVibeFillControls', () => {
         expect(handle.autoScroll).toHaveBeenLastCalledWith(20);
         expect(controls.autoScrollActive.value).toBe(true);
 
-        controls.setAutoScrollSpeed(151);
+        controls.setAutoScrollSpeed(301);
 
-        expect(controls.autoScrollSpeed.value).toBe(150);
-        expect(handle.autoScroll).toHaveBeenLastCalledWith(150);
+        expect(controls.autoScrollSpeed.value).toBe(300);
+        expect(handle.autoScroll).toHaveBeenLastCalledWith(300);
 
         surfaceMode.value = 'fullscreen';
         await nextTick();

@@ -90,7 +90,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   totalAvailable: null,
   autoScrollActive: false,
-  autoScrollMax: 150,
+  autoScrollMax: 300,
   autoScrollMin: 20,
   autoScrollSpeed: 50,
   bulkActionsDisabled: true,

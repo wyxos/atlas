@@ -148,8 +148,8 @@ function getFullscreenReactionPositionClasses(item: VibeViewerItem): string {
 const vibeLayoutBindings = computed(() => ({
     activeIndex: props.activeIndex,
     emptyStateMode: 'hidden' as const,
-    fillDelayMs: 2000,
-    fillDelayStepMs: 1000,
+    fillDelayMs: props.form.data.feed === 'local' ? 0 : 2000,
+    fillDelayStepMs: props.form.data.feed === 'local' ? 0 : 1000,
     initialCursor: props.vibeInitialCursor,
     initialState: props.vibeInitialState,
     loopFullscreenVideo: true,

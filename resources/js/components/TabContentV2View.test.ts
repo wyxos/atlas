@@ -45,6 +45,22 @@ const browseV2StatusBarStub = defineComponent({
     },
 });
 
+const defaultStubs = {
+    BrowseV2StatusBar: browseV2StatusBarStub,
+    Button: testStub,
+    ContainerBlacklistManager: testStub,
+    DownloadedReactionDialog: testStub,
+    FileReactions: testStub,
+    FileViewerSheet: testStub,
+    LocalFileDeleteDialog: testStub,
+    PanelRightOpen: testStub,
+    TabContentContainerDrawer: testStub,
+    TabContentPromptDialog: testStub,
+    TabContentServiceHeader: testStub,
+    TabContentStartForm: testStub,
+    TabContentV2GridOverlay: testStub,
+};
+
 vi.mock('@wyxos/vibe', () => ({
     VibeLayout: defineComponent({
         name: 'VibeLayout',
@@ -52,6 +68,8 @@ vi.mock('@wyxos/vibe', () => ({
         props: {
             activeIndex: { type: Number, default: 0 },
             emptyStateMode: { type: String, default: 'inline' },
+            fillDelayMs: { type: Number, default: undefined },
+            fillDelayStepMs: { type: Number, default: undefined },
             loopFullscreenVideo: { type: Boolean, default: false },
             showEndBadge: { type: Boolean, default: true },
             showStatusBadges: { type: Boolean, default: true },
@@ -63,6 +81,8 @@ vi.mock('@wyxos/vibe', () => ({
                 props: {
                     activeIndex: props.activeIndex,
                     emptyStateMode: props.emptyStateMode,
+                    fillDelayMs: props.fillDelayMs,
+                    fillDelayStepMs: props.fillDelayStepMs,
                     loopFullscreenVideo: props.loopFullscreenVideo,
                     showEndBadge: props.showEndBadge,
                     showStatusBadges: props.showStatusBadges,
@@ -269,21 +289,7 @@ describe('TabContentV2View', () => {
         const wrapper = mount(TabContentV2View, {
             props: createProps(),
             global: {
-                stubs: {
-                    BrowseV2StatusBar: browseV2StatusBarStub,
-                    Button: testStub,
-                    ContainerBlacklistManager: testStub,
-                    DownloadedReactionDialog: testStub,
-                    FileReactions: testStub,
-                    FileViewerSheet: testStub,
-                    LocalFileDeleteDialog: testStub,
-                    TabContentContainerDrawer: testStub,
-                    TabContentPromptDialog: testStub,
-                    TabContentServiceHeader: testStub,
-                    TabContentStartForm: testStub,
-                    TabContentV2GridOverlay: testStub,
-                    PanelRightOpen: testStub,
-                },
+                stubs: defaultStubs,
             },
         });
 
@@ -291,30 +297,34 @@ describe('TabContentV2View', () => {
         expect(vibeLayoutSpy).toHaveBeenCalled();
         expect(vibeLayoutSpy.mock.calls[0][0].props.activeIndex).toBe(1);
         expect(vibeLayoutSpy.mock.calls[0][0].props.emptyStateMode).toBe('hidden');
+        expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayMs).toBe(2000);
+        expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayStepMs).toBe(1000);
         expect(vibeLayoutSpy.mock.calls[0][0].props.loopFullscreenVideo).toBe(true);
         expect(vibeLayoutSpy.mock.calls[0][0].props.showEndBadge).toBe(false);
         expect(vibeLayoutSpy.mock.calls[0][0].props.surfaceMode).toBe('fullscreen');
         expect(vibeLayoutSpy.mock.calls[0][0].props.showStatusBadges).toBe(false);
     });
 
+    it('removes Vibe fill delay while browsing the local service', () => {
+        const props = createProps();
+        props.form.data.feed = 'local';
+
+        mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: defaultStubs,
+            },
+        });
+
+        expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayMs).toBe(0);
+        expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayStepMs).toBe(0);
+    });
+
     it('does not provide Vibe status badge slots when Atlas disables them', () => {
         const wrapper = mount(TabContentV2View, {
             props: createProps(),
             global: {
-                stubs: {
-                    BrowseV2StatusBar: browseV2StatusBarStub,
-                    Button: testStub,
-                    ContainerBlacklistManager: testStub,
-                    DownloadedReactionDialog: testStub,
-                    FileReactions: testStub,
-                    FileViewerSheet: testStub,
-                    LocalFileDeleteDialog: testStub,
-                    TabContentContainerDrawer: testStub,
-                    TabContentPromptDialog: testStub,
-                    TabContentServiceHeader: testStub,
-                    TabContentStartForm: testStub,
-                    TabContentV2GridOverlay: testStub,
-                },
+                stubs: defaultStubs,
             },
         });
 
@@ -329,20 +339,7 @@ describe('TabContentV2View', () => {
         const wrapper = mount(TabContentV2View, {
             props,
             global: {
-                stubs: {
-                    BrowseV2StatusBar: browseV2StatusBarStub,
-                    Button: testStub,
-                    ContainerBlacklistManager: testStub,
-                    DownloadedReactionDialog: testStub,
-                    FileReactions: testStub,
-                    FileViewerSheet: testStub,
-                    LocalFileDeleteDialog: testStub,
-                    TabContentContainerDrawer: testStub,
-                    TabContentPromptDialog: testStub,
-                    TabContentServiceHeader: testStub,
-                    TabContentStartForm: testStub,
-                    TabContentV2GridOverlay: testStub,
-                },
+                stubs: defaultStubs,
             },
         });
 
@@ -366,20 +363,7 @@ describe('TabContentV2View', () => {
         mount(TabContentV2View, {
             props,
             global: {
-                stubs: {
-                    BrowseV2StatusBar: browseV2StatusBarStub,
-                    Button: testStub,
-                    ContainerBlacklistManager: testStub,
-                    DownloadedReactionDialog: testStub,
-                    FileReactions: testStub,
-                    FileViewerSheet: testStub,
-                    LocalFileDeleteDialog: testStub,
-                    TabContentContainerDrawer: testStub,
-                    TabContentPromptDialog: testStub,
-                    TabContentServiceHeader: testStub,
-                    TabContentStartForm: testStub,
-                    TabContentV2GridOverlay: testStub,
-                },
+                stubs: defaultStubs,
             },
         });
 
@@ -404,20 +388,7 @@ describe('TabContentV2View', () => {
         mount(TabContentV2View, {
             props,
             global: {
-                stubs: {
-                    BrowseV2StatusBar: browseV2StatusBarStub,
-                    Button: testStub,
-                    ContainerBlacklistManager: testStub,
-                    DownloadedReactionDialog: testStub,
-                    FileReactions: testStub,
-                    FileViewerSheet: testStub,
-                    LocalFileDeleteDialog: testStub,
-                    TabContentContainerDrawer: testStub,
-                    TabContentPromptDialog: testStub,
-                    TabContentServiceHeader: testStub,
-                    TabContentStartForm: testStub,
-                    TabContentV2GridOverlay: testStub,
-                },
+                stubs: defaultStubs,
             },
         });
 
@@ -456,20 +427,7 @@ describe('TabContentV2View', () => {
             const wrapper = mount(TabContentV2View, {
                 props: createProps(),
                 global: {
-                    stubs: {
-                        BrowseV2StatusBar: browseV2StatusBarStub,
-                        Button: testStub,
-                        ContainerBlacklistManager: testStub,
-                        DownloadedReactionDialog: testStub,
-                        FileReactions: testStub,
-                        FileViewerSheet: testStub,
-                        LocalFileDeleteDialog: testStub,
-                        TabContentContainerDrawer: testStub,
-                        TabContentPromptDialog: testStub,
-                        TabContentServiceHeader: testStub,
-                        TabContentStartForm: testStub,
-                        TabContentV2GridOverlay: testStub,
-                    },
+                    stubs: defaultStubs,
                 },
             });
 
@@ -511,18 +469,8 @@ describe('TabContentV2View', () => {
             props,
             global: {
                 stubs: {
-                    BrowseV2StatusBar: browseV2StatusBarStub,
-                    Button: testStub,
-                    ContainerBlacklistManager: testStub,
-                    DownloadedReactionDialog: testStub,
+                    ...defaultStubs,
                     FileReactions: fileReactionsStub,
-                    FileViewerSheet: testStub,
-                    LocalFileDeleteDialog: testStub,
-                    TabContentContainerDrawer: testStub,
-                    TabContentPromptDialog: testStub,
-                    TabContentServiceHeader: testStub,
-                    TabContentStartForm: testStub,
-                    TabContentV2GridOverlay: testStub,
                 },
             },
         });

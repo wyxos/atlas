@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue';
 import type { VibeHandle, VibeStatus } from '@wyxos/vibe';
 
-export const AUTO_SCROLL_SPEED_MAX = 150;
+export const AUTO_SCROLL_SPEED_MAX = 300;
 export const AUTO_SCROLL_SPEED_MIN = 20;
 export const DEFAULT_AUTO_SCROLL_SPEED = 50;
 export const DEFAULT_FILL_CALL_COUNT = 10;
