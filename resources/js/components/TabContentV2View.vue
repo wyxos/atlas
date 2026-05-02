@@ -52,11 +52,10 @@ const props = defineProps<{
     autoScrollMin?: number;
     autoScrollSpeed?: number;
     availableServices: ServiceOption[];
-    availableSources: ServiceOption[];
+    availableSources: string[];
     applyFilters: () => Promise<void>;
     applyService: () => Promise<void>;
     cancelFill: () => void;
-    cancelLoad: () => void;
     closeFileSheet: () => void;
     containerInteractions: TabContentContainerInteractions;
     currentVisibleItem: FeedItem | null;
@@ -182,7 +181,6 @@ useEventListener(document, 'pointermove', (event) => {
             :apply-service="applyService"
             :apply-filters="applyFilters"
             :reset-filters="form.reset"
-            :cancel-masonry-load="cancelLoad"
             :go-to-first-page="goToFirstPage"
             :load-next-page="loadNext"
         >
@@ -194,9 +192,8 @@ useEventListener(document, 'pointermove', (event) => {
         </TabContentServiceHeader>
         <TabContentStartForm
             v-if="shouldShowForm"
-            :form="form"
             :available-services="availableServices"
-            :available-sources="availableSources"
+            :local-service="localService"
             :is-loading="vibeStatus.phase === 'loading' || vibeStatus.phase === 'filling' || vibeStatus.phase === 'refreshing'"
             :set-local-mode="setLocalMode"
             :update-service="updateService"

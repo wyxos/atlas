@@ -1,4 +1,5 @@
 import type { FeedItem } from '@/composables/useTabs';
+import { FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 import type { ReactionType } from '@/types/reaction';
 
 const POSITIVE_REACTION_TYPES: ReactionType[] = ['love', 'like', 'funny'];
@@ -16,6 +17,7 @@ export type LocalReactionSnapshot = {
     auto_blacklist_rule: FeedItem['auto_blacklist_rule'];
     blacklisted_at: FeedItem['blacklisted_at'];
     blacklist_rule: FeedItem['blacklist_rule'];
+    previewed_count: FeedItem['previewed_count'];
 };
 
 export function normalizeReactionType(value: unknown): ReactionType | null {
@@ -63,6 +65,7 @@ export function createLocalReactionSnapshot(item: FeedItem): LocalReactionSnapsh
         auto_blacklist_rule: item.auto_blacklist_rule ?? null,
         blacklisted_at: item.blacklisted_at ?? null,
         blacklist_rule: item.blacklist_rule ?? null,
+        previewed_count: item.previewed_count,
     };
 }
 
@@ -99,6 +102,38 @@ export function applyExactLocalReactionState(
     item.blacklist_rule = null;
 }
 
+export function applyOptimisticLocalBlacklistState(item: FeedItem): LocalReactionSnapshot {
+    const snapshot = createLocalReactionSnapshot(item);
+
+    item.reaction = null;
+    item.auto_blacklisted = false;
+    item.auto_blacklist_rule = null;
+    item.blacklisted_at = item.blacklisted_at ?? new Date().toISOString();
+    item.blacklist_rule = null;
+    item.previewed_count = Math.max(
+        Number(item.previewed_count ?? 0),
+        FEED_REMOVED_PREVIEW_COUNT,
+    );
+
+    return snapshot;
+}
+
+export function applyConfirmedLocalBlacklistState(
+    item: FeedItem,
+    result: { blacklisted_at: string; previewed_count?: number },
+): void {
+    item.blacklisted_at = result.blacklisted_at;
+    item.blacklist_rule = null;
+    item.reaction = null;
+    item.auto_blacklisted = false;
+    item.auto_blacklist_rule = null;
+    item.previewed_count = Math.max(
+        Number(item.previewed_count ?? 0),
+        Number(result.previewed_count ?? 0),
+        FEED_REMOVED_PREVIEW_COUNT,
+    );
+}
+
 export function restoreOptimisticLocalReactionState(
     item: FeedItem,
     snapshot: LocalReactionSnapshot,
@@ -114,6 +149,7 @@ export function restoreOptimisticLocalReactionState(
     item.auto_blacklist_rule = snapshot.auto_blacklist_rule ?? null;
     item.blacklisted_at = snapshot.blacklisted_at ?? null;
     item.blacklist_rule = snapshot.blacklist_rule ?? null;
+    item.previewed_count = snapshot.previewed_count;
 }
 
 function matchesDownloadedFilter(item: FeedItem, value: unknown): boolean {

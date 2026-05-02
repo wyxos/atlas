@@ -2,10 +2,17 @@ import { store as storeReaction } from '@/actions/App/Http/Controllers/FileReact
 import type { ReactionType } from '@/types/reaction';
 
 const BATCH_STORE_URL = '/api/files/reactions/batch/store';
+const BATCH_BLACKLIST_URL = '/api/files/blacklist/batch';
 
 export type ReactionStoreResponse = {
     reaction: { type: ReactionType } | null;
     should_prompt_redownload?: boolean;
+};
+
+export type BatchBlacklistResult = {
+    id: number;
+    blacklisted_at: string;
+    previewed_count?: number;
 };
 
 /**
@@ -54,5 +61,31 @@ export function createBatchReactionCallback(): (
                 })),
             });
         }
+    };
+}
+
+export function createBatchBlacklistCallback(): (
+    fileIds: number[]
+) => Promise<BatchBlacklistResult[]> {
+    return async (fileIds: number[]) => {
+        if (fileIds.length === 0) {
+            return [];
+        }
+
+        const results: BatchBlacklistResult[] = [];
+        const CHUNK_SIZE = 100;
+
+        for (let i = 0; i < fileIds.length; i += CHUNK_SIZE) {
+            const chunk = fileIds.slice(i, i + CHUNK_SIZE);
+            const { data } = await window.axios.post<{ results?: BatchBlacklistResult[] }>(BATCH_BLACKLIST_URL, {
+                file_ids: chunk,
+            });
+
+            if (Array.isArray(data.results)) {
+                results.push(...data.results);
+            }
+        }
+
+        return results;
     };
 }

@@ -61,6 +61,8 @@ type VibeStatusLike = {
   phase: 'failed' | 'filling' | 'idle' | 'initializing' | 'loading' | 'refreshing'
   previousBoundaryLoadProgress: number
   previousCursor: string | null
+  removedCount?: number
+  removedIds?: readonly string[]
 }
 
 interface Props {
@@ -131,6 +133,17 @@ const showActionRail = computed(() => (
 ))
 const nextBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.nextBoundaryLoadProgress) * 100))
 const previousBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.previousBoundaryLoadProgress) * 100))
+const availableTotal = computed(() => {
+  if (props.totalAvailable === null || props.totalAvailable === undefined) {
+    return null
+  }
+
+  const removedCount = Number.isFinite(Number(props.status.removedCount))
+    ? Number(props.status.removedCount)
+    : (Array.isArray(props.status.removedIds) ? props.status.removedIds.length : 0)
+
+  return Math.max(0, props.totalAvailable - Math.max(0, removedCount))
+})
 
 const statusLabel = computed(() => {
   if (props.status.loadState === 'failed') {
@@ -311,9 +324,9 @@ function clampProgress(value: unknown): number {
       </Pill>
       <Pill label="Loaded" :value="status.itemCount" variant="primary" reversed data-testid="browse-v2-loaded-total-pill" />
       <Pill
-        v-if="props.totalAvailable !== null && props.totalAvailable !== undefined"
+        v-if="availableTotal !== null"
         label="Available"
-        :value="props.totalAvailable"
+        :value="availableTotal"
         variant="primary"
         reversed
         data-testid="browse-v2-available-total-pill"
@@ -337,7 +350,7 @@ function clampProgress(value: unknown): number {
               class="relative h-2 flex-1 overflow-hidden rounded-full border border-white/10 bg-white/[0.08]"
             >
               <span
-                class="absolute inset-y-0 left-0 rounded-full bg-sky-300/80 transition-[width] duration-150"
+                class="absolute inset-y-0 left-0 rounded-full bg-amber-300/80 transition-[width] duration-150"
                 :class="props.pageLoadingLocked ? 'opacity-45' : ''"
                 :style="{ width: `${previousBoundaryProgressPercent}%` }"
               />
@@ -349,7 +362,7 @@ function clampProgress(value: unknown): number {
       <Pill
         label="Next load"
         value=""
-        variant="warning"
+        variant="info"
         reversed
         data-testid="browse-v2-next-boundary-pill"
       >

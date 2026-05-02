@@ -437,13 +437,14 @@ describe('BrowseV2StatusBar', () => {
             props: {
                 status: createStatus({
                     itemCount: 24,
+                    removedCount: 4,
                 }),
                 totalAvailable: 381,
             },
         });
 
         expect(wrapper.get('[data-testid="browse-v2-loaded-total-pill"]').text()).toContain('24');
-        expect(wrapper.get('[data-testid="browse-v2-available-total-pill"]').text()).toContain('381');
+        expect(wrapper.get('[data-testid="browse-v2-available-total-pill"]').text()).toContain('377');
     });
 
     it('hides backend available total when unavailable', () => {
@@ -491,6 +492,9 @@ describe('BrowseV2StatusBar', () => {
 
         expect(wrapper.get('[data-testid="browse-v2-previous-boundary-progress"]').attributes('aria-valuenow')).toBe('68');
         expect(wrapper.get('[data-testid="browse-v2-next-boundary-progress"]').attributes('aria-valuenow')).toBe('42');
+        expect(wrapper.get('[data-testid="browse-v2-previous-boundary-pill"]').attributes('data-variant')).toBe('info');
+        expect(wrapper.get('[data-testid="browse-v2-next-boundary-pill"]').attributes('data-variant')).toBe('info');
+        expect(wrapper.html()).toContain('bg-amber-300/80');
         expect(wrapper.html()).not.toContain('max-w-[1280px]');
     });
 

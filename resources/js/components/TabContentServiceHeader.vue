@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronsUp, Play, X } from 'lucide-vue-next';
+import { ChevronDown, ChevronsUp, Play } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import TabFilter from './TabFilter.vue';
@@ -22,7 +22,6 @@ interface Props {
     applyService: () => void | Promise<void>;
     applyFilters: () => void | Promise<void>;
     resetFilters: () => void;
-    cancelMasonryLoad: () => void;
     goToFirstPage: () => void | Promise<void>;
     loadNextPage: () => void | Promise<void>;
 }
@@ -88,11 +87,6 @@ withDefaults(defineProps<Props>(), {
 
             <ModerationRulesManager :disabled="masonry?.isLoading" />
             <slot />
-
-            <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
-                data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
-                <X :size="14" />
-            </Button>
 
             <Button @click="goToFirstPage" size="sm" variant="ghost" class="h-10 w-10"
                 data-test="go-first-page-button" title="Go to first page"

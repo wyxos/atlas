@@ -32,6 +32,18 @@ describe('FileReactions', () => {
         expect(wrapper.text()).toContain('3/20');
     });
 
+    it('shows an infinity icon instead of the terminal preview count', () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                previewedCount: 99999,
+            },
+        });
+
+        expect(wrapper.text()).not.toContain('99999');
+        expect(wrapper.find('[aria-label="Preview count removed from feed"]').exists()).toBe(true);
+    });
+
     it('shows only index (not total) in small variant', () => {
         const wrapper = mount(FileReactions, {
             props: {

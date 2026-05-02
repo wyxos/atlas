@@ -1,27 +1,21 @@
 import { nextTick, triggerRef, type Ref, type ShallowRef } from 'vue';
 import type { FeedItem, TabData } from '@/composables/useTabs';
-import { queueBatchReaction } from '@/utils/reactionQueue';
+import { queueBatchBlacklist, queueBatchReaction, queueBlacklist } from '@/utils/reactionQueue';
 import type { BrowseFeedHandle } from '@/types/browse';
 import type { ReactionType } from '@/types/reaction';
-import { FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 import {
+    applyConfirmedLocalBlacklistState,
+    applyOptimisticLocalBlacklistState,
     applyOptimisticLocalReactionState,
     restoreOptimisticLocalReactionState,
     type LocalReactionSnapshot,
 } from '@/utils/localReactionState';
+import type { BatchBlacklistResult } from '@/utils/reactions';
 
 export type LoadedItemsBulkAction =
     | 'love'
     | 'like'
     | 'blacklist';
-
-type BatchBlacklistResponse = {
-    results?: Array<{
-        id: number;
-        blacklisted_at: string;
-        previewed_count?: number;
-    }>;
-};
 
 type CreateLoadedItemsBulkActionsOptions = {
     getLoadedItems: () => FeedItem[];
@@ -33,8 +27,6 @@ type CreateLoadedItemsBulkActionsOptions = {
     clearHoverForRemovedItems: (itemIds: Set<number>) => void;
     onReaction: (fileId: number, type: ReactionType) => void;
 };
-
-const LOADED_ITEMS_BATCH_SIZE = 100;
 
 export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActionsOptions) {
     function getItemsToRemoveAfterLocalMutation(changedItems: FeedItem[]): FeedItem[] {
@@ -127,47 +119,77 @@ export function createLoadedItemsBulkActions(options: CreateLoadedItemsBulkActio
         }
 
         const fileIds = itemsToBlacklist.map((item) => item.id);
-        const results: NonNullable<BatchBlacklistResponse['results']> = [];
+        const previews = itemsToBlacklist.map((item) => ({
+            fileId: item.id,
+            thumbnail: item.thumbnail || item.preview || item.src,
+        }));
+        const currentTabId = options.tab.value?.id;
+        let restoreCallback: (() => Promise<void> | void) | undefined;
 
-        for (let index = 0; index < fileIds.length; index += LOADED_ITEMS_BATCH_SIZE) {
-            const chunk = fileIds.slice(index, index + LOADED_ITEMS_BATCH_SIZE);
-            const { data } = await window.axios.post<BatchBlacklistResponse>('/api/files/blacklist/batch', {
-                file_ids: chunk,
-            });
+        if (options.isLocal.value) {
+            const snapshots = new Map<number, LocalReactionSnapshot>();
 
-            if (Array.isArray(data.results)) {
-                results.push(...data.results);
-            }
-        }
-
-        const resultMap = new Map(results.map((result) => [result.id, result]));
-        const confirmedBlacklistedItems = itemsToBlacklist.filter((item) => resultMap.has(item.id));
-
-        for (const item of confirmedBlacklistedItems) {
-            const result = resultMap.get(item.id);
-            if (!result) {
-                continue;
+            for (const item of itemsToBlacklist) {
+                snapshots.set(item.id, applyOptimisticLocalBlacklistState(item));
             }
 
-            item.blacklisted_at = result.blacklisted_at;
-            item.blacklist_rule = null;
-            item.reaction = null;
-            item.auto_blacklisted = false;
-            item.auto_blacklist_rule = null;
-            item.previewed_count = Math.max(
-                Number(item.previewed_count ?? 0),
-                Number(result.previewed_count ?? 0),
-                FEED_REMOVED_PREVIEW_COUNT,
-            );
+            const itemsToTemporarilyRemove = getItemsToRemoveAfterLocalMutation(itemsToBlacklist);
+
+            if (itemsToTemporarilyRemove.length > 0) {
+                await removeItemsFromView(itemsToTemporarilyRemove);
+            } else {
+                triggerRef(options.items);
+                await nextTick();
+            }
+
+            restoreCallback = async () => {
+                for (const item of itemsToBlacklist) {
+                    const snapshot = snapshots.get(item.id);
+
+                    if (snapshot) {
+                        restoreOptimisticLocalReactionState(item, snapshot);
+                    }
+                }
+
+                triggerRef(options.items);
+
+                if (itemsToTemporarilyRemove.length === 0) {
+                    return;
+                }
+
+                await options.masonry.value?.restore(itemsToTemporarilyRemove);
+            };
+        } else {
+            await removeItemsFromView(itemsToBlacklist);
+
+            restoreCallback = currentTabId !== undefined
+                ? async () => {
+                    await options.masonry.value?.restore(itemsToBlacklist);
+                }
+                : undefined;
         }
 
-        if (confirmedBlacklistedItems.length === 0) {
-            return 0;
+        const onSuccess = (results: BatchBlacklistResult[]) => {
+            const resultMap = new Map(results.map((result) => [result.id, result]));
+
+            for (const item of itemsToBlacklist) {
+                const result = resultMap.get(item.id);
+
+                if (result) {
+                    applyConfirmedLocalBlacklistState(item, result);
+                }
+            }
+
+            triggerRef(options.items);
+        };
+
+        if (fileIds.length === 1) {
+            queueBlacklist(fileIds[0], previews[0]?.thumbnail, restoreCallback, options.items, { onSuccess });
+        } else {
+            queueBatchBlacklist(fileIds, previews, restoreCallback, options.items, { onSuccess });
         }
 
-        await removeItemsFromView(confirmedBlacklistedItems);
-
-        return confirmedBlacklistedItems.length;
+        return fileIds.length;
     }
 
     async function performLoadedItemsBulkAction(action: LoadedItemsBulkAction): Promise<number> {

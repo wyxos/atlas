@@ -40,7 +40,6 @@ function createProps() {
         applyService: vi.fn(async () => undefined),
         applyFilters: vi.fn(async () => undefined),
         resetFilters: vi.fn(),
-        cancelMasonryLoad: vi.fn(),
         goToFirstPage: vi.fn(async () => undefined),
         loadNextPage: vi.fn(async () => undefined),
     };
@@ -63,13 +62,12 @@ describe('TabContentServiceHeader', () => {
                     SelectTrigger: simpleStub,
                     SelectValue: simpleStub,
                     TabFilter: simpleStub,
-                    X: simpleStub,
                 },
             },
         });
 
         expect(wrapper.find('[data-test="loaded-items-menu-trigger"]').exists()).toBe(false);
-        expect(wrapper.get('[data-test="cancel-loading-button"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="cancel-loading-button"]').exists()).toBe(false);
         expect(wrapper.get('[data-test="go-first-page-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="load-next-page-button"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="page-loading-lock-button"]').exists()).toBe(false);
@@ -101,7 +99,6 @@ describe('TabContentServiceHeader', () => {
                     SelectTrigger: simpleStub,
                     SelectValue: simpleStub,
                     TabFilter: simpleStub,
-                    X: simpleStub,
                 },
             },
         });
@@ -113,15 +110,5 @@ describe('TabContentServiceHeader', () => {
         expect(props.goToFirstPage).toHaveBeenCalledTimes(1);
         expect(props.loadNextPage).toHaveBeenCalledTimes(1);
         expect(props.applyService).toHaveBeenCalledTimes(1);
-
-        await wrapper.setProps({
-            masonry: {
-                ...props.masonry,
-                isLoading: true,
-            },
-        });
-        await wrapper.get('[data-test="cancel-loading-button"]').trigger('click');
-
-        expect(props.cancelMasonryLoad).toHaveBeenCalledTimes(1);
     });
 });

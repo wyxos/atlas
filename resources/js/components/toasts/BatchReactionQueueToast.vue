@@ -2,9 +2,8 @@
 import { computed } from 'vue';
 import { useToast } from '@/components/ui/toast/use-toast';
 import { queueManager } from '@/composables/useQueue';
-import { cancelBatchQueuedReaction } from '@/utils/reactionQueue';
-import type { ReactionType } from '@/types/reaction';
-import { Heart, ThumbsUp, Smile, Undo2 } from 'lucide-vue-next';
+import { cancelBatchQueuedReaction, type QueuedReactionType } from '@/utils/reactionQueue';
+import { Ban, Heart, ThumbsUp, Smile, Undo2 } from 'lucide-vue-next';
 import ToastPreviewStrip from './ToastPreviewStrip.vue';
 
 const toast = useToast();
@@ -16,7 +15,7 @@ interface PreviewItem {
 
 interface Props {
     queueId: string;
-    reactionType: ReactionType;
+    reactionType: QueuedReactionType;
     previews: PreviewItem[];
     totalCount: number;
 }
@@ -36,10 +35,11 @@ const previewItems = computed(() =>
 );
 
 const reactionConfig = computed(() => {
-    const configs: Record<ReactionType, { label: string; icon: typeof Heart; color: string }> = {
+    const configs: Record<QueuedReactionType, { label: string; icon: typeof Heart; color: string }> = {
         love: { label: 'Loved', icon: Heart, color: 'text-red-500' },
         like: { label: 'Liked', icon: ThumbsUp, color: 'text-blue-500' },
         funny: { label: 'Funny', icon: Smile, color: 'text-yellow-500' },
+        blacklist: { label: 'Blacklisted', icon: Ban, color: 'text-danger-400' },
     };
     return configs[props.reactionType];
 });

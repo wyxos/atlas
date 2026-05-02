@@ -497,7 +497,6 @@ watch(
         :auto-scroll-min="AUTO_SCROLL_SPEED_MIN"
         :auto-scroll-speed="autoScrollSpeed"
         :cancel-fill="cancelActiveVibeFill"
-        :cancel-load="() => vibeRef?.cancel()"
         :fill-actions-disabled="fillActionsDisabled"
         :fill-call-count="fillCallCount"
         :fill-call-count-max="FILL_CALL_COUNT_MAX"

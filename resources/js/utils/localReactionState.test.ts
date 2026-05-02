@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { FeedItem } from '@/composables/useTabs';
 import {
+    applyConfirmedLocalBlacklistState,
+    applyOptimisticLocalBlacklistState,
     applyOptimisticLocalReactionState,
     isPositiveOnlyLocalView,
     matchesLocalViewFilters,
@@ -59,6 +61,45 @@ describe('localReactionState', () => {
             auto_blacklisted: 'any',
             reaction_mode: 'any',
         })).toBe(false);
+    });
+
+    it('sets terminal preview count for optimistic manual blacklists and restores it on rollback', () => {
+        const item = createItem({
+            reaction: { type: 'like' },
+            previewed_count: 4,
+        });
+
+        const snapshot = applyOptimisticLocalBlacklistState(item);
+
+        expect(item.reaction).toBeNull();
+        expect(item.auto_blacklisted).toBe(false);
+        expect(item.blacklisted_at).not.toBeNull();
+        expect(item.previewed_count).toBe(99999);
+
+        restoreOptimisticLocalReactionState(item, snapshot);
+
+        expect(item.reaction).toEqual({ type: 'like' });
+        expect(item.blacklisted_at).toBeNull();
+        expect(item.previewed_count).toBe(4);
+    });
+
+    it('applies confirmed manual blacklist results from the queued backend response', () => {
+        const item = createItem({
+            reaction: { type: 'funny' },
+            auto_blacklisted: true,
+            previewed_count: 2,
+        });
+
+        applyConfirmedLocalBlacklistState(item, {
+            blacklisted_at: '2026-05-01T00:00:00Z',
+            previewed_count: 99999,
+        });
+
+        expect(item.reaction).toBeNull();
+        expect(item.auto_blacklisted).toBe(false);
+        expect(item.auto_blacklist_rule).toBeNull();
+        expect(item.blacklisted_at).toBe('2026-05-01T00:00:00Z');
+        expect(item.previewed_count).toBe(99999);
     });
 
     it('keeps only love reactions in favorite presets', () => {

@@ -1,6 +1,6 @@
 import { useToast } from '@/components/ui/toast/use-toast';
 import { queueManager } from '@/composables/useQueue';
-import { createReactionCallback, createBatchReactionCallback } from './reactions';
+import { createReactionCallback, createBatchReactionCallback, createBatchBlacklistCallback, type BatchBlacklistResult } from './reactions';
 import updateReactionState from '@/utils/reactionStateUpdater';
 import type { ReactionType } from '@/types/reaction';
 import type { Ref } from 'vue';
@@ -13,18 +13,19 @@ const toast = useToast();
 const queue = queueManager;
 const queueCollection = queue.collection;
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
-const REACTION_TYPES: ReactionType[] = ['love', 'like', 'funny'];
+const QUEUED_REACTION_TYPES = ['love', 'like', 'funny', 'blacklist'] as const;
+export type QueuedReactionType = ReactionType | 'blacklist';
 type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
     items?: Ref<FeedItem[]>;
 };
 type SingleReactionQueueMetadata = ReactionQueueMetadata & {
     fileId: number;
-    reactionType: ReactionType;
+    reactionType: QueuedReactionType;
 };
 type BatchReactionQueueMetadata = ReactionQueueMetadata & {
     fileIds: number[];
-    reactionType: ReactionType;
+    reactionType: QueuedReactionType;
 };
 type QueueReactionOptions = {
     forceDownload?: boolean;
@@ -33,16 +34,19 @@ type QueueReactionOptions = {
 type QueueBatchReactionOptions = {
     updateLocalState?: boolean;
 };
+type QueueBlacklistOptions = {
+    onSuccess?: (results: BatchBlacklistResult[]) => Promise<void> | void;
+};
 
-function isReactionType(value: unknown): value is ReactionType {
-    return typeof value === 'string' && REACTION_TYPES.includes(value as ReactionType);
+function isQueuedReactionType(value: unknown): value is QueuedReactionType {
+    return typeof value === 'string' && QUEUED_REACTION_TYPES.includes(value as QueuedReactionType);
 }
 
 function isSingleReactionQueueMetadata(metadata: unknown): metadata is SingleReactionQueueMetadata {
     return typeof metadata === 'object'
         && metadata !== null
         && typeof (metadata as { fileId?: unknown }).fileId === 'number'
-        && isReactionType((metadata as { reactionType?: unknown }).reactionType);
+        && isQueuedReactionType((metadata as { reactionType?: unknown }).reactionType);
 }
 
 function isBatchReactionQueueMetadata(metadata: unknown): metadata is BatchReactionQueueMetadata {
@@ -50,7 +54,7 @@ function isBatchReactionQueueMetadata(metadata: unknown): metadata is BatchReact
         && metadata !== null
         && Array.isArray((metadata as { fileIds?: unknown }).fileIds)
         && (metadata as { fileIds: unknown[] }).fileIds.every((fileId) => typeof fileId === 'number')
-        && isReactionType((metadata as { reactionType?: unknown }).reactionType);
+        && isQueuedReactionType((metadata as { reactionType?: unknown }).reactionType);
 }
 
 function getLatestQueuedReactionMetadata():
@@ -248,10 +252,134 @@ export function queueBatchReaction(
     );
 }
 
+export function queueBlacklist(
+    fileId: number,
+    thumbnail?: string,
+    restoreCallback?: () => Promise<void> | void,
+    items?: Ref<FeedItem[]>,
+    options?: QueueBlacklistOptions,
+): void {
+    const queueId = `blacklist-${fileId}`;
+    const batchBlacklistCallback = createBatchBlacklistCallback();
+
+    const existingItem = queueCollection.getAll().find((item) => item.id === queueId);
+    if (existingItem) {
+        queueCollection.remove(existingItem.id);
+        toast.dismiss(existingItem.id);
+    }
+
+    queueCollection.add({
+        id: queueId,
+        duration: REACTION_COUNTDOWN_DURATION,
+        onComplete: async () => {
+            try {
+                const results = await batchBlacklistCallback([fileId]);
+                await options?.onSuccess?.(results);
+                toast.dismiss(queueId);
+            } catch (error) {
+                console.error('Failed to execute queued blacklist:', error);
+                await runRestoreCallback(restoreCallback, 'Failed to restore queued blacklist state:');
+                toast.error('Failed to blacklist file', {
+                    id: `${queueId}-error`,
+                });
+                toast.dismiss(queueId);
+            }
+        },
+        metadata: {
+            fileId,
+            reactionType: 'blacklist',
+            thumbnail,
+            restoreCallback,
+            items,
+        },
+    });
+
+    toast(
+        {
+            component: ReactionQueueToast,
+            props: {
+                queueId,
+                fileId,
+                reactionType: 'blacklist',
+                thumbnail,
+            },
+        },
+        {
+            id: queueId,
+            timeout: false,
+            closeButton: false,
+            closeOnClick: false,
+            toastClassName: 'reaction-queue-toast-wrapper',
+            bodyClassName: 'reaction-queue-toast-body',
+        }
+    );
+}
+
+export function queueBatchBlacklist(
+    fileIds: number[],
+    previews: Array<{ fileId: number; thumbnail?: string }>,
+    restoreCallback?: () => Promise<void> | void,
+    items?: Ref<FeedItem[]>,
+    options?: QueueBlacklistOptions,
+): void {
+    if (fileIds.length === 0) {
+        return;
+    }
+
+    const queueId = `batch-blacklist-${fileIds[0]}-${fileIds.length}-${Date.now()}`;
+    const batchBlacklistCallback = createBatchBlacklistCallback();
+
+    queue.collection.add({
+        id: queueId,
+        duration: REACTION_COUNTDOWN_DURATION,
+        onComplete: async () => {
+            toast.dismiss(queueId);
+
+            try {
+                const results = await batchBlacklistCallback(fileIds);
+                await options?.onSuccess?.(results);
+            } catch (error) {
+                console.error('Failed to execute queued batch blacklist:', error);
+                await runRestoreCallback(restoreCallback, 'Failed to restore queued batch blacklist state:');
+                toast.error('Failed to blacklist files', {
+                    id: `${queueId}-error`,
+                });
+            }
+        },
+        metadata: {
+            fileIds,
+            reactionType: 'blacklist',
+            previews,
+            restoreCallback,
+            items,
+        },
+    });
+
+    toast(
+        {
+            component: BatchReactionQueueToast,
+            props: {
+                queueId,
+                reactionType: 'blacklist',
+                previews,
+                totalCount: fileIds.length,
+            },
+        },
+        {
+            id: queueId,
+            timeout: false,
+            closeButton: false,
+            closeOnClick: false,
+            toastClassName: 'reaction-queue-toast-wrapper',
+            bodyClassName: 'reaction-queue-toast-body',
+        }
+    );
+}
+
 /**
  * Cancel a queued reaction and restore to masonry if restore callback exists.
  */
-export async function cancelQueuedReaction(fileId: number, reactionType: ReactionType): Promise<void> {
+export async function cancelQueuedReaction(fileId: number, reactionType: QueuedReactionType): Promise<void> {
     const queueId = `${reactionType}-${fileId}`;
     const item = queueCollection.getAll().find((item) => item.id === queueId);
 

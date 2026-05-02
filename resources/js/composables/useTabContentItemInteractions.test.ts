@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTabContentItemInteractions } from './useTabContentItemInteractions';
 import type { FeedItem } from './useTabs';
 
-const { mockQueueBatchReaction, mockQueueReaction } = vi.hoisted(() => ({
+const { mockQueueBatchBlacklist, mockQueueBatchReaction, mockQueueBlacklist, mockQueueReaction } = vi.hoisted(() => ({
+    mockQueueBatchBlacklist: vi.fn(),
     mockQueueBatchReaction: vi.fn(),
+    mockQueueBlacklist: vi.fn(),
     mockQueueReaction: vi.fn(),
 }));
 
 vi.mock('@/utils/reactionQueue', () => ({
+    queueBatchBlacklist: mockQueueBatchBlacklist,
     queueBatchReaction: mockQueueBatchReaction,
+    queueBlacklist: mockQueueBlacklist,
     queueReaction: mockQueueReaction,
 }));
 
@@ -190,7 +194,7 @@ describe('useTabContentItemInteractions', () => {
         expect(remove).toHaveBeenCalledWith(item);
     });
 
-    it('chunks large blacklist requests before removing loaded items', async () => {
+    it('queues large blacklist batches before finalizing the backend update', async () => {
         const items = shallowRef<FeedItem[]>(
             Array.from({ length: 205 }, (_, index) => ({
                 id: index + 1,
@@ -207,17 +211,6 @@ describe('useTabContentItemInteractions', () => {
         );
         const loadedItems = ref(items.value);
         const remove = vi.fn().mockResolvedValue(undefined);
-
-        window.axios.post = vi.fn().mockImplementation((_url: string, payload: { file_ids: number[] }) => {
-            return Promise.resolve({
-                data: {
-                    results: payload.file_ids.map((fileId) => ({
-                        id: fileId,
-                        blacklisted_at: '2026-04-14T00:00:00Z',
-                    })),
-                },
-            });
-        }) as typeof window.axios.post;
 
         const interactions = useTabContentItemInteractions({
             items,
@@ -244,18 +237,28 @@ describe('useTabContentItemInteractions', () => {
         const count = await interactions.performLoadedItemsBulkAction('blacklist');
 
         expect(count).toBe(205);
-        expect(window.axios.post).toHaveBeenCalledTimes(3);
-        expect(window.axios.post).toHaveBeenNthCalledWith(1, '/api/files/blacklist/batch', {
-            file_ids: Array.from({ length: 100 }, (_, index) => index + 1),
-        });
-        expect(window.axios.post).toHaveBeenNthCalledWith(2, '/api/files/blacklist/batch', {
-            file_ids: Array.from({ length: 100 }, (_, index) => index + 101),
-        });
-        expect(window.axios.post).toHaveBeenNthCalledWith(3, '/api/files/blacklist/batch', {
-            file_ids: Array.from({ length: 5 }, (_, index) => index + 201),
-        });
         expect(remove).toHaveBeenCalledTimes(1);
         expect(remove).toHaveBeenCalledWith(items.value);
+        expect(mockQueueBatchBlacklist).toHaveBeenCalledTimes(1);
+        expect(mockQueueBatchBlacklist).toHaveBeenCalledWith(
+            Array.from({ length: 205 }, (_, index) => index + 1),
+            Array.from({ length: 205 }, (_, index) => ({
+                fileId: index + 1,
+                thumbnail: `https://example.com/image${index + 1}.jpg`,
+            })),
+            undefined,
+            items,
+            expect.objectContaining({ onSuccess: expect.any(Function) }),
+        );
+
+        const onSuccess = mockQueueBatchBlacklist.mock.calls[0]?.[4]?.onSuccess as ((results: Array<{ id: number; blacklisted_at: string }>) => void) | undefined;
+        onSuccess?.([
+            {
+                id: 1,
+                blacklisted_at: '2026-04-14T00:00:00Z',
+            },
+        ]);
+
         expect(items.value[0].reaction).toBeNull();
         expect(items.value[0].auto_blacklisted).toBe(false);
         expect(items.value[0].auto_blacklist_rule).toBeNull();
@@ -279,17 +282,6 @@ describe('useTabContentItemInteractions', () => {
         } as FeedItem;
         const items = shallowRef<FeedItem[]>([item]);
         const remove = vi.fn().mockResolvedValue(undefined);
-
-        window.axios.post = vi.fn().mockResolvedValue({
-            data: {
-                results: [
-                    {
-                        id: 42,
-                        blacklisted_at: '2026-04-30T00:00:00Z',
-                    },
-                ],
-            },
-        }) as typeof window.axios.post;
 
         const interactions = useTabContentItemInteractions({
             items,
@@ -315,10 +307,24 @@ describe('useTabContentItemInteractions', () => {
         const count = await interactions.reactions.onFileBlacklist(item);
 
         expect(count).toBe(1);
-        expect(window.axios.post).toHaveBeenCalledWith('/api/files/blacklist/batch', {
-            file_ids: [42],
-        });
         expect(remove).toHaveBeenCalledWith([item]);
+        expect(mockQueueBlacklist).toHaveBeenCalledTimes(1);
+        expect(mockQueueBlacklist).toHaveBeenCalledWith(
+            42,
+            'https://example.com/image42.jpg',
+            undefined,
+            items,
+            expect.objectContaining({ onSuccess: expect.any(Function) }),
+        );
+
+        const onSuccess = mockQueueBlacklist.mock.calls[0]?.[4]?.onSuccess as ((results: Array<{ id: number; blacklisted_at: string }>) => void) | undefined;
+        onSuccess?.([
+            {
+                id: 42,
+                blacklisted_at: '2026-04-30T00:00:00Z',
+            },
+        ]);
+
         expect(item.blacklisted_at).toBe('2026-04-30T00:00:00Z');
         expect(item.reaction).toBeNull();
         expect(item.auto_blacklisted).toBe(false);
@@ -327,7 +333,7 @@ describe('useTabContentItemInteractions', () => {
         expect(item.previewed_count).toBe(99999);
     });
 
-    it('removes all locally loaded items after blacklist even when active filters still match', async () => {
+    it('keeps locally loaded blacklist items visible when active filters still match and restores them on undo', async () => {
         const items = shallowRef<FeedItem[]>([
             {
                 id: 1,
@@ -352,23 +358,6 @@ describe('useTabContentItemInteractions', () => {
             } as FeedItem,
         ]);
         const remove = vi.fn().mockResolvedValue(undefined);
-
-        window.axios.post = vi.fn().mockResolvedValue({
-            data: {
-                results: [
-                    {
-                        id: 1,
-                        blacklisted_at: '2026-04-29T00:00:00Z',
-                        previewed_count: 99999,
-                    },
-                    {
-                        id: 2,
-                        blacklisted_at: '2026-04-30T00:00:00Z',
-                        previewed_count: 99999,
-                    },
-                ],
-            },
-        }) as typeof window.axios.post;
 
         const interactions = useTabContentItemInteractions({
             items,
@@ -396,7 +385,14 @@ describe('useTabContentItemInteractions', () => {
         const count = await interactions.performLoadedItemsBulkAction('blacklist');
 
         expect(count).toBe(2);
-        expect(remove).toHaveBeenCalledWith(items.value);
+        expect(remove).not.toHaveBeenCalled();
+        expect(mockQueueBatchBlacklist).toHaveBeenCalledTimes(1);
         expect(items.value.map((item) => item.previewed_count)).toEqual([99999, 99999]);
+
+        const restoreCallback = mockQueueBatchBlacklist.mock.calls[0]?.[2] as (() => Promise<void>) | undefined;
+        await restoreCallback?.();
+
+        expect(items.value.map((item) => item.previewed_count)).toEqual([1, 0]);
+        expect(items.value[1].blacklisted_at).toBeNull();
     });
 });

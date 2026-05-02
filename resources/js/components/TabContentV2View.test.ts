@@ -136,7 +136,7 @@ function createProps() {
         availableSources: [],
         applyFilters: vi.fn(async () => undefined),
         applyService: vi.fn(async () => undefined),
-        cancelFill: vi.fn(), cancelLoad: vi.fn(),
+        cancelFill: vi.fn(),
         closeFileSheet: vi.fn(),
         containerInteractions: {
             managerRef: ref(null),

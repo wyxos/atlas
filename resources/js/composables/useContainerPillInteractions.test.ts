@@ -3,8 +3,8 @@ import { ref, computed } from 'vue';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { FeedItem } from './useTabs';
 
-const { mockAxiosPost, mockQueueBatchReaction } = vi.hoisted(() => ({
-    mockAxiosPost: vi.fn(),
+const { mockQueueBatchBlacklist, mockQueueBatchReaction } = vi.hoisted(() => ({
+    mockQueueBatchBlacklist: vi.fn(),
     mockQueueBatchReaction: vi.fn(),
 }));
 
@@ -14,6 +14,7 @@ vi.mock('@/utils/reactions', () => ({
 }));
 
 vi.mock('@/utils/reactionQueue', () => ({
+    queueBatchBlacklist: mockQueueBatchBlacklist,
     queueBatchReaction: mockQueueBatchReaction,
 }));
 
@@ -25,15 +26,7 @@ describe('useContainerPillInteractions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockRemove.mockResolvedValue(undefined);
-        (window as any).axios = { post: mockAxiosPost };
-        mockAxiosPost.mockResolvedValue({
-            data: {
-                results: [
-                    { id: 1, blacklisted_at: '2026-05-01T00:00:00Z', previewed_count: 99999 },
-                    { id: 2, blacklisted_at: '2026-05-01T00:00:00Z', previewed_count: 99999 },
-                ],
-            },
-        });
+        (window as any).axios = { post: vi.fn() };
     });
 
     it('uses remove when batch reacting to multiple siblings', async () => {
@@ -317,10 +310,17 @@ describe('useContainerPillInteractions', () => {
         expect(mockEvent.preventDefault).toHaveBeenCalled();
         expect(mockEvent.stopPropagation).toHaveBeenCalled();
 
-        expect(mockAxiosPost).toHaveBeenCalledWith('/api/files/blacklist/batch', {
-            file_ids: [1, 2],
-        });
         expect(mockRemoveMany).toHaveBeenCalled();
+        expect(mockQueueBatchBlacklist).toHaveBeenCalledWith(
+            [1, 2],
+            [
+                { fileId: 1, thumbnail: 'https://example.com/image1.jpg' },
+                { fileId: 2, thumbnail: 'https://example.com/image2.jpg' },
+            ],
+            expect.any(Function),
+            items,
+            expect.objectContaining({ onSuccess: expect.any(Function) }),
+        );
     });
 
     it('handles double left click (without alt) to like all siblings', async () => {
@@ -446,10 +446,17 @@ describe('useContainerPillInteractions', () => {
         await Promise.resolve();
         await Promise.resolve();
 
-        expect(mockAxiosPost).toHaveBeenCalledWith('/api/files/blacklist/batch', {
-            file_ids: [1, 2],
-        });
         expect(mockRemoveMany).toHaveBeenCalled();
+        expect(mockQueueBatchBlacklist).toHaveBeenCalledWith(
+            [1, 2],
+            [
+                { fileId: 1, thumbnail: 'https://example.com/image1.jpg' },
+                { fileId: 2, thumbnail: 'https://example.com/image2.jpg' },
+            ],
+            expect.any(Function),
+            items,
+            expect.objectContaining({ onSuccess: expect.any(Function) }),
+        );
     });
 
     it('handles double middle click (without alt) to love all siblings', async () => {

@@ -10,8 +10,7 @@ import {
 import { queueManager } from '@/composables/useQueue';
 import type { ReactionType } from '@/types/reaction';
 
-// Hoist mocks to avoid initialization issues
-const { mockToast, mockReactionCallback, mockBatchReactionCallback, mockUpdateReactionState } = vi.hoisted(() => {
+const { mockToast, mockReactionCallback, mockBatchReactionCallback, mockBatchBlacklistCallback, mockUpdateReactionState } = vi.hoisted(() => {
     const toast = vi.fn();
     toast.dismiss = vi.fn();
     toast.error = vi.fn();
@@ -20,32 +19,32 @@ const { mockToast, mockReactionCallback, mockBatchReactionCallback, mockUpdateRe
     toast.warning = vi.fn();
     const callback = vi.fn().mockResolvedValue(undefined);
     const batchCallback = vi.fn().mockResolvedValue(undefined);
+    const batchBlacklistCallback = vi.fn().mockResolvedValue([]);
     const updateReactionState = vi.fn();
     return {
         mockToast: toast,
         mockReactionCallback: callback,
         mockBatchReactionCallback: batchCallback,
+        mockBatchBlacklistCallback: batchBlacklistCallback,
         mockUpdateReactionState: updateReactionState,
     };
 });
 
-// Mock toast helper
 vi.mock('@/components/ui/toast/use-toast', () => ({
     useToast: () => mockToast,
     default: {},
 }));
 
-// Mock createReactionCallback
 vi.mock('./reactions', () => ({
     createReactionCallback: () => mockReactionCallback,
     createBatchReactionCallback: () => mockBatchReactionCallback,
+    createBatchBlacklistCallback: () => mockBatchBlacklistCallback,
 }));
 
 vi.mock('@/utils/reactionStateUpdater', () => ({
     default: mockUpdateReactionState,
 }));
 
-// Mock axios
 const mockAxios = {
     post: vi.fn().mockResolvedValue({ data: {} }),
 };
@@ -63,6 +62,7 @@ describe('reactionQueue', () => {
         vi.clearAllMocks();
         mockReactionCallback.mockResolvedValue(undefined);
         mockBatchReactionCallback.mockResolvedValue(undefined);
+        mockBatchBlacklistCallback.mockResolvedValue([]);
         queue = queueManager;
         queue.collection.reset();
     });
@@ -98,7 +98,6 @@ describe('reactionQueue', () => {
 
             expect(mockToast).toHaveBeenCalled();
             const toastCall = mockToast.mock.calls[0];
-            // Check that the component receives thumbnail prop
             expect(toastCall[0].props.thumbnail).toBe(thumbnail);
         });
 
@@ -108,7 +107,6 @@ describe('reactionQueue', () => {
 
             queueReaction(123, 'like');
             
-            // Should still have only one item
             expect(queue.collection.getAll().filter((item) => item.id === 'like-123')).toHaveLength(1);
             expect(mockToast.dismiss).toHaveBeenCalledWith('like-123');
         });
@@ -116,7 +114,6 @@ describe('reactionQueue', () => {
         it('executes reaction callback when countdown expires', async () => {
             queueReaction(123, 'like');
 
-            // Advance time past duration (5 seconds)
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
@@ -135,7 +132,6 @@ describe('reactionQueue', () => {
         it('dismisses toast after successful execution', async () => {
             queueReaction(123, 'like');
 
-            // Advance time past duration
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
@@ -149,7 +145,6 @@ describe('reactionQueue', () => {
 
             queueReaction(123, 'like');
 
-            // Advance time past duration
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
@@ -293,7 +288,6 @@ describe('reactionQueue', () => {
 
             const toastCall = mockToast.mock.calls[0];
             expect(toastCall[0].props.totalCount).toBe(6);
-            // Component receives all previews, but only shows first 5
             expect(toastCall[0].props.previews).toHaveLength(6);
             expect(toastCall[0].props.reactionType).toBe('funny');
         });
@@ -302,7 +296,6 @@ describe('reactionQueue', () => {
             const fileIds = [123, 456, 789];
             queueBatchReaction(fileIds, 'like', []);
 
-            // Advance time past duration (5 seconds)
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
@@ -350,12 +343,10 @@ describe('reactionQueue', () => {
             const fileIds = [123, 456];
             queueBatchReaction(fileIds, 'like', []);
 
-            // Get queueId before advancing time
             const items = queue.collection.getAll();
             const queueId = items[0]?.id;
             expect(queueId).toBeDefined();
 
-            // Advance time past duration
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 
@@ -370,12 +361,10 @@ describe('reactionQueue', () => {
             const fileIds = [123, 456];
             queueBatchReaction(fileIds, 'like', []);
 
-            // Get queueId before advancing time
             const items = queue.collection.getAll();
             const queueId = items[0]?.id;
             expect(queueId).toBeDefined();
 
-            // Advance time past duration
             vi.advanceTimersByTime(5000);
             await vi.runAllTimersAsync();
 

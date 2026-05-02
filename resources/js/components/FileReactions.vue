@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Ban, Heart, ThumbsUp, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
+import { Ban, Heart, ThumbsUp, Smile, Eye, EyeOff, Hash, Infinity as InfinityIcon } from 'lucide-vue-next';
+import { FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 import type { ReactionType } from '@/types/reaction';
 
 interface Props {
@@ -91,6 +92,7 @@ const indexDisplay = computed(() => {
     }
     return null;
 });
+const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= FEED_REMOVED_PREVIEW_COUNT);
 </script>
 
 <template>
@@ -148,7 +150,12 @@ const indexDisplay = computed(() => {
         <div v-if="!isReactionOnly" class="flex items-center gap-2">
             <!-- Previewed Count -->
             <div class="flex items-center text-white gap-1.5">
-                <span :class="[textSize, 'font-medium']">{{ previewedCount }}</span>
+                <InfinityIcon
+                    v-if="hasTerminalPreviewCount"
+                    :size="18"
+                    aria-label="Preview count removed from feed"
+                />
+                <span v-else :class="[textSize, 'font-medium']">{{ previewedCount }}</span>
                 <Eye :size="18" />
             </div>
 
