@@ -63,7 +63,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
 
         event.preventDefault();
         event.stopPropagation();
-        void options.onReaction(item, 'like');
+        void options.onReaction(item, 'love');
     }
 
     function handleContextMenuCapture(event: MouseEvent): void {
@@ -95,7 +95,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
         event.stopPropagation();
 
         if (event.altKey) {
-            void options.onReaction(item, 'love');
+            void options.onReaction(item, 'like');
         }
     }
 

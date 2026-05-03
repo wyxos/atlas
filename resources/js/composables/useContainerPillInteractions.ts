@@ -417,9 +417,8 @@ export function useContainerPillInteractions(
         const isReactionTrigger = e.altKey || isDouble;
 
         if (isReactionTrigger) {
-            // Alt + Left Click or Double Left Click = Like
             if (buttonToCheck === 0) {
-                reactionType = 'like';
+                reactionType = 'love';
             }
             // Alt + Right Click or Double Right Click = Blacklist
             else if (buttonToCheck === 2 || e.type === 'contextmenu') {
@@ -429,9 +428,8 @@ export function useContainerPillInteractions(
 
                 return;
             }
-            // Alt + Middle Click or Double Middle Click = Favorite (Love)
             else if (buttonToCheck === 1) {
-                reactionType = 'love';
+                reactionType = 'like';
             }
         }
 
@@ -462,16 +460,16 @@ export function useContainerPillInteractions(
             );
 
             if (isDouble) {
-                // Double Middle Click = Favorite (Love) all siblings
+                // Double Middle Click = Like all siblings
                 cancelPendingMiddleClick();
                 lastClickTime.value = null; // Reset after handling
                 e.preventDefault();
-                batchReactToSiblings(containerId, 'love');
+                batchReactToSiblings(containerId, 'like');
             } else if (e.altKey) {
-                // Alt + Middle Click = Favorite (Love) all siblings
+                // Alt + Middle Click = Like all siblings
                 cancelPendingMiddleClick();
                 e.preventDefault();
-                batchReactToSiblings(containerId, 'love');
+                batchReactToSiblings(containerId, 'like');
             } else {
                 // Middle click without alt and not double - open URL
                 lastClickTime.value = { containerId, timestamp: now, button: 1 };

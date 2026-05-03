@@ -84,11 +84,11 @@ export class OverlayManager {
     }
 
     private readonly handleGlobalClick = (event: MouseEvent): void => {
-        this.handleGlobalMouseShortcut(event, 'like', 0);
+        this.handleGlobalMouseShortcut(event, 'love', 0);
     };
 
     private readonly handleGlobalMousedown = (event: MouseEvent): void => {
-        this.handleGlobalMouseShortcut(event, 'love', 1);
+        this.handleGlobalMouseShortcut(event, 'like', 1);
     };
 
     private handleGlobalMouseShortcut(event: MouseEvent, type: BadgeReactionType, button?: number): void {

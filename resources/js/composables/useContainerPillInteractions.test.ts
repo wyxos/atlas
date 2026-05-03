@@ -148,7 +148,7 @@ describe('useContainerPillInteractions', () => {
         expect(items.value.map((item) => item.id)).toEqual([1, 2, 3]);
     });
 
-    it('handles alt + middle click to favorite all siblings', async () => {
+    it('handles alt + middle click to like all siblings', async () => {
         const items = ref<FeedItem[]>([
             {
                 id: 1,
@@ -323,7 +323,7 @@ describe('useContainerPillInteractions', () => {
         );
     });
 
-    it('handles double left click (without alt) to like all siblings', async () => {
+    it('handles double left click (without alt) to favorite all siblings', async () => {
         const items = ref<FeedItem[]>([
             {
                 id: 1,
@@ -378,7 +378,7 @@ describe('useContainerPillInteractions', () => {
         expect(mockEvent.preventDefault).toHaveBeenCalled();
         expect(mockEvent.stopPropagation).toHaveBeenCalled();
 
-        // Verify removeMany was called (indicating batchReactToSiblings was called with 'like')
+        // Verify removeMany was called (indicating batchReactToSiblings was called)
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 
@@ -459,7 +459,7 @@ describe('useContainerPillInteractions', () => {
         );
     });
 
-    it('handles double middle click (without alt) to love all siblings', async () => {
+    it('handles double middle click (without alt) to like all siblings', async () => {
         vi.useFakeTimers();
         const items = ref<FeedItem[]>([
             {
@@ -524,7 +524,7 @@ describe('useContainerPillInteractions', () => {
         vi.advanceTimersByTime(300);
         vi.runOnlyPendingTimers();
 
-        // Verify removeMany was called (indicating batchReactToSiblings was called with 'love')
+        // Verify removeMany was called (indicating batchReactToSiblings was called)
         expect(mockRemoveMany).toHaveBeenCalled();
 
         vi.useRealTimers();

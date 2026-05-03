@@ -20,14 +20,14 @@ const bulkActionButtons: Array<{
     dataTest: 'loaded-items-like-button',
     icon: ThumbsUp,
     label: 'Like all',
-    title: 'Run the ALT + left click reaction on all loaded items',
+    title: 'Run the ALT + middle click reaction on all loaded items',
   },
   {
     action: 'love',
     dataTest: 'loaded-items-love-button',
     icon: Heart,
     label: 'Love all',
-    title: 'Run the ALT + middle click reaction on all loaded items',
+    title: 'Run the ALT + left click reaction on all loaded items',
   },
   {
     action: 'blacklist',

@@ -114,4 +114,54 @@ describe('tabContentV2MouseShortcuts', () => {
         expect(onBlacklist).toHaveBeenCalledWith(secondDuplicate);
         expect(onReaction).not.toHaveBeenCalled();
     });
+
+    it('favorites the target item on alt left click', () => {
+        const item = createFeedItem(1);
+        const onReaction = vi.fn();
+        const handlers = createBrowseV2MouseShortcutHandlers({
+            getCurrentItem: () => item,
+            getItemFromTarget: () => item,
+            getSurfaceMode: () => 'list',
+            onBlacklist: vi.fn(),
+            onReaction,
+        });
+
+        document.body.innerHTML = `
+            <article data-item-id="1">
+                <div id="card-body">Card</div>
+            </article>
+        `;
+
+        const event = new MouseEvent('click', { altKey: true, button: 0 });
+        Object.defineProperty(event, 'target', { value: document.getElementById('card-body'), configurable: true });
+
+        handlers.handleClickCapture(event);
+
+        expect(onReaction).toHaveBeenCalledWith(item, 'love');
+    });
+
+    it('likes the target item on alt middle click', () => {
+        const item = createFeedItem(1);
+        const onReaction = vi.fn();
+        const handlers = createBrowseV2MouseShortcutHandlers({
+            getCurrentItem: () => item,
+            getItemFromTarget: () => item,
+            getSurfaceMode: () => 'list',
+            onBlacklist: vi.fn(),
+            onReaction,
+        });
+
+        document.body.innerHTML = `
+            <article data-item-id="1">
+                <div id="card-body">Card</div>
+            </article>
+        `;
+
+        const event = new MouseEvent('mousedown', { altKey: true, button: 1 });
+        Object.defineProperty(event, 'target', { value: document.getElementById('card-body'), configurable: true });
+
+        handlers.handleMouseDownCapture(event);
+
+        expect(onReaction).toHaveBeenCalledWith(item, 'like');
+    });
 });

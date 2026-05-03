@@ -93,7 +93,7 @@ describe('OverlayManager', () => {
         manager.remove(image);
     });
 
-    it('keeps Alt+click mouse reactions working', async () => {
+    it('favorites media on Alt+left click', async () => {
         const { OverlayManager } = await import('./overlay-manager');
         const manager = new OverlayManager();
         const { image } = appendTrackedImage();
@@ -111,12 +111,12 @@ describe('OverlayManager', () => {
         image.dispatchEvent(event);
 
         expect(event.defaultPrevented).toBe(true);
-        expect(triggerReaction).toHaveBeenCalledWith('like');
+        expect(triggerReaction).toHaveBeenCalledWith('love');
 
         manager.remove(image);
     });
 
-    it('ignores Alt+contextmenu while keeping Alt+middle-click reactions working', async () => {
+    it('ignores Alt+contextmenu while liking media on Alt+middle click', async () => {
         const { OverlayManager } = await import('./overlay-manager');
         const manager = new OverlayManager();
         const { image } = appendTrackedImage();
@@ -145,7 +145,7 @@ describe('OverlayManager', () => {
         expect(contextmenuEvent.defaultPrevented).toBe(false);
         expect(middleClickEvent.defaultPrevented).toBe(true);
         expect(triggerReaction).toHaveBeenCalledTimes(1);
-        expect(triggerReaction).toHaveBeenNthCalledWith(1, 'love');
+        expect(triggerReaction).toHaveBeenNthCalledWith(1, 'like');
 
         manager.remove(image);
     });
@@ -175,7 +175,7 @@ describe('OverlayManager', () => {
             clientY: 120,
         }));
 
-        expect(triggerReactionByMedia.get(dialogImage)).toHaveBeenCalledWith('like');
+        expect(triggerReactionByMedia.get(dialogImage)).toHaveBeenCalledWith('love');
         expect(triggerReactionByMedia.get(regularImage)).not.toHaveBeenCalled();
 
         manager.remove(regularImage);

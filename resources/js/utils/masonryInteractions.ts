@@ -12,13 +12,13 @@ export function createMasonryInteractions(
         let reactionType: ReactionType | null = null;
 
         if (e.button === 0 || (e.type === 'click' && e.button === 0)) {
-            reactionType = 'like';
+            reactionType = 'love';
         } else if (e.button === 2 || e.type === 'contextmenu') {
             void handleMasonryBlacklist(item, index);
 
             return;
         } else if (e.button === 1) {
-            reactionType = 'love';
+            reactionType = 'like';
         }
 
         if (!reactionType) {
