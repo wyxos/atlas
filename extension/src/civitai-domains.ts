@@ -14,6 +14,12 @@ export function isCivitAiHostname(hostname: string): boolean {
         normalized === domain || normalized.endsWith(`.${domain}`));
 }
 
+export function isCivitAiNsfwHostname(hostname: string): boolean {
+    const normalized = normalizeHostname(hostname);
+
+    return normalized === CIVITAI_NSFW_DOMAIN || normalized.endsWith(`.${CIVITAI_NSFW_DOMAIN}`);
+}
+
 export function isCivitAiMediaHostname(hostname: string): boolean {
     const normalized = normalizeHostname(hostname);
 

@@ -165,6 +165,7 @@ describe('installCivitAiModelBrowseCtas', () => {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
             modelId: 9303103,
             modelVersionId: null,
+            nsfw: true,
         }, expect.any(Function));
     });
 

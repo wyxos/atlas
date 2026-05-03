@@ -386,6 +386,44 @@ describe('background runtime message bridge', () => {
         });
     });
 
+    it('marks Civitai model browse requests as nsfw when requested by the content script', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            browse_url: 'https://atlas.test/browse',
+            tab: {
+                id: 46,
+                label: 'CivitAI Images: Model 9303103 - 1',
+            },
+        }), { status: 200 }));
+        vi.stubGlobal('chrome', chromeMock);
+        vi.stubGlobal('fetch', fetchMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        await sendRuntimeMessage(listener!, {
+            type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
+            modelId: 9303103,
+            modelVersionId: null,
+            nsfw: true,
+        });
+
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.test/api/extension/browse-tabs/civitai-model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Atlas-Api-Key': 'test-api-token',
+            },
+            body: JSON.stringify({
+                model_id: 9303103,
+                model_version_id: null,
+                nsfw: true,
+            }),
+        });
+    });
+
     it('creates a new Atlas browser tab for a Civitai username browse request', async () => {
         const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
         const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({

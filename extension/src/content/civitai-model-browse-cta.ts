@@ -1,4 +1,7 @@
-import { isCivitAiHostname as isSupportedCivitAiHostname } from '../civitai-domains';
+import {
+    isCivitAiHostname as isSupportedCivitAiHostname,
+    isCivitAiNsfwHostname,
+} from '../civitai-domains';
 
 const URN_PREFIX = 'civitai:';
 const CTA_TEXT = 'Open in Atlas';
@@ -174,6 +177,7 @@ function requestOpenCivitAiModelTab(reference: CivitAiModelReference): Promise<R
                 type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
                 modelId: reference.modelId,
                 modelVersionId: reference.modelVersionId,
+                ...(isCivitAiNsfwHostname(window.location.hostname) ? { nsfw: true } : {}),
             }, (response: unknown) => {
                 if (chrome.runtime.lastError) {
                     resolve(null);

@@ -101,6 +101,30 @@ it('creates and activates a civitai browse tab for the requested model filter', 
     'model and version' => [9404101],
 ]);
 
+it('enables nsfw params for civitai model browse tabs when requested by the extension', function () {
+    $user = User::factory()->create();
+    setExtensionBrowseTabsApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/browse-tabs/civitai-model', [
+        'model_id' => 9303103,
+        'nsfw' => true,
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('tab.params.modelId', 9303103);
+    $response->assertJsonPath('tab.params.nsfw', true);
+
+    $createdTab = Tab::query()
+        ->where('user_id', $user->id)
+        ->where('label', 'CivitAI Images: Model 9303103 - 1')
+        ->first();
+
+    expect($createdTab)->not->toBeNull();
+    expect($createdTab?->params['nsfw'] ?? null)->toBeTrue();
+});
+
 it('creates and activates a civitai browse tab for the requested username filter', function () {
     $user = User::factory()->create();
     setExtensionBrowseTabsApiKey('valid-api-key', $user->id);

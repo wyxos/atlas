@@ -6,6 +6,7 @@ type OpenCivitAiModelTabPayload = {
     type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB';
     modelId: unknown;
     modelVersionId?: unknown;
+    nsfw?: unknown;
 };
 
 type OpenCivitAiUsernameTabPayload = {
@@ -130,10 +131,16 @@ export function handleOpenCivitAiModelTabRuntimeMessage(
         return false;
     }
 
-    void openCivitAiBrowseTab('civitai-model', {
+    const body: Record<string, unknown> = {
         model_id: modelId,
         model_version_id: modelVersionId,
-    }, sendResponse).catch(() => {
+    };
+
+    if (payload.nsfw === true) {
+        body.nsfw = true;
+    }
+
+    void openCivitAiBrowseTab('civitai-model', body, sendResponse).catch(() => {
         sendResponse({ ok: false, status: 0, payload: null });
     });
 

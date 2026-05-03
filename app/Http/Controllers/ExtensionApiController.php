@@ -409,10 +409,12 @@ class ExtensionApiController extends Controller
         $validated = $request->validate([
             'model_id' => ['required', 'integer', 'min:1'],
             'model_version_id' => ['nullable', 'integer', 'min:1'],
+            'nsfw' => ['sometimes', 'boolean'],
         ]);
 
         $modelId = (int) $validated['model_id'];
         $modelVersionId = isset($validated['model_version_id']) ? (int) $validated['model_version_id'] : null;
+        $nsfw = (bool) ($validated['nsfw'] ?? false);
         $params = array_filter([
             'feed' => 'online',
             'service' => CivitAiImages::key(),
@@ -420,6 +422,7 @@ class ExtensionApiController extends Controller
             'limit' => 20,
             'modelId' => $modelId,
             'modelVersionId' => $modelVersionId,
+            'nsfw' => $nsfw ? true : null,
         ], static fn (mixed $value): bool => $value !== null);
 
         $tab = $this->createExtensionBrowseTab(
