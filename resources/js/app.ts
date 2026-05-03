@@ -10,6 +10,7 @@ import './bootstrap';
 import './icons';
 import { configureEcho, echo } from '@laravel/echo-vue';
 import type Echo from 'laravel-echo';
+import { registerStaleAssetReload } from './utils/staleAssetReload';
 
 declare global {
     interface Window {
@@ -37,6 +38,8 @@ if (appElement?.dataset.vueRoot === 'spa') {
         history: createWebHistory(),
         routes,
     });
+
+    registerStaleAssetReload(router);
 
     const app = createApp(App);
     app.use(router);
