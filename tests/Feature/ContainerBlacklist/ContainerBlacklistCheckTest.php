@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
@@ -13,6 +14,7 @@ test('authenticated user can check if container is blacklisted', function () {
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
         'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
     ]);
 
     $response = $this->actingAs($user)->getJson("/api/container-blacklists/{$container->id}/check");
@@ -22,6 +24,7 @@ test('authenticated user can check if container is blacklisted', function () {
     expect($data['blacklisted'])->toBeTrue();
     expect($data['blacklisted_at'])->not->toBeNull();
     expect($data['action_type'])->toBe('blacklist');
+    expect($data['blacklist_previewed_count_mode'])->toBe(BlacklistPreviewedCountMode::FEED_REMOVED);
     expect($data['file_stats'])->toBe([
         'unreacted' => 0,
         'blacklisted' => 0,
@@ -43,6 +46,7 @@ test('check returns false for non-blacklisted container', function () {
     expect($data['blacklisted'])->toBeFalse();
     expect($data['blacklisted_at'])->toBeNull();
     expect($data['action_type'])->toBeNull();
+    expect($data['blacklist_previewed_count_mode'])->toBe(BlacklistPreviewedCountMode::PRESERVE);
     expect($data['file_stats'])->toBe([
         'unreacted' => 0,
         'blacklisted' => 0,

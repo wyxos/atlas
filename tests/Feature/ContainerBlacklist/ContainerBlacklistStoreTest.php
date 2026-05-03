@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\User;
+use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -24,11 +26,13 @@ test('authenticated user can create container blacklist', function () {
     $data = $response->json();
     expect($data['id'])->toBe($container->id);
     expect($data['action_type'])->toBe('blacklist');
+    expect($data['blacklist_previewed_count_mode'])->toBe(BlacklistPreviewedCountMode::PRESERVE);
     expect($data['blacklisted_at'])->not->toBeNull();
 
     $this->assertDatabaseHas('containers', [
         'id' => $container->id,
         'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
     ]);
 
     $container->refresh();
@@ -61,6 +65,7 @@ test('blacklist action immediately blacklists files already attached to the cont
 
     $matchedFile = File::factory()->create([
         'blacklisted_at' => null,
+        'previewed_count' => 4,
         'path' => 'downloads/test-user.jpg',
     ]);
     $otherFile = File::factory()->create([
@@ -77,7 +82,38 @@ test('blacklist action immediately blacklists files already attached to the cont
     $response->assertStatus(201);
 
     expect($matchedFile->fresh()->blacklisted_at)->not->toBeNull();
+    expect($matchedFile->fresh()->previewed_count)->toBe(4);
     expect($otherFile->fresh()->blacklisted_at)->toBeNull();
+});
+
+test('container blacklist can set attached files to feed removed preview count', function () {
+    $user = User::factory()->create();
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+    ]);
+
+    $matchedFile = File::factory()->create([
+        'blacklisted_at' => null,
+        'previewed_count' => 4,
+        'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+    ]);
+    $matchedFile->containers()->attach($container->id);
+
+    $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
+        'container_id' => $container->id,
+        'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('blacklist_previewed_count_mode', BlacklistPreviewedCountMode::FEED_REMOVED);
+
+    expect($matchedFile->fresh()->blacklisted_at)->not->toBeNull();
+    expect($matchedFile->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
 });
 
 test('validates container_id is required', function () {

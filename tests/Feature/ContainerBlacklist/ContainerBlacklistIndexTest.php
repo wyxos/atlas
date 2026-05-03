@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\Container;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,6 +16,7 @@ test('authenticated user can view blacklisted containers', function () {
     $container2 = Container::factory()->create([
         'blacklisted_at' => now()->subDays(1),
         'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
     ]);
     Container::factory()->create(['blacklisted_at' => null]); // Not blacklisted
 
@@ -26,6 +28,7 @@ test('authenticated user can view blacklisted containers', function () {
     expect(count($data))->toBe(2);
     // Should be ordered by blacklisted_at desc (newest first)
     expect($data[0]['id'])->toBe($container2->id);
+    expect($data[0]['blacklist_previewed_count_mode'])->toBe(BlacklistPreviewedCountMode::FEED_REMOVED);
     expect($data[1]['id'])->toBe($container1->id);
 });
 

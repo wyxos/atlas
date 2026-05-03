@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -13,6 +14,7 @@ import {
 import { useContainerBlacklists } from '@/composables/useContainerBlacklists';
 import type {
     ContainerBlacklistActionType,
+    ContainerBlacklistPreviewedCountMode,
     ContainerBlacklistStatus,
 } from '@/types/container-blacklist';
 
@@ -31,13 +33,18 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
-    'confirm': [containerId: number, actionType: ContainerBlacklistActionType];
+    'confirm': [
+        containerId: number,
+        actionType: ContainerBlacklistActionType,
+        previewedCountMode: ContainerBlacklistPreviewedCountMode
+    ];
     'blacklist-changed': [];
 }>();
 
 const { checkBlacklist, deleteBlacklist } = useContainerBlacklists();
 
 const actionType = ref<ContainerBlacklistActionType>('blacklist');
+const previewedCountMode = ref<ContainerBlacklistPreviewedCountMode>('preserve');
 const isSaving = ref(false);
 const isDeleting = ref(false);
 const isCheckingStatus = ref(false);
@@ -55,6 +62,7 @@ function resetState(): void {
     isCheckingStatus.value = false;
     status.value = null;
     actionType.value = 'blacklist';
+    previewedCountMode.value = 'preserve';
 }
 
 // Expose method to initialize state (called by parent when opening)
@@ -72,6 +80,8 @@ async function initializeState(): Promise<void> {
         if (status.value?.blacklisted && status.value.action_type) {
             actionType.value = status.value.action_type;
         }
+
+        previewedCountMode.value = status.value?.blacklist_previewed_count_mode ?? 'preserve';
     } finally {
         isCheckingStatus.value = false;
     }
@@ -91,6 +101,10 @@ const existingActionType = computed(() => {
     return status.value?.action_type || null;
 });
 
+const existingPreviewedCountMode = computed(() => {
+    return status.value?.blacklist_previewed_count_mode === 'feed_removed' ? '99,999' : 'keep count';
+});
+
 const blacklistedAt = computed(() => {
     return status.value?.blacklisted_at || null;
 });
@@ -105,7 +119,7 @@ async function handleConfirm(): Promise<void> {
     }
 
     isSaving.value = true;
-    emit('confirm', props.container.id, actionType.value);
+    emit('confirm', props.container.id, actionType.value, previewedCountMode.value);
     // Note: isSaving will be reset by parent component after API call completes, but also reset when dialog reopens
 }
 
@@ -129,6 +143,7 @@ async function handleWhitelist(): Promise<void> {
 function handleCancel(): void {
     isOpen.value = false;
     actionType.value = 'blacklist';
+    previewedCountMode.value = 'preserve';
     isSaving.value = false;
 }
 </script>
@@ -159,7 +174,8 @@ function handleCancel(): void {
                             <p class="text-sm font-medium text-danger-300 mb-1">Container is Blacklisted</p>
                             <p class="text-xs text-danger-400/80">
                                 This container was blacklisted on <strong>{{ blacklistedAt ? new Date(blacklistedAt).toLocaleString() : 'N/A' }}</strong>
-                                with action type: <strong>{{ existingActionType || 'N/A' }}</strong>.
+                                with action type: <strong>{{ existingActionType || 'N/A' }}</strong>
+                                and previewed count: <strong>{{ existingPreviewedCountMode }}</strong>.
                             </p>
                         </div>
                     </div>
@@ -227,6 +243,19 @@ function handleCancel(): void {
                     <p v-else class="rounded-lg border border-twilight-indigo-500/30 bg-prussian-blue-700/30 p-3 text-sm text-twilight-indigo-300">
                         Container stats are unavailable right now.
                     </p>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-regal-navy-100">Previewed Count</label>
+                    <Select v-model="previewedCountMode">
+                        <SelectTrigger class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="preserve">Blacklist, keep current count</SelectItem>
+                            <SelectItem value="feed_removed">Blacklist, set to 99,999</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <p class="rounded-lg border border-danger-500/30 bg-danger-500/10 p-3 text-xs text-danger-100">

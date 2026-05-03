@@ -169,6 +169,7 @@ vi.mock('@/composables/useTabContentContainerInteractions', () => ({
             },
             derived: {
                 container: ref(null),
+                highlightedItemIds: ref(new Set<number>()),
                 items: ref([]),
             },
             state: {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\Container;
 use App\Services\BaseService;
 use App\Services\ContainerBlacklistService;
@@ -36,6 +37,7 @@ class ContainerBlacklistController extends Controller
         $validated = $request->validate([
             'container_id' => ['required', 'integer', 'exists:containers,id'],
             'action_type' => ['required', 'string', 'in:blacklist'],
+            'blacklist_previewed_count_mode' => ['nullable', 'string', 'in:preserve,feed_removed'],
         ]);
 
         $container = Container::findOrFail($validated['container_id']);
@@ -54,6 +56,7 @@ class ContainerBlacklistController extends Controller
 
         $container->update([
             'action_type' => $validated['action_type'],
+            'blacklist_previewed_count_mode' => $validated['blacklist_previewed_count_mode'] ?? BlacklistPreviewedCountMode::PRESERVE,
             'blacklisted_at' => now(),
         ]);
 
@@ -89,6 +92,7 @@ class ContainerBlacklistController extends Controller
             'blacklisted' => $container->blacklisted_at !== null,
             'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
             'action_type' => $container->action_type,
+            'blacklist_previewed_count_mode' => $container->blacklist_previewed_count_mode ?? BlacklistPreviewedCountMode::PRESERVE,
             'file_stats' => [
                 'unreacted' => (int) ($container->unreacted_files_count ?? 0),
                 'blacklisted' => (int) ($container->blacklisted_files_count ?? 0),
@@ -109,6 +113,7 @@ class ContainerBlacklistController extends Controller
         $container->update([
             'blacklisted_at' => null,
             'action_type' => null,
+            'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
         ]);
 
         app(MetricsService::class)->incrementMetric(MetricsService::KEY_CONTAINERS_BLACKLISTED, -1);

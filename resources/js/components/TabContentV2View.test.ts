@@ -6,6 +6,17 @@ import TabContentV2View from './TabContentV2View.vue';
 const vibeLayoutSpy = vi.hoisted(() => vi.fn());
 const browseV2StatusBarSpy = vi.hoisted(() => vi.fn());
 const testState = vi.hoisted(() => ({
+    gridOverlayItem: {
+        fileId: 12,
+        feedItem: {
+            id: 12,
+            previewed_count: 1,
+            reaction: null,
+            seen_count: 0,
+        },
+        id: 'grid-item',
+        type: 'image',
+    } as Record<string, unknown>,
     fullscreenOverlayItem: {
         fileId: 11,
         feedItem: {
@@ -115,6 +126,14 @@ vi.mock('@wyxos/vibe', () => ({
                     'data-testid': 'emit-items-change',
                     onClick: () => emit('items-change', [testState.fullscreenOverlayItem]),
                 }),
+                slots['grid-item-overlay']?.({
+                    active: false,
+                    focused: false,
+                    hovered: false,
+                    index: 0,
+                    item: testState.gridOverlayItem,
+                    openFullscreen: vi.fn(),
+                }),
                 slots['fullscreen-overlay']?.({
                     hasNextPage: true,
                     index: props.activeIndex,
@@ -142,7 +161,7 @@ function createProps() {
             managerRef: ref(null),
             drawer: {
                 state: { isOpen: ref(false) },
-                derived: { container: ref(null), items: ref([]) },
+                derived: { container: ref(null), highlightedItemIds: ref(new Set<number>()), items: ref([]) },
                 actions: { setOpen: vi.fn() },
             },
         },
@@ -272,6 +291,17 @@ describe('TabContentV2View', () => {
     beforeEach(() => {
         vibeLayoutSpy.mockClear();
         browseV2StatusBarSpy.mockClear();
+        testState.gridOverlayItem = {
+            fileId: 12,
+            feedItem: {
+                id: 12,
+                previewed_count: 1,
+                reaction: null,
+                seen_count: 0,
+            },
+            id: 'grid-item',
+            type: 'image',
+        };
         testState.fullscreenOverlayItem = {
             fileId: 11,
             feedItem: {
@@ -354,6 +384,36 @@ describe('TabContentV2View', () => {
         expect(props.handleAssetLoads).toHaveBeenCalledWith([]);
         expect(props.handleAssetErrors).toHaveBeenCalledWith([]);
         expect(props.handleItemsChange).toHaveBeenCalledWith([testState.fullscreenOverlayItem]);
+    });
+
+    it('dims grid overlay cards that are not in the active container drawer sibling set', () => {
+        const props = createProps();
+        props.containerInteractions.drawer.derived.highlightedItemIds = ref(new Set([99]));
+        const gridOverlaySpy = vi.fn();
+        const gridOverlayStub = defineComponent({
+            name: 'TabContentV2GridOverlayStub',
+            props: {
+                dimmed: { type: Boolean, default: false },
+            },
+            setup(stubProps) {
+                gridOverlaySpy(stubProps);
+
+                return () => h('div', { 'data-testid': 'grid-overlay-stub' });
+            },
+        });
+
+        mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: {
+                    ...defaultStubs,
+                    TabContentV2GridOverlay: gridOverlayStub,
+                },
+            },
+        });
+
+        expect(gridOverlaySpy).toHaveBeenCalled();
+        expect(gridOverlaySpy.mock.calls[0][0].dimmed).toBe(true);
     });
 
     it('passes backend available total to the status bar', () => {

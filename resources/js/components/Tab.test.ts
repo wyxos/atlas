@@ -49,6 +49,21 @@ describe('Tab', () => {
         wrapper.unmount();
     });
 
+    it('opens the custom label editor on double click', async () => {
+        const wrapper = mount(Tab, {
+            props: {
+                id: 1,
+                label: 'Generated Label',
+                customLabel: 'Pinned Search',
+            },
+        });
+
+        await wrapper.get('[role="button"]').trigger('dblclick', { button: 0 });
+
+        const input = wrapper.get('[data-test="tab-custom-label-input"]');
+        expect((input.element as HTMLInputElement).value).toBe('Pinned Search');
+    });
+
     it('renders close-range context actions with correct disabled state and emits close others', async () => {
         const wrapper = mount(Tab, {
             attachTo: document.body,

@@ -39,6 +39,7 @@ describe('ContainerBlacklistDialog', () => {
             blacklisted: true,
             blacklisted_at: '2024-01-15T10:00:00Z',
             action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'feed_removed',
             file_stats: {
                 unreacted: 12,
                 blacklisted: 8,
@@ -84,5 +85,6 @@ describe('ContainerBlacklistDialog', () => {
         expect(wrapper.get('[data-test="container-stat-positive"]').text()).toContain('3');
         expect(wrapper.get('[data-test="container-stat-blacklisted"]').classes()).toContain('border-danger-500/40');
         expect(wrapper.get('[data-test="container-stat-positive"]').classes()).toContain('border-emerald-500/40');
+        expect(wrapper.text()).toContain('99,999');
     });
 });

@@ -106,6 +106,7 @@ describe('FileViewerSheet', () => {
                             blacklisted: true,
                             blacklisted_at: '2026-04-06T09:30:00Z',
                             action_type: 'blacklist',
+                            blacklist_previewed_count_mode: 'preserve',
                             file_stats: {
                                 unreacted: 12,
                                 blacklisted: 9,

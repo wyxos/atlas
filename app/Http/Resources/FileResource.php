@@ -141,6 +141,9 @@ class FileResource extends JsonResource
                     'action_type' => is_string($container->action_type) && trim($container->action_type) !== ''
                         ? $container->action_type
                         : null,
+                    'blacklist_previewed_count_mode' => is_string($container->blacklist_previewed_count_mode) && trim($container->blacklist_previewed_count_mode) !== ''
+                        ? $container->blacklist_previewed_count_mode
+                        : 'preserve',
                     'file_stats' => [
                         'unreacted' => (int) ($container->unreacted_files_count ?? 0),
                         'blacklisted' => (int) ($container->blacklisted_files_count ?? 0),

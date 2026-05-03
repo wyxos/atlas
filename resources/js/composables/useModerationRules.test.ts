@@ -25,6 +25,8 @@ const createMockRule = (overrides: Partial<ModerationRule> = {}): ModerationRule
     name: 'Test Rule',
     active: true,
     nsfw: false,
+    action_type: 'blacklist',
+    blacklist_previewed_count_mode: 'preserve',
     op: 'any',
     terms: ['test', 'example'],
     min: null,
@@ -474,4 +476,3 @@ describe('useModerationRules', () => {
         });
     });
 });
-

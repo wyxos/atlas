@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\BlacklistPreviewedCountMode;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -18,7 +20,7 @@ class ModerationRule extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'name', 'active', 'nsfw', 'action_type', 'op', 'terms', 'min', 'options', 'children',
+        'name', 'active', 'nsfw', 'action_type', 'blacklist_previewed_count_mode', 'op', 'terms', 'min', 'options', 'children',
     ];
 
     /**
@@ -34,6 +36,14 @@ class ModerationRule extends Model
             'options' => 'array',
             'children' => 'array',
         ];
+    }
+
+    /**
+     * Default legacy/null rows to preserving previewed count.
+     */
+    protected function blacklistPreviewedCountMode(): Attribute
+    {
+        return Attribute::get(fn (?string $value): string => $value ?: BlacklistPreviewedCountMode::PRESERVE);
     }
 
     /**

@@ -27,6 +27,13 @@ abstract class BaseModerationService
     protected array $blacklistFileIds = [];
 
     /**
+     * Minimum previewed counts for blacklist actions that should hide files from normal feeds.
+     *
+     * @var array<int, int>
+     */
+    protected array $blacklistMinimumPreviewedCounts = [];
+
+    /**
      * Immediate blacklist actions tracked for toast notification.
      *
      * @var array<int, array{file_id:int, action_type:string}>
@@ -92,7 +99,7 @@ abstract class BaseModerationService
             }
 
             $this->recordMatch($file, $match, $actionType);
-            $this->handleActionType($actionType, $file);
+            $this->handleActionType($actionType, $file, $match);
         }
 
         $this->flushRecordedMatches();
@@ -114,16 +121,22 @@ abstract class BaseModerationService
     {
         $this->flaggedIds = [];
         $this->blacklistFileIds = [];
+        $this->blacklistMinimumPreviewedCounts = [];
         $this->immediateActions = [];
     }
 
     /**
      * Handle action type for a file and collect it into appropriate arrays.
      */
-    protected function handleActionType(string $actionType, File $file): void
+    protected function handleActionType(string $actionType, File $file, object $match): void
     {
         if ($actionType === ActionType::BLACKLIST) {
             $this->blacklistFileIds[] = $file->id;
+
+            $minimumPreviewedCount = $this->getBlacklistMinimumPreviewedCount($match);
+            if (is_int($minimumPreviewedCount) && $minimumPreviewedCount >= 0) {
+                $this->blacklistMinimumPreviewedCounts[(int) $file->id] = $minimumPreviewedCount;
+            }
         }
     }
 
@@ -134,16 +147,46 @@ abstract class BaseModerationService
     {
         if (! empty($this->blacklistFileIds)) {
             $userId = Auth::id();
-            app(FileBlacklistService::class)->apply(
-                File::query()
-                    ->whereIn('id', $this->blacklistFileIds)
-                    ->get(),
-                is_int($userId) ? $userId : null,
-                autoBlacklisted: true,
-            );
+            $blacklistService = app(FileBlacklistService::class);
+            $fileIds = array_values(array_unique(array_map('intval', $this->blacklistFileIds)));
+            $files = File::query()
+                ->whereIn('id', $fileIds)
+                ->get()
+                ->keyBy('id');
+
+            foreach ($this->groupBlacklistFileIdsByPreviewedMinimum($fileIds) as $group) {
+                $blacklistService->apply(
+                    $files->only($group['file_ids'])->values(),
+                    is_int($userId) ? $userId : null,
+                    minimumPreviewedCount: $group['minimum_previewed_count'],
+                    autoBlacklisted: true,
+                );
+            }
         }
 
         return $this->blacklistFileIds;
+    }
+
+    /**
+     * @param  array<int>  $fileIds
+     * @return array<int, array{file_ids: array<int>, minimum_previewed_count: int|null}>
+     */
+    private function groupBlacklistFileIdsByPreviewedMinimum(array $fileIds): array
+    {
+        $groups = [];
+
+        foreach ($fileIds as $fileId) {
+            $minimumPreviewedCount = $this->blacklistMinimumPreviewedCounts[$fileId] ?? null;
+            $key = $minimumPreviewedCount === null ? 'preserve' : (string) $minimumPreviewedCount;
+
+            $groups[$key] ??= [
+                'file_ids' => [],
+                'minimum_previewed_count' => $minimumPreviewedCount,
+            ];
+            $groups[$key]['file_ids'][] = $fileId;
+        }
+
+        return array_values($groups);
     }
 
     /**
@@ -279,6 +322,14 @@ abstract class BaseModerationService
      * Get the action type from a matched rule/container.
      */
     abstract protected function getActionType(object $match): string;
+
+    /**
+     * Return a minimum previewed count for blacklist actions that should be hidden from normal feeds.
+     */
+    protected function getBlacklistMinimumPreviewedCount(object $match): ?int
+    {
+        return null;
+    }
 
     /**
      * Record match metadata (e.g. to show which rule flagged a file for auto-blacklist).

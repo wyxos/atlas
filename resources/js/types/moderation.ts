@@ -38,6 +38,8 @@ export interface ModerationRuleNode {
  */
 export type ModerationRuleActionType = 'blacklist';
 
+export type ModerationRuleBlacklistPreviewedCountMode = 'preserve' | 'feed_removed';
+
 /**
  * The main ModerationRule interface representing a database record.
  */
@@ -47,6 +49,7 @@ export interface ModerationRule {
     active: boolean;
     nsfw: boolean;
     action_type: ModerationRuleActionType;
+    blacklist_previewed_count_mode: ModerationRuleBlacklistPreviewedCountMode;
     op: ModerationRuleOp;
     terms: ModerationRuleTerm[] | null;
     min: number | null;
@@ -64,6 +67,7 @@ export interface CreateModerationRulePayload {
     active?: boolean;
     nsfw?: boolean;
     action_type?: ModerationRuleActionType;
+    blacklist_previewed_count_mode?: ModerationRuleBlacklistPreviewedCountMode;
     op: ModerationRuleOp;
     terms?: ModerationRuleTerm[] | null;
     min?: number | null;
@@ -79,6 +83,7 @@ export interface UpdateModerationRulePayload {
     active?: boolean;
     nsfw?: boolean;
     action_type?: ModerationRuleActionType;
+    blacklist_previewed_count_mode?: ModerationRuleBlacklistPreviewedCountMode;
     op?: ModerationRuleOp;
     terms?: ModerationRuleTerm[] | null;
     min?: number | null;

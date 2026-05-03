@@ -80,6 +80,17 @@ function handleClick(event: MouseEvent | KeyboardEvent): void {
     emit('click');
 }
 
+function handleDoubleClick(event: MouseEvent): void {
+    if (event.button !== 0) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    suppressNextClick();
+    startCustomLabelEdit();
+}
+
 function handleClose(event: MouseEvent): void {
     event.stopPropagation();
     emit('close');
@@ -238,6 +249,7 @@ function handleDragEnd(): void {
                 role="button"
                 tabindex="0"
                 @click="handleClick"
+                @dblclick="handleDoubleClick"
                 @mousedown="handleMouseDown"
                 @dragstart="handleDragStart"
                 @dragover="handleDragOver"

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ActionType;
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\ModerationRule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,7 @@ class ModerationRuleController extends Controller
             'active' => ['boolean'],
             'nsfw' => ['boolean'],
             'action_type' => ['nullable', 'string', 'in:blacklist'],
+            'blacklist_previewed_count_mode' => ['nullable', 'string', 'in:preserve,feed_removed'],
             'op' => ['required', 'string', 'in:any,all,not_any,at_least,and,or'],
             'terms' => ['nullable', 'array'],
             'terms.*' => ['nullable'], // Can be string or object with term and allow_digit_prefix
@@ -44,6 +46,7 @@ class ModerationRuleController extends Controller
             'active' => $validated['active'] ?? true,
             'nsfw' => $validated['nsfw'] ?? false,
             'action_type' => $validated['action_type'] ?? ActionType::BLACKLIST,
+            'blacklist_previewed_count_mode' => $validated['blacklist_previewed_count_mode'] ?? BlacklistPreviewedCountMode::PRESERVE,
             'op' => $validated['op'],
             'terms' => $validated['terms'] ?? null,
             'min' => $validated['min'] ?? null,
@@ -72,6 +75,7 @@ class ModerationRuleController extends Controller
             'active' => ['boolean'],
             'nsfw' => ['boolean'],
             'action_type' => ['nullable', 'string', 'in:blacklist'],
+            'blacklist_previewed_count_mode' => ['nullable', 'string', 'in:preserve,feed_removed'],
             'op' => ['string', 'in:any,all,not_any,at_least,and,or'],
             'terms' => ['nullable', 'array'],
             'terms.*' => ['nullable'], // Can be string or object with term and allow_digit_prefix

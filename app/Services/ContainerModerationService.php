@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ActionType;
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\Container;
 use App\Models\File;
 use Illuminate\Support\Collection;
@@ -53,18 +54,35 @@ final class ContainerModerationService extends BaseModerationService
     protected function getMatchForFile(File $file): ?Container
     {
         $containerIds = $this->fileContainerMap[$file->id] ?? [];
+        $firstMatch = null;
 
         foreach ($containerIds as $containerId) {
             if (isset($this->blacklistedContainers[$containerId])) {
-                return $this->blacklistedContainers[$containerId];
+                $container = $this->blacklistedContainers[$containerId];
+                $firstMatch ??= $container;
+
+                if ($container->blacklist_previewed_count_mode === BlacklistPreviewedCountMode::FEED_REMOVED) {
+                    return $container;
+                }
             }
         }
 
-        return null;
+        return $firstMatch;
     }
 
     protected function getActionType(object $match): string
     {
         return ActionType::BLACKLIST;
+    }
+
+    protected function getBlacklistMinimumPreviewedCount(object $match): ?int
+    {
+        if (! ($match instanceof Container)) {
+            return null;
+        }
+
+        return $match->blacklist_previewed_count_mode === BlacklistPreviewedCountMode::FEED_REMOVED
+            ? FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
+            : null;
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\ModerationRule;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,6 +36,7 @@ test('can create a moderation rule with any operation', function () {
         'active' => true,
         'nsfw' => false,
         'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
         'options' => [
             'case_sensitive' => false,
             'whole_word' => true,
@@ -51,13 +53,25 @@ test('can create a moderation rule with any operation', function () {
             'active' => true,
             'nsfw' => false,
             'action_type' => 'blacklist',
+            'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
         ]);
 
     $this->assertDatabaseHas('moderation_rules', [
         'name' => 'Block spam terms',
         'op' => 'any',
         'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
     ]);
+});
+
+test('defaults moderation rule previewed count mode to preserve', function () {
+    $response = $this->postJson('/api/moderation-rules', [
+        'op' => 'any',
+        'terms' => ['uncertain'],
+    ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('blacklist_previewed_count_mode', BlacklistPreviewedCountMode::PRESERVE);
 });
 
 test('can create a moderation rule with at_least operation', function () {
@@ -169,6 +183,21 @@ test('can update moderation rule terms', function () {
         ->assertJson([
             'terms' => ['new1', 'new2', 'new3'],
         ]);
+});
+
+test('can update moderation rule previewed count mode', function () {
+    $rule = ModerationRule::factory()->create([
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
+    ]);
+
+    $response = $this->putJson("/api/moderation-rules/{$rule->id}", [
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('blacklist_previewed_count_mode', BlacklistPreviewedCountMode::FEED_REMOVED);
+
+    expect($rule->fresh()->blacklist_previewed_count_mode)->toBe(BlacklistPreviewedCountMode::FEED_REMOVED);
 });
 
 test('can delete a moderation rule', function () {

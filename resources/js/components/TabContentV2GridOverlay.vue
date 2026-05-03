@@ -17,6 +17,7 @@ interface Props {
     hovered: boolean;
     index: number;
     item: FeedItem;
+    dimmed?: boolean;
     totalItems: number;
     vibeItem: VibeViewerItem;
     containers: TabContentContainerInteractions;
@@ -47,7 +48,10 @@ const showReactions = computed(() => (
 </script>
 
 <template>
-    <div class="pointer-events-none absolute inset-0 z-[5]">
+    <div
+        class="pointer-events-none absolute inset-0 z-[5]"
+        :data-container-drawer-dimmed="dimmed ? 'true' : undefined"
+    >
         <div
             v-if="showContainers"
             class="pointer-events-auto absolute left-2 top-2 flex flex-col gap-1"
@@ -123,3 +127,13 @@ const showReactions = computed(() => (
         </div>
     </div>
 </template>
+
+<style scoped>
+:global(article[data-testid="vibe-list-card"]) {
+    transition: opacity 0.16s ease;
+}
+
+:global(article[data-testid="vibe-list-card"]:has([data-container-drawer-dimmed="true"])) {
+    opacity: 0.3;
+}
+</style>

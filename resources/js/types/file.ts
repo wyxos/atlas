@@ -1,4 +1,8 @@
-import type { ContainerBlacklistActionType, ContainerBlacklistFileStats } from './container-blacklist';
+import type {
+    ContainerBlacklistActionType,
+    ContainerBlacklistFileStats,
+    ContainerBlacklistPreviewedCountMode,
+} from './container-blacklist';
 
 export interface FileContainer {
     id: number;
@@ -9,6 +13,7 @@ export interface FileContainer {
     blacklisted: boolean;
     blacklisted_at: string | null;
     action_type: ContainerBlacklistActionType | null;
+    blacklist_previewed_count_mode: ContainerBlacklistPreviewedCountMode;
     file_stats: ContainerBlacklistFileStats;
 }
 

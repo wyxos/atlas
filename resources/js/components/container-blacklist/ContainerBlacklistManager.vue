@@ -11,7 +11,11 @@ import {
 } from '@/components/ui/dialog';
 import ContainerBlacklistDialog from './ContainerBlacklistDialog.vue';
 import { useContainerBlacklists } from '@/composables/useContainerBlacklists';
-import type { ContainerBlacklist, ContainerBlacklistActionType } from '@/types/container-blacklist';
+import type {
+    ContainerBlacklist,
+    ContainerBlacklistActionType,
+    ContainerBlacklistPreviewedCountMode,
+} from '@/types/container-blacklist';
 
 interface Props {
     disabled?: boolean;
@@ -79,11 +83,15 @@ async function openBlacklistDialog(container: {
 }
 
 // Handle confirm from blacklist dialog
-async function handleConfirmBlacklist(containerId: number, actionType: ContainerBlacklistActionType): Promise<void> {
+async function handleConfirmBlacklist(
+    containerId: number,
+    actionType: ContainerBlacklistActionType,
+    previewedCountMode: ContainerBlacklistPreviewedCountMode
+): Promise<void> {
     isSaving.value = true;
 
     try {
-        const created = await createBlacklist(containerId, actionType);
+        const created = await createBlacklist(containerId, actionType, previewedCountMode);
         if (created) {
             isBlacklistDialogOpen.value = false;
             containerToBlacklist.value = null;
@@ -129,6 +137,7 @@ async function handleDialogBlacklistChanged(): Promise<void> {
             blacklist: {
                 ...containerToBlacklist.value,
                 action_type: null,
+                blacklist_previewed_count_mode: 'preserve',
                 blacklisted_at: null,
             },
         });
@@ -141,6 +150,10 @@ async function handleDialogBlacklistChanged(): Promise<void> {
 defineExpose({
     openBlacklistDialog,
 });
+
+function previewedCountModeLabel(mode?: ContainerBlacklistPreviewedCountMode): string {
+    return mode === 'feed_removed' ? '99,999' : 'keep count';
+}
 </script>
 
 <template>
@@ -225,6 +238,11 @@ defineExpose({
                                             >
                                                 {{ blacklist.action_type }}
                                             </span>
+                                            <span
+                                                class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-smart-blue-500/20 text-smart-blue-300"
+                                            >
+                                                {{ previewedCountModeLabel(blacklist.blacklist_previewed_count_mode) }}
+                                            </span>
                                         </div>
                                     </div>
                                     <div class="flex items-center justify-between">
@@ -277,6 +295,12 @@ defineExpose({
                                         <div class="text-sm">
                                             <span class="text-twilight-indigo-300">Action Type:</span>
                                             <span class="ml-2 text-regal-navy-100 font-medium">{{ selectedContainer.action_type }}</span>
+                                        </div>
+                                        <div class="text-sm">
+                                            <span class="text-twilight-indigo-300">Previewed Count:</span>
+                                            <span class="ml-2 text-regal-navy-100 font-medium">
+                                                {{ previewedCountModeLabel(selectedContainer.blacklist_previewed_count_mode) }}
+                                            </span>
                                         </div>
                                         <div v-if="selectedContainer.blacklisted_at" class="text-sm">
                                             <span class="text-twilight-indigo-300">Blacklisted At:</span>

@@ -121,6 +121,7 @@ class FileItemFormatter
                         'source_id' => $container->source_id,
                     ], $browseContext),
                     'action_type' => $container->action_type,
+                    'blacklist_previewed_count_mode' => $container->blacklist_previewed_count_mode ?? 'preserve',
                     'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
                 ];
             })->values()->all();

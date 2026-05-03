@@ -143,6 +143,13 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             ? []
             : getVisibleSiblingItems(selectedContainerId.value)
     ));
+    const highlightedItemIds = computed(() => {
+        if (!isDrawerOpen.value || relatedItems.value.length <= 1) {
+            return new Set<number>();
+        }
+
+        return new Set(relatedItems.value.map((item) => item.id));
+    });
 
     function cancelPendingHoverOpen(): void {
         if (pendingHoverOpenTimer) {
@@ -323,6 +330,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             },
             derived: {
                 container: selectedContainer,
+                highlightedItemIds,
                 items: relatedItems,
             },
             actions: {

@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import type {
     ContainerBlacklist,
+    ContainerBlacklistPreviewedCountMode,
     ContainerBlacklistStatus,
     CreateContainerBlacklistPayload,
 } from '@/types/container-blacklist';
@@ -40,7 +41,8 @@ export function useContainerBlacklists() {
      */
     async function createBlacklist(
         containerId: number,
-        actionType: ContainerBlacklist['action_type']
+        actionType: ContainerBlacklist['action_type'],
+        previewedCountMode: ContainerBlacklistPreviewedCountMode = 'preserve'
     ): Promise<ContainerBlacklist | null> {
         if (!actionType) {
             return null;
@@ -53,6 +55,7 @@ export function useContainerBlacklists() {
             const payload: CreateContainerBlacklistPayload = {
                 container_id: containerId,
                 action_type: actionType,
+                blacklist_previewed_count_mode: previewedCountMode,
             };
 
             const { data: created } = await window.axios.post<ContainerBlacklist>('/api/container-blacklists', payload);

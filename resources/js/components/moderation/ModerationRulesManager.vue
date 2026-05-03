@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { Shield, Plus, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
     Dialog,
@@ -19,6 +20,7 @@ import type {
     ModerationRuleOp,
     ModerationRuleActionType,
     ModerationRuleTerm,
+    ModerationRuleBlacklistPreviewedCountMode,
     CreateModerationRulePayload,
 } from '@/types/moderation';
 
@@ -59,6 +61,7 @@ interface ModerationRuleForm {
     active: boolean;
     nsfw: boolean;
     action_type: ModerationRuleActionType;
+    blacklist_previewed_count_mode: ModerationRuleBlacklistPreviewedCountMode;
     op: ModerationRuleOp;
     terms: ModerationRuleTerm[];
     min: number | null;
@@ -72,6 +75,7 @@ function defaultRuleForm(): ModerationRuleForm {
         active: true,
         nsfw: false,
         action_type: 'blacklist',
+        blacklist_previewed_count_mode: 'preserve',
         op: 'any',
         terms: [],
         min: null,
@@ -87,6 +91,7 @@ function ruleToForm(rule: ModerationRule): ModerationRuleForm {
         active: rule.active,
         nsfw: rule.nsfw,
         action_type: 'blacklist',
+        blacklist_previewed_count_mode: rule.blacklist_previewed_count_mode ?? 'preserve',
         op: rule.op,
         terms: rule.terms ?? [],
         min: rule.min,
@@ -132,6 +137,11 @@ function onRuleNodeUpdate(node: ModerationRuleNode): void {
     ruleForm.value.children = node.children ?? [];
 }
 
+function updateBlacklistPreviewedCountMode(value: unknown): void {
+    if (!ruleForm.value) return;
+    ruleForm.value.blacklist_previewed_count_mode = value === 'feed_removed' ? 'feed_removed' : 'preserve';
+}
+
 // Convert form to node for RuleEditor
 const ruleNodeFromForm = computed<ModerationRuleNode | null>(() => {
     if (!ruleForm.value) return null;
@@ -156,6 +166,7 @@ async function saveRule(): Promise<void> {
             active: ruleForm.value.active,
             nsfw: ruleForm.value.nsfw,
             action_type: ruleForm.value.action_type,
+            blacklist_previewed_count_mode: ruleForm.value.blacklist_previewed_count_mode,
             op: ruleForm.value.op,
             terms: ['any', 'all', 'not_any', 'at_least'].includes(ruleForm.value.op)
                 ? ruleForm.value.terms
@@ -242,6 +253,10 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
             return op;
     }
 }
+
+function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMode): string {
+    return mode === 'feed_removed' ? '99,999' : 'keep count';
+}
 </script>
 
 <template>
@@ -289,6 +304,22 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                         <Switch v-model="ruleForm.nsfw" />
                                         <span class="text-sm text-twilight-indigo-200">NSFW</span>
                                     </label>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium text-regal-navy-100">Previewed Count</label>
+                                    <Select
+                                        :model-value="ruleForm.blacklist_previewed_count_mode"
+                                        @update:model-value="updateBlacklistPreviewedCountMode"
+                                    >
+                                        <SelectTrigger class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="preserve">Blacklist, keep current count</SelectItem>
+                                            <SelectItem value="feed_removed">Blacklist, set to 99,999</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <p class="rounded-lg border border-danger-500/30 bg-danger-500/10 p-3 text-xs text-danger-100">
@@ -381,6 +412,11 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                             <span v-if="rule.nsfw"
                                                 class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/20 text-amber-400">
                                                 nsfw
+                                            </span>
+                                            <span
+                                                class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-smart-blue-500/20 text-smart-blue-300"
+                                            >
+                                                {{ previewedCountModeLabel(rule.blacklist_previewed_count_mode) }}
                                             </span>
                                         </div>
                                     </div>

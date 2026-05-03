@@ -1,12 +1,14 @@
 <?php
 
 use App\Enums\ActionType;
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationRule;
 use App\Models\Reaction;
 use App\Models\User;
 use App\Services\FileModerationService;
+use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
@@ -93,6 +95,98 @@ test('persist the moderation rule that flagged a file for auto-blacklist', funct
         ->assertJsonPath('file.auto_blacklisted', true)
         ->assertJsonPath('file.auto_blacklist_rule.id', $rule->id)
         ->assertJsonPath('file.auto_blacklist_rule.name', $rule->name);
+});
+
+test('rule blacklist preserves previewed count by default', function () {
+    ModerationRule::factory()->any(['maybe'])->create([
+        'name' => 'Reviewable rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+    ]);
+
+    $file = File::factory()->create([
+        'auto_blacklisted' => false,
+        'blacklisted_at' => null,
+        'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'previewed_count' => 3,
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This includes maybe questionable content'],
+    ]);
+
+    $result = $this->service->moderate(collect([$file->fresh()->load('metadata')]));
+
+    expect($result['processedIds'])->toContain($file->id);
+    expect($file->fresh()->previewed_count)->toBe(3);
+});
+
+test('rule blacklist can set previewed count to feed removed count', function () {
+    ModerationRule::factory()->any(['never'])->create([
+        'name' => 'Permanent rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+
+    $file = File::factory()->create([
+        'auto_blacklisted' => false,
+        'blacklisted_at' => null,
+        'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'previewed_count' => 3,
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This includes never allowed content'],
+    ]);
+
+    $result = $this->service->moderate(collect([$file->fresh()->load('metadata')]));
+
+    expect($result['processedIds'])->toContain($file->id);
+    expect($file->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
+});
+
+test('feed removed rule wins over earlier preserve rule', function () {
+    ModerationRule::factory()->any(['shared'])->create([
+        'name' => 'Reviewable first rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
+    ]);
+    $permanentRule = ModerationRule::factory()->any(['shared'])->create([
+        'name' => 'Permanent second rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+
+    $file = File::factory()->create([
+        'auto_blacklisted' => false,
+        'blacklisted_at' => null,
+        'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'previewed_count' => 3,
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'shared term'],
+    ]);
+
+    $this->service->moderate(collect([$file->fresh()->load('metadata')]));
+
+    expect($file->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
+    $this->assertDatabaseHas('file_moderation_actions', [
+        'file_id' => $file->id,
+        'moderation_rule_id' => $permanentRule->id,
+    ]);
 });
 
 test('files without matching prompts are not flagged', function () {

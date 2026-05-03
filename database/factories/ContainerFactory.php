@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\BlacklistPreviewedCountMode;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -24,6 +25,7 @@ class ContainerFactory extends Factory
             'source' => fake()->randomElement($sources),
             'source_id' => fake()->uuid(),
             'referrer' => fake()->optional()->url(),
+            'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
         ];
     }
 }

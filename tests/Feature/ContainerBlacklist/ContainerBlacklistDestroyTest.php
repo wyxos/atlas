@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\Container;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,6 +12,7 @@ test('authenticated user can remove container from blacklist', function () {
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
         'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
     ]);
 
     $response = $this->actingAs($user)->deleteJson("/api/container-blacklists/{$container->id}");
@@ -23,13 +25,15 @@ test('authenticated user can remove container from blacklist', function () {
     $container->refresh();
     expect($container->blacklisted_at)->toBeNull();
     expect($container->action_type)->toBeNull();
+    expect($container->blacklist_previewed_count_mode)->toBe(BlacklistPreviewedCountMode::PRESERVE);
 });
 
-test('removing blacklist clears both blacklisted_at and action_type', function () {
+test('removing blacklist clears blacklist fields', function () {
     $user = User::factory()->create();
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
         'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
     ]);
 
     $this->actingAs($user)->deleteJson("/api/container-blacklists/{$container->id}");
@@ -37,6 +41,7 @@ test('removing blacklist clears both blacklisted_at and action_type', function (
     $container->refresh();
     expect($container->blacklisted_at)->toBeNull();
     expect($container->action_type)->toBeNull();
+    expect($container->blacklist_previewed_count_mode)->toBe(BlacklistPreviewedCountMode::PRESERVE);
 });
 
 test('returns 404 when container is not blacklisted', function () {

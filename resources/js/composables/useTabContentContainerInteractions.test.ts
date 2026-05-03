@@ -73,6 +73,28 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.drawer.state.isOpen.value).toBe(true);
         expect(interactions.drawer.derived.container.value?.id).toBe(10);
         expect(interactions.drawer.derived.items.value.map((item) => item.id)).toEqual([1, 2]);
+        expect([...interactions.drawer.derived.highlightedItemIds.value]).toEqual([1, 2]);
+
+        vi.useRealTimers();
+    });
+
+    it('clears drawer highlighted item ids when the drawer closes', () => {
+        vi.useFakeTimers();
+        const interactions = createSubject([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+            createItem(3, [{ id: 20, type: 'album' }]),
+        ]);
+
+        interactions.pillHandlers.onClick(10, createEvent());
+        vi.advanceTimersByTime(300);
+        vi.runOnlyPendingTimers();
+
+        expect([...interactions.drawer.derived.highlightedItemIds.value]).toEqual([1, 2]);
+
+        interactions.drawer.actions.close();
+
+        expect(interactions.drawer.derived.highlightedItemIds.value.size).toBe(0);
 
         vi.useRealTimers();
     });

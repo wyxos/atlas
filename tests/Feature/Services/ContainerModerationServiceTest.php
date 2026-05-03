@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Jobs\DeleteStoredFileJob;
 use App\Models\Container;
 use App\Models\File;
@@ -7,6 +8,7 @@ use App\Models\Reaction;
 use App\Models\Tab;
 use App\Models\User;
 use App\Services\ContainerModerationService;
+use App\Services\FilePreviewService;
 use App\Services\Local\LocalBrowseTypesenseGateway;
 use App\Services\LocalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +51,7 @@ test('auto blacklists files from blacklisted containers', function () {
     $file = File::factory()->create([
         'auto_blacklisted' => false,
         'blacklisted_at' => null,
+        'previewed_count' => 3,
         'path' => null,
         'preview_path' => null,
         'poster_path' => null,
@@ -63,7 +66,70 @@ test('auto blacklists files from blacklisted containers', function () {
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->auto_blacklisted)->toBeTrue();
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
+    expect($file->fresh()->previewed_count)->toBe(3);
     expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
+    Bus::assertNothingDispatched();
+});
+
+test('blacklisted containers can set previewed count to feed removed count', function () {
+    Bus::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $container = Container::factory()->create([
+        'blacklisted_at' => now(),
+        'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+    $file = File::factory()->create([
+        'auto_blacklisted' => false,
+        'blacklisted_at' => null,
+        'previewed_count' => 3,
+        'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+        'downloaded_at' => null,
+    ]);
+    $file->containers()->attach($container->id);
+
+    $result = $this->service->moderate(collect([$file]));
+
+    expect($result['processedIds'])->toContain($file->id);
+    expect($file->fresh()->blacklisted_at)->not->toBeNull();
+    expect($file->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
+    Bus::assertNothingDispatched();
+});
+
+test('feed removed container wins over earlier preserve container', function () {
+    Bus::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $preserveContainer = Container::factory()->create([
+        'blacklisted_at' => now(),
+        'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
+    ]);
+    $feedRemovedContainer = Container::factory()->create([
+        'blacklisted_at' => now(),
+        'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+    $file = File::factory()->create([
+        'auto_blacklisted' => false,
+        'blacklisted_at' => null,
+        'previewed_count' => 3,
+        'path' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+        'downloaded' => false,
+    ]);
+    $file->containers()->attach([$preserveContainer->id, $feedRemovedContainer->id]);
+
+    $this->service->moderate(collect([$file]));
+
+    expect($file->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
     Bus::assertNothingDispatched();
 });
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\Container;
 
 class ContainerBlacklistService
@@ -32,6 +33,15 @@ class ContainerBlacklistService
             ->whereDoesntHave('reactions')
             ->get();
 
-        return app(FileBlacklistService::class)->apply($files, $userId, autoBlacklisted: true);
+        $minimumPreviewedCount = $container->blacklist_previewed_count_mode === BlacklistPreviewedCountMode::FEED_REMOVED
+            ? FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
+            : null;
+
+        return app(FileBlacklistService::class)->apply(
+            $files,
+            $userId,
+            minimumPreviewedCount: $minimumPreviewedCount,
+            autoBlacklisted: true,
+        );
     }
 }

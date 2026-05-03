@@ -115,6 +115,17 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
     return (item.feedItem as FeedItem | undefined) ?? null;
 }
 
+function shouldDimGridItemForContainerDrawer(item: VibeViewerItem): boolean {
+    const feedItem = getFeedItemFromVibeItem(item);
+    if (!feedItem) {
+        return false;
+    }
+
+    const highlightedItemIds = props.containerInteractions.drawer.derived.highlightedItemIds.value;
+
+    return highlightedItemIds.size > 0 && !highlightedItemIds.has(feedItem.id);
+}
+
 async function handleBlacklist(item: VibeViewerItem): Promise<void> {
     const feedItem = getFeedItemFromVibeItem(item);
 
@@ -225,6 +236,7 @@ useEventListener(document, 'pointermove', (event) => {
                             :active="active"
                             :hovered="hovered"
                             :index="index"
+                            :dimmed="shouldDimGridItemForContainerDrawer(item as VibeViewerItem)"
                             :item="getFeedItemFromVibeItem(item as VibeViewerItem)!"
                             :total-items="vibeStatus.itemCount"
                             :vibe-item="item as VibeViewerItem"

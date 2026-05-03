@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ActionType;
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\File;
 use App\Models\FileModerationAction;
 use App\Models\ModerationRule;
@@ -95,19 +96,36 @@ final class FileModerationService extends BaseModerationService
             return null;
         }
 
+        $firstMatch = null;
+
         foreach ($this->activeRules as $rule) {
             $this->moderator->loadRule($rule);
             if ($this->moderator->check($prompt)) {
-                return $rule;
+                $firstMatch ??= $rule;
+
+                if ($rule->blacklist_previewed_count_mode === BlacklistPreviewedCountMode::FEED_REMOVED) {
+                    return $rule;
+                }
             }
         }
 
-        return null;
+        return $firstMatch;
     }
 
     protected function getActionType(object $match): string
     {
         return ActionType::BLACKLIST;
+    }
+
+    protected function getBlacklistMinimumPreviewedCount(object $match): ?int
+    {
+        if (! ($match instanceof ModerationRule)) {
+            return null;
+        }
+
+        return $match->blacklist_previewed_count_mode === BlacklistPreviewedCountMode::FEED_REMOVED
+            ? FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
+            : null;
     }
 
     protected function resetState(): void

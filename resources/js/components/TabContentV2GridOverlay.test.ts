@@ -95,6 +95,24 @@ it('renders hover actions without preview-side dependencies', () => {
         expect(wrapper.exists()).toBe(true);
     });
 
+    it('marks non-sibling cards as dimmed while a container drawer is open', () => {
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props: {
+                ...createProps(),
+                dimmed: true,
+            },
+            global: {
+                stubs: {
+                    Button: testStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        expect(wrapper.attributes('data-container-drawer-dimmed')).toBe('true');
+    });
+
     it('shows and wires the blacklist state action for blacklisted items', async () => {
         const props = createProps();
         props.item.blacklisted_at = '2026-04-30T00:00:00Z';

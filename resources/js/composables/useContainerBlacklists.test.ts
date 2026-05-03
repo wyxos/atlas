@@ -38,6 +38,7 @@ describe('useContainerBlacklists', () => {
                 source: 'CivitAI',
                 source_id: '123',
                 action_type: 'blacklist',
+                blacklist_previewed_count_mode: 'preserve',
                 blacklisted_at: '2024-01-15T10:00:00Z',
             },
             {
@@ -46,6 +47,7 @@ describe('useContainerBlacklists', () => {
                 source: 'CivitAI',
                 source_id: '456',
                 action_type: 'blacklist',
+                blacklist_previewed_count_mode: 'preserve',
                 blacklisted_at: '2024-01-14T10:00:00Z',
             },
         ];
@@ -82,6 +84,7 @@ describe('useContainerBlacklists', () => {
             source: 'CivitAI',
             source_id: '123',
             action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 
@@ -94,10 +97,35 @@ describe('useContainerBlacklists', () => {
         expect(mockAxios.post).toHaveBeenCalledWith('/api/container-blacklists', {
             container_id: 1,
             action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
         });
         expect(result).toEqual(mockContainer);
         expect(blacklists.value.length).toBeGreaterThan(0);
         expect(blacklists.value.find((b) => b.id === mockContainer.id)).toEqual(mockContainer);
+    });
+
+    it('creates container blacklist with feed removal preview mode', async () => {
+        const mockContainer = {
+            id: 1,
+            type: 'User',
+            source: 'CivitAI',
+            source_id: '123',
+            action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'feed_removed',
+            blacklisted_at: '2024-01-15T10:00:00Z',
+        };
+
+        mockAxios.post.mockResolvedValue({ data: mockContainer });
+
+        const { createBlacklist } = useContainerBlacklists();
+
+        await createBlacklist(1, 'blacklist', 'feed_removed');
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/container-blacklists', {
+            container_id: 1,
+            action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'feed_removed',
+        });
     });
 
     it('updates existing blacklist when creating', async () => {
@@ -107,6 +135,7 @@ describe('useContainerBlacklists', () => {
             source: 'CivitAI',
             source_id: '123',
             action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
         const updated = {
@@ -140,6 +169,7 @@ describe('useContainerBlacklists', () => {
             source: 'CivitAI',
             source_id: '123',
             action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 
@@ -173,6 +203,7 @@ describe('useContainerBlacklists', () => {
             blacklisted: true,
             blacklisted_at: '2024-01-15T10:00:00Z',
             action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
             file_stats: {
                 unreacted: 12,
                 blacklisted: 8,
@@ -207,6 +238,7 @@ describe('useContainerBlacklists', () => {
             source: 'CivitAI',
             source_id: '123',
             action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 

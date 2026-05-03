@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\ModerationRule;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -28,6 +29,7 @@ class ModerationRuleFactory extends Factory
             'name' => $this->faker->words(2, true),
             'active' => true,
             'nsfw' => false,
+            'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
             'op' => 'any',
             'terms' => ['car'],
             'min' => null,
