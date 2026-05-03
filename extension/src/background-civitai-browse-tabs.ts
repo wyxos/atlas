@@ -1,17 +1,28 @@
 import { getStoredOptions } from './atlas-options';
+import { isCivitAiNsfwHostname } from './civitai-domains';
 
 type RuntimeSendResponse = (response?: unknown) => void;
+type RuntimeMessageSender = {
+    tab?: {
+        url?: string;
+    };
+};
 
 type OpenCivitAiModelTabPayload = {
     type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB';
     modelId: unknown;
     modelVersionId?: unknown;
     nsfw?: unknown;
+    sourceHostname?: unknown;
+    sourceUrl?: unknown;
 };
 
 type OpenCivitAiUsernameTabPayload = {
     type: 'ATLAS_OPEN_CIVITAI_USERNAME_TAB';
     username: unknown;
+    nsfw?: unknown;
+    sourceHostname?: unknown;
+    sourceUrl?: unknown;
 };
 
 function parseJsonResponse(response: Response): Promise<unknown> {
@@ -68,6 +79,33 @@ function resolveBrowseUrlFromPayload(payload: unknown): string | null {
     return typeof browseUrl === 'string' && browseUrl.trim() !== '' ? browseUrl.trim() : null;
 }
 
+function isNsfwSourceUrl(value: unknown): boolean {
+    if (typeof value !== 'string' || value.trim() === '') {
+        return false;
+    }
+
+    try {
+        return isCivitAiNsfwHostname(new URL(value).hostname);
+    } catch {
+        return false;
+    }
+}
+
+function resolveCivitAiNsfw(
+    payload: { nsfw?: unknown; sourceHostname?: unknown; sourceUrl?: unknown },
+    sender?: RuntimeMessageSender,
+): boolean {
+    if (payload.nsfw === true) {
+        return true;
+    }
+
+    if (typeof payload.sourceHostname === 'string' && isCivitAiNsfwHostname(payload.sourceHostname)) {
+        return true;
+    }
+
+    return isNsfwSourceUrl(payload.sourceUrl) || isNsfwSourceUrl(sender?.tab?.url);
+}
+
 async function openCivitAiBrowseTab(
     endpoint: string,
     body: Record<string, unknown>,
@@ -112,6 +150,7 @@ async function openCivitAiBrowseTab(
 
 export function handleOpenCivitAiModelTabRuntimeMessage(
     message: unknown,
+    sender: RuntimeMessageSender,
     sendResponse: RuntimeSendResponse,
 ): boolean {
     if (!message || typeof message !== 'object') {
@@ -136,7 +175,7 @@ export function handleOpenCivitAiModelTabRuntimeMessage(
         model_version_id: modelVersionId,
     };
 
-    if (payload.nsfw === true) {
+    if (resolveCivitAiNsfw(payload, sender)) {
         body.nsfw = true;
     }
 
@@ -149,6 +188,7 @@ export function handleOpenCivitAiModelTabRuntimeMessage(
 
 export function handleOpenCivitAiUsernameTabRuntimeMessage(
     message: unknown,
+    sender: RuntimeMessageSender,
     sendResponse: RuntimeSendResponse,
 ): boolean {
     if (!message || typeof message !== 'object') {
@@ -166,7 +206,13 @@ export function handleOpenCivitAiUsernameTabRuntimeMessage(
         return false;
     }
 
-    void openCivitAiBrowseTab('civitai-user', { username }, sendResponse).catch(() => {
+    const body: Record<string, unknown> = { username };
+
+    if (resolveCivitAiNsfw(payload, sender)) {
+        body.nsfw = true;
+    }
+
+    void openCivitAiBrowseTab('civitai-user', body, sendResponse).catch(() => {
         sendResponse({ ok: false, status: 0, payload: null });
     });
 

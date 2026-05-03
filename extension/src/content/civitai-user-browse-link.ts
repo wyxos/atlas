@@ -1,4 +1,7 @@
-import { isCivitAiHostname as isSupportedCivitAiHostname } from '../civitai-domains';
+import {
+    isCivitAiHostname as isSupportedCivitAiHostname,
+    isCivitAiNsfwHostname,
+} from '../civitai-domains';
 
 const USER_OPEN_TITLE = 'Open this CivitAI user in Atlas';
 const USER_PENDING_TITLE = 'Opening this CivitAI user in Atlas...';
@@ -71,6 +74,9 @@ function requestOpenCivitAiUsernameTab(reference: CivitAiUsernameReference): Pro
             chrome.runtime.sendMessage({
                 type: 'ATLAS_OPEN_CIVITAI_USERNAME_TAB',
                 username: reference.username,
+                sourceHostname: window.location.hostname,
+                sourceUrl: window.location.href,
+                ...(isCivitAiNsfwHostname(window.location.hostname) ? { nsfw: true } : {}),
             }, (response: unknown) => {
                 if (chrome.runtime.lastError) {
                     console.error('[Atlas Extension] CivitAI user browse request failed', chrome.runtime.lastError.message);

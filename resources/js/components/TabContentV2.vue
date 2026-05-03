@@ -267,7 +267,8 @@ const headerMasonry = vibeMasonry;
 const fillControls = useVibeFillControls({ getVibeHandle: () => vibeRef.value, status: vibeStatus, surfaceMode });
 const { autoScrollActive, autoScrollSpeed, fillActionsDisabled, fillCallCount } = fillControls;
 
-useBrowseGridAutoScrollShortcut({ surfaceMode, toggleAutoScroll: fillControls.toggleAutoScroll });
+function togglePageLoadingLock(): void { const handle = vibeRef.value; if (handle) (vibeStatus.value.pageLoadingLocked ? handle.unlockPageLoading : handle.lockPageLoading)(); }
+useBrowseGridAutoScrollShortcut({ surfaceMode, toggleAutoScroll: fillControls.toggleAutoScroll, togglePageLoadingLock });
 
 function setTabDataLoading(isLoading: boolean): void {
     isTabDataLoading.value = isLoading;

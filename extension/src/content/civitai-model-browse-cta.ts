@@ -177,6 +177,8 @@ function requestOpenCivitAiModelTab(reference: CivitAiModelReference): Promise<R
                 type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
                 modelId: reference.modelId,
                 modelVersionId: reference.modelVersionId,
+                sourceHostname: window.location.hostname,
+                sourceUrl: window.location.href,
                 ...(isCivitAiNsfwHostname(window.location.hostname) ? { nsfw: true } : {}),
             }, (response: unknown) => {
                 if (chrome.runtime.lastError) {

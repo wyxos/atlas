@@ -73,6 +73,41 @@ describe('installCivitAiUserBrowseLinks', () => {
         expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
             type: 'ATLAS_OPEN_CIVITAI_USERNAME_TAB',
             username: 'forsunlee404',
+            sourceHostname: 'civitai.com',
+            sourceUrl: 'https://civitai.com/user/forsunlee404',
+        }, expect.any(Function));
+    });
+
+    it('marks Civitai red profile opens as nsfw', async () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://civitai.red/user/forsunlee404') as unknown as Location,
+        });
+        document.body.innerHTML = `
+            <div class="mantine-Stack-root">
+                <p class="mantine-Text-root" data-size="xl">forsunlee404</p>
+                <p class="mantine-Text-root">Joined Dec 7, 2024</p>
+            </div>
+        `;
+
+        const { installCivitAiUserBrowseLinks } = await import('./civitai-user-browse-link');
+
+        installCivitAiUserBrowseLinks();
+
+        const username = document.querySelector('[data-atlas-civitai-user-browse-link]');
+
+        username?.dispatchEvent(new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+        }));
+        await flushPromises();
+
+        expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+            type: 'ATLAS_OPEN_CIVITAI_USERNAME_TAB',
+            username: 'forsunlee404',
+            sourceHostname: 'civitai.red',
+            sourceUrl: 'https://civitai.red/user/forsunlee404',
+            nsfw: true,
         }, expect.any(Function));
     });
 
@@ -110,6 +145,8 @@ describe('installCivitAiUserBrowseLinks', () => {
         expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
             type: 'ATLAS_OPEN_CIVITAI_USERNAME_TAB',
             username: 'forsunlee404',
+            sourceHostname: 'civitai.com',
+            sourceUrl: 'https://civitai.com/user/forsunlee404',
         }, expect.any(Function));
     });
 

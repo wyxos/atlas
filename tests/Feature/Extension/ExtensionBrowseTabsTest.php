@@ -160,3 +160,27 @@ it('creates and activates a civitai browse tab for the requested username filter
     expect($existingActiveTab->fresh()?->is_active)->toBeFalse();
     expect($createdTab?->params['username'] ?? null)->toBe('forsunlee404');
 });
+
+it('enables nsfw params for civitai user browse tabs when requested by the extension', function () {
+    $user = User::factory()->create();
+    setExtensionBrowseTabsApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/browse-tabs/civitai-user', [
+        'username' => 'forsunlee404',
+        'nsfw' => true,
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('tab.params.username', 'forsunlee404');
+    $response->assertJsonPath('tab.params.nsfw', true);
+
+    $createdTab = Tab::query()
+        ->where('user_id', $user->id)
+        ->where('label', 'CivitAI Images: User forsunlee404 - 1')
+        ->first();
+
+    expect($createdTab)->not->toBeNull();
+    expect($createdTab?->params['nsfw'] ?? null)->toBeTrue();
+});

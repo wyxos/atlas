@@ -31,7 +31,7 @@ type BrowserTab = {
 
 type RuntimeMessageListener = (
     message: unknown,
-    sender: { tab?: { id?: number } },
+    sender: { tab?: { id?: number; url?: string } },
     sendResponse: (response?: unknown) => void,
 ) => boolean | void;
 
@@ -107,7 +107,7 @@ function createChromeMock(initialTabs: BrowserTab[]) {
 function sendRuntimeMessage(
     listener: RuntimeMessageListener,
     message: unknown,
-    sender: { tab?: { id?: number } } = {},
+    sender: { tab?: { id?: number; url?: string } } = {},
 ): Promise<unknown> {
     return new Promise((resolve) => {
         listener(message, sender, resolve);
@@ -386,7 +386,7 @@ describe('background runtime message bridge', () => {
         });
     });
 
-    it('marks Civitai model browse requests as nsfw when requested by the content script', async () => {
+    it('marks Civitai model browse requests as nsfw from Civitai red source urls', async () => {
         const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
         const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
             browse_url: 'https://atlas.test/browse',
@@ -407,7 +407,7 @@ describe('background runtime message bridge', () => {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
             modelId: 9303103,
             modelVersionId: null,
-            nsfw: true,
+            sourceUrl: 'https://civitai.red/models/9303103/example',
         });
 
         expect(fetchMock).toHaveBeenCalledWith('https://atlas.test/api/extension/browse-tabs/civitai-model', {
@@ -419,6 +419,45 @@ describe('background runtime message bridge', () => {
             body: JSON.stringify({
                 model_id: 9303103,
                 model_version_id: null,
+                nsfw: true,
+            }),
+        });
+    });
+
+    it('marks Civitai user browse requests as nsfw from the sender tab url', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            browse_url: 'https://atlas.test/browse',
+            tab: {
+                id: 47,
+                label: 'CivitAI Images: User forsunlee404 - 1',
+            },
+        }), { status: 200 }));
+        vi.stubGlobal('chrome', chromeMock);
+        vi.stubGlobal('fetch', fetchMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        await sendRuntimeMessage(listener!, {
+            type: 'ATLAS_OPEN_CIVITAI_USERNAME_TAB',
+            username: 'forsunlee404',
+        }, {
+            tab: {
+                url: 'https://civitai.red/user/forsunlee404',
+            },
+        });
+
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.test/api/extension/browse-tabs/civitai-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Atlas-Api-Key': 'test-api-token',
+            },
+            body: JSON.stringify({
+                username: 'forsunlee404',
                 nsfw: true,
             }),
         });

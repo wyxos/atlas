@@ -18,6 +18,7 @@ function dispatchSpace(target: EventTarget = window, options: KeyboardEventInit 
 
 function createShortcut(surfaceMode: 'fullscreen' | 'list' = 'list') {
     const toggleAutoScroll = vi.fn();
+    const togglePageLoadingLock = vi.fn();
     const mode = ref(surfaceMode);
     const scope = effectScope();
 
@@ -25,6 +26,7 @@ function createShortcut(surfaceMode: 'fullscreen' | 'list' = 'list') {
         useBrowseGridAutoScrollShortcut({
             surfaceMode: mode,
             toggleAutoScroll,
+            togglePageLoadingLock,
         });
     });
 
@@ -32,6 +34,7 @@ function createShortcut(surfaceMode: 'fullscreen' | 'list' = 'list') {
         mode,
         stop: () => scope.stop(),
         toggleAutoScroll,
+        togglePageLoadingLock,
     };
 }
 
@@ -71,6 +74,63 @@ describe('useBrowseGridAutoScrollShortcut', () => {
         expect(shortcut.toggleAutoScroll).not.toHaveBeenCalled();
         expect(inputEvent.defaultPrevented).toBe(false);
         expect(repeatedEvent.defaultPrevented).toBe(false);
+
+        shortcut.stop();
+    });
+
+    it('toggles the page-loading lock with alt+l while the grid surface is active', () => {
+        const shortcut = createShortcut();
+        const event = new KeyboardEvent('keydown', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            code: 'KeyL',
+            key: 'l',
+        });
+
+        window.dispatchEvent(event);
+
+        expect(shortcut.togglePageLoadingLock).toHaveBeenCalledTimes(1);
+        expect(shortcut.toggleAutoScroll).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(true);
+
+        shortcut.stop();
+    });
+
+    it('ignores alt+l outside the grid surface', () => {
+        const shortcut = createShortcut('fullscreen');
+        const fullscreenEvent = new KeyboardEvent('keydown', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            code: 'KeyL',
+            key: 'l',
+        });
+
+        window.dispatchEvent(fullscreenEvent);
+
+        expect(shortcut.togglePageLoadingLock).not.toHaveBeenCalled();
+        expect(fullscreenEvent.defaultPrevented).toBe(false);
+
+        shortcut.stop();
+    });
+
+    it('ignores alt+l inside inputs', () => {
+        const shortcut = createShortcut();
+        const input = document.createElement('input');
+        document.body.appendChild(input);
+        const event = new KeyboardEvent('keydown', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            code: 'KeyL',
+            key: 'l',
+        });
+
+        input.dispatchEvent(event);
+
+        expect(shortcut.togglePageLoadingLock).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
 
         shortcut.stop();
     });

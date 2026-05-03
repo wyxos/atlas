@@ -454,6 +454,7 @@ class ExtensionApiController extends Controller
 
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:255'],
+            'nsfw' => ['sometimes', 'boolean'],
         ]);
 
         $username = trim((string) $validated['username']);
@@ -472,6 +473,7 @@ class ExtensionApiController extends Controller
                 'page' => 1,
                 'limit' => 20,
                 'username' => $username,
+                ...(($validated['nsfw'] ?? false) ? ['nsfw' => true] : []),
             ],
         );
 

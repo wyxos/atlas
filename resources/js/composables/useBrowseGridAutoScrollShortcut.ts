@@ -6,8 +6,15 @@ type SurfaceMode = 'fullscreen' | 'list';
 export function useBrowseGridAutoScrollShortcut(options: {
     surfaceMode: ComputedRef<SurfaceMode> | Ref<SurfaceMode>;
     toggleAutoScroll: () => void;
+    togglePageLoadingLock?: () => void;
 }): void {
     useEventListener('keydown', (event) => {
+        if (shouldTogglePageLoadingLock(event, options.surfaceMode.value)) {
+            event.preventDefault();
+            options.togglePageLoadingLock?.();
+            return;
+        }
+
         if (!shouldToggleAutoScroll(event, options.surfaceMode.value)) {
             return;
         }
@@ -15,6 +22,23 @@ export function useBrowseGridAutoScrollShortcut(options: {
         event.preventDefault();
         options.toggleAutoScroll();
     });
+}
+
+function shouldTogglePageLoadingLock(event: KeyboardEvent, surfaceMode: SurfaceMode): boolean {
+    if (
+        event.defaultPrevented
+        || event.repeat
+        || surfaceMode !== 'list'
+        || !event.altKey
+        || event.ctrlKey
+        || event.metaKey
+        || event.shiftKey
+        || !isKeyboardL(event)
+    ) {
+        return false;
+    }
+
+    return !isInteractiveTarget(event.target);
 }
 
 function shouldToggleAutoScroll(event: KeyboardEvent, surfaceMode: SurfaceMode): boolean {
@@ -35,6 +59,10 @@ function shouldToggleAutoScroll(event: KeyboardEvent, surfaceMode: SurfaceMode):
     }
 
     return !isInteractiveTarget(event.target);
+}
+
+function isKeyboardL(event: KeyboardEvent): boolean {
+    return event.code === 'KeyL' || event.key.toLowerCase() === 'l';
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {

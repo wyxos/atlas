@@ -29,6 +29,7 @@ type TabCountChangedMessage = {
 type RuntimeMessageSender = {
     tab?: {
         id?: number;
+        url?: string;
     };
 };
 type BrowserTab = {
@@ -243,8 +244,8 @@ chrome.runtime.onMessage.addListener((
         || handleQueuedBadgeCheckRuntimeMessage(message, sendResponse)
         || handleQueuedReferrerCheckRuntimeMessage(message, sendResponse)
         || handleAtlasApiRequestRuntimeMessage(message, sendResponse)
-        || handleOpenCivitAiModelTabRuntimeMessage(message, sendResponse)
-        || handleOpenCivitAiUsernameTabRuntimeMessage(message, sendResponse)) {
+        || handleOpenCivitAiModelTabRuntimeMessage(message, sender, sendResponse)
+        || handleOpenCivitAiUsernameTabRuntimeMessage(message, sender, sendResponse)) {
         return true;
     }
 

@@ -73,6 +73,8 @@ describe('installCivitAiModelBrowseCtas', () => {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
             modelId: 9303101,
             modelVersionId: 9404101,
+            sourceHostname: 'civitai.com',
+            sourceUrl: 'https://civitai.com/models/9303101/example',
         }, expect.any(Function));
     });
 
@@ -123,6 +125,8 @@ describe('installCivitAiModelBrowseCtas', () => {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
             modelId: 9303102,
             modelVersionId: 9404103,
+            sourceHostname: 'civitai.com',
+            sourceUrl: 'https://civitai.com/models/9303102?modelVersionId=9404103',
         }, expect.any(Function));
     });
 
@@ -165,6 +169,8 @@ describe('installCivitAiModelBrowseCtas', () => {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
             modelId: 9303103,
             modelVersionId: null,
+            sourceHostname: 'civitai.red',
+            sourceUrl: 'https://civitai.red/models/9303103/example',
             nsfw: true,
         }, expect.any(Function));
     });
@@ -242,6 +248,8 @@ describe('installCivitAiModelBrowseCtas', () => {
             type: 'ATLAS_OPEN_CIVITAI_MODEL_TAB',
             modelId: 9303104,
             modelVersionId: 9404104,
+            sourceHostname: 'civitai.com',
+            sourceUrl: 'https://civitai.com/models/9303104/example',
         }, expect.any(Function));
     });
 
