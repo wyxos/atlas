@@ -33,6 +33,7 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($local['defaults']['reaction_mode'])->toBe('any');
     expect($local['defaults']['reaction'])->toBe(['love', 'like', 'funny']);
     expect($local['defaults']['downloaded'])->toBe('any');
+    expect($local['defaults']['not_found'])->toBe('no');
     expect($local['defaults']['blacklisted'])->toBe('any');
     expect($local['defaults']['auto_blacklisted'])->toBe('any');
     expect($local['defaults']['sort'])->toBe('downloaded_at');
@@ -50,6 +51,7 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'reaction_mode',
         'reaction',
         'downloaded',
+        'not_found',
         'blacklisted',
         'auto_blacklisted',
         'sort',
