@@ -126,6 +126,9 @@ class CivitAiImages extends BaseService
         $type = $this->resolveType($uiType);
 
         $postId = isset($this->params['postId']) ? (int) $this->params['postId'] : null;
+        $imageId = isset($this->params['imageId'])
+            ? (int) $this->params['imageId']
+            : (isset($this->params['id']) ? (int) $this->params['id'] : null);
         $modelId = isset($this->params['modelId']) ? (int) $this->params['modelId'] : null;
         $modelVersionId = isset($this->params['modelVersionId']) ? (int) $this->params['modelVersionId'] : null;
         $username = isset($this->params['username']) && is_string($this->params['username'])
@@ -153,6 +156,10 @@ class CivitAiImages extends BaseService
 
         if ($postId && $postId > 0) {
             $query['postId'] = $postId;
+        }
+
+        if ($imageId && $imageId > 0) {
+            $query['imageId'] = $imageId;
         }
 
         if ($modelId && $modelId > 0) {
