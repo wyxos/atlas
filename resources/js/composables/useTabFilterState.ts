@@ -159,6 +159,7 @@ export function useTabFilterState(options: UseTabFilterStateOptions) {
 
         form.data.serviceFilters = {
             ...form.data.serviceFilters,
+            not_found: 'no',
             ...preset.filters,
         };
         form.data.page = 1;

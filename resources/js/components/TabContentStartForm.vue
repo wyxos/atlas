@@ -121,6 +121,7 @@ function applyLocalPreset(value: string): void {
 
     form.data.serviceFilters = {
         ...form.data.serviceFilters,
+        not_found: 'no',
         ...preset.filters,
     };
     form.data.page = 1;

@@ -103,6 +103,7 @@ class BrowseController extends Controller
                         'reaction' => ['love', 'like', 'funny'],
                         // Tri-state selects.
                         'downloaded' => 'any',
+                        'not_found' => 'no',
                         'blacklisted' => 'any',
                         'auto_blacklisted' => 'any',
                         'sort' => 'downloaded_at',
@@ -169,6 +170,16 @@ class BrowseController extends Controller
                                 ['label' => 'No', 'value' => 'no'],
                             ],
                             'default' => 'any',
+                        ]),
+                        $localSchema->field('not_found', [
+                            'type' => 'radio',
+                            'description' => 'Whether the local file has been marked missing.',
+                            'options' => [
+                                ['label' => 'Any', 'value' => 'any'],
+                                ['label' => 'Yes', 'value' => 'yes'],
+                                ['label' => 'No', 'value' => 'no'],
+                            ],
+                            'default' => 'no',
                         ]),
                         $localSchema->field('blacklisted', [
                             'type' => 'radio',

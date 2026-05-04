@@ -66,6 +66,28 @@ describe('TabFilter', () => {
         });
     });
 
+    it('provides not found anomaly presets', () => {
+        const anomaliesGroup = LOCAL_TAB_FILTER_PRESET_GROUPS.find((group) => group.label === 'Anomalies');
+
+        expect(anomaliesGroup?.presets.map((preset) => preset.label)).toEqual([
+            'Not Found',
+            'Not Found (Reacted)',
+            'Saved Blacklisted',
+        ]);
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'not_found')?.filters).toMatchObject({
+            not_found: 'yes',
+            reaction_mode: 'any',
+            blacklisted: 'no',
+            sort: 'updated_at',
+        });
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'not_found_reacted')?.filters).toMatchObject({
+            not_found: 'yes',
+            reaction_mode: 'reacted',
+            blacklisted: 'no',
+            sort: 'reaction_at',
+        });
+    });
+
     it('prefills civitai username from tab params after sync', async () => {
         const form = createBrowseForm();
 
@@ -315,6 +337,8 @@ describe('TabFilter', () => {
         expect(wrapper.text()).toContain('Anomalies');
         expect(wrapper.text()).toContain('Blacklisted (Newest)');
         expect(wrapper.text()).toContain('Blacklisted (Oldest)');
+        expect(wrapper.text()).toContain('Not Found');
+        expect(wrapper.text()).toContain('Not Found (Reacted)');
         expect(wrapper.text()).toContain('Saved Blacklisted');
         expect(wrapper.text()).not.toContain('Auto blacklisted');
         expect(wrapper.text()).not.toContain('Saved Auto blacklisted');

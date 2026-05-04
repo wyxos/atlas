@@ -75,6 +75,34 @@ test('compiler builds blacklisted and Auto blacklisted filters', function () {
         ->and($filter)->toContain('auto_blacklisted:=true');
 });
 
+test('compiler builds not found filters', function () {
+    $compiler = app(LocalBrowseTypesenseCompiler::class);
+
+    $notFound = $compiler->compileFileFilter([
+        'notFound' => 'yes',
+        'blacklisted' => 'no',
+        'autoBlacklisted' => 'any',
+        'reactionMode' => 'any',
+        'reactionTypes' => null,
+        'fileTypes' => ['all'],
+        'downloaded' => 'any',
+    ], 11);
+    $any = $compiler->compileFileFilter([
+        'notFound' => 'any',
+        'blacklisted' => 'no',
+        'autoBlacklisted' => 'any',
+        'reactionMode' => 'any',
+        'reactionTypes' => null,
+        'fileTypes' => ['all'],
+        'downloaded' => 'any',
+    ], 11);
+
+    expect($notFound)->toContain('not_found:=true')
+        ->and($notFound)->toContain('blacklisted:=false')
+        ->and($any)->not->toContain('not_found:=')
+        ->and($any)->toContain('blacklisted:=false');
+});
+
 test('compiler builds reacted types and unreacted filters', function () {
     $compiler = app(LocalBrowseTypesenseCompiler::class);
 
@@ -148,6 +176,19 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'autoBlacklisted' => 'no',
         'allTypes' => ['love', 'like', 'funny'],
     ], 5, 'atlas_local_local_browse_files__v20260331_000000');
+    $notFoundReacted = $compiler->compile([
+        'page' => 1,
+        'limit' => 25,
+        'sort' => 'reaction_at',
+        'notFound' => 'yes',
+        'blacklisted' => 'no',
+        'fileTypes' => ['all'],
+        'downloaded' => 'any',
+        'reactionMode' => 'reacted',
+        'reactionTypes' => null,
+        'autoBlacklisted' => 'any',
+        'allTypes' => ['love', 'like', 'funny'],
+    ], 5, 'atlas_local_local_browse_files__v20260331_000000');
 
     expect($desc['mode'])->toBe('reactions')
         ->and($desc['collection'])->toBe(app(LocalBrowseTypesenseNames::class)->reactionsAlias())
@@ -163,5 +204,7 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         ->and($desc['options']['filter_by'])->toContain('auto_blacklisted:=false')
         ->and($desc['options']['sort_by'])->toBe('created_at:desc,sort_id:desc')
         ->and($asc['options']['filter_by'])->toContain('type:=[`funny`]')
-        ->and($asc['options']['sort_by'])->toBe('created_at:asc,sort_id:asc');
+        ->and($asc['options']['sort_by'])->toBe('created_at:asc,sort_id:asc')
+        ->and($notFoundReacted['options']['filter_by'])->toContain('not_found:=true')
+        ->and($notFoundReacted['options']['filter_by'])->toContain('blacklisted:=false');
 });

@@ -279,6 +279,32 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
         label: 'Anomalies',
         presets: [
             {
+                label: 'Not Found',
+                value: 'not_found',
+                filters: {
+                    downloaded: 'any',
+                    not_found: 'yes',
+                    reaction_mode: 'any',
+                    blacklisted: 'no',
+                    auto_blacklisted: 'any',
+                    max_previewed_count: null,
+                    sort: 'updated_at',
+                },
+            },
+            {
+                label: 'Not Found (Reacted)',
+                value: 'not_found_reacted',
+                filters: {
+                    downloaded: 'any',
+                    not_found: 'yes',
+                    reaction_mode: 'reacted',
+                    blacklisted: 'no',
+                    auto_blacklisted: 'any',
+                    max_previewed_count: null,
+                    sort: 'reaction_at',
+                },
+            },
+            {
                 label: 'Saved Blacklisted',
                 value: 'saved_blacklisted',
                 filters: {

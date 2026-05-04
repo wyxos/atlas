@@ -123,7 +123,14 @@ class LocalBrowseTypesenseCompiler
      */
     public function compileFileFilter(array $context, ?int $userId): string
     {
-        $filters = ['not_found:=false'];
+        $filters = [];
+
+        $notFound = (string) ($context['notFound'] ?? 'no');
+        if ($notFound === 'yes') {
+            $filters[] = 'not_found:=true';
+        } elseif ($notFound === 'no') {
+            $filters[] = 'not_found:=false';
+        }
 
         $source = $context['source'] ?? null;
         if (is_string($source) && $source !== '' && $source !== 'all') {

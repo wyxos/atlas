@@ -44,6 +44,16 @@ it('keeps explicit max_previewed_count untouched', function () {
     expect($context['maxPreviewed'])->toBe(0);
 });
 
+it('defaults not found filtering to no and keeps explicit values', function () {
+    $defaultContext = LocalFetchParams::normalize([]);
+    $notFoundContext = LocalFetchParams::normalize([
+        'not_found' => 'yes',
+    ]);
+
+    expect($defaultContext['notFound'])->toBe('no')
+        ->and($notFoundContext['notFound'])->toBe('yes');
+});
+
 it('normalizes file types to all when empty or invalid', function () {
     $context = LocalFetchParams::normalize([
         'file_type' => ['invalid-type'],

@@ -118,6 +118,20 @@ describe('browseTabLabel', () => {
         })).toBe('Local - Blacklisted (Oldest) - 2');
     });
 
+    it('uses the configured label for not found reacted presets in local tab labels', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'not_found_reacted',
+                },
+            }),
+            pageToken: 8,
+            availableServices: [],
+            localService: { key: 'local', label: 'Local' },
+        })).toBe('Local - Not Found (Reacted) - 8');
+    });
+
     it('restores renamed unreacted preset labels for existing local tabs', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
