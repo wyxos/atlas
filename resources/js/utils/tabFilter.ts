@@ -250,7 +250,7 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
         label: 'Moderation',
         presets: [
             {
-                label: 'Blacklisted',
+                label: 'Blacklisted (Newest)',
                 value: 'blacklisted_any',
                 filters: {
                     downloaded: 'any',
@@ -259,6 +259,18 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
                     auto_blacklisted: 'any',
                     max_previewed_count: FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT,
                     sort: 'blacklisted_at',
+                },
+            },
+            {
+                label: 'Blacklisted (Oldest)',
+                value: 'blacklisted_oldest',
+                filters: {
+                    downloaded: 'any',
+                    reaction_mode: 'any',
+                    blacklisted: 'yes',
+                    auto_blacklisted: 'any',
+                    max_previewed_count: FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT,
+                    sort: 'blacklisted_at_asc',
                 },
             },
         ],

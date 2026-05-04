@@ -104,6 +104,20 @@ describe('browseTabLabel', () => {
         })).toBe('Local - Saved Blacklisted - 5');
     });
 
+    it('uses the configured label for blacklisted oldest presets in local tab labels', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'blacklisted_oldest',
+                },
+            }),
+            pageToken: 2,
+            availableServices: [],
+            localService: { key: 'local', label: 'Local' },
+        })).toBe('Local - Blacklisted (Oldest) - 2');
+    });
+
     it('restores renamed unreacted preset labels for existing local tabs', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({

@@ -5,6 +5,7 @@ import TabFilter from './TabFilter.vue';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
 import type { TabData } from '@/composables/useTabs';
 import { LOCAL_TAB_FILTER_PRESET_GROUPS, LOCAL_TAB_FILTER_PRESETS } from '@/utils/tabFilter';
+import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT } from '@/lib/feedModeration';
 
 const Stub = defineComponent({
     template: '<div><slot /></div>',
@@ -43,6 +44,25 @@ describe('TabFilter', () => {
             reaction_mode: 'types',
             reaction: ['like'],
             sort: 'reaction_at_asc',
+        });
+    });
+
+    it('provides newest and oldest presets for blacklisted local files', () => {
+        const moderationGroup = LOCAL_TAB_FILTER_PRESET_GROUPS.find((group) => group.label === 'Moderation');
+
+        expect(moderationGroup?.presets.map((preset) => preset.label)).toEqual([
+            'Blacklisted (Newest)',
+            'Blacklisted (Oldest)',
+        ]);
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'blacklisted_any')?.filters).toMatchObject({
+            blacklisted: 'yes',
+            max_previewed_count: FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT,
+            sort: 'blacklisted_at',
+        });
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'blacklisted_oldest')?.filters).toMatchObject({
+            blacklisted: 'yes',
+            max_previewed_count: FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT,
+            sort: 'blacklisted_at_asc',
         });
     });
 
@@ -293,7 +313,8 @@ describe('TabFilter', () => {
         expect(wrapper.text()).toContain('Funny (Oldest)');
         expect(wrapper.text()).toContain('Moderation');
         expect(wrapper.text()).toContain('Anomalies');
-        expect(wrapper.text()).toContain('Blacklisted');
+        expect(wrapper.text()).toContain('Blacklisted (Newest)');
+        expect(wrapper.text()).toContain('Blacklisted (Oldest)');
         expect(wrapper.text()).toContain('Saved Blacklisted');
         expect(wrapper.text()).not.toContain('Auto blacklisted');
         expect(wrapper.text()).not.toContain('Saved Auto blacklisted');
