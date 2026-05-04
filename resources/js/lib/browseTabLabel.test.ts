@@ -62,6 +62,34 @@ describe('browseTabLabel', () => {
         })).toBe('Local - Favorite (Random) - 7');
     });
 
+    it('uses the configured label for like presets in local tab labels', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'like_newest',
+                },
+            }),
+            pageToken: 4,
+            availableServices: [],
+            localService: { key: 'local', label: 'Local' },
+        })).toBe('Local - Likes (Newest) - 4');
+    });
+
+    it('keeps the existing favorite latest preset value labeled as newest', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'favorite_latest',
+                },
+            }),
+            pageToken: 6,
+            availableServices: [],
+            localService: { key: 'local', label: 'Local' },
+        })).toBe('Local - Favorite (Newest) - 6');
+    });
+
     it('uses the configured label for saved blacklist presets in local tab labels', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({

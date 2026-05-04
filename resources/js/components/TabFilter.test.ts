@@ -4,12 +4,48 @@ import { defineComponent, nextTick } from 'vue';
 import TabFilter from './TabFilter.vue';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
 import type { TabData } from '@/composables/useTabs';
+import { LOCAL_TAB_FILTER_PRESET_GROUPS, LOCAL_TAB_FILTER_PRESETS } from '@/utils/tabFilter';
 
 const Stub = defineComponent({
     template: '<div><slot /></div>',
 });
 
 describe('TabFilter', () => {
+    it('provides random newest and oldest presets for each local reaction view', () => {
+        const reactionsGroup = LOCAL_TAB_FILTER_PRESET_GROUPS.find((group) => group.label === 'Reactions');
+
+        expect(reactionsGroup?.presets.map((preset) => preset.label)).toEqual([
+            'Reacted (Random)',
+            'Reacted (Newest)',
+            'Reacted (Oldest)',
+            'Favorite (Random)',
+            'Favorite (Newest)',
+            'Favorite (Oldest)',
+            'Likes (Random)',
+            'Likes (Newest)',
+            'Likes (Oldest)',
+            'Funny (Random)',
+            'Funny (Newest)',
+            'Funny (Oldest)',
+        ]);
+
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'like_random')?.filters).toMatchObject({
+            reaction_mode: 'types',
+            reaction: ['like'],
+            sort: 'random',
+        });
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'like_newest')?.filters).toMatchObject({
+            reaction_mode: 'types',
+            reaction: ['like'],
+            sort: 'reaction_at',
+        });
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'like_oldest')?.filters).toMatchObject({
+            reaction_mode: 'types',
+            reaction: ['like'],
+            sort: 'reaction_at_asc',
+        });
+    });
+
     it('prefills civitai username from tab params after sync', async () => {
         const form = createBrowseForm();
 
@@ -247,8 +283,14 @@ describe('TabFilter', () => {
         expect(wrapper.text()).toContain('Unreacted (Newest)');
         expect(wrapper.text()).toContain('Unreacted (Oldest)');
         expect(wrapper.text()).toContain('Favorite (Random)');
-        expect(wrapper.text()).toContain('Favorite (Latest)');
+        expect(wrapper.text()).toContain('Favorite (Newest)');
+        expect(wrapper.text()).toContain('Favorite (Oldest)');
+        expect(wrapper.text()).toContain('Likes (Random)');
+        expect(wrapper.text()).toContain('Likes (Newest)');
+        expect(wrapper.text()).toContain('Likes (Oldest)');
         expect(wrapper.text()).toContain('Funny (Random)');
+        expect(wrapper.text()).toContain('Funny (Newest)');
+        expect(wrapper.text()).toContain('Funny (Oldest)');
         expect(wrapper.text()).toContain('Moderation');
         expect(wrapper.text()).toContain('Anomalies');
         expect(wrapper.text()).toContain('Blacklisted');
