@@ -83,8 +83,7 @@ const interactionItems = computed(() => {
         return [standaloneItem.value];
     }
 
-    void vibeStatus.value.itemCount;
-    void vibeStatus.value.removedIds.join(',');
+    void vibeStatus.value.itemsRevision;
 
     return getCurrentVibeFeedItems();
 });
@@ -445,7 +444,7 @@ watch(
 );
 
 watch(
-    () => vibeStatus.value.removedIds.join(','),
+    () => vibeStatus.value.removedRevision,
     () => {
         removedItemIds.value = createRemovedItemIdSet(vibeStatus.value.removedIds);
     },

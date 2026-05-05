@@ -257,6 +257,7 @@ vi.mock('./TabContentV2View.vue', () => ({
                     const nextIds = ids.filter((id) => !status.removedIds.includes(id));
                     status.removedIds = [...status.removedIds, ...nextIds];
                     status.removedCount = status.removedIds.length;
+                    status.removedRevision += nextIds.length > 0 ? 1 : 0;
 
                     return { ids: nextIds };
                 },
@@ -265,6 +266,7 @@ vi.mock('./TabContentV2View.vue', () => ({
                     const restoredIds = status.removedIds.filter((id) => ids.has(id));
                     status.removedIds = status.removedIds.filter((id) => !ids.has(id));
                     status.removedCount = status.removedIds.length;
+                    status.removedRevision += restoredIds.length > 0 ? 1 : 0;
                     return { ids: restoredIds };
                 },
                 retry: vi.fn(async () => undefined),
@@ -298,8 +300,8 @@ vi.mock('./TabContentV2View.vue', () => ({
 const status = reactive({
     activeIndex: 0, currentCursor: '1', errorMessage: null, fillCollectedCount: null, fillCompletedCalls: 0, fillDelayRemainingMs: null,
     fillLoadedCount: 0, fillMode: 'idle' as const, fillProgress: null, fillTargetCalls: null, fillTargetCount: null, fillTotalCount: null,
-    hasNextPage: true, hasPreviousPage: false, itemCount: 0, loadState: 'loaded' as const, nextCursor: '2', phase: 'idle' as const,
-    previousCursor: null, removedCount: 0, removedIds: [] as string[], surfaceMode: 'list' as const,
+    hasNextPage: true, hasPreviousPage: false, itemCount: 0, itemsRevision: 0, loadState: 'loaded' as const, nextCursor: '2', phase: 'idle' as const,
+    previousCursor: null, removedCount: 0, removedIds: [] as string[], removedRevision: 0, surfaceMode: 'list' as const,
 });
 
 function createFeedItem(id: number) {
@@ -404,7 +406,7 @@ describe('TabContentV2 browse route sync', () => {
         testState.toastError.mockReset();
         testState.viewerOnClose.mockReset();
         testState.viewerOnOpen.mockReset();
-        status.itemCount = 0; status.removedCount = 0; status.removedIds = [];
+        status.itemCount = 0; status.removedCount = 0; status.removedIds = []; status.removedRevision = 0;
         mockAxios.delete.mockReset();
         mockAxios.get.mockReset();
         mockAxios.patch.mockReset();

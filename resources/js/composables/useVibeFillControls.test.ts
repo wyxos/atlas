@@ -22,6 +22,7 @@ function createStatus(overrides: Partial<VibeStatus> = {}): VibeStatus {
         hasNextPage: true,
         hasPreviousPage: false,
         itemCount: 20,
+        itemsRevision: 0,
         loadState: 'loaded',
         nextBoundaryLoadProgress: 0,
         nextCursor: '2',
@@ -31,6 +32,7 @@ function createStatus(overrides: Partial<VibeStatus> = {}): VibeStatus {
         previousCursor: null,
         removedCount: 0,
         removedIds: [],
+        removedRevision: 0,
         surfaceMode: 'list',
         ...overrides,
     };

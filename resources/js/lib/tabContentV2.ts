@@ -49,6 +49,7 @@ export function createTabContentV2EmptyStatus(): VibeStatus {
         hasNextPage: false,
         hasPreviousPage: false,
         itemCount: 0,
+        itemsRevision: 0,
         loadState: 'loaded',
         nextBoundaryLoadProgress: 0,
         nextCursor: null,
@@ -58,6 +59,7 @@ export function createTabContentV2EmptyStatus(): VibeStatus {
         previousCursor: null,
         removedCount: 0,
         removedIds: [],
+        removedRevision: 0,
         surfaceMode: 'list',
     };
 }
