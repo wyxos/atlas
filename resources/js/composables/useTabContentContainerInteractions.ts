@@ -32,7 +32,7 @@ type UseTabContentContainerInteractionsOptions = {
     onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;
 };
 
-type DrawerOpenReason = 'hover' | 'click' | null;
+type DrawerOpenReason = 'hover' | null;
 
 function isContainerHoverTarget(target: EventTarget | null): boolean {
     if (!(target instanceof Element)) {
@@ -48,7 +48,9 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     const badges = useContainerBadges(visibleItems);
     const managerRef = ref<ContainerBlacklistDialogRef | null>(null);
     const selectedContainerId = ref<number | null>(null);
+    const selectedSheetContainerId = ref<number | null>(null);
     const isDrawerOpen = ref(false);
+    const isSheetOpen = ref(false);
     const drawerOpenReason = ref<DrawerOpenReason>(null);
     let pendingHoverOpenTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingHoverContainerId: number | null = null;
@@ -131,17 +133,27 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         matchesActiveLocalFilters: options.matchesActiveLocalFilters,
         onReaction: options.onReaction,
         onOpenContainerTab: handleContainerNavigation,
-        onPlainLeftClick: toggleDrawerFromClick,
+        onPlainLeftClick: openSheetFromClick,
     });
     const selectedContainer = computed(() => (
         selectedContainerId.value === null
             ? null
             : getVisibleContainer(selectedContainerId.value)
     ));
+    const selectedSheetContainer = computed(() => (
+        selectedSheetContainerId.value === null
+            ? null
+            : getVisibleContainer(selectedSheetContainerId.value)
+    ));
     const relatedItems = computed(() => (
         selectedContainerId.value === null
             ? []
             : getVisibleSiblingItems(selectedContainerId.value)
+    ));
+    const sheetItems = computed(() => (
+        selectedSheetContainerId.value === null
+            ? []
+            : getVisibleSiblingItems(selectedSheetContainerId.value)
     ));
     const highlightedItemIds = computed(() => {
         if (!isDrawerOpen.value || relatedItems.value.length <= 1) {
@@ -195,22 +207,40 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
         drawerOpenReason.value = reason;
     }
 
-    function toggleDrawerFromClick(container: ContainerTarget): void {
+    function closeSheet(): void {
         cancelPendingHoverOpen();
+        isSheetOpen.value = false;
+        selectedSheetContainerId.value = null;
+    }
 
-        if (isDrawerOpen.value && selectedContainerId.value === container.id) {
-            closeDrawer();
+    function setSheetOpen(open: boolean): void {
+        if (!open) {
+            closeSheet();
             return;
         }
 
-        openDrawer(container, 'click');
+        if (selectedSheetContainer.value && sheetItems.value.length > 1) {
+            isSheetOpen.value = true;
+            return;
+        }
+
+        closeSheet();
+    }
+
+    function openSheetFromClick(container: ContainerTarget): void {
+        cancelPendingHoverOpen();
+
+        if (getVisibleSiblingItems(container.id).length <= 1) {
+            closeSheet();
+            return;
+        }
+
+        closeDrawer();
+        selectedSheetContainerId.value = container.id;
+        isSheetOpen.value = true;
     }
 
     function openDrawerFromHover(containerId: number): void {
-        if (drawerOpenReason.value === 'click') {
-            return;
-        }
-
         const container = pillInteractions.getContainer(containerId);
         if (!container) {
             closeDrawer();
@@ -221,10 +251,6 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     }
 
     function handlePillMouseEnter(containerId: number): void {
-        if (drawerOpenReason.value === 'click') {
-            return;
-        }
-
         cancelPendingHoverOpen();
         pendingHoverContainerId = containerId;
         pendingHoverOpenTimer = setTimeout(() => {
@@ -257,10 +283,6 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     }
 
     function syncHoverTarget(target: EventTarget | null): void {
-        if (drawerOpenReason.value === 'click') {
-            return;
-        }
-
         if (!isContainerHoverTarget(target)) {
             if (pendingHoverContainerId !== null) {
                 cancelPendingHoverOpen();
@@ -275,6 +297,12 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     watch([selectedContainer, relatedItems], ([container, items]) => {
         if (isDrawerOpen.value && (!container || items.length <= 1)) {
             closeDrawer();
+        }
+    });
+
+    watch([selectedSheetContainer, sheetItems], ([container, items]) => {
+        if (isSheetOpen.value && !container && items.length === 0) {
+            closeSheet();
         }
     });
 
@@ -337,6 +365,20 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
                 close: closeDrawer,
                 setOpen: setDrawerOpen,
                 syncHoverTarget,
+            },
+        },
+        sheet: {
+            state: {
+                isOpen: isSheetOpen,
+            },
+            derived: {
+                container: selectedSheetContainer,
+                items: sheetItems,
+            },
+            actions: {
+                close: closeSheet,
+                setOpen: setSheetOpen,
+                open: openSheetFromClick,
             },
         },
     };

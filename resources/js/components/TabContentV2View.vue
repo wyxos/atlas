@@ -22,6 +22,7 @@ import FileReactions from './FileReactions.vue';
 import FileViewerSheet from './FileViewerSheet.vue';
 import LocalFileDeleteDialog from './LocalFileDeleteDialog.vue';
 import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
+import TabContentContainerSheet from './TabContentContainerSheet.vue';
 import TabContentPromptDialog from './TabContentPromptDialog.vue';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentStartForm from './TabContentStartForm.vue';
@@ -342,11 +343,20 @@ useEventListener(document, 'pointermove', (event) => {
                     :open="containerInteractions.drawer.state.isOpen.value"
                     :container="containerInteractions.drawer.derived.container.value"
                     :items="containerInteractions.drawer.derived.items.value"
-                    :close-on-mouse-leave="containerInteractions.drawer.state.openReason?.value === 'hover'"
+                    :close-on-mouse-leave="true"
                     @update:open="containerInteractions.drawer.actions.setOpen"
                 />
             </div>
         </div>
+
+        <TabContentContainerSheet
+            :open="containerInteractions.sheet.state.isOpen.value"
+            :container="containerInteractions.sheet.derived.container.value"
+            :items="containerInteractions.sheet.derived.items.value"
+            :item-interactions="itemInteractions"
+            @close="containerInteractions.sheet.actions.close"
+        />
+
         <Sheet :open="showGlobalStartPanel" @update:open="handleGlobalStartPanelOpenChange">
             <SheetContent
                 id="browse-global-start-panel"

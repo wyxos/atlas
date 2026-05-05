@@ -64,8 +64,8 @@ const defaultStubs = {
     FileReactions: testStub,
     FileViewerSheet: testStub,
     LocalFileDeleteDialog: testStub,
-    PanelRightOpen: testStub,
-    TabContentContainerDrawer: testStub,
+    PanelRightOpen: testStub, TabContentContainerDrawer: testStub,
+    TabContentContainerSheet: testStub,
     TabContentPromptDialog: testStub,
     TabContentServiceHeader: testStub,
     TabContentStartForm: testStub,
@@ -164,6 +164,7 @@ function createProps() {
                 derived: { container: ref(null), highlightedItemIds: ref(new Set<number>()), items: ref([]) },
                 actions: { setOpen: vi.fn() },
             },
+            sheet: { state: { isOpen: ref(false) }, derived: { container: ref(null), items: ref([]) }, actions: { close: vi.fn() } },
         },
         currentVisibleItem: null,
         downloadedReactionPrompt: {

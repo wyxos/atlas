@@ -86,8 +86,8 @@ describe('useTabContentContainerInteractions', () => {
             createItem(3, [{ id: 20, type: 'album' }]),
         ]);
 
-        interactions.pillHandlers.onClick(10, createEvent());
-        vi.advanceTimersByTime(300);
+        interactions.pillHandlers.onMouseEnter(10);
+        vi.advanceTimersByTime(700);
         vi.runOnlyPendingTimers();
 
         expect([...interactions.drawer.derived.highlightedItemIds.value]).toEqual([1, 2]);
@@ -158,7 +158,7 @@ describe('useTabContentContainerInteractions', () => {
         vi.useRealTimers();
     });
 
-    it('opens the drawer on single left click', () => {
+    it('opens the sheet on single left click', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -169,14 +169,15 @@ describe('useTabContentContainerInteractions', () => {
         vi.advanceTimersByTime(300);
         vi.runOnlyPendingTimers();
 
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
-        expect(interactions.drawer.derived.container.value?.id).toBe(10);
-        expect(interactions.drawer.derived.items.value.map((item) => item.id)).toEqual([1, 2]);
+        expect(interactions.drawer.state.isOpen.value).toBe(false);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.derived.container.value?.id).toBe(10);
+        expect(interactions.sheet.derived.items.value.map((item) => item.id)).toEqual([1, 2]);
 
         vi.useRealTimers();
     });
 
-    it('keeps the drawer open on hover out when it was opened by click', () => {
+    it('keeps the sheet open on hover out after click', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -186,17 +187,17 @@ describe('useTabContentContainerInteractions', () => {
         interactions.pillHandlers.onClick(10, createEvent());
         vi.advanceTimersByTime(300);
         vi.runOnlyPendingTimers();
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
 
         interactions.pillHandlers.onMouseLeave(10);
 
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
-        expect(interactions.drawer.derived.container.value?.id).toBe(10);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.derived.container.value?.id).toBe(10);
 
         vi.useRealTimers();
     });
 
-    it('keeps a click-open drawer open when pointer tracking leaves the hover region', () => {
+    it('keeps a click-open sheet open when pointer tracking leaves the hover region', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -206,17 +207,17 @@ describe('useTabContentContainerInteractions', () => {
         interactions.pillHandlers.onClick(10, createEvent());
         vi.advanceTimersByTime(300);
         vi.runOnlyPendingTimers();
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
 
         interactions.drawer.actions.syncHoverTarget(document.createElement('div'));
 
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
-        expect(interactions.drawer.derived.container.value?.id).toBe(10);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.derived.container.value?.id).toBe(10);
 
         vi.useRealTimers();
     });
 
-    it('does not open the drawer when the container has only one loaded item', () => {
+    it('does not open the sheet when the container has only one loaded item', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -230,11 +231,14 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.drawer.state.isOpen.value).toBe(false);
         expect(interactions.drawer.derived.container.value).toBeNull();
         expect(interactions.drawer.derived.items.value).toEqual([]);
+        expect(interactions.sheet.state.isOpen.value).toBe(false);
+        expect(interactions.sheet.derived.container.value).toBeNull();
+        expect(interactions.sheet.derived.items.value).toEqual([]);
 
         vi.useRealTimers();
     });
 
-    it('closes the drawer when clicking the same pill again', () => {
+    it('keeps the same sheet open when clicking the same pill again', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -250,15 +254,17 @@ describe('useTabContentContainerInteractions', () => {
         vi.runOnlyPendingTimers();
 
         expect(interactions.drawer.state.isOpen.value).toBe(false);
-        expect(interactions.drawer.derived.container.value).toBeNull();
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.derived.container.value?.id).toBe(10);
 
         vi.useRealTimers();
     });
 
-    it('swaps drawer content when clicking a different pill', () => {
+    it('swaps sheet content when clicking a different pill', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(4, [{ id: 10, type: 'gallery' }]),
             createItem(2, [{ id: 20, type: 'album' }]),
             createItem(3, [{ id: 20, type: 'album' }]),
         ]);
@@ -271,14 +277,15 @@ describe('useTabContentContainerInteractions', () => {
         vi.advanceTimersByTime(300);
         vi.runOnlyPendingTimers();
 
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
-        expect(interactions.drawer.derived.container.value?.id).toBe(20);
-        expect(interactions.drawer.derived.items.value.map((item) => item.id)).toEqual([2, 3]);
+        expect(interactions.drawer.state.isOpen.value).toBe(false);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.derived.container.value?.id).toBe(20);
+        expect(interactions.sheet.derived.items.value.map((item) => item.id)).toEqual([2, 3]);
 
         vi.useRealTimers();
     });
 
-    it('closes the drawer when the selected container no longer has loaded items', async () => {
+    it('closes the sheet when the selected container no longer has loaded items', async () => {
         vi.useFakeTimers();
         const subjectItems = shallowRef([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -304,13 +311,53 @@ describe('useTabContentContainerInteractions', () => {
         interactions.pillHandlers.onClick(10, createEvent());
         vi.advanceTimersByTime(300);
         vi.runOnlyPendingTimers();
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
 
         subjectItems.value = [createItem(3, [{ id: 20, type: 'album' }])];
         await nextTick();
 
-        expect(interactions.drawer.state.isOpen.value).toBe(false);
-        expect(interactions.drawer.derived.container.value).toBeNull();
+        expect(interactions.sheet.state.isOpen.value).toBe(false);
+        expect(interactions.sheet.derived.container.value).toBeNull();
+
+        vi.useRealTimers();
+    });
+
+    it('keeps the sheet open when the selected container drops to one loaded item', async () => {
+        vi.useFakeTimers();
+        const subjectItems = shallowRef([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+            createItem(3, [{ id: 20, type: 'album' }]),
+        ]);
+        const interactions = useTabContentContainerInteractions({
+            items: subjectItems,
+            tab: ref<TabData | null>({
+                id: 1,
+                label: 'Test tab',
+                params: {},
+                position: 0,
+                isActive: true,
+                updatedAt: null,
+            }),
+            form: { isLocal: ref(false) } as unknown as BrowseFormInstance,
+            masonry: ref(null),
+            onReaction: vi.fn(),
+            onOpenContainerTab: vi.fn(),
+        });
+
+        interactions.pillHandlers.onClick(10, createEvent());
+        vi.advanceTimersByTime(300);
+        vi.runOnlyPendingTimers();
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+
+        subjectItems.value = [
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+            createItem(3, [{ id: 20, type: 'album' }]),
+        ];
+        await nextTick();
+
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.derived.container.value?.id).toBe(10);
 
         vi.useRealTimers();
     });
