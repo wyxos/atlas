@@ -28,6 +28,7 @@ services:
       - atlas-network
     depends_on:
       - php
+      - reverb
 
   mariadb:
     image: mariadb:10.11

@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip && \
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip sockets && \
     pecl install redis && \
     docker-php-ext-enable redis && \
     apt-get update && apt-get install -y libmagickwand-dev && \
