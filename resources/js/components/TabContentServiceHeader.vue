@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronsUp, Play } from 'lucide-vue-next';
+import { ChevronDown, ChevronsUp, PanelRightOpen, Play } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
+import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import TabFilter from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
@@ -31,6 +32,8 @@ withDefaults(defineProps<Props>(), {
     masonry: null,
     filterSheetOpen: false,
 });
+
+const globalStartPanel = useBrowseGlobalStartPanel();
 </script>
 
 <template>
@@ -87,6 +90,22 @@ withDefaults(defineProps<Props>(), {
 
             <ModerationRulesManager :disabled="masonry?.isLoading" />
             <slot />
+
+            <Button
+                v-if="globalStartPanel"
+                type="button"
+                size="sm"
+                variant="secondary"
+                class="h-10 gap-2 px-3"
+                data-test="global-start-panel-button"
+                aria-controls="browse-global-start-panel"
+                :aria-expanded="String(globalStartPanel.isOpen.value)"
+                title="Open browse setup"
+                @click="globalStartPanel.toggle"
+            >
+                <PanelRightOpen :size="14" />
+                <span>Setup</span>
+            </Button>
 
             <Button @click="goToFirstPage" size="sm" variant="ghost" class="h-10 w-10"
                 data-test="go-first-page-button" title="Go to first page"

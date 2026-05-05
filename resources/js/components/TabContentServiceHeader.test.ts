@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
+import { provideBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
 
 const buttonStub = defineComponent({
@@ -45,26 +46,38 @@ function createProps() {
     };
 }
 
+function mountHeader(props = createProps()) {
+    const HeaderHarness = defineComponent({
+        setup() {
+            provideBrowseGlobalStartPanel();
+
+            return () => h(TabContentServiceHeader, props);
+        },
+    });
+
+    return mount(HeaderHarness, {
+        global: {
+            stubs: {
+                Button: buttonStub,
+                ChevronDown: simpleStub,
+                ChevronsUp: simpleStub,
+                ModerationRulesManager: simpleStub,
+                PanelRightOpen: simpleStub,
+                Play: simpleStub,
+                Select: simpleStub,
+                SelectContent: simpleStub,
+                SelectItem: simpleStub,
+                SelectTrigger: simpleStub,
+                SelectValue: simpleStub,
+                TabFilter: simpleStub,
+            },
+        },
+    });
+}
+
 describe('TabContentServiceHeader', () => {
     it('keeps only the top-level browse controls in the header', () => {
-        const wrapper = mount(TabContentServiceHeader, {
-            props: createProps(),
-            global: {
-                stubs: {
-                    Button: buttonStub,
-                    ChevronDown: simpleStub,
-                    ChevronsUp: simpleStub,
-                    ModerationRulesManager: simpleStub,
-                    Play: simpleStub,
-                    Select: simpleStub,
-                    SelectContent: simpleStub,
-                    SelectItem: simpleStub,
-                    SelectTrigger: simpleStub,
-                    SelectValue: simpleStub,
-                    TabFilter: simpleStub,
-                },
-            },
-        });
+        const wrapper = mountHeader();
 
         expect(wrapper.find('[data-test="loaded-items-menu-trigger"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="cancel-loading-button"]').exists()).toBe(false);
@@ -75,6 +88,7 @@ describe('TabContentServiceHeader', () => {
         expect(wrapper.find('[data-test="loaded-items-like-button"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="loaded-items-love-button"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="loaded-items-blacklist-button"]').exists()).toBe(false);
+        expect(wrapper.get('[data-test="global-start-panel-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="apply-service-button"]').exists()).toBe(true);
     });
 
@@ -84,24 +98,7 @@ describe('TabContentServiceHeader', () => {
             isLoading: false,
         };
 
-        const wrapper = mount(TabContentServiceHeader, {
-            props,
-            global: {
-                stubs: {
-                    Button: buttonStub,
-                    ChevronDown: simpleStub,
-                    ChevronsUp: simpleStub,
-                    ModerationRulesManager: simpleStub,
-                    Play: simpleStub,
-                    Select: simpleStub,
-                    SelectContent: simpleStub,
-                    SelectItem: simpleStub,
-                    SelectTrigger: simpleStub,
-                    SelectValue: simpleStub,
-                    TabFilter: simpleStub,
-                },
-            },
-        });
+        const wrapper = mountHeader(props);
 
         await wrapper.get('[data-test="go-first-page-button"]').trigger('click');
         await wrapper.get('[data-test="load-next-page-button"]').trigger('click');
@@ -110,5 +107,16 @@ describe('TabContentServiceHeader', () => {
         expect(props.goToFirstPage).toHaveBeenCalledTimes(1);
         expect(props.loadNextPage).toHaveBeenCalledTimes(1);
         expect(props.applyService).toHaveBeenCalledTimes(1);
+    });
+
+    it('toggles the global start panel from the setup CTA', async () => {
+        const wrapper = mountHeader();
+        const button = wrapper.get('[data-test="global-start-panel-button"]');
+
+        expect(button.attributes('aria-expanded')).toBe('false');
+
+        await button.trigger('click');
+
+        expect(button.attributes('aria-expanded')).toBe('true');
     });
 });

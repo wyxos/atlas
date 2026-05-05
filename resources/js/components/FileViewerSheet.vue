@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
+import { computed } from 'vue';
+import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
 import { copyToClipboard } from '@/utils/clipboard';
+import FullscreenSheetPreviewStrip from './FullscreenSheetPreviewStrip.vue';
 
 interface Props {
     embedded?: boolean;
@@ -8,9 +11,16 @@ interface Props {
     fileId: number | null;
     fileData: import('@/types/file').File | null;
     isLoading: boolean;
+    nextPreviews?: VibeFullscreenPreviewItem[];
+    totalItems?: number;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    nextPreviews: () => [],
+    totalItems: 0,
+});
+
+const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
 
 function normalizePathForOs(path: string): string {
     const platform = typeof navigator !== 'undefined' ? navigator.platform : '';
@@ -47,12 +57,13 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
 
 const emit = defineEmits<{
     close: [];
+    'select-preview': [index: number];
 }>();
 </script>
 
 <template>
     <div
-        class="flex h-full min-h-0 flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden pointer-events-auto"
+        class="relative flex h-full min-h-0 flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden pointer-events-auto"
         :class="embedded ? 'w-full max-w-none' : (isOpen ? 'w-80 max-w-80' : 'w-0 max-w-0')"
     >
         <div class="flex h-full min-h-0 flex-col" :class="embedded ? 'w-full min-w-0 max-w-none' : 'w-80 min-w-80 max-w-80'">
@@ -73,7 +84,7 @@ const emit = defineEmits<{
             </div>
             <div
                 class="flex-1 min-h-0 overflow-y-auto overscroll-y-contain p-4 min-w-0"
-                :class="isOpen ? '' : 'opacity-0 pointer-events-none'"
+                :class="[isOpen ? '' : 'opacity-0 pointer-events-none', hasNextPreviews ? 'pb-[11.75rem]' : '']"
             >
                 <div v-if="isLoading" class="flex items-center justify-center py-8">
                     <Loader2 :size="24" class="animate-spin text-smart-blue-500" />
@@ -336,6 +347,12 @@ const emit = defineEmits<{
                     No file data available
                 </div>
             </div>
+            <FullscreenSheetPreviewStrip
+                v-if="hasNextPreviews"
+                :previews="nextPreviews"
+                :total-items="totalItems"
+                @select="emit('select-preview', $event)"
+            />
         </div>
     </div>
 </template>

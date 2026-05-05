@@ -5,6 +5,7 @@ import TabPanel from '../components/ui/TabPanel.vue';
 import Tab from '../components/Tab.vue';
 import TabContentV2 from '../components/TabContentV2.vue';
 import { Button } from '@/components/ui/button';
+import { provideBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import { useTabs } from '@/composables/useTabs';
 import { undoLatestQueuedReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
@@ -27,6 +28,8 @@ const dropTargetTabId = ref<number | null>(null);
 const dropIndicator = ref<DropIndicator | null>(null);
 const tabMasonryLoadingStates = ref<Map<number, boolean>>(new Map());
 const tabDataLoadingStates = ref<Map<number, boolean>>(new Map());
+
+provideBrowseGlobalStartPanel();
 
 async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promise<void> {
     if (!skipActiveCheck && activeTabId.value === tabId) {

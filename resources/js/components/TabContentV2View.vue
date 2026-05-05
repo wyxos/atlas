@@ -4,6 +4,7 @@ import { useEventListener } from '@vueuse/core';
 import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeResolveResult, type VibeViewerItem, type VibeStatus } from '@wyxos/vibe';
 import { PanelRightOpen } from 'lucide-vue-next';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
+import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
@@ -12,6 +13,7 @@ import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
 import type { ReactionType } from '@/types/reaction';
+import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import DownloadedReactionDialog from './DownloadedReactionDialog.vue';
@@ -107,6 +109,13 @@ const props = defineProps<{
     viewerKey: string;
 }>();
 
+const globalStartPanel = useBrowseGlobalStartPanel();
+const showGlobalStartPanel = computed(() => Boolean(globalStartPanel?.isOpen.value) && !props.shouldShowForm);
+
+function closeGlobalStartPanel(): void {
+    globalStartPanel?.close();
+}
+
 function handleVibeRef(instance: unknown): void {
     props.setVibeHandle((instance as VibeHandle | null) ?? null);
 }
@@ -176,7 +185,7 @@ useEventListener(document, 'pointermove', (event) => {
 </script>
 
 <template>
-    <div v-if="tab" class="flex h-full min-h-0 flex-col">
+    <div v-if="tab" class="relative flex h-full min-h-0 flex-col overflow-hidden">
         <TabContentServiceHeader
             v-if="!shouldShowForm"
             :form="form"
@@ -306,7 +315,7 @@ useEventListener(document, 'pointermove', (event) => {
                             <PanelRightOpen :size="16" />
                         </button>
                     </template>
-                    <template #fullscreen-aside>
+                    <template #fullscreen-aside="{ nextPreviews, total }">
                         <FileViewerSheet
                             v-if="fileSheetState.isOpen"
                             embedded
@@ -314,7 +323,10 @@ useEventListener(document, 'pointermove', (event) => {
                             :file-id="currentVisibleItem?.id ?? null"
                             :file-data="fileViewerData.fileData.value"
                             :is-loading="fileViewerData.isLoadingFileData.value"
+                            :next-previews="nextPreviews"
+                            :total-items="total"
                             @close="closeFileSheet"
+                            @select-preview="props.updateActiveIndex"
                         />
                     </template>
                 </VibeLayout>
@@ -328,6 +340,23 @@ useEventListener(document, 'pointermove', (event) => {
                 />
             </div>
         </div>
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="translate-x-8 opacity-0"
+            enter-to-class="translate-x-0 opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="translate-x-0 opacity-100"
+            leave-to-class="translate-x-8 opacity-0"
+        >
+            <div
+                v-if="showGlobalStartPanel"
+                id="browse-global-start-panel"
+                class="absolute inset-0 z-40"
+                data-test="browse-global-start-panel"
+            >
+                <BrowseGlobalStartPanel @close="closeGlobalStartPanel" />
+            </div>
+        </Transition>
 
         <TabContentPromptDialog
             :open="promptDialog.data.promptDialogOpen.value"

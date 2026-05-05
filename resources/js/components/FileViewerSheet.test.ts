@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
 import FileViewerSheet from './FileViewerSheet.vue';
 import type { File } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -52,6 +53,32 @@ function makeFile(overrides: Partial<File> = {}): File {
         containers: [],
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
+        ...overrides,
+    };
+}
+
+function makePreview(overrides: Partial<VibeFullscreenPreviewItem> = {}): VibeFullscreenPreviewItem {
+    return {
+        asset: {
+            height: 300,
+            kind: 'image',
+            label: 'Next file',
+            url: 'https://example.test/next-preview.jpg',
+            width: 900,
+        },
+        index: 1,
+        item: {
+            id: 'next-file',
+            preview: {
+                height: 300,
+                mediaType: 'image',
+                url: 'https://example.test/next-preview.jpg',
+                width: 900,
+            },
+            title: 'Next file',
+            type: 'image',
+            url: 'https://example.test/next-original.jpg',
+        },
         ...overrides,
     };
 }
@@ -150,6 +177,60 @@ describe('FileViewerSheet', () => {
         expect(root.classes()).toContain('w-full');
         expect(root.classes()).not.toContain('w-80');
         expect(root.classes()).not.toContain('max-w-80');
+    });
+
+    it('renders fullscreen next previews fixed at the bottom of the embedded sheet', async () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                embedded: true,
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile(),
+                nextPreviews: [
+                    makePreview(),
+                    makePreview({
+                        asset: {
+                            height: 600,
+                            kind: 'image',
+                            label: 'Second file',
+                            url: 'https://example.test/second-preview.jpg',
+                            width: 720,
+                        },
+                        index: 2,
+                        item: {
+                            id: 'second-file',
+                            title: 'Second file',
+                            type: 'image',
+                            url: 'https://example.test/second-original.jpg',
+                        },
+                    }),
+                ],
+                totalItems: 20,
+            },
+        });
+
+        const strip = wrapper.get('[data-testid="fullscreen-sheet-next-previews"]');
+        const previews = wrapper.findAll('[data-testid="fullscreen-sheet-next-preview"]');
+
+        expect(strip.classes()).toContain('absolute');
+        expect(strip.classes()).toContain('bottom-0');
+        expect(previews).toHaveLength(2);
+        expect(previews[0].classes()).toContain('h-[150px]');
+        expect(previews[0].classes()).toContain('w-[150px]');
+        expect(previews[0].attributes('data-index')).toBe('1');
+        expect(previews[0].get('img').attributes('src')).toBe('https://example.test/next-preview.jpg');
+        expect(previews[0].get('img').classes()).toContain('object-cover');
+        expect(wrapper.findAll('[data-testid="fullscreen-sheet-next-preview-spinner"]')).toHaveLength(2);
+
+        await previews[0].get('img').trigger('load');
+
+        expect(wrapper.findAll('[data-testid="fullscreen-sheet-next-preview-spinner"]')).toHaveLength(1);
+        expect(previews[0].get('img').classes()).toContain('opacity-100');
+
+        await previews[0].trigger('click');
+
+        expect(wrapper.emitted('select-preview')).toEqual([[1]]);
     });
 });
 
