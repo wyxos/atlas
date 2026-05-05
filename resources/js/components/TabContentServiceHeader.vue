@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronsUp, PanelRightOpen, Play } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
+import { queueManager } from '@/composables/useQueue';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import TabFilter from './TabFilter.vue';
@@ -34,6 +35,7 @@ withDefaults(defineProps<Props>(), {
 });
 
 const globalStartPanel = useBrowseGlobalStartPanel();
+const queuedReactionCount = queueManager.collection.getAllComputed();
 </script>
 
 <template>
@@ -100,11 +102,18 @@ const globalStartPanel = useBrowseGlobalStartPanel();
                 data-test="global-start-panel-button"
                 aria-controls="browse-global-start-panel"
                 :aria-expanded="String(globalStartPanel.isOpen.value)"
-                title="Open browse setup"
+                title="Open reaction queue"
                 @click="globalStartPanel.toggle"
             >
                 <PanelRightOpen :size="14" />
-                <span>Setup</span>
+                <span>Queue</span>
+                <span
+                    v-if="queuedReactionCount.length > 0"
+                    class="ml-1 inline-flex min-w-5 justify-center rounded-full bg-smart-blue-500 px-1.5 text-[11px] font-semibold text-white"
+                    data-test="global-start-panel-queue-count"
+                >
+                    {{ queuedReactionCount.length }}
+                </span>
             </Button>
 
             <Button @click="goToFirstPage" size="sm" variant="ghost" class="h-10 w-10"

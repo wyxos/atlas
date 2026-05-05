@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { queueManager } from '@/composables/useQueue';
 import { provideBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
 
@@ -76,6 +77,10 @@ function mountHeader(props = createProps()) {
 }
 
 describe('TabContentServiceHeader', () => {
+    beforeEach(() => {
+        queueManager.collection.reset();
+    });
+
     it('keeps only the top-level browse controls in the header', () => {
         const wrapper = mountHeader();
 

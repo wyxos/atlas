@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
-import { defineComponent, h, nextTick } from 'vue';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { queueManager } from '@/composables/useQueue';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 
 const simpleStub = defineComponent({
@@ -10,45 +11,101 @@ const simpleStub = defineComponent({
     },
 });
 
+function mountPanel() {
+    return mount(BrowseGlobalStartPanel, {
+        global: {
+            stubs: {
+                Ban: simpleStub,
+                Heart: simpleStub,
+                PanelRightClose: simpleStub,
+                Plus: simpleStub,
+                Smile: simpleStub,
+                ThumbsUp: simpleStub,
+                Undo2: simpleStub,
+                X: simpleStub,
+            },
+        },
+    });
+}
+
 describe('BrowseGlobalStartPanel', () => {
     beforeEach(() => {
         vi.useFakeTimers();
-        vi.spyOn(Math, 'random').mockReturnValue(0);
+        queueManager.collection.reset();
     });
 
     afterEach(() => {
+        queueManager.collection.reset();
         vi.useRealTimers();
-        vi.restoreAllMocks();
     });
 
-    it('renders static reaction-like cards and emits close from the close button', async () => {
-        const wrapper = mount(BrowseGlobalStartPanel, {
-            global: {
-                stubs: {
-                    Ban: simpleStub,
-                    Heart: simpleStub,
-                    PanelRightClose: simpleStub,
-                    Smile: simpleStub,
-                    ThumbsUp: simpleStub,
-                    Undo2: simpleStub,
-                    X: simpleStub,
-                },
+    it('renders live queued reaction cards and emits close from the close button', async () => {
+        queueManager.collection.add({
+            id: 'like-5501',
+            duration: 5000,
+            onComplete: vi.fn(),
+            metadata: { fileId: 5501, reactionType: 'like', thumbnail: 'thumb.jpg' },
+        });
+        queueManager.collection.add({
+            id: 'batch-love-5502-2',
+            duration: 5000,
+            onComplete: vi.fn(),
+            metadata: {
+                fileIds: [5502, 5503],
+                previews: [{ fileId: 5502, thumbnail: 'thumb-5502.jpg' }, { fileId: 5503 }],
+                reactionType: 'love',
             },
         });
 
-        await nextTick();
+        const wrapper = mountPanel();
 
         expect(wrapper.get('[data-test="browse-global-start-panel-list"]').exists()).toBe(true);
-        expect(wrapper.findAll('[data-test="browse-global-start-panel-card"]')).toHaveLength(100);
-        expect(wrapper.findAll('[data-test="browse-global-start-panel-card"]')[0].text()).toContain('#5500');
-
-        await vi.advanceTimersByTimeAsync(700);
-
-        expect(wrapper.findAll('[data-test="browse-global-start-panel-card"]')).toHaveLength(101);
-        expect(wrapper.findAll('[data-test="browse-global-start-panel-card"]')[0].text()).toContain('#5501');
+        expect(wrapper.get('[data-test="browse-global-start-panel-count"]').text()).toBe('3');
+        expect(wrapper.findAll('[data-test="browse-global-start-panel-card"]')).toHaveLength(2);
+        expect(wrapper.text()).toContain('Loved 2 files');
+        expect(wrapper.text()).toContain('file #5501');
 
         await wrapper.get('[data-test="browse-global-start-panel-close-button"]').trigger('click');
 
         expect(wrapper.emitted('close')).toEqual([[]]);
+    });
+
+    it('pauses the queue while mounted and resumes immediately when unmounted', async () => {
+        const onComplete = vi.fn();
+        queueManager.collection.add({
+            id: 'funny-5504',
+            duration: 1000,
+            onComplete,
+            metadata: { fileId: 5504, reactionType: 'funny' },
+        });
+
+        const wrapper = mountPanel();
+
+        expect(queueManager.freeze.isFrozen.value).toBe(true);
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(onComplete).not.toHaveBeenCalled();
+
+        wrapper.unmount();
+
+        expect(queueManager.freeze.isFrozen.value).toBe(false);
+        await vi.advanceTimersByTimeAsync(1100);
+        expect(onComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('undoes a queued card from the panel', async () => {
+        const restoreCallback = vi.fn();
+        queueManager.collection.add({
+            id: 'blacklist-5505',
+            duration: 5000,
+            onComplete: vi.fn(),
+            metadata: { fileId: 5505, reactionType: 'blacklist', restoreCallback },
+        });
+
+        const wrapper = mountPanel();
+
+        await wrapper.get('[data-test="browse-global-start-panel-card"] button[aria-label="Remove queued reaction"]').trigger('click');
+
+        expect(queueManager.collection.has('blacklist-5505')).toBe(false);
+        expect(restoreCallback).toHaveBeenCalledTimes(1);
     });
 });

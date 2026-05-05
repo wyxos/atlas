@@ -5,8 +5,6 @@ import updateReactionState from '@/utils/reactionStateUpdater';
 import type { ReactionType } from '@/types/reaction';
 import type { Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
-import ReactionQueueToast from '@/components/toasts/ReactionQueueToast.vue';
-import BatchReactionQueueToast from '@/components/toasts/BatchReactionQueueToast.vue';
 
 const toast = useToast();
 
@@ -22,9 +20,11 @@ type ReactionQueueMetadata = {
 type SingleReactionQueueMetadata = ReactionQueueMetadata & {
     fileId: number;
     reactionType: QueuedReactionType;
+    thumbnail?: string;
 };
 type BatchReactionQueueMetadata = ReactionQueueMetadata & {
     fileIds: number[];
+    previews?: ReactionQueuePreview[];
     reactionType: QueuedReactionType;
 };
 type QueueReactionOptions = {
@@ -37,19 +37,23 @@ type QueueBatchReactionOptions = {
 type QueueBlacklistOptions = {
     onSuccess?: (results: BatchBlacklistResult[]) => Promise<void> | void;
 };
+export type ReactionQueuePreview = {
+    fileId: number;
+    thumbnail?: string;
+};
 
 function isQueuedReactionType(value: unknown): value is QueuedReactionType {
     return typeof value === 'string' && QUEUED_REACTION_TYPES.includes(value as QueuedReactionType);
 }
 
-function isSingleReactionQueueMetadata(metadata: unknown): metadata is SingleReactionQueueMetadata {
+export function isSingleReactionQueueMetadata(metadata: unknown): metadata is SingleReactionQueueMetadata {
     return typeof metadata === 'object'
         && metadata !== null
         && typeof (metadata as { fileId?: unknown }).fileId === 'number'
         && isQueuedReactionType((metadata as { reactionType?: unknown }).reactionType);
 }
 
-function isBatchReactionQueueMetadata(metadata: unknown): metadata is BatchReactionQueueMetadata {
+export function isBatchReactionQueueMetadata(metadata: unknown): metadata is BatchReactionQueueMetadata {
     return typeof metadata === 'object'
         && metadata !== null
         && Array.isArray((metadata as { fileIds?: unknown }).fileIds)
@@ -155,26 +159,6 @@ export function queueReaction(
         },
     });
 
-    // Show toast immediately with countdown
-    toast(
-        {
-            component: ReactionQueueToast,
-            props: {
-                queueId,
-                fileId,
-                reactionType,
-                thumbnail,
-            },
-        },
-        {
-            id: queueId,
-            timeout: false, // Don't auto-dismiss - we handle it in onComplete
-            closeButton: false,
-            closeOnClick: false,
-            toastClassName: 'reaction-queue-toast-wrapper',
-            bodyClassName: 'reaction-queue-toast-body',
-        }
-    );
 }
 
 /**
@@ -184,7 +168,7 @@ export function queueReaction(
 export function queueBatchReaction(
     fileIds: number[],
     reactionType: ReactionType,
-    previews: Array<{ fileId: number; thumbnail?: string }>,
+    previews: ReactionQueuePreview[],
     restoreCallback?: () => Promise<void> | void,
     items?: Ref<FeedItem[]>,
     options?: QueueBatchReactionOptions,
@@ -230,26 +214,6 @@ export function queueBatchReaction(
         },
     });
 
-    // Show toast immediately with countdown
-    toast(
-        {
-            component: BatchReactionQueueToast,
-            props: {
-                queueId,
-                reactionType,
-                previews,
-                totalCount: fileIds.length,
-            },
-        },
-        {
-            id: queueId,
-            timeout: false, // Don't auto-dismiss - we handle it in onComplete
-            closeButton: false,
-            closeOnClick: false,
-            toastClassName: 'reaction-queue-toast-wrapper',
-            bodyClassName: 'reaction-queue-toast-body',
-        }
-    );
 }
 
 export function queueBlacklist(
@@ -294,30 +258,11 @@ export function queueBlacklist(
         },
     });
 
-    toast(
-        {
-            component: ReactionQueueToast,
-            props: {
-                queueId,
-                fileId,
-                reactionType: 'blacklist',
-                thumbnail,
-            },
-        },
-        {
-            id: queueId,
-            timeout: false,
-            closeButton: false,
-            closeOnClick: false,
-            toastClassName: 'reaction-queue-toast-wrapper',
-            bodyClassName: 'reaction-queue-toast-body',
-        }
-    );
 }
 
 export function queueBatchBlacklist(
     fileIds: number[],
-    previews: Array<{ fileId: number; thumbnail?: string }>,
+    previews: ReactionQueuePreview[],
     restoreCallback?: () => Promise<void> | void,
     items?: Ref<FeedItem[]>,
     options?: QueueBlacklistOptions,
@@ -355,25 +300,6 @@ export function queueBatchBlacklist(
         },
     });
 
-    toast(
-        {
-            component: BatchReactionQueueToast,
-            props: {
-                queueId,
-                reactionType: 'blacklist',
-                previews,
-                totalCount: fileIds.length,
-            },
-        },
-        {
-            id: queueId,
-            timeout: false,
-            closeButton: false,
-            closeOnClick: false,
-            toastClassName: 'reaction-queue-toast-wrapper',
-            bodyClassName: 'reaction-queue-toast-body',
-        }
-    );
 }
 
 /**

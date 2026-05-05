@@ -79,26 +79,17 @@ describe('reactionQueue', () => {
             expect(queue.collection.has('like-123')).toBe(true);
         });
 
-        it('shows toast immediately', () => {
+        it('does not show a countdown toast immediately', () => {
             queueReaction(123, 'like', 'https://example.com/thumb.jpg');
 
-            expect(mockToast).toHaveBeenCalledTimes(1);
-            const toastCall = mockToast.mock.calls[0];
-            expect(toastCall[1]).toMatchObject({
-                id: 'like-123',
-                timeout: false,
-                closeButton: false,
-                closeOnClick: false,
-            });
+            expect(mockToast).not.toHaveBeenCalled();
         });
 
-        it('passes thumbnail to toast component', () => {
+        it('stores thumbnail metadata for the reaction sheet', () => {
             const thumbnail = 'https://example.com/thumb.jpg';
             queueReaction(123, 'like', thumbnail);
 
-            expect(mockToast).toHaveBeenCalled();
-            const toastCall = mockToast.mock.calls[0];
-            expect(toastCall[0].props.thumbnail).toBe(thumbnail);
+            expect(queue.collection.getAll()[0]?.metadata).toMatchObject({ thumbnail });
         });
 
         it('replaces existing reaction for same file and type', () => {
@@ -263,7 +254,7 @@ describe('reactionQueue', () => {
             expect(items[0].id).toMatch(/^batch-like-123-3-\d+$/);
         });
 
-        it('shows toast immediately with BatchReactionQueueToast component', () => {
+        it('stores batch metadata for the reaction sheet', () => {
             const fileIds = [123, 456];
             const previews = [
                 { fileId: 123, thumbnail: 'thumb1.jpg' },
@@ -271,25 +262,22 @@ describe('reactionQueue', () => {
             ];
             queueBatchReaction(fileIds, 'like', previews);
 
-            expect(mockToast).toHaveBeenCalledTimes(1);
-            const toastCall = mockToast.mock.calls[0];
-            expect(toastCall[0].component.name || toastCall[0].component.__name).toBe('BatchReactionQueueToast');
-            expect(toastCall[0].props).toMatchObject({
+            expect(mockToast).not.toHaveBeenCalled();
+            expect(queue.collection.getAll()[0]?.metadata).toMatchObject({
+                fileIds,
                 reactionType: 'like',
                 previews,
-                totalCount: 2,
             });
         });
 
-        it('passes correct props to batch toast component', () => {
+        it('stores full preview metadata for batch reactions', () => {
             const fileIds = [1, 2, 3, 4, 5, 6];
             const previews = fileIds.map((id) => ({ fileId: id, thumbnail: `thumb${id}.jpg` }));
             queueBatchReaction(fileIds, 'funny', previews);
 
-            const toastCall = mockToast.mock.calls[0];
-            expect(toastCall[0].props.totalCount).toBe(6);
-            expect(toastCall[0].props.previews).toHaveLength(6);
-            expect(toastCall[0].props.reactionType).toBe('funny');
+            const metadata = queue.collection.getAll()[0]?.metadata as { previews?: unknown[]; reactionType?: string };
+            expect(metadata.previews).toHaveLength(6);
+            expect(metadata.reactionType).toBe('funny');
         });
 
         it('uses the batch callback when countdown expires for small batches too', async () => {

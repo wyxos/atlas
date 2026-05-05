@@ -61,10 +61,7 @@ describe('reactionQueue blacklist', () => {
             reactionType: 'blacklist',
             restoreCallback,
         });
-        expect(mockToast.mock.calls[0][0].props).toMatchObject({
-            fileId: 123,
-            reactionType: 'blacklist',
-        });
+        expect(mockToast).not.toHaveBeenCalled();
     });
 
     it('executes blacklist callback and success handler when countdown expires', async () => {
@@ -112,10 +109,10 @@ describe('reactionQueue blacklist', () => {
             reactionType: 'blacklist',
             previews,
         });
-        expect(mockToast.mock.calls[0][0].props).toMatchObject({
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(item?.metadata).toMatchObject({
             reactionType: 'blacklist',
             previews,
-            totalCount: 2,
         });
     });
 
