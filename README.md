@@ -51,3 +51,18 @@ Built to handle these.
 - Local files you already have
 
 More sources can be added over time.
+
+## Docker
+
+Run the entire stack with a single command:
+
+```bash
+./docker-setup.sh
+```
+
+This starts MariaDB, Redis, Typesense, Reverb (WebSockets), Horizon (queues), Nginx, and phpMyAdmin — all pre-configured.
+
+- **App**: http://localhost:8080
+- **phpMyAdmin**: http://localhost:8081
+
+See [docs/SETUP.md](docs/SETUP.md) for detailed Docker instructions.

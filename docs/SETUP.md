@@ -42,3 +42,68 @@ This guide mirrors a real-world install on a server.
 
 - CivitAI and Wallhaven API keys improve rate limits.
 - HTTPS is recommended if you access Atlas outside your network.
+
+## Docker Setup
+
+Run Atlas with all dependencies containerized — no need to install PHP, Node.js, MariaDB, Redis, or Typesense locally.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
+
+### Quick Start
+
+```bash
+./docker-setup.sh
+```
+
+This script copies `.env.docker` to `.env`, starts all containers, waits for MariaDB, generates the app key, runs migrations, and creates the admin account.
+
+### Manual Setup
+
+```bash
+cp .env.docker .env
+docker-compose up -d
+
+# Wait for MariaDB to be ready (check with: docker-compose ps)
+docker-compose exec php php artisan key:generate
+docker-compose exec php php artisan migrate --force
+docker-compose exec php php artisan app:setup
+```
+
+### Services and Ports
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Nginx (App) | 8080 | Web application |
+| phpMyAdmin | 8081 | Database management |
+| MariaDB | 3306 | Database |
+| Redis | 6379 | Cache and sessions |
+| Typesense | 8108 | Search engine |
+| Reverb | 8080 | WebSockets (same port as app) |
+
+### Data Persistence
+
+Docker named volumes keep your data across container restarts:
+
+- `atlas-mariadb-data` — Database files
+- `atlas-redis-data` — Redis persistence
+- `atlas-typesense-data` — Search index
+
+### Common Commands
+
+```bash
+docker-compose down                    # Stop all services
+docker-compose logs -f                 # View all logs
+docker-compose logs -f php             # View PHP/app logs
+docker-compose build                   # Rebuild images after Dockerfile changes
+docker-compose exec php php artisan migrate        # Run migrations
+docker-compose exec php php artisan horizon:terminate  # Restart Horizon
+```
+
+### Troubleshooting
+
+- **Reverb keeps restarting**: Run `docker-compose exec php php artisan migrate --force` first, then `docker-compose restart reverb`
+- **500 error on app**: Check `docker-compose logs php` and ensure `.env` was copied from `.env.docker`
+- **Permission issues on storage**: `docker-compose exec php chmod -R 777 storage bootstrap/cache`
+- **Reset everything**: `docker-compose down -v` (WARNING: deletes all data volumes)

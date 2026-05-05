@@ -33,7 +33,28 @@ composer run dev
 php artisan serve          # Laravel server
 php artisan queue:listen    # Queue worker
 npm run dev                 # Vite dev server
+
+# Docker Standalone Setup
+./docker-setup.sh          # One-time setup & start
+docker-compose up -d       # Start services
+docker-compose down        # Stop services
+docker-compose logs -f     # View logs
 ```
+
+### Docker Management Stack
+- **Application**: http://localhost:8080
+- **Database**: MariaDB (atlas-mariadb)
+- **Caching/Queue**: Redis (atlas-redis)
+- **Search**: Typesense (atlas-typesense)
+- **WebSockets**: Laravel Reverb (atlas-reverb)
+- **Queue Monitor**: Laravel Horizon (atlas-horizon)
+- **DB Admin**: phpMyAdmin (http://localhost:8081)
+
+### User & Password Management (Docker)
+- **Default Admin**: demo@atlas.test / password
+- **Create Admin**: `docker exec -it atlas-php php artisan app:setup`
+- **Reset Password**: `docker exec -it atlas-php php artisan tinker`
+- **List Users**: `docker exec atlas-php php artisan tinker --execute="echo \App\Models\User::pluck('email')->toJson();"`
 
 ### Build & Typecheck
 ```bash
