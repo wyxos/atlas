@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onUnmounted, watch } from 'vue';
 import { Ban, Heart, PanelRightClose, Smile, ThumbsUp, Undo2, X } from 'lucide-vue-next';
 import { queueManager } from '@/composables/useQueue';
 import ToastPreviewStrip, { type ToastPreviewStripItem } from './toasts/ToastPreviewStrip.vue';
@@ -19,6 +19,12 @@ type ReactionQueueCard = {
     reactionType: QueuedReactionType;
     totalCount: number;
 };
+
+const props = withDefaults(defineProps<{
+    open?: boolean;
+}>(), {
+    open: true,
+});
 
 const emit = defineEmits<{
     close: [];
@@ -110,10 +116,16 @@ async function undoCard(card: ReactionQueueCard): Promise<void> {
     await cancelQueuedReaction(card.fileId, card.reactionType);
 }
 
-onMounted(() => {
-    queue.modal.setModalOpen(true);
-    queue.freeze.freezeAll();
-});
+watch(() => props.open, (open) => {
+    queue.modal.setModalOpen(open);
+
+    if (open) {
+        queue.freeze.freezeAll();
+        return;
+    }
+
+    queue.freeze.unfreezeImmediately();
+}, { immediate: true });
 
 onUnmounted(() => {
     queue.modal.setModalOpen(false);
@@ -122,123 +134,121 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex h-full w-full justify-end bg-prussian-blue-900/70">
-        <aside class="flex h-full w-[min(100%,30rem)] flex-col border-l border-white/10 bg-prussian-blue-700 shadow-2xl shadow-prussian-blue-900/60">
-            <header class="grid grid-cols-[2.25rem_1fr_2.25rem] items-center border-b border-white/10 bg-prussian-blue-800/80 px-4 py-3">
-                <div />
-                <div class="flex justify-center">
-                    <span
-                        class="inline-flex min-w-6 items-center justify-center rounded-full border border-smart-blue-300/60 bg-smart-blue-500 px-2 py-0.5 text-xs font-semibold text-white shadow-lg shadow-smart-blue-900/40"
-                        data-test="browse-global-start-panel-count"
-                    >
-                        {{ queuedCount }}
-                    </span>
-                </div>
-                <button
-                    type="button"
-                    class="inline-flex h-9 w-9 items-center justify-center border border-white/10 bg-prussian-blue-900/40 text-twilight-indigo-100 transition hover:border-white/20 hover:bg-prussian-blue-800/80"
-                    aria-label="Close reaction queue"
-                    data-test="browse-global-start-panel-close-button"
-                    @click="emit('close')"
+    <div class="flex h-full flex-col bg-prussian-blue-700 shadow-2xl shadow-prussian-blue-900/60">
+        <header class="grid grid-cols-[2.25rem_1fr_2.25rem] items-center border-b border-white/10 bg-prussian-blue-800/80 px-4 py-3">
+            <div />
+            <div class="flex justify-center">
+                <span
+                    class="inline-flex min-w-6 items-center justify-center rounded-full border border-smart-blue-300/60 bg-smart-blue-500 px-2 py-0.5 text-xs font-semibold text-white shadow-lg shadow-smart-blue-900/40"
+                    data-test="browse-global-start-panel-count"
                 >
-                    <PanelRightClose :size="16" />
-                </button>
-            </header>
-            <div class="min-h-0 flex-1 overflow-y-auto bg-prussian-blue-700 p-4" data-test="browse-global-start-panel-list">
-                <TransitionGroup
-                    v-if="visibleCards.length > 0"
-                    name="reaction-card"
-                    tag="div"
-                    class="relative space-y-3"
-                    data-test="browse-global-start-panel-cards"
-                >
-                    <article
-                        v-for="card in visibleCards"
-                        :key="card.queueId"
-                        class="reaction-panel-card group relative flex min-w-[300px] items-center gap-4 rounded-lg border border-twilight-indigo-500/50 bg-prussian-blue-600 p-4 shadow-xl"
-                        data-test="browse-global-start-panel-card"
-                    >
-                        <ToastPreviewStrip
-                            v-if="card.isBatch"
-                            :items="card.previewItems"
-                            :total-count="card.totalCount"
-                            :max-visible="3"
-                        />
-                        <div v-else class="shrink-0">
-                            <img
-                                v-if="card.previewItems[0]?.thumbnail"
-                                :src="card.previewItems[0].thumbnail"
-                                :alt="`File ${card.fileId}`"
-                                class="size-16 rounded object-cover"
-                            />
-                            <div
-                                v-else
-                                class="flex size-16 items-center justify-center rounded bg-gradient-to-br from-smart-blue-300 via-sapphire-500 to-prussian-blue-800 text-xs text-twilight-indigo-100"
-                                :aria-label="`File ${card.fileId}`"
-                            >
-                                #{{ card.fileId }}
-                            </div>
-                        </div>
-
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-2">
-                                <div class="flex min-w-0 items-center gap-2">
-                                    <div :class="['shrink-0', getReactionMeta(card.reactionType).color]">
-                                        <component :is="getReactionMeta(card.reactionType).icon" class="size-4" />
-                                    </div>
-                                    <p class="truncate text-sm font-semibold text-twilight-indigo-100">
-                                        {{ getReactionMeta(card.reactionType).label }}
-                                        <template v-if="card.isBatch">
-                                            {{ card.totalCount }} files
-                                        </template>
-                                        <template v-else>
-                                            file #{{ card.fileId }}
-                                        </template>
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    class="shrink-0 rounded p-1 text-twilight-indigo-300 transition-colors hover:bg-twilight-indigo-500/20 hover:text-twilight-indigo-100"
-                                    aria-label="Remove queued reaction"
-                                    @click="undoCard(card)"
-                                >
-                                    <X class="size-4" />
-                                </button>
-                            </div>
-
-                            <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-twilight-indigo-500/20">
-                                <div
-                                    class="h-full bg-smart-blue-400 transition-all duration-100 ease-linear"
-                                    :style="{ width: `${getProgress(card.queueId)}%` }"
-                                />
-                            </div>
-
-                            <div class="mt-2 flex items-center justify-between gap-2">
-                                <p class="font-mono text-xs text-twilight-indigo-300">
-                                    {{ formatCountdown(card.queueId) }}
-                                </p>
-                                <button
-                                    type="button"
-                                    class="flex items-center gap-1 rounded bg-twilight-indigo-500/20 px-2 py-1 text-xs font-medium text-twilight-indigo-200 transition-colors hover:bg-twilight-indigo-500/30 hover:text-twilight-indigo-100"
-                                    @click="undoCard(card)"
-                                >
-                                    <Undo2 class="size-3" />
-                                    Undo
-                                </button>
-                            </div>
-                        </div>
-                    </article>
-                </TransitionGroup>
-
-                <div
-                    v-else
-                    class="flex h-full items-center justify-center border border-dashed border-white/10 bg-prussian-blue-800/40 px-6 text-sm text-twilight-indigo-300"
-                    data-test="browse-global-start-panel-empty"
-                >
-                    No queued reactions
-                </div>
+                    {{ queuedCount }}
+                </span>
             </div>
-        </aside>
+            <button
+                type="button"
+                class="inline-flex h-9 w-9 items-center justify-center border border-white/10 bg-prussian-blue-900/40 text-twilight-indigo-100 transition hover:border-white/20 hover:bg-prussian-blue-800/80"
+                aria-label="Close reaction queue"
+                data-test="browse-global-start-panel-close-button"
+                @click="emit('close')"
+            >
+                <PanelRightClose :size="16" />
+            </button>
+        </header>
+        <div class="min-h-0 flex-1 overflow-y-auto bg-prussian-blue-700 p-4" data-test="browse-global-start-panel-list">
+            <TransitionGroup
+                v-if="visibleCards.length > 0"
+                name="reaction-card"
+                tag="div"
+                class="relative space-y-3"
+                data-test="browse-global-start-panel-cards"
+            >
+                <article
+                    v-for="card in visibleCards"
+                    :key="card.queueId"
+                    class="reaction-panel-card group relative flex min-w-[300px] items-center gap-4 rounded-lg border border-twilight-indigo-500/50 bg-prussian-blue-600 p-4 shadow-xl"
+                    data-test="browse-global-start-panel-card"
+                >
+                    <ToastPreviewStrip
+                        v-if="card.isBatch"
+                        :items="card.previewItems"
+                        :total-count="card.totalCount"
+                        :max-visible="3"
+                    />
+                    <div v-else class="shrink-0">
+                        <img
+                            v-if="card.previewItems[0]?.thumbnail"
+                            :src="card.previewItems[0].thumbnail"
+                            :alt="`File ${card.fileId}`"
+                            class="size-16 rounded object-cover"
+                        />
+                        <div
+                            v-else
+                            class="flex size-16 items-center justify-center rounded bg-gradient-to-br from-smart-blue-300 via-sapphire-500 to-prussian-blue-800 text-xs text-twilight-indigo-100"
+                            :aria-label="`File ${card.fileId}`"
+                        >
+                            #{{ card.fileId }}
+                        </div>
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <div :class="['shrink-0', getReactionMeta(card.reactionType).color]">
+                                    <component :is="getReactionMeta(card.reactionType).icon" class="size-4" />
+                                </div>
+                                <p class="truncate text-sm font-semibold text-twilight-indigo-100">
+                                    {{ getReactionMeta(card.reactionType).label }}
+                                    <template v-if="card.isBatch">
+                                        {{ card.totalCount }} files
+                                    </template>
+                                    <template v-else>
+                                        file #{{ card.fileId }}
+                                    </template>
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                class="shrink-0 rounded p-1 text-twilight-indigo-300 transition-colors hover:bg-twilight-indigo-500/20 hover:text-twilight-indigo-100"
+                                aria-label="Remove queued reaction"
+                                @click="undoCard(card)"
+                            >
+                                <X class="size-4" />
+                            </button>
+                        </div>
+
+                        <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-twilight-indigo-500/20">
+                            <div
+                                class="h-full bg-smart-blue-400 transition-all duration-100 ease-linear"
+                                :style="{ width: `${getProgress(card.queueId)}%` }"
+                            />
+                        </div>
+
+                        <div class="mt-2 flex items-center justify-between gap-2">
+                            <p class="font-mono text-xs text-twilight-indigo-300">
+                                {{ formatCountdown(card.queueId) }}
+                            </p>
+                            <button
+                                type="button"
+                                class="flex items-center gap-1 rounded bg-twilight-indigo-500/20 px-2 py-1 text-xs font-medium text-twilight-indigo-200 transition-colors hover:bg-twilight-indigo-500/30 hover:text-twilight-indigo-100"
+                                @click="undoCard(card)"
+                            >
+                                <Undo2 class="size-3" />
+                                Undo
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            </TransitionGroup>
+
+            <div
+                v-else
+                class="flex h-full items-center justify-center border border-dashed border-white/10 bg-prussian-blue-800/40 px-6 text-sm text-twilight-indigo-300"
+                data-test="browse-global-start-panel-empty"
+            >
+                No queued reactions
+            </div>
+        </div>
     </div>
 </template>
 

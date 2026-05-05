@@ -70,7 +70,7 @@ describe('BrowseGlobalStartPanel', () => {
         expect(wrapper.emitted('close')).toEqual([[]]);
     });
 
-    it('pauses the queue while mounted and resumes immediately when unmounted', async () => {
+    it('pauses the queue while open and resumes immediately when closed', async () => {
         const onComplete = vi.fn();
         queueManager.collection.add({
             id: 'funny-5504',
@@ -85,11 +85,28 @@ describe('BrowseGlobalStartPanel', () => {
         await vi.advanceTimersByTimeAsync(1500);
         expect(onComplete).not.toHaveBeenCalled();
 
-        wrapper.unmount();
+        await wrapper.setProps({ open: false });
 
         expect(queueManager.freeze.isFrozen.value).toBe(false);
         await vi.advanceTimersByTimeAsync(1100);
         expect(onComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('cleans up queue freeze state when unmounted', async () => {
+        queueManager.collection.add({
+            id: 'funny-5504',
+            duration: 1000,
+            onComplete: vi.fn(),
+            metadata: { fileId: 5504, reactionType: 'funny' },
+        });
+
+        const wrapper = mountPanel();
+
+        expect(queueManager.freeze.isFrozen.value).toBe(true);
+
+        wrapper.unmount();
+
+        expect(queueManager.freeze.isFrozen.value).toBe(false);
     });
 
     it('undoes a queued card from the panel', async () => {

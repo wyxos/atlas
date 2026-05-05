@@ -9,6 +9,7 @@ import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
 import type { TabContentPromptDialog as TabContentPromptDialogHandle } from '@/composables/useTabContentPromptDialog';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
@@ -114,6 +115,12 @@ const showGlobalStartPanel = computed(() => Boolean(globalStartPanel?.isOpen.val
 
 function closeGlobalStartPanel(): void {
     globalStartPanel?.close();
+}
+
+function handleGlobalStartPanelOpenChange(value: boolean): void {
+    if (!value) {
+        closeGlobalStartPanel();
+    }
 }
 
 function handleVibeRef(instance: unknown): void {
@@ -340,23 +347,17 @@ useEventListener(document, 'pointermove', (event) => {
                 />
             </div>
         </div>
-        <Transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="translate-x-8 opacity-0"
-            enter-to-class="translate-x-0 opacity-100"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="translate-x-0 opacity-100"
-            leave-to-class="translate-x-8 opacity-0"
-        >
-            <div
-                v-if="showGlobalStartPanel"
+        <Sheet :open="showGlobalStartPanel" @update:open="handleGlobalStartPanelOpenChange">
+            <SheetContent
                 id="browse-global-start-panel"
-                class="absolute inset-0 z-40"
+                side="right"
+                :show-close="false"
+                class="w-full max-w-none gap-0 border-l border-white/10 p-0 sm:max-w-[30rem]"
                 data-test="browse-global-start-panel"
             >
-                <BrowseGlobalStartPanel @close="closeGlobalStartPanel" />
-            </div>
-        </Transition>
+                <BrowseGlobalStartPanel :open="showGlobalStartPanel" @close="closeGlobalStartPanel" />
+            </SheetContent>
+        </Sheet>
 
         <TabContentPromptDialog
             :open="promptDialog.data.promptDialogOpen.value"
