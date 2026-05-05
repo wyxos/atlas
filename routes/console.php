@@ -52,7 +52,7 @@ Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-passw
         }
 
         $this->error($validator->errors()->first('name'));
-        $name = (string) ($this->option('name') ?: $this->ask('Name'));
+        $name = (string) $this->ask('Name');
     }
 
     $email = (string) ($this->option('email') ?: $this->ask('Email'));
@@ -68,7 +68,7 @@ Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-passw
         }
 
         $this->error($validator->errors()->first('email'));
-        $email = (string) ($this->option('email') ?: $this->ask('Email'));
+        $email = (string) $this->ask('Email');
     }
 
     $passwordRule = Password::min(12)
