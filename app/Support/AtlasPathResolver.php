@@ -11,10 +11,7 @@ final class AtlasPathResolver
      */
     public static function preferredDiskNames(): array
     {
-        return array_values(array_unique(array_filter([
-            (string) config('downloads.disk'),
-            'atlas',
-        ], static fn (mixed $diskName): bool => is_string($diskName) && $diskName !== '')));
+        return [AtlasStorage::DISK];
     }
 
     /**

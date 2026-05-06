@@ -29,7 +29,7 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
                     auto_blacklisted: 'any',
                     blacklisted: 'any',
                     max_previewed_count: null,
-                    sort: 'downloaded_at',
+                    sort: 'stored_at',
                     seed: null,
                 },
             },

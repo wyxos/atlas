@@ -140,9 +140,12 @@ class FileItemFormatter
             $originalUrl = $file->url;
             $thumbnailUrl = $file->preview_url;
 
-            if ($file->downloaded && $file->path) {
-                $originalUrl = FileApiPath::downloaded($file->id);
-                $thumbnailUrl = FileApiPath::preview($file->id);
+            $isStored = $file->path && ($file->downloaded || $file->imported_at !== null);
+            if ($isStored) {
+                $originalUrl = $file->downloaded ? FileApiPath::downloaded($file->id) : FileApiPath::serve($file->id);
+                if ($file->preview_path) {
+                    $thumbnailUrl = FileApiPath::preview($file->id);
+                }
             } else {
                 if (! $originalUrl && $file->path) {
                     $originalUrl = FileApiPath::serve($file->id);
@@ -191,6 +194,7 @@ class FileItemFormatter
                 'previewed_count' => $file->previewed_count ?? 0,
                 'seen_count' => $file->seen_count ?? 0,
                 'downloaded' => (bool) $file->downloaded,
+                'imported_at' => $file->imported_at?->toIso8601String(),
                 'auto_blacklisted' => $file->auto_blacklisted ?? false,
                 'reaction' => $reaction, // Current user's reaction for this file
                 // Include metadata with prompt if available - full metadata loaded on-demand

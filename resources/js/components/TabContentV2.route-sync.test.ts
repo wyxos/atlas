@@ -330,6 +330,7 @@ function createFilePayload(id: number) {
             download_progress: 0,
             downloaded: true,
             downloaded_at: null,
+            imported_at: null,
             ext: 'jpg',
             file_url: `/api/files/${id}/downloaded`,
             filename: `file-${id}.jpg`,

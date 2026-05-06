@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
     Cache::flush();
 });
 
@@ -56,7 +56,7 @@ test('skips download if file is already downloaded', function () {
         'path' => 'downloads/existing-file.jpg',
     ]);
 
-    Storage::disk('atlas-app')->put('downloads/existing-file.jpg', 'already downloaded');
+    Storage::disk('atlas')->put('downloads/existing-file.jpg', 'already downloaded');
 
     $job = new DownloadFile($file->id);
     $job->handle();
@@ -79,7 +79,7 @@ test('re-queues download when a downloaded video resolved to HTML', function () 
         ],
     ]);
 
-    Storage::disk('atlas-app')->put('downloads/existing-video.html', '<!doctype html>');
+    Storage::disk('atlas')->put('downloads/existing-video.html', '<!doctype html>');
 
     $job = new DownloadFile($file->id);
     $job->handle();
@@ -252,7 +252,7 @@ test('clears blacklist flags when finalizing a downloaded file', function () {
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
-    Storage::disk('atlas-app')->put($tmpPath, 'fake image content');
+    Storage::disk('atlas')->put($tmpPath, 'fake image content');
 
     app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
@@ -279,7 +279,7 @@ test('resets terminal preview count when finalizing a non blacklisted downloaded
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/non-blacklisted.tmp';
-    Storage::disk('atlas-app')->put($tmpPath, 'fake image content');
+    Storage::disk('atlas')->put($tmpPath, 'fake image content');
 
     app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
@@ -303,7 +303,7 @@ test('determines extension from MIME type when URL has no extension (finalizer)'
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
-    Storage::disk('atlas-app')->put($tmpPath, $jpegContent);
+    Storage::disk('atlas')->put($tmpPath, $jpegContent);
 
     app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
@@ -330,7 +330,7 @@ test('determines extension from file content when Content-Type header is missing
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
-    Storage::disk('atlas-app')->put($tmpPath, $pngContent);
+    Storage::disk('atlas')->put($tmpPath, $pngContent);
 
     app(FileDownloadFinalizer::class)->finalize($file, $tmpPath);
 
@@ -363,7 +363,7 @@ test('corrects stale mime type when downloaded file content disagrees', function
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/mismatch.tmp';
-    Storage::disk('atlas-app')->put($tmpPath, $pngContent);
+    Storage::disk('atlas')->put($tmpPath, $pngContent);
 
     app(FileDownloadFinalizer::class)->finalize($file, $tmpPath);
 
@@ -394,7 +394,7 @@ test('generates thumbnail for image files (finalizer)', function () {
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
-    Storage::disk('atlas-app')->put($tmpPath, $jpegContent);
+    Storage::disk('atlas')->put($tmpPath, $jpegContent);
 
     app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
@@ -415,6 +415,6 @@ test('generates thumbnail for image files (finalizer)', function () {
         expect($file->preview_path)->toMatch('/^thumbnails\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
         expect($file->preview_path)->toContain('_thumb.');
         // Verify thumbnail exists in fake storage
-        Storage::disk('atlas-app')->assertExists($file->preview_path);
+        Storage::disk('atlas')->assertExists($file->preview_path);
     }
 });

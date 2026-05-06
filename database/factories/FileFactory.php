@@ -67,6 +67,7 @@ class FileFactory extends Factory
             'detail_metadata' => null,
             'downloaded' => fake()->boolean(),
             'downloaded_at' => fake()->optional()->dateTime(),
+            'imported_at' => null,
             'download_progress' => 0,
         ];
     }

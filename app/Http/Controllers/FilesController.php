@@ -10,6 +10,7 @@ use App\Services\FileNotFoundService;
 use App\Services\FilePreviewService;
 use App\Services\FileStorageResponseService;
 use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Support\AtlasStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -330,7 +331,7 @@ SVG;
         app(LocalBrowseIndexSyncService::class)->deleteAll();
 
         // Empty atlas app storage (including directory structure)
-        $atlasDisk = Storage::disk('atlas-app');
+        $atlasDisk = Storage::disk(AtlasStorage::DISK);
 
         // Delete all top-level directories (downloads/, thumbnails/, and any future ones)
         foreach ($atlasDisk->directories() as $directory) {

@@ -33,7 +33,7 @@ class LocalFetchParams
         $downloaded = is_string($params['downloaded'] ?? null) ? (string) $params['downloaded'] : 'any';
         $notFound = is_string($params['not_found'] ?? null) ? (string) $params['not_found'] : 'no';
         $blacklisted = is_string($params['blacklisted'] ?? null) ? (string) $params['blacklisted'] : 'any';
-        $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'downloaded_at';
+        $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'stored_at';
         $fileTypes = self::normalizeFileTypes($params['file_type'] ?? ['all']);
 
         $seedRaw = $params['seed'] ?? null;

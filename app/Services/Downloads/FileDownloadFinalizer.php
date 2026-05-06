@@ -6,6 +6,7 @@ use App\Models\File;
 use App\Services\FilePreviewService;
 use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Services\MetricsService;
+use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -13,7 +14,10 @@ use League\MimeTypeDetection\FinfoMimeTypeDetector;
 
 class FileDownloadFinalizer
 {
-    public function __construct(private readonly FileDownloadPreviewAssetGenerator $previewAssetGenerator) {}
+    public function __construct(
+        private readonly FileDownloadPreviewAssetGenerator $previewAssetGenerator,
+        private readonly AtlasStorage $appStorage,
+    ) {}
 
     /**
      * @return array{preview_path?: string, poster_path?: string}
@@ -52,9 +56,9 @@ class FileDownloadFinalizer
             ?? 'bin';
 
         $storedFilename = $this->resolveStoredFilename($file, $extension);
-        $hashForSegmentation = $this->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
+        $hashForSegmentation = $this->appStorage->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
 
-        $finalPath = $this->generateSegmentedPath('downloads', $storedFilename, $hashForSegmentation);
+        $finalPath = $this->appStorage->uniqueSegmentedPath($disk, AtlasStorage::DOWNLOADS, $storedFilename, $hashForSegmentation);
 
         if ($downloadedPath !== $finalPath) {
             $directory = dirname($finalPath);
@@ -147,26 +151,7 @@ class FileDownloadFinalizer
             return $this->generateStoredFilename($extension);
         }
 
-        $suffix = '.'.strtolower($extension);
-        if ($suffix !== '.' && str_ends_with(strtolower($baseFilename), $suffix)) {
-            return $baseFilename;
-        }
-
-        return $baseFilename.$suffix;
-    }
-
-    private function normalizeHash(?string $hash): ?string
-    {
-        if (! $hash) {
-            return null;
-        }
-
-        $hash = strtolower(trim($hash));
-        if ($hash === '') {
-            return null;
-        }
-
-        return preg_match('/^[a-f0-9]{4,}$/', $hash) === 1 ? $hash : null;
+        return $this->appStorage->storedFilename($baseFilename, $extension);
     }
 
     private function getExtensionFromUrl(string $url): ?string
@@ -245,13 +230,5 @@ class FileDownloadFinalizer
         }
 
         return $detector->lookupExtension($mimeType);
-    }
-
-    private function generateSegmentedPath(string $base, string $filename, string $hash): string
-    {
-        $subfolder1 = substr($hash, 0, 2);
-        $subfolder2 = substr($hash, 2, 2);
-
-        return "{$base}/{$subfolder1}/{$subfolder2}/{$filename}";
     }
 }

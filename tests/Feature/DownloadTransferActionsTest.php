@@ -83,7 +83,7 @@ it('resumes a paused transfer and requeues it', function () {
 
 it('resumes an eligible failed yt-dlp transfer without discarding temp state', function () {
     Bus::fake();
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -106,7 +106,7 @@ it('resumes an eligible failed yt-dlp transfer without discarding temp state', f
 
     $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
     $fragmentPath = $tmpDir.'/download.mp4.part-Frag35.part';
-    Storage::disk('atlas-app')->put($fragmentPath, 'partial-fragment');
+    Storage::disk('atlas')->put($fragmentPath, 'partial-fragment');
 
     $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/resume");
 
@@ -122,7 +122,7 @@ it('resumes an eligible failed yt-dlp transfer without discarding temp state', f
     expect($transfer->failed_at)->toBeNull();
     expect($file->download_progress)->toBe(61);
 
-    Storage::disk('atlas-app')->assertExists($fragmentPath);
+    Storage::disk('atlas')->assertExists($fragmentPath);
 
     Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'example.com');
 });
@@ -200,7 +200,7 @@ it('cancels an active transfer and clears progress', function () {
 });
 
 it('keeps active yt-dlp fragments on cancel until the running process exits', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -221,7 +221,7 @@ it('keeps active yt-dlp fragments on cancel until the running process exits', fu
 
     $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
     $fragmentPath = $tmpDir.'/download.mp4.part-Frag33.part';
-    Storage::disk('atlas-app')->put($fragmentPath, 'partial-fragment');
+    Storage::disk('atlas')->put($fragmentPath, 'partial-fragment');
     $lock = app(DownloadTransferExecutionLock::class)->acquireYtDlp($transfer->id, 30);
 
     $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/cancel");
@@ -233,7 +233,7 @@ it('keeps active yt-dlp fragments on cancel until the running process exits', fu
 
     expect($transfer->status)->toBe(DownloadTransferStatus::CANCELED);
     expect($file->download_progress)->toBe(0);
-    Storage::disk('atlas-app')->assertExists($fragmentPath);
+    Storage::disk('atlas')->assertExists($fragmentPath);
 
     $lock?->release();
 });
@@ -274,7 +274,7 @@ it('restarts a canceled transfer', function () {
 
 it('defers restarting yt-dlp until the superseded process releases the transfer lock', function () {
     Bus::fake();
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -295,7 +295,7 @@ it('defers restarting yt-dlp until the superseded process releases the transfer 
 
     $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
     $fragmentPath = $tmpDir.'/download.mp4.part-Frag33.part';
-    Storage::disk('atlas-app')->put($fragmentPath, 'partial-fragment');
+    Storage::disk('atlas')->put($fragmentPath, 'partial-fragment');
     $lock = app(DownloadTransferExecutionLock::class)->acquireYtDlp($transfer->id, 30);
 
     $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/restart");
@@ -311,7 +311,7 @@ it('defers restarting yt-dlp until the superseded process releases the transfer 
     expect($transfer->last_broadcast_percent)->toBe(0);
     expect($file->download_progress)->toBe(0);
 
-    Storage::disk('atlas-app')->assertExists($fragmentPath);
+    Storage::disk('atlas')->assertExists($fragmentPath);
     Bus::assertNotDispatched(PumpDomainDownloads::class);
 
     $lock?->release();

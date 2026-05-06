@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\GenerateFilePreviewAssets;
 use App\Models\File;
 use App\Support\AtlasPathResolver;
+use App\Support\AtlasStorage;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -55,7 +56,7 @@ class FileStorageResponseService
 
     public function hydrateDiskMetadata(File $file): void
     {
-        if (! $file->downloaded || ! $file->path) {
+        if ((! $file->downloaded && $file->imported_at === null) || ! $file->path) {
             return;
         }
 
@@ -116,7 +117,7 @@ class FileStorageResponseService
     public function servePreview(File $file)
     {
         if (! $file->preview_path || ! AtlasPathResolver::resolveExistingPath($file->preview_path)) {
-            $this->dispatchPreviewGeneration($file, Storage::disk(config('downloads.disk')));
+            $this->dispatchPreviewGeneration($file, Storage::disk(AtlasStorage::DISK));
             abort(404, 'File not found');
         }
 
@@ -228,7 +229,7 @@ class FileStorageResponseService
 
     private function dispatchPreviewGeneration(File $file, Filesystem $disk): void
     {
-        if (! $file->downloaded || ! $file->path) {
+        if ((! $file->downloaded && $file->imported_at === null) || ! $file->path) {
             return;
         }
 

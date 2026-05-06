@@ -65,14 +65,6 @@ return [
 
         'atlas' => [
             'driver' => 'local',
-            'root' => $atlasRoot,
-            'serve' => true,
-            'throw' => false,
-            'report' => false,
-        ],
-
-        'atlas-app' => [
-            'driver' => 'local',
             'root' => $atlasRoot.DIRECTORY_SEPARATOR.'.app',
             'serve' => true,
             'throw' => false,

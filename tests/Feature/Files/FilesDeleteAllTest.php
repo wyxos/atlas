@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
     Storage::fake('local');
 });
 
@@ -125,7 +125,7 @@ test('deleteAll empties atlas app storage', function () {
     $file = File::factory()->create();
 
     // Create files in atlas app storage
-    $atlasDisk = Storage::disk('atlas-app');
+    $atlasDisk = Storage::disk('atlas');
     $atlasDisk->put('test-file.txt', 'test content');
     $atlasDisk->put('subdir/another-file.txt', 'more content');
 

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\AtlasStorage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -53,8 +54,7 @@ class DeleteStoredFileJob implements ShouldQueue
         $diskNames = $this->diskNames !== []
             ? $this->diskNames
             : array_values(array_unique(array_filter([
-                (string) config('downloads.disk'),
-                'atlas',
+                AtlasStorage::DISK,
             ], static fn (mixed $diskName): bool => is_string($diskName) && $diskName !== '')));
 
         foreach ($diskNames as $diskName) {

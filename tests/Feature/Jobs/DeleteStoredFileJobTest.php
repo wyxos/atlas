@@ -8,18 +8,7 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    Storage::fake('atlas-app');
     Storage::fake('atlas');
-});
-
-test('deletes file from atlas-app disk', function () {
-    $filePath = 'downloads/ab/cd/test.jpg';
-    Storage::disk('atlas-app')->put($filePath, 'test content');
-
-    $job = new DeleteStoredFileJob($filePath);
-    $job->handle();
-
-    Storage::disk('atlas-app')->assertMissing($filePath);
 });
 
 test('deletes file from atlas disk', function () {
@@ -29,18 +18,6 @@ test('deletes file from atlas disk', function () {
     $job = new DeleteStoredFileJob($filePath);
     $job->handle();
 
-    Storage::disk('atlas')->assertMissing($filePath);
-});
-
-test('deletes file from both disks when present', function () {
-    $filePath = 'downloads/ab/cd/test.jpg';
-    Storage::disk('atlas-app')->put($filePath, 'test content');
-    Storage::disk('atlas')->put($filePath, 'test content');
-
-    $job = new DeleteStoredFileJob($filePath);
-    $job->handle();
-
-    Storage::disk('atlas-app')->assertMissing($filePath);
     Storage::disk('atlas')->assertMissing($filePath);
 });
 
@@ -88,12 +65,13 @@ test('uses custom disk names when provided', function () {
 test('continues to next disk if one fails', function () {
     Log::spy();
     $filePath = 'downloads/ab/cd/test.jpg';
-    Storage::disk('atlas')->put($filePath, 'test content');
+    Storage::fake('custom-disk');
+    Storage::disk('custom-disk')->put($filePath, 'test content');
 
     // First disk will fail (invalid), second should succeed
-    $job = new DeleteStoredFileJob($filePath, ['invalid-disk', 'atlas']);
+    $job = new DeleteStoredFileJob($filePath, ['invalid-disk', 'custom-disk']);
     $job->handle();
 
-    Storage::disk('atlas')->assertMissing($filePath);
+    Storage::disk('custom-disk')->assertMissing($filePath);
     Log::shouldHaveReceived('debug');
 });

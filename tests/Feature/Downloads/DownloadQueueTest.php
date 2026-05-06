@@ -150,7 +150,7 @@ test('progress broadcaster emits only at 5% boundaries and updates File.download
 
 test('assemble job concatenates chunk parts, finalizes file, and marks transfer completed', function () {
     Bus::fake();
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
     Event::fake([DownloadTransferProgressUpdated::class]);
 
     $file = File::factory()->create([
@@ -175,8 +175,8 @@ test('assemble job concatenates chunk parts, finalizes file, and marks transfer 
     $part0 = "{$tmpDir}/part-0.part";
     $part1 = "{$tmpDir}/part-1.part";
 
-    Storage::disk('atlas-app')->put($part0, 'abc');
-    Storage::disk('atlas-app')->put($part1, 'def');
+    Storage::disk('atlas')->put($part0, 'abc');
+    Storage::disk('atlas')->put($part1, 'def');
 
     DownloadChunk::query()->create([
         'download_transfer_id' => $transfer->id,
@@ -206,15 +206,15 @@ test('assemble job concatenates chunk parts, finalizes file, and marks transfer 
     expect($transfer->status)->toBe(DownloadTransferStatus::COMPLETED);
     expect($file->downloaded)->toBeTrue();
     expect($file->path)->toStartWith('downloads/');
-    Storage::disk('atlas-app')->assertExists($file->path);
-    expect(Storage::disk('atlas-app')->get($file->path))->toBe('abcdef');
+    Storage::disk('atlas')->assertExists($file->path);
+    expect(Storage::disk('atlas')->get($file->path))->toBe('abcdef');
 
     Event::assertDispatched(DownloadTransferProgressUpdated::class, fn (DownloadTransferProgressUpdated $event) => $event->downloadTransferId === $transfer->id && $event->percent === 100);
 });
 
 test('finalizer falls back when hash contains invalid path characters', function () {
-    Storage::fake('atlas-app');
-    config()->set('downloads.disk', 'atlas-app');
+    Storage::fake('atlas');
+    config()->set('downloads.disk', 'atlas');
 
     $file = File::factory()->create([
         'url' => 'https://example.com/test.jpg',
@@ -226,7 +226,7 @@ test('finalizer falls back when hash contains invalid path characters', function
     ]);
 
     $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
-    Storage::disk('atlas-app')->put($tmpPath, 'abc');
+    Storage::disk('atlas')->put($tmpPath, 'abc');
 
     app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
@@ -234,5 +234,5 @@ test('finalizer falls back when hash contains invalid path characters', function
 
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\/.+\.jpg$/');
     expect($file->path)->not()->toContain(':');
-    Storage::disk('atlas-app')->assertExists($file->path);
+    Storage::disk('atlas')->assertExists($file->path);
 });

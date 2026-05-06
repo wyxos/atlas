@@ -18,7 +18,7 @@ class LocalBrowseTypesenseGateway
      */
     public function search(array $context): array
     {
-        $sort = (string) ($context['sort'] ?? 'downloaded_at');
+        $sort = (string) ($context['sort'] ?? 'stored_at');
         $this->ensureAliasesAvailable($sort);
 
         $compiled = $this->compiler->compile($context, auth()->id(), $this->names->currentReactionJoinCollection());

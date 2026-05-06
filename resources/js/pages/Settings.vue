@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/PageLayout.vue';
+import LibraryScanSettings from '@/components/settings/LibraryScanSettings.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -236,7 +237,7 @@ async function handleResetApp(): Promise<void> {
         resetDialogOpen.value = false;
 
         // Redirect to home page
-        router.push('/');
+        await router.push('/');
     } catch (error) {
         console.error('Failed to reset app:', error);
         // Error is logged, user can try again
@@ -453,6 +454,8 @@ onMounted(() => {
                         Default extension domain: {{ extensionDefaultDomain }}.
                     </p>
                 </div>
+
+                <LibraryScanSettings />
 
                 <div class="border border-danger-500/30 rounded-lg p-6 bg-prussian-blue-700/50">
                     <h5 class="text-lg font-semibold text-danger-400 mb-2">Danger Zone</h5>

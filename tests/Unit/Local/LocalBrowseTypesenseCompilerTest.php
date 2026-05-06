@@ -17,7 +17,7 @@ test('compiler builds default browse query', function () {
     $compiled = $compiler->compile([
         'page' => 1,
         'limit' => 20,
-        'sort' => 'downloaded_at',
+        'sort' => 'stored_at',
         'fileTypes' => ['all'],
         'reactionMode' => 'any',
         'reactionTypes' => null,
@@ -29,7 +29,7 @@ test('compiler builds default browse query', function () {
     expect($compiled['mode'])->toBe('files')
         ->and($compiled['collection'])->toBe(app(LocalBrowseTypesenseNames::class)->filesAlias())
         ->and($compiled['options']['filter_by'])->toBe('not_found:=false')
-        ->and($compiled['options']['sort_by'])->toBe('downloaded_at:desc,updated_at:desc,sort_id:desc');
+        ->and($compiled['options']['sort_by'])->toBe('stored_at:desc,updated_at:desc,sort_id:desc');
 });
 
 test('compiler builds source downloaded file-type and random filters', function () {

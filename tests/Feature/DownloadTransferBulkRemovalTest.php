@@ -69,7 +69,7 @@ it('removes completed transfers in one request without touching other statuses',
 });
 
 it('removes completed transfers and deletes their files from disk while keeping Atlas file records by default', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $reactionUser = User::factory()->create();
@@ -85,8 +85,8 @@ it('removes completed transfers and deletes their files from disk while keeping 
         'user_id' => $reactionUser->id,
         'type' => 'like',
     ]);
-    Storage::disk('atlas-app')->put($file->path, 'video');
-    Storage::disk('atlas-app')->put($file->preview_path, 'preview');
+    Storage::disk('atlas')->put($file->path, 'video');
+    Storage::disk('atlas')->put($file->preview_path, 'preview');
 
     $transfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,
@@ -116,12 +116,12 @@ it('removes completed transfers and deletes their files from disk while keeping 
     expect($file->downloaded)->toBeFalse();
     expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeTrue();
 
-    Storage::disk('atlas-app')->assertMissing('downloads/completed-video.mp4');
-    Storage::disk('atlas-app')->assertMissing('thumbnails/completed-video.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/completed-video.mp4');
+    Storage::disk('atlas')->assertMissing('thumbnails/completed-video.jpg');
 });
 
 it('removes multiple transfers from disk in one bulk request while keeping Atlas file records by default', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $firstFile = File::factory()->create([
@@ -138,10 +138,10 @@ it('removes multiple transfers from disk in one bulk request while keeping Atlas
         'path' => 'downloads/second-video.mp4',
         'preview_path' => 'thumbnails/second-video.jpg',
     ]);
-    Storage::disk('atlas-app')->put($firstFile->path, 'video');
-    Storage::disk('atlas-app')->put($firstFile->preview_path, 'preview');
-    Storage::disk('atlas-app')->put($secondFile->path, 'video');
-    Storage::disk('atlas-app')->put($secondFile->preview_path, 'preview');
+    Storage::disk('atlas')->put($firstFile->path, 'video');
+    Storage::disk('atlas')->put($firstFile->preview_path, 'preview');
+    Storage::disk('atlas')->put($secondFile->path, 'video');
+    Storage::disk('atlas')->put($secondFile->preview_path, 'preview');
 
     $firstTransfer = DownloadTransfer::query()->create([
         'file_id' => $firstFile->id,
@@ -185,14 +185,14 @@ it('removes multiple transfers from disk in one bulk request while keeping Atlas
     expect($firstFile->downloaded)->toBeFalse();
     expect($secondFile->downloaded)->toBeFalse();
 
-    Storage::disk('atlas-app')->assertMissing('downloads/first-video.mp4');
-    Storage::disk('atlas-app')->assertMissing('thumbnails/first-video.jpg');
-    Storage::disk('atlas-app')->assertMissing('downloads/second-video.mp4');
-    Storage::disk('atlas-app')->assertMissing('thumbnails/second-video.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/first-video.mp4');
+    Storage::disk('atlas')->assertMissing('thumbnails/first-video.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/second-video.mp4');
+    Storage::disk('atlas')->assertMissing('thumbnails/second-video.jpg');
 });
 
 it('can delete Atlas file records and reactions during bulk delete from disk when requested', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $reactionUser = User::factory()->create();
@@ -208,8 +208,8 @@ it('can delete Atlas file records and reactions during bulk delete from disk whe
         'user_id' => $reactionUser->id,
         'type' => 'funny',
     ]);
-    Storage::disk('atlas-app')->put($file->path, 'video');
-    Storage::disk('atlas-app')->put($file->preview_path, 'preview');
+    Storage::disk('atlas')->put($file->path, 'video');
+    Storage::disk('atlas')->put($file->preview_path, 'preview');
 
     $firstTransfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,

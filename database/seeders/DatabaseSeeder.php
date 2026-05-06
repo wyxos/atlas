@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\File;
 use App\Models\Tab;
 use App\Models\User;
+use App\Support\AtlasStorage;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -43,7 +44,7 @@ class DatabaseSeeder extends Seeder
      */
     private function resetAppIfStorageNotEmpty(): void
     {
-        $atlasDisk = Storage::disk('atlas-app');
+        $atlasDisk = Storage::disk(AtlasStorage::DISK);
         $localDisk = Storage::disk('local');
 
         $hasAtlasDirectories = $atlasDisk->directories() !== [];

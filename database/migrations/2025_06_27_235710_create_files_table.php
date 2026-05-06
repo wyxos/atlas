@@ -41,6 +41,7 @@ return new class extends Migration
             $table->json('detail_metadata')->nullable();
             $table->boolean('downloaded')->default(false); // Downloaded to local/NAS
             $table->timestamp('downloaded_at')->nullable(); // When download completed
+            $table->timestamp('imported_at')->nullable(); // When imported from unmanaged library storage
             $table->integer('download_progress')->default(0); // % downloaded
             $table->timestamps();
 
@@ -49,6 +50,7 @@ return new class extends Migration
             $table->index('not_found');
             $table->index(['mime_type', 'size']); // Composite index for size calculations
             $table->index(['downloaded_at', 'updated_at', 'id'], 'files_downloaded_at_updated_at_id_idx');
+            $table->index(['imported_at', 'updated_at', 'id'], 'files_imported_at_updated_at_id_idx');
             $table->index(['created_at', 'id'], 'files_created_at_id_idx');
             $table->index(['updated_at', 'id'], 'files_updated_at_id_idx');
             $table->index(['blacklisted_at', 'updated_at', 'id'], 'files_blacklisted_at_updated_at_id_idx');

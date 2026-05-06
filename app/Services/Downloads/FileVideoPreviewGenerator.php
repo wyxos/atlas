@@ -33,7 +33,8 @@ class FileVideoPreviewGenerator
         ).",scale={$previewWidth}:-2";
 
         $directory = pathinfo($finalPath, PATHINFO_DIRNAME);
-        $filename = pathinfo($finalPath, PATHINFO_FILENAME);
+        $filename = basename($finalPath);
+        $filename = pathinfo($filename, PATHINFO_FILENAME);
         $previewPath = $directory.'/'.$filename.'.preview.mp4';
         $posterPath = $directory.'/'.$filename.'.poster.jpg';
 

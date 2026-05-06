@@ -55,6 +55,7 @@ export interface File {
     blacklist_rule?: { id: number; name: string } | null;
     downloaded: boolean;
     downloaded_at: string | null;
+    imported_at: string | null;
     download_progress: number;
     not_found: boolean;
     listing_metadata: Record<string, unknown> | null;

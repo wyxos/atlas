@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'disk' => 'atlas-app',
+    'disk' => 'atlas',
 
     'max_transfers_total' => (int) env('DOWNLOADS_MAX_TRANSFERS_TOTAL', 20),
 
@@ -20,6 +20,8 @@ return [
     'tmp_dir' => env('DOWNLOADS_TMP_DIR', 'downloads/.tmp'),
 
     'ffmpeg_path' => env('DOWNLOADS_FFMPEG_PATH', 'ffmpeg'),
+
+    'ffprobe_path' => env('DOWNLOADS_FFPROBE_PATH'),
 
     'ffmpeg_timeout_seconds' => (int) env('DOWNLOADS_FFMPEG_TIMEOUT_SECONDS', 120),
 

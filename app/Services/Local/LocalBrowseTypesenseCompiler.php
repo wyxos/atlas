@@ -17,7 +17,7 @@ class LocalBrowseTypesenseCompiler
     {
         $page = max(1, (int) ($context['page'] ?? 1));
         $limit = max(1, (int) ($context['limit'] ?? 20));
-        $sort = (string) ($context['sort'] ?? 'downloaded_at');
+        $sort = (string) ($context['sort'] ?? 'stored_at');
         $seed = isset($context['seed']) && is_numeric($context['seed']) ? (int) $context['seed'] : null;
 
         if ($sort === 'reaction_at' || $sort === 'reaction_at_asc') {
@@ -35,7 +35,7 @@ class LocalBrowseTypesenseCompiler
                 'page' => $page,
                 'per_page' => $limit,
                 'filter_by' => $this->compileFileFilter($context, $userId),
-                'sort_by' => $this->compileFileSort((string) ($context['sort'] ?? 'downloaded_at'), $seed),
+                'sort_by' => $this->compileFileSort((string) ($context['sort'] ?? 'stored_at'), $seed),
                 'include_fields' => 'id',
             ],
         ];
@@ -222,9 +222,12 @@ class LocalBrowseTypesenseCompiler
             'updated_at_asc' => 'updated_at:asc,sort_id:asc',
             'blacklisted_at' => 'blacklisted_at:desc,updated_at:desc,sort_id:desc',
             'blacklisted_at_asc' => 'blacklisted_at:asc,updated_at:asc,sort_id:asc',
+            'downloaded_at' => 'downloaded_at:desc,updated_at:desc,sort_id:desc',
             'downloaded_at_asc' => 'downloaded_at:asc,updated_at:asc,sort_id:asc',
+            'stored_at' => 'stored_at:desc,updated_at:desc,sort_id:desc',
+            'stored_at_asc' => 'stored_at:asc,updated_at:asc,sort_id:asc',
             'random' => '_rand('.($seed ?? time()).'):desc,sort_id:desc',
-            default => 'downloaded_at:desc,updated_at:desc,sort_id:desc',
+            default => 'stored_at:desc,updated_at:desc,sort_id:desc',
         };
     }
 

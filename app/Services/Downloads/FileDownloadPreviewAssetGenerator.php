@@ -4,6 +4,7 @@ namespace App\Services\Downloads;
 
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,7 @@ class FileDownloadPreviewAssetGenerator
     public function __construct(
         private readonly FileThumbnailMemoryGuard $memoryGuard,
         private readonly FileVideoPreviewGenerator $videoPreviewGenerator,
+        private readonly AtlasStorage $appStorage,
     ) {}
 
     /**
@@ -25,7 +27,7 @@ class FileDownloadPreviewAssetGenerator
             return [];
         }
 
-        $disk = Storage::disk(config('downloads.disk'));
+        $disk = Storage::disk(AtlasStorage::DISK);
 
         if (! $disk->exists($file->path)) {
             return [];
@@ -38,7 +40,7 @@ class FileDownloadPreviewAssetGenerator
 
         if ($this->isImageMimeType($mimeType) && ! $file->preview_path) {
             $storedFilename = basename($file->path);
-            $hashForSegmentation = $this->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
+            $hashForSegmentation = $this->appStorage->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
 
             $this->persistImageDimensions($file, $absolutePath);
             $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
@@ -70,7 +72,7 @@ class FileDownloadPreviewAssetGenerator
             return [];
         }
 
-        $disk = Storage::disk(config('downloads.disk'));
+        $disk = Storage::disk(AtlasStorage::DISK);
         if (! $disk->exists($file->path)) {
             return [];
         }
@@ -143,28 +145,6 @@ class FileDownloadPreviewAssetGenerator
         return $mimeType && $mimeType !== 'application/octet-stream' ? $mimeType : null;
     }
 
-    private function normalizeHash(?string $hash): ?string
-    {
-        if (! $hash) {
-            return null;
-        }
-
-        $hash = strtolower(trim($hash));
-        if ($hash === '') {
-            return null;
-        }
-
-        return preg_match('/^[a-f0-9]{4,}$/', $hash) === 1 ? $hash : null;
-    }
-
-    private function generateSegmentedPath(string $base, string $filename, string $hash): string
-    {
-        $subfolder1 = substr($hash, 0, 2);
-        $subfolder2 = substr($hash, 2, 2);
-
-        return "{$base}/{$subfolder1}/{$subfolder2}/{$filename}";
-    }
-
     private function isImageMimeType(?string $mimeType): bool
     {
         if (! $mimeType) {
@@ -201,7 +181,7 @@ class FileDownloadPreviewAssetGenerator
         $imageType = $this->detectImageType($absolutePath);
         $thumbnailExtension = $this->resolveThumbnailOutputExtension($imageType);
         $thumbnailFilename = pathinfo($filename, PATHINFO_FILENAME).'_thumb.'.$thumbnailExtension;
-        $thumbnailPath = $this->generateSegmentedPath('thumbnails', $thumbnailFilename, $hash);
+        $thumbnailPath = 'thumbnails/'.substr($hash, 0, 2).'/'.substr($hash, 2, 2)."/{$thumbnailFilename}";
 
         $thumbnailDirectory = dirname($thumbnailPath);
         if (! $disk->exists($thumbnailDirectory)) {

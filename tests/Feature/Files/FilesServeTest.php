@@ -149,41 +149,17 @@ test('guest cannot serve files', function () {
     $response->assertRedirect('/login');
 });
 
-test('serve falls back to atlas disk when atlas-app does not contain the local file', function () {
-    Storage::fake('atlas-app');
+test('serve returns imported files from atlas storage', function () {
     Storage::fake('atlas');
 
     $admin = User::factory()->admin()->create();
-    $filePath = '0000 - Downloads/audio/fallback-track.mp3';
-    Storage::disk('atlas')->put($filePath, 'atlas-fallback-content');
+    $filePath = 'imports/aa/bb/imported-track.mp3';
+    Storage::disk('atlas')->put($filePath, 'atlas-imported-content');
 
     $file = File::factory()->create([
         'path' => $filePath,
         'downloaded' => false,
-        'source' => 'local',
-        'mime_type' => 'audio/mpeg',
-    ]);
-
-    $response = $this->actingAs($admin)
-        ->withHeader('Range', 'bytes=0-4')
-        ->get("/api/files/{$file->id}/serve");
-
-    $response->assertStatus(206);
-    expect($response->streamedContent())->toBe('atlas');
-});
-
-test('serve prefers atlas-app before atlas when the file exists on both disks', function () {
-    Storage::fake('atlas-app');
-    Storage::fake('atlas');
-
-    $admin = User::factory()->admin()->create();
-    $filePath = '0000 - Downloads/audio/preferred-track.mp3';
-    Storage::disk('atlas-app')->put($filePath, 'atlas-app-content');
-    Storage::disk('atlas')->put($filePath, 'atlas-root-content');
-
-    $file = File::factory()->create([
-        'path' => $filePath,
-        'downloaded' => false,
+        'imported_at' => now(),
         'source' => 'local',
         'mime_type' => 'audio/mpeg',
     ]);
@@ -193,5 +169,5 @@ test('serve prefers atlas-app before atlas when the file exists on both disks', 
         ->get("/api/files/{$file->id}/serve");
 
     $response->assertStatus(206);
-    expect($response->streamedContent())->toBe('atlas-app');
+    expect($response->streamedContent())->toBe('atlas-imp');
 });

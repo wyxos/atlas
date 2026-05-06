@@ -68,6 +68,20 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.services.spotify.refresh');
     Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])
         ->name('api.settings.services.spotify.disconnect');
+    Route::get('/api/settings/library-scans', [\App\Http\Controllers\LibraryScanController::class, 'index'])
+        ->name('api.settings.library-scans.index');
+    Route::post('/api/settings/library-scans', [\App\Http\Controllers\LibraryScanController::class, 'store'])
+        ->name('api.settings.library-scans.store');
+    Route::get('/api/settings/library-scans/{libraryScanRun}', [\App\Http\Controllers\LibraryScanController::class, 'show'])
+        ->name('api.settings.library-scans.show');
+    Route::post('/api/settings/library-scans/{libraryScanRun}/pause', [\App\Http\Controllers\LibraryScanController::class, 'pause'])
+        ->name('api.settings.library-scans.pause');
+    Route::post('/api/settings/library-scans/{libraryScanRun}/resume', [\App\Http\Controllers\LibraryScanController::class, 'resume'])
+        ->name('api.settings.library-scans.resume');
+    Route::post('/api/settings/library-scans/{libraryScanRun}/cancel', [\App\Http\Controllers\LibraryScanController::class, 'cancel'])
+        ->name('api.settings.library-scans.cancel');
+    Route::post('/api/settings/library-scans/{libraryScanRun}/restart', [\App\Http\Controllers\LibraryScanController::class, 'restart'])
+        ->name('api.settings.library-scans.restart');
     Route::get('/settings/browser-extension/download', [\App\Http\Controllers\BrowserExtensionDownloadController::class, 'download'])
         ->name('settings.browser-extension.download');
 

@@ -7,4 +7,5 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 });
 
 Broadcast::channel('downloads', fn ($user) => $user !== null);
+Broadcast::channel('library-scans', fn ($user) => $user !== null);
 Broadcast::channel('extension-downloads.{id}', fn () => false);

@@ -191,6 +191,7 @@ class FileResource extends JsonResource
             'blacklist_rule' => $blacklistRule,
             'downloaded' => $this->downloaded,
             'downloaded_at' => $this->downloaded_at?->toIso8601String(),
+            'imported_at' => $this->imported_at?->toIso8601String(),
             'download_progress' => $this->download_progress,
             'not_found' => $this->not_found,
             'listing_metadata' => $listingMetadata,

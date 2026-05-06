@@ -63,8 +63,7 @@ it('deletes local assets but keeps the file record by default when requested', f
     Storage::disk(config('downloads.disk'))->assertMissing('posters/deletable.jpg');
 });
 
-it('deletes local source files from atlas disk when requested', function () {
-    Storage::fake('atlas-app');
+it('deletes imported local source files from atlas disk when requested', function () {
     Storage::fake('atlas');
 
     $user = User::factory()->create();
@@ -73,7 +72,8 @@ it('deletes local source files from atlas disk when requested', function () {
         'filename' => 'local-track.mp3',
         'source' => 'local',
         'downloaded' => false,
-        'path' => '0000 - Downloads/audio/local-track.mp3',
+        'imported_at' => now(),
+        'path' => 'imports/aa/bb/local-track.mp3',
         'mime_type' => 'audio/mpeg',
     ]);
 
@@ -96,7 +96,7 @@ it('deletes local source files from atlas disk when requested', function () {
         ->and($file->preview_path)->toBeNull()
         ->and($file->poster_path)->toBeNull();
 
-    Storage::disk('atlas')->assertMissing('0000 - Downloads/audio/local-track.mp3');
+    Storage::disk('atlas')->assertMissing('imports/aa/bb/local-track.mp3');
 });
 
 it('can delete the local assets and the file record together', function () {

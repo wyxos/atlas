@@ -63,6 +63,7 @@ class File extends Model
         'detail_metadata',
         'downloaded',
         'downloaded_at',
+        'imported_at',
         'download_progress',
         'auto_blacklisted',
     ];
@@ -80,6 +81,7 @@ class File extends Model
             'seen_at' => 'datetime',
             'blacklisted_at' => 'datetime',
             'downloaded_at' => 'datetime',
+            'imported_at' => 'datetime',
             'not_found' => 'boolean',
             'downloaded' => 'boolean',
             'auto_blacklisted' => 'boolean',

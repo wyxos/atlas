@@ -10,7 +10,6 @@ use Tests\TestCase;
 uses(TestCase::class);
 
 beforeEach(function () {
-    Storage::fake('atlas-app');
     Storage::fake('atlas');
 });
 
@@ -88,13 +87,14 @@ it('prefers downloaded and preview file routes for downloaded files', function (
         ->and($data['preview_url'])->toBe("/api/files/{$file->id}/preview");
 });
 
-it('resolves local file absolute path from atlas when atlas-app does not contain the file', function () {
-    $path = '0000 - Downloads/audio/local-track.mp3';
+it('resolves imported local file absolute path from atlas storage', function () {
+    $path = 'imports/aa/bb/local-track.mp3';
     Storage::disk('atlas')->put($path, 'atlas-track');
 
     $file = resourceFile([
         'path' => $path,
         'downloaded' => false,
+        'imported_at' => now(),
         'source' => 'local',
         'mime_type' => 'audio/mpeg',
     ]);
@@ -102,21 +102,4 @@ it('resolves local file absolute path from atlas when atlas-app does not contain
     $data = FileResource::make($file)->toArray(Request::create('https://atlas.test/files'));
 
     expect($data['absolute_path'])->toBe(realpath(Storage::disk('atlas')->path($path)));
-});
-
-it('prefers atlas-app absolute path before atlas when the file exists on both disks', function () {
-    $path = '0000 - Downloads/audio/local-track.mp3';
-    Storage::disk('atlas-app')->put($path, 'atlas-app-track');
-    Storage::disk('atlas')->put($path, 'atlas-track');
-
-    $file = resourceFile([
-        'path' => $path,
-        'downloaded' => false,
-        'source' => 'local',
-        'mime_type' => 'audio/mpeg',
-    ]);
-
-    $data = FileResource::make($file)->toArray(Request::create('https://atlas.test/files'));
-
-    expect($data['absolute_path'])->toBe(realpath(Storage::disk('atlas-app')->path($path)));
 });

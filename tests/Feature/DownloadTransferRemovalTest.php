@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 it('removes a transfer and deletes the file from disk while keeping the Atlas file record by default', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -27,8 +27,8 @@ it('removes a transfer and deletes the file from disk while keeping the Atlas fi
         'preview_path' => 'thumbnails/aa/bb/test_thumb.jpg',
     ]);
     File::query()->whereKey($file->id)->update(['download_progress' => 100]);
-    Storage::disk('atlas-app')->put($file->path, 'file');
-    Storage::disk('atlas-app')->put($file->preview_path, 'thumb');
+    Storage::disk('atlas')->put($file->path, 'file');
+    Storage::disk('atlas')->put($file->preview_path, 'thumb');
 
     $transfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,
@@ -52,12 +52,12 @@ it('removes a transfer and deletes the file from disk while keeping the Atlas fi
     expect($file->preview_path)->toBeNull();
     expect($file->downloaded)->toBeFalse();
 
-    Storage::disk('atlas-app')->assertMissing('downloads/aa/bb/test.jpg');
-    Storage::disk('atlas-app')->assertMissing('thumbnails/aa/bb/test_thumb.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/aa/bb/test.jpg');
+    Storage::disk('atlas')->assertMissing('thumbnails/aa/bb/test_thumb.jpg');
 });
 
 it('deletes the file record and cascaded transfers when requested while removing a downloaded file from disk', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $reactionUser = User::factory()->create();
@@ -73,8 +73,8 @@ it('deletes the file record and cascaded transfers when requested while removing
         'user_id' => $reactionUser->id,
         'type' => 'love',
     ]);
-    Storage::disk('atlas-app')->put($file->path, 'file');
-    Storage::disk('atlas-app')->put($file->preview_path, 'thumb');
+    Storage::disk('atlas')->put($file->path, 'file');
+    Storage::disk('atlas')->put($file->preview_path, 'thumb');
 
     $firstTransfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,
@@ -112,12 +112,12 @@ it('deletes the file record and cascaded transfers when requested while removing
     expect(File::query()->whereKey($file->id)->exists())->toBeFalse();
     expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
 
-    Storage::disk('atlas-app')->assertMissing('downloads/cascade.jpg');
-    Storage::disk('atlas-app')->assertMissing('thumbnails/cascade.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/cascade.jpg');
+    Storage::disk('atlas')->assertMissing('thumbnails/cascade.jpg');
 });
 
 it('keeps reactions and the file record when deleting a non-downloaded file from disk by default', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $user = User::factory()->create();
     $reactionUser = User::factory()->create();
@@ -133,8 +133,8 @@ it('keeps reactions and the file record when deleting a non-downloaded file from
         'user_id' => $reactionUser->id,
         'type' => 'like',
     ]);
-    Storage::disk('atlas-app')->put($file->path, 'file');
-    Storage::disk('atlas-app')->put($file->preview_path, 'thumb');
+    Storage::disk('atlas')->put($file->path, 'file');
+    Storage::disk('atlas')->put($file->preview_path, 'thumb');
 
     $transfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,
@@ -163,12 +163,12 @@ it('keeps reactions and the file record when deleting a non-downloaded file from
     expect($file->preview_path)->toBeNull();
     expect($file->downloaded)->toBeFalse();
 
-    Storage::disk('atlas-app')->assertMissing('downloads/pending.jpg');
-    Storage::disk('atlas-app')->assertMissing('thumbnails/pending.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/pending.jpg');
+    Storage::disk('atlas')->assertMissing('thumbnails/pending.jpg');
 });
 
 it('removes an active transfer from disk even when the temp directory and stored files are already missing', function () {
-    Storage::fake('atlas-app');
+    Storage::fake('atlas');
 
     $file = File::factory()->create([
         'url' => 'https://example.com/missing-active.bin',

@@ -106,7 +106,7 @@ class BrowseController extends Controller
                         'not_found' => 'no',
                         'blacklisted' => 'any',
                         'auto_blacklisted' => 'any',
-                        'sort' => 'downloaded_at',
+                        'sort' => 'stored_at',
                         'seed' => null,
                         'max_previewed_count' => null,
                     ],
@@ -205,6 +205,8 @@ class BrowseController extends Controller
                             'type' => 'select',
                             'description' => 'Sort local results.',
                             'options' => [
+                                ['label' => 'Stored At', 'value' => 'stored_at'],
+                                ['label' => 'Stored At (Oldest)', 'value' => 'stored_at_asc'],
                                 ['label' => 'Downloaded At', 'value' => 'downloaded_at'],
                                 ['label' => 'Downloaded At (Oldest)', 'value' => 'downloaded_at_asc'],
                                 ['label' => 'Created At', 'value' => 'created_at'],
@@ -217,7 +219,7 @@ class BrowseController extends Controller
                                 ['label' => 'Reaction Timestamp (Oldest)', 'value' => 'reaction_at_asc'],
                                 ['label' => 'Random', 'value' => 'random'],
                             ],
-                            'default' => 'downloaded_at',
+                            'default' => 'stored_at',
                         ]),
                         $localSchema->field('seed', [
                             'type' => 'number',
