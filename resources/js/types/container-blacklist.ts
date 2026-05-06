@@ -36,4 +36,5 @@ export interface CreateContainerBlacklistPayload {
     container_id: number;
     action_type: ContainerBlacklistActionType;
     blacklist_previewed_count_mode?: ContainerBlacklistPreviewedCountMode;
+    current_file_ids?: number[];
 }

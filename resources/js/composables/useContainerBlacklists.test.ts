@@ -128,6 +128,31 @@ describe('useContainerBlacklists', () => {
         });
     });
 
+    it('creates container blacklist with current grid file ids', async () => {
+        const mockContainer = {
+            id: 1,
+            type: 'User',
+            source: 'CivitAI',
+            source_id: '123',
+            action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
+            blacklisted_at: '2024-01-15T10:00:00Z',
+        };
+
+        mockAxios.post.mockResolvedValue({ data: mockContainer });
+
+        const { createBlacklist } = useContainerBlacklists();
+
+        await createBlacklist(1, 'blacklist', 'preserve', [12, 15]);
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/container-blacklists', {
+            container_id: 1,
+            action_type: 'blacklist',
+            blacklist_previewed_count_mode: 'preserve',
+            current_file_ids: [12, 15],
+        });
+    });
+
     it('updates existing blacklist when creating', async () => {
         const existing = {
             id: 1,

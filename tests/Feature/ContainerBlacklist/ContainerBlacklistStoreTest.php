@@ -116,6 +116,42 @@ test('container blacklist can set attached files to feed removed preview count',
     expect($matchedFile->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
 });
 
+test('container blacklist forces currently loaded attached files to feed removed count', function () {
+    $user = User::factory()->create();
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+    ]);
+
+    $loadedFile = File::factory()->create([
+        'blacklisted_at' => null,
+        'previewed_count' => 4,
+    ]);
+    $otherAttachedFile = File::factory()->create([
+        'blacklisted_at' => null,
+        'previewed_count' => 7,
+    ]);
+    $unattachedFile = File::factory()->create([
+        'blacklisted_at' => null,
+        'previewed_count' => 9,
+    ]);
+    $loadedFile->containers()->attach($container->id);
+    $otherAttachedFile->containers()->attach($container->id);
+
+    $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
+        'container_id' => $container->id,
+        'action_type' => 'blacklist',
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
+        'current_file_ids' => [$loadedFile->id],
+    ]);
+
+    $response->assertStatus(201);
+
+    expect($loadedFile->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
+    expect($otherAttachedFile->fresh()->previewed_count)->toBe(7);
+    expect($unattachedFile->fresh()->previewed_count)->toBe(9);
+});
+
 test('validates container_id is required', function () {
     $user = User::factory()->create();
 

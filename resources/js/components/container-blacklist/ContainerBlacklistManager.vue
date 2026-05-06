@@ -51,6 +51,7 @@ const containerToBlacklist = ref<{
     type: string;
     source: string;
     source_id: string;
+    currentFileIds?: number[];
     referrer?: string | null;
 } | null>(null);
 
@@ -71,6 +72,7 @@ async function openBlacklistDialog(container: {
     type: string;
     source: string;
     source_id: string;
+    currentFileIds?: number[];
     referrer?: string | null;
 }): Promise<void> {
     containerToBlacklist.value = container;
@@ -86,12 +88,13 @@ async function openBlacklistDialog(container: {
 async function handleConfirmBlacklist(
     containerId: number,
     actionType: ContainerBlacklistActionType,
-    previewedCountMode: ContainerBlacklistPreviewedCountMode
+    previewedCountMode: ContainerBlacklistPreviewedCountMode,
+    currentFileIds: number[]
 ): Promise<void> {
     isSaving.value = true;
 
     try {
-        const created = await createBlacklist(containerId, actionType, previewedCountMode);
+        const created = await createBlacklist(containerId, actionType, previewedCountMode, currentFileIds);
         if (created) {
             isBlacklistDialogOpen.value = false;
             containerToBlacklist.value = null;

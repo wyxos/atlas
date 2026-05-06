@@ -38,6 +38,8 @@ class ContainerBlacklistController extends Controller
             'container_id' => ['required', 'integer', 'exists:containers,id'],
             'action_type' => ['required', 'string', 'in:blacklist'],
             'blacklist_previewed_count_mode' => ['nullable', 'string', 'in:preserve,feed_removed'],
+            'current_file_ids' => ['sometimes', 'array'],
+            'current_file_ids.*' => ['integer', 'distinct'],
         ]);
 
         $container = Container::findOrFail($validated['container_id']);
@@ -61,7 +63,11 @@ class ContainerBlacklistController extends Controller
         ]);
 
         $userId = auth()->id();
-        app(ContainerBlacklistService::class)->apply($container, is_int($userId) ? $userId : null);
+        app(ContainerBlacklistService::class)->apply(
+            $container,
+            is_int($userId) ? $userId : null,
+            forceFeedRemovedFileIds: $validated['current_file_ids'] ?? [],
+        );
 
         if (! $wasBlacklisted) {
             app(MetricsService::class)->incrementMetric(MetricsService::KEY_CONTAINERS_BLACKLISTED, 1);

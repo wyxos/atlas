@@ -11,6 +11,7 @@ type ContainerBlacklistDialogTarget = {
     type: string;
     source: string;
     source_id: string;
+    currentFileIds?: number[];
     referrer?: string | null;
 };
 
@@ -119,6 +120,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
                 type: container.type,
                 source: container.source,
                 source_id: container.source_id,
+                currentFileIds: getVisibleSiblingItems(container.id).map((item) => item.id),
                 referrer: container.referrer,
             });
         }

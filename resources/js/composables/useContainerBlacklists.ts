@@ -42,7 +42,8 @@ export function useContainerBlacklists() {
     async function createBlacklist(
         containerId: number,
         actionType: ContainerBlacklist['action_type'],
-        previewedCountMode: ContainerBlacklistPreviewedCountMode = 'preserve'
+        previewedCountMode: ContainerBlacklistPreviewedCountMode = 'preserve',
+        currentFileIds: number[] = []
     ): Promise<ContainerBlacklist | null> {
         if (!actionType) {
             return null;
@@ -57,6 +58,10 @@ export function useContainerBlacklists() {
                 action_type: actionType,
                 blacklist_previewed_count_mode: previewedCountMode,
             };
+
+            if (currentFileIds.length > 0) {
+                payload.current_file_ids = currentFileIds;
+            }
 
             const { data: created } = await window.axios.post<ContainerBlacklist>('/api/container-blacklists', payload);
 

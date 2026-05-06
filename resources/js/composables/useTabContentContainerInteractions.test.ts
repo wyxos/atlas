@@ -19,6 +19,15 @@ function createItem(id: number, containers: Array<{ id: number; type: string }>)
     } as FeedItem;
 }
 
+function createCivitAiUserContainer(id: number) {
+    return {
+        id,
+        type: 'User',
+        source: 'CivitAI',
+        source_id: String(id),
+    };
+}
+
 function createEvent(overrides: Partial<MouseEvent> = {}): MouseEvent {
     return {
         button: 0,
@@ -236,6 +245,25 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.sheet.derived.items.value).toEqual([]);
 
         vi.useRealTimers();
+    });
+
+    it('passes current sibling ids when opening the container blacklist dialog', () => {
+        const container = createCivitAiUserContainer(10);
+        const interactions = createSubject([
+            createItem(1, [container]),
+            createItem(2, [container]),
+            createItem(3, [createCivitAiUserContainer(20)]),
+        ]);
+        const openBlacklistDialog = vi.fn();
+        interactions.managerRef.value = { openBlacklistDialog };
+
+        interactions.pillHandlers.onDismiss(container);
+
+        expect(openBlacklistDialog).toHaveBeenCalledWith({
+            ...container,
+            currentFileIds: [1, 2],
+            referrer: undefined,
+        });
     });
 
     it('keeps the same sheet open when clicking the same pill again', () => {

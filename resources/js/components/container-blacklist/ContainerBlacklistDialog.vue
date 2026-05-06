@@ -24,6 +24,7 @@ interface Props {
         type: string;
         source: string;
         source_id: string;
+        currentFileIds?: number[];
         referrer?: string | null;
     } | null;
     open: boolean;
@@ -36,7 +37,8 @@ const emit = defineEmits<{
     'confirm': [
         containerId: number,
         actionType: ContainerBlacklistActionType,
-        previewedCountMode: ContainerBlacklistPreviewedCountMode
+        previewedCountMode: ContainerBlacklistPreviewedCountMode,
+        currentFileIds: number[]
     ];
     'blacklist-changed': [];
 }>();
@@ -119,7 +121,7 @@ async function handleConfirm(): Promise<void> {
     }
 
     isSaving.value = true;
-    emit('confirm', props.container.id, actionType.value, previewedCountMode.value);
+    emit('confirm', props.container.id, actionType.value, previewedCountMode.value, props.container.currentFileIds ?? []);
     // Note: isSaving will be reset by parent component after API call completes, but also reset when dialog reopens
 }
 

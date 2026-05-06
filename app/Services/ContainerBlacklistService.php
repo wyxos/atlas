@@ -12,7 +12,7 @@ class ContainerBlacklistService
      *
      * @return array<int>
      */
-    public function apply(Container $container, ?int $userId = null): array
+    public function apply(Container $container, ?int $userId = null, array $forceFeedRemovedFileIds = []): array
     {
         if ($container->blacklisted_at === null) {
             return [];
@@ -37,11 +37,38 @@ class ContainerBlacklistService
             ? FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
             : null;
 
-        return app(FileBlacklistService::class)->apply(
-            $files,
-            $userId,
-            minimumPreviewedCount: $minimumPreviewedCount,
-            autoBlacklisted: true,
-        );
+        $forceFeedRemovedIdLookup = collect($forceFeedRemovedFileIds)
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->unique()
+            ->flip();
+        $blacklistService = app(FileBlacklistService::class);
+        $blacklistedFileIds = [];
+
+        foreach ([
+            [
+                'files' => $files->filter(fn ($file): bool => $forceFeedRemovedIdLookup->has((int) $file->id)),
+                'minimumPreviewedCount' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+            ],
+            [
+                'files' => $files->reject(fn ($file): bool => $forceFeedRemovedIdLookup->has((int) $file->id)),
+                'minimumPreviewedCount' => $minimumPreviewedCount,
+            ],
+        ] as $group) {
+            if ($group['files']->isEmpty()) {
+                continue;
+            }
+
+            array_push(
+                $blacklistedFileIds,
+                ...$blacklistService->apply(
+                    $group['files'],
+                    $userId,
+                    minimumPreviewedCount: $group['minimumPreviewedCount'],
+                    autoBlacklisted: true,
+                ),
+            );
+        }
+
+        return array_values(array_unique($blacklistedFileIds));
     }
 }

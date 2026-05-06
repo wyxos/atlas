@@ -14,6 +14,7 @@ import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
 import type { ReactionType } from '@/types/reaction';
+import { shouldCloseContainerSheetForEscape, shouldExitFullscreenForMediaBarEscape } from '@/lib/vibeMediaBarEscape';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -172,6 +173,30 @@ function getFullscreenReactionPositionClasses(item: VibeViewerItem): string {
     return 'bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)]';
 }
 
+function handleFullscreenMediaBarEscape(event: KeyboardEvent): void {
+    if (!shouldExitFullscreenForMediaBarEscape(event, props.surfaceMode)) {
+        return;
+    }
+
+    event.preventDefault();
+    props.updateSurfaceMode('list');
+}
+
+function handleContainerSheetEscape(event: KeyboardEvent): void {
+    if (
+        !shouldCloseContainerSheetForEscape(
+            event,
+            props.containerInteractions.sheet.state.isOpen.value,
+        )
+    ) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    props.containerInteractions.sheet.actions.close();
+}
+
 const vibeLayoutBindings = computed(() => ({
     activeIndex: props.activeIndex,
     emptyStateMode: 'hidden' as const,
@@ -190,10 +215,17 @@ const vibeLayoutBindings = computed(() => ({
 useEventListener(document, 'pointermove', (event) => {
     props.containerInteractions.drawer.actions.syncHoverTarget?.(event.target);
 });
+
+useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true });
+
 </script>
 
 <template>
-    <div v-if="tab" class="relative flex h-full min-h-0 flex-col overflow-hidden">
+    <div
+        v-if="tab"
+        class="relative flex h-full min-h-0 flex-col overflow-hidden"
+        @keydown.capture="handleFullscreenMediaBarEscape"
+    >
         <TabContentServiceHeader
             v-if="!shouldShowForm"
             :form="form"
