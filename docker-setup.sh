@@ -45,7 +45,7 @@ docker-compose exec -T php php artisan migrate --force
 
 # Create admin user (if not exists)
 echo "Setting up admin user..."
-docker-compose exec -T php php artisan app:setup --no-interaction || echo "Admin user setup completed or already exists"
+docker-compose exec -T php php artisan app:setup --name=Admin --email=demo@atlas.test --generate-password --no-interaction || echo "Admin user setup completed or already exists"
 
 # Display service status
 echo ""

@@ -40,7 +40,7 @@ Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-passw
         return implode('', $password);
     };
 
-    $name = (string) ($this->option('name') ?: $this->ask('Name'));
+    $name = (string) ($this->option('name') ?: ($this->input->isInteractive() ? $this->ask('Name') : ''));
     while (true) {
         $validator = Validator::make(
             ['name' => $name],
@@ -52,10 +52,15 @@ Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-passw
         }
 
         $this->error($validator->errors()->first('name'));
+
+        if (! $this->input->isInteractive()) {
+            return 1;
+        }
+
         $name = (string) $this->ask('Name');
     }
 
-    $email = (string) ($this->option('email') ?: $this->ask('Email'));
+    $email = (string) ($this->option('email') ?: ($this->input->isInteractive() ? $this->ask('Email') : ''));
     while (true) {
         $validator = Validator::make(
             ['email' => $email],
@@ -68,6 +73,11 @@ Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-passw
         }
 
         $this->error($validator->errors()->first('email'));
+
+        if (! $this->input->isInteractive()) {
+            return 1;
+        }
+
         $email = (string) $this->ask('Email');
     }
 
@@ -77,21 +87,41 @@ Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-passw
         ->numbers()
         ->symbols();
 
+    $passwordProvidedViaOption = (bool) $this->option('password');
     $password = (string) ($this->option('password') ?? '');
 
     if ($this->option('generate-password')) {
-        $password = '';
-    }
-
-    if ($password === '') {
-        $password = (string) $this->secret('Password (leave blank to generate a secure one)');
-    }
-
-    if ($password === '') {
         $password = $generatePassword();
         $this->warn('Generated password (store this now; it will not be shown again):');
         $this->line($password);
-    } else {
+    } elseif ($password === '') {
+        if (! $this->input->isInteractive()) {
+            $this->error('Password is required in non-interactive mode. Use --password= or --generate-password.');
+
+            return 1;
+        }
+
+        $password = (string) $this->secret('Password (leave blank to generate a secure one)');
+
+        if ($password === '') {
+            $password = $generatePassword();
+            $this->warn('Generated password (store this now; it will not be shown again):');
+            $this->line($password);
+        }
+    }
+
+    if ($passwordProvidedViaOption) {
+        $validator = Validator::make(
+            ['password' => $password],
+            ['password' => ['required', 'string', $passwordRule]],
+        );
+
+        if ($validator->fails()) {
+            $this->error($validator->errors()->first('password'));
+
+            return 1;
+        }
+    } elseif ($this->input->isInteractive() && ! $this->option('generate-password') && $password !== '') {
         while (true) {
             $confirm = (string) $this->secret('Confirm password');
 
