@@ -14,6 +14,11 @@ services:
       - mariadb
       - redis
       - typesense
+    environment:
+      - TYPESENSE_HOST=typesense
+      - TYPESENSE_PORT=8108
+      - TYPESENSE_PROTOCOL=http
+      - TYPESENSE_API_KEY=xyz
 
   nginx:
     image: nginx:alpine
@@ -96,6 +101,8 @@ services:
     container_name: atlas-reverb
     restart: unless-stopped
     command: php artisan reverb:start
+    env_file:
+      - .env.docker
     volumes:
       - ./:/var/www/html
     networks:
@@ -103,32 +110,6 @@ services:
     depends_on:
       - php
       - redis
-    environment:
-      - APP_NAME=Laravel
-      - APP_ENV=local
-      - APP_KEY=
-      - APP_DEBUG=true
-      - APP_URL=http://localhost:8080
-      - BROADCAST_CONNECTION=reverb
-      - REDIS_HOST=redis
-      - REDIS_PASSWORD=null
-      - REDIS_PORT=6379
-      - REVERB_APP_ID=1001
-      - REVERB_APP_KEY=laravel-herd
-      - REVERB_APP_SECRET=secret
-      - REVERB_HOST=reverb
-      - REVERB_PORT=8080
-      - REVERB_SCHEME=http
-      - DB_CONNECTION=mariadb
-      - DB_HOST=mariadb
-      - DB_PORT=3306
-      - DB_DATABASE=laravel
-      - DB_USERNAME=root
-      - DB_PASSWORD=
-      - TYPESENSE_API_KEY=xyz
-      - TYPESENSE_HOST=typesense
-      - TYPESENSE_PORT=8108
-      - TYPESENSE_PROTOCOL=http
 
   horizon:
     build:
@@ -138,6 +119,8 @@ services:
     container_name: atlas-horizon
     restart: unless-stopped
     command: php artisan horizon
+    env_file:
+      - .env.docker
     volumes:
       - ./:/var/www/html
     networks:
@@ -146,32 +129,8 @@ services:
       - php
       - redis
     environment:
-      - APP_NAME=Laravel
-      - APP_ENV=local
-      - APP_KEY=
-      - APP_DEBUG=true
-      - APP_URL=http://localhost:8080
-      - QUEUE_CONNECTION=database
-      - REDIS_HOST=redis
-      - REDIS_PASSWORD=null
-      - REDIS_PORT=6379
-      - BROADCAST_CONNECTION=reverb
-      - REVERB_APP_ID=1001
-      - REVERB_APP_KEY=laravel-herd
-      - REVERB_APP_SECRET=secret
-      - REVERB_HOST=reverb
-      - REVERB_PORT=8080
-      - REVERB_SCHEME=http
-      - DB_CONNECTION=mariadb
-      - DB_HOST=mariadb
-      - DB_PORT=3306
-      - DB_DATABASE=laravel
-      - DB_USERNAME=root
-      - DB_PASSWORD=
-      - TYPESENSE_API_KEY=xyz
-      - TYPESENSE_HOST=typesense
-      - TYPESENSE_PORT=8108
-      - TYPESENSE_PROTOCOL=http
+      - QUEUE_CONNECTION=redis
+      - CACHE_STORE=redis
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:5.2

@@ -47,6 +47,10 @@ docker-compose exec -T php php artisan migrate --force
 echo "Setting up admin user..."
 docker-compose exec -T php php artisan app:setup --name=Admin --email=demo@atlas.test --generate-password --no-interaction || echo "Admin user setup completed or already exists"
 
+# Build search index for local browse (always run to ensure schema/aliases exist)
+echo "Building local browse search index..."
+docker-compose exec -T php php artisan atlas:reindex-local-browse --no-interaction || echo "Typesense reindex skipped"
+
 # Display service status
 echo ""
 echo "Checking service status..."
