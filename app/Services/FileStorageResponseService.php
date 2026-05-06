@@ -9,6 +9,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class FileStorageResponseService
 {
@@ -144,11 +145,25 @@ class FileStorageResponseService
         }
 
         $mimeType = $mimeType ?? 'application/octet-stream';
+        $contentDisposition = HeaderUtils::makeDisposition('inline', basename($fullPath));
 
         $baseHeaders = [
             'Content-Type' => $mimeType,
             'Accept-Ranges' => 'bytes',
         ];
+
+        if ($this->shouldUseXAccelRedirect()) {
+            $relativePath = $this->mediaRelativePath($fullPath);
+
+            if (is_string($relativePath) && $relativePath !== '') {
+                return response('', 200, [
+                    ...$baseHeaders,
+                    'X-Accel-Redirect' => '/_media/'.$relativePath,
+                    'Content-Disposition' => $contentDisposition,
+                    'Content-Length' => (string) $size,
+                ]);
+            }
+        }
 
         $range = request()->header('Range');
         if (is_string($range) && preg_match('/bytes=(\d*)-(\d*)/i', $range, $matches)) {
@@ -224,6 +239,42 @@ class FileStorageResponseService
             ...$baseHeaders,
             'Content-Length' => (string) $size,
         ]);
+    }
+
+    private function shouldUseXAccelRedirect(): bool
+    {
+        if (isset($_SERVER['HTTP_X_ACCEL_REDIRECT_CAPABLE'])) {
+            return true;
+        }
+
+        $serverSoftware = strtolower((string) request()->server('SERVER_SOFTWARE', ''));
+
+        return str_contains($serverSoftware, 'nginx');
+    }
+
+    private function mediaRelativePath(string $fullPath): ?string
+    {
+        try {
+            $storageRoot = Storage::disk(config('downloads.disk'))->path('');
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $normalizedStorageRoot = $this->normalizePath($storageRoot);
+        $normalizedFullPath = $this->normalizePath($fullPath);
+
+        if (! str_starts_with($normalizedFullPath, $normalizedStorageRoot.'/')) {
+            return null;
+        }
+
+        return ltrim(substr($normalizedFullPath, strlen($normalizedStorageRoot)), '/');
+    }
+
+    private function normalizePath(string $path): string
+    {
+        $normalized = realpath($path);
+
+        return rtrim(str_replace('\\', '/', $normalized !== false ? $normalized : $path), '/');
     }
 
     private function dispatchPreviewGeneration(File $file, Filesystem $disk): void
