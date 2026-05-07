@@ -12,7 +12,8 @@ class DashboardMetricsController extends Controller
     public function __invoke(): JsonResponse
     {
         $metricsService = app(MetricsService::class);
-        if (DB::table('metrics')->count() === 0) {
+        $requiredMetricKeys = $this->metricKeys();
+        if (DB::table('metrics')->whereIn('key', $requiredMetricKeys)->count() < count($requiredMetricKeys)) {
             $metricsService->syncAll();
         }
 
@@ -21,20 +22,7 @@ class DashboardMetricsController extends Controller
 
     private function metricsFromTable(): array
     {
-        $metrics = app(MetricsService::class)->getMetrics([
-            MetricsService::KEY_FILES_TOTAL,
-            MetricsService::KEY_FILES_DOWNLOADED,
-            MetricsService::KEY_FILES_LOCAL,
-            MetricsService::KEY_FILES_NOT_FOUND,
-            MetricsService::KEY_FILES_BLACKLISTED_TOTAL,
-            MetricsService::KEY_FILES_AUTO_BLACKLISTED,
-            MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED,
-            MetricsService::KEY_REACTIONS_LOVE,
-            MetricsService::KEY_REACTIONS_LIKE,
-            MetricsService::KEY_REACTIONS_FUNNY,
-            MetricsService::KEY_CONTAINERS_TOTAL,
-            MetricsService::KEY_CONTAINERS_BLACKLISTED,
-        ]);
+        $metrics = app(MetricsService::class)->getMetrics($this->metricKeys());
 
         $reactions = [
             'love' => $metrics[MetricsService::KEY_REACTIONS_LOVE] ?? 0,
@@ -50,11 +38,40 @@ class DashboardMetricsController extends Controller
                 'non_local' => max(0, ($metrics[MetricsService::KEY_FILES_TOTAL] ?? 0) - ($metrics[MetricsService::KEY_FILES_LOCAL] ?? 0)),
                 'reactions' => $reactions,
                 'blacklisted' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_TOTAL] ?? 0,
+                'blacklisted_manual' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_MANUAL] ?? 0,
+                'blacklisted_feed_removed' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_FEED_REMOVED] ?? 0,
                 'auto_blacklisted' => $metrics[MetricsService::KEY_FILES_AUTO_BLACKLISTED] ?? 0,
                 'not_found' => $metrics[MetricsService::KEY_FILES_NOT_FOUND] ?? 0,
                 'unreacted_not_blacklisted' => $metrics[MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED] ?? 0,
+                'unreacted_previewed_not_blacklisted' => $metrics[MetricsService::KEY_FILES_UNREACTED_PREVIEWED_NOT_BLACKLISTED] ?? 0,
+                'unreacted_unpreviewed_not_blacklisted' => $metrics[MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED] ?? 0,
             ],
             'containers' => $this->containerMetrics(),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function metricKeys(): array
+    {
+        return [
+            MetricsService::KEY_FILES_TOTAL,
+            MetricsService::KEY_FILES_DOWNLOADED,
+            MetricsService::KEY_FILES_LOCAL,
+            MetricsService::KEY_FILES_NOT_FOUND,
+            MetricsService::KEY_FILES_BLACKLISTED_TOTAL,
+            MetricsService::KEY_FILES_BLACKLISTED_MANUAL,
+            MetricsService::KEY_FILES_BLACKLISTED_FEED_REMOVED,
+            MetricsService::KEY_FILES_AUTO_BLACKLISTED,
+            MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED,
+            MetricsService::KEY_FILES_UNREACTED_PREVIEWED_NOT_BLACKLISTED,
+            MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED,
+            MetricsService::KEY_REACTIONS_LOVE,
+            MetricsService::KEY_REACTIONS_LIKE,
+            MetricsService::KEY_REACTIONS_FUNNY,
+            MetricsService::KEY_CONTAINERS_TOTAL,
+            MetricsService::KEY_CONTAINERS_BLACKLISTED,
         ];
     }
 

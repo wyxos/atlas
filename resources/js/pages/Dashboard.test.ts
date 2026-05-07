@@ -15,9 +15,13 @@ type DashboardMetrics = {
             funny: number;
         };
         blacklisted: number;
+        blacklisted_manual: number;
+        blacklisted_feed_removed: number;
         auto_blacklisted: number;
         not_found: number;
         unreacted_not_blacklisted: number;
+        unreacted_previewed_not_blacklisted: number;
+        unreacted_unpreviewed_not_blacklisted: number;
     };
     containers: {
         total: number;
@@ -73,9 +77,13 @@ const createMetrics = (): DashboardMetrics => ({
             funny: 0,
         },
         blacklisted: 0,
+        blacklisted_manual: 0,
+        blacklisted_feed_removed: 0,
         auto_blacklisted: 0,
         not_found: 0,
         unreacted_not_blacklisted: 0,
+        unreacted_previewed_not_blacklisted: 0,
+        unreacted_unpreviewed_not_blacklisted: 0,
     },
     containers: {
         total: 0,
@@ -149,6 +157,37 @@ describe('Dashboard', () => {
 
         expect(wrapper.text()).toContain('Reactions');
         expect(wrapper.text()).toContain('Negative outcomes');
+    });
+
+    it('renders blacklist and unreacted breakdown labels', async () => {
+        const metrics = createMetrics();
+        metrics.files.blacklisted = 9;
+        metrics.files.blacklisted_manual = 4;
+        metrics.files.auto_blacklisted = 3;
+        metrics.files.blacklisted_feed_removed = 2;
+        metrics.files.unreacted_not_blacklisted = 11;
+        metrics.files.unreacted_previewed_not_blacklisted = 6;
+        metrics.files.unreacted_unpreviewed_not_blacklisted = 5;
+
+        mockMetricsRequest(metrics);
+
+        const router = await createTestRouter();
+        const wrapper = mount(Dashboard, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await Promise.resolve();
+        await wrapper.vm.$nextTick();
+
+        const text = wrapper.text();
+        expect(text).toContain('Total blacklisted');
+        expect(text).toContain('Manual blacklist');
+        expect(text).toContain('Auto blacklist');
+        expect(text).toContain('Out of feed');
+        expect(text).toContain('Unreacted previewed');
+        expect(text).toContain('Unreacted not previewed');
     });
 
     it('shows container actions for supported sources', async () => {

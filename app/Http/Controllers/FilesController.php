@@ -10,6 +10,7 @@ use App\Services\FileNotFoundService;
 use App\Services\FilePreviewService;
 use App\Services\FileStorageResponseService;
 use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\MetricsService;
 use App\Support\AtlasStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -268,6 +269,11 @@ SVG;
         ]);
 
         $fileIds = $request->input('file_ids');
+
+        $metricFileIds = array_map('intval', $fileIds);
+        $metrics = app(MetricsService::class);
+        $metrics->applyPreviewReset($metricFileIds);
+        $metrics->applyBlacklistedFeedRemovedClear($metricFileIds);
 
         File::whereIn('id', $fileIds)->update([
             'previewed_count' => 0,

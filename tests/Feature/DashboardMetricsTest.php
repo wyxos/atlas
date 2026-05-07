@@ -4,6 +4,7 @@ use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\FilePreviewService;
 use App\Services\MetricsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ test('dashboard metrics report file and reaction totals', function () {
     $manualBlacklisted = File::factory()->create([
         'blacklisted_at' => now(),
         'downloaded' => true,
+        'previewed_count' => 1,
         'source' => 'local',
     ]);
 
@@ -26,6 +28,7 @@ test('dashboard metrics report file and reaction totals', function () {
         'blacklisted_at' => now(),
         'auto_blacklisted' => true,
         'downloaded' => false,
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
         'source' => 'NAS',
     ]);
 
@@ -41,6 +44,7 @@ test('dashboard metrics report file and reaction totals', function () {
     ]);
     $unreacted = File::factory()->create([
         'downloaded' => false,
+        'previewed_count' => 3,
         'source' => 'YouTube',
     ]);
 
@@ -106,9 +110,13 @@ test('dashboard metrics report file and reaction totals', function () {
             'local' => 2,
             'non_local' => 3,
             'blacklisted' => 2,
+            'blacklisted_manual' => 1,
+            'blacklisted_feed_removed' => 1,
             'auto_blacklisted' => 1,
             'not_found' => 1,
             'unreacted_not_blacklisted' => 2,
+            'unreacted_previewed_not_blacklisted' => 1,
+            'unreacted_unpreviewed_not_blacklisted' => 1,
         ],
         'containers' => [
             'total' => 2,

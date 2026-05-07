@@ -11,7 +11,8 @@ export const reactionChartConfig = {
     love: { label: 'Favorite', color: '#ef4444' },
     like: { label: 'Like', color: 'var(--color-smart-blue-500)' },
     funny: { label: 'Funny', color: '#eab308' },
-    unreacted: { label: 'Unreacted', color: 'var(--color-blue-slate-400)' },
+    unreacted_previewed: { label: 'Unreacted previewed', color: '#f97316' },
+    unreacted_unpreviewed: { label: 'Unreacted not previewed', color: 'var(--color-blue-slate-400)' },
 } satisfies ChartConfig;
 
 export const overviewChartConfig = {
@@ -23,8 +24,10 @@ export const overviewChartConfig = {
 } satisfies ChartConfig;
 
 export const negativeOutcomeChartConfig = {
-    blacklisted: { label: 'Blacklisted', color: 'var(--color-danger-300)' },
-    auto_blacklisted: { label: 'Auto blacklisted', color: '#6b7280' },
+    blacklisted: { label: 'Total blacklisted', color: 'var(--color-danger-300)' },
+    blacklisted_manual: { label: 'Manual blacklist', color: '#f97316' },
+    auto_blacklisted: { label: 'Auto blacklist', color: '#6b7280' },
+    blacklisted_feed_removed: { label: 'Out of feed', color: '#eab308' },
 } satisfies ChartConfig;
 
 export function formatDashboardCount(value: number): string {
@@ -99,21 +102,31 @@ export function createDashboardChartSections(metrics: DashboardMetrics | null): 
         {
             key: 'reactions',
             title: 'Reactions',
-            description: 'Files with at least one reaction by type.',
+            description: 'Reacted files and unreacted files split by preview state.',
             tooltipLabel: 'Reactions',
             config: reactionChartConfig,
-            seriesKeys: ['love', 'like', 'funny', 'unreacted'],
+            seriesKeys: ['love', 'like', 'funny', 'unreacted_previewed', 'unreacted_unpreviewed'],
             data: [
-                { index: 0, label: 'Favorite', love: files?.reactions.love ?? 0, like: 0, funny: 0, unreacted: 0 },
-                { index: 1, label: 'Like', love: 0, like: files?.reactions.like ?? 0, funny: 0, unreacted: 0 },
-                { index: 2, label: 'Funny', love: 0, like: 0, funny: files?.reactions.funny ?? 0, unreacted: 0 },
+                { index: 0, label: 'Favorite', love: files?.reactions.love ?? 0, like: 0, funny: 0, unreacted_previewed: 0, unreacted_unpreviewed: 0 },
+                { index: 1, label: 'Like', love: 0, like: files?.reactions.like ?? 0, funny: 0, unreacted_previewed: 0, unreacted_unpreviewed: 0 },
+                { index: 2, label: 'Funny', love: 0, like: 0, funny: files?.reactions.funny ?? 0, unreacted_previewed: 0, unreacted_unpreviewed: 0 },
                 {
                     index: 3,
-                    label: 'Unreacted',
+                    label: 'Previewed',
                     love: 0,
                     like: 0,
                     funny: 0,
-                    unreacted: files?.unreacted_not_blacklisted ?? 0,
+                    unreacted_previewed: files?.unreacted_previewed_not_blacklisted ?? 0,
+                    unreacted_unpreviewed: 0,
+                },
+                {
+                    index: 4,
+                    label: 'Not previewed',
+                    love: 0,
+                    like: 0,
+                    funny: 0,
+                    unreacted_previewed: 0,
+                    unreacted_unpreviewed: files?.unreacted_unpreviewed_not_blacklisted ?? 0,
                 },
             ],
             summary: [
@@ -121,26 +134,46 @@ export function createDashboardChartSections(metrics: DashboardMetrics | null): 
                 { label: 'Like', value: files?.reactions.like ?? 0, color: reactionChartConfig.like.color },
                 { label: 'Funny', value: files?.reactions.funny ?? 0, color: reactionChartConfig.funny.color },
                 {
-                    label: 'Unreacted',
-                    value: files?.unreacted_not_blacklisted ?? 0,
-                    color: reactionChartConfig.unreacted.color,
+                    label: 'Unreacted previewed',
+                    value: files?.unreacted_previewed_not_blacklisted ?? 0,
+                    color: reactionChartConfig.unreacted_previewed.color,
+                },
+                {
+                    label: 'Unreacted not previewed',
+                    value: files?.unreacted_unpreviewed_not_blacklisted ?? 0,
+                    color: reactionChartConfig.unreacted_unpreviewed.color,
                 },
             ],
         },
         {
             key: 'negative',
             title: 'Negative outcomes',
-            description: 'Backend blacklists and auto-blacklists.',
+            description: 'Blacklist totals, source split, and out-of-feed terminal state.',
             tooltipLabel: 'Negative outcomes',
             config: negativeOutcomeChartConfig,
-            seriesKeys: ['blacklisted', 'auto_blacklisted'],
+            seriesKeys: ['blacklisted', 'blacklisted_manual', 'auto_blacklisted', 'blacklisted_feed_removed'],
             data: [
-                { index: 0, label: 'Blacklisted', blacklisted: files?.blacklisted ?? 0, auto_blacklisted: 0 },
-                { index: 1, label: 'Auto blacklisted', blacklisted: 0, auto_blacklisted: files?.auto_blacklisted ?? 0 },
+                { index: 0, label: 'Total', blacklisted: files?.blacklisted ?? 0, blacklisted_manual: 0, auto_blacklisted: 0, blacklisted_feed_removed: 0 },
+                { index: 1, label: 'Manual', blacklisted: 0, blacklisted_manual: files?.blacklisted_manual ?? 0, auto_blacklisted: 0, blacklisted_feed_removed: 0 },
+                { index: 2, label: 'Auto', blacklisted: 0, blacklisted_manual: 0, auto_blacklisted: files?.auto_blacklisted ?? 0, blacklisted_feed_removed: 0 },
+                {
+                    index: 3,
+                    label: 'Out',
+                    blacklisted: 0,
+                    blacklisted_manual: 0,
+                    auto_blacklisted: 0,
+                    blacklisted_feed_removed: files?.blacklisted_feed_removed ?? 0,
+                },
             ],
             summary: [
-                { label: 'Blacklisted', value: files?.blacklisted ?? 0, color: negativeOutcomeChartConfig.blacklisted.color },
-                { label: 'Auto blacklisted', value: files?.auto_blacklisted ?? 0, color: negativeOutcomeChartConfig.auto_blacklisted.color },
+                { label: 'Total blacklisted', value: files?.blacklisted ?? 0, color: negativeOutcomeChartConfig.blacklisted.color },
+                { label: 'Manual blacklist', value: files?.blacklisted_manual ?? 0, color: negativeOutcomeChartConfig.blacklisted_manual.color },
+                { label: 'Auto blacklist', value: files?.auto_blacklisted ?? 0, color: negativeOutcomeChartConfig.auto_blacklisted.color },
+                {
+                    label: 'Out of feed',
+                    value: files?.blacklisted_feed_removed ?? 0,
+                    color: negativeOutcomeChartConfig.blacklisted_feed_removed.color,
+                },
             ],
         },
     ];

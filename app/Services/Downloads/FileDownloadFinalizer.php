@@ -127,7 +127,7 @@ class FileDownloadFinalizer
 
         $metrics = app(MetricsService::class);
         if ($wasAutoBlacklisted) {
-            $metrics->applyAutoBlacklistClear($file);
+            $metrics->applyAutoBlacklistClear($file, countAsManualBlacklisted: ! $wasBlacklisted);
         }
 
         $file->update($updates);
@@ -135,7 +135,11 @@ class FileDownloadFinalizer
 
         $metrics->applyDownload($file, $wasDownloaded);
         if ($wasBlacklisted) {
-            $metrics->applyBlacklistClear($file);
+            $metrics->applyBlacklistClear(
+                $file,
+                wasAutoBlacklisted: $wasAutoBlacklisted,
+                hadTerminalPreviewCount: $hasTerminalPreviewCount,
+            );
         }
     }
 

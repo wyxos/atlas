@@ -51,7 +51,7 @@ class FileBlacklistService
                 ->map(fn (mixed $fileId): int => (int) $fileId)
                 ->all();
 
-            $this->metricsService->applyBlacklistAdd($newBlacklistIds);
+            $this->metricsService->applyBlacklistAdd($newBlacklistIds, $autoBlacklisted, $minimumPreviewedCount);
 
             $autoBlacklistAddIds = [];
 
@@ -77,6 +77,13 @@ class FileBlacklistService
             }
 
             $this->metricsService->applyAutoBlacklistAdd($autoBlacklistAddIds);
+
+            if (
+                is_int($minimumPreviewedCount)
+                && $minimumPreviewedCount >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
+            ) {
+                $this->metricsService->applyBlacklistedFeedRemovedMark($fileIds);
+            }
 
             if ($newBlacklistIds !== []) {
                 File::query()

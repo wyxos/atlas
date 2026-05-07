@@ -22,9 +22,13 @@ export type DashboardMetrics = {
             funny: number;
         };
         blacklisted: number;
+        blacklisted_manual: number;
+        blacklisted_feed_removed: number;
         auto_blacklisted: number;
         not_found: number;
         unreacted_not_blacklisted: number;
+        unreacted_previewed_not_blacklisted: number;
+        unreacted_unpreviewed_not_blacklisted: number;
     };
     containers: {
         total: number;

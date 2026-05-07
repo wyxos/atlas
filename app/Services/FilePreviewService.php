@@ -47,6 +47,10 @@ class FilePreviewService
             ->pluck('id')
             ->map(fn (mixed $fileId): int => (int) $fileId)
             ->all();
+        $metrics = app(MetricsService::class);
+
+        $metrics->applyPreviewIncrement($fileIds);
+        $metrics->applyBlacklistedFeedRemovedMark($fileIds);
 
         File::query()
             ->whereIn('id', $fileIds)

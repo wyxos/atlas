@@ -160,8 +160,9 @@ class FileReactionService
         // Positive reactions recover a blacklisted file and queue/download as normal.
         if (in_array($type, ['love', 'like', 'funny'], true)) {
             $updates = ['auto_blacklisted' => false];
+            $willClearBlacklist = $file->blacklisted_at !== null;
 
-            $metrics->applyAutoBlacklistClear($file);
+            $metrics->applyAutoBlacklistClear($file, countAsManualBlacklisted: ! $willClearBlacklist);
 
             if ($file->blacklisted_at !== null) {
                 $metrics->applyBlacklistClear($file, false);
