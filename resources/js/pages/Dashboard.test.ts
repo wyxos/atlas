@@ -155,12 +155,17 @@ describe('Dashboard', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('Reactions');
-        expect(wrapper.text()).toContain('Negative outcomes');
+        expect(wrapper.text()).toContain('Moderation coverage');
+        expect(wrapper.text()).toContain('Library health');
+        expect(wrapper.text()).toContain('Review backlog');
+        expect(wrapper.text()).toContain('Positive outcomes');
+        expect(wrapper.text()).toContain('Filtered / removed');
+        expect(wrapper.text()).toContain('Feed impact');
     });
 
-    it('renders blacklist and unreacted breakdown labels', async () => {
+    it('renders moderation coverage and regrouped metric labels', async () => {
         const metrics = createMetrics();
+        metrics.files.total = 100;
         metrics.files.blacklisted = 9;
         metrics.files.blacklisted_manual = 4;
         metrics.files.auto_blacklisted = 3;
@@ -182,12 +187,19 @@ describe('Dashboard', () => {
         await wrapper.vm.$nextTick();
 
         const text = wrapper.text();
+        expect(text).toContain('Moderated');
+        expect(text).toContain('89%');
+        expect(text).toContain('Unseen');
+        expect(text).toContain('Seen, no decision');
+        expect(text).toContain('Kept');
+        expect(text).toContain('Removed');
+        expect(text).toContain('Decision coverage');
+        expect(text).toContain('Previewed, no decision');
         expect(text).toContain('Total blacklisted');
         expect(text).toContain('Manual blacklist');
         expect(text).toContain('Auto blacklist');
         expect(text).toContain('Out of feed');
-        expect(text).toContain('Unreacted previewed');
-        expect(text).toContain('Unreacted not previewed');
+        expect(text).toContain('Still in feed');
     });
 
     it('shows container actions for supported sources', async () => {

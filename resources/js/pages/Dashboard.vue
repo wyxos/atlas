@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router';
 import { Skeleton } from '@/components/ui/skeleton';
 import { store as tabsStore, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
 import DashboardContainerList from '@/components/dashboard/DashboardContainerList.vue';
-import DashboardMetricChartCard from '@/components/dashboard/DashboardMetricChartCard.vue';
+import DashboardCoverageCard from '@/components/dashboard/DashboardCoverageCard.vue';
+import DashboardMetricPanel from '@/components/dashboard/DashboardMetricPanel.vue';
+import DashboardPositiveOutcomePanel from '@/components/dashboard/DashboardPositiveOutcomePanel.vue';
 import { useDashboardMetrics } from '@/composables/useDashboardMetrics';
 import type { ContainerMetricItem } from '@/types/dashboard';
 import { formatDashboardCount } from '@/utils/dashboard';
@@ -14,7 +16,9 @@ const router = useRouter();
 const dashboard = useDashboardMetrics();
 const loadError = dashboard.state.loadError;
 const isLoading = dashboard.state.isLoading;
-const chartSections = dashboard.derived.chartSections;
+const coverage = dashboard.derived.coverage;
+const metricPanels = dashboard.derived.metricPanels;
+const positiveOutcomes = dashboard.derived.positiveOutcomes;
 const containerGroups = dashboard.derived.containerGroups;
 const containerTotals = dashboard.derived.containerTotals;
 
@@ -40,8 +44,8 @@ onMounted(dashboard.actions.fetchMetrics);
 </script>
 
 <template>
-    <PageLayout>
-        <div class="w-full space-y-8">
+    <PageLayout flush>
+        <div class="w-full space-y-8 p-4 md:p-8">
             <div class="text-center">
                 <h4 class="text-xl font-semibold text-regal-navy-100">
                     Dashboard
@@ -58,11 +62,20 @@ onMounted(dashboard.actions.fetchMetrics);
                 {{ loadError }}
             </div>
 
+            <DashboardCoverageCard :coverage="coverage" :is-loading="isLoading" />
+
             <div class="grid gap-6 lg:grid-cols-3">
-                <DashboardMetricChartCard
-                    v-for="section in chartSections"
-                    :key="section.key"
-                    :section="section"
+                <DashboardMetricPanel
+                    v-for="panel in metricPanels.slice(0, 2)"
+                    :key="panel.key"
+                    :panel="panel"
+                    :is-loading="isLoading"
+                />
+                <DashboardPositiveOutcomePanel :outcomes="positiveOutcomes" :is-loading="isLoading" />
+                <DashboardMetricPanel
+                    v-for="panel in metricPanels.slice(2)"
+                    :key="panel.key"
+                    :panel="panel"
                     :is-loading="isLoading"
                 />
             </div>

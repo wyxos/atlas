@@ -1,9 +1,11 @@
 import { computed, ref } from 'vue';
 import type { DashboardMetrics } from '@/types/dashboard';
 import {
-    createDashboardChartSections,
     createDashboardContainerGroups,
     createDashboardContainerTotals,
+    createDashboardCoverage,
+    createDashboardMetricPanels,
+    createDashboardPositiveOutcomes,
 } from '@/utils/dashboard';
 
 export function useDashboardMetrics() {
@@ -11,7 +13,9 @@ export function useDashboardMetrics() {
     const isLoading = ref(true);
     const loadError = ref<string | null>(null);
 
-    const chartSections = computed(() => createDashboardChartSections(metrics.value));
+    const coverage = computed(() => createDashboardCoverage(metrics.value));
+    const metricPanels = computed(() => createDashboardMetricPanels(metrics.value));
+    const positiveOutcomes = computed(() => createDashboardPositiveOutcomes(metrics.value));
     const containerGroups = computed(() => createDashboardContainerGroups(metrics.value));
     const containerTotals = computed(() => createDashboardContainerTotals(metrics.value));
 
@@ -36,7 +40,9 @@ export function useDashboardMetrics() {
             loadError,
         },
         derived: {
-            chartSections,
+            coverage,
+            metricPanels,
+            positiveOutcomes,
             containerGroups,
             containerTotals,
         },

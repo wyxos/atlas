@@ -1,5 +1,3 @@
-import type { ChartConfig } from '@/components/ui/chart';
-
 export type ContainerMetricItem = {
     id: number;
     type: string;
@@ -39,26 +37,42 @@ export type DashboardMetrics = {
     };
 };
 
-export type DashboardChartDatum = {
-    index: number;
-    label: string;
-} & Record<string, number | string>;
-
-export type DashboardSummaryItem = {
+export type DashboardCoverageSegment = {
+    key: 'unseen' | 'pending' | 'kept' | 'removed';
     label: string;
     value: number;
+    barPercent: number;
     color: string;
 };
 
-export type DashboardChartSection = {
-    key: 'overview' | 'reactions' | 'negative';
+export type DashboardCoverage = {
+    total: number;
+    moderated: number;
+    moderatedPercent: string;
+    segments: DashboardCoverageSegment[];
+};
+
+export type DashboardMetricRow = {
+    key: string;
+    label: string;
+    value: number;
+    meta?: string;
+    barPercent?: number;
+    color: string;
+};
+
+export type DashboardMetricPanel = {
+    key: 'library' | 'backlog' | 'filtered' | 'feed';
     title: string;
     description: string;
-    tooltipLabel: string;
-    config: ChartConfig;
-    data: DashboardChartDatum[];
-    seriesKeys: string[];
-    summary: DashboardSummaryItem[];
+    rows: DashboardMetricRow[];
+};
+
+export type DashboardPositiveOutcomes = {
+    title: string;
+    description: string;
+    total: number;
+    rows: DashboardMetricRow[];
 };
 
 export type DashboardContainerGroup = {

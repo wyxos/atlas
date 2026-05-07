@@ -1,182 +1,143 @@
-import type { ChartConfig } from '@/components/ui/chart';
 import type {
     ContainerMetricItem,
-    DashboardChartSection,
     DashboardContainerGroup,
     DashboardContainerTotals,
+    DashboardCoverage,
+    DashboardMetricPanel,
+    DashboardMetricRow,
     DashboardMetrics,
+    DashboardPositiveOutcomes,
 } from '@/types/dashboard';
 
-export const reactionChartConfig = {
-    love: { label: 'Favorite', color: '#ef4444' },
-    like: { label: 'Like', color: 'var(--color-smart-blue-500)' },
-    funny: { label: 'Funny', color: '#eab308' },
-    unreacted_previewed: { label: 'Unreacted previewed', color: '#f97316' },
-    unreacted_unpreviewed: { label: 'Unreacted not previewed', color: 'var(--color-blue-slate-400)' },
-} satisfies ChartConfig;
-
-export const overviewChartConfig = {
-    total: { label: 'Total', color: 'var(--color-blue-slate-200)' },
-    not_found: { label: 'Not found', color: 'var(--color-danger-300)' },
-    downloaded: { label: 'Downloaded', color: 'var(--color-success-400)' },
-    local: { label: 'Local', color: 'var(--color-smart-blue-500)' },
-    non_local: { label: 'Non-local', color: 'var(--color-twilight-indigo-300)' },
-} satisfies ChartConfig;
-
-export const negativeOutcomeChartConfig = {
-    blacklisted: { label: 'Total blacklisted', color: 'var(--color-danger-300)' },
-    blacklisted_manual: { label: 'Manual blacklist', color: '#f97316' },
-    auto_blacklisted: { label: 'Auto blacklist', color: '#6b7280' },
-    blacklisted_feed_removed: { label: 'Out of feed', color: '#eab308' },
-} satisfies ChartConfig;
+const colors = {
+    total: 'var(--color-blue-slate-200)',
+    downloaded: 'var(--color-success-400)',
+    local: 'var(--color-smart-blue-500)',
+    nonLocal: 'var(--color-twilight-indigo-300)',
+    notFound: 'var(--color-danger-300)',
+    unseen: 'var(--color-blue-slate-500)',
+    pending: '#f97316',
+    kept: 'var(--color-success-400)',
+    removed: 'var(--color-danger-300)',
+    favorite: '#ef4444',
+    like: 'var(--color-smart-blue-500)',
+    funny: '#eab308',
+    auto: '#6b7280',
+    feed: '#eab308',
+};
 
 export function formatDashboardCount(value: number): string {
     return value.toLocaleString();
 }
 
-export function buildDashboardTickValues(maxValue: number, steps = 5): number[] {
-    if (maxValue <= 0) {
-        return [0];
+export function formatDashboardPercent(value: number): string {
+    if (value === 0) {
+        return '0%';
     }
 
-    const rawStep = maxValue / steps;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-    const normalized = rawStep / magnitude;
-    const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-    const niceStep = niceNormalized * magnitude;
-    const top = Math.ceil(maxValue / niceStep) * niceStep;
+    if (value > 0 && value < 0.1) {
+        return '<0.1%';
+    }
 
-    return Array.from({ length: steps + 1 }, (_, index) => index * niceStep).filter((value) => value <= top);
+    return `${value.toFixed(value >= 10 ? 0 : 1)}%`;
 }
 
-export function createDashboardChartSections(metrics: DashboardMetrics | null): DashboardChartSection[] {
+export function createDashboardCoverage(metrics: DashboardMetrics | null): DashboardCoverage {
     const files = metrics?.files;
+    const total = files?.total ?? 0;
+    const unseen = files?.unreacted_unpreviewed_not_blacklisted ?? 0;
+    const pending = files?.unreacted_previewed_not_blacklisted ?? 0;
+    const removed = files?.blacklisted ?? 0;
+    const kept = Math.max(0, total - unseen - pending - removed);
+    const moderated = kept + removed;
+
+    return {
+        total,
+        moderated,
+        moderatedPercent: formatDashboardPercent(percent(moderated, total)),
+        segments: [
+            createCoverageSegment('unseen', 'Unseen', unseen, total, colors.unseen),
+            createCoverageSegment('pending', 'Seen, no decision', pending, total, colors.pending),
+            createCoverageSegment('kept', 'Kept', kept, total, colors.kept),
+            createCoverageSegment('removed', 'Removed', removed, total, colors.removed),
+        ],
+    };
+}
+
+export function createDashboardMetricPanels(metrics: DashboardMetrics | null): DashboardMetricPanel[] {
+    const files = metrics?.files;
+    const total = files?.total ?? 0;
+    const unreacted = files?.unreacted_not_blacklisted ?? 0;
+    const blacklisted = files?.blacklisted ?? 0;
+    const outOfFeed = files?.blacklisted_feed_removed ?? 0;
+    const decided = Math.max(0, total - unreacted);
 
     return [
         {
-            key: 'overview',
-            title: 'Library overview',
-            description: 'Inventory health and storage coverage at a glance.',
-            tooltipLabel: 'Overview',
-            config: overviewChartConfig,
-            seriesKeys: ['total', 'not_found', 'downloaded', 'local', 'non_local'],
-            data: [
-                { index: 0, label: 'Total', total: files?.total ?? 0, not_found: 0, downloaded: 0, local: 0, non_local: 0 },
-                {
-                    index: 1,
-                    label: 'Not found',
-                    total: 0,
-                    not_found: files?.not_found ?? 0,
-                    downloaded: 0,
-                    local: 0,
-                    non_local: 0,
-                },
-                {
-                    index: 2,
-                    label: 'Downloaded',
-                    total: 0,
-                    not_found: 0,
-                    downloaded: files?.downloaded ?? 0,
-                    local: 0,
-                    non_local: 0,
-                },
-                { index: 3, label: 'Local', total: 0, not_found: 0, downloaded: 0, local: files?.local ?? 0, non_local: 0 },
-                {
-                    index: 4,
-                    label: 'Non-local',
-                    total: 0,
-                    not_found: 0,
-                    downloaded: 0,
-                    local: 0,
-                    non_local: files?.non_local ?? 0,
-                },
-            ],
-            summary: [
-                { label: 'Total', value: files?.total ?? 0, color: overviewChartConfig.total.color },
-                { label: 'Not found', value: files?.not_found ?? 0, color: overviewChartConfig.not_found.color },
-                { label: 'Downloaded', value: files?.downloaded ?? 0, color: overviewChartConfig.downloaded.color },
-                { label: 'Local', value: files?.local ?? 0, color: overviewChartConfig.local.color },
-                { label: 'Non-local', value: files?.non_local ?? 0, color: overviewChartConfig.non_local.color },
+            key: 'library',
+            title: 'Library health',
+            description: 'Inventory coverage and file availability.',
+            rows: [
+                createMetricRow('total', 'Total files', total, colors.total),
+                createMetricRow('downloaded', 'Downloaded', files?.downloaded ?? 0, colors.downloaded, total, 'of library'),
+                createMetricRow('local', 'Local', files?.local ?? 0, colors.local, total, 'of library'),
+                createMetricRow('non-local', 'Non-local', files?.non_local ?? 0, colors.nonLocal, total, 'of library'),
+                createMetricRow('not-found', 'Not found', files?.not_found ?? 0, colors.notFound, total, 'of library'),
             ],
         },
         {
-            key: 'reactions',
-            title: 'Reactions',
-            description: 'Reacted files and unreacted files split by preview state.',
-            tooltipLabel: 'Reactions',
-            config: reactionChartConfig,
-            seriesKeys: ['love', 'like', 'funny', 'unreacted_previewed', 'unreacted_unpreviewed'],
-            data: [
-                { index: 0, label: 'Favorite', love: files?.reactions.love ?? 0, like: 0, funny: 0, unreacted_previewed: 0, unreacted_unpreviewed: 0 },
-                { index: 1, label: 'Like', love: 0, like: files?.reactions.like ?? 0, funny: 0, unreacted_previewed: 0, unreacted_unpreviewed: 0 },
-                { index: 2, label: 'Funny', love: 0, like: 0, funny: files?.reactions.funny ?? 0, unreacted_previewed: 0, unreacted_unpreviewed: 0 },
-                {
-                    index: 3,
-                    label: 'Previewed',
-                    love: 0,
-                    like: 0,
-                    funny: 0,
-                    unreacted_previewed: files?.unreacted_previewed_not_blacklisted ?? 0,
-                    unreacted_unpreviewed: 0,
-                },
-                {
-                    index: 4,
-                    label: 'Not previewed',
-                    love: 0,
-                    like: 0,
-                    funny: 0,
-                    unreacted_previewed: 0,
-                    unreacted_unpreviewed: files?.unreacted_unpreviewed_not_blacklisted ?? 0,
-                },
-            ],
-            summary: [
-                { label: 'Favorite', value: files?.reactions.love ?? 0, color: reactionChartConfig.love.color },
-                { label: 'Like', value: files?.reactions.like ?? 0, color: reactionChartConfig.like.color },
-                { label: 'Funny', value: files?.reactions.funny ?? 0, color: reactionChartConfig.funny.color },
-                {
-                    label: 'Unreacted previewed',
-                    value: files?.unreacted_previewed_not_blacklisted ?? 0,
-                    color: reactionChartConfig.unreacted_previewed.color,
-                },
-                {
-                    label: 'Unreacted not previewed',
-                    value: files?.unreacted_unpreviewed_not_blacklisted ?? 0,
-                    color: reactionChartConfig.unreacted_unpreviewed.color,
-                },
+            key: 'backlog',
+            title: 'Review backlog',
+            description: 'Files still waiting for a decision.',
+            rows: [
+                createMetricRow('decided', 'Decision coverage', decided, colors.kept, total, 'of library'),
+                createMetricRow('unseen', 'Not previewed', files?.unreacted_unpreviewed_not_blacklisted ?? 0, colors.unseen, total, 'of library'),
+                createMetricRow('pending', 'Previewed, no decision', files?.unreacted_previewed_not_blacklisted ?? 0, colors.pending, total, 'of library'),
             ],
         },
         {
-            key: 'negative',
-            title: 'Negative outcomes',
-            description: 'Blacklist totals, source split, and out-of-feed terminal state.',
-            tooltipLabel: 'Negative outcomes',
-            config: negativeOutcomeChartConfig,
-            seriesKeys: ['blacklisted', 'blacklisted_manual', 'auto_blacklisted', 'blacklisted_feed_removed'],
-            data: [
-                { index: 0, label: 'Total', blacklisted: files?.blacklisted ?? 0, blacklisted_manual: 0, auto_blacklisted: 0, blacklisted_feed_removed: 0 },
-                { index: 1, label: 'Manual', blacklisted: 0, blacklisted_manual: files?.blacklisted_manual ?? 0, auto_blacklisted: 0, blacklisted_feed_removed: 0 },
-                { index: 2, label: 'Auto', blacklisted: 0, blacklisted_manual: 0, auto_blacklisted: files?.auto_blacklisted ?? 0, blacklisted_feed_removed: 0 },
-                {
-                    index: 3,
-                    label: 'Out',
-                    blacklisted: 0,
-                    blacklisted_manual: 0,
-                    auto_blacklisted: 0,
-                    blacklisted_feed_removed: files?.blacklisted_feed_removed ?? 0,
-                },
+            key: 'filtered',
+            title: 'Filtered / removed',
+            description: 'Blacklist volume and source split.',
+            rows: [
+                createMetricRow('blacklisted', 'Total blacklisted', blacklisted, colors.removed, total, 'of library'),
+                createMetricRow('manual', 'Manual blacklist', files?.blacklisted_manual ?? 0, colors.pending, blacklisted, 'of blacklisted'),
+                createMetricRow('auto', 'Auto blacklist', files?.auto_blacklisted ?? 0, colors.auto, blacklisted, 'of blacklisted'),
             ],
-            summary: [
-                { label: 'Total blacklisted', value: files?.blacklisted ?? 0, color: negativeOutcomeChartConfig.blacklisted.color },
-                { label: 'Manual blacklist', value: files?.blacklisted_manual ?? 0, color: negativeOutcomeChartConfig.blacklisted_manual.color },
-                { label: 'Auto blacklist', value: files?.auto_blacklisted ?? 0, color: negativeOutcomeChartConfig.auto_blacklisted.color },
-                {
-                    label: 'Out of feed',
-                    value: files?.blacklisted_feed_removed ?? 0,
-                    color: negativeOutcomeChartConfig.blacklisted_feed_removed.color,
-                },
+        },
+        {
+            key: 'feed',
+            title: 'Feed impact',
+            description: 'Blacklisted files pushed out of normal feed rotation.',
+            rows: [
+                createMetricRow('out-of-feed', 'Out of feed', outOfFeed, colors.feed, blacklisted, 'of blacklisted'),
+                createMetricRow('blacklisted-in-feed', 'Still in feed', Math.max(0, blacklisted - outOfFeed), colors.auto, blacklisted, 'of blacklisted'),
+                createMetricRow('library-share', 'Library share', outOfFeed, colors.feed, total, 'of library'),
             ],
         },
     ];
+}
+
+export function createDashboardPositiveOutcomes(metrics: DashboardMetrics | null): DashboardPositiveOutcomes {
+    const reactions = metrics?.files.reactions;
+    const rows = [
+        { key: 'favorite', label: 'Favorite', value: reactions?.love ?? 0, color: colors.favorite },
+        { key: 'like', label: 'Like', value: reactions?.like ?? 0, color: colors.like },
+        { key: 'funny', label: 'Funny', value: reactions?.funny ?? 0, color: colors.funny },
+    ];
+    const maxValue = Math.max(...rows.map((row) => row.value), 0);
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+
+    return {
+        title: 'Positive outcomes',
+        description: 'Ranked positive signals by reaction type.',
+        total,
+        rows: rows.map((row) => ({
+            ...row,
+            barPercent: percent(row.value, maxValue),
+            meta: `${formatDashboardPercent(percent(row.value, total))} of positive signals`,
+        })),
+    };
 }
 
 export function createDashboardContainerTotals(metrics: DashboardMetrics | null): DashboardContainerTotals {
@@ -208,4 +169,48 @@ export function createDashboardContainerGroups(metrics: DashboardMetrics | null)
 
 export function formatDashboardContainerLabel(item: ContainerMetricItem): string {
     return `${item.type} • ${item.source} • ${item.source_id}`;
+}
+
+function createCoverageSegment(
+    key: DashboardCoverage['segments'][number]['key'],
+    label: string,
+    value: number,
+    total: number,
+    color: string,
+): DashboardCoverage['segments'][number] {
+    return {
+        key,
+        label,
+        value,
+        barPercent: percent(value, total),
+        color,
+    };
+}
+
+function createMetricRow(
+    key: string,
+    label: string,
+    value: number,
+    color: string,
+    denominator?: number,
+    basisLabel?: string,
+): DashboardMetricRow {
+    const barPercent = denominator === undefined ? undefined : percent(value, denominator);
+
+    return {
+        key,
+        label,
+        value,
+        color,
+        barPercent,
+        meta: barPercent === undefined ? undefined : `${formatDashboardPercent(barPercent)} ${basisLabel}`,
+    };
+}
+
+function percent(value: number, denominator: number): number {
+    if (denominator <= 0 || value <= 0) {
+        return 0;
+    }
+
+    return Math.min(100, (value / denominator) * 100);
 }
