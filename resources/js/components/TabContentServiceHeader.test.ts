@@ -63,6 +63,7 @@ function mountHeader(props = createProps()) {
                 ChevronDown: simpleStub,
                 ChevronsUp: simpleStub,
                 ModerationRulesManager: simpleStub,
+                LocalSourceDropdown: simpleStub,
                 PanelRightOpen: simpleStub,
                 Play: simpleStub,
                 Select: simpleStub,

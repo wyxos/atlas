@@ -90,6 +90,7 @@ function mountStartForm(
             stubs: {
                 Button: buttonStub,
                 Input: simpleStub,
+                LocalSourceDropdown: simpleStub,
                 Play: simpleStub,
                 Select: simpleStub,
                 SelectContent: simpleStub,

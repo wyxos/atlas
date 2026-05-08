@@ -69,6 +69,42 @@ describe('tabContentV2 resolve', () => {
         expect(result.items).toHaveLength(2);
     });
 
+    it('serializes multiple local sources into the browse request', async () => {
+        window.axios.get = vi.fn().mockResolvedValue({
+            data: {
+                items: [],
+                nextPage: null,
+                previousPage: null,
+                total: 0,
+            },
+        }) as typeof window.axios.get;
+
+        const resolve = createTabContentV2Resolve({
+            form: {
+                getData: () => ({
+                    feed: 'local',
+                    limit: 20,
+                    page: 1,
+                    service: '',
+                    serviceFilters: {},
+                    source: ['CivitAI', 'Wallhaven'],
+                    tab_id: 1,
+                }),
+            } as any,
+            startPageToken: ref(1),
+            toast: {
+                error: vi.fn(),
+            },
+        });
+
+        await resolve({ cursor: null, pageSize: 20 });
+
+        const requestedUrl = decodeURIComponent(vi.mocked(window.axios.get).mock.calls[0]?.[0] as string);
+
+        expect(requestedUrl).toContain('source[]=CivitAI');
+        expect(requestedUrl).toContain('source[]=Wallhaven');
+    });
+
     it('resolves a params-only CivitAI startup state as a page one model-version query', async () => {
         window.axios.get = vi.fn().mockResolvedValue({
             data: {

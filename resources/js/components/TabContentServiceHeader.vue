@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { ChevronDown, ChevronsUp, PanelRightOpen, Play } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { queueManager } from '@/composables/useQueue';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import TabFilter from './TabFilter.vue';
+import LocalSourceDropdown from '@/components/tab-filter/LocalSourceDropdown.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
+import { createLocalSourceOptions, type LocalSourceSelection } from '@/utils/localSourceSelection';
 
 interface Props {
     form: BrowseFormInstance;
@@ -20,7 +23,7 @@ interface Props {
     updateFilterSheetOpen: (value: boolean) => void;
     updateFeed: (value: 'online' | 'local') => void;
     updateService: (service: string) => void;
-    updateSource: (source: string) => void;
+    updateSource: (source: LocalSourceSelection) => void;
     applyService: () => void | Promise<void>;
     applyFilters: () => void | Promise<void>;
     resetFilters: () => void;
@@ -28,7 +31,7 @@ interface Props {
     loadNextPage: () => void | Promise<void>;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
     localService: null,
     masonry: null,
     filterSheetOpen: false,
@@ -36,6 +39,7 @@ withDefaults(defineProps<Props>(), {
 
 const globalStartPanel = useBrowseGlobalStartPanel();
 const queuedReactionCount = queueManager.collection.getAllComputed();
+const localSourceOptions = computed(() => createLocalSourceOptions(props.availableSources));
 </script>
 
 <template>
@@ -73,18 +77,13 @@ const queuedReactionCount = queueManager.collection.getAllComputed();
             </div>
 
             <div v-if="form.data.feed === 'local'" class="flex-1">
-                <Select :model-value="form.data.source" @update:model-value="(value) => updateSource(value as string)"
-                    :disabled="masonry?.isLoading">
-                    <SelectTrigger class="w-[200px]" data-test="source-select-trigger">
-                        <SelectValue placeholder="Select a source..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="source in availableSources" :key="source" :value="source"
-                            data-test="source-select-item">
-                            {{ source }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+                <LocalSourceDropdown
+                    :model-value="form.data.source"
+                    :options="localSourceOptions"
+                    :disabled="masonry?.isLoading"
+                    trigger-class="w-[220px]"
+                    @update:model-value="updateSource"
+                />
             </div>
 
             <TabFilter :open="filterSheetOpen" :available-services="availableServices" :local-def="localService"

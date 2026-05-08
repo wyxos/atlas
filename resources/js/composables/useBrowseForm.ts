@@ -1,4 +1,5 @@
 import { computed, hasInjectionContext, inject, reactive, ref, type InjectionKey } from 'vue';
+import { normalizeLocalSourceSelection, type LocalSourceSelection } from '@/utils/localSourceSelection';
 import type { TabData } from './useTabs';
 
 export interface BrowseFormData {
@@ -6,7 +7,7 @@ export interface BrowseFormData {
     limit: string;
     page: string | number;
     feed: 'online' | 'local';
-    source: string;
+    source: LocalSourceSelection;
     tab_id: number | null;
     // Service-specific UI filters (excluding global keys like service/feed/source/tab_id).
     // These are persisted/restored per service key.
@@ -62,11 +63,14 @@ function createFormInstance() {
             if (typeof value === 'number') return value;
             return fallback;
         };
+        const parseSource = (value: unknown, fallback: string): LocalSourceSelection => {
+            return Array.isArray(value) ? normalizeLocalSourceSelection(value) : parseString(value, fallback);
+        };
 
         data.tab_id = tab.id;
         data.service = parseString(params.service, defaultData.service);
         data.feed = params.feed === 'local' ? 'local' : 'online';
-        data.source = parseString(params.source, defaultData.source);
+        data.source = parseSource(params.source, 'all');
 
         const limitValue = params.limit;
         if (typeof limitValue === 'number' && Number.isFinite(limitValue)) {

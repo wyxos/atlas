@@ -14,6 +14,7 @@ import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
 import type { ReactionType } from '@/types/reaction';
+import type { LocalSourceSelection } from '@/utils/localSourceSelection';
 import { shouldCloseContainerSheetForEscape, shouldExitFullscreenForMediaBarEscape } from '@/lib/vibeMediaBarEscape';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
@@ -101,7 +102,7 @@ const props = defineProps<{
     totalAvailable: number | null;
     updateFeed: (value: 'local' | 'online') => void;
     updateActiveIndex: (value: number) => void;
-    updateSource: (value: string | null) => void;
+    updateSource: (value: LocalSourceSelection) => void;
     updateSurfaceMode: (value: 'fullscreen' | 'list') => void;
     updateService: (value: string) => void | Promise<void>;
     surfaceMode: 'fullscreen' | 'list';

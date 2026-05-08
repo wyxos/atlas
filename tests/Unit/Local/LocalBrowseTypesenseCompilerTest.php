@@ -58,6 +58,40 @@ test('compiler builds source downloaded file-type and random filters', function 
         ->and($compiled['options']['sort_by'])->toBe('_rand(123):desc,sort_id:desc');
 });
 
+test('compiler builds multiple source filter', function () {
+    $compiler = app(LocalBrowseTypesenseCompiler::class);
+
+    $filter = $compiler->compileFileFilter([
+        'source' => ['CivitAI', 'Wallhaven'],
+        'downloaded' => 'any',
+        'blacklisted' => 'any',
+        'autoBlacklisted' => 'any',
+        'reactionMode' => 'any',
+        'reactionTypes' => null,
+        'fileTypes' => ['all'],
+    ], 11);
+
+    expect($filter)->toContain('source:=[`CivitAI`, `Wallhaven`]')
+        ->and($filter)->toContain('not_found:=false');
+});
+
+test('compiler ignores source filters when all is selected with other sources', function () {
+    $compiler = app(LocalBrowseTypesenseCompiler::class);
+
+    $filter = $compiler->compileFileFilter([
+        'source' => ['all', 'CivitAI'],
+        'downloaded' => 'any',
+        'blacklisted' => 'any',
+        'autoBlacklisted' => 'any',
+        'reactionMode' => 'any',
+        'reactionTypes' => null,
+        'fileTypes' => ['all'],
+    ], 11);
+
+    expect($filter)->not->toContain('source:=')
+        ->and($filter)->toContain('not_found:=false');
+});
+
 test('compiler builds blacklisted and Auto blacklisted filters', function () {
     $compiler = app(LocalBrowseTypesenseCompiler::class);
 

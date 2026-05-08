@@ -61,3 +61,12 @@ it('normalizes file types to all when empty or invalid', function () {
 
     expect($context['fileTypes'])->toBe(['all']);
 });
+
+it('normalizes multiple local sources and keeps them in params', function () {
+    $context = LocalFetchParams::normalize([
+        'source' => ['CivitAI', 'Wallhaven', 'CivitAI'],
+    ]);
+
+    expect($context['source'])->toBe(['CivitAI', 'Wallhaven'])
+        ->and($context['params']['source'])->toBe(['CivitAI', 'Wallhaven']);
+});

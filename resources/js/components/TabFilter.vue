@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SlidersHorizontal } from 'lucide-vue-next';
 import Input from '@/components/ui/input/Input.vue';
+import LocalSourceDropdown from '@/components/tab-filter/LocalSourceDropdown.vue';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
+import type { LocalSourceSelection } from '@/utils/localSourceSelection';
 import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
 import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
 import { useTabFilterState } from '@/composables/useTabFilterState';
@@ -59,7 +61,7 @@ function updateLimit(value: string): void {
     form.data.limit = value;
 }
 
-function updateSource(value: string): void {
+function updateSource(value: LocalSourceSelection): void {
     form.data.source = value;
 }
 
@@ -147,20 +149,12 @@ function handleFieldUpdate(field: TabFilterFieldUpdate): void {
 
                     <div v-if="localSourceField" class="form-field">
                         <label class="form-label">{{ localSourceField.label }}</label>
-                        <Select :model-value="form.data.source" @update:model-value="(value) => updateSource(String(value))">
-                            <SelectTrigger class="w-full">
-                                <SelectValue :placeholder="localSourceField.placeholder || 'Select…'" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="option in localSourceField.options ?? []"
-                                    :key="String(option.value)"
-                                    :value="option.value as any"
-                                >
-                                    {{ option.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <LocalSourceDropdown
+                            :model-value="form.data.source"
+                            :options="localSourceField.options ?? []"
+                            :placeholder="localSourceField.placeholder || 'Select...'"
+                            @update:model-value="updateSource"
+                        />
                         <p v-if="shouldShowTabFilterDescriptionBelow(localSourceField)" class="form-help">
                             {{ localSourceField.description }}
                         </p>

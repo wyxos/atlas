@@ -172,6 +172,26 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.serviceFilters.local_preset).toBe('reacted_random');
     });
 
+    it('restores multiple local source selections from tab params', () => {
+        const form = createBrowseForm();
+        form.reset();
+
+        form.syncFromTab({
+            id: 5,
+            label: 'Local tab',
+            position: 0,
+            isActive: true,
+            params: {
+                feed: 'local',
+                source: ['CivitAI', 'Wallhaven'],
+                page: 1,
+                limit: 20,
+            } as any,
+        });
+
+        expect(form.data.feed).toBe('local');
+        expect(form.data.source).toEqual(['CivitAI', 'Wallhaven']);
+    });
 
     it('uses provided instance when available (tab isolation)', () => {
         const Parent = defineComponent({

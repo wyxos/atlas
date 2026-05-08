@@ -132,9 +132,11 @@ class LocalBrowseTypesenseCompiler
             $filters[] = 'not_found:=false';
         }
 
-        $source = $context['source'] ?? null;
-        if (is_string($source) && $source !== '' && $source !== 'all') {
-            $filters[] = 'source:='.$this->quote($source);
+        $sources = $this->normalizeSources($context['source'] ?? 'all');
+        if ($sources !== ['all']) {
+            $filters[] = count($sources) === 1
+                ? 'source:='.$this->quote($sources[0])
+                : 'source:=['.$this->implodeExactValues($sources).']';
         }
 
         $downloaded = (string) ($context['downloaded'] ?? 'any');
@@ -237,6 +239,34 @@ class LocalBrowseTypesenseCompiler
     private function implodeExactValues(array $values): string
     {
         return implode(', ', array_map(fn ($value) => $this->quote($value), $values));
+    }
+
+    private function normalizeSources(mixed $sourceRaw): array
+    {
+        $rawSources = is_array($sourceRaw) ? $sourceRaw : [$sourceRaw];
+        $sources = [];
+
+        foreach ($rawSources as $source) {
+            if (! is_string($source) && ! is_numeric($source)) {
+                continue;
+            }
+
+            $source = trim((string) $source);
+
+            if ($source === '') {
+                continue;
+            }
+
+            $sources[] = $source;
+        }
+
+        $sources = array_values(array_unique($sources));
+
+        if ($sources === [] || in_array('all', $sources, true)) {
+            return ['all'];
+        }
+
+        return $sources;
     }
 
     private function quote(string $value): string

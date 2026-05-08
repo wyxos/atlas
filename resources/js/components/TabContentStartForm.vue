@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from '@/components/ui/switch';
 import Input from '@/components/ui/input/Input.vue';
+import LocalSourceDropdown from '@/components/tab-filter/LocalSourceDropdown.vue';
 import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
 import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/lib/browseCatalog';
+import type { LocalSourceSelection } from '@/utils/localSourceSelection';
 import {
     LOCAL_TAB_FILTER_PRESET_GROUPS,
     LOCAL_TAB_FILTER_PRESETS,
@@ -26,7 +28,7 @@ interface Props {
     isLoading: boolean;
     setLocalMode: (value: boolean) => void;
     updateService: (service: string) => void;
-    updateSource: (source: string) => void;
+    updateSource: (source: LocalSourceSelection) => void;
     applyService: () => void | Promise<void>;
 }
 
@@ -102,7 +104,7 @@ function updateLocalPage(value: string | number): void {
     localPageInput.value = page;
 }
 
-function handleSourceUpdate(value: string): void {
+function handleSourceUpdate(value: LocalSourceSelection): void {
     form.data.source = value;
     props.updateSource(value);
 }
@@ -249,20 +251,13 @@ watch(
 
                     <div v-if="localSourceField" class="form-field">
                         <label class="form-label">{{ localSourceField.label }}</label>
-                        <Select :model-value="form.data.source" :disabled="isLoading" @update:model-value="(value) => handleSourceUpdate(String(value))">
-                            <SelectTrigger class="w-full" data-test="source-select-trigger">
-                                <SelectValue :placeholder="localSourceField.placeholder || 'Select…'" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="option in localSourceField.options ?? []"
-                                    :key="String(option.value)"
-                                    :value="option.value as any"
-                                >
-                                    {{ option.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <LocalSourceDropdown
+                            :model-value="form.data.source"
+                            :options="localSourceField.options ?? []"
+                            :disabled="isLoading"
+                            :placeholder="localSourceField.placeholder || 'Select...'"
+                            @update:model-value="handleSourceUpdate"
+                        />
                         <p v-if="shouldShowTabFilterDescriptionBelow(localSourceField)" class="form-help">
                             {{ localSourceField.description }}
                         </p>

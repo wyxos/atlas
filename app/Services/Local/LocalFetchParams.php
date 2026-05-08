@@ -9,7 +9,7 @@ class LocalFetchParams
      *   params: array<string, mixed>,
      *   page: int,
      *   limit: int,
-     *   source: ?string,
+     *   source: array<int, string>,
      *   downloaded: string,
      *   notFound: string,
      *   blacklisted: string,
@@ -29,7 +29,8 @@ class LocalFetchParams
     {
         $page = (int) ($params['page'] ?? 1);
         $limit = (int) ($params['limit'] ?? 20);
-        $source = is_string($params['source'] ?? null) ? (string) $params['source'] : null;
+        $source = self::normalizeSources($params['source'] ?? 'all');
+        $params['source'] = count($source) === 1 ? $source[0] : $source;
         $downloaded = is_string($params['downloaded'] ?? null) ? (string) $params['downloaded'] : 'any';
         $notFound = is_string($params['not_found'] ?? null) ? (string) $params['not_found'] : 'no';
         $blacklisted = is_string($params['blacklisted'] ?? null) ? (string) $params['blacklisted'] : 'any';
@@ -124,6 +125,17 @@ class LocalFetchParams
         }
 
         return $fileTypes;
+    }
+
+    private static function normalizeSources(mixed $sourceRaw): array
+    {
+        $sources = self::normalizeStringList($sourceRaw);
+
+        if ($sources === [] || in_array('all', $sources, true)) {
+            return ['all'];
+        }
+
+        return $sources;
     }
 
     private static function normalizeReactionTypes(mixed $reaction, array $allTypes): ?array

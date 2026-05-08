@@ -28,7 +28,7 @@ test('fetch delegates normalized params to the typesense gateway', function () {
         ->withArgs(function (array $context): bool {
             expect($context['page'])->toBe(2)
                 ->and($context['limit'])->toBe(15)
-                ->and($context['source'])->toBe('Wallhaven')
+                ->and($context['source'])->toBe(['Wallhaven'])
                 ->and($context['downloaded'])->toBe('no')
                 ->and($context['fileTypes'])->toBe(['video'])
                 ->and($context['reactionMode'])->toBe('types')
