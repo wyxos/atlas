@@ -62,22 +62,11 @@ onMounted(dashboard.actions.fetchMetrics);
                 {{ loadError }}
             </div>
 
-            <DashboardCoverageCard :coverage="coverage" :is-loading="isLoading" />
-
-            <div class="grid gap-6 lg:grid-cols-3">
-                <DashboardMetricPanel
-                    v-for="panel in metricPanels.slice(0, 2)"
-                    :key="panel.key"
-                    :panel="panel"
-                    :is-loading="isLoading"
-                />
+            <div class="grid auto-rows-fr gap-6 lg:grid-cols-2">
+                <DashboardCoverageCard :coverage="coverage" :is-loading="isLoading" />
+                <DashboardMetricPanel :panel="metricPanels[0]" :is-loading="isLoading" />
                 <DashboardPositiveOutcomePanel :outcomes="positiveOutcomes" :is-loading="isLoading" />
-                <DashboardMetricPanel
-                    v-for="panel in metricPanels.slice(2)"
-                    :key="panel.key"
-                    :panel="panel"
-                    :is-loading="isLoading"
-                />
+                <DashboardMetricPanel :panel="metricPanels[1]" :is-loading="isLoading" />
             </div>
 
             <div class="space-y-6 rounded-lg border border-twilight-indigo-500/40 bg-prussian-blue-600 p-6">

@@ -3,6 +3,7 @@ import type {
     DashboardContainerGroup,
     DashboardContainerTotals,
     DashboardCoverage,
+    DashboardMetricDistribution,
     DashboardMetricPanel,
     DashboardMetricRow,
     DashboardMetrics,
@@ -47,19 +48,28 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
     const total = files?.total ?? 0;
     const unseen = files?.unreacted_unpreviewed_not_blacklisted ?? 0;
     const pending = files?.unreacted_previewed_not_blacklisted ?? 0;
+    const unreacted = files?.unreacted_not_blacklisted ?? 0;
     const removed = files?.blacklisted ?? 0;
     const kept = Math.max(0, total - unseen - pending - removed);
     const moderated = kept + removed;
+    const segments = [
+        createCoverageSegment('unseen', 'Unseen', unseen, total, colors.unseen),
+        createCoverageSegment('pending', 'Seen, no decision', pending, total, colors.pending),
+        createCoverageSegment('kept', 'Kept', kept, total, colors.kept),
+        createCoverageSegment('removed', 'Removed', removed, total, colors.removed),
+    ];
 
     return {
         total,
         moderated,
         moderatedPercent: formatDashboardPercent(percent(moderated, total)),
-        segments: [
-            createCoverageSegment('unseen', 'Unseen', unseen, total, colors.unseen),
-            createCoverageSegment('pending', 'Seen, no decision', pending, total, colors.pending),
-            createCoverageSegment('kept', 'Kept', kept, total, colors.kept),
-            createCoverageSegment('removed', 'Removed', removed, total, colors.removed),
+        segments,
+        distributions: [
+            createMetricDistribution('coverage', 'Coverage split', 'Unseen, pending, kept, and removed files', segments),
+            createMetricDistribution('backlog', 'Backlog split', 'Unseen files vs seen files still waiting for a decision', [
+                createMetricRow('unseen', 'Not previewed', unseen, colors.unseen, unreacted, 'of backlog'),
+                createMetricRow('pending', 'Previewed, no decision', pending, colors.pending, unreacted, 'of backlog'),
+            ]),
         ],
     };
 }
@@ -67,53 +77,59 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
 export function createDashboardMetricPanels(metrics: DashboardMetrics | null): DashboardMetricPanel[] {
     const files = metrics?.files;
     const total = files?.total ?? 0;
-    const unreacted = files?.unreacted_not_blacklisted ?? 0;
+    const downloaded = files?.downloaded ?? 0;
+    const local = files?.local ?? 0;
+    const nonLocal = files?.non_local ?? 0;
+    const notFound = files?.not_found ?? 0;
     const blacklisted = files?.blacklisted ?? 0;
+    const manualBlacklisted = files?.blacklisted_manual ?? 0;
+    const autoBlacklisted = files?.auto_blacklisted ?? 0;
     const outOfFeed = files?.blacklisted_feed_removed ?? 0;
-    const decided = Math.max(0, total - unreacted);
+    const blacklistedInFeed = Math.max(0, blacklisted - outOfFeed);
 
     return [
         {
             key: 'library',
             title: 'Library health',
-            description: 'Inventory coverage and file availability.',
-            rows: [
+            description: 'Inventory source and availability distribution.',
+            summaryRows: [
                 createMetricRow('total', 'Total files', total, colors.total),
-                createMetricRow('downloaded', 'Downloaded', files?.downloaded ?? 0, colors.downloaded, total, 'of library'),
-                createMetricRow('local', 'Local', files?.local ?? 0, colors.local, total, 'of library'),
-                createMetricRow('non-local', 'Non-local', files?.non_local ?? 0, colors.nonLocal, total, 'of library'),
-                createMetricRow('not-found', 'Not found', files?.not_found ?? 0, colors.notFound, total, 'of library'),
             ],
+            distributions: [
+                createMetricDistribution('source', 'Source split', 'Local files vs external references', [
+                    createMetricRow('local', 'Local', local, colors.local, total, 'of library'),
+                    createMetricRow('non-local', 'Non-local', nonLocal, colors.nonLocal, total, 'of library'),
+                ]),
+                createMetricDistribution('storage', 'Storage state', 'Downloaded assets vs remote-only records', [
+                    createMetricRow('downloaded', 'Downloaded', downloaded, colors.downloaded, total, 'of library'),
+                    createMetricRow('remote-only', 'Remote only', Math.max(0, total - downloaded), colors.unseen, total, 'of library'),
+                ]),
+                createMetricDistribution('availability', 'Availability', 'Reachable records vs missing source files', [
+                    createMetricRow('available', 'Available', Math.max(0, total - notFound), colors.total, total, 'of library'),
+                    createMetricRow('not-found', 'Not found', notFound, colors.notFound, total, 'of library'),
+                ]),
+            ],
+            rows: [],
         },
         {
-            key: 'backlog',
-            title: 'Review backlog',
-            description: 'Files still waiting for a decision.',
-            rows: [
-                createMetricRow('decided', 'Decision coverage', decided, colors.kept, total, 'of library'),
-                createMetricRow('unseen', 'Not previewed', files?.unreacted_unpreviewed_not_blacklisted ?? 0, colors.unseen, total, 'of library'),
-                createMetricRow('pending', 'Previewed, no decision', files?.unreacted_previewed_not_blacklisted ?? 0, colors.pending, total, 'of library'),
-            ],
-        },
-        {
-            key: 'filtered',
-            title: 'Filtered / removed',
-            description: 'Blacklist volume and source split.',
-            rows: [
+            key: 'removal',
+            title: 'Removal impact',
+            description: 'Blacklist source and feed rotation impact.',
+            summaryRows: [
                 createMetricRow('blacklisted', 'Total blacklisted', blacklisted, colors.removed, total, 'of library'),
-                createMetricRow('manual', 'Manual blacklist', files?.blacklisted_manual ?? 0, colors.pending, blacklisted, 'of blacklisted'),
-                createMetricRow('auto', 'Auto blacklist', files?.auto_blacklisted ?? 0, colors.auto, blacklisted, 'of blacklisted'),
-            ],
-        },
-        {
-            key: 'feed',
-            title: 'Feed impact',
-            description: 'Blacklisted files pushed out of normal feed rotation.',
-            rows: [
                 createMetricRow('out-of-feed', 'Out of feed', outOfFeed, colors.feed, blacklisted, 'of blacklisted'),
-                createMetricRow('blacklisted-in-feed', 'Still in feed', Math.max(0, blacklisted - outOfFeed), colors.auto, blacklisted, 'of blacklisted'),
-                createMetricRow('library-share', 'Library share', outOfFeed, colors.feed, total, 'of library'),
             ],
+            distributions: [
+                createMetricDistribution('blacklist-source', 'Blacklist source', 'Manual removals vs backend-applied removals', [
+                    createMetricRow('manual', 'Manual', manualBlacklisted, colors.pending, blacklisted, 'of blacklisted'),
+                    createMetricRow('auto', 'Auto', autoBlacklisted, colors.auto, blacklisted, 'of blacklisted'),
+                ]),
+                createMetricDistribution('feed-state', 'Feed state', 'Removed from normal rotation vs still visible in feed', [
+                    createMetricRow('out-of-feed', 'Out of feed', outOfFeed, colors.feed, blacklisted, 'of blacklisted'),
+                    createMetricRow('blacklisted-in-feed', 'Still in feed', blacklistedInFeed, colors.auto, blacklisted, 'of blacklisted'),
+                ]),
+            ],
+            rows: [],
         },
     ];
 }
@@ -125,7 +141,6 @@ export function createDashboardPositiveOutcomes(metrics: DashboardMetrics | null
         { key: 'like', label: 'Like', value: reactions?.like ?? 0, color: colors.like },
         { key: 'funny', label: 'Funny', value: reactions?.funny ?? 0, color: colors.funny },
     ];
-    const maxValue = Math.max(...rows.map((row) => row.value), 0);
     const total = rows.reduce((sum, row) => sum + row.value, 0);
 
     return {
@@ -134,7 +149,7 @@ export function createDashboardPositiveOutcomes(metrics: DashboardMetrics | null
         total,
         rows: rows.map((row) => ({
             ...row,
-            barPercent: percent(row.value, maxValue),
+            barPercent: percent(row.value, total),
             meta: `${formatDashboardPercent(percent(row.value, total))} of positive signals`,
         })),
     };
@@ -204,6 +219,20 @@ function createMetricRow(
         color,
         barPercent,
         meta: barPercent === undefined ? undefined : `${formatDashboardPercent(barPercent)} ${basisLabel}`,
+    };
+}
+
+function createMetricDistribution(
+    key: string,
+    label: string,
+    meta: string,
+    segments: DashboardMetricRow[],
+): DashboardMetricDistribution {
+    return {
+        key,
+        label,
+        meta,
+        segments,
     };
 }
 

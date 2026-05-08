@@ -157,10 +157,8 @@ describe('Dashboard', () => {
 
         expect(wrapper.text()).toContain('Moderation coverage');
         expect(wrapper.text()).toContain('Library health');
-        expect(wrapper.text()).toContain('Review backlog');
         expect(wrapper.text()).toContain('Positive outcomes');
-        expect(wrapper.text()).toContain('Filtered / removed');
-        expect(wrapper.text()).toContain('Feed impact');
+        expect(wrapper.text()).toContain('Removal impact');
     });
 
     it('renders moderation coverage and regrouped metric labels', async () => {
@@ -170,6 +168,9 @@ describe('Dashboard', () => {
         metrics.files.blacklisted_manual = 4;
         metrics.files.auto_blacklisted = 3;
         metrics.files.blacklisted_feed_removed = 2;
+        metrics.files.reactions.love = 5;
+        metrics.files.reactions.like = 3;
+        metrics.files.reactions.funny = 2;
         metrics.files.unreacted_not_blacklisted = 11;
         metrics.files.unreacted_previewed_not_blacklisted = 6;
         metrics.files.unreacted_unpreviewed_not_blacklisted = 5;
@@ -187,18 +188,32 @@ describe('Dashboard', () => {
         await wrapper.vm.$nextTick();
 
         const text = wrapper.text();
-        expect(text).toContain('Moderated');
+        expect(text).toContain('Decision coverage');
         expect(text).toContain('89%');
         expect(text).toContain('Unseen');
         expect(text).toContain('Seen, no decision');
         expect(text).toContain('Kept');
         expect(text).toContain('Removed');
+        expect(text).toContain('Source split');
+        expect(text).toContain('Storage state');
+        expect(text).toContain('Availability');
+        expect(text).toContain('Remote only');
         expect(text).toContain('Decision coverage');
+        expect(text).toContain('Backlog split');
         expect(text).toContain('Previewed, no decision');
+        expect(text).toContain('Reaction split');
+        expect(text).toContain('Favorite');
+        expect(text).toContain('50%');
+        expect(text).toContain('Like');
+        expect(text).toContain('30%');
+        expect(text).toContain('Funny');
+        expect(text).toContain('20%');
         expect(text).toContain('Total blacklisted');
-        expect(text).toContain('Manual blacklist');
-        expect(text).toContain('Auto blacklist');
+        expect(text).toContain('Blacklist source');
+        expect(text).toContain('Manual');
+        expect(text).toContain('Auto');
         expect(text).toContain('Out of feed');
+        expect(text).toContain('Feed state');
         expect(text).toContain('Still in feed');
     });
 

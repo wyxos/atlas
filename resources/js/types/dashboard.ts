@@ -50,6 +50,7 @@ export type DashboardCoverage = {
     moderated: number;
     moderatedPercent: string;
     segments: DashboardCoverageSegment[];
+    distributions: DashboardMetricDistribution[];
 };
 
 export type DashboardMetricRow = {
@@ -61,11 +62,20 @@ export type DashboardMetricRow = {
     color: string;
 };
 
+export type DashboardMetricDistribution = {
+    key: string;
+    label: string;
+    meta?: string;
+    segments: DashboardMetricRow[];
+};
+
 export type DashboardMetricPanel = {
-    key: 'library' | 'backlog' | 'filtered' | 'feed';
+    key: 'library' | 'removal';
     title: string;
     description: string;
     rows: DashboardMetricRow[];
+    summaryRows?: DashboardMetricRow[];
+    distributions?: DashboardMetricDistribution[];
 };
 
 export type DashboardPositiveOutcomes = {
