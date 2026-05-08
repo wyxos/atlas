@@ -13,6 +13,7 @@ const { mockVibeMount, mockVibeRemove } = vi.hoisted(() => ({
 vi.mock('@wyxos/vibe', () => ({
     VibeLayout: {
         name: 'VibeLayout',
+        emits: ['asset-loads'],
         props: ['initialState'],
         mounted() {
             mockVibeMount();
@@ -28,6 +29,11 @@ vi.mock('@wyxos/vibe', () => ({
         },
         template: `
             <div data-test="sheet-vibe">
+                <button
+                    data-test="emit-sheet-asset-loads"
+                    type="button"
+                    @click="$emit('asset-loads', [{ item: initialState.items[0] }])"
+                />
                 <article
                     v-for="(item, index) in initialState.items"
                     :key="item.id"
@@ -69,6 +75,9 @@ function createItemInteractions() {
             hasBlacklistState: vi.fn(() => false),
             onFileReaction: vi.fn(),
             onFileBlacklist: vi.fn().mockResolvedValue(1),
+        },
+        preload: {
+            onBatchPreloaded: vi.fn(),
         },
     };
 }
@@ -156,6 +165,34 @@ describe('TabContentContainerSheet', () => {
             'like',
         );
         expect(mockVibeRemove).toHaveBeenCalledWith('1');
+
+        wrapper.unmount();
+    });
+
+    it('increments preview state when sheet items preload', async () => {
+        const itemInteractions = createItemInteractions();
+        const wrapper = mount(TabContentContainerSheet, {
+            props: {
+                open: true,
+                container: { id: 10, type: 'gallery' },
+                items: [createItem(1), createItem(2)],
+                itemInteractions: itemInteractions as never,
+            },
+            global: {
+                stubs: {
+                    FileReactions: {
+                        name: 'FileReactions',
+                        template: '<div />',
+                    },
+                },
+            },
+        });
+
+        await wrapper.get('[data-test="emit-sheet-asset-loads"]').trigger('click');
+
+        expect(itemInteractions.preload.onBatchPreloaded).toHaveBeenCalledWith([
+            expect.objectContaining({ id: 1 }),
+        ]);
 
         wrapper.unmount();
     });

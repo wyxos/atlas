@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { VibeLayout, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe';
+import { VibeLayout, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeViewerItem } from '@wyxos/vibe';
 import { X } from 'lucide-vue-next';
 import type { ContainerPillTarget } from '@/composables/useContainerPillInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
@@ -77,6 +77,16 @@ function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
 
 function handleVibeRef(instance: VibeHandle | null): void {
     vibeRef.value = (instance as AtlasVibeHandle | null) ?? null;
+}
+
+function handleAssetLoads(loads: VibeAssetLoadEvent[]): void {
+    const batch = loads
+        .map((load) => getFeedItemFromVibeItem(load.item))
+        .filter((item): item is FeedItem => item !== null);
+
+    if (batch.length > 0) {
+        props.itemInteractions.preload.onBatchPreloaded(batch);
+    }
 }
 
 function getShortcutItemFromTarget(target: EventTarget | null): FeedItem | null {
@@ -190,6 +200,7 @@ const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
                     :show-status-badges="false"
                     :surface-mode="'list'"
                     empty-state-mode="hidden"
+                    @asset-loads="handleAssetLoads"
                 >
                     <template #grid-item-overlay="{ item, hovered, active, index }">
                         <div class="pointer-events-none absolute inset-0 z-[5]">

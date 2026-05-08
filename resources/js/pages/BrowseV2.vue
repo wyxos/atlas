@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
 import Tab from '../components/Tab.vue';
@@ -23,6 +23,7 @@ type TabContentV2Handle = {
 
 const isPanelMinimized = ref(false);
 const activeTabContentRef = ref<TabContentV2Handle | null>(null);
+const browseTabListRef = ref<HTMLElement | null>(null);
 const draggedTabId = ref<number | null>(null);
 const dropTargetTabId = ref<number | null>(null);
 const dropIndicator = ref<DropIndicator | null>(null);
@@ -126,8 +127,53 @@ function handleRenameTab(tabId: number, customLabel: string | null): void {
     updateTabCustomLabel(tabId, customLabel);
 }
 
+function getTabListScrollContainer(): HTMLElement | null {
+    return browseTabListRef.value?.parentElement ?? null;
+}
+
+function getScrollPaddingTop(element: HTMLElement): number {
+    const paddingTop = Number.parseFloat(window.getComputedStyle(element).paddingTop);
+
+    return Number.isNaN(paddingTop) ? 0 : paddingTop;
+}
+
+async function scrollTabIntoView(tabId: number | null): Promise<void> {
+    if (tabId === null) {
+        return;
+    }
+
+    await nextTick();
+
+    const scrollContainer = getTabListScrollContainer();
+    const tabElement = browseTabListRef.value?.querySelector(`[data-browse-tab-id="${tabId}"]`);
+
+    if (!scrollContainer || !(tabElement instanceof HTMLElement)) {
+        return;
+    }
+
+    scrollContainer.scrollTo({
+        top: Math.max(
+            0,
+            scrollContainer.scrollTop
+                + tabElement.getBoundingClientRect().top
+                - scrollContainer.getBoundingClientRect().top
+                - getScrollPaddingTop(scrollContainer),
+        ),
+        behavior: 'smooth',
+    });
+}
+
+async function handleCreateTab(): Promise<void> {
+    const tab = await createTab();
+    await scrollTabIntoView(tab.id);
+}
+
 async function handleDuplicateTab(tabId: number): Promise<void> {
-    await duplicateTab(tabId);
+    const tab = await duplicateTab(tabId);
+
+    if (tab && activeTabId.value === tab.id) {
+        await scrollTabIntoView(tab.id);
+    }
 }
 
 async function handleOpenContainerTab(payload: ContainerTabPayload): Promise<void> {
@@ -157,11 +203,17 @@ async function handleCloseTabs(tabIds: number[], preferredTabId: number | null =
         return;
     }
 
+    const previousActiveTabId = activeTabId.value;
+
     try {
         await closeTabs(ids, {
             preferredTabId,
         });
         pruneTabLoadingState(ids);
+
+        if (activeTabId.value !== previousActiveTabId) {
+            await scrollTabIntoView(activeTabId.value);
+        }
     } finally {
         resetDragState();
     }
@@ -311,34 +363,37 @@ onUnmounted(() => {
         <div class="flex-1 min-h-0 relative flex">
             <TabPanel :model-value="true" v-model:is-minimized="isPanelMinimized">
                 <template #tabs="{ isMinimized }">
-                    <Tab
-                        v-for="(tab, index) in tabs"
-                        :key="tab.id"
-                        :id="tab.id"
-                        :label="tab.label"
-                        :custom-label="tab.customLabel ?? null"
-                        :is-active="tab.id === activeTabId"
-                        :is-minimized="isMinimized"
-                        :is-loading="isTabDataLoading(tab.id)"
-                        :is-masonry-loading="tabMasonryLoadingStates.get(tab.id) ?? false"
-                        :is-dragging="isTabDragSource(tab.id)"
-                        :drop-indicator="getTabDropIndicator(tab.id)"
-                        :can-close-above="index > 0"
-                        :can-close-below="index < tabs.length - 1"
-                        :can-close-others="tabs.length > 1"
-                        :data-test="`browse-tab-${tab.id}`"
-                        @click="switchTab(tab.id)"
-                        @close="handleCloseTab(tab.id)"
-                        @rename="handleRenameTab(tab.id, $event)"
-                        @duplicate="handleDuplicateTab(tab.id)"
-                        @close-above="handleCloseTabsRelative(tab.id, 'above')"
-                        @close-below="handleCloseTabsRelative(tab.id, 'below')"
-                        @close-others="handleCloseTabsRelative(tab.id, 'others')"
-                        @drag-start="handleTabDragStart(tab.id)"
-                        @drag-over="handleTabDragOver(tab.id, $event)"
-                        @drag-drop="handleTabDrop(tab.id, $event)"
-                        @drag-end="handleTabDragEnd"
-                    />
+                    <div ref="browseTabListRef" class="flex flex-col gap-2" data-test="browse-tab-list">
+                        <Tab
+                            v-for="(tab, index) in tabs"
+                            :key="tab.id"
+                            :id="tab.id"
+                            :label="tab.label"
+                            :custom-label="tab.customLabel ?? null"
+                            :is-active="tab.id === activeTabId"
+                            :is-minimized="isMinimized"
+                            :is-loading="isTabDataLoading(tab.id)"
+                            :is-masonry-loading="tabMasonryLoadingStates.get(tab.id) ?? false"
+                            :is-dragging="isTabDragSource(tab.id)"
+                            :drop-indicator="getTabDropIndicator(tab.id)"
+                            :can-close-above="index > 0"
+                            :can-close-below="index < tabs.length - 1"
+                            :can-close-others="tabs.length > 1"
+                            :data-browse-tab-id="tab.id"
+                            :data-test="`browse-tab-${tab.id}`"
+                            @click="switchTab(tab.id)"
+                            @close="handleCloseTab(tab.id)"
+                            @rename="handleRenameTab(tab.id, $event)"
+                            @duplicate="handleDuplicateTab(tab.id)"
+                            @close-above="handleCloseTabsRelative(tab.id, 'above')"
+                            @close-below="handleCloseTabsRelative(tab.id, 'below')"
+                            @close-others="handleCloseTabsRelative(tab.id, 'others')"
+                            @drag-start="handleTabDragStart(tab.id)"
+                            @drag-over="handleTabDragOver(tab.id, $event)"
+                            @drag-drop="handleTabDrop(tab.id, $event)"
+                            @drag-end="handleTabDragEnd"
+                        />
+                    </div>
                 </template>
                 <template #footer="{ isMinimized }">
                     <Button
@@ -347,7 +402,7 @@ onUnmounted(() => {
                         :class="['w-full rounded h-8', isMinimized ? 'justify-center' : 'justify-start']"
                         aria-label="New tab"
                         data-test="create-tab-button"
-                        @click="createTab"
+                        @click="handleCreateTab"
                     >
                         <Plus :size="16" />
                         <span

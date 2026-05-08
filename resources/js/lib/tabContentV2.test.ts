@@ -188,6 +188,40 @@ describe('tabContentV2 resolve', () => {
         expect(totalAvailable.value).toBeNull();
     });
 
+    it('auto-hides the local browse unavailable toast', async () => {
+        const toast = {
+            error: vi.fn(),
+        };
+
+        window.axios.get = vi.fn().mockRejectedValue({
+            response: {
+                data: {
+                    message: 'Local browse unavailable',
+                },
+            },
+        }) as typeof window.axios.get;
+
+        const resolve = createTabContentV2Resolve({
+            form: {
+                getData: () => ({
+                    feed: 'local',
+                    limit: 20,
+                    page: 1,
+                    service: '',
+                    serviceFilters: {},
+                    source: 'all',
+                    tab_id: 44,
+                }),
+            } as any,
+            startPageToken: ref(1),
+            toast,
+        });
+
+        await expect(resolve({ cursor: 1, pageSize: 20 })).rejects.toThrow('Local browse unavailable');
+
+        expect(toast.error).toHaveBeenCalledWith('Local browse unavailable', { duration: 5000 });
+    });
+
     it('marks audio and video previews with explicit renderable media types', () => {
         const audioItem = mapFeedItemToVibeItem({
             ...createFeedItem(10),

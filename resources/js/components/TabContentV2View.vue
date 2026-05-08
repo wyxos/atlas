@@ -23,6 +23,7 @@ import DownloadedReactionDialog from './DownloadedReactionDialog.vue';
 import FileReactions from './FileReactions.vue';
 import FileViewerSheet from './FileViewerSheet.vue';
 import LocalFileDeleteDialog from './LocalFileDeleteDialog.vue';
+import Pill from './ui/Pill.vue';
 import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
 import TabContentContainerSheet from './TabContentContainerSheet.vue';
 import TabContentPromptDialog from './TabContentPromptDialog.vue';
@@ -132,6 +133,14 @@ function handleVibeRef(instance: unknown): void {
 
 function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
     return (item.feedItem as FeedItem | undefined) ?? null;
+}
+
+function getContainerPillTargets(item: VibeViewerItem) {
+    const feedItem = getFeedItemFromVibeItem(item);
+
+    return feedItem
+        ? props.containerInteractions.badges?.getContainersForItem(feedItem) ?? []
+        : [];
 }
 
 function shouldDimGridItemForContainerDrawer(item: VibeViewerItem): boolean {
@@ -326,6 +335,32 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                     </template>
                     <template #fullscreen-overlay="{ item, index, total }">
                         <div class="pointer-events-none absolute inset-0 z-[5]">
+                            <div
+                                v-if="getContainerPillTargets(item as VibeViewerItem).length > 0"
+                                class="pointer-events-auto absolute left-4 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] flex max-w-[min(24rem,calc(100vw-2rem))] flex-col gap-1 max-[720px]:top-[calc(env(safe-area-inset-top,0px)+4.25rem)]"
+                            >
+                                <div
+                                    v-for="container in getContainerPillTargets(item as VibeViewerItem)"
+                                    :key="container.id"
+                                    class="cursor-pointer"
+                                    data-container-pill-trigger
+                                    @mouseenter="() => containerInteractions.pillHandlers.onMouseEnter(container.id)"
+                                    @mouseleave="() => containerInteractions.pillHandlers.onMouseLeave(container.id)"
+                                    @click.stop="(event) => containerInteractions.pillHandlers.onClick(container.id, event)"
+                                    @dblclick.prevent.stop="(event) => containerInteractions.pillHandlers.onDoubleClick(container.id, event)"
+                                    @contextmenu.prevent.stop="(event) => containerInteractions.pillHandlers.onContextMenu(container.id, event)"
+                                    @mousedown.stop="containerInteractions.pillHandlers.onMouseDown"
+                                    @mouseup.stop="(event) => { if (event.button === 1) containerInteractions.pillHandlers.onAuxClick(container.id, event) }"
+                                >
+                                    <Pill
+                                        :label="container.type"
+                                        :value="containerInteractions.badges.getItemCountForContainerId(container.id)"
+                                        :variant="containerInteractions.badges.getVariantForContainerType(container.type)"
+                                        :dismissible="containerInteractions.isBlacklistable(container) ? 'danger' : false"
+                                        @dismiss="() => containerInteractions.pillHandlers.onDismiss(container)"
+                                    />
+                                </div>
+                            </div>
                             <div
                                 data-testid="browse-fullscreen-reactions"
                                 class="pointer-events-auto absolute left-1/2 -translate-x-1/2"

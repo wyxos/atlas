@@ -43,7 +43,9 @@ vi.mock('../components/ui/TabPanel.vue', () => ({
         name: 'TabPanel',
         template: `
             <div class="tab-panel-mock">
-                <slot name="tabs" :isMinimized="false" />
+                <div data-test="tab-panel-tabs-scroll">
+                    <slot name="tabs" :isMinimized="false" />
+                </div>
                 <slot name="footer" :isMinimized="false" />
             </div>
         `,
@@ -130,22 +132,38 @@ vi.mock('@/composables/useTabs', async () => {
     };
 });
 
+type MockedTabsModule = {
+    __tabsRef: {
+        value: Array<{
+            id: number;
+            label: string;
+            customLabel?: string | null;
+            params: Record<string, unknown>;
+            position: number;
+            isActive: boolean;
+        }>;
+    };
+    __activeTabIdRef: { value: number | null };
+};
+
+function createRect(top: number, height: number = 40): DOMRect {
+    return {
+        bottom: top + height,
+        height,
+        left: 0,
+        right: 240,
+        top,
+        width: 240,
+        x: 0,
+        y: top,
+        toJSON: () => ({}),
+    } as DOMRect;
+}
+
 beforeEach(async () => {
     vi.clearAllMocks();
 
-    const mockedTabsModule = await import('@/composables/useTabs') as {
-        __tabsRef: {
-            value: Array<{
-                id: number;
-                label: string;
-                customLabel?: string | null;
-                params: Record<string, unknown>;
-                position: number;
-                isActive: boolean;
-            }>;
-        };
-        __activeTabIdRef: { value: number | null };
-    };
+    const mockedTabsModule = await import('@/composables/useTabs') as MockedTabsModule;
 
     mockedTabsModule.__tabsRef.value = [
         { id: 1, label: 'Tab 1', params: { service: 'civit-ai-images', page: 4 }, position: 0, isActive: true },
@@ -187,5 +205,116 @@ describe('Browse actions', () => {
         expect(tabContentStopAutoScrollMock).toHaveBeenCalledTimes(1);
         expect(setActiveTabMock).toHaveBeenCalledWith(2);
         expect(tabContentCancelFillMock.mock.invocationCallOrder[0]).toBeLessThan(setActiveTabMock.mock.invocationCallOrder[0]);
+    });
+
+    it('smoothly scrolls a newly opened tab into view', async () => {
+        const mockedTabsModule = await import('@/composables/useTabs') as MockedTabsModule;
+        const createdTab = {
+            id: 3,
+            label: 'Tab 3',
+            params: { service: 'civit-ai-images', page: 1 },
+            position: 2,
+            isActive: true,
+        };
+        createTabMock.mockImplementationOnce(async () => {
+            mockedTabsModule.__tabsRef.value = [
+                ...mockedTabsModule.__tabsRef.value.map(tab => ({ ...tab, isActive: false })),
+                createdTab,
+            ];
+            mockedTabsModule.__activeTabIdRef.value = createdTab.id;
+
+            return createdTab;
+        });
+
+        const wrapper = mount(BrowseV2, { attachTo: document.body });
+        const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            if (this.getAttribute('data-test') === 'tab-panel-tabs-scroll') {
+                return createRect(100, 200);
+            }
+
+            if (this.getAttribute('data-browse-tab-id') === '3') {
+                return createRect(240);
+            }
+
+            return createRect(0);
+        });
+
+        try {
+            await flushPromises();
+
+            const scrollContainer = wrapper.get('[data-test="tab-panel-tabs-scroll"]').element as HTMLElement;
+            const scrollToMock = vi.fn();
+            scrollContainer.scrollTop = 40;
+            scrollContainer.style.paddingTop = '16px';
+            scrollContainer.scrollTo = scrollToMock;
+
+            await wrapper.get('[data-test="create-tab-button"]').trigger('click');
+            await flushPromises();
+
+            expect(createTabMock).toHaveBeenCalledTimes(1);
+            expect(scrollToMock).toHaveBeenCalledWith({
+                top: 164,
+                behavior: 'smooth',
+            });
+        } finally {
+            rectSpy.mockRestore();
+            wrapper.unmount();
+        }
+    });
+
+    it('smoothly scrolls the focused tab into view after active tab closure', async () => {
+        const mockedTabsModule = await import('@/composables/useTabs') as MockedTabsModule;
+        mockedTabsModule.__tabsRef.value = [
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: true },
+            { id: 2, label: 'Tab 2', params: {}, position: 1, isActive: false },
+            { id: 3, label: 'Tab 3', params: {}, position: 2, isActive: false },
+        ];
+        mockedTabsModule.__activeTabIdRef.value = 1;
+        closeTabsMock.mockImplementationOnce(async () => {
+            mockedTabsModule.__tabsRef.value = [
+                { id: 2, label: 'Tab 2', params: {}, position: 0, isActive: true },
+                { id: 3, label: 'Tab 3', params: {}, position: 1, isActive: false },
+            ];
+            mockedTabsModule.__activeTabIdRef.value = 2;
+
+            return [1];
+        });
+
+        const wrapper = mount(BrowseV2, { attachTo: document.body });
+        const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            if (this.getAttribute('data-test') === 'tab-panel-tabs-scroll') {
+                return createRect(50, 200);
+            }
+
+            if (this.getAttribute('data-browse-tab-id') === '2') {
+                return createRect(180);
+            }
+
+            return createRect(0);
+        });
+
+        try {
+            await flushPromises();
+
+            const scrollContainer = wrapper.get('[data-test="tab-panel-tabs-scroll"]').element as HTMLElement;
+            const scrollToMock = vi.fn();
+            scrollContainer.scrollTop = 10;
+            scrollContainer.style.paddingTop = '8px';
+            scrollContainer.scrollTo = scrollToMock;
+
+            wrapper.findAllComponents({ name: 'Tab' })[0].vm.$emit('close');
+            await flushPromises();
+
+            expect(closeTabsMock).toHaveBeenCalledWith([1], {
+                preferredTabId: null,
+            });
+            expect(scrollToMock).toHaveBeenCalledWith({
+                top: 132,
+                behavior: 'smooth',
+            });
+        } finally {
+            rectSpy.mockRestore();
+            wrapper.unmount();
+        }
     });
 });

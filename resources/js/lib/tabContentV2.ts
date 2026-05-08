@@ -27,9 +27,12 @@ type TabContentV2ResolveArgs = {
     updateTabLabel?: (cursor: BrowsePageToken | string | number | null | undefined) => void;
     filterItems?: (items: FeedItem[]) => FeedItem[];
     toast: {
-        error: (message: string) => void;
+        error: (message: string, options?: { duration?: number }) => void;
     };
 };
+
+const LOCAL_BROWSE_UNAVAILABLE_MESSAGE = 'Local browse unavailable';
+const LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS = 5000;
 
 export function createTabContentV2EmptyStatus(): VibeStatus {
     return {
@@ -115,6 +118,18 @@ function normalizeUrl(value: unknown): string | null {
 
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+}
+
+function showBrowseErrorToast(
+    toast: TabContentV2ResolveArgs['toast'],
+    message: string,
+): void {
+    if (message === LOCAL_BROWSE_UNAVAILABLE_MESSAGE) {
+        toast.error(message, { duration: LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS });
+        return;
+    }
+
+    toast.error(message);
 }
 
 export function resolveOverlayMediaType(item: FeedItem): OverlayMediaType {
@@ -225,7 +240,7 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
                 || 'Browse request failed.';
             const trimmed = message.length > 280 ? `${message.slice(0, 280)}…` : message;
 
-            args.toast.error(trimmed);
+            showBrowseErrorToast(args.toast, trimmed);
             console.error('Browse request failed', { query, error });
 
             if (args.totalAvailable) {
