@@ -245,8 +245,13 @@ describe('TabContentV2View fullscreen overlay', () => {
             },
         });
         const wrapper = mount(TabContentV2View, { props, global: { stubs: { ...defaultStubs, Pill: pillStub } } });
+        const pillRow = wrapper.get('[data-testid="browse-fullscreen-container-pills"]');
         const trigger = wrapper.get('[data-container-pill-trigger]');
 
+        expect(pillRow.attributes('class')).toContain('left-1/2');
+        expect(pillRow.attributes('class')).toContain('-translate-x-1/2');
+        expect(pillRow.attributes('class')).toContain('flex-row');
+        expect(pillRow.attributes('class')).toContain('justify-center');
         expect(wrapper.get('[data-testid="fullscreen-container-pill"]').text()).toBe('User:5');
 
         await trigger.trigger('mouseenter');

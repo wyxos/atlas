@@ -337,7 +337,8 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                         <div class="pointer-events-none absolute inset-0 z-[5]">
                             <div
                                 v-if="getContainerPillTargets(item as VibeViewerItem).length > 0"
-                                class="pointer-events-auto absolute left-4 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] flex max-w-[min(24rem,calc(100vw-2rem))] flex-col gap-1 max-[720px]:top-[calc(env(safe-area-inset-top,0px)+4.25rem)]"
+                                class="pointer-events-auto absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] flex max-w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-row flex-wrap justify-center gap-1 max-[720px]:top-[calc(env(safe-area-inset-top,0px)+4.25rem)]"
+                                data-testid="browse-fullscreen-container-pills"
                             >
                                 <div
                                     v-for="container in getContainerPillTargets(item as VibeViewerItem)"

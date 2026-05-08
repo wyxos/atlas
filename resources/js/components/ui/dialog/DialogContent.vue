@@ -28,6 +28,9 @@ const isOpen = computed(() => {
 
 function handleEscape(event: KeyboardEvent): void {
     if (event.key === 'Escape' && isOpen.value) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
         setDialogOpen?.(false);
     }
 }
@@ -111,4 +114,3 @@ onUnmounted(() => {
         </Transition>
     </Teleport>
 </template>
-
