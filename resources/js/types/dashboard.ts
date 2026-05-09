@@ -18,6 +18,12 @@ export type DashboardMetrics = {
         non_local: number;
         local_available: number;
         non_local_available: number;
+        file_types: {
+            image: number;
+            video: number;
+            audio: number;
+            other: number;
+        };
         reactions: {
             love: number;
             like: number;
@@ -55,13 +61,17 @@ export type DashboardMetricIcon =
     | 'download'
     | 'eye'
     | 'eye-off'
+    | 'file'
     | 'file-x'
     | 'hard-drive'
     | 'heart'
+    | 'image'
     | 'import'
+    | 'music'
     | 'smile'
     | 'thumbs-up'
-    | 'user';
+    | 'user'
+    | 'video';
 
 export type DashboardCoverageSegment = {
     key: 'unseen' | 'pending' | 'kept' | 'removed';

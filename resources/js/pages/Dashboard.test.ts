@@ -13,6 +13,12 @@ type DashboardMetrics = {
         non_local: number;
         local_available: number;
         non_local_available: number;
+        file_types: {
+            image: number;
+            video: number;
+            audio: number;
+            other: number;
+        };
         reactions: {
             love: number;
             like: number;
@@ -83,6 +89,12 @@ const createMetrics = (): DashboardMetrics => ({
         non_local: 0,
         local_available: 0,
         non_local_available: 0,
+        file_types: {
+            image: 0,
+            video: 0,
+            audio: 0,
+            other: 0,
+        },
         reactions: {
             love: 0,
             like: 0,
@@ -193,6 +205,10 @@ describe('Dashboard', () => {
         metrics.files.non_local = 70;
         metrics.files.local_available = 20;
         metrics.files.non_local_available = 75;
+        metrics.files.file_types.image = 45;
+        metrics.files.file_types.video = 30;
+        metrics.files.file_types.audio = 15;
+        metrics.files.file_types.other = 10;
         metrics.files.not_found = 5;
         metrics.files.reacted = 89;
         metrics.files.unreacted = 11;
@@ -229,6 +245,12 @@ describe('Dashboard', () => {
         expect(text).toContain('Not found');
         expect(text).toContain('Stored origin');
         expect(text).toContain('Imported');
+        expect(text).toContain('File types');
+        expect(text).toContain('Images');
+        expect(text).toContain('Videos');
+        expect(text).toContain('Audio');
+        expect(text).toContain('Other');
+        expect(text).toContain('45 / 100');
         expect(text).toContain('Reaction state');
         expect(text).toContain('Reacted');
         expect(text).toContain('Not reacted');

@@ -18,6 +18,10 @@ const colors = {
     imported: 'var(--color-smart-blue-500)',
     notFound: 'var(--color-danger-300)',
     online: '#38bdf8',
+    image: 'var(--color-success-400)',
+    video: '#38bdf8',
+    audio: '#a78bfa',
+    other: 'var(--color-blue-slate-500)',
     unseen: 'var(--color-blue-slate-500)',
     pending: '#f97316',
     kept: 'var(--color-success-400)',
@@ -38,6 +42,10 @@ const metricIcons: Record<string, DashboardMetricIcon> = {
     'not-found': 'file-x',
     downloaded: 'download',
     imported: 'import',
+    image: 'image',
+    video: 'video',
+    audio: 'music',
+    other: 'file',
     unseen: 'eye-off',
     pending: 'eye',
     kept: 'thumbs-up',
@@ -66,10 +74,6 @@ export function formatDashboardPercent(value: number): string {
     }
 
     return `${value.toFixed(value >= 10 ? 0 : 1)}%`;
-}
-
-export function formatDashboardRatio(value: number, total: number): string {
-    return `${formatDashboardCount(value)} / ${formatDashboardCount(total)}`;
 }
 
 export function createDashboardCoverage(metrics: DashboardMetrics | null): DashboardCoverage {
@@ -140,6 +144,12 @@ export function createDashboardMetricPanels(metrics: DashboardMetrics | null): D
     const notFound = files?.not_found ?? 0;
     const notFoundRecords = Math.min(notFound, recordsOnly);
     const onlineRecords = Math.max(0, recordsOnly - notFoundRecords);
+    const fileTypes = files?.file_types ?? {
+        image: 0,
+        video: 0,
+        audio: 0,
+        other: 0,
+    };
 
     return [
         {
@@ -160,6 +170,12 @@ export function createDashboardMetricPanels(metrics: DashboardMetrics | null): D
                     createMetricRow('downloaded', 'Downloaded', downloaded, colors.downloaded, stored, 'of stored media'),
                     createMetricRow('imported', 'Imported', importedStored, colors.imported, stored, 'of stored media'),
                 ], stored),
+                createMetricDistribution('file-types', 'File types', 'Records grouped by media type', [
+                    createMetricRow('image', 'Images', fileTypes.image, colors.image, total, 'of records'),
+                    createMetricRow('video', 'Videos', fileTypes.video, colors.video, total, 'of records'),
+                    createMetricRow('audio', 'Audio', fileTypes.audio, colors.audio, total, 'of records'),
+                    createMetricRow('other', 'Other', fileTypes.other, colors.other, total, 'of records'),
+                ], total),
             ],
             rows: [],
         },

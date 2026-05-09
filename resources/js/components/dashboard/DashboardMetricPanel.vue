@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import DashboardMetricDistributionBlock from '@/components/dashboard/DashboardMetricDistributionBlock.vue';
+import DashboardMetricValue from '@/components/dashboard/DashboardMetricValue.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { DashboardMetricPanel, DashboardMetricRow } from '@/types/dashboard';
-import { formatDashboardCount, formatDashboardRatio } from '@/utils/dashboard';
+import type { DashboardMetricPanel } from '@/types/dashboard';
 
 interface Props {
     panel: DashboardMetricPanel;
@@ -10,12 +10,6 @@ interface Props {
 }
 
 defineProps<Props>();
-
-function formatMetricRowValue(row: DashboardMetricRow): string {
-    return row.denominator === undefined
-        ? formatDashboardCount(row.value)
-        : formatDashboardRatio(row.value, row.denominator);
-}
 </script>
 
 <template>
@@ -29,8 +23,8 @@ function formatMetricRowValue(row: DashboardMetricRow): string {
             <div v-if="panel.summaryRows?.length" class="flex shrink-0 flex-wrap items-start justify-end gap-x-6 gap-y-2 text-right">
                 <div v-for="row in panel.summaryRows" :key="row.key" class="min-w-20">
                     <div class="text-xs text-twilight-indigo-300">{{ row.label }}</div>
-                    <div class="text-lg font-semibold tabular-nums text-regal-navy-100">
-                        {{ formatMetricRowValue(row) }}
+                    <div class="text-lg font-semibold tabular-nums">
+                        <DashboardMetricValue :value="row.value" :denominator="row.denominator" :color="row.color" />
                     </div>
                     <div v-if="row.meta" class="text-xs text-twilight-indigo-300">
                         {{ row.meta }}
@@ -56,8 +50,8 @@ function formatMetricRowValue(row: DashboardMetricRow): string {
                         <div class="truncate text-sm font-medium text-regal-navy-100">{{ row.label }}</div>
                         <div v-if="row.meta" class="text-xs text-twilight-indigo-300">{{ row.meta }}</div>
                     </div>
-                    <div class="shrink-0 text-sm font-semibold tabular-nums text-regal-navy-100">
-                        {{ formatMetricRowValue(row) }}
+                    <div class="shrink-0 text-sm font-semibold tabular-nums">
+                        <DashboardMetricValue :value="row.value" :denominator="row.denominator" :color="row.color" />
                     </div>
                 </div>
 

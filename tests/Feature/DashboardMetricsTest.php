@@ -20,6 +20,7 @@ test('dashboard metrics report file and reaction totals', function () {
     $manualBlacklisted = File::factory()->create([
         'blacklisted_at' => now(),
         'downloaded' => true,
+        'mime_type' => 'image/jpeg',
         'path' => 'downloads/manual-blacklisted.jpg',
         'previewed_count' => 1,
         'source' => 'local',
@@ -29,6 +30,7 @@ test('dashboard metrics report file and reaction totals', function () {
         'blacklisted_at' => now(),
         'auto_blacklisted' => true,
         'downloaded' => false,
+        'mime_type' => 'video/mp4',
         'path' => null,
         'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
         'source' => 'NAS',
@@ -37,17 +39,20 @@ test('dashboard metrics report file and reaction totals', function () {
     $notFound = File::factory()->create([
         'not_found' => true,
         'downloaded' => false,
+        'mime_type' => 'audio/mpeg',
         'path' => null,
         'source' => 'local',
     ]);
 
     $unblacklisted = File::factory()->create([
         'downloaded' => true,
+        'mime_type' => 'application/pdf',
         'path' => 'downloads/unblacklisted.jpg',
         'source' => 'Booru',
     ]);
     $unreacted = File::factory()->create([
         'downloaded' => false,
+        'mime_type' => null,
         'path' => 'imports/unreacted.jpg',
         'previewed_count' => 3,
         'source' => 'YouTube',
@@ -118,6 +123,12 @@ test('dashboard metrics report file and reaction totals', function () {
             'non_local' => 3,
             'local_available' => 1,
             'non_local_available' => 3,
+            'file_types' => [
+                'image' => 1,
+                'video' => 1,
+                'audio' => 1,
+                'other' => 2,
+            ],
             'reacted' => 3,
             'unreacted' => 1,
             'blacklisted' => 2,

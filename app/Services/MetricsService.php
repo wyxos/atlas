@@ -24,6 +24,14 @@ class MetricsService
 
     public const string KEY_FILES_NOT_FOUND = 'files_not_found';
 
+    public const string KEY_FILES_TYPE_IMAGE = 'files_type_image';
+
+    public const string KEY_FILES_TYPE_VIDEO = 'files_type_video';
+
+    public const string KEY_FILES_TYPE_AUDIO = 'files_type_audio';
+
+    public const string KEY_FILES_TYPE_OTHER = 'files_type_other';
+
     public const string KEY_FILES_REACTED = 'files_reacted';
 
     public const string KEY_FILES_BLACKLISTED_TOTAL = 'files_blacklisted_total';
@@ -637,6 +645,10 @@ class MetricsService
             ->selectRaw("SUM(CASE WHEN source IN ('local', 'Local') THEN 1 ELSE 0 END) as local_total")
             ->selectRaw("SUM(CASE WHEN source IN ('local', 'Local') AND not_found = 0 THEN 1 ELSE 0 END) as local_available_total")
             ->selectRaw("SUM(CASE WHEN source NOT IN ('local', 'Local') AND not_found = 0 THEN 1 ELSE 0 END) as non_local_available_total")
+            ->selectRaw("SUM(CASE WHEN LOWER(COALESCE(mime_type, '')) LIKE 'image/%' THEN 1 ELSE 0 END) as type_image_total")
+            ->selectRaw("SUM(CASE WHEN LOWER(COALESCE(mime_type, '')) LIKE 'video/%' THEN 1 ELSE 0 END) as type_video_total")
+            ->selectRaw("SUM(CASE WHEN LOWER(COALESCE(mime_type, '')) LIKE 'audio/%' THEN 1 ELSE 0 END) as type_audio_total")
+            ->selectRaw("SUM(CASE WHEN LOWER(COALESCE(mime_type, '')) NOT LIKE 'image/%' AND LOWER(COALESCE(mime_type, '')) NOT LIKE 'video/%' AND LOWER(COALESCE(mime_type, '')) NOT LIKE 'audio/%' THEN 1 ELSE 0 END) as type_other_total")
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL THEN 1 ELSE 0 END) as blacklisted_total')
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND auto_blacklisted = 0 THEN 1 ELSE 0 END) as blacklisted_manual_total')
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND previewed_count >= '.FilePreviewService::FEED_REMOVED_PREVIEW_COUNT.' THEN 1 ELSE 0 END) as blacklisted_feed_removed_total')
@@ -677,6 +689,10 @@ class MetricsService
         $this->setMetric(self::KEY_FILES_LOCAL_AVAILABLE, (int) ($fileCounts->local_available_total ?? 0), 'Available local files');
         $this->setMetric(self::KEY_FILES_NON_LOCAL_AVAILABLE, (int) ($fileCounts->non_local_available_total ?? 0), 'Available non-local files');
         $this->setMetric(self::KEY_FILES_NOT_FOUND, (int) ($fileCounts->not_found_total ?? 0), 'Not found files');
+        $this->setMetric(self::KEY_FILES_TYPE_IMAGE, (int) ($fileCounts->type_image_total ?? 0), 'Image files');
+        $this->setMetric(self::KEY_FILES_TYPE_VIDEO, (int) ($fileCounts->type_video_total ?? 0), 'Video files');
+        $this->setMetric(self::KEY_FILES_TYPE_AUDIO, (int) ($fileCounts->type_audio_total ?? 0), 'Audio files');
+        $this->setMetric(self::KEY_FILES_TYPE_OTHER, (int) ($fileCounts->type_other_total ?? 0), 'Other file types');
         $this->setMetric(self::KEY_FILES_REACTED, $reactedTotal, 'Files with any reaction');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_TOTAL, (int) ($fileCounts->blacklisted_total ?? 0), 'Blacklisted files');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_MANUAL, (int) ($fileCounts->blacklisted_manual_total ?? 0), 'Manual blacklisted files');
