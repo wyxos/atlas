@@ -3,9 +3,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 
 const LIBRARY_SCAN_CHANNEL = 'library-scans';
+const LIBRARY_SCAN_ITEMS_PAGE_SIZE = 100;
 
 type LibraryScanRun = {
     id: number;
+    mode: string;
     status: string;
     phase: string | null;
     files_found: number;
@@ -45,9 +47,22 @@ type LibraryScanItem = {
     updated_at: string | null;
 };
 
+type LibraryScanItemsPagination = {
+    limit: number;
+    next_cursor: string | null;
+    previous_cursor: string | null;
+    has_more: boolean;
+};
+
 const libraryScanRuns = ref<LibraryScanRun[]>([]);
 const selectedLibraryScanItems = ref<LibraryScanItem[]>([]);
 const selectedLibraryScanRunId = ref<number | null>(null);
+const selectedLibraryScanItemsPagination = ref<LibraryScanItemsPagination>({
+    limit: LIBRARY_SCAN_ITEMS_PAGE_SIZE,
+    next_cursor: null,
+    previous_cursor: null,
+    has_more: false,
+});
 const isLibraryScansLoading = ref(false);
 const isLibraryScanActionBusy = ref(false);
 const libraryScanNotice = ref('');
@@ -57,6 +72,10 @@ const activeLibraryScan = computed(() => libraryScanRuns.value[0] ?? null);
 const libraryScanCanPause = computed(() => ['pending', 'scanning', 'processing'].includes(activeLibraryScan.value?.status ?? ''));
 const libraryScanCanResume = computed(() => activeLibraryScan.value?.status === 'paused');
 const libraryScanCanCancel = computed(() => ['pending', 'scanning', 'processing', 'paused'].includes(activeLibraryScan.value?.status ?? ''));
+const activeLibraryScanModeLabel = computed(() => (
+    activeLibraryScan.value?.mode === 'reparse' ? 'Parser re-run' : 'Library scan'
+));
+const isViewingLatestLibraryScanItems = computed(() => !selectedLibraryScanItemsPagination.value.previous_cursor);
 const libraryScanProgress = computed(() => {
     const run = activeLibraryScan.value;
     if (!run || run.files_found <= 0) {
@@ -92,7 +111,14 @@ function upsertLibraryScanItem(item: LibraryScanItem): void {
 
     const index = selectedLibraryScanItems.value.findIndex((row) => row.id === item.id);
     if (index === -1) {
-        selectedLibraryScanItems.value = [item, ...selectedLibraryScanItems.value].slice(0, 100);
+        if (!isViewingLatestLibraryScanItems.value) {
+            return;
+        }
+
+        selectedLibraryScanItems.value = [item, ...selectedLibraryScanItems.value].slice(
+            0,
+            selectedLibraryScanItemsPagination.value.limit,
+        );
         return;
     }
 
@@ -117,13 +143,24 @@ async function fetchLibraryScans(): Promise<void> {
     }
 }
 
-async function fetchLibraryScanDetails(id: number): Promise<void> {
-    const { data } = await window.axios.get<{ run: LibraryScanRun; items: LibraryScanItem[] }>(
+async function fetchLibraryScanDetails(id: number, cursor: string | null = null): Promise<void> {
+    const { data } = await window.axios.get<{
+        run: LibraryScanRun;
+        items: LibraryScanItem[];
+        pagination?: LibraryScanItemsPagination;
+    }>(
         `/api/settings/library-scans/${id}`,
+        { params: { limit: LIBRARY_SCAN_ITEMS_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
     );
     selectedLibraryScanRunId.value = id;
     upsertLibraryScanRun(data.run);
     selectedLibraryScanItems.value = data.items;
+    selectedLibraryScanItemsPagination.value = data.pagination ?? {
+        limit: LIBRARY_SCAN_ITEMS_PAGE_SIZE,
+        next_cursor: null,
+        previous_cursor: null,
+        has_more: false,
+    };
 }
 
 async function handleStartLibraryScan(): Promise<void> {
@@ -135,6 +172,27 @@ async function handleStartLibraryScan(): Promise<void> {
         setLibraryScanNotice('Library scan queued.', 'success');
     } catch {
         setLibraryScanNotice('Failed to start library scan.', 'error');
+    } finally {
+        isLibraryScanActionBusy.value = false;
+    }
+}
+
+async function handleReparseImportedFiles(): Promise<void> {
+    isLibraryScanActionBusy.value = true;
+    try {
+        const { data } = await window.axios.post<{ run: LibraryScanRun }>(
+            '/api/settings/library-scans/reparse-imported',
+        );
+        upsertLibraryScanRun(data.run);
+        await fetchLibraryScanDetails(data.run.id);
+        setLibraryScanNotice(
+            data.run.mode === 'reparse'
+                ? 'Imported file parser re-run queued.'
+                : 'A library scan is already active.',
+            data.run.mode === 'reparse' ? 'success' : 'neutral',
+        );
+    } catch {
+        setLibraryScanNotice('Failed to re-run imported file parser.', 'error');
     } finally {
         isLibraryScanActionBusy.value = false;
     }
@@ -158,6 +216,25 @@ async function postLibraryScanAction(action: 'pause' | 'resume' | 'cancel' | 're
     } finally {
         isLibraryScanActionBusy.value = false;
     }
+}
+
+async function handleLoadLatestLibraryScanItems(): Promise<void> {
+    if (!selectedLibraryScanRunId.value) {
+        return;
+    }
+
+    await fetchLibraryScanDetails(selectedLibraryScanRunId.value);
+}
+
+async function handleLoadOlderLibraryScanItems(): Promise<void> {
+    if (!selectedLibraryScanRunId.value || !selectedLibraryScanItemsPagination.value.next_cursor) {
+        return;
+    }
+
+    await fetchLibraryScanDetails(
+        selectedLibraryScanRunId.value,
+        selectedLibraryScanItemsPagination.value.next_cursor,
+    );
 }
 
 function startLibraryScanEchoListeners(): void {
@@ -223,6 +300,15 @@ onBeforeUnmount(() => {
                 <Button
                     type="button"
                     size="sm"
+                    variant="secondary"
+                    :loading="isLibraryScanActionBusy"
+                    @click="handleReparseImportedFiles"
+                >
+                    Re-run Parsers
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
                     variant="outline"
                     :disabled="!libraryScanCanPause || isLibraryScanActionBusy"
                     @click="postLibraryScanAction('pause')"
@@ -265,6 +351,10 @@ onBeforeUnmount(() => {
 
         <div v-else-if="activeLibraryScan" class="space-y-4">
             <div class="grid gap-3 text-sm text-twilight-indigo-100 md:grid-cols-3">
+                <p>
+                    <span class="text-twilight-indigo-300">Mode:</span>
+                    {{ activeLibraryScanModeLabel }}
+                </p>
                 <p>
                     <span class="text-twilight-indigo-300">Status:</span>
                     {{ activeLibraryScan.status }}
@@ -314,46 +404,72 @@ onBeforeUnmount(() => {
                 {{ activeLibraryScan.error }}
             </p>
 
-            <div v-if="selectedLibraryScanItems.length" class="overflow-x-auto">
-                <table class="w-full min-w-[720px] text-left text-sm">
-                    <thead class="text-xs uppercase text-twilight-indigo-300">
-                        <tr>
-                            <th class="py-2 pr-4 font-medium">File</th>
-                            <th class="py-2 pr-4 font-medium">Status</th>
-                            <th class="py-2 pr-4 font-medium">Parser</th>
-                            <th class="py-2 pr-4 font-medium">Progress</th>
-                            <th class="py-2 pr-4 font-medium">Result</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-smart-blue-500/20 text-twilight-indigo-100">
-                        <tr v-for="item in selectedLibraryScanItems" :key="item.id">
-                            <td class="py-2 pr-4">
-                                <div class="max-w-[280px] truncate">
-                                    {{ item.imported_path ?? item.original_path }}
-                                </div>
-                                <div v-if="item.mime_type" class="text-xs text-twilight-indigo-300">
-                                    {{ item.mime_type }}
-                                </div>
-                            </td>
-                            <td class="py-2 pr-4">
-                                {{ item.status }}
-                            </td>
-                            <td class="py-2 pr-4">
-                                {{ item.parser ?? 'none' }}
-                            </td>
-                            <td class="py-2 pr-4">
-                                {{ item.progress }}%
-                            </td>
-                            <td class="py-2 pr-4">
-                                <span v-if="item.duplicate">Duplicate</span>
-                                <span v-else-if="item.error_message" class="text-danger-200">
-                                    {{ item.error_message }}
-                                </span>
-                                <span v-else>{{ item.phase ?? 'pending' }}</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div v-if="selectedLibraryScanItems.length" class="space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h6 class="text-sm font-semibold text-smart-blue-200">Queued Files</h6>
+                    <div class="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            :disabled="isViewingLatestLibraryScanItems"
+                            @click="handleLoadLatestLibraryScanItems"
+                        >
+                            Latest
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            :disabled="!selectedLibraryScanItemsPagination.next_cursor"
+                            @click="handleLoadOlderLibraryScanItems"
+                        >
+                            Older
+                        </Button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[720px] text-left text-sm">
+                        <thead class="text-xs uppercase text-twilight-indigo-300">
+                            <tr>
+                                <th class="py-2 pr-4 font-medium">File</th>
+                                <th class="py-2 pr-4 font-medium">Status</th>
+                                <th class="py-2 pr-4 font-medium">Parser</th>
+                                <th class="py-2 pr-4 font-medium">Progress</th>
+                                <th class="py-2 pr-4 font-medium">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-smart-blue-500/20 text-twilight-indigo-100">
+                            <tr v-for="item in selectedLibraryScanItems" :key="item.id">
+                                <td class="py-2 pr-4">
+                                    <div class="max-w-[280px] truncate">
+                                        {{ item.imported_path ?? item.original_path }}
+                                    </div>
+                                    <div v-if="item.mime_type" class="text-xs text-twilight-indigo-300">
+                                        {{ item.mime_type }}
+                                    </div>
+                                </td>
+                                <td class="py-2 pr-4">
+                                    {{ item.status }}
+                                </td>
+                                <td class="py-2 pr-4">
+                                    {{ item.parser ?? 'none' }}
+                                </td>
+                                <td class="py-2 pr-4">
+                                    {{ item.progress }}%
+                                </td>
+                                <td class="py-2 pr-4">
+                                    <span v-if="item.duplicate">Duplicate</span>
+                                    <span v-else-if="item.error_message" class="text-danger-200">
+                                        {{ item.error_message }}
+                                    </span>
+                                    <span v-else>{{ item.phase ?? 'pending' }}</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 

@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('library_scan_runs', function (Blueprint $table) {
             $table->id();
+            $table->string('mode')->default('scan')->index();
             $table->string('status')->index();
             $table->string('phase')->nullable()->index();
             $table->unsignedBigInteger('files_found')->default(0);

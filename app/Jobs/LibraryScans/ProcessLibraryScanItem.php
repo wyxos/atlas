@@ -19,8 +19,10 @@ class ProcessLibraryScanItem implements ShouldQueue
 
     public int $timeout = 300;
 
-    public function __construct(private readonly int $itemId)
-    {
+    public function __construct(
+        public readonly int $itemId,
+        public readonly bool $regeneratePreviewAssets = false,
+    ) {
         $this->onQueue('library-scans');
     }
 
@@ -69,7 +71,7 @@ class ProcessLibraryScanItem implements ShouldQueue
         $scans->broadcastItem($item->fresh());
 
         try {
-            $parser->parse($item->file, $item->parser);
+            $parser->parse($item->file, $item->parser, $this->regeneratePreviewAssets);
             app(LocalBrowseIndexSyncService::class)->syncFilesByIds([(int) $item->file_id]);
 
             $item->update([

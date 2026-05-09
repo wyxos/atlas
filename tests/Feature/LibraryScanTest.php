@@ -1,13 +1,20 @@
 <?php
 
 use App\Enums\LibraryScanItemStatus;
+use App\Enums\LibraryScanRunMode;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
+use App\Jobs\LibraryScans\ReparseImportedFilesRun;
 use App\Jobs\LibraryScans\ScanLibraryRun;
 use App\Models\File;
+use App\Models\FileMetadata;
 use App\Models\LibraryScanItem;
 use App\Models\LibraryScanRun;
 use App\Models\User;
+use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
+use App\Services\LibraryScans\LibraryScanFileParser;
 use App\Services\LibraryScans\LibraryScanService;
+use App\Services\LibraryScans\MediaProbeService;
+use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Support\AtlasStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -119,6 +126,18 @@ it('starts a library scan from settings', function () {
     Queue::assertPushed(ScanLibraryRun::class, fn (ScanLibraryRun $job): bool => $job->queue === 'library-scans');
 });
 
+it('starts an imported file parser rerun from settings', function () {
+    Queue::fake([ReparseImportedFilesRun::class]);
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/settings/library-scans/reparse-imported');
+
+    $response->assertAccepted()
+        ->assertJsonPath('run.mode', LibraryScanRunMode::REPARSE)
+        ->assertJsonPath('run.status', 'pending');
+    Queue::assertPushed(ReparseImportedFilesRun::class, fn (ReparseImportedFilesRun $job): bool => $job->queue === 'library-scans');
+});
+
 it('dispatches library scan parser jobs on the dedicated queue', function () {
     Queue::fake([ProcessLibraryScanItem::class]);
 
@@ -133,6 +152,147 @@ it('dispatches library scan parser jobs on the dedicated queue', function () {
 
     Queue::assertPushed(
         ProcessLibraryScanItem::class,
-        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans',
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans'
+            && $job->regeneratePreviewAssets === false,
     );
+});
+
+it('queues imported file parser reruns with preview regeneration', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $run = LibraryScanRun::factory()->create([
+        'mode' => LibraryScanRunMode::REPARSE,
+        'status' => 'pending',
+        'phase' => 'reparse_pending',
+    ]);
+    $file = File::factory()->create([
+        'source' => 'local',
+        'path' => 'imports/aa/bb/video.mp4',
+        'filename' => 'video.mp4',
+        'mime_type' => 'video/mp4',
+        'hash' => str_repeat('a', 64),
+        'imported_at' => now(),
+    ]);
+
+    (new ReparseImportedFilesRun($run->id))->handle(app(LibraryScanService::class));
+
+    $item = LibraryScanItem::query()->where('file_id', $file->id)->first();
+
+    expect($item)->not->toBeNull()
+        ->and($item->parser)->toBe('video')
+        ->and($item->status)->toBe(LibraryScanItemStatus::IMPORTED);
+
+    Queue::assertPushed(
+        ProcessLibraryScanItem::class,
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans'
+            && $job->itemId === $item->id
+            && $job->regeneratePreviewAssets === true,
+    );
+});
+
+it('reprocesses imported files by regenerating previews before marking the parser item complete', function () {
+    $run = LibraryScanRun::factory()->create([
+        'mode' => LibraryScanRunMode::REPARSE,
+        'status' => 'processing',
+        'phase' => 'processing',
+        'scan_completed_at' => now(),
+    ]);
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/image.jpg',
+        'mime_type' => 'image/jpeg',
+        'imported_at' => now(),
+        'preview_path' => 'thumbnails/old.jpg',
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'status' => LibraryScanItemStatus::IMPORTED,
+        'parser' => 'image',
+    ]);
+
+    $parser = \Mockery::mock(LibraryScanFileParser::class);
+    $parser->shouldReceive('parse')
+        ->once()
+        ->with(\Mockery::on(fn (File $parsedFile): bool => $parsedFile->is($file)), 'image', true)
+        ->andReturn(['updates' => ['preview_path' => 'thumbnails/new.jpg'], 'metadata' => []]);
+    $this->app->instance(LibraryScanFileParser::class, $parser);
+
+    $sync = \Mockery::mock(LocalBrowseIndexSyncService::class);
+    $sync->shouldReceive('syncFilesByIds')->once()->with([$file->id])->andReturnNull();
+    $this->app->instance(LocalBrowseIndexSyncService::class, $sync);
+
+    (new ProcessLibraryScanItem($item->id, regeneratePreviewAssets: true))->handle(
+        app(LibraryScanFileParser::class),
+        app(LibraryScanService::class),
+    );
+
+    expect($item->fresh()->status)->toBe(LibraryScanItemStatus::COMPLETED);
+});
+
+it('uses the download preview generator when imported file parsing is forced to regenerate previews', function () {
+    $root = configureLibraryScanStorage();
+    Storage::disk(AtlasStorage::DISK)->put('imports/aa/bb/image.jpg', 'image');
+
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/image.jpg',
+        'mime_type' => 'image/jpeg',
+        'hash' => str_repeat('b', 64),
+        'imported_at' => now(),
+        'preview_path' => 'thumbnails/old.jpg',
+    ]);
+
+    $preview = \Mockery::mock(FileDownloadPreviewAssetGenerator::class);
+    $preview->shouldReceive('regeneratePreviewAssets')
+        ->once()
+        ->with(\Mockery::on(fn (File $parsedFile): bool => $parsedFile->is($file)))
+        ->andReturn(['preview_path' => 'thumbnails/bb/bb/image_thumb.jpg']);
+    $preview->shouldReceive('generatePreviewAssets')->never();
+    $this->app->instance(FileDownloadPreviewAssetGenerator::class, $preview);
+
+    $probe = \Mockery::mock(MediaProbeService::class);
+    $probe->shouldReceive('probe')->once()->andReturn([]);
+    $this->app->instance(MediaProbeService::class, $probe);
+
+    $result = app(LibraryScanFileParser::class)->parse($file, 'image', regeneratePreviewAssets: true);
+
+    expect($result['updates'])->toBe(['preview_path' => 'thumbnails/bb/bb/image_thumb.jpg'])
+        ->and($file->fresh()->preview_path)->toBe('thumbnails/bb/bb/image_thumb.jpg')
+        ->and(is_dir($root))->toBeTrue();
+});
+
+it('creates streamable video conversions for oversized imported mp4 files without seekbar preview conversions', function () {
+    configureLibraryScanStorage();
+    Storage::disk(AtlasStorage::DISK)->put('imports/aa/bb/video.mp4', 'video');
+
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/video.mp4',
+        'filename' => 'video.mp4',
+        'mime_type' => 'video/mp4',
+        'hash' => str_repeat('c', 64),
+        'imported_at' => now(),
+    ]);
+
+    $preview = \Mockery::mock(FileDownloadPreviewAssetGenerator::class);
+    $preview->shouldReceive('generatePreviewAssets')->once()->andReturn([]);
+    $this->app->instance(FileDownloadPreviewAssetGenerator::class, $preview);
+
+    $probe = \Mockery::mock(MediaProbeService::class);
+    $probe->shouldReceive('probe')->once()->andReturn([
+        'streams' => [
+            [
+                'codec_type' => 'video',
+                'codec_name' => 'h264',
+                'width' => 3840,
+                'height' => 2160,
+            ],
+        ],
+    ]);
+    $probe->shouldReceive('resolveFfmpegPath')->once()->andReturn(null);
+    $this->app->instance(MediaProbeService::class, $probe);
+
+    $result = app(LibraryScanFileParser::class)->parse($file, 'video');
+
+    expect($result['metadata']['conversions'])->toHaveKey('streamable_video_warning')
+        ->and($result['metadata']['conversions'])->not->toHaveKey('seekbar_preview')
+        ->and($result['metadata']['conversions'])->not->toHaveKey('seekbar_preview_warning');
+    expect(FileMetadata::query()->where('file_id', $file->id)->exists())->toBeTrue();
 });

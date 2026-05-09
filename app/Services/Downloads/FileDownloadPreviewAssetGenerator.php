@@ -99,6 +99,36 @@ class FileDownloadPreviewAssetGenerator
     /**
      * @return array{preview_path?: string, poster_path?: string}
      */
+    public function regeneratePreviewAssets(File $file): array
+    {
+        if (! $file->path) {
+            return [];
+        }
+
+        $disk = Storage::disk(AtlasStorage::DISK);
+        if (! $disk->exists($file->path)) {
+            return [];
+        }
+
+        $absolutePath = $disk->path($file->path);
+        $storedFilename = basename($file->path);
+        $hashForSegmentation = $this->appStorage->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
+        $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->getMimeTypeFromFile($absolutePath));
+
+        return $this->generateFinalizedPreviewAssets(
+            $file,
+            $disk,
+            $absolutePath,
+            $file->path,
+            $storedFilename,
+            $hashForSegmentation,
+            $mimeType,
+        );
+    }
+
+    /**
+     * @return array{preview_path?: string, poster_path?: string}
+     */
     public function generateFinalizedPreviewAssets(
         File $file,
         Filesystem $disk,

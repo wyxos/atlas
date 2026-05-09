@@ -3,10 +3,12 @@
 namespace App\Services\LibraryScans;
 
 use App\Enums\LibraryScanItemStatus;
+use App\Enums\LibraryScanRunMode;
 use App\Enums\LibraryScanRunStatus;
 use App\Events\LibraryScanItemUpdated;
 use App\Events\LibraryScanRunUpdated;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
+use App\Jobs\LibraryScans\ReparseImportedFilesRun;
 use App\Jobs\LibraryScans\ScanLibraryRun;
 use App\Models\LibraryScanItem;
 use App\Models\LibraryScanRun;
@@ -25,12 +27,36 @@ class LibraryScanService
         }
 
         $run = LibraryScanRun::query()->create([
+            'mode' => LibraryScanRunMode::SCAN,
             'status' => LibraryScanRunStatus::PENDING,
             'phase' => 'pending',
         ]);
 
         $this->broadcastRun($run);
         ScanLibraryRun::dispatch($run->id);
+
+        return $run;
+    }
+
+    public function startImportedFileReparse(): LibraryScanRun
+    {
+        $activeRun = LibraryScanRun::query()
+            ->whereIn('status', LibraryScanRunStatus::active())
+            ->latest()
+            ->first();
+
+        if ($activeRun) {
+            return $activeRun;
+        }
+
+        $run = LibraryScanRun::query()->create([
+            'mode' => LibraryScanRunMode::REPARSE,
+            'status' => LibraryScanRunStatus::PENDING,
+            'phase' => 'reparse_pending',
+        ]);
+
+        $this->broadcastRun($run);
+        ReparseImportedFilesRun::dispatch($run->id);
 
         return $run;
     }
@@ -68,10 +94,12 @@ class LibraryScanService
         $this->broadcastRun($run);
 
         if ($run->scan_completed_at) {
-            $this->dispatchPendingParsers($run);
+            $this->dispatchPendingParsers($run, regeneratePreviewAssets: $run->mode === LibraryScanRunMode::REPARSE);
             $this->completeIfDone($run);
         } else {
-            ScanLibraryRun::dispatch($run->id);
+            $run->mode === LibraryScanRunMode::REPARSE
+                ? ReparseImportedFilesRun::dispatch($run->id)
+                : ScanLibraryRun::dispatch($run->id);
         }
 
         return $run;
@@ -107,9 +135,13 @@ class LibraryScanService
 
     public function restart(LibraryScanRun $run): LibraryScanRun
     {
+        $mode = $run->mode;
+
         $this->cancel($run);
 
-        return $this->start();
+        return $mode === LibraryScanRunMode::REPARSE
+            ? $this->startImportedFileReparse()
+            : $this->start();
     }
 
     public function markItemFailed(LibraryScanItem $item, string $code, string $message, array $context = []): void
@@ -156,12 +188,15 @@ class LibraryScanService
         $this->broadcastRun($run->fresh());
     }
 
-    public function dispatchPendingParsers(LibraryScanRun $run): void
+    public function dispatchPendingParsers(LibraryScanRun $run, bool $regeneratePreviewAssets = false): void
     {
         $run->items()
             ->where('status', LibraryScanItemStatus::IMPORTED)
             ->whereNotNull('parser')
-            ->each(fn (LibraryScanItem $item) => ProcessLibraryScanItem::dispatch($item->id));
+            ->each(fn (LibraryScanItem $item) => ProcessLibraryScanItem::dispatch(
+                $item->id,
+                regeneratePreviewAssets: $regeneratePreviewAssets,
+            ));
     }
 
     public function refreshCounters(LibraryScanRun $run): LibraryScanRun

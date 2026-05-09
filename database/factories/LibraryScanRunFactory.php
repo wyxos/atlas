@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\LibraryScanRunMode;
 use App\Enums\LibraryScanRunStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -13,6 +14,7 @@ class LibraryScanRunFactory extends Factory
     public function definition(): array
     {
         return [
+            'mode' => LibraryScanRunMode::SCAN,
             'status' => LibraryScanRunStatus::PENDING,
             'phase' => 'pending',
             'files_found' => 0,

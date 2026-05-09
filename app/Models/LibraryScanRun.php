@@ -11,6 +11,7 @@ class LibraryScanRun extends Model
     use HasFactory;
 
     protected $fillable = [
+        'mode',
         'status',
         'phase',
         'files_found',

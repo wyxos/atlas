@@ -72,6 +72,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.library-scans.index');
     Route::post('/api/settings/library-scans', [\App\Http\Controllers\LibraryScanController::class, 'store'])
         ->name('api.settings.library-scans.store');
+    Route::post('/api/settings/library-scans/reparse-imported', [\App\Http\Controllers\LibraryScanController::class, 'reparseImported'])
+        ->name('api.settings.library-scans.reparse-imported');
     Route::get('/api/settings/library-scans/{libraryScanRun}', [\App\Http\Controllers\LibraryScanController::class, 'show'])
         ->name('api.settings.library-scans.show');
     Route::post('/api/settings/library-scans/{libraryScanRun}/pause', [\App\Http\Controllers\LibraryScanController::class, 'pause'])

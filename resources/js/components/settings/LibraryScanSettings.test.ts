@@ -14,6 +14,7 @@ type EchoMock = {
 
 type ScanRunOverrides = Partial<{
     id: number;
+    mode: string;
     status: string;
     phase: string | null;
     files_found: number;
@@ -28,6 +29,7 @@ type ScanRunOverrides = Partial<{
 function makeRun(overrides: ScanRunOverrides = {}) {
     return {
         id: 12,
+        mode: 'scan',
         status: 'processing',
         phase: 'video',
         files_found: 4,
@@ -90,7 +92,18 @@ function installAxiosMock(run = makeRun(), items = [makeItem()]): AxiosMock {
                 return Promise.resolve({ data: { items: [run] } });
             }
 
-            return Promise.resolve({ data: { run, items } });
+            return Promise.resolve({
+                data: {
+                    run,
+                    items,
+                    pagination: {
+                        limit: 100,
+                        next_cursor: null,
+                        previous_cursor: null,
+                        has_more: false,
+                    },
+                },
+            });
         }),
         post: vi.fn(() => Promise.resolve({ data: { run } })),
     };
@@ -142,5 +155,20 @@ describe('LibraryScanSettings', () => {
         await flushPromises();
 
         expect(axios.post).toHaveBeenCalledWith('/api/settings/library-scans/12/resume');
+    });
+
+    it('starts imported file parser reruns from settings', async () => {
+        const run = makeRun({ id: 18, mode: 'reparse', status: 'pending', phase: 'reparse_pending' });
+        const axios = installAxiosMock(run, []);
+        installEchoMock();
+
+        const wrapper = await mountScanSettings();
+
+        await wrapper.findAll('button').find((button) => button.text() === 'Re-run Parsers')?.trigger('click');
+        await flushPromises();
+
+        expect(axios.post).toHaveBeenCalledWith('/api/settings/library-scans/reparse-imported');
+        expect(wrapper.text()).toContain('Imported file parser re-run queued.');
+        expect(wrapper.text()).toContain('Parser re-run');
     });
 });

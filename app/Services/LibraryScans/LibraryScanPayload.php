@@ -2,6 +2,7 @@
 
 namespace App\Services\LibraryScans;
 
+use App\Enums\LibraryScanRunMode;
 use App\Models\LibraryScanItem;
 use App\Models\LibraryScanRun;
 
@@ -14,6 +15,7 @@ class LibraryScanPayload
     {
         return [
             'id' => $run->id,
+            'mode' => $run->mode ?: LibraryScanRunMode::SCAN,
             'status' => $run->status,
             'phase' => $run->phase,
             'files_found' => (int) $run->files_found,
