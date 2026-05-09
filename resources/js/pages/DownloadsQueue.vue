@@ -16,6 +16,7 @@ import {
 const ITEM_HEIGHT = 64;
 
 const queueTableRef = ref<{ resetScroll: () => void } | null>(null);
+const searchQuery = ref('');
 
 const transferState = useDownloadsQueueTransfers();
 const {
@@ -31,6 +32,7 @@ const {
 
 const tableState = useDownloadsQueueTableState({
     downloads,
+    searchQuery,
 });
 const {
     selectedStatus,
@@ -137,7 +139,7 @@ function handleRemoveFiltered(): void {
     openRemoveDialog('all', filteredIds.value);
 }
 
-watch(selectedStatus, () => {
+watch([selectedStatus, searchQuery], () => {
     queueTableRef.value?.resetScroll();
     cancelActiveRequest();
     scheduleVisibleDetailsFetch();
@@ -166,6 +168,7 @@ watch([sortKey, sortDirection], () => {
             <DownloadsQueueToolbar
                 :filters="DOWNLOAD_QUEUE_FILTERS"
                 :selected-status="selectedStatus"
+                :search-query="searchQuery"
                 :downloads-count="downloads.length"
                 :filtered-count="filteredItems.length"
                 :status-counts="statusCounts"
@@ -186,6 +189,7 @@ watch([sortKey, sortDirection], () => {
                 :batch-is-restarting-failed="batchIsRestartingFailed"
                 :remove-is-deleting="removeIsDeleting"
                 @select-status="handleStatusSelect"
+                @update:search-query="searchQuery = $event"
                 @resume-failed="resumeFailedDownloads"
                 @restart-failed="restartFailedDownloads"
                 @remove-completed="removeCompletedDownloads"

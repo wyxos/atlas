@@ -109,6 +109,8 @@ export function useDownloadsQueueTransfers() {
             percent: value.percent ?? 0,
             error: incomingNullable(value.error, existing?.error),
             download_via: incomingNullable(value.download_via, existing?.download_via),
+            referrer_url: incomingNullable(value.referrer_url, existing?.referrer_url),
+            search_text: incomingNullable(value.search_text, existing?.search_text),
             can_resume: value.can_resume ?? existing?.can_resume ?? false,
             can_restart: value.can_restart ?? existing?.can_restart ?? false,
         };
@@ -143,6 +145,8 @@ export function useDownloadsQueueTransfers() {
             failed_at: incomingNullable(value.failed_at, current.failed_at),
             error: incomingNullable(value.error, current.error),
             download_via: incomingNullable(value.download_via, current.download_via),
+            referrer_url: incomingNullable(value.referrer_url, current.referrer_url),
+            search_text: incomingNullable(value.search_text, current.search_text),
             can_resume: value.can_resume ?? current.can_resume ?? false,
             can_restart: value.can_restart ?? current.can_restart ?? false,
         }));

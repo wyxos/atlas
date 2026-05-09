@@ -116,10 +116,6 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
         segments,
         distributions: [
             createMetricDistribution('coverage', 'Coverage split', 'Unseen, pending, kept, and removed records', segments, total),
-            createMetricDistribution('backlog', 'Backlog split', 'Unseen files vs seen files still waiting for a decision', [
-                createMetricRow('unseen', 'Not previewed', unseen, colors.unseen, backlog, 'of backlog'),
-                createMetricRow('pending', 'Previewed, no decision', pending, colors.pending, backlog, 'of backlog'),
-            ], backlog),
             createMetricDistribution('reaction-state', 'Reaction state', 'Available, non-blacklisted records by reaction state', [
                 createMetricRow('reacted', 'Reacted', reacted, colors.reacted, reactionTotal, 'of available records'),
                 createMetricRow('unreacted', 'Not reacted', unreacted, colors.unreacted, reactionTotal, 'of available records'),

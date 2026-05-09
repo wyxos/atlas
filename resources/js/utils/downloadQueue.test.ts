@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     canRestartDownloadQueueItem,
     canResumeDownloadQueueItem,
+    downloadQueueItemMatchesSearch,
 } from '@/utils/downloadQueue';
 import type { DownloadQueueItem } from '@/types/downloadQueue';
 
@@ -34,5 +35,22 @@ describe('downloadQueue action availability', () => {
     it('uses backend restart flags for restartable downloads', () => {
         expect(canRestartDownloadQueueItem(makeItem({ can_restart: true }))).toBe(true);
         expect(canRestartDownloadQueueItem(makeItem({ can_restart: false }))).toBe(false);
+    });
+});
+
+describe('downloadQueue search', () => {
+    it('matches exact terms from backend search text', () => {
+        expect(downloadQueueItemMatchesSearch(makeItem({
+            search_text: 'downloads/ab/cd/civitai-preview.png https://civitai.com/images/12345',
+        }), 'civitai 12345')).toBe(true);
+    });
+
+    it('matches fuzzy subsequence terms without matching very short fuzzy tokens', () => {
+        const item = makeItem({
+            search_text: 'downloads/ab/cd/civitai-preview.png',
+        });
+
+        expect(downloadQueueItemMatchesSearch(item, 'cvta')).toBe(true);
+        expect(downloadQueueItemMatchesSearch(item, 'ct')).toBe(false);
     });
 });

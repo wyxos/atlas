@@ -132,6 +132,49 @@ it('shows a yt-dlp badge for transfers that use yt-dlp', async () => {
     expect(wrapper.text()).toContain('YT-DLP');
 });
 
+it('filters downloads by fuzzy search text', async () => {
+    window.axios.get = vi.fn().mockResolvedValue({
+        data: {
+            items: [
+                {
+                    id: 101,
+                    status: 'queued',
+                    created_at: null,
+                    queued_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    failed_at: null,
+                    percent: 0,
+                    error: null,
+                    search_text: 'downloads/ab/cd/civitai-preview.png',
+                },
+                {
+                    id: 202,
+                    status: 'queued',
+                    created_at: null,
+                    queued_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    failed_at: null,
+                    percent: 0,
+                    error: null,
+                    search_text: 'downloads/ef/gh/wallhaven-landscape.png',
+                },
+            ],
+        },
+    });
+
+    const wrapper = mount(DownloadsQueue);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Filtered files: 2');
+
+    await wrapper.find('input[aria-label="Search downloads"]').setValue('cvta');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('Filtered files: 1');
+});
+
 it('clears stale error when progress payload sends error as null', async () => {
     const listeners = new Map<string, (payload: unknown) => void>();
     window.Echo = {

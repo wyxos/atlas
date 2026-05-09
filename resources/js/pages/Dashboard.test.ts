@@ -257,8 +257,8 @@ describe('Dashboard', () => {
         expect(text).toContain('11 / 86');
         expect(text).toContain('Downloaded');
         expect(text).toContain('Decision coverage');
-        expect(text).toContain('Backlog split');
-        expect(text).toContain('Previewed, no decision');
+        expect(text).not.toContain('Backlog split');
+        expect(text).not.toContain('Not previewed');
         expect(text).toContain('Reaction types');
         expect(text).toContain('Favorite');
         expect(text).toContain('50%');

@@ -25,7 +25,7 @@ class DownloadTransfersController extends Controller
                 'last_broadcast_percent',
                 'error',
             ])
-            ->with(['file:id,listing_metadata,referrer_url,downloaded_at,blacklisted_at'])
+            ->with(['file:id,listing_metadata,filename,path,url,referrer_url,downloaded_at,blacklisted_at'])
             ->orderByDesc('id')
             ->get();
 

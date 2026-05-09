@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown, Search, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -15,6 +15,7 @@ import { getDownloadQueueFilterLabel } from '@/utils/downloadQueue';
 interface Props {
     filters: readonly DownloadQueueFilterStatus[];
     selectedStatus: DownloadQueueFilterStatus;
+    searchQuery: string;
     downloadsCount: number;
     filteredCount: number;
     statusCounts: Record<string, number>;
@@ -40,6 +41,7 @@ defineProps<Props>();
 
 defineEmits<{
     selectStatus: [status: DownloadQueueFilterStatus];
+    'update:searchQuery': [query: string];
     resumeFailed: [];
     restartFailed: [];
     removeCompleted: [];
@@ -75,6 +77,30 @@ defineEmits<{
                     {{ status === 'all' ? downloadsCount : (statusCounts[status] ?? 0) }}
                 </span>
             </button>
+
+            <div class="relative min-w-64 flex-1 sm:flex-none">
+                <Search
+                    class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-blue-slate-400"
+                    aria-hidden="true"
+                />
+                <input
+                    :value="searchQuery"
+                    type="search"
+                    aria-label="Search downloads"
+                    placeholder="Search downloads"
+                    class="h-9 w-full rounded border border-twilight-indigo-500 bg-prussian-blue-600 py-1 pl-9 pr-9 text-sm text-twilight-indigo-100 placeholder:text-blue-slate-400 focus:border-smart-blue-500 focus:outline-none focus:ring-1 focus:ring-smart-blue-500"
+                    @input="$emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
+                />
+                <button
+                    v-if="searchQuery"
+                    type="button"
+                    class="absolute right-2 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-blue-slate-300 transition-colors hover:bg-prussian-blue-500 hover:text-white"
+                    aria-label="Clear download search"
+                    @click="$emit('update:searchQuery', '')"
+                >
+                    <X :size="14" />
+                </button>
+            </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-3 text-xs text-blue-slate-300">

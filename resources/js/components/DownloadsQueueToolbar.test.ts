@@ -21,6 +21,7 @@ describe('DownloadsQueueToolbar', () => {
             props: {
                 filters: ['all'],
                 selectedStatus: 'all',
+                searchQuery: '',
                 downloadsCount: 6,
                 filteredCount: 6,
                 statusCounts: {},
@@ -75,6 +76,7 @@ describe('DownloadsQueueToolbar', () => {
             props: {
                 filters: ['all'],
                 selectedStatus: 'all',
+                searchQuery: '',
                 downloadsCount: 6,
                 filteredCount: 6,
                 statusCounts: {},
@@ -127,5 +129,42 @@ describe('DownloadsQueueToolbar', () => {
         expect(wrapper.emitted('cancelSelection')).toHaveLength(1);
         expect(wrapper.emitted('restartSelection')).toHaveLength(1);
         expect(wrapper.emitted('removeSelection')).toHaveLength(1);
+    });
+
+    it('emits search query updates and clear actions', async () => {
+        const wrapper = mount(DownloadsQueueToolbar, {
+            props: {
+                filters: ['all'],
+                selectedStatus: 'all',
+                searchQuery: 'queued',
+                downloadsCount: 6,
+                filteredCount: 2,
+                statusCounts: {},
+                selectedCount: 0,
+                selectedInFilterCount: 0,
+                selectedPausableCount: 0,
+                selectedResumableCount: 0,
+                selectedCancelableCount: 0,
+                selectedRestartableCount: 0,
+                resumableFailedCount: 0,
+                restartableFailedCount: 0,
+                completedCount: 0,
+                batchIsPausing: false,
+                batchIsResuming: false,
+                batchIsCanceling: false,
+                batchIsRestarting: false,
+                batchIsResumingFailed: false,
+                batchIsRestartingFailed: false,
+                removeIsDeleting: false,
+            },
+            global: {
+                stubs: dropdownMenuStubs,
+            },
+        });
+
+        await wrapper.find('input[aria-label="Search downloads"]').setValue('civitai');
+        await wrapper.find('button[aria-label="Clear download search"]').trigger('click');
+
+        expect(wrapper.emitted('update:searchQuery')).toEqual([['civitai'], ['']]);
     });
 });

@@ -11,11 +11,13 @@ import {
     canRestartDownloadQueueItem,
     canResumeDownloadQueueItem,
     compareDownloadQueueItems,
+    downloadQueueItemMatchesSearch,
 } from '@/utils/downloadQueue';
 import { DEFAULT_DOWNLOAD_QUEUE_SORT } from '@/types/downloadQueue';
 
 export function useDownloadsQueueTableState(params: {
     downloads: Ref<DownloadQueueItem[]>;
+    searchQuery: Ref<string>;
 }) {
     const selectedStatus = ref<DownloadQueueFilterStatus>('all');
     const sortKey = ref<DownloadQueueSortKey | null>(null);
@@ -28,9 +30,10 @@ export function useDownloadsQueueTableState(params: {
     const lastSelectedIndex = ref<number | null>(null);
 
     const filteredItems = computed(() =>
-        selectedStatus.value === 'all'
-            ? params.downloads.value
-            : params.downloads.value.filter((item) => item.status === selectedStatus.value),
+        params.downloads.value.filter((item) =>
+            (selectedStatus.value === 'all' || item.status === selectedStatus.value)
+            && downloadQueueItemMatchesSearch(item, params.searchQuery.value),
+        ),
     );
 
     const statusCounts = computed(() =>

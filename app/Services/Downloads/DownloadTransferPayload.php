@@ -98,7 +98,8 @@ final class DownloadTransferPayload
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
-     *     blacklisted_at:string|null
+     *     blacklisted_at:string|null,
+     *     search_text:string
      * }>  $lookups
      * @return array<string, mixed>
      */
@@ -128,7 +129,8 @@ final class DownloadTransferPayload
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
-     *     blacklisted_at:string|null
+     *     blacklisted_at:string|null,
+     *     search_text:string
      * }>  $lookups
      * @return array{
      *     extension_channel:string|null,
@@ -136,7 +138,8 @@ final class DownloadTransferPayload
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
-     *     blacklisted_at:string|null
+     *     blacklisted_at:string|null,
+     *     search_text:string
      * }
      */
     private static function transferFacts(DownloadTransfer $transfer, array $lookups = []): array
@@ -150,6 +153,9 @@ final class DownloadTransferPayload
         $metadata = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
         $reaction = null;
         $extensionUserId = self::extensionUserIdFromListingMetadata($metadata);
+        $extensionChannel = self::extensionChannelFromListingMetadata($metadata);
+        $downloadVia = self::downloadViaFromListingMetadata($metadata);
+        $referrerUrl = self::trimmedStringOrNull($file?->referrer_url);
 
         if ($transfer->file_id !== null && $extensionUserId !== null) {
             $resolved = Reaction::query()
@@ -161,12 +167,13 @@ final class DownloadTransferPayload
         }
 
         return [
-            'extension_channel' => self::extensionChannelFromListingMetadata($metadata),
-            'download_via' => self::downloadViaFromListingMetadata($metadata),
+            'extension_channel' => $extensionChannel,
+            'download_via' => $downloadVia,
             'reaction' => $reaction,
-            'referrer_url' => self::trimmedStringOrNull($file?->referrer_url),
+            'referrer_url' => $referrerUrl,
             'downloaded_at' => self::datetimeToIsoStringOrNull($file?->downloaded_at),
             'blacklisted_at' => self::datetimeToIsoStringOrNull($file?->blacklisted_at),
+            'search_text' => self::searchTextForTransfer($transfer, $file, $metadata, $downloadVia, $reaction, $referrerUrl),
         ];
     }
 
@@ -272,7 +279,8 @@ final class DownloadTransferPayload
      *     reaction:string|null,
      *     referrer_url:string|null,
      *     downloaded_at:string|null,
-     *     blacklisted_at:string|null
+     *     blacklisted_at:string|null,
+     *     search_text:string
      * }>
      */
     private static function buildListLookups(Collection $transfers): array
@@ -293,23 +301,30 @@ final class DownloadTransferPayload
          *     reaction:string|null,
          *     referrer_url:string|null,
          *     downloaded_at:string|null,
-         *     blacklisted_at:string|null
+         *     blacklisted_at:string|null,
+         *     search_text:string
          * }> $lookups
          */
         $lookups = [];
+        /** @var array<int, DownloadTransfer> $transfersByLookupKey */
+        $transfersByLookupKey = [];
 
         foreach ($transfers as $transfer) {
             $lookupKey = self::transferLookupKey($transfer);
+            $transfersByLookupKey[$lookupKey] = $transfer;
             $file = self::listingMetadataFileForTransfer($transfer);
             $listing = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
+            $downloadVia = self::downloadViaFromListingMetadata($listing);
+            $referrerUrl = self::trimmedStringOrNull($file?->referrer_url);
 
             $lookups[$lookupKey] = [
                 'extension_channel' => self::extensionChannelFromListingMetadata($listing),
-                'download_via' => self::downloadViaFromListingMetadata($listing),
+                'download_via' => $downloadVia,
                 'reaction' => null,
-                'referrer_url' => self::trimmedStringOrNull($file?->referrer_url),
+                'referrer_url' => $referrerUrl,
                 'downloaded_at' => self::datetimeToIsoStringOrNull($file?->downloaded_at),
                 'blacklisted_at' => self::datetimeToIsoStringOrNull($file?->blacklisted_at),
+                'search_text' => self::searchTextForTransfer($transfer, $file, $listing, $downloadVia, null, $referrerUrl),
             ];
 
             if ($transfer->file_id === null) {
@@ -361,6 +376,17 @@ final class DownloadTransferPayload
 
         foreach ($pairByTransferLookupKey as $lookupKey => $pairKey) {
             $lookups[$lookupKey]['reaction'] = $reactionByPair[$pairKey] ?? null;
+            $transfer = $transfersByLookupKey[$lookupKey];
+            $file = self::listingMetadataFileForTransfer($transfer);
+            $listing = is_array($file?->listing_metadata) ? $file->listing_metadata : [];
+            $lookups[$lookupKey]['search_text'] = self::searchTextForTransfer(
+                $transfer,
+                $file,
+                $listing,
+                $lookups[$lookupKey]['download_via'],
+                $lookups[$lookupKey]['reaction'],
+                $lookups[$lookupKey]['referrer_url'],
+            );
         }
 
         return $lookups;
@@ -384,7 +410,7 @@ final class DownloadTransferPayload
         }
 
         $filesById = File::query()
-            ->select(['id', 'listing_metadata', 'referrer_url', 'downloaded_at', 'blacklisted_at'])
+            ->select(['id', 'listing_metadata', 'filename', 'path', 'url', 'referrer_url', 'downloaded_at', 'blacklisted_at'])
             ->whereIn('id', $fileIds->all())
             ->get()
             ->keyBy('id');
@@ -420,7 +446,7 @@ final class DownloadTransferPayload
         }
 
         return $transfer->file()
-            ->select(['id', 'listing_metadata', 'referrer_url', 'downloaded_at', 'blacklisted_at'])
+            ->select(['id', 'listing_metadata', 'filename', 'path', 'url', 'referrer_url', 'downloaded_at', 'blacklisted_at'])
             ->first();
     }
 
@@ -492,5 +518,43 @@ final class DownloadTransferPayload
         $normalized = strtolower(trim($value));
 
         return $normalized !== '' ? $normalized : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
+    private static function searchTextForTransfer(
+        DownloadTransfer $transfer,
+        ?File $file,
+        array $metadata,
+        ?string $downloadVia,
+        ?string $reaction,
+        ?string $referrerUrl,
+    ): string {
+        $parts = [
+            $transfer->id,
+            $transfer->file_id,
+            $transfer->status,
+            $transfer->url,
+            $transfer->error,
+            $downloadVia,
+            $reaction,
+            $referrerUrl,
+            $file?->filename,
+            $file?->path,
+            $file?->url,
+        ];
+
+        foreach (['page_url', 'postId', 'username', 'title', 'name'] as $key) {
+            $value = $metadata[$key] ?? null;
+            if (is_scalar($value)) {
+                $parts[] = $value;
+            }
+        }
+
+        return implode(' ', array_values(array_unique(array_filter(
+            array_map(static fn (mixed $part): string => trim((string) $part), $parts),
+            static fn (string $part): bool => $part !== '',
+        ))));
     }
 }

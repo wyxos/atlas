@@ -111,6 +111,41 @@ it('includes download_via in list, queued, and progress payloads', function () {
         ->and($progressPayload['download_via'])->toBe('yt-dlp');
 });
 
+it('includes searchable queue text in list payloads', function () {
+    $file = File::factory()->create([
+        'url' => 'https://cdn.example.com/files/civitai-preview.png',
+        'referrer_url' => 'https://civitai.com/images/12345',
+        'filename' => 'civitai-preview.png',
+        'path' => 'downloads/ab/cd/civitai-preview.png',
+        'listing_metadata' => [
+            'page_url' => 'https://civitai.com/images/12345',
+            'username' => 'atlas-maker',
+            'download_via' => 'yt-dlp',
+        ],
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://cdn.example.com/files/civitai-preview.png',
+        'domain' => 'cdn.example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 0,
+        'error' => 'Timeout while fetching sample',
+    ]);
+
+    $payload = DownloadTransferPayload::forListCollection(collect([$transfer]))->first();
+
+    expect($payload)->not->toBeNull()
+        ->and($payload['search_text'])->toContain((string) $transfer->id)
+        ->and($payload['search_text'])->toContain('civitai-preview.png')
+        ->and($payload['search_text'])->toContain('downloads/ab/cd/civitai-preview.png')
+        ->and($payload['search_text'])->toContain('https://civitai.com/images/12345')
+        ->and($payload['search_text'])->toContain('atlas-maker')
+        ->and($payload['search_text'])->toContain('Timeout while fetching sample');
+});
+
 it('includes null reaction for extension payloads when no reaction exists', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([

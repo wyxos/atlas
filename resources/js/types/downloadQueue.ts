@@ -19,6 +19,8 @@ export type DownloadQueueFilterStatus = typeof DOWNLOAD_QUEUE_FILTERS[number];
 
 export interface DownloadQueueItem {
     id: number;
+    fileId?: number | null;
+    file_id?: number | null;
     status: DownloadQueueStatus;
     created_at: string | null;
     queued_at: string | null;
@@ -28,6 +30,9 @@ export interface DownloadQueueItem {
     percent: number;
     error: string | null;
     download_via?: string | null;
+    referrer_url?: string | null;
+    url?: string | null;
+    search_text?: string | null;
     can_resume?: boolean;
     can_restart?: boolean;
 }
@@ -77,12 +82,13 @@ export interface DownloadQueueProgressPayload {
     failed_at?: string | null;
     error?: string | null;
     download_via?: string | null;
+    referrer_url?: string | null;
+    search_text?: string | null;
     can_resume?: boolean;
     can_restart?: boolean;
     path?: string | null;
     absolute_path?: string | null;
     original?: string | null;
-    referrer_url?: string | null;
     preview?: string | null;
     size?: number | null;
     filename?: string | null;

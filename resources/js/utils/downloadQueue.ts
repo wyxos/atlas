@@ -74,6 +74,29 @@ export function compareDownloadQueueItems(
     return direction === 'asc' ? aValue - bValue : bValue - aValue;
 }
 
+export function downloadQueueItemMatchesSearch(item: DownloadQueueItem, query: string): boolean {
+    const normalizedQuery = normalizeDownloadQueueSearchText(query);
+    if (normalizedQuery === '') {
+        return true;
+    }
+
+    const haystack = normalizeDownloadQueueSearchText([
+        item.id,
+        item.fileId,
+        item.file_id,
+        item.status,
+        item.error,
+        item.download_via,
+        item.referrer_url,
+        item.url,
+        item.search_text,
+    ].filter((part) => part !== null && part !== undefined).join(' '));
+
+    return normalizedQuery
+        .split(/\s+/)
+        .every((token) => searchTokenMatches(haystack, token));
+}
+
 export function normalizeDownloadQueueProgress(value: number): number {
     return Math.max(0, Math.min(100, Math.round(value)));
 }
@@ -146,4 +169,41 @@ export async function copyDownloadQueuePath(path: string | null, absolutePath: s
     } catch {
         // Ignore clipboard errors.
     }
+}
+
+function normalizeDownloadQueueSearchText(value: string): string {
+    return value
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function searchTokenMatches(haystack: string, token: string): boolean {
+    if (haystack.includes(token)) {
+        return true;
+    }
+
+    if (token.length < 3) {
+        return false;
+    }
+
+    let tokenIndex = 0;
+    let previousMatchIndex = -1;
+    let gapTotal = 0;
+
+    for (let haystackIndex = 0; haystackIndex < haystack.length && tokenIndex < token.length; haystackIndex += 1) {
+        if (haystack[haystackIndex] !== token[tokenIndex]) {
+            continue;
+        }
+
+        if (previousMatchIndex >= 0) {
+            gapTotal += haystackIndex - previousMatchIndex - 1;
+        }
+
+        previousMatchIndex = haystackIndex;
+        tokenIndex += 1;
+    }
+
+    return tokenIndex === token.length && gapTotal <= Math.max(8, token.length * 4);
 }
