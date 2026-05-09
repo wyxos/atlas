@@ -48,7 +48,7 @@ class FileNotFoundService
                             'not_found' => true,
                         ])->save();
 
-                        app(MetricsService::class)->incrementMetric(MetricsService::KEY_FILES_NOT_FOUND, 1);
+                        app(MetricsService::class)->applyNotFoundMark($file, $wasMarkedNotFound);
                         app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
                     }
 

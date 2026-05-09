@@ -6,7 +6,6 @@ import { store as tabsStore, setActive as tabsSetActive } from '@/actions/App/Ht
 import DashboardContainerList from '@/components/dashboard/DashboardContainerList.vue';
 import DashboardCoverageCard from '@/components/dashboard/DashboardCoverageCard.vue';
 import DashboardMetricPanel from '@/components/dashboard/DashboardMetricPanel.vue';
-import DashboardPositiveOutcomePanel from '@/components/dashboard/DashboardPositiveOutcomePanel.vue';
 import { useDashboardMetrics } from '@/composables/useDashboardMetrics';
 import type { ContainerMetricItem } from '@/types/dashboard';
 import { formatDashboardCount } from '@/utils/dashboard';
@@ -18,7 +17,6 @@ const loadError = dashboard.state.loadError;
 const isLoading = dashboard.state.isLoading;
 const coverage = dashboard.derived.coverage;
 const metricPanels = dashboard.derived.metricPanels;
-const positiveOutcomes = dashboard.derived.positiveOutcomes;
 const containerGroups = dashboard.derived.containerGroups;
 const containerTotals = dashboard.derived.containerTotals;
 
@@ -51,7 +49,7 @@ onMounted(dashboard.actions.fetchMetrics);
                     Dashboard
                 </h4>
                 <p class="text-sm text-blue-slate-300">
-                    File volume and moderation impact at a glance.
+                    Library records, storage coverage, and moderation impact at a glance.
                 </p>
             </div>
 
@@ -62,11 +60,9 @@ onMounted(dashboard.actions.fetchMetrics);
                 {{ loadError }}
             </div>
 
-            <div class="grid auto-rows-fr gap-6 lg:grid-cols-2">
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                 <DashboardCoverageCard :coverage="coverage" :is-loading="isLoading" />
                 <DashboardMetricPanel :panel="metricPanels[0]" :is-loading="isLoading" />
-                <DashboardPositiveOutcomePanel :outcomes="positiveOutcomes" :is-loading="isLoading" />
-                <DashboardMetricPanel :panel="metricPanels[1]" :is-loading="isLoading" />
             </div>
 
             <div class="space-y-6 rounded-lg border border-twilight-indigo-500/40 bg-prussian-blue-600 p-6">

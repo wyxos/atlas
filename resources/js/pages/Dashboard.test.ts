@@ -7,16 +7,24 @@ type DashboardMetrics = {
     files: {
         total: number;
         downloaded: number;
+        stored: number;
+        records_only: number;
         local: number;
         non_local: number;
+        local_available: number;
+        non_local_available: number;
         reactions: {
             love: number;
             like: number;
             funny: number;
         };
+        reacted: number;
+        unreacted: number;
         blacklisted: number;
         blacklisted_manual: number;
         blacklisted_feed_removed: number;
+        blacklisted_manual_in_feed: number;
+        blacklisted_auto_in_feed: number;
         auto_blacklisted: number;
         not_found: number;
         unreacted_not_blacklisted: number;
@@ -69,16 +77,24 @@ const createMetrics = (): DashboardMetrics => ({
     files: {
         total: 0,
         downloaded: 0,
+        stored: 0,
+        records_only: 0,
         local: 0,
         non_local: 0,
+        local_available: 0,
+        non_local_available: 0,
         reactions: {
             love: 0,
             like: 0,
             funny: 0,
         },
+        reacted: 0,
+        unreacted: 0,
         blacklisted: 0,
         blacklisted_manual: 0,
         blacklisted_feed_removed: 0,
+        blacklisted_manual_in_feed: 0,
+        blacklisted_auto_in_feed: 0,
         auto_blacklisted: 0,
         not_found: 0,
         unreacted_not_blacklisted: 0,
@@ -144,7 +160,7 @@ describe('Dashboard', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('File volume and moderation impact at a glance.');
+        expect(wrapper.text()).toContain('Library records, storage coverage, and moderation impact at a glance.');
     });
 
     it('renders section headers', async () => {
@@ -156,9 +172,9 @@ describe('Dashboard', () => {
         });
 
         expect(wrapper.text()).toContain('Moderation coverage');
-        expect(wrapper.text()).toContain('Library health');
-        expect(wrapper.text()).toContain('Positive outcomes');
-        expect(wrapper.text()).toContain('Removal impact');
+        expect(wrapper.text()).toContain('Library inventory');
+        expect(wrapper.text()).not.toContain('Positive reaction categories');
+        expect(wrapper.text()).not.toContain('Removal impact');
     });
 
     it('renders moderation coverage and regrouped metric labels', async () => {
@@ -166,8 +182,20 @@ describe('Dashboard', () => {
         metrics.files.total = 100;
         metrics.files.blacklisted = 9;
         metrics.files.blacklisted_manual = 4;
+        metrics.files.blacklisted_manual_in_feed = 4;
+        metrics.files.blacklisted_auto_in_feed = 3;
         metrics.files.auto_blacklisted = 3;
         metrics.files.blacklisted_feed_removed = 2;
+        metrics.files.stored = 40;
+        metrics.files.records_only = 60;
+        metrics.files.downloaded = 25;
+        metrics.files.local = 30;
+        metrics.files.non_local = 70;
+        metrics.files.local_available = 20;
+        metrics.files.non_local_available = 75;
+        metrics.files.not_found = 5;
+        metrics.files.reacted = 89;
+        metrics.files.unreacted = 11;
         metrics.files.reactions.love = 5;
         metrics.files.reactions.like = 3;
         metrics.files.reactions.funny = 2;
@@ -194,27 +222,32 @@ describe('Dashboard', () => {
         expect(text).toContain('Seen, no decision');
         expect(text).toContain('Kept');
         expect(text).toContain('Removed');
-        expect(text).toContain('Source split');
-        expect(text).toContain('Storage state');
-        expect(text).toContain('Availability');
-        expect(text).toContain('Remote only');
+        expect(text).toContain('Total records');
+        expect(text).toContain('Storage coverage');
+        expect(text).toContain('On disk');
+        expect(text).toContain('Online records');
+        expect(text).toContain('Not found');
+        expect(text).toContain('Stored origin');
+        expect(text).toContain('Imported');
+        expect(text).toContain('Reaction state');
+        expect(text).toContain('Reacted');
+        expect(text).toContain('Not reacted');
+        expect(text).toContain('11 / 100');
+        expect(text).toContain('Downloaded');
         expect(text).toContain('Decision coverage');
         expect(text).toContain('Backlog split');
         expect(text).toContain('Previewed, no decision');
-        expect(text).toContain('Reaction split');
+        expect(text).toContain('Reaction types');
         expect(text).toContain('Favorite');
         expect(text).toContain('50%');
         expect(text).toContain('Like');
         expect(text).toContain('30%');
         expect(text).toContain('Funny');
         expect(text).toContain('20%');
-        expect(text).toContain('Total blacklisted');
-        expect(text).toContain('Blacklist source');
         expect(text).toContain('Manual');
         expect(text).toContain('Auto');
         expect(text).toContain('Out of feed');
-        expect(text).toContain('Feed state');
-        expect(text).toContain('Still in feed');
+        expect(text).toContain('Removal state');
     });
 
     it('shows container actions for supported sources', async () => {

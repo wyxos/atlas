@@ -14,15 +14,27 @@ class MetricsService
 
     public const string KEY_FILES_DOWNLOADED = 'files_downloaded';
 
+    public const string KEY_FILES_WITH_PATH = 'files_with_path';
+
     public const string KEY_FILES_LOCAL = 'files_local';
 
+    public const string KEY_FILES_LOCAL_AVAILABLE = 'files_local_available';
+
+    public const string KEY_FILES_NON_LOCAL_AVAILABLE = 'files_non_local_available';
+
     public const string KEY_FILES_NOT_FOUND = 'files_not_found';
+
+    public const string KEY_FILES_REACTED = 'files_reacted';
 
     public const string KEY_FILES_BLACKLISTED_TOTAL = 'files_blacklisted_total';
 
     public const string KEY_FILES_BLACKLISTED_MANUAL = 'files_blacklisted_manual';
 
     public const string KEY_FILES_BLACKLISTED_FEED_REMOVED = 'files_blacklisted_feed_removed';
+
+    public const string KEY_FILES_BLACKLISTED_MANUAL_IN_FEED = 'files_blacklisted_manual_in_feed';
+
+    public const string KEY_FILES_BLACKLISTED_AUTO_IN_FEED = 'files_blacklisted_auto_in_feed';
 
     public const string KEY_FILES_AUTO_BLACKLISTED = 'files_auto_blacklisted';
 
@@ -280,6 +292,12 @@ class MetricsService
             $this->incrementUnreactedNotBlacklistedForFile($file, $afterCounted ? 1 : -1);
         }
 
+        $beforeReacted = $totalBefore > 0;
+        $afterReacted = $totalAfter > 0;
+        if ($beforeReacted !== $afterReacted) {
+            $this->incrementMetric(self::KEY_FILES_REACTED, $afterReacted ? 1 : -1);
+        }
+
         if ($loveDelta !== 0) {
             $this->incrementContainersForFileIds([$file->id], 'files_favorited', $loveDelta);
         }
@@ -299,7 +317,7 @@ class MetricsService
         $eligibleFiles = File::query()
             ->whereIn('id', $fileIds)
             ->where('auto_blacklisted', false)
-            ->get(['id', 'blacklisted_at']);
+            ->get(['id', 'blacklisted_at', 'previewed_count']);
 
         if ($eligibleFiles->isEmpty()) {
             return;
@@ -313,6 +331,14 @@ class MetricsService
         if ($manualBlacklisted > 0) {
             $this->incrementMetric(self::KEY_FILES_BLACKLISTED_MANUAL, -$manualBlacklisted);
         }
+
+        $manualInFeedBlacklisted = $eligibleFiles
+            ->filter(fn (File $file): bool => $file->blacklisted_at !== null && ! $this->isFeedRemoved($file))
+            ->count();
+        if ($manualInFeedBlacklisted > 0) {
+            $this->incrementMetric(self::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED, -$manualInFeedBlacklisted);
+            $this->incrementMetric(self::KEY_FILES_BLACKLISTED_AUTO_IN_FEED, $manualInFeedBlacklisted);
+        }
     }
 
     public function applyAutoBlacklistClear(File $file, bool $countAsManualBlacklisted = true): void
@@ -325,6 +351,11 @@ class MetricsService
 
         if ($countAsManualBlacklisted && $file->blacklisted_at !== null) {
             $this->incrementMetric(self::KEY_FILES_BLACKLISTED_MANUAL, 1);
+
+            if (! $this->isFeedRemoved($file)) {
+                $this->incrementMetric(self::KEY_FILES_BLACKLISTED_AUTO_IN_FEED, -1);
+                $this->incrementMetric(self::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED, 1);
+            }
         }
     }
 
@@ -369,6 +400,14 @@ class MetricsService
             $this->incrementMetric(self::KEY_FILES_BLACKLISTED_FEED_REMOVED, $feedRemovedCount);
         }
 
+        $inFeedCount = $eligibleFiles->count() - $feedRemovedCount;
+        if ($inFeedCount > 0) {
+            $this->incrementMetric(
+                $autoBlacklisted ? self::KEY_FILES_BLACKLISTED_AUTO_IN_FEED : self::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED,
+                $inFeedCount,
+            );
+        }
+
         $filesWithoutReactions = DB::table('files')
             ->select(['id', 'previewed_count'])
             ->whereIn('id', $eligibleIds)
@@ -404,6 +443,11 @@ class MetricsService
 
         if ($hadTerminalPreviewCount) {
             $this->incrementMetric(self::KEY_FILES_BLACKLISTED_FEED_REMOVED, -1);
+        } else {
+            $this->incrementMetric(
+                $wasAutoBlacklisted ? self::KEY_FILES_BLACKLISTED_AUTO_IN_FEED : self::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED,
+                -1,
+            );
         }
 
         if ($adjustUnreacted) {
@@ -491,6 +535,7 @@ class MetricsService
 
         if ($count > 0) {
             $this->incrementMetric(self::KEY_FILES_BLACKLISTED_FEED_REMOVED, $count);
+            $this->incrementBlacklistedInFeedByAutoState($fileIds, -1, terminal: false);
         }
     }
 
@@ -513,20 +558,23 @@ class MetricsService
 
         if ($count > 0) {
             $this->incrementMetric(self::KEY_FILES_BLACKLISTED_FEED_REMOVED, -$count);
+            $this->incrementBlacklistedInFeedByAutoState($fileIds, 1, terminal: true);
         }
     }
 
     /**
      * Apply metrics for downloading a file.
      */
-    public function applyDownload(File $file, bool $wasDownloaded): void
+    public function applyDownload(File $file, bool $wasDownloaded, bool $hadPath = false): void
     {
-        if ($wasDownloaded) {
-            return;
+        if (! $wasDownloaded) {
+            $this->incrementMetric(self::KEY_FILES_DOWNLOADED, 1);
+            $this->incrementContainersForFileIds([$file->id], 'files_downloaded', 1);
         }
 
-        $this->incrementMetric(self::KEY_FILES_DOWNLOADED, 1);
-        $this->incrementContainersForFileIds([$file->id], 'files_downloaded', 1);
+        if (! $hadPath && $this->fileHasPath($file)) {
+            $this->incrementMetric(self::KEY_FILES_WITH_PATH, 1);
+        }
     }
 
     /**
@@ -534,12 +582,34 @@ class MetricsService
      */
     public function applyDownloadClear(File $file, bool $wasDownloaded): void
     {
-        if (! $wasDownloaded) {
+        if ($wasDownloaded) {
+            $this->incrementMetric(self::KEY_FILES_DOWNLOADED, -1);
+            $this->incrementContainersForFileIds([$file->id], 'files_downloaded', -1);
+        }
+
+        if ($this->fileHasPath($file)) {
+            $this->incrementMetric(self::KEY_FILES_WITH_PATH, -1);
+        }
+    }
+
+    public function applyNotFoundMark(File $file, bool $wasNotFound): void
+    {
+        if ($wasNotFound) {
             return;
         }
 
-        $this->incrementMetric(self::KEY_FILES_DOWNLOADED, -1);
-        $this->incrementContainersForFileIds([$file->id], 'files_downloaded', -1);
+        $this->incrementMetric(self::KEY_FILES_NOT_FOUND, 1);
+        $this->incrementAvailableSourceMetric($file, -1);
+    }
+
+    public function applyNotFoundClear(File $file, bool $wasNotFound): void
+    {
+        if (! $wasNotFound) {
+            return;
+        }
+
+        $this->incrementMetric(self::KEY_FILES_NOT_FOUND, -1);
+        $this->incrementAvailableSourceMetric($file, 1);
     }
 
     /**
@@ -557,10 +627,15 @@ class MetricsService
             ->selectRaw('COUNT(*) as total')
             ->selectRaw('SUM(CASE WHEN not_found = 1 THEN 1 ELSE 0 END) as not_found_total')
             ->selectRaw('SUM(CASE WHEN downloaded = 1 THEN 1 ELSE 0 END) as downloaded_total')
+            ->selectRaw("SUM(CASE WHEN path IS NOT NULL AND path != '' THEN 1 ELSE 0 END) as with_path_total")
             ->selectRaw("SUM(CASE WHEN source IN ('local', 'Local') THEN 1 ELSE 0 END) as local_total")
+            ->selectRaw("SUM(CASE WHEN source IN ('local', 'Local') AND not_found = 0 THEN 1 ELSE 0 END) as local_available_total")
+            ->selectRaw("SUM(CASE WHEN source NOT IN ('local', 'Local') AND not_found = 0 THEN 1 ELSE 0 END) as non_local_available_total")
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL THEN 1 ELSE 0 END) as blacklisted_total')
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND auto_blacklisted = 0 THEN 1 ELSE 0 END) as blacklisted_manual_total')
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND previewed_count >= '.FilePreviewService::FEED_REMOVED_PREVIEW_COUNT.' THEN 1 ELSE 0 END) as blacklisted_feed_removed_total')
+            ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND auto_blacklisted = 0 AND previewed_count < '.FilePreviewService::FEED_REMOVED_PREVIEW_COUNT.' THEN 1 ELSE 0 END) as blacklisted_manual_in_feed_total')
+            ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND auto_blacklisted = 1 AND previewed_count < '.FilePreviewService::FEED_REMOVED_PREVIEW_COUNT.' THEN 1 ELSE 0 END) as blacklisted_auto_in_feed_total')
             ->selectRaw('SUM(CASE WHEN auto_blacklisted = 1 THEN 1 ELSE 0 END) as auto_blacklisted_total')
             ->first();
 
@@ -584,14 +659,23 @@ class MetricsService
             ->whereIn('type', ['love', 'like', 'funny'])
             ->groupBy('type')
             ->pluck('total', 'type');
+        $reactedTotal = Reaction::query()
+            ->distinct('file_id')
+            ->count('file_id');
 
         $this->setMetric(self::KEY_FILES_TOTAL, (int) ($fileCounts->total ?? 0), 'Total files');
         $this->setMetric(self::KEY_FILES_DOWNLOADED, (int) ($fileCounts->downloaded_total ?? 0), 'Downloaded files');
+        $this->setMetric(self::KEY_FILES_WITH_PATH, (int) ($fileCounts->with_path_total ?? 0), 'Files with a stored path');
         $this->setMetric(self::KEY_FILES_LOCAL, (int) ($fileCounts->local_total ?? 0), 'Local files');
+        $this->setMetric(self::KEY_FILES_LOCAL_AVAILABLE, (int) ($fileCounts->local_available_total ?? 0), 'Available local files');
+        $this->setMetric(self::KEY_FILES_NON_LOCAL_AVAILABLE, (int) ($fileCounts->non_local_available_total ?? 0), 'Available non-local files');
         $this->setMetric(self::KEY_FILES_NOT_FOUND, (int) ($fileCounts->not_found_total ?? 0), 'Not found files');
+        $this->setMetric(self::KEY_FILES_REACTED, $reactedTotal, 'Files with any reaction');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_TOTAL, (int) ($fileCounts->blacklisted_total ?? 0), 'Blacklisted files');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_MANUAL, (int) ($fileCounts->blacklisted_manual_total ?? 0), 'Manual blacklisted files');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_FEED_REMOVED, (int) ($fileCounts->blacklisted_feed_removed_total ?? 0), 'Feed-removed blacklisted files');
+        $this->setMetric(self::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED, (int) ($fileCounts->blacklisted_manual_in_feed_total ?? 0), 'Manual blacklisted files still in feed');
+        $this->setMetric(self::KEY_FILES_BLACKLISTED_AUTO_IN_FEED, (int) ($fileCounts->blacklisted_auto_in_feed_total ?? 0), 'Auto blacklisted files still in feed');
         $this->setMetric(self::KEY_FILES_AUTO_BLACKLISTED, (int) ($fileCounts->auto_blacklisted_total ?? 0), 'Auto blacklisted files');
         $this->setMetric(self::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $unreactedNotBlacklisted, 'Unreacted, not blacklisted');
         $this->setMetric(self::KEY_FILES_UNREACTED_PREVIEWED_NOT_BLACKLISTED, $unreactedPreviewed, 'Unreacted previewed, not blacklisted');
@@ -652,9 +736,61 @@ class MetricsService
             : self::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED;
     }
 
+    /**
+     * @param  array<int>  $fileIds
+     */
+    private function incrementBlacklistedInFeedByAutoState(array $fileIds, int $direction, bool $terminal): void
+    {
+        if ($direction === 0 || $fileIds === []) {
+            return;
+        }
+
+        $operator = $terminal ? '>=' : '<';
+        $counts = File::query()
+            ->whereIn('id', $fileIds)
+            ->whereNotNull('blacklisted_at')
+            ->where('previewed_count', $operator, FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
+            ->selectRaw('SUM(CASE WHEN auto_blacklisted = 1 THEN 1 ELSE 0 END) as auto_total')
+            ->selectRaw('SUM(CASE WHEN auto_blacklisted = 0 THEN 1 ELSE 0 END) as manual_total')
+            ->first();
+
+        $manual = (int) ($counts->manual_total ?? 0);
+        if ($manual > 0) {
+            $this->incrementMetric(self::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED, $manual * $direction);
+        }
+
+        $auto = (int) ($counts->auto_total ?? 0);
+        if ($auto > 0) {
+            $this->incrementMetric(self::KEY_FILES_BLACKLISTED_AUTO_IN_FEED, $auto * $direction);
+        }
+    }
+
     private function willBeFeedRemoved(File $file, ?int $minimumPreviewedCount): bool
     {
         return (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
             || (is_int($minimumPreviewedCount) && $minimumPreviewedCount >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
+    }
+
+    private function isFeedRemoved(File $file): bool
+    {
+        return (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT;
+    }
+
+    private function fileHasPath(File $file): bool
+    {
+        return is_string($file->path) && $file->path !== '';
+    }
+
+    private function incrementAvailableSourceMetric(File $file, int $delta): void
+    {
+        $this->incrementMetric(
+            $this->isLocalSource($file) ? self::KEY_FILES_LOCAL_AVAILABLE : self::KEY_FILES_NON_LOCAL_AVAILABLE,
+            $delta,
+        );
+    }
+
+    private function isLocalSource(File $file): bool
+    {
+        return strtolower(trim((string) $file->source)) === 'local';
     }
 }

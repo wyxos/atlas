@@ -45,6 +45,7 @@ class FileDownloadFinalizer
         bool $generatePreviews = true
     ): void {
         $wasDownloaded = (bool) $file->downloaded;
+        $hadPath = is_string($file->path) && $file->path !== '';
         $wasBlacklisted = $file->blacklisted_at !== null;
         $wasAutoBlacklisted = (bool) $file->auto_blacklisted;
         $hasTerminalPreviewCount = (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT;
@@ -134,7 +135,7 @@ class FileDownloadFinalizer
         $file->update($updates);
         app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
 
-        $metrics->applyDownload($file, $wasDownloaded);
+        $metrics->applyDownload($file, $wasDownloaded, $hadPath);
         if ($wasBlacklisted) {
             $metrics->applyBlacklistClear(
                 $file,

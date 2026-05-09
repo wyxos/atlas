@@ -12,16 +12,24 @@ export type DashboardMetrics = {
     files: {
         total: number;
         downloaded: number;
+        stored: number;
+        records_only: number;
         local: number;
         non_local: number;
+        local_available: number;
+        non_local_available: number;
         reactions: {
             love: number;
             like: number;
             funny: number;
         };
+        reacted: number;
+        unreacted: number;
         blacklisted: number;
         blacklisted_manual: number;
         blacklisted_feed_removed: number;
+        blacklisted_manual_in_feed: number;
+        blacklisted_auto_in_feed: number;
         auto_blacklisted: number;
         not_found: number;
         unreacted_not_blacklisted: number;
@@ -37,12 +45,31 @@ export type DashboardMetrics = {
     };
 };
 
+export type DashboardMetricIcon =
+    | 'archive'
+    | 'ban'
+    | 'bot'
+    | 'circle'
+    | 'circle-slash'
+    | 'cloud'
+    | 'download'
+    | 'eye'
+    | 'eye-off'
+    | 'file-x'
+    | 'hard-drive'
+    | 'heart'
+    | 'import'
+    | 'smile'
+    | 'thumbs-up'
+    | 'user';
+
 export type DashboardCoverageSegment = {
     key: 'unseen' | 'pending' | 'kept' | 'removed';
     label: string;
     value: number;
     barPercent: number;
     color: string;
+    icon: DashboardMetricIcon;
 };
 
 export type DashboardCoverage = {
@@ -57,6 +84,8 @@ export type DashboardMetricRow = {
     key: string;
     label: string;
     value: number;
+    denominator?: number;
+    icon: DashboardMetricIcon;
     meta?: string;
     barPercent?: number;
     color: string;
@@ -66,23 +95,17 @@ export type DashboardMetricDistribution = {
     key: string;
     label: string;
     meta?: string;
+    total: number;
     segments: DashboardMetricRow[];
 };
 
 export type DashboardMetricPanel = {
-    key: 'library' | 'removal';
+    key: 'inventory';
     title: string;
     description: string;
     rows: DashboardMetricRow[];
     summaryRows?: DashboardMetricRow[];
     distributions?: DashboardMetricDistribution[];
-};
-
-export type DashboardPositiveOutcomes = {
-    title: string;
-    description: string;
-    total: number;
-    rows: DashboardMetricRow[];
 };
 
 export type DashboardContainerGroup = {

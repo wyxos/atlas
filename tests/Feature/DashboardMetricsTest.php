@@ -20,6 +20,7 @@ test('dashboard metrics report file and reaction totals', function () {
     $manualBlacklisted = File::factory()->create([
         'blacklisted_at' => now(),
         'downloaded' => true,
+        'path' => 'downloads/manual-blacklisted.jpg',
         'previewed_count' => 1,
         'source' => 'local',
     ]);
@@ -28,6 +29,7 @@ test('dashboard metrics report file and reaction totals', function () {
         'blacklisted_at' => now(),
         'auto_blacklisted' => true,
         'downloaded' => false,
+        'path' => null,
         'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
         'source' => 'NAS',
     ]);
@@ -35,15 +37,18 @@ test('dashboard metrics report file and reaction totals', function () {
     $notFound = File::factory()->create([
         'not_found' => true,
         'downloaded' => false,
+        'path' => null,
         'source' => 'local',
     ]);
 
     $unblacklisted = File::factory()->create([
         'downloaded' => true,
+        'path' => 'downloads/unblacklisted.jpg',
         'source' => 'Booru',
     ]);
     $unreacted = File::factory()->create([
         'downloaded' => false,
+        'path' => 'imports/unreacted.jpg',
         'previewed_count' => 3,
         'source' => 'YouTube',
     ]);
@@ -107,11 +112,19 @@ test('dashboard metrics report file and reaction totals', function () {
                 'funny' => 1,
             ],
             'downloaded' => 2,
+            'stored' => 3,
+            'records_only' => 2,
             'local' => 2,
             'non_local' => 3,
+            'local_available' => 1,
+            'non_local_available' => 3,
+            'reacted' => 3,
+            'unreacted' => 2,
             'blacklisted' => 2,
             'blacklisted_manual' => 1,
             'blacklisted_feed_removed' => 1,
+            'blacklisted_manual_in_feed' => 1,
+            'blacklisted_auto_in_feed' => 0,
             'auto_blacklisted' => 1,
             'not_found' => 1,
             'unreacted_not_blacklisted' => 2,

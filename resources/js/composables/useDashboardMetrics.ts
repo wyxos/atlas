@@ -5,7 +5,6 @@ import {
     createDashboardContainerTotals,
     createDashboardCoverage,
     createDashboardMetricPanels,
-    createDashboardPositiveOutcomes,
 } from '@/utils/dashboard';
 
 export function useDashboardMetrics() {
@@ -15,7 +14,6 @@ export function useDashboardMetrics() {
 
     const coverage = computed(() => createDashboardCoverage(metrics.value));
     const metricPanels = computed(() => createDashboardMetricPanels(metrics.value));
-    const positiveOutcomes = computed(() => createDashboardPositiveOutcomes(metrics.value));
     const containerGroups = computed(() => createDashboardContainerGroups(metrics.value));
     const containerTotals = computed(() => createDashboardContainerTotals(metrics.value));
 
@@ -42,7 +40,6 @@ export function useDashboardMetrics() {
         derived: {
             coverage,
             metricPanels,
-            positiveOutcomes,
             containerGroups,
             containerTotals,
         },

@@ -22,6 +22,7 @@ class DownloadedFileResetService
             return;
         }
 
+        $wasNotFound = (bool) $file->not_found;
         $this->downloadedFileClearService->clear($file);
 
         $updates = [
@@ -35,5 +36,6 @@ class DownloadedFileResetService
         }
 
         $file->forceFill($updates)->save();
+        app(MetricsService::class)->applyNotFoundClear($file, $wasNotFound);
     }
 }

@@ -4,18 +4,20 @@ import type {
     DashboardContainerTotals,
     DashboardCoverage,
     DashboardMetricDistribution,
+    DashboardMetricIcon,
     DashboardMetricPanel,
     DashboardMetricRow,
     DashboardMetrics,
-    DashboardPositiveOutcomes,
 } from '@/types/dashboard';
 
 const colors = {
     total: 'var(--color-blue-slate-200)',
     downloaded: 'var(--color-success-400)',
-    local: 'var(--color-smart-blue-500)',
-    nonLocal: 'var(--color-twilight-indigo-300)',
+    stored: '#14b8a6',
+    recordsOnly: 'var(--color-blue-slate-500)',
+    imported: 'var(--color-smart-blue-500)',
     notFound: 'var(--color-danger-300)',
+    online: '#38bdf8',
     unseen: 'var(--color-blue-slate-500)',
     pending: '#f97316',
     kept: 'var(--color-success-400)',
@@ -23,12 +25,35 @@ const colors = {
     favorite: '#ef4444',
     like: 'var(--color-smart-blue-500)',
     funny: '#eab308',
+    reacted: 'var(--color-success-400)',
+    unreacted: '#f97316',
     auto: '#6b7280',
     feed: '#eab308',
 };
 
+const metricIcons: Record<string, DashboardMetricIcon> = {
+    total: 'circle',
+    stored: 'hard-drive',
+    online: 'cloud',
+    'not-found': 'file-x',
+    downloaded: 'download',
+    imported: 'import',
+    unseen: 'eye-off',
+    pending: 'eye',
+    kept: 'thumbs-up',
+    removed: 'ban',
+    reacted: 'smile',
+    unreacted: 'circle-slash',
+    favorite: 'heart',
+    like: 'thumbs-up',
+    funny: 'smile',
+    'manual-in-feed': 'user',
+    'auto-in-feed': 'bot',
+    'out-of-feed': 'archive',
+};
+
 export function formatDashboardCount(value: number): string {
-    return value.toLocaleString();
+    return value.toLocaleString('en-US');
 }
 
 export function formatDashboardPercent(value: number): string {
@@ -43,15 +68,34 @@ export function formatDashboardPercent(value: number): string {
     return `${value.toFixed(value >= 10 ? 0 : 1)}%`;
 }
 
+export function formatDashboardRatio(value: number, total: number): string {
+    return `${formatDashboardCount(value)} / ${formatDashboardCount(total)}`;
+}
+
 export function createDashboardCoverage(metrics: DashboardMetrics | null): DashboardCoverage {
     const files = metrics?.files;
     const total = files?.total ?? 0;
+    const reactions = files?.reactions;
+    const reacted = files?.reacted ?? 0;
+    const unreacted = files?.unreacted ?? Math.max(0, total - reacted);
     const unseen = files?.unreacted_unpreviewed_not_blacklisted ?? 0;
     const pending = files?.unreacted_previewed_not_blacklisted ?? 0;
-    const unreacted = files?.unreacted_not_blacklisted ?? 0;
+    const backlog = files?.unreacted_not_blacklisted ?? 0;
     const removed = files?.blacklisted ?? 0;
+    const manualInFeed = files?.blacklisted_manual_in_feed ?? 0;
+    const autoInFeed = files?.blacklisted_auto_in_feed ?? 0;
+    const outOfFeed = files?.blacklisted_feed_removed ?? 0;
     const kept = Math.max(0, total - unseen - pending - removed);
     const moderated = kept + removed;
+    const favoriteReactions = reactions?.love ?? 0;
+    const likeReactions = reactions?.like ?? 0;
+    const funnyReactions = reactions?.funny ?? 0;
+    const reactionSignals = favoriteReactions + likeReactions + funnyReactions;
+    const reactionRows = [
+        createMetricRow('favorite', 'Favorite', favoriteReactions, colors.favorite, reactionSignals, 'of reaction signals'),
+        createMetricRow('like', 'Like', likeReactions, colors.like, reactionSignals, 'of reaction signals'),
+        createMetricRow('funny', 'Funny', funnyReactions, colors.funny, reactionSignals, 'of reaction signals'),
+    ];
     const segments = [
         createCoverageSegment('unseen', 'Unseen', unseen, total, colors.unseen),
         createCoverageSegment('pending', 'Seen, no decision', pending, total, colors.pending),
@@ -65,11 +109,21 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
         moderatedPercent: formatDashboardPercent(percent(moderated, total)),
         segments,
         distributions: [
-            createMetricDistribution('coverage', 'Coverage split', 'Unseen, pending, kept, and removed files', segments),
+            createMetricDistribution('coverage', 'Coverage split', 'Unseen, pending, kept, and removed records', segments, total),
             createMetricDistribution('backlog', 'Backlog split', 'Unseen files vs seen files still waiting for a decision', [
-                createMetricRow('unseen', 'Not previewed', unseen, colors.unseen, unreacted, 'of backlog'),
-                createMetricRow('pending', 'Previewed, no decision', pending, colors.pending, unreacted, 'of backlog'),
-            ]),
+                createMetricRow('unseen', 'Not previewed', unseen, colors.unseen, backlog, 'of backlog'),
+                createMetricRow('pending', 'Previewed, no decision', pending, colors.pending, backlog, 'of backlog'),
+            ], backlog),
+            createMetricDistribution('reaction-state', 'Reaction state', 'Records with any reaction vs records with no reaction', [
+                createMetricRow('reacted', 'Reacted', reacted, colors.reacted, total, 'of records'),
+                createMetricRow('unreacted', 'Not reacted', unreacted, colors.unreacted, total, 'of records'),
+            ], total),
+            createMetricDistribution('reaction-types', 'Reaction types', 'Reaction signals by type', reactionRows, reactionSignals),
+            createMetricDistribution('removal-state', 'Removal state', 'Manual and auto counts only include blacklisted records still in feed', [
+                createMetricRow('manual-in-feed', 'Manual', manualInFeed, colors.pending, removed, 'of blacklisted'),
+                createMetricRow('auto-in-feed', 'Auto', autoInFeed, colors.auto, removed, 'of blacklisted'),
+                createMetricRow('out-of-feed', 'Out of feed', outOfFeed, colors.feed, removed, 'of blacklisted'),
+            ], removed),
         ],
     };
 }
@@ -78,81 +132,36 @@ export function createDashboardMetricPanels(metrics: DashboardMetrics | null): D
     const files = metrics?.files;
     const total = files?.total ?? 0;
     const downloaded = files?.downloaded ?? 0;
-    const local = files?.local ?? 0;
-    const nonLocal = files?.non_local ?? 0;
+    const stored = files?.stored ?? 0;
+    const recordsOnly = files?.records_only ?? Math.max(0, total - stored);
+    const importedStored = Math.max(0, stored - downloaded);
     const notFound = files?.not_found ?? 0;
-    const blacklisted = files?.blacklisted ?? 0;
-    const manualBlacklisted = files?.blacklisted_manual ?? 0;
-    const autoBlacklisted = files?.auto_blacklisted ?? 0;
-    const outOfFeed = files?.blacklisted_feed_removed ?? 0;
-    const blacklistedInFeed = Math.max(0, blacklisted - outOfFeed);
+    const notFoundRecords = Math.min(notFound, recordsOnly);
+    const onlineRecords = Math.max(0, recordsOnly - notFoundRecords);
 
     return [
         {
-            key: 'library',
-            title: 'Library health',
-            description: 'Inventory source and availability distribution.',
+            key: 'inventory',
+            title: 'Library inventory',
+            description: 'Records by disk coverage and stored origin.',
             summaryRows: [
-                createMetricRow('total', 'Total files', total, colors.total),
+                createMetricRow('total', 'Total records', total, colors.total),
+                createMetricRow('stored', 'On disk', stored, colors.stored, total, 'of records'),
             ],
             distributions: [
-                createMetricDistribution('source', 'Source split', 'Local files vs external references', [
-                    createMetricRow('local', 'Local', local, colors.local, total, 'of library'),
-                    createMetricRow('non-local', 'Non-local', nonLocal, colors.nonLocal, total, 'of library'),
-                ]),
-                createMetricDistribution('storage', 'Storage state', 'Downloaded assets vs remote-only records', [
-                    createMetricRow('downloaded', 'Downloaded', downloaded, colors.downloaded, total, 'of library'),
-                    createMetricRow('remote-only', 'Remote only', Math.max(0, total - downloaded), colors.unseen, total, 'of library'),
-                ]),
-                createMetricDistribution('availability', 'Availability', 'Reachable records vs missing source files', [
-                    createMetricRow('available', 'Available', Math.max(0, total - notFound), colors.total, total, 'of library'),
-                    createMetricRow('not-found', 'Not found', notFound, colors.notFound, total, 'of library'),
-                ]),
-            ],
-            rows: [],
-        },
-        {
-            key: 'removal',
-            title: 'Removal impact',
-            description: 'Blacklist source and feed rotation impact.',
-            summaryRows: [
-                createMetricRow('blacklisted', 'Total blacklisted', blacklisted, colors.removed, total, 'of library'),
-                createMetricRow('out-of-feed', 'Out of feed', outOfFeed, colors.feed, blacklisted, 'of blacklisted'),
-            ],
-            distributions: [
-                createMetricDistribution('blacklist-source', 'Blacklist source', 'Manual removals vs backend-applied removals', [
-                    createMetricRow('manual', 'Manual', manualBlacklisted, colors.pending, blacklisted, 'of blacklisted'),
-                    createMetricRow('auto', 'Auto', autoBlacklisted, colors.auto, blacklisted, 'of blacklisted'),
-                ]),
-                createMetricDistribution('feed-state', 'Feed state', 'Removed from normal rotation vs still visible in feed', [
-                    createMetricRow('out-of-feed', 'Out of feed', outOfFeed, colors.feed, blacklisted, 'of blacklisted'),
-                    createMetricRow('blacklisted-in-feed', 'Still in feed', blacklistedInFeed, colors.auto, blacklisted, 'of blacklisted'),
-                ]),
+                createMetricDistribution('storage-coverage', 'Storage coverage', 'On-disk files, online records, and missing source records', [
+                    createMetricRow('stored', 'On disk', stored, colors.stored, total, 'of records'),
+                    createMetricRow('online', 'Online records', onlineRecords, colors.online, total, 'of records'),
+                    createMetricRow('not-found', 'Not found', notFoundRecords, colors.notFound, total, 'of records'),
+                ], total),
+                createMetricDistribution('stored-origin', 'Stored origin', 'Downloaded vs imported files on disk', [
+                    createMetricRow('downloaded', 'Downloaded', downloaded, colors.downloaded, stored, 'of stored media'),
+                    createMetricRow('imported', 'Imported', importedStored, colors.imported, stored, 'of stored media'),
+                ], stored),
             ],
             rows: [],
         },
     ];
-}
-
-export function createDashboardPositiveOutcomes(metrics: DashboardMetrics | null): DashboardPositiveOutcomes {
-    const reactions = metrics?.files.reactions;
-    const rows = [
-        { key: 'favorite', label: 'Favorite', value: reactions?.love ?? 0, color: colors.favorite },
-        { key: 'like', label: 'Like', value: reactions?.like ?? 0, color: colors.like },
-        { key: 'funny', label: 'Funny', value: reactions?.funny ?? 0, color: colors.funny },
-    ];
-    const total = rows.reduce((sum, row) => sum + row.value, 0);
-
-    return {
-        title: 'Positive outcomes',
-        description: 'Ranked positive signals by reaction type.',
-        total,
-        rows: rows.map((row) => ({
-            ...row,
-            barPercent: percent(row.value, total),
-            meta: `${formatDashboardPercent(percent(row.value, total))} of positive signals`,
-        })),
-    };
 }
 
 export function createDashboardContainerTotals(metrics: DashboardMetrics | null): DashboardContainerTotals {
@@ -199,6 +208,7 @@ function createCoverageSegment(
         value,
         barPercent: percent(value, total),
         color,
+        icon: metricIcon(key),
     };
 }
 
@@ -217,6 +227,8 @@ function createMetricRow(
         label,
         value,
         color,
+        denominator,
+        icon: metricIcon(key),
         barPercent,
         meta: barPercent === undefined ? undefined : `${formatDashboardPercent(barPercent)} ${basisLabel}`,
     };
@@ -227,11 +239,13 @@ function createMetricDistribution(
     label: string,
     meta: string,
     segments: DashboardMetricRow[],
+    total = segments.reduce((sum, segment) => sum + segment.value, 0),
 ): DashboardMetricDistribution {
     return {
         key,
         label,
         meta,
+        total,
         segments,
     };
 }
@@ -242,4 +256,8 @@ function percent(value: number, denominator: number): number {
     }
 
     return Math.min(100, (value / denominator) * 100);
+}
+
+function metricIcon(key: string): DashboardMetricIcon {
+    return metricIcons[key] ?? 'circle';
 }
