@@ -88,5 +88,23 @@ it('starts a library scan from settings', function () {
 
     $response->assertAccepted()
         ->assertJsonPath('run.status', 'pending');
-    Queue::assertPushed(ScanLibraryRun::class);
+    Queue::assertPushed(ScanLibraryRun::class, fn (ScanLibraryRun $job): bool => $job->queue === 'library-scans');
+});
+
+it('dispatches library scan parser jobs on the dedicated queue', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+
+    $run = LibraryScanRun::factory()->create();
+    LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'status' => LibraryScanItemStatus::IMPORTED,
+        'parser' => 'audio',
+    ]);
+
+    app(LibraryScanService::class)->dispatchPendingParsers($run);
+
+    Queue::assertPushed(
+        ProcessLibraryScanItem::class,
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans',
+    );
 });

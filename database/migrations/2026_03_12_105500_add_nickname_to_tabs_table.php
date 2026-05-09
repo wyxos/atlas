@@ -11,8 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('tabs', 'nickname') || Schema::hasColumn('tabs', 'custom_label')) {
+            return;
+        }
+
         Schema::table('tabs', function (Blueprint $table) {
-            $table->string('nickname')->nullable()->after('label');
+            $table->string('custom_label')->nullable()->after('label');
         });
     }
 
@@ -21,8 +25,16 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('tabs', function (Blueprint $table) {
-            $table->dropColumn('nickname');
+        $column = Schema::hasColumn('tabs', 'custom_label')
+            ? 'custom_label'
+            : (Schema::hasColumn('tabs', 'nickname') ? 'nickname' : null);
+
+        if ($column === null) {
+            return;
+        }
+
+        Schema::table('tabs', function (Blueprint $table) use ($column) {
+            $table->dropColumn($column);
         });
     }
 };

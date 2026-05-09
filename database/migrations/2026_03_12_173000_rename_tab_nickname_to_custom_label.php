@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasColumn('tabs', 'nickname') || Schema::hasColumn('tabs', 'custom_label')) {
+            return;
+        }
+
         Schema::table('tabs', function (Blueprint $table) {
             $table->renameColumn('nickname', 'custom_label');
         });
@@ -21,6 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasColumn('tabs', 'custom_label') || Schema::hasColumn('tabs', 'nickname')) {
+            return;
+        }
+
         Schema::table('tabs', function (Blueprint $table) {
             $table->renameColumn('custom_label', 'nickname');
         });

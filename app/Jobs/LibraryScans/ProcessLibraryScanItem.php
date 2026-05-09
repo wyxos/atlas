@@ -21,7 +21,7 @@ class ProcessLibraryScanItem implements ShouldQueue
 
     public function __construct(private readonly int $itemId)
     {
-        $this->onQueue('processing');
+        $this->onQueue('library-scans');
     }
 
     public function handle(LibraryScanFileParser $parser, LibraryScanService $scans): void

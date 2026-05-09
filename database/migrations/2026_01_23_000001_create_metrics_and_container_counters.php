@@ -8,25 +8,41 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('metrics', function (Blueprint $table) {
-            $table->id();
-            $table->string('key')->unique();
-            $table->string('description')->nullable();
-            $table->unsignedBigInteger('value')->default(0);
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('metrics')) {
+            Schema::create('metrics', function (Blueprint $table) {
+                $table->id();
+                $table->string('key')->unique();
+                $table->string('description')->nullable();
+                $table->unsignedBigInteger('value')->default(0);
+                $table->timestamps();
+            });
+        }
 
-        Schema::table('containers', function (Blueprint $table) {
-            $table->unsignedBigInteger('files_total')->default(0);
-            $table->unsignedBigInteger('files_downloaded')->default(0);
-            $table->unsignedBigInteger('files_blacklisted')->default(0);
-            $table->unsignedBigInteger('files_favorited')->default(0);
+        $counterColumns = [
+            'files_total',
+            'files_downloaded',
+            'files_blacklisted',
+            'files_favorited',
+        ];
 
-            $table->index('files_total');
-            $table->index('files_downloaded');
-            $table->index('files_blacklisted');
-            $table->index('files_favorited');
-        });
+        $missingColumns = collect($counterColumns)
+            ->filter(fn (string $column): bool => ! Schema::hasColumn('containers', $column))
+            ->values()
+            ->all();
+
+        if ($missingColumns !== []) {
+            Schema::table('containers', function (Blueprint $table) use ($missingColumns) {
+                foreach ($missingColumns as $column) {
+                    $table->unsignedBigInteger($column)->default(0);
+                }
+            });
+        }
+
+        foreach ($counterColumns as $column) {
+            Schema::whenTableDoesntHaveIndex('containers', "containers_{$column}_index", static function (Blueprint $table) use ($column): void {
+                $table->index($column);
+            });
+        }
     }
 
     public function down(): void

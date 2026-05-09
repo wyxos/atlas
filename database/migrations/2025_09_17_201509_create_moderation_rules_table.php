@@ -16,11 +16,13 @@ return new class extends Migration
             $table->string('name')->nullable();
             $table->boolean('active')->default(true);
             $table->boolean('nsfw')->default(false);
+            $table->string('action_type')->default('blacklist');
             $table->string('op');
             $table->json('terms')->nullable();
             $table->unsignedInteger('min')->nullable();
             $table->json('options')->nullable();
             $table->json('children')->nullable();
+            $table->string('blacklist_previewed_count_mode')->nullable();
             $table->timestamps();
         });
     }

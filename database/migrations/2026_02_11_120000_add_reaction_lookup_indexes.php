@@ -8,9 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('reactions', function (Blueprint $table) {
+        Schema::whenTableDoesntHaveIndex('reactions', 'reactions_user_created_file_idx', function (Blueprint $table) {
             // Supports reaction_at sorting for a single user.
             $table->index(['user_id', 'created_at', 'file_id'], 'reactions_user_created_file_idx');
+        });
+
+        Schema::whenTableDoesntHaveIndex('reactions', 'reactions_user_type_created_file_idx', function (Blueprint $table) {
             // Supports reaction_at sorting scoped to specific reaction types.
             $table->index(['user_id', 'type', 'created_at', 'file_id'], 'reactions_user_type_created_file_idx');
         });

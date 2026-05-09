@@ -35,6 +35,7 @@ return new class extends Migration
             $table->unsignedInteger('previewed_count')->default(0);
             $table->timestamp('seen_at')->nullable(); // When file was viewed
             $table->unsignedInteger('seen_count')->default(0);
+            $table->boolean('auto_blacklisted')->default(false);
             $table->timestamp('blacklisted_at')->nullable(); // When file was blacklisted
             $table->boolean('not_found')->default(false);
             $table->json('listing_metadata')->nullable();
@@ -49,13 +50,15 @@ return new class extends Migration
             $table->index('mime_type');
             $table->index('not_found');
             $table->index(['mime_type', 'size']); // Composite index for size calculations
+            $table->index(['mime_type', 'id'], 'files_mime_type_id_index');
             $table->index(['downloaded_at', 'updated_at', 'id'], 'files_downloaded_at_updated_at_id_idx');
             $table->index(['imported_at', 'updated_at', 'id'], 'files_imported_at_updated_at_id_idx');
             $table->index(['created_at', 'id'], 'files_created_at_id_idx');
             $table->index(['updated_at', 'id'], 'files_updated_at_id_idx');
             $table->index(['blacklisted_at', 'updated_at', 'id'], 'files_blacklisted_at_updated_at_id_idx');
             $table->index(['source', 'updated_at', 'id'], 'files_source_updated_at_id_idx');
-            $table->unique('referrer_url');
+            $table->unique('url', 'files_url_unique');
+            $table->index('referrer_url', 'files_referrer_url_index');
         });
     }
 

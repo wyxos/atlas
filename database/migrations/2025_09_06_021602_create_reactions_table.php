@@ -19,6 +19,8 @@ return new class extends Migration
             $table->index(['type']);
             $table->index(['file_id', 'user_id'], 'reactions_file_user_idx');
             $table->index(['file_id', 'user_id', 'type'], 'reactions_file_user_type_idx');
+            $table->index(['user_id', 'created_at', 'file_id'], 'reactions_user_created_file_idx');
+            $table->index(['user_id', 'type', 'created_at', 'file_id'], 'reactions_user_type_created_file_idx');
         });
 
     }

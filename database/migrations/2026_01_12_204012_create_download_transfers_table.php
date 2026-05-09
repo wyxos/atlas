@@ -17,6 +17,7 @@ return new class extends Migration
             $table->text('url');
             $table->string('domain')->index();
             $table->string('status')->index();
+            $table->unsignedInteger('attempt')->default(0);
 
             $table->unsignedBigInteger('bytes_total')->nullable();
             $table->unsignedBigInteger('bytes_downloaded')->default(0);

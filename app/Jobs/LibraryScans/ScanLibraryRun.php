@@ -26,7 +26,7 @@ class ScanLibraryRun implements ShouldQueue
 
     public function __construct(private readonly int $runId)
     {
-        $this->onQueue('processing');
+        $this->onQueue('library-scans');
     }
 
     public function handle(AtlasStorage $storage, LibraryScanService $scans): void

@@ -15,8 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('label');
+            $table->string('custom_label')->nullable();
             $table->json('params')->nullable();
             $table->integer('position')->default(0);
+            $table->boolean('is_active')->default(false);
             $table->timestamps();
         });
     }

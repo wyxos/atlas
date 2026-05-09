@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('containers', 'blacklist_previewed_count_mode')) {
+            return;
+        }
+
         Schema::table('containers', function (Blueprint $table) {
             $table->string('blacklist_previewed_count_mode')->nullable();
         });
@@ -21,6 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasColumn('containers', 'blacklist_previewed_count_mode')) {
+            return;
+        }
+
         Schema::table('containers', function (Blueprint $table) {
             $table->dropColumn('blacklist_previewed_count_mode');
         });

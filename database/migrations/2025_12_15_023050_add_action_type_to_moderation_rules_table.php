@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('moderation_rules', 'action_type')) {
+            return;
+        }
+
         Schema::table('moderation_rules', function (Blueprint $table) {
             $table->string('action_type')->default('blacklist')->after('nsfw');
         });
@@ -21,6 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasColumn('moderation_rules', 'action_type')) {
+            return;
+        }
+
         Schema::table('moderation_rules', function (Blueprint $table) {
             $table->dropColumn('action_type');
         });
