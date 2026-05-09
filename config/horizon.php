@@ -101,6 +101,8 @@ return [
         'redis:downloads' => 600,
         'redis:library-scans' => 600,
         'redis:maintenance' => 600,
+        'redis:media-conversions' => 3600,
+        'redis:media-previews' => 600,
         'redis:processing' => 300,
         'redis:scout' => 300,
     ],
@@ -241,6 +243,32 @@ return [
             'timeout' => 600,
             'nice' => 0,
         ],
+        'supervisor-media-previews' => [
+            'connection' => 'redis',
+            'queue' => ['media-previews'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 512,
+            'tries' => 2,
+            'timeout' => 600,
+            'nice' => 0,
+        ],
+        'supervisor-media-conversions' => [
+            'connection' => 'redis',
+            'queue' => ['media-conversions'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 512,
+            'tries' => 1,
+            'timeout' => 21600,
+            'nice' => 0,
+        ],
         'supervisor-downloads' => [
             'connection' => 'redis',
             'queue' => ['downloads'],
@@ -302,6 +330,16 @@ return [
                 'balanceCooldown' => 5,
                 'memory' => 384,
             ],
+            'supervisor-media-previews' => [
+                'maxProcesses' => 2,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 512,
+            ],
+            'supervisor-media-conversions' => [
+                'maxProcesses' => 1,
+                'memory' => 512,
+            ],
             'supervisor-downloads' => [
                 'maxProcesses' => 12,
                 'balanceMaxShift' => 1,
@@ -327,6 +365,12 @@ return [
             ],
             'supervisor-library-scans' => [
                 'maxProcesses' => 2,
+            ],
+            'supervisor-media-previews' => [
+                'maxProcesses' => 2,
+            ],
+            'supervisor-media-conversions' => [
+                'maxProcesses' => 1,
             ],
             'supervisor-downloads' => [
                 'maxProcesses' => 8,

@@ -130,6 +130,7 @@ class ScanLibraryRun implements ShouldQueue
         AtlasStorage $appStorage,
         LibraryScanService $scans,
     ): void {
+        $importedParentDirectories = [];
         $directory = new \RecursiveDirectoryIterator($atlasRoot, \FilesystemIterator::SKIP_DOTS);
         $filter = new \RecursiveCallbackFilterIterator(
             $directory,
@@ -173,7 +174,16 @@ class ScanLibraryRun implements ShouldQueue
                 return;
             }
 
-            $this->importFile($run, $file->getPathname(), $appStorage, $scans);
+            $importedParent = $this->importFile($run, $file->getPathname(), $appStorage, $scans);
+            if ($importedParent) {
+                $importedParentDirectories[] = $importedParent;
+            }
+        }
+
+        unset($iterator, $filter, $directory);
+
+        foreach (array_unique($importedParentDirectories) as $directory) {
+            $this->deleteEmptyDirectParent($directory, $atlasRoot);
         }
     }
 
@@ -195,7 +205,8 @@ class ScanLibraryRun implements ShouldQueue
         string $absolutePath,
         AtlasStorage $appStorage,
         LibraryScanService $scans,
-    ): void {
+    ): ?string {
+        $sourceParent = dirname($absolutePath);
         $item = LibraryScanItem::query()->create([
             'library_scan_run_id' => $run->id,
             'original_path' => $absolutePath,
@@ -249,7 +260,7 @@ class ScanLibraryRun implements ShouldQueue
                 $scans->broadcastItem($item->fresh());
                 $scans->broadcastRun($run->fresh());
 
-                return;
+                return $sourceParent;
             }
 
             $file = AtlasFile::query()->create([
@@ -294,12 +305,36 @@ class ScanLibraryRun implements ShouldQueue
             $scans->refreshCounters($run->fresh());
             $scans->broadcastItem($item->fresh());
             $scans->broadcastRun($run->fresh());
+
+            return $sourceParent;
         } catch (\Throwable $e) {
             $scans->markItemFailed($item, 'import_failed', $e->getMessage(), [
                 'path' => $absolutePath,
                 'exception' => $e::class,
             ]);
+
+            return null;
         }
+    }
+
+    private function deleteEmptyDirectParent(string $directory, string $atlasRoot): void
+    {
+        if (! is_dir($directory)) {
+            return;
+        }
+
+        $parent = $this->normalizePath($directory);
+        $root = $this->normalizePath($atlasRoot);
+        if ($parent === $root || ! str_starts_with($parent, $root)) {
+            return;
+        }
+
+        $entries = scandir($directory);
+        if ($entries === false || array_diff($entries, ['.', '..']) !== []) {
+            return;
+        }
+
+        @rmdir($directory);
     }
 
     private function moveToAppStorage(string $sourcePath, string $targetPath, $disk, string $directory): void

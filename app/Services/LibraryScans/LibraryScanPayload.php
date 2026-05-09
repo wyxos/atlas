@@ -54,6 +54,20 @@ class LibraryScanPayload
             'progress' => (int) $item->progress,
             'duplicate' => (bool) $item->duplicate,
             'parser' => $item->parser,
+            'media_tasks' => $item->relationLoaded('mediaTasks')
+                ? $item->mediaTasks->map(fn ($task): array => [
+                    'id' => $task->id,
+                    'type' => $task->type,
+                    'status' => $task->status,
+                    'phase' => $task->phase,
+                    'progress' => (int) $task->progress,
+                    'error_code' => $task->error_code,
+                    'error_message' => $task->error_message,
+                    'result' => $task->result,
+                    'created_at' => $task->created_at?->toIso8601String(),
+                    'updated_at' => $task->updated_at?->toIso8601String(),
+                ])->values()
+                : [],
             'error_code' => $item->error_code,
             'error_message' => $item->error_message,
             'error_context' => $item->error_context,

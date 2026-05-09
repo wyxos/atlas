@@ -1,17 +1,22 @@
 <?php
 
 use App\Enums\LibraryScanItemStatus;
+use App\Enums\LibraryScanMediaTask as MediaTask;
 use App\Enums\LibraryScanRunMode;
+use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
+use App\Jobs\LibraryScans\GenerateLibraryScanPreviewAssets;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
 use App\Jobs\LibraryScans\ReparseImportedFilesRun;
 use App\Jobs\LibraryScans\ScanLibraryRun;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\LibraryScanItem;
+use App\Models\LibraryScanMediaTask;
 use App\Models\LibraryScanRun;
 use App\Models\User;
 use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
 use App\Services\LibraryScans\LibraryScanFileParser;
+use App\Services\LibraryScans\LibraryScanMediaProcessor;
 use App\Services\LibraryScans\LibraryScanService;
 use App\Services\LibraryScans\MediaProbeService;
 use App\Services\Local\LocalBrowseIndexSyncService;
@@ -64,6 +69,7 @@ it('scans atlas root, excludes app storage, moves files to imports, and creates 
         ->and($item->status)->toBe(LibraryScanItemStatus::COMPLETED)
         ->and($item->imported_path)->toBe($file->path)
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'loose'.DIRECTORY_SEPARATOR.'sample.txt'))->toBeFalse()
+        ->and(is_dir($root.DIRECTORY_SEPARATOR.'loose'))->toBeFalse()
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'.app'.DIRECTORY_SEPARATOR.'downloads'.DIRECTORY_SEPARATOR.'ignored.txt'))->toBeTrue();
 });
 
@@ -104,6 +110,7 @@ it('skips filesystem metadata files and directories during library scans', funct
         ->and(LibraryScanItem::query()->count())->toBe(1)
         ->and(File::query()->first()->filename)->toBe('track.mp3')
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'track.mp3'))->toBeFalse()
+        ->and(is_dir($root.DIRECTORY_SEPARATOR.'album'))->toBeTrue()
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'.gitignore'))->toBeTrue()
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'Thumbs.db'))->toBeTrue()
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'desktop.ini'))->toBeTrue()
@@ -189,7 +196,8 @@ it('queues imported file parser reruns with preview regeneration', function () {
     );
 });
 
-it('reprocesses imported files by regenerating previews before marking the parser item complete', function () {
+it('queues imported file preview regeneration as media work before completing the parser item', function () {
+    Queue::fake([GenerateLibraryScanPreviewAssets::class]);
     $run = LibraryScanRun::factory()->create([
         'mode' => LibraryScanRunMode::REPARSE,
         'status' => 'processing',
@@ -213,19 +221,82 @@ it('reprocesses imported files by regenerating previews before marking the parse
     $parser->shouldReceive('parse')
         ->once()
         ->with(\Mockery::on(fn (File $parsedFile): bool => $parsedFile->is($file)), 'image', true)
-        ->andReturn(['updates' => ['preview_path' => 'thumbnails/new.jpg'], 'metadata' => []]);
+        ->andReturn([
+            'updates' => [],
+            'metadata' => [],
+            'tasks' => [MediaTask::TASK_PREVIEW_ASSETS],
+        ]);
     $this->app->instance(LibraryScanFileParser::class, $parser);
-
-    $sync = \Mockery::mock(LocalBrowseIndexSyncService::class);
-    $sync->shouldReceive('syncFilesByIds')->once()->with([$file->id])->andReturnNull();
-    $this->app->instance(LocalBrowseIndexSyncService::class, $sync);
 
     (new ProcessLibraryScanItem($item->id, regeneratePreviewAssets: true))->handle(
         app(LibraryScanFileParser::class),
         app(LibraryScanService::class),
     );
 
-    expect($item->fresh()->status)->toBe(LibraryScanItemStatus::COMPLETED);
+    $task = LibraryScanMediaTask::query()->where('library_scan_item_id', $item->id)->first();
+
+    expect($item->fresh()->status)->toBe(LibraryScanItemStatus::PROCESSING)
+        ->and($task)->not->toBeNull()
+        ->and($task->type)->toBe(MediaTask::TASK_PREVIEW_ASSETS)
+        ->and($task->status)->toBe(MediaTask::STATUS_PENDING);
+
+    Queue::assertPushed(
+        GenerateLibraryScanPreviewAssets::class,
+        fn (GenerateLibraryScanPreviewAssets $job): bool => $job->queue === MediaTask::PREVIEW_QUEUE
+            && $job->taskId === $task->id
+            && $job->regeneratePreviewAssets === true,
+    );
+});
+
+it('queues streamable video conversions on the media conversion queue', function () {
+    Queue::fake([GenerateLibraryScanPreviewAssets::class, CreateLibraryScanStreamableVideo::class]);
+    $run = LibraryScanRun::factory()->create([
+        'status' => 'processing',
+        'phase' => 'processing',
+        'scan_completed_at' => now(),
+    ]);
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/video.mkv',
+        'mime_type' => 'video/x-matroska',
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'status' => LibraryScanItemStatus::IMPORTED,
+        'parser' => 'video',
+    ]);
+
+    $parser = \Mockery::mock(LibraryScanFileParser::class);
+    $parser->shouldReceive('parse')
+        ->once()
+        ->andReturn([
+            'updates' => [],
+            'metadata' => [],
+            'tasks' => [
+                MediaTask::TASK_PREVIEW_ASSETS,
+                MediaTask::TASK_VIDEO_STREAMABLE,
+            ],
+        ]);
+    $this->app->instance(LibraryScanFileParser::class, $parser);
+
+    (new ProcessLibraryScanItem($item->id))->handle(
+        app(LibraryScanFileParser::class),
+        app(LibraryScanService::class),
+    );
+
+    $videoTask = LibraryScanMediaTask::query()
+        ->where('library_scan_item_id', $item->id)
+        ->where('type', MediaTask::TASK_VIDEO_STREAMABLE)
+        ->first();
+
+    expect($videoTask)->not->toBeNull()
+        ->and($item->fresh()->status)->toBe(LibraryScanItemStatus::PROCESSING);
+
+    Queue::assertPushed(
+        CreateLibraryScanStreamableVideo::class,
+        fn (CreateLibraryScanStreamableVideo $job): bool => $job->queue === MediaTask::CONVERSION_QUEUE
+            && $job->taskId === $videoTask->id,
+    );
 });
 
 it('uses the download preview generator when imported file parsing is forced to regenerate previews', function () {
@@ -248,18 +319,14 @@ it('uses the download preview generator when imported file parsing is forced to 
     $preview->shouldReceive('generatePreviewAssets')->never();
     $this->app->instance(FileDownloadPreviewAssetGenerator::class, $preview);
 
-    $probe = \Mockery::mock(MediaProbeService::class);
-    $probe->shouldReceive('probe')->once()->andReturn([]);
-    $this->app->instance(MediaProbeService::class, $probe);
+    $result = app(LibraryScanMediaProcessor::class)->generatePreviewAssets($file, regeneratePreviewAssets: true);
 
-    $result = app(LibraryScanFileParser::class)->parse($file, 'image', regeneratePreviewAssets: true);
-
-    expect($result['updates'])->toBe(['preview_path' => 'thumbnails/bb/bb/image_thumb.jpg'])
+    expect($result)->toBe(['updates' => ['preview_path' => 'thumbnails/bb/bb/image_thumb.jpg']])
         ->and($file->fresh()->preview_path)->toBe('thumbnails/bb/bb/image_thumb.jpg')
         ->and(is_dir($root))->toBeTrue();
 });
 
-it('creates streamable video conversions for oversized imported mp4 files without seekbar preview conversions', function () {
+it('plans streamable video conversion work for oversized imported mp4 files without inline conversions', function () {
     configureLibraryScanStorage();
     Storage::disk(AtlasStorage::DISK)->put('imports/aa/bb/video.mp4', 'video');
 
@@ -270,10 +337,6 @@ it('creates streamable video conversions for oversized imported mp4 files withou
         'hash' => str_repeat('c', 64),
         'imported_at' => now(),
     ]);
-
-    $preview = \Mockery::mock(FileDownloadPreviewAssetGenerator::class);
-    $preview->shouldReceive('generatePreviewAssets')->once()->andReturn([]);
-    $this->app->instance(FileDownloadPreviewAssetGenerator::class, $preview);
 
     $probe = \Mockery::mock(MediaProbeService::class);
     $probe->shouldReceive('probe')->once()->andReturn([
@@ -286,13 +349,111 @@ it('creates streamable video conversions for oversized imported mp4 files withou
             ],
         ],
     ]);
-    $probe->shouldReceive('resolveFfmpegPath')->once()->andReturn(null);
     $this->app->instance(MediaProbeService::class, $probe);
 
     $result = app(LibraryScanFileParser::class)->parse($file, 'video');
 
-    expect($result['metadata']['conversions'])->toHaveKey('streamable_video_warning')
-        ->and($result['metadata']['conversions'])->not->toHaveKey('seekbar_preview')
-        ->and($result['metadata']['conversions'])->not->toHaveKey('seekbar_preview_warning');
+    expect($result['tasks'])->toBe([
+        MediaTask::TASK_PREVIEW_ASSETS,
+        MediaTask::TASK_VIDEO_STREAMABLE,
+    ])
+        ->and($result['metadata'])->not->toHaveKey('conversions');
     expect(FileMetadata::query()->where('file_id', $file->id)->exists())->toBeTrue();
+});
+
+it('completes a parser item after its media preview task completes', function () {
+    $run = LibraryScanRun::factory()->create([
+        'status' => 'processing',
+        'phase' => 'processing',
+        'scan_completed_at' => now(),
+    ]);
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/image.jpg',
+        'mime_type' => 'image/jpeg',
+        'preview_path' => null,
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'status' => LibraryScanItemStatus::PROCESSING,
+        'parser' => 'image',
+    ]);
+    $task = LibraryScanMediaTask::factory()->create([
+        'library_scan_item_id' => $item->id,
+        'file_id' => $file->id,
+        'type' => MediaTask::TASK_PREVIEW_ASSETS,
+        'status' => MediaTask::STATUS_PENDING,
+    ]);
+
+    $preview = \Mockery::mock(FileDownloadPreviewAssetGenerator::class);
+    $preview->shouldReceive('regeneratePreviewAssets')
+        ->once()
+        ->with(\Mockery::on(fn (File $parsedFile): bool => $parsedFile->is($file)))
+        ->andReturn(['preview_path' => 'thumbnails/bb/bb/image_thumb.jpg']);
+    $preview->shouldReceive('generatePreviewAssets')->never();
+    $this->app->instance(FileDownloadPreviewAssetGenerator::class, $preview);
+
+    $sync = \Mockery::mock(LocalBrowseIndexSyncService::class);
+    $sync->shouldReceive('syncFilesByIds')->once()->with([$file->id])->andReturnNull();
+    $this->app->instance(LocalBrowseIndexSyncService::class, $sync);
+
+    (new GenerateLibraryScanPreviewAssets($task->id, regeneratePreviewAssets: true))->handle(
+        app(LibraryScanMediaProcessor::class),
+        app(LibraryScanService::class),
+    );
+
+    expect($task->fresh()->status)->toBe(MediaTask::STATUS_COMPLETED)
+        ->and($item->fresh()->status)->toBe(LibraryScanItemStatus::COMPLETED)
+        ->and($file->fresh()->preview_path)->toBe('thumbnails/bb/bb/image_thumb.jpg')
+        ->and($run->fresh()->status)->toBe('completed');
+});
+
+it('fails the parser item when a conversion media task fails', function () {
+    configureLibraryScanStorage();
+    Storage::disk(AtlasStorage::DISK)->put('imports/aa/bb/video.mkv', 'video');
+
+    $run = LibraryScanRun::factory()->create([
+        'status' => 'processing',
+        'phase' => 'processing',
+        'scan_completed_at' => now(),
+    ]);
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/video.mkv',
+        'filename' => 'video.mkv',
+        'mime_type' => 'video/x-matroska',
+        'hash' => str_repeat('d', 64),
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'status' => LibraryScanItemStatus::PROCESSING,
+        'parser' => 'video',
+    ]);
+    $task = LibraryScanMediaTask::factory()->create([
+        'library_scan_item_id' => $item->id,
+        'file_id' => $file->id,
+        'type' => MediaTask::TASK_VIDEO_STREAMABLE,
+        'status' => MediaTask::STATUS_PENDING,
+    ]);
+
+    $probe = \Mockery::mock(MediaProbeService::class);
+    $probe->shouldReceive('probe')->once()->andReturn([]);
+    $probe->shouldReceive('resolveFfmpegPath')->once()->andReturn(null);
+    $this->app->instance(MediaProbeService::class, $probe);
+
+    (new CreateLibraryScanStreamableVideo($task->id))->handle(
+        app(LibraryScanMediaProcessor::class),
+        app(LibraryScanService::class),
+    );
+
+    expect($task->fresh()->status)->toBe(MediaTask::STATUS_FAILED)
+        ->and($item->fresh()->status)->toBe(LibraryScanItemStatus::FAILED)
+        ->and($item->fresh()->error_code)->toBe('video_streamable_failed')
+        ->and($run->fresh()->status)->toBe('failed');
+});
+
+it('uses separate horizon queues for library scan media previews and conversions', function () {
+    expect(config('horizon.defaults.supervisor-media-previews.queue'))->toBe([MediaTask::PREVIEW_QUEUE])
+        ->and(config('horizon.defaults.supervisor-media-conversions.queue'))->toBe([MediaTask::CONVERSION_QUEUE])
+        ->and(config('horizon.defaults.supervisor-media-conversions.timeout'))->toBe(21600);
 });

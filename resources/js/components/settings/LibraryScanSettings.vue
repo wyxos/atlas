@@ -26,6 +26,19 @@ type LibraryScanRun = {
     updated_at: string | null;
 };
 
+type LibraryScanMediaTask = {
+    id: number;
+    type: string;
+    status: string;
+    phase: string | null;
+    progress: number;
+    error_code: string | null;
+    error_message: string | null;
+    result: Record<string, unknown> | null;
+    created_at: string | null;
+    updated_at: string | null;
+};
+
 type LibraryScanItem = {
     id: number;
     library_scan_run_id: number;
@@ -40,6 +53,7 @@ type LibraryScanItem = {
     progress: number;
     duplicate: boolean;
     parser: string | null;
+    media_tasks: LibraryScanMediaTask[];
     error_code: string | null;
     error_message: string | null;
     error_context: Record<string, unknown> | null;
@@ -269,6 +283,10 @@ function stopLibraryScanEchoListeners(): void {
     echo?.leave(LIBRARY_SCAN_CHANNEL);
 }
 
+function formatLibraryScanMediaTaskType(type: string): string {
+    return type.replaceAll('_', ' ');
+}
+
 onMounted(() => {
     void fetchLibraryScans();
     startLibraryScanEchoListeners();
@@ -464,6 +482,17 @@ onBeforeUnmount(() => {
                                     <span v-else-if="item.error_message" class="text-danger-200">
                                         {{ item.error_message }}
                                     </span>
+                                    <div v-else-if="item.media_tasks.length" class="space-y-1 text-xs">
+                                        <div v-for="task in item.media_tasks" :key="task.id">
+                                            <span class="text-twilight-indigo-300">
+                                                {{ formatLibraryScanMediaTaskType(task.type) }}:
+                                            </span>
+                                            {{ task.status }} {{ task.progress }}%
+                                            <span v-if="task.error_message" class="text-danger-200">
+                                                - {{ task.error_message }}
+                                            </span>
+                                        </div>
+                                    </div>
                                     <span v-else>{{ item.phase ?? 'pending' }}</span>
                                 </td>
                             </tr>

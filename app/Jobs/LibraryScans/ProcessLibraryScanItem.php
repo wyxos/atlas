@@ -71,9 +71,18 @@ class ProcessLibraryScanItem implements ShouldQueue
         $scans->broadcastItem($item->fresh());
 
         try {
-            $parser->parse($item->file, $item->parser, $this->regeneratePreviewAssets);
-            app(LocalBrowseIndexSyncService::class)->syncFilesByIds([(int) $item->file_id]);
+            $result = $parser->parse($item->file, $item->parser, $this->regeneratePreviewAssets);
+            $tasks = array_values(array_filter(
+                is_array($result['tasks'] ?? null) ? $result['tasks'] : [],
+                'is_string',
+            ));
 
+            $item = $item->fresh() ?? $item;
+            if ($scans->queueMediaTasks($item, $tasks, $this->regeneratePreviewAssets) > 0) {
+                return;
+            }
+
+            app(LocalBrowseIndexSyncService::class)->syncFilesByIds([(int) $item->file_id]);
             $item->update([
                 'status' => LibraryScanItemStatus::COMPLETED,
                 'phase' => 'completed',

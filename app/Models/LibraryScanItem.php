@@ -6,6 +6,7 @@ use App\Enums\LibraryScanItemStatus;
 use App\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LibraryScanItem extends Model
 {
@@ -47,6 +48,11 @@ class LibraryScanItem extends Model
     public function file(): BelongsTo
     {
         return $this->belongsTo(File::class);
+    }
+
+    public function mediaTasks(): HasMany
+    {
+        return $this->hasMany(LibraryScanMediaTask::class);
     }
 
     public function isTerminal(): bool

@@ -52,6 +52,7 @@ class LibraryScanController extends Controller
             : null;
 
         $paginator = LibraryScanItem::query()
+            ->with('mediaTasks')
             ->where('library_scan_run_id', $libraryScanRun->id)
             ->orderByDesc('id')
             ->cursorPaginate($limit, ['*'], 'cursor', $cursor);

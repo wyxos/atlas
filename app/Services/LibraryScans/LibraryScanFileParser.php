@@ -2,21 +2,17 @@
 
 namespace App\Services\LibraryScans;
 
+use App\Enums\LibraryScanMediaTask;
 use App\Models\File;
 use App\Models\FileMetadata;
-use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
 use App\Support\AtlasPathResolver;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
-use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Process;
 
 class LibraryScanFileParser
 {
     public function __construct(
-        private readonly FileDownloadPreviewAssetGenerator $previewAssetGenerator,
         private readonly MediaProbeService $probe,
-        private readonly AtlasStorage $appStorage,
     ) {}
 
     /**
@@ -32,11 +28,11 @@ class LibraryScanFileParser
         $absolutePath = $resolved['full_path'];
         $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->detectMimeType($absolutePath));
         $probe = $this->probe->probe($absolutePath);
-        $updates = [];
         $metadata = [
             'library_scan' => [
                 'parser' => $parser,
                 'parsed_at' => now()->toIso8601String(),
+                'regenerate_preview_assets' => $regeneratePreviewAssets,
             ],
         ];
 
@@ -44,103 +40,39 @@ class LibraryScanFileParser
             $metadata['probe'] = $probe;
         }
 
-        if ($parser === 'image' || $parser === 'video') {
-            $updates = $regeneratePreviewAssets
-                ? $this->previewAssetGenerator->regeneratePreviewAssets($file)
-                : $this->previewAssetGenerator->generatePreviewAssets($file);
-            if ($updates !== []) {
-                $file->forceFill($updates)->save();
-            }
-        }
-
-        if ($parser === 'audio') {
-            $metadata['conversions'] = $this->normalizeAudioIfNeeded($file, $absolutePath, $mimeType);
-        }
-
-        if ($parser === 'video') {
-            $metadata['conversions'] = [
-                ...($metadata['conversions'] ?? []),
-                ...$this->createVideoConversions($file, $absolutePath, $mimeType, $probe),
-            ];
-        }
-
         $this->mergeMetadata($file, $metadata);
 
         return [
-            'updates' => $updates,
+            'updates' => [],
             'metadata' => $metadata,
+            'tasks' => $this->mediaTasksFor($parser, $mimeType, $probe),
         ];
     }
 
     /**
-     * @return array<string, mixed>
+     * @param  array<string, mixed>  $probe
+     * @return list<string>
      */
-    private function normalizeAudioIfNeeded(File $file, string $absolutePath, ?string $mimeType): array
+    private function mediaTasksFor(string $parser, ?string $mimeType, array $probe): array
     {
-        if (in_array($mimeType, ['audio/mpeg', 'audio/mp3'], true)) {
-            return [];
-        }
-
-        $targetPath = $this->conversionPath($file, 'normalized', 'mp3');
-
-        return $this->runFfmpegConversion([
-            '-y',
-            '-i',
-            $absolutePath,
-            '-vn',
-            '-codec:a',
-            'libmp3lame',
-            '-q:a',
-            '2',
-            Storage::disk(AtlasStorage::DISK)->path($targetPath),
-        ], 'normalized_audio', $targetPath);
+        return match ($parser) {
+            'image' => [LibraryScanMediaTask::TASK_PREVIEW_ASSETS],
+            'audio' => $this->shouldNormalizeAudio($mimeType)
+                ? [LibraryScanMediaTask::TASK_AUDIO_NORMALIZATION]
+                : [],
+            'video' => [
+                LibraryScanMediaTask::TASK_PREVIEW_ASSETS,
+                ...($this->shouldCreateStreamableVideo($mimeType, $probe)
+                    ? [LibraryScanMediaTask::TASK_VIDEO_STREAMABLE]
+                    : []),
+            ],
+            default => [],
+        };
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function createVideoConversions(File $file, string $absolutePath, ?string $mimeType, array $probe): array
+    private function shouldNormalizeAudio(?string $mimeType): bool
     {
-        $conversions = [];
-
-        if ($this->shouldCreateStreamableVideo($mimeType, $probe)) {
-            $targetPath = $this->conversionPath($file, 'streamable', 'mp4');
-            $args = [
-                '-y',
-                '-i',
-                $absolutePath,
-            ];
-
-            if ($this->hasOversizedVideoStream($probe)) {
-                $args = [
-                    ...$args,
-                    '-vf',
-                    "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
-                ];
-            }
-
-            $conversions = [
-                ...$conversions,
-                ...$this->runFfmpegConversion([
-                    ...$args,
-                    '-c:v',
-                    'libx264',
-                    '-preset',
-                    'veryfast',
-                    '-crf',
-                    '23',
-                    '-pix_fmt',
-                    'yuv420p',
-                    '-c:a',
-                    'aac',
-                    '-movflags',
-                    '+faststart',
-                    Storage::disk(AtlasStorage::DISK)->path($targetPath),
-                ], 'streamable_video', $targetPath),
-            ];
-        }
-
-        return $conversions;
+        return ! in_array($mimeType, ['audio/mpeg', 'audio/mp3'], true);
     }
 
     /**
@@ -203,54 +135,6 @@ class LibraryScanFileParser
         }
 
         return null;
-    }
-
-    /**
-     * @param  list<string>  $args
-     * @return array<string, mixed>
-     */
-    private function runFfmpegConversion(array $args, string $key, string $targetPath): array
-    {
-        $ffmpeg = $this->probe->resolveFfmpegPath();
-        if ($ffmpeg === null) {
-            return [
-                "{$key}_warning" => 'ffmpeg unavailable',
-            ];
-        }
-
-        $disk = Storage::disk(AtlasStorage::DISK);
-        $directory = dirname($targetPath);
-        if (! $disk->exists($directory)) {
-            $disk->makeDirectory($directory, 0755, true);
-        }
-
-        $process = new Process([$ffmpeg, ...$args]);
-        $process->setTimeout((int) config('downloads.ffmpeg_timeout_seconds', 120));
-
-        try {
-            $process->run();
-        } catch (\Throwable $e) {
-            return [
-                "{$key}_error" => $e->getMessage(),
-            ];
-        }
-
-        if (! $process->isSuccessful() || ! $disk->exists($targetPath)) {
-            return [
-                "{$key}_error" => trim($process->getErrorOutput()) ?: 'ffmpeg conversion failed',
-            ];
-        }
-
-        return [
-            $key => $targetPath,
-        ];
-    }
-
-    private function conversionPath(File $file, string $variant, string $extension): string
-    {
-        $filename = $this->appStorage->variantFilename((string) $file->filename, $variant, $extension);
-
-        return $this->appStorage->segmentedPath(AtlasStorage::CONVERSIONS, $filename, $file->hash);
     }
 
     private function detectMimeType(string $absolutePath): ?string

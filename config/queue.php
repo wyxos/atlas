@@ -68,7 +68,14 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env(
+                'REDIS_QUEUE_RETRY_AFTER',
+                max(
+                    90,
+                    (int) env('DOWNLOADS_YT_DLP_TIMEOUT_SECONDS', 1800) + 120,
+                    (int) env('DOWNLOADS_LIBRARY_SCAN_CONVERSION_TIMEOUT_SECONDS', 21600) + 120,
+                ),
+            ),
             'block_for' => null,
             'after_commit' => false,
         ],

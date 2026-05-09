@@ -25,6 +25,8 @@ return [
 
     'ffmpeg_timeout_seconds' => (int) env('DOWNLOADS_FFMPEG_TIMEOUT_SECONDS', 120),
 
+    'library_scan_conversion_timeout_seconds' => (int) env('DOWNLOADS_LIBRARY_SCAN_CONVERSION_TIMEOUT_SECONDS', 21600),
+
     // Preview-generation jobs can need more headroom than the default CLI PHP limit.
     'preview_php_memory_limit' => env('DOWNLOADS_PREVIEW_PHP_MEMORY_LIMIT', '512M'),
 
