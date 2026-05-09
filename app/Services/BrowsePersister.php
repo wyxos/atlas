@@ -92,6 +92,7 @@ class BrowsePersister
             $metrics = app(MetricsService::class);
             $metrics->incrementMetric(MetricsService::KEY_FILES_TOTAL, $newFileCount);
             $metrics->incrementMetric(MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $newFileCount);
+            $metrics->incrementMetric(MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED, $newFileCount);
         }
 
         $fileMap = File::query()

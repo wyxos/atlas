@@ -76,12 +76,14 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
     const files = metrics?.files;
     const total = files?.total ?? 0;
     const reactions = files?.reactions;
-    const reacted = files?.reacted ?? 0;
-    const unreacted = files?.unreacted ?? Math.max(0, total - reacted);
+    const removed = files?.blacklisted ?? 0;
+    const notFound = files?.not_found ?? 0;
     const unseen = files?.unreacted_unpreviewed_not_blacklisted ?? 0;
     const pending = files?.unreacted_previewed_not_blacklisted ?? 0;
     const backlog = files?.unreacted_not_blacklisted ?? 0;
-    const removed = files?.blacklisted ?? 0;
+    const reactionTotal = Math.max(0, total - removed - notFound);
+    const unreacted = Math.min(files?.unreacted ?? backlog, reactionTotal);
+    const reacted = Math.max(0, reactionTotal - unreacted);
     const manualInFeed = files?.blacklisted_manual_in_feed ?? 0;
     const autoInFeed = files?.blacklisted_auto_in_feed ?? 0;
     const outOfFeed = files?.blacklisted_feed_removed ?? 0;
@@ -114,10 +116,10 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
                 createMetricRow('unseen', 'Not previewed', unseen, colors.unseen, backlog, 'of backlog'),
                 createMetricRow('pending', 'Previewed, no decision', pending, colors.pending, backlog, 'of backlog'),
             ], backlog),
-            createMetricDistribution('reaction-state', 'Reaction state', 'Records with any reaction vs records with no reaction', [
-                createMetricRow('reacted', 'Reacted', reacted, colors.reacted, total, 'of records'),
-                createMetricRow('unreacted', 'Not reacted', unreacted, colors.unreacted, total, 'of records'),
-            ], total),
+            createMetricDistribution('reaction-state', 'Reaction state', 'Available, non-blacklisted records by reaction state', [
+                createMetricRow('reacted', 'Reacted', reacted, colors.reacted, reactionTotal, 'of available records'),
+                createMetricRow('unreacted', 'Not reacted', unreacted, colors.unreacted, reactionTotal, 'of available records'),
+            ], reactionTotal),
             createMetricDistribution('reaction-types', 'Reaction types', 'Reaction signals by type', reactionRows, reactionSignals),
             createMetricDistribution('removal-state', 'Removal state', 'Manual and auto counts only include blacklisted records still in feed', [
                 createMetricRow('manual-in-feed', 'Manual', manualInFeed, colors.pending, removed, 'of blacklisted'),

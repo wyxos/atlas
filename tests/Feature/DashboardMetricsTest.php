@@ -119,7 +119,7 @@ test('dashboard metrics report file and reaction totals', function () {
             'local_available' => 1,
             'non_local_available' => 3,
             'reacted' => 3,
-            'unreacted' => 2,
+            'unreacted' => 1,
             'blacklisted' => 2,
             'blacklisted_manual' => 1,
             'blacklisted_feed_removed' => 1,
@@ -127,15 +127,25 @@ test('dashboard metrics report file and reaction totals', function () {
             'blacklisted_auto_in_feed' => 0,
             'auto_blacklisted' => 1,
             'not_found' => 1,
-            'unreacted_not_blacklisted' => 2,
+            'unreacted_not_blacklisted' => 1,
             'unreacted_previewed_not_blacklisted' => 1,
-            'unreacted_unpreviewed_not_blacklisted' => 1,
+            'unreacted_unpreviewed_not_blacklisted' => 0,
         ],
         'containers' => [
             'total' => 2,
             'blacklisted' => 1,
         ],
     ]);
+});
+
+test('dashboard metrics does not recompute missing metric rows during the request', function () {
+    $user = User::factory()->create();
+    File::factory()->count(3)->create();
+
+    $response = $this->actingAs($user)->getJson('/api/dashboard/metrics');
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('files.total', 0);
 });
 
 test('incrementContainersByCounts applies batched deltas and clamps at zero', function () {
@@ -167,6 +177,47 @@ test('incrementMetric clamps negative deltas without unsigned underflow', functi
     $service->setMetric($key, 2);
     $service->incrementMetric($key, -5);
     expect((int) DB::table('metrics')->where('key', $key)->value('value'))->toBe(0);
+});
+
+test('not found transitions remove unreacted files from the actionable backlog', function () {
+    $file = File::factory()->create([
+        'blacklisted_at' => null,
+        'not_found' => false,
+        'previewed_count' => 0,
+    ]);
+
+    $metrics = app(MetricsService::class);
+    $metrics->syncAll();
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED,
+        MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED => 1,
+        MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED => 1,
+    ]);
+
+    $file->forceFill(['not_found' => true])->save();
+    $metrics->applyNotFoundMark($file, false);
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED,
+        MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED => 0,
+        MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED => 0,
+    ]);
+
+    $file->forceFill(['not_found' => false])->save();
+    $metrics->applyNotFoundClear($file, true);
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED,
+        MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED => 1,
+        MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED => 1,
+    ]);
 });
 
 test('incrementContainersByCounts chunks large container batches', function () {

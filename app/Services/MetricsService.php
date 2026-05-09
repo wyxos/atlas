@@ -286,8 +286,9 @@ class MetricsService
             }
         }
 
-        $beforeCounted = ! $wasBlacklisted && $totalBefore === 0;
-        $afterCounted = ! $isBlacklisted && $totalAfter === 0;
+        $isNotFound = $this->isNotFound($file);
+        $beforeCounted = $this->countsAsUnreactedBacklog($wasBlacklisted, $isNotFound, $totalBefore);
+        $afterCounted = $this->countsAsUnreactedBacklog($isBlacklisted, $isNotFound, $totalAfter);
         if ($beforeCounted !== $afterCounted) {
             $this->incrementUnreactedNotBlacklistedForFile($file, $afterCounted ? 1 : -1);
         }
@@ -411,6 +412,7 @@ class MetricsService
         $filesWithoutReactions = DB::table('files')
             ->select(['id', 'previewed_count'])
             ->whereIn('id', $eligibleIds)
+            ->where('not_found', false)
             ->whereNotExists(function ($query) {
                 $query->selectRaw('1')
                     ->from('reactions')
@@ -452,7 +454,7 @@ class MetricsService
 
         if ($adjustUnreacted) {
             $hasReactions = Reaction::where('file_id', $file->id)->exists();
-            if (! $hasReactions) {
+            if (! $hasReactions && ! $this->isNotFound($file)) {
                 $this->incrementUnreactedNotBlacklistedForFile($file, 1);
             }
         }
@@ -474,6 +476,7 @@ class MetricsService
         $newlyPreviewedUnreacted = DB::table('files')
             ->whereIn('id', $fileIds)
             ->whereNull('blacklisted_at')
+            ->where('not_found', false)
             ->where('previewed_count', 0)
             ->whereNotExists(function ($query) {
                 $query->selectRaw('1')
@@ -502,6 +505,7 @@ class MetricsService
         $resetUnreacted = DB::table('files')
             ->whereIn('id', $fileIds)
             ->whereNull('blacklisted_at')
+            ->where('not_found', false)
             ->where('previewed_count', '>', 0)
             ->whereNotExists(function ($query) {
                 $query->selectRaw('1')
@@ -600,6 +604,7 @@ class MetricsService
 
         $this->incrementMetric(self::KEY_FILES_NOT_FOUND, 1);
         $this->incrementAvailableSourceMetric($file, -1);
+        $this->incrementUnreactedForNotFoundTransition($file, -1);
     }
 
     public function applyNotFoundClear(File $file, bool $wasNotFound): void
@@ -610,6 +615,7 @@ class MetricsService
 
         $this->incrementMetric(self::KEY_FILES_NOT_FOUND, -1);
         $this->incrementAvailableSourceMetric($file, 1);
+        $this->incrementUnreactedForNotFoundTransition($file, 1);
     }
 
     /**
@@ -641,6 +647,7 @@ class MetricsService
 
         $unreactedCounts = File::query()
             ->whereNull('blacklisted_at')
+            ->where('not_found', false)
             ->whereNotExists(function ($query) {
                 $query->selectRaw('1')
                     ->from('reactions')
@@ -677,9 +684,9 @@ class MetricsService
         $this->setMetric(self::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED, (int) ($fileCounts->blacklisted_manual_in_feed_total ?? 0), 'Manual blacklisted files still in feed');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_AUTO_IN_FEED, (int) ($fileCounts->blacklisted_auto_in_feed_total ?? 0), 'Auto blacklisted files still in feed');
         $this->setMetric(self::KEY_FILES_AUTO_BLACKLISTED, (int) ($fileCounts->auto_blacklisted_total ?? 0), 'Auto blacklisted files');
-        $this->setMetric(self::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $unreactedNotBlacklisted, 'Unreacted, not blacklisted');
-        $this->setMetric(self::KEY_FILES_UNREACTED_PREVIEWED_NOT_BLACKLISTED, $unreactedPreviewed, 'Unreacted previewed, not blacklisted');
-        $this->setMetric(self::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED, $unreactedUnpreviewed, 'Unreacted not previewed, not blacklisted');
+        $this->setMetric(self::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $unreactedNotBlacklisted, 'Unreacted, not blacklisted or missing');
+        $this->setMetric(self::KEY_FILES_UNREACTED_PREVIEWED_NOT_BLACKLISTED, $unreactedPreviewed, 'Unreacted previewed, not blacklisted or missing');
+        $this->setMetric(self::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED, $unreactedUnpreviewed, 'Unreacted not previewed, not blacklisted or missing');
         $this->setMetric(self::KEY_REACTIONS_LOVE, (int) ($reactionCounts['love'] ?? 0), 'Files with love reactions');
         $this->setMetric(self::KEY_REACTIONS_LIKE, (int) ($reactionCounts['like'] ?? 0), 'Files with like reactions');
         $this->setMetric(self::KEY_REACTIONS_FUNNY, (int) ($reactionCounts['funny'] ?? 0), 'Files with funny reactions');
@@ -734,6 +741,20 @@ class MetricsService
         return (int) $file->previewed_count > 0
             ? self::KEY_FILES_UNREACTED_PREVIEWED_NOT_BLACKLISTED
             : self::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED;
+    }
+
+    private function incrementUnreactedForNotFoundTransition(File $file, int $delta): void
+    {
+        if ($file->blacklisted_at !== null || Reaction::where('file_id', $file->id)->exists()) {
+            return;
+        }
+
+        $this->incrementUnreactedNotBlacklistedForFile($file, $delta);
+    }
+
+    private function countsAsUnreactedBacklog(bool $isBlacklisted, bool $isNotFound, int $reactionCount): bool
+    {
+        return ! $isBlacklisted && ! $isNotFound && $reactionCount === 0;
     }
 
     /**
@@ -792,5 +813,10 @@ class MetricsService
     private function isLocalSource(File $file): bool
     {
         return strtolower(trim((string) $file->source)) === 'local';
+    }
+
+    private function isNotFound(File $file): bool
+    {
+        return (bool) $file->not_found;
     }
 }

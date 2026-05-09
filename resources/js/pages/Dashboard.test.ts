@@ -232,7 +232,7 @@ describe('Dashboard', () => {
         expect(text).toContain('Reaction state');
         expect(text).toContain('Reacted');
         expect(text).toContain('Not reacted');
-        expect(text).toContain('11 / 100');
+        expect(text).toContain('11 / 86');
         expect(text).toContain('Downloaded');
         expect(text).toContain('Decision coverage');
         expect(text).toContain('Backlog split');

@@ -11,12 +11,6 @@ class DashboardMetricsController extends Controller
 {
     public function __invoke(): JsonResponse
     {
-        $metricsService = app(MetricsService::class);
-        $requiredMetricKeys = $this->metricKeys();
-        if (DB::table('metrics')->whereIn('key', $requiredMetricKeys)->count() < count($requiredMetricKeys)) {
-            $metricsService->syncAll();
-        }
-
         return response()->json($this->metricsFromTable());
     }
 
@@ -42,7 +36,7 @@ class DashboardMetricsController extends Controller
                 'non_local_available' => $metrics[MetricsService::KEY_FILES_NON_LOCAL_AVAILABLE] ?? 0,
                 'reactions' => $reactions,
                 'reacted' => $metrics[MetricsService::KEY_FILES_REACTED] ?? 0,
-                'unreacted' => max(0, ($metrics[MetricsService::KEY_FILES_TOTAL] ?? 0) - ($metrics[MetricsService::KEY_FILES_REACTED] ?? 0)),
+                'unreacted' => $metrics[MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED] ?? 0,
                 'blacklisted' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_TOTAL] ?? 0,
                 'blacklisted_manual' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_MANUAL] ?? 0,
                 'blacklisted_feed_removed' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_FEED_REMOVED] ?? 0,
