@@ -132,7 +132,6 @@ const showActionRail = computed(() => (
   || props.canTogglePageLoadingLock
 ))
 const nextBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.nextBoundaryLoadProgress) * 100))
-const previousBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.previousBoundaryLoadProgress) * 100))
 const availableTotal = computed(() => {
   if (props.totalAvailable === null || props.totalAvailable === undefined) {
     return null
@@ -332,35 +331,7 @@ function clampProgress(value: unknown): number {
         data-testid="browse-v2-available-total-pill"
       />
       <Pill
-        label="Prev load"
-        value=""
-        variant="info"
-        reversed
-        data-testid="browse-v2-previous-boundary-pill"
-      >
-        <template #value>
-          <span class="flex min-w-[7.5rem] items-center gap-2">
-            <span
-              data-testid="browse-v2-previous-boundary-progress"
-              role="progressbar"
-              aria-label="Previous page load proximity"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-valuenow="previousBoundaryProgressPercent"
-              class="relative h-2 flex-1 overflow-hidden rounded-full border border-white/10 bg-white/[0.08]"
-            >
-              <span
-                class="absolute inset-y-0 left-0 rounded-full bg-amber-300/80 transition-[width] duration-150"
-                :class="props.pageLoadingLocked ? 'opacity-45' : ''"
-                :style="{ width: `${previousBoundaryProgressPercent}%` }"
-              />
-            </span>
-            <span class="min-w-[2.25rem] text-right tabular-nums">{{ previousBoundaryProgressPercent }}%</span>
-          </span>
-        </template>
-      </Pill>
-      <Pill
-        label="Next load"
+        label="Proximity"
         value=""
         variant="info"
         reversed
@@ -393,7 +364,7 @@ function clampProgress(value: unknown): number {
       v-if="showActionRail"
       class="flex items-center justify-center lg:justify-end"
     >
-      <div class="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 shadow-[0_18px_60px_-38px_rgba(0,0,0,0.95)]">
+      <div class="flex items-center gap-2 rounded-lg bg-black/60 px-2 py-1 backdrop-blur-sm">
         <div
           v-if="showFillControls"
           class="flex items-center gap-1 border-r border-white/10 pr-1"
@@ -411,7 +382,7 @@ function clampProgress(value: unknown): number {
           <Button
             size="icon-sm"
             variant="ghost"
-            class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            class="rounded border-0 bg-transparent text-white hover:bg-transparent hover:text-smart-blue-300"
             data-test="fill-count-button"
             aria-label="Fill selected call count"
             title="Fill selected call count"
@@ -423,7 +394,7 @@ function clampProgress(value: unknown): number {
           <Button
             size="icon-sm"
             variant="ghost"
-            class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            class="rounded border-0 bg-transparent text-white hover:bg-transparent hover:text-smart-blue-300"
             data-test="fill-until-end-button"
             aria-label="Fill to end"
             title="Fill to end"
@@ -452,8 +423,8 @@ function clampProgress(value: unknown): number {
           <Button
             size="icon-sm"
             variant="ghost"
-            class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
-            :class="props.autoScrollActive ? 'border-sky-300/55 bg-sky-500/18 text-sky-50 hover:border-sky-200/70 hover:bg-sky-500/28 hover:text-white' : ''"
+            class="rounded border-0 bg-transparent text-white hover:bg-transparent hover:text-smart-blue-300"
+            :class="props.autoScrollActive ? 'bg-smart-blue-500 text-white hover:bg-smart-blue-500 hover:text-white' : ''"
             data-test="auto-scroll-toggle-button"
             :aria-label="props.autoScrollActive ? 'Stop auto scroll' : 'Start auto scroll'"
             :aria-pressed="props.autoScrollActive ? 'true' : 'false'"
@@ -469,7 +440,7 @@ function clampProgress(value: unknown): number {
           v-if="canCancelFill"
           size="icon-sm"
           variant="ghost"
-          class="rounded-full border-danger-400/60 bg-danger-500/18 text-danger-100 hover:border-danger-300 hover:bg-danger-500/28 hover:text-white"
+          class="rounded border-0 bg-danger-600 text-white hover:bg-danger-500 hover:text-white"
           data-test="cancel-fill-button"
           aria-label="Cancel fill"
           title="Cancel Vibe fill"
@@ -481,8 +452,8 @@ function clampProgress(value: unknown): number {
         <Button
           size="icon-sm"
           variant="ghost"
-          class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
-          :class="props.pageLoadingLocked ? 'border-danger-400/60 bg-danger-500/18 text-danger-100 hover:border-danger-300 hover:bg-danger-500/28 hover:text-white' : ''"
+          class="rounded border-0 bg-transparent text-white hover:bg-transparent hover:text-smart-blue-300"
+          :class="props.pageLoadingLocked ? 'bg-danger-600 text-white hover:bg-danger-500 hover:text-white' : ''"
           data-test="page-loading-lock-button"
           :aria-label="props.pageLoadingLocked ? 'Unlock page loading' : 'Lock page loading'"
           :aria-pressed="props.pageLoadingLocked ? 'true' : 'false'"
@@ -498,8 +469,8 @@ function clampProgress(value: unknown): number {
           :key="action.dataTest"
           size="icon-sm"
           variant="ghost"
-          class="rounded-full border-white/10 bg-transparent text-[#f7f1ea]/78 hover:border-white/20 hover:bg-white/10 hover:text-white"
-          :class="action.color === 'danger' ? 'text-danger-100 hover:border-danger-400/60 hover:bg-danger-500/20 hover:text-white' : ''"
+          class="rounded border-0 bg-transparent text-white hover:bg-transparent hover:text-smart-blue-300"
+          :class="action.color === 'danger' ? 'hover:text-danger-300' : ''"
           :aria-label="action.label"
           :data-test="action.dataTest"
           :disabled="props.bulkActionsDisabled || !props.performLoadedItemsBulkAction"

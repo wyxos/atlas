@@ -109,6 +109,40 @@ describe('useVibeFillControls', () => {
         expect(controls.autoScrollActive.value).toBe(false);
     });
 
+    it('temporarily pauses active auto-scroll and resumes with the latest speed', () => {
+        const { controls, handle } = mountControls();
+
+        controls.toggleAutoScroll();
+        controls.pauseAutoScroll();
+
+        expect(handle.autoScroll).toHaveBeenLastCalledWith(0);
+        expect(controls.autoScrollActive.value).toBe(true);
+        expect(controls.autoScrollTemporarilyPaused.value).toBe(true);
+
+        controls.setAutoScrollSpeed(120);
+
+        expect(handle.autoScroll).toHaveBeenLastCalledWith(0);
+
+        controls.resumeAutoScroll();
+
+        expect(handle.autoScroll).toHaveBeenLastCalledWith(120);
+        expect(controls.autoScrollActive.value).toBe(true);
+        expect(controls.autoScrollTemporarilyPaused.value).toBe(false);
+    });
+
+    it('does not resume auto-scroll after it is stopped while temporarily paused', () => {
+        const { controls, handle } = mountControls();
+
+        controls.toggleAutoScroll();
+        controls.pauseAutoScroll();
+        controls.stopAutoScroll();
+        controls.resumeAutoScroll();
+
+        expect(handle.autoScroll).toHaveBeenLastCalledWith(0);
+        expect(controls.autoScrollActive.value).toBe(false);
+        expect(controls.autoScrollTemporarilyPaused.value).toBe(false);
+    });
+
     it('cancels fill and stops auto-scroll on unmount', () => {
         const { controls, handle, wrapper } = mountControls();
 

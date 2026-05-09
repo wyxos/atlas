@@ -111,7 +111,10 @@ vi.mock('./ui/Pill.vue', () => ({
             return () => h('div', {
                 'data-testid': `${props.label.toLowerCase()}-pill`,
                 'data-variant': props.variant,
-            }, slots.value ? slots.value() : String(props.value ?? ''));
+            }, [
+                h('span', props.label),
+                slots.value ? slots.value() : String(props.value ?? ''),
+            ]);
         },
     }),
 }));
@@ -480,7 +483,7 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.text()).not.toContain('Lock paging');
     });
 
-    it('mirrors the previous and next boundary progress bars from the Vibe status', () => {
+    it('mirrors the next boundary proximity from the Vibe status', () => {
         const wrapper = mount(BrowseV2StatusBar, {
             props: {
                 status: createStatus({
@@ -490,10 +493,10 @@ describe('BrowseV2StatusBar', () => {
             },
         });
 
-        expect(wrapper.get('[data-testid="browse-v2-previous-boundary-progress"]').attributes('aria-valuenow')).toBe('68');
         expect(wrapper.get('[data-testid="browse-v2-next-boundary-progress"]').attributes('aria-valuenow')).toBe('42');
-        expect(wrapper.get('[data-testid="browse-v2-previous-boundary-pill"]').attributes('data-variant')).toBe('info');
         expect(wrapper.get('[data-testid="browse-v2-next-boundary-pill"]').attributes('data-variant')).toBe('info');
+        expect(wrapper.find('[data-testid="browse-v2-previous-boundary-pill"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain('Proximity');
         expect(wrapper.html()).toContain('bg-amber-300/80');
         expect(wrapper.html()).not.toContain('max-w-[1280px]');
     });
@@ -510,8 +513,8 @@ describe('BrowseV2StatusBar', () => {
 
         const lockButton = wrapper.get('[data-test="page-loading-lock-button"]');
 
-        expect(lockButton.classes().join(' ')).toContain('border-danger-400/60');
-        expect(lockButton.classes().join(' ')).toContain('text-danger-100');
+        expect(lockButton.classes().join(' ')).toContain('bg-danger-600');
+        expect(lockButton.classes().join(' ')).toContain('text-white');
         expect(lockButton.find('[data-testid="lock-keyhole-icon"]').exists()).toBe(true);
         expect(lockButton.find('[data-testid="lock-keyhole-open-icon"]').exists()).toBe(false);
     });

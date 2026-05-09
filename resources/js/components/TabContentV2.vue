@@ -267,7 +267,7 @@ const fillControls = useVibeFillControls({ getVibeHandle: () => vibeRef.value, s
 const { autoScrollActive, autoScrollSpeed, fillActionsDisabled, fillCallCount } = fillControls;
 
 function togglePageLoadingLock(): void { const handle = vibeRef.value; if (handle) (vibeStatus.value.pageLoadingLocked ? handle.unlockPageLoading : handle.lockPageLoading)(); }
-useBrowseGridAutoScrollShortcut({ surfaceMode, toggleAutoScroll: fillControls.toggleAutoScroll, togglePageLoadingLock });
+useBrowseGridAutoScrollShortcut({ pauseAutoScroll: fillControls.pauseAutoScroll, resumeAutoScroll: fillControls.resumeAutoScroll, surfaceMode, toggleAutoScroll: fillControls.toggleAutoScroll, togglePageLoadingLock });
 
 function setTabDataLoading(isLoading: boolean): void {
     isTabDataLoading.value = isLoading;

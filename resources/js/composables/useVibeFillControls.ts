@@ -17,6 +17,7 @@ export function useVibeFillControls(options: {
     surfaceMode: ComputedRef<SurfaceMode> | Ref<SurfaceMode>;
 }) {
     const autoScrollActive = ref(false);
+    const autoScrollTemporarilyPaused = ref(false);
     const autoScrollSpeed = ref(DEFAULT_AUTO_SCROLL_SPEED);
     const fillCallCount = ref(DEFAULT_FILL_CALL_COUNT);
     const fillActionsDisabled = computed(() => {
@@ -59,7 +60,7 @@ export function useVibeFillControls(options: {
     function setAutoScrollSpeed(value: number): void {
         autoScrollSpeed.value = clampInteger(value, AUTO_SCROLL_SPEED_MIN, AUTO_SCROLL_SPEED_MAX);
 
-        if (autoScrollActive.value) {
+        if (autoScrollActive.value && !autoScrollTemporarilyPaused.value) {
             options.getVibeHandle()?.autoScroll(autoScrollSpeed.value);
         }
     }
@@ -71,6 +72,30 @@ export function useVibeFillControls(options: {
 
         options.getVibeHandle()?.autoScroll(0);
         autoScrollActive.value = false;
+        autoScrollTemporarilyPaused.value = false;
+    }
+
+    function pauseAutoScroll(): void {
+        if (!autoScrollActive.value || autoScrollTemporarilyPaused.value) {
+            return;
+        }
+
+        options.getVibeHandle()?.autoScroll(0);
+        autoScrollTemporarilyPaused.value = true;
+    }
+
+    function resumeAutoScroll(): void {
+        if (!autoScrollActive.value || !autoScrollTemporarilyPaused.value) {
+            return;
+        }
+
+        if (options.surfaceMode.value !== 'list') {
+            stopAutoScroll();
+            return;
+        }
+
+        options.getVibeHandle()?.autoScroll(autoScrollSpeed.value);
+        autoScrollTemporarilyPaused.value = false;
     }
 
     function toggleAutoScroll(): void {
@@ -85,6 +110,7 @@ export function useVibeFillControls(options: {
 
         options.getVibeHandle()?.autoScroll(autoScrollSpeed.value);
         autoScrollActive.value = true;
+        autoScrollTemporarilyPaused.value = false;
     }
 
     watch(
@@ -104,11 +130,14 @@ export function useVibeFillControls(options: {
     return {
         autoScrollActive,
         autoScrollSpeed,
+        autoScrollTemporarilyPaused,
         cancelFill,
         fillActionsDisabled,
         fillCallCount,
         fillUntilCount,
         fillUntilEnd,
+        pauseAutoScroll,
+        resumeAutoScroll,
         setAutoScrollSpeed,
         setFillCallCount,
         stopAutoScroll,

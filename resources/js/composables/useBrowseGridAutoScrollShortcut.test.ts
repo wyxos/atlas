@@ -16,7 +16,24 @@ function dispatchSpace(target: EventTarget = window, options: KeyboardEventInit 
     return event;
 }
 
+function dispatchAlt(type: 'keydown' | 'keyup', target: EventTarget = window, options: KeyboardEventInit = {}): KeyboardEvent {
+    const event = new KeyboardEvent(type, {
+        altKey: type === 'keydown',
+        bubbles: true,
+        cancelable: true,
+        code: 'AltLeft',
+        key: 'Alt',
+        ...options,
+    });
+
+    target.dispatchEvent(event);
+
+    return event;
+}
+
 function createShortcut(surfaceMode: 'fullscreen' | 'list' = 'list') {
+    const pauseAutoScroll = vi.fn();
+    const resumeAutoScroll = vi.fn();
     const toggleAutoScroll = vi.fn();
     const togglePageLoadingLock = vi.fn();
     const mode = ref(surfaceMode);
@@ -24,6 +41,8 @@ function createShortcut(surfaceMode: 'fullscreen' | 'list' = 'list') {
 
     scope.run(() => {
         useBrowseGridAutoScrollShortcut({
+            pauseAutoScroll,
+            resumeAutoScroll,
             surfaceMode: mode,
             toggleAutoScroll,
             togglePageLoadingLock,
@@ -32,6 +51,8 @@ function createShortcut(surfaceMode: 'fullscreen' | 'list' = 'list') {
 
     return {
         mode,
+        pauseAutoScroll,
+        resumeAutoScroll,
         stop: () => scope.stop(),
         toggleAutoScroll,
         togglePageLoadingLock,
@@ -93,6 +114,38 @@ describe('useBrowseGridAutoScrollShortcut', () => {
         expect(shortcut.togglePageLoadingLock).toHaveBeenCalledTimes(1);
         expect(shortcut.toggleAutoScroll).not.toHaveBeenCalled();
         expect(event.defaultPrevented).toBe(true);
+
+        shortcut.stop();
+    });
+
+    it('temporarily pauses auto-scroll while alt is held', () => {
+        const shortcut = createShortcut();
+        const keydownEvent = dispatchAlt('keydown');
+        const keyupEvent = dispatchAlt('keyup', window, { altKey: false });
+
+        expect(shortcut.pauseAutoScroll).toHaveBeenCalledTimes(1);
+        expect(shortcut.resumeAutoScroll).toHaveBeenCalledTimes(1);
+        expect(shortcut.toggleAutoScroll).not.toHaveBeenCalled();
+        expect(keydownEvent.defaultPrevented).toBe(true);
+        expect(keyupEvent.defaultPrevented).toBe(true);
+
+        shortcut.stop();
+    });
+
+    it('pauses globally in list mode and ignores alt pause outside list mode', () => {
+        const fullscreenShortcut = createShortcut('fullscreen');
+        const fullscreenEvent = dispatchAlt('keydown');
+        fullscreenShortcut.stop();
+
+        const shortcut = createShortcut();
+        const input = document.createElement('input');
+        document.body.appendChild(input);
+        const inputEvent = dispatchAlt('keydown', input);
+
+        expect(fullscreenShortcut.pauseAutoScroll).not.toHaveBeenCalled();
+        expect(fullscreenEvent.defaultPrevented).toBe(false);
+        expect(shortcut.pauseAutoScroll).toHaveBeenCalledTimes(1);
+        expect(inputEvent.defaultPrevented).toBe(true);
 
         shortcut.stop();
     });

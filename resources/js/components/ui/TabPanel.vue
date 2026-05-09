@@ -51,7 +51,7 @@ const switchState = computed({
         </div>
 
         <!-- New Tab Button (Fixed at bottom, always visible) -->
-        <div class="p-4">
+        <div>
             <slot name="footer" :isMinimized="isMinimized" />
         </div>
     </div>

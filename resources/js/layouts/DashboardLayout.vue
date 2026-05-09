@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import {
-    ChevronDown,
     LayoutDashboard,
     Users,
     Folder,
@@ -35,6 +34,15 @@ const props = defineProps<{
 const userName = computed(() => {
     const metaTag = document.querySelector('meta[name="user-name"]');
     return metaTag?.getAttribute('content') || 'User';
+});
+
+const userInitials = computed(() => {
+    return userName.value
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((name) => name[0]?.toUpperCase())
+        .join('') || 'U';
 });
 
 const appName = computed(() => {
@@ -158,23 +166,23 @@ onUnmounted(() => {
         <aside :class="[
             'absolute lg:static z-40 h-screen bg-prussian-blue-800 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
             'flex flex-col',
-            isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-16 lg:translate-x-0'
+            isMenuOpen ? 'w-24 translate-x-0' : 'w-24 -translate-x-full lg:translate-x-0'
         ]">
             <!-- Atlas Icon / Logo -->
-            <div class="flex flex-col items-center justify-center h-16 px-4 gap-1">
-                <AtlasIcon @click="toggleMenu" class="w-10 h-10 cursor-pointer" />
+            <div class="flex h-20 flex-col items-center justify-center gap-1 px-2">
+                <AtlasIcon class="h-10 w-10" />
                 <span class="text-[10px] font-medium text-twilight-indigo-300 tracking-wide">v{{ appVersion }}</span>
             </div>
 
             <!-- Menu Items -->
             <nav class="flex-1 overflow-y-auto py-4">
-                <div class="space-y-1 px-2">
+                <div class="space-y-2 px-2">
                     <router-link v-for="item in menuItems" :key="item.name" :to="item.path" @click="handleMenuItemClick"
                         active-class="!bg-smart-blue-600 !text-white"
                         exact-active-class="!bg-smart-blue-600 !text-white"
-                        class="flex items-center gap-3 px-3 py-2 h-10 rounded-lg bg-transparent transition-colors text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white">
-                        <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
-                        <span v-show="isMenuOpen" class="text-sm font-medium whitespace-nowrap transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'">
+                        class="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg bg-transparent px-1.5 py-2 text-center text-twilight-indigo-100 transition-colors hover:bg-smart-blue-700/50 hover:text-white">
+                        <component :is="item.icon" class="size-8 flex-shrink-0" />
+                        <span class="w-full text-[11px] font-medium leading-tight">
                             {{ item.label }}
                         </span>
                     </router-link>
@@ -182,10 +190,10 @@ onUnmounted(() => {
                         v-if="isAdmin"
                         href="/horizon"
                         @click="handleMenuItemClick"
-                        class="flex items-center gap-3 px-3 py-2 h-10 rounded-lg bg-transparent transition-colors text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white"
+                        class="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg bg-transparent px-1.5 py-2 text-center text-twilight-indigo-100 transition-colors hover:bg-smart-blue-700/50 hover:text-white"
                     >
-                        <Activity class="w-5 h-5 flex-shrink-0" />
-                        <span v-show="isMenuOpen" class="text-sm font-medium whitespace-nowrap transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'">
+                        <Activity class="size-8 flex-shrink-0" />
+                        <span class="w-full text-[11px] font-medium leading-tight">
                             Horizon
                         </span>
                     </a>
@@ -193,16 +201,17 @@ onUnmounted(() => {
             </nav>
 
             <!-- User Menu at Bottom -->
-            <div class="border-t border-twilight-indigo-500 p-4">
+            <div class="border-t border-twilight-indigo-500">
                 <DropdownMenu>
                     <DropdownMenuTrigger as-child>
-                        <Button variant="ghost"
-                            class="w-full flex items-center gap-3 px-3 py-2 h-10 text-twilight-indigo-100 hover:text-smart-blue-100">
-                            <User class="w-5 h-5 flex-shrink-0" />
-                            <span v-show="isMenuOpen" class="text-sm font-medium whitespace-nowrap truncate flex-1 text-left transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'">
-                                {{ userName }}
+                        <Button
+                            variant="ghost"
+                            :aria-label="`Open user menu for ${userName}`"
+                            class="h-16 w-full rounded-none border-0 p-0 text-twilight-indigo-100 hover:text-smart-blue-100 [&>span]:justify-center"
+                        >
+                            <span class="text-xs font-semibold leading-none tracking-wide text-smart-blue-100">
+                                {{ userInitials }}
                             </span>
-                            <ChevronDown v-show="isMenuOpen" class="w-4 h-4 flex-shrink-0 ml-auto transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="top" align="start"

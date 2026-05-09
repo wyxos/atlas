@@ -399,7 +399,7 @@ onUnmounted(() => {
                     <Button
                         variant="dashed"
                         size="sm"
-                        :class="['w-full rounded h-8', isMinimized ? 'justify-center' : 'justify-start']"
+                        :class="['h-8 w-full rounded-none border-0', isMinimized ? 'justify-center' : 'justify-start']"
                         aria-label="New tab"
                         data-test="create-tab-button"
                         @click="handleCreateTab"

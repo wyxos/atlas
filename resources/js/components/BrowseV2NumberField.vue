@@ -90,7 +90,7 @@ function clampInteger(value: number): number {
 </script>
 
 <template>
-  <span class="inline-flex h-8 items-center overflow-hidden rounded-full border border-white/10 bg-black/25 text-[#f7f1ea]/82 transition focus-within:border-sky-300/50">
+  <span class="inline-flex h-8 items-center overflow-hidden rounded border border-white/10 bg-black/25 text-[#f7f1ea]/82 transition focus-within:border-sky-300/50">
     <Button
       size="icon-sm"
       variant="ghost"
