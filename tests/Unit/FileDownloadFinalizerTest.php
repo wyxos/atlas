@@ -1,6 +1,10 @@
 <?php
 
+use App\Models\File;
+use App\Services\Downloads\FileDownloadFinalizer;
+use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
 use App\Services\Downloads\FileThumbnailMemoryGuard;
+use App\Support\AtlasStorage;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -63,4 +67,36 @@ it('allows thumbnails when the image memory estimate fits the worker budget', fu
 
     expect($probe->canGenerate(1200, 800, 450, 300))->toBeTrue()
         ->and($probe->estimateUsage(1200, 800, 450, 300))->toBeLessThan(128 * 1024 * 1024);
+});
+
+it('uses normal preview generation unless force is requested', function () {
+    $file = new File(['path' => 'downloads/aa/bb/file.jpg']);
+    $generator = Mockery::mock(FileDownloadPreviewAssetGenerator::class);
+    $updates = ['preview_path' => 'downloads/aa/bb/preview/file.jpg'];
+
+    $generator->shouldReceive('generatePreviewAssets')
+        ->once()
+        ->with($file)
+        ->andReturn($updates);
+    $generator->shouldReceive('regeneratePreviewAssets')->never();
+
+    $finalizer = new FileDownloadFinalizer($generator, app(AtlasStorage::class));
+
+    expect($finalizer->generatePreviewAssets($file))->toBe($updates);
+});
+
+it('uses preview regeneration when force is requested', function () {
+    $file = new File(['path' => 'downloads/aa/bb/file.jpg']);
+    $generator = Mockery::mock(FileDownloadPreviewAssetGenerator::class);
+    $updates = ['preview_path' => 'downloads/aa/bb/preview/file.jpg'];
+
+    $generator->shouldReceive('generatePreviewAssets')->never();
+    $generator->shouldReceive('regeneratePreviewAssets')
+        ->once()
+        ->with($file)
+        ->andReturn($updates);
+
+    $finalizer = new FileDownloadFinalizer($generator, app(AtlasStorage::class));
+
+    expect($finalizer->generatePreviewAssets($file, force: true))->toBe($updates);
 });

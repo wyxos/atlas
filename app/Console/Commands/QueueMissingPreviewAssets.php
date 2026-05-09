@@ -12,6 +12,7 @@ class QueueMissingPreviewAssets extends Command
         {--chunk=500 : Chunk size for scanning file IDs}
         {--limit=0 : Max number of files to queue (0 = no limit)}
         {--queue=processing : Queue name to dispatch jobs to}
+        {--include-stale-paths : Also queue files whose preview/poster paths use obsolete generated asset locations}
         {--dry-run : Print how many would be queued without dispatching}';
 
     protected $description = 'Queue preview/poster generation jobs for downloaded files missing preview assets';
@@ -30,11 +31,12 @@ class QueueMissingPreviewAssets extends Command
         }
 
         $dryRun = (bool) $this->option('dry-run');
+        $includeStalePaths = (bool) $this->option('include-stale-paths');
 
         $query = File::query()
             ->where('downloaded', true)
             ->whereNotNull('path')
-            ->where(function ($q) {
+            ->where(function ($q) use ($includeStalePaths) {
                 $q
                     // Missing preview for images or videos
                     ->whereNull('preview_path')
@@ -44,6 +46,19 @@ class QueueMissingPreviewAssets extends Command
                             $qq->where('mime_type', 'like', 'video/%')
                                 ->orWhere('mime_type', 'application/mp4');
                         })->whereNull('poster_path');
+                    });
+
+                if (! $includeStalePaths) {
+                    return;
+                }
+
+                $q
+                    ->orWhere(fn ($q) => $this->whereStaleGeneratedAssetPath($q, 'preview_path'))
+                    ->orWhere(function ($q) {
+                        $q->where(function ($qq) {
+                            $qq->where('mime_type', 'like', 'video/%')
+                                ->orWhere('mime_type', 'application/mp4');
+                        })->where(fn ($qq) => $this->whereStaleGeneratedAssetPath($qq, 'poster_path'));
                     });
             })
             ->where(function ($q) {
@@ -63,13 +78,13 @@ class QueueMissingPreviewAssets extends Command
 
         $queued = 0;
 
-        $query->chunkById($chunk, function ($files) use (&$queued, $limit, $queue) {
+        $query->chunkById($chunk, function ($files) use (&$queued, $limit, $queue, $includeStalePaths) {
             foreach ($files as $file) {
                 if ($limit > 0 && $queued >= $limit) {
                     return false;
                 }
 
-                GenerateFilePreviewAssets::dispatch($file->id)->onQueue($queue);
+                GenerateFilePreviewAssets::dispatch($file->id, $includeStalePaths && $this->hasStaleGeneratedAssetPath($file))->onQueue($queue);
                 $queued += 1;
             }
 
@@ -80,5 +95,62 @@ class QueueMissingPreviewAssets extends Command
         $this->info("Queued {$queued} file(s) to queue={$queue}.");
 
         return self::SUCCESS;
+    }
+
+    private function whereStaleGeneratedAssetPath($query, string $column): void
+    {
+        $query
+            ->whereNotNull($column)
+            ->where(function ($q) use ($column) {
+                foreach ($this->staleGeneratedAssetPathPatterns() as $pattern) {
+                    $q->orWhere($column, 'like', $pattern);
+                }
+            });
+    }
+
+    private function hasStaleGeneratedAssetPath(File $file): bool
+    {
+        return $this->isStaleGeneratedAssetPath($file->preview_path)
+            || ($this->isVideoMimeType($file->mime_type) && $this->isStaleGeneratedAssetPath($file->poster_path));
+    }
+
+    private function isStaleGeneratedAssetPath(?string $path): bool
+    {
+        if (! is_string($path) || $path === '') {
+            return false;
+        }
+
+        foreach ($this->staleGeneratedAssetPathPatterns() as $pattern) {
+            $regex = '/^'.str_replace('%', '.*', preg_quote($pattern, '/')).'$/';
+            if (preg_match($regex, $path) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isVideoMimeType(?string $mimeType): bool
+    {
+        $mimeType = strtolower((string) $mimeType);
+
+        return str_starts_with($mimeType, 'video/') || $mimeType === 'application/mp4';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function staleGeneratedAssetPathPatterns(): array
+    {
+        return [
+            'thumbnails/%',
+            '%/thumbnails/%',
+            'previews/%',
+            '%/previews/%',
+            'posters/%',
+            '%/posters/%',
+            '%.preview.%',
+            '%.poster.%',
+        ];
     }
 }

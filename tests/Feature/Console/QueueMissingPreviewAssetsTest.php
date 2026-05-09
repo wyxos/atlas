@@ -43,10 +43,74 @@ test('atlas:queue-missing-previews dispatches jobs for downloaded files missing 
     $this->artisan('atlas:queue-missing-previews --queue=processing')
         ->assertExitCode(0);
 
-    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $image->id);
-    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $video->id);
-    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $applicationMp4Video->id);
+    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $image->id && $job->force === false);
+    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $video->id && $job->force === false);
+    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $applicationMp4Video->id && $job->force === false);
     Bus::assertNotDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $alreadyOk->id);
+});
+
+test('atlas:queue-missing-previews ignores stale generated paths unless requested', function () {
+    Bus::fake();
+
+    $staleImage = File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/stale.jpg',
+        'mime_type' => 'image/jpeg',
+        'preview_path' => 'downloads/aa/bb/thumbnails/stale.jpg',
+    ]);
+
+    $this->artisan('atlas:queue-missing-previews --queue=processing')
+        ->assertExitCode(0);
+
+    Bus::assertNotDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $staleImage->id);
+});
+
+test('atlas:queue-missing-previews can force queue stale generated paths', function () {
+    Bus::fake();
+
+    $staleImage = File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/stale.jpg',
+        'mime_type' => 'image/jpeg',
+        'preview_path' => 'downloads/aa/bb/thumbnails/stale.jpg',
+    ]);
+    $staleVideo = File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/stale-video.mp4',
+        'mime_type' => 'video/mp4',
+        'preview_path' => 'downloads/aa/bb/preview/stale-video.mp4',
+        'poster_path' => 'downloads/aa/bb/stale-video.poster.jpg',
+    ]);
+    $alreadyOk = File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/ok.jpg',
+        'mime_type' => 'image/jpeg',
+        'preview_path' => 'downloads/aa/bb/preview/ok.jpg',
+    ]);
+
+    $this->artisan('atlas:queue-missing-previews --include-stale-paths --queue=processing')
+        ->assertExitCode(0);
+
+    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $staleImage->id && $job->force === true);
+    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $staleVideo->id && $job->force === true);
+    Bus::assertNotDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $alreadyOk->id);
+});
+
+test('atlas:queue-missing-previews dry-run counts stale generated paths when requested', function () {
+    Bus::fake();
+
+    File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/stale.jpg',
+        'mime_type' => 'image/jpeg',
+        'preview_path' => 'thumbnails/stale.jpg',
+    ]);
+
+    $this->artisan('atlas:queue-missing-previews --include-stale-paths --dry-run')
+        ->expectsOutput('Would queue 1 file(s).')
+        ->assertExitCode(0);
+
+    Bus::assertNotDispatched(GenerateFilePreviewAssets::class);
 });
 
 test('atlas:queue-missing-previews dry-run does not dispatch jobs', function () {

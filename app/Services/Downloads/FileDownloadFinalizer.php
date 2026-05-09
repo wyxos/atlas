@@ -21,8 +21,12 @@ class FileDownloadFinalizer
     /**
      * @return array{preview_path?: string, poster_path?: string}
      */
-    public function generatePreviewAssets(File $file): array
+    public function generatePreviewAssets(File $file, bool $force = false): array
     {
+        if ($force) {
+            return $this->previewAssetGenerator->regeneratePreviewAssets($file);
+        }
+
         return $this->previewAssetGenerator->generatePreviewAssets($file);
     }
 

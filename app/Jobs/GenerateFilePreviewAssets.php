@@ -14,8 +14,11 @@ class GenerateFilePreviewAssets implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $fileId)
+    public bool $force = false;
+
+    public function __construct(public int $fileId, bool $force = false)
     {
+        $this->force = $force;
         $this->onQueue('processing');
     }
 
@@ -31,7 +34,7 @@ class GenerateFilePreviewAssets implements ShouldQueue
             return;
         }
 
-        $updates = $finalizer->generatePreviewAssets($file);
+        $updates = $finalizer->generatePreviewAssets($file, $this->force);
         if ($updates === []) {
             return;
         }
