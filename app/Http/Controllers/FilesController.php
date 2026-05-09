@@ -78,7 +78,7 @@ class FilesController extends Controller
     /**
      * Serve a lightweight SVG icon for non-image/video files.
      *
-     * This avoids trying to generate thumbnails for formats where we don't yet have preview support
+     * This avoids trying to generate previews for formats where we don't yet have preview support
      * (audio, documents, archives, etc.).
      */
     public function serveIcon(File $file)
@@ -339,7 +339,7 @@ SVG;
         // Empty atlas app storage (including directory structure)
         $atlasDisk = Storage::disk(AtlasStorage::DISK);
 
-        // Delete all top-level directories (downloads/, thumbnails/, and any future ones)
+        // Delete all top-level app-storage directories (downloads/, imports/, and any future namespaces)
         foreach ($atlasDisk->directories() as $directory) {
             $atlasDisk->deleteDirectory($directory);
         }

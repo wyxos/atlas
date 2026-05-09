@@ -13,8 +13,8 @@ it('regenerates preview assets for a video file', function () {
     $file = File::factory()->create([
         'downloaded' => true,
         'path' => 'downloads/aa/bb/test.mp4',
-        'preview_path' => 'downloads/aa/bb/test.preview.mp4',
-        'poster_path' => 'downloads/aa/bb/test.poster.jpg',
+        'preview_path' => 'downloads/aa/bb/preview/test.mp4',
+        'poster_path' => 'downloads/aa/bb/preview/test.jpg',
         'mime_type' => 'video/mp4',
     ]);
 
@@ -22,13 +22,13 @@ it('regenerates preview assets for a video file', function () {
         ->shouldReceive('regenerateVideoPreviewAssets')
         ->once()
         ->andReturn([
-            'preview_path' => 'downloads/aa/bb/test.preview.mp4',
-            'poster_path' => 'downloads/aa/bb/test.poster.jpg',
+            'preview_path' => 'downloads/aa/bb/preview/test.mp4',
+            'poster_path' => 'downloads/aa/bb/preview/test.jpg',
         ]);
 
     $job = new RegenerateVideoPreviewAssets($file->id);
     $job->handle(app(FileDownloadFinalizer::class));
 
-    expect($file->fresh()?->preview_path)->toBe('downloads/aa/bb/test.preview.mp4');
-    expect($file->fresh()?->poster_path)->toBe('downloads/aa/bb/test.poster.jpg');
+    expect($file->fresh()?->preview_path)->toBe('downloads/aa/bb/preview/test.mp4');
+    expect($file->fresh()?->poster_path)->toBe('downloads/aa/bb/preview/test.jpg');
 });

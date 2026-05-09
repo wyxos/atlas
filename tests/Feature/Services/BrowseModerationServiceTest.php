@@ -109,8 +109,8 @@ test('blacklisting from moderation detaches the auth user tabs and clears stored
         'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/moderated.jpg',
-        'preview_path' => 'thumbnails/moderated.jpg',
-        'poster_path' => 'posters/moderated.jpg',
+        'preview_path' => 'downloads/preview/moderated.jpg',
+        'poster_path' => 'downloads/preview/moderated-poster.jpg',
         'downloaded' => true,
         'downloaded_at' => now(),
     ]);
@@ -151,8 +151,8 @@ test('blacklisting from moderation detaches the auth user tabs and clears stored
 
         return $paths === [
             'downloads/moderated.jpg',
-            'posters/moderated.jpg',
-            'thumbnails/moderated.jpg',
+            'downloads/preview/moderated-poster.jpg',
+            'downloads/preview/moderated.jpg',
         ];
     });
 });

@@ -373,7 +373,7 @@ test('corrects stale mime type when downloaded file content disagrees', function
     expect($file->path)->toEndWith('.png');
 });
 
-test('generates thumbnail for image files (finalizer)', function () {
+test('generates preview for image files (finalizer)', function () {
     // Create a simple 1x1 pixel JPEG image for testing
     // This is a minimal but valid JPEG that GD can process
     $image = imagecreatetruecolor(1, 1);
@@ -411,10 +411,9 @@ test('generates thumbnail for image files (finalizer)', function () {
     // Preview should be generated for valid images
     // Verify the path structure and that it exists in fake storage
     if ($file->preview_path) {
-        expect($file->preview_path)->toStartWith('thumbnails/');
-        expect($file->preview_path)->toMatch('/^thumbnails\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
-        expect($file->preview_path)->toContain('_thumb.');
-        // Verify thumbnail exists in fake storage
+        expect($file->preview_path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\/preview\//');
+        expect($file->preview_path)->toEndWith('.jpg');
+        // Verify preview exists in fake storage
         Storage::disk('atlas')->assertExists($file->preview_path);
     }
 });

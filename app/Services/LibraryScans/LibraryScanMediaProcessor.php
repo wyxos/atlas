@@ -45,13 +45,8 @@ class LibraryScanMediaProcessor
     public function normalizeAudio(File $file): array
     {
         $resolved = $this->resolveFilePath($file);
-        $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->detectMimeType($resolved));
 
-        if (in_array($mimeType, ['audio/mpeg', 'audio/mp3'], true)) {
-            return [];
-        }
-
-        $targetPath = $this->conversionPath($file, 'normalized', 'mp3');
+        $targetPath = $this->conversionPath($file, 'mp3');
         $result = $this->runFfmpegConversion([
             '-y',
             '-i',
@@ -82,7 +77,7 @@ class LibraryScanMediaProcessor
             return [];
         }
 
-        $targetPath = $this->conversionPath($file, 'streamable', 'mp4');
+        $targetPath = $this->conversionPath($file, 'mp4');
         $args = [
             '-y',
             '-i',
@@ -164,11 +159,11 @@ class LibraryScanMediaProcessor
         ];
     }
 
-    private function conversionPath(File $file, string $variant, string $extension): string
+    private function conversionPath(File $file, string $extension): string
     {
-        $filename = $this->appStorage->variantFilename((string) $file->filename, $variant, $extension);
+        $filename = $this->appStorage->filenameWithExtension(basename((string) $file->path), $extension);
 
-        return $this->appStorage->segmentedPath(AtlasStorage::CONVERSIONS, $filename, $file->hash);
+        return $this->appStorage->derivedPath((string) $file->path, 'conversions', $filename);
     }
 
     /**

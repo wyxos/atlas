@@ -32,6 +32,11 @@ class FileFactory extends Factory
         $pathToken = fake()->optional()->uuid();
         $previewPathToken = fake()->optional()->uuid();
         $posterPathToken = fake()->optional()->uuid();
+        $pathHash = $pathToken ? str_replace('-', '', $pathToken) : null;
+        $path = $pathToken
+            ? 'downloads/'.substr($pathHash, 0, 2).'/'.substr($pathHash, 2, 2).'/'.$pathToken.'.'.$ext
+            : null;
+        $assetDirectory = $path ? dirname($path).'/preview' : null;
 
         $url = fake()->unique()->url();
         $referrerUrl = fake()->url();
@@ -43,7 +48,7 @@ class FileFactory extends Factory
             // Provenance page URL is now non-unique.
             'referrer_url' => $referrerUrl,
             // Avoid Faker's filePath() (tempnam) which can emit warnings that PHPUnit treats as exceptions.
-            'path' => $pathToken ? 'files/'.$pathToken.'.'.$ext : null,
+            'path' => $path,
             'filename' => fake()->word().'.'.$ext,
             'ext' => $ext,
             'size' => fake()->numberBetween(1024, 104857600), // 1KB to 100MB
@@ -52,8 +57,8 @@ class FileFactory extends Factory
             'title' => fake()->optional()->sentence(),
             'description' => fake()->optional()->paragraph(),
             'preview_url' => fake()->optional()->imageUrl(),
-            'preview_path' => $previewPathToken ? 'thumbnails/'.$previewPathToken.'.jpg' : null,
-            'poster_path' => $posterPathToken ? 'thumbnails/'.$posterPathToken.'_poster.jpg' : null,
+            'preview_path' => $assetDirectory && $previewPathToken ? $assetDirectory.'/'.$previewPathToken.'.jpg' : null,
+            'poster_path' => $assetDirectory && $posterPathToken ? $assetDirectory.'/'.$posterPathToken.'.jpg' : null,
             'tags' => fake()->optional()->randomElements(['tag1', 'tag2', 'tag3', 'tag4'], 2),
             'parent_id' => null,
             'chapter' => null,

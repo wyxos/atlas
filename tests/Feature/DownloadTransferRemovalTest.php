@@ -24,7 +24,7 @@ it('removes a transfer and deletes the file from disk while keeping the Atlas fi
         'filename' => 'test.jpg',
         'downloaded' => true,
         'path' => 'downloads/aa/bb/test.jpg',
-        'preview_path' => 'thumbnails/aa/bb/test_thumb.jpg',
+        'preview_path' => 'downloads/aa/bb/preview/test.jpg',
     ]);
     File::query()->whereKey($file->id)->update(['download_progress' => 100]);
     Storage::disk('atlas')->put($file->path, 'file');
@@ -53,7 +53,7 @@ it('removes a transfer and deletes the file from disk while keeping the Atlas fi
     expect($file->downloaded)->toBeFalse();
 
     Storage::disk('atlas')->assertMissing('downloads/aa/bb/test.jpg');
-    Storage::disk('atlas')->assertMissing('thumbnails/aa/bb/test_thumb.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/aa/bb/preview/test.jpg');
 });
 
 it('deletes the file record and cascaded transfers when requested while removing a downloaded file from disk', function () {
@@ -66,7 +66,7 @@ it('deletes the file record and cascaded transfers when requested while removing
         'filename' => 'cascade.jpg',
         'downloaded' => true,
         'path' => 'downloads/cascade.jpg',
-        'preview_path' => 'thumbnails/cascade.jpg',
+        'preview_path' => 'downloads/preview/cascade.jpg',
     ]);
     Reaction::query()->create([
         'file_id' => $file->id,
@@ -113,7 +113,7 @@ it('deletes the file record and cascaded transfers when requested while removing
     expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
 
     Storage::disk('atlas')->assertMissing('downloads/cascade.jpg');
-    Storage::disk('atlas')->assertMissing('thumbnails/cascade.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/preview/cascade.jpg');
 });
 
 it('keeps reactions and the file record when deleting a non-downloaded file from disk by default', function () {
@@ -126,7 +126,7 @@ it('keeps reactions and the file record when deleting a non-downloaded file from
         'filename' => 'pending.jpg',
         'downloaded' => false,
         'path' => 'downloads/pending.jpg',
-        'preview_path' => 'thumbnails/pending.jpg',
+        'preview_path' => 'downloads/preview/pending.jpg',
     ]);
     Reaction::query()->create([
         'file_id' => $file->id,
@@ -164,7 +164,7 @@ it('keeps reactions and the file record when deleting a non-downloaded file from
     expect($file->downloaded)->toBeFalse();
 
     Storage::disk('atlas')->assertMissing('downloads/pending.jpg');
-    Storage::disk('atlas')->assertMissing('thumbnails/pending.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/preview/pending.jpg');
 });
 
 it('removes an active transfer from disk even when the temp directory and stored files are already missing', function () {
@@ -175,7 +175,7 @@ it('removes an active transfer from disk even when the temp directory and stored
         'filename' => 'missing-active.bin',
         'downloaded' => false,
         'path' => 'downloads/missing-active.bin',
-        'preview_path' => 'thumbnails/missing-active.jpg',
+        'preview_path' => 'downloads/preview/missing-active.jpg',
     ]);
     File::query()->whereKey($file->id)->update(['download_progress' => 35]);
 

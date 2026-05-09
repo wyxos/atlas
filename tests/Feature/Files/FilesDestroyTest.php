@@ -26,8 +26,8 @@ it('deletes local assets but keeps the file record by default when requested', f
         'downloaded' => true,
         'downloaded_at' => now(),
         'path' => 'downloads/deletable.jpg',
-        'preview_path' => 'thumbnails/deletable.jpg',
-        'poster_path' => 'posters/deletable.jpg',
+        'preview_path' => 'downloads/preview/deletable.jpg',
+        'poster_path' => 'downloads/preview/deletable-poster.jpg',
     ]);
 
     Reaction::query()->create([
@@ -59,8 +59,8 @@ it('deletes local assets but keeps the file record by default when requested', f
         ->and(Reaction::query()->where('file_id', $file->id)->count())->toBe(1);
 
     Storage::disk(config('downloads.disk'))->assertMissing('downloads/deletable.jpg');
-    Storage::disk(config('downloads.disk'))->assertMissing('thumbnails/deletable.jpg');
-    Storage::disk(config('downloads.disk'))->assertMissing('posters/deletable.jpg');
+    Storage::disk(config('downloads.disk'))->assertMissing('downloads/preview/deletable.jpg');
+    Storage::disk(config('downloads.disk'))->assertMissing('downloads/preview/deletable-poster.jpg');
 });
 
 it('deletes imported local source files from atlas disk when requested', function () {
@@ -110,7 +110,7 @@ it('can delete the local assets and the file record together', function () {
         'downloaded' => true,
         'downloaded_at' => now(),
         'path' => 'downloads/remove-record.jpg',
-        'preview_path' => 'thumbnails/remove-record.jpg',
+        'preview_path' => 'downloads/preview/remove-record.jpg',
     ]);
 
     Reaction::query()->create([
@@ -147,5 +147,5 @@ it('can delete the local assets and the file record together', function () {
         ->and(DownloadTransfer::query()->whereKey($transfer->id)->exists())->toBeFalse();
 
     Storage::disk(config('downloads.disk'))->assertMissing('downloads/remove-record.jpg');
-    Storage::disk(config('downloads.disk'))->assertMissing('thumbnails/remove-record.jpg');
+    Storage::disk(config('downloads.disk'))->assertMissing('downloads/preview/remove-record.jpg');
 });

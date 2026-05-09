@@ -9,7 +9,6 @@ use App\Services\MetricsService;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use League\MimeTypeDetection\FinfoMimeTypeDetector;
 
 class FileDownloadFinalizer
@@ -106,8 +105,6 @@ class FileDownloadFinalizer
                     $disk,
                     $absolutePath,
                     $finalPath,
-                    $storedFilename,
-                    $hashForSegmentation,
                     $resolvedMimeType,
                 ),
             ];
@@ -143,16 +140,11 @@ class FileDownloadFinalizer
         }
     }
 
-    private function generateStoredFilename(string $extension): string
-    {
-        return Str::random(40).'.'.$extension;
-    }
-
     private function resolveStoredFilename(File $file, string $extension): string
     {
         $baseFilename = $file->filename;
         if (! $baseFilename) {
-            return $this->generateStoredFilename($extension);
+            return $this->appStorage->randomStoredFilename($extension);
         }
 
         return $this->appStorage->storedFilename($baseFilename, $extension);

@@ -11,17 +11,42 @@ it('builds segmented paths with sanitized filenames', function () {
     expect($paths->segmentedPath(AtlasStorage::DOWNLOADS, 'bad:name.jpg', 'abcdef1234'))
         ->toBe('downloads/ab/cd/bad-name.jpg')
         ->and($paths->segmentedPath(AtlasStorage::IMPORTS, 'track.mp3', '123456'))
-        ->toBe('imports/12/34/track.mp3')
-        ->and($paths->segmentedPath(AtlasStorage::CONVERSIONS, 'video.preview.mp4', 'feedface'))
-        ->toBe('conversions/fe/ed/video.preview.mp4');
+        ->toBe('imports/12/34/track.mp3');
 });
+
+it('keeps downloads and imports as the only managed top-level namespaces', function () {
+    expect(AtlasStorage::namespaces())->toBe([
+        AtlasStorage::DOWNLOADS,
+        AtlasStorage::IMPORTS,
+    ]);
+});
+
+it('builds derived paths inside the source file parent directory', function () {
+    $paths = new AtlasStorage;
+
+    expect($paths->derivedPath('downloads/12/34/myfile.jpg', 'preview', 'myfile.jpg'))
+        ->toBe('downloads/12/34/preview/myfile.jpg')
+        ->and($paths->derivedPath('imports/ab/cd/audio.wav', 'conversions', 'audio.mp3'))
+        ->toBe('imports/ab/cd/conversions/audio.mp3');
+});
+
+it('requires a derived directory name', function () {
+    (new AtlasStorage)->derivedPath('downloads/12/34/myfile.jpg', '', 'myfile.jpg');
+})->throws(InvalidArgumentException::class);
 
 it('normalizes filename extensions consistently', function () {
     $paths = new AtlasStorage;
 
     expect($paths->storedFilename('image', 'jpg'))->toBe('image.jpg')
         ->and($paths->storedFilename('image.JPG', 'jpg'))->toBe('image.JPG')
-        ->and($paths->variantFilename('movie.mp4', 'streamable', 'mp4'))->toBe('movie.streamable.mp4');
+        ->and($paths->filenameWithExtension('movie.webm', 'mp4'))->toBe('movie.mp4');
+});
+
+it('generates random stored filenames with normalized extensions', function () {
+    $paths = new AtlasStorage;
+
+    expect($paths->randomStoredFilename('MP3'))->toMatch('/^[A-Za-z0-9]{40}\.mp3$/')
+        ->and($paths->randomStoredFilename())->toMatch('/^[A-Za-z0-9]{40}\.bin$/');
 });
 
 it('adds suffixes when a segmented path already exists', function () {

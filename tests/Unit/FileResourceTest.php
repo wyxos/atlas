@@ -47,7 +47,7 @@ function resourceFile(array $attributes = [], ?FileMetadata $metadata = null): F
 it('includes absolute preview path when preview path is set', function () {
     $file = resourceFile([
         'path' => 'downloads/aa/bb/example.jpg',
-        'preview_path' => 'thumbnails/aa/bb/example.preview.jpg',
+        'preview_path' => 'downloads/aa/bb/preview/example.jpg',
     ]);
 
     $data = FileResource::make($file)->toArray(Request::create('https://atlas.test/files'));
@@ -73,7 +73,7 @@ it('prefers downloaded and preview file routes for downloaded files', function (
     $file = resourceFile([
         'downloaded' => true,
         'path' => 'downloads/aa/bb/example.mp4',
-        'preview_path' => 'downloads/aa/bb/example.preview.mp4',
+        'preview_path' => 'downloads/aa/bb/preview/example.mp4',
         'url' => 'https://www.youtube.com/watch?v=example',
         'preview_url' => 'https://www.youtube.com/watch?v=example',
         'mime_type' => 'video/mp4',

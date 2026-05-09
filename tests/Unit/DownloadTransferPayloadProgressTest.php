@@ -145,7 +145,7 @@ it('prefers downloaded file URLs for terminal yt-dlp payloads', function () {
         'url' => 'https://www.youtube.com/watch?v=example',
         'downloaded' => true,
         'path' => 'downloads/aa/bb/example.mp4',
-        'preview_path' => 'downloads/aa/bb/example.preview.mp4',
+        'preview_path' => 'downloads/aa/bb/preview/example.mp4',
         'preview_url' => 'https://www.youtube.com/watch?v=example',
         'mime_type' => 'video/mp4',
     ]);

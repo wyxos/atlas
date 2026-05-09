@@ -14,8 +14,6 @@ final class AtlasStorage
 
     public const string IMPORTS = 'imports';
 
-    public const string CONVERSIONS = 'conversions';
-
     /**
      * @return list<string>
      */
@@ -24,7 +22,6 @@ final class AtlasStorage
         return [
             self::DOWNLOADS,
             self::IMPORTS,
-            self::CONVERSIONS,
         ];
     }
 
@@ -71,14 +68,20 @@ final class AtlasStorage
         return $filename.$suffix;
     }
 
-    public function variantFilename(string $filename, string $variant, string $extension): string
+    public function randomStoredFilename(?string $extension = null): string
+    {
+        $extension = $this->normalizeExtension($extension) ?? 'bin';
+
+        return Str::random(40).'.'.$extension;
+    }
+
+    public function filenameWithExtension(string $filename, string $extension): string
     {
         $filename = $this->sanitizeFilename($filename);
-        $variant = $this->sanitizeSegment($variant) ?: 'asset';
         $extension = $this->normalizeExtension($extension) ?? 'bin';
         $base = pathinfo($filename, PATHINFO_FILENAME) ?: 'file';
 
-        return "{$base}.{$variant}.{$extension}";
+        return $base.'.'.$extension;
     }
 
     public function segmentedPath(string $namespace, string $filename, ?string $hash = null): string
@@ -88,6 +91,24 @@ final class AtlasStorage
         $hash = $this->normalizeHash($hash) ?? hash('sha256', $filename);
 
         return "{$namespace}/".substr($hash, 0, 2).'/'.substr($hash, 2, 2)."/{$filename}";
+    }
+
+    public function derivedPath(string $sourcePath, string $directory, string $filename): string
+    {
+        return $this->derivedDirectory($sourcePath, $directory).'/'.$this->sanitizeFilename($filename);
+    }
+
+    public function derivedDirectory(string $sourcePath, string $directory): string
+    {
+        $sourcePath = trim(str_replace('\\', '/', $sourcePath), '/');
+        $parent = trim(dirname($sourcePath), '. /');
+        $directory = $this->sanitizeSegment($directory);
+
+        if ($directory === '') {
+            throw new \InvalidArgumentException('Derived directory is required.');
+        }
+
+        return $parent !== '' ? $parent.'/'.$directory : $directory;
     }
 
     public function uniqueSegmentedPath(Filesystem $disk, string $namespace, string $filename, ?string $hash = null): string

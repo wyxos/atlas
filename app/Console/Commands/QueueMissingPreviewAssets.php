@@ -36,7 +36,7 @@ class QueueMissingPreviewAssets extends Command
             ->whereNotNull('path')
             ->where(function ($q) {
                 $q
-                    // Missing thumbnail for images or videos
+                    // Missing preview for images or videos
                     ->whereNull('preview_path')
                     // Missing poster for videos
                     ->orWhere(function ($q) {

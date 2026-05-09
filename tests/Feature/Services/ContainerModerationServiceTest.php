@@ -146,8 +146,8 @@ test('blacklists files for blacklist action type', function () {
         'auto_blacklisted' => false,
         'blacklisted_at' => null,
         'path' => 'downloads/ab/cd/test.jpg',
-        'preview_path' => 'thumbnails/ab/cd/test.jpg',
-        'poster_path' => 'posters/ab/cd/test.jpg',
+        'preview_path' => 'downloads/ab/cd/preview/test.jpg',
+        'poster_path' => 'downloads/ab/cd/preview/test-poster.jpg',
         'downloaded' => true,
         'downloaded_at' => now(),
     ]);
@@ -184,9 +184,9 @@ test('blacklists files for blacklist action type', function () {
         sort($paths);
 
         return $paths === [
+            'downloads/ab/cd/preview/test-poster.jpg',
+            'downloads/ab/cd/preview/test.jpg',
             'downloads/ab/cd/test.jpg',
-            'posters/ab/cd/test.jpg',
-            'thumbnails/ab/cd/test.jpg',
         ];
     });
 

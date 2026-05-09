@@ -2,17 +2,21 @@
 
 use App\Support\VideoPreviewSamplingPlan;
 
-it('builds take-skip windows for sampled video previews', function () {
-    expect(VideoPreviewSamplingPlan::windows(1, 5, 10, 5))->toBe([
-        ['start' => 1.0, 'end' => 6.0],
-        ['start' => 16.0, 'end' => 21.0],
-        ['start' => 31.0, 'end' => 36.0],
-        ['start' => 46.0, 'end' => 51.0],
-        ['start' => 61.0, 'end' => 66.0],
-    ]);
+it('uses the whole file for videos at or below the short preview threshold', function () {
+    expect(VideoPreviewSamplingPlan::selectFilterForDuration(60, 60, 5, 10))->toBeNull();
 });
 
-it('builds an ffmpeg select filter from sampled preview windows', function () {
-    expect(VideoPreviewSamplingPlan::selectFilter(1, 5, 10, 3))
-        ->toBe("select='between(t\\,1\\,6)+between(t\\,16\\,21)+between(t\\,31\\,36)',setpts=N/FRAME_RATE/TB");
+it('builds ten evenly distributed five second windows from the first half of long videos', function () {
+    $windows = VideoPreviewSamplingPlan::sampledWindows(120, 5, 10);
+
+    expect($windows)->toHaveCount(10)
+        ->and($windows[0])->toBe(['start' => 0.0, 'end' => 5.0])
+        ->and($windows[9])->toBe(['start' => 55.0, 'end' => 60.0])
+        ->and(round($windows[4]['start'], 3))->toBe(24.444)
+        ->and(round($windows[5]['start'], 3))->toBe(30.556);
+});
+
+it('builds an ffmpeg select filter for long video preview windows', function () {
+    expect(VideoPreviewSamplingPlan::selectFilterForDuration(120, 60, 5, 10))
+        ->toBe("select='between(t\\,0\\,5)+between(t\\,6.111\\,11.111)+between(t\\,12.222\\,17.222)+between(t\\,18.333\\,23.333)+between(t\\,24.444\\,29.444)+between(t\\,30.556\\,35.556)+between(t\\,36.667\\,41.667)+between(t\\,42.778\\,47.778)+between(t\\,48.889\\,53.889)+between(t\\,55\\,60)',setpts=N/FRAME_RATE/TB");
 });

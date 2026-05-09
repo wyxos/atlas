@@ -78,7 +78,7 @@ it('removes completed transfers and deletes their files from disk while keeping 
         'filename' => 'completed-video.mp4',
         'downloaded' => true,
         'path' => 'downloads/completed-video.mp4',
-        'preview_path' => 'thumbnails/completed-video.jpg',
+        'preview_path' => 'downloads/preview/completed-video.jpg',
     ]);
     Reaction::query()->create([
         'file_id' => $file->id,
@@ -117,7 +117,7 @@ it('removes completed transfers and deletes their files from disk while keeping 
     expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeTrue();
 
     Storage::disk('atlas')->assertMissing('downloads/completed-video.mp4');
-    Storage::disk('atlas')->assertMissing('thumbnails/completed-video.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/preview/completed-video.jpg');
 });
 
 it('removes multiple transfers from disk in one bulk request while keeping Atlas file records by default', function () {
@@ -129,14 +129,14 @@ it('removes multiple transfers from disk in one bulk request while keeping Atlas
         'filename' => 'first-video.mp4',
         'downloaded' => true,
         'path' => 'downloads/first-video.mp4',
-        'preview_path' => 'thumbnails/first-video.jpg',
+        'preview_path' => 'downloads/preview/first-video.jpg',
     ]);
     $secondFile = File::factory()->create([
         'url' => 'https://example.com/second-video.mp4',
         'filename' => 'second-video.mp4',
         'downloaded' => true,
         'path' => 'downloads/second-video.mp4',
-        'preview_path' => 'thumbnails/second-video.jpg',
+        'preview_path' => 'downloads/preview/second-video.jpg',
     ]);
     Storage::disk('atlas')->put($firstFile->path, 'video');
     Storage::disk('atlas')->put($firstFile->preview_path, 'preview');
@@ -186,9 +186,9 @@ it('removes multiple transfers from disk in one bulk request while keeping Atlas
     expect($secondFile->downloaded)->toBeFalse();
 
     Storage::disk('atlas')->assertMissing('downloads/first-video.mp4');
-    Storage::disk('atlas')->assertMissing('thumbnails/first-video.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/preview/first-video.jpg');
     Storage::disk('atlas')->assertMissing('downloads/second-video.mp4');
-    Storage::disk('atlas')->assertMissing('thumbnails/second-video.jpg');
+    Storage::disk('atlas')->assertMissing('downloads/preview/second-video.jpg');
 });
 
 it('can delete Atlas file records and reactions during bulk delete from disk when requested', function () {
@@ -201,7 +201,7 @@ it('can delete Atlas file records and reactions during bulk delete from disk whe
         'filename' => 'bulk-record-delete.mp4',
         'downloaded' => true,
         'path' => 'downloads/bulk-record-delete.mp4',
-        'preview_path' => 'thumbnails/bulk-record-delete.jpg',
+        'preview_path' => 'downloads/preview/bulk-record-delete.jpg',
     ]);
     Reaction::query()->create([
         'file_id' => $file->id,

@@ -7,39 +7,45 @@ class VideoPreviewSamplingPlan
     /**
      * @return list<array{start: float, end: float}>
      */
-    public static function windows(
-        float $startSecond,
-        float $takeSeconds,
-        float $skipSeconds,
-        int $repeatCount,
-    ): array {
-        $startSecond = max(0, $startSecond);
-        $takeSeconds = max(0.1, $takeSeconds);
-        $skipSeconds = max(0, $skipSeconds);
-        $repeatCount = max(1, $repeatCount);
+    public static function sampledWindows(float $durationSeconds, float $clipSeconds, int $clipCount): array
+    {
+        $durationSeconds = max(0.1, $durationSeconds);
+        $clipSeconds = max(0.1, $clipSeconds);
+        $clipCount = max(1, $clipCount);
+        $sampleRangeEnd = max($clipSeconds, $durationSeconds / 2);
 
+        if ($clipCount === 1) {
+            return [[
+                'start' => 0.0,
+                'end' => min($clipSeconds, $sampleRangeEnd),
+            ]];
+        }
+
+        $lastStart = max(0, $sampleRangeEnd - $clipSeconds);
+        $step = $lastStart / ($clipCount - 1);
         $windows = [];
-        $cursor = $startSecond;
 
-        for ($index = 0; $index < $repeatCount; $index++) {
+        for ($index = 0; $index < $clipCount; $index++) {
+            $start = $index === $clipCount - 1 ? $lastStart : $step * $index;
+
             $windows[] = [
-                'start' => $cursor,
-                'end' => $cursor + $takeSeconds,
+                'start' => $start,
+                'end' => min($start + $clipSeconds, $sampleRangeEnd),
             ];
-
-            $cursor += $takeSeconds + $skipSeconds;
         }
 
         return $windows;
     }
 
-    public static function selectFilter(
-        float $startSecond,
-        float $takeSeconds,
-        float $skipSeconds,
-        int $repeatCount,
-    ): string {
-        $windows = self::windows($startSecond, $takeSeconds, $skipSeconds, $repeatCount);
+    public static function selectFilterForDuration(
+        float $durationSeconds,
+        float $shortMaxSeconds,
+        float $clipSeconds,
+        int $clipCount,
+    ): ?string {
+        if ($durationSeconds <= max(0.1, $shortMaxSeconds)) {
+            return null;
+        }
 
         $ranges = array_map(function (array $window): string {
             return sprintf(
@@ -47,7 +53,7 @@ class VideoPreviewSamplingPlan
                 self::formatTime($window['start']),
                 self::formatTime($window['end']),
             );
-        }, $windows);
+        }, self::sampledWindows($durationSeconds, $clipSeconds, $clipCount));
 
         return "select='".implode('+', $ranges)."',setpts=N/FRAME_RATE/TB";
     }

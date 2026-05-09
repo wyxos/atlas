@@ -14,8 +14,8 @@ test('atlas:regenerate-video-previews dispatches jobs for downloaded videos with
         'downloaded' => true,
         'path' => 'downloads/video-a.mp4',
         'mime_type' => 'video/mp4',
-        'preview_path' => 'downloads/video-a.preview.mp4',
-        'poster_path' => 'downloads/video-a.poster.jpg',
+        'preview_path' => 'downloads/preview/video-a.mp4',
+        'poster_path' => 'downloads/preview/video-a.jpg',
     ]);
 
     $videoWithPosterOnly = File::factory()->create([
@@ -23,7 +23,7 @@ test('atlas:regenerate-video-previews dispatches jobs for downloaded videos with
         'path' => 'downloads/video-b.mp4',
         'mime_type' => 'application/mp4',
         'preview_path' => null,
-        'poster_path' => 'downloads/video-b.poster.jpg',
+        'poster_path' => 'downloads/preview/video-b.jpg',
     ]);
 
     $videoWithoutAssets = File::factory()->create([
@@ -38,7 +38,7 @@ test('atlas:regenerate-video-previews dispatches jobs for downloaded videos with
         'downloaded' => true,
         'path' => 'downloads/image.jpg',
         'mime_type' => 'image/jpeg',
-        'preview_path' => 'downloads/image.preview.webp',
+        'preview_path' => 'downloads/preview/image.jpg',
     ]);
 
     $this->artisan('atlas:regenerate-video-previews --queue=maintenance')
@@ -57,8 +57,8 @@ test('atlas:regenerate-video-previews dry-run does not dispatch jobs', function 
         'downloaded' => true,
         'path' => 'downloads/video-a.mp4',
         'mime_type' => 'video/mp4',
-        'preview_path' => 'downloads/video-a.preview.mp4',
-        'poster_path' => 'downloads/video-a.poster.jpg',
+        'preview_path' => 'downloads/preview/video-a.mp4',
+        'poster_path' => 'downloads/preview/video-a.jpg',
     ]);
 
     $this->artisan('atlas:regenerate-video-previews --dry-run')

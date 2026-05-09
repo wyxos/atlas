@@ -36,7 +36,7 @@ it('completes the transfer after preview generation', function () {
     mock(FileDownloadFinalizer::class)
         ->shouldReceive('generatePreviewAssets')
         ->once()
-        ->andReturn(['preview_path' => 'downloads/aa/bb/test.preview.mp4']);
+        ->andReturn(['preview_path' => 'downloads/aa/bb/preview/test.mp4']);
 
     $job = new GenerateTransferPreview($transfer->id);
     $job->handle(app(FileDownloadFinalizer::class));
@@ -48,5 +48,5 @@ it('completes the transfer after preview generation', function () {
     expect($transfer->finished_at)->not->toBeNull();
     expect($transfer->failed_at)->toBeNull();
     expect($transfer->error)->toBeNull();
-    expect($file->preview_path)->toBe('downloads/aa/bb/test.preview.mp4');
+    expect($file->preview_path)->toBe('downloads/aa/bb/preview/test.mp4');
 });

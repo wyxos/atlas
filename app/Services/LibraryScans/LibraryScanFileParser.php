@@ -57,9 +57,7 @@ class LibraryScanFileParser
     {
         return match ($parser) {
             'image' => [LibraryScanMediaTask::TASK_PREVIEW_ASSETS],
-            'audio' => $this->shouldNormalizeAudio($mimeType)
-                ? [LibraryScanMediaTask::TASK_AUDIO_NORMALIZATION]
-                : [],
+            'audio' => [LibraryScanMediaTask::TASK_AUDIO_NORMALIZATION],
             'video' => [
                 LibraryScanMediaTask::TASK_PREVIEW_ASSETS,
                 ...($this->shouldCreateStreamableVideo($mimeType, $probe)
@@ -68,11 +66,6 @@ class LibraryScanFileParser
             ],
             default => [],
         };
-    }
-
-    private function shouldNormalizeAudio(?string $mimeType): bool
-    {
-        return ! in_array($mimeType, ['audio/mpeg', 'audio/mp3'], true);
     }
 
     /**

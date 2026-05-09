@@ -39,11 +39,8 @@ class FileDownloadPreviewAssetGenerator
         $updates = [];
 
         if ($this->isImageMimeType($mimeType) && ! $file->preview_path) {
-            $storedFilename = basename($file->path);
-            $hashForSegmentation = $this->appStorage->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
-
             $this->persistImageDimensions($file, $absolutePath);
-            $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
+            $previewPath = $this->generateImagePreviewFromFile($disk, $absolutePath, $file->path);
             if ($previewPath) {
                 $updates['preview_path'] = $previewPath;
             }
@@ -111,8 +108,6 @@ class FileDownloadPreviewAssetGenerator
         }
 
         $absolutePath = $disk->path($file->path);
-        $storedFilename = basename($file->path);
-        $hashForSegmentation = $this->appStorage->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
         $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->getMimeTypeFromFile($absolutePath));
 
         return $this->generateFinalizedPreviewAssets(
@@ -120,8 +115,6 @@ class FileDownloadPreviewAssetGenerator
             $disk,
             $absolutePath,
             $file->path,
-            $storedFilename,
-            $hashForSegmentation,
             $mimeType,
         );
     }
@@ -134,15 +127,13 @@ class FileDownloadPreviewAssetGenerator
         Filesystem $disk,
         string $absolutePath,
         string $finalPath,
-        string $storedFilename,
-        string $hashForSegmentation,
         ?string $mimeType,
     ): array {
         $updates = [];
 
         if ($this->isImageMimeType($mimeType)) {
             $this->persistImageDimensions($file, $absolutePath);
-            $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
+            $previewPath = $this->generateImagePreviewFromFile($disk, $absolutePath, $finalPath);
             if ($previewPath) {
                 $updates['preview_path'] = $previewPath;
             }
@@ -192,7 +183,7 @@ class FileDownloadPreviewAssetGenerator
         return FileMimeType::isVideo($mimeType);
     }
 
-    private function generateThumbnailFromFile(Filesystem $disk, string $absolutePath, string $filename, string $hash): ?string
+    private function generateImagePreviewFromFile(Filesystem $disk, string $absolutePath, string $sourcePath): ?string
     {
         $imageSize = @getimagesize($absolutePath);
         if (! is_array($imageSize)) {
@@ -206,31 +197,31 @@ class FileDownloadPreviewAssetGenerator
             return null;
         }
 
-        [$thumbnailWidth, $thumbnailHeight] = $this->resolveThumbnailDimensions($originalWidth, $originalHeight);
+        [$previewWidth, $previewHeight] = $this->resolveImagePreviewDimensions($originalWidth, $originalHeight);
 
         $imageType = $this->detectImageType($absolutePath);
-        $thumbnailExtension = $this->resolveThumbnailOutputExtension($imageType);
-        $thumbnailFilename = pathinfo($filename, PATHINFO_FILENAME).'_thumb.'.$thumbnailExtension;
-        $thumbnailPath = 'thumbnails/'.substr($hash, 0, 2).'/'.substr($hash, 2, 2)."/{$thumbnailFilename}";
+        $previewExtension = $this->resolveImagePreviewOutputExtension($imageType);
+        $previewFilename = $this->appStorage->filenameWithExtension(basename($sourcePath), $previewExtension);
+        $previewPath = $this->appStorage->derivedPath($sourcePath, 'preview', $previewFilename);
 
-        $thumbnailDirectory = dirname($thumbnailPath);
-        if (! $disk->exists($thumbnailDirectory)) {
-            $disk->makeDirectory($thumbnailDirectory, 0755, true);
+        $previewDirectory = dirname($previewPath);
+        if (! $disk->exists($previewDirectory)) {
+            $disk->makeDirectory($previewDirectory, 0755, true);
         }
 
-        $thumbnailPathFromProcess = $this->generateThumbnailWithFfmpeg(
+        $previewPathFromProcess = $this->generateImagePreviewWithFfmpeg(
             $disk,
             $absolutePath,
-            $thumbnailPath,
-            $thumbnailWidth,
-            $thumbnailHeight,
-            $thumbnailExtension,
+            $previewPath,
+            $previewWidth,
+            $previewHeight,
+            $previewExtension,
         );
-        if ($thumbnailPathFromProcess) {
-            return $thumbnailPathFromProcess;
+        if ($previewPathFromProcess) {
+            return $previewPathFromProcess;
         }
 
-        if (! $this->memoryGuard->canGenerate($originalWidth, $originalHeight, $thumbnailWidth, $thumbnailHeight)) {
+        if (! $this->memoryGuard->canGenerate($originalWidth, $originalHeight, $previewWidth, $previewHeight)) {
             return null;
         }
 
@@ -239,54 +230,54 @@ class FileDownloadPreviewAssetGenerator
             return null;
         }
 
-        $thumbnail = imagecreatetruecolor($thumbnailWidth, $thumbnailHeight);
+        $preview = imagecreatetruecolor($previewWidth, $previewHeight);
 
-        if ($thumbnailExtension === 'png') {
-            imagealphablending($thumbnail, false);
-            imagesavealpha($thumbnail, true);
-            $transparent = imagecolorallocatealpha($thumbnail, 0, 0, 0, 127);
-            imagefill($thumbnail, 0, 0, $transparent);
+        if ($previewExtension === 'png') {
+            imagealphablending($preview, false);
+            imagesavealpha($preview, true);
+            $transparent = imagecolorallocatealpha($preview, 0, 0, 0, 127);
+            imagefill($preview, 0, 0, $transparent);
         }
 
         imagecopyresampled(
-            $thumbnail,
+            $preview,
             $image,
             0,
             0,
             0,
             0,
-            $thumbnailWidth,
-            $thumbnailHeight,
+            $previewWidth,
+            $previewHeight,
             $originalWidth,
             $originalHeight
         );
 
         imagedestroy($image);
 
-        $tempFile = tempnam(sys_get_temp_dir(), 'thumb_');
+        $tempFile = tempnam(sys_get_temp_dir(), 'preview_');
         if (! $tempFile) {
-            imagedestroy($thumbnail);
+            imagedestroy($preview);
 
             return null;
         }
 
-        $saved = match ($thumbnailExtension) {
-            'jpg' => imagejpeg($thumbnail, $tempFile, 85),
-            'png' => imagepng($thumbnail, $tempFile, 6),
+        $saved = match ($previewExtension) {
+            'jpg' => imagejpeg($preview, $tempFile, 85),
+            'png' => imagepng($preview, $tempFile, 6),
             default => false,
         };
 
-        imagedestroy($thumbnail);
+        imagedestroy($preview);
 
         return $saved && file_exists($tempFile)
-            ? $this->storeTempThumbnail($disk, $thumbnailPath, $tempFile)
+            ? $this->storeTempPreview($disk, $previewPath, $tempFile)
             : null;
     }
 
     /**
      * @return array{0: int, 1: int}
      */
-    private function resolveThumbnailDimensions(int $originalWidth, int $originalHeight): array
+    private function resolveImagePreviewDimensions(int $originalWidth, int $originalHeight): array
     {
         $targetWidth = 450;
 
@@ -304,7 +295,7 @@ class FileDownloadPreviewAssetGenerator
         return function_exists('exif_imagetype') ? @exif_imagetype($absolutePath) : false;
     }
 
-    private function resolveThumbnailOutputExtension(int|false $imageType): string
+    private function resolveImagePreviewOutputExtension(int|false $imageType): string
     {
         if (in_array($imageType, [IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP], true)) {
             return 'png';
@@ -317,26 +308,26 @@ class FileDownloadPreviewAssetGenerator
         return 'jpg';
     }
 
-    private function generateThumbnailWithFfmpeg(
+    private function generateImagePreviewWithFfmpeg(
         Filesystem $disk,
         string $absolutePath,
-        string $thumbnailPath,
-        int $thumbnailWidth,
-        int $thumbnailHeight,
-        string $thumbnailExtension
+        string $previewPath,
+        int $previewWidth,
+        int $previewHeight,
+        string $previewExtension
     ): ?string {
         $ffmpegPath = $this->resolveFfmpegPath((string) config('downloads.ffmpeg_path'));
         if (! $ffmpegPath) {
             return null;
         }
 
-        $baseTempFile = tempnam(sys_get_temp_dir(), 'thumb_');
+        $baseTempFile = tempnam(sys_get_temp_dir(), 'preview_');
         if (! $baseTempFile) {
             return null;
         }
 
         @unlink($baseTempFile);
-        $tempFile = $baseTempFile.'.'.$thumbnailExtension;
+        $tempFile = $baseTempFile.'.'.$previewExtension;
         $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
 
         $process = new Process([
@@ -347,7 +338,7 @@ class FileDownloadPreviewAssetGenerator
             '-i',
             $absolutePath,
             '-vf',
-            "scale={$thumbnailWidth}:{$thumbnailHeight}:force_original_aspect_ratio=decrease",
+            "scale={$previewWidth}:{$previewHeight}:force_original_aspect_ratio=decrease",
             '-frames:v',
             '1',
             '-update',
@@ -370,7 +361,7 @@ class FileDownloadPreviewAssetGenerator
             return null;
         }
 
-        return $this->storeTempThumbnail($disk, $thumbnailPath, $tempFile);
+        return $this->storeTempPreview($disk, $previewPath, $tempFile);
     }
 
     private function resolveFfmpegPath(string $ffmpegPath): ?string
@@ -391,7 +382,7 @@ class FileDownloadPreviewAssetGenerator
         return $ffmpegPath !== '' ? $ffmpegPath : null;
     }
 
-    private function storeTempThumbnail(Filesystem $disk, string $thumbnailPath, string $tempFile): ?string
+    private function storeTempPreview(Filesystem $disk, string $previewPath, string $tempFile): ?string
     {
         $stream = fopen($tempFile, 'rb');
         if ($stream === false) {
@@ -401,13 +392,13 @@ class FileDownloadPreviewAssetGenerator
         }
 
         try {
-            $stored = $disk->put($thumbnailPath, $stream);
+            $stored = $disk->put($previewPath, $stream);
         } finally {
             fclose($stream);
             @unlink($tempFile);
         }
 
-        return $stored ? $thumbnailPath : null;
+        return $stored ? $previewPath : null;
     }
 
     /**

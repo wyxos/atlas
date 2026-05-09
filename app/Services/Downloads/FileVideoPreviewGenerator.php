@@ -2,12 +2,19 @@
 
 namespace App\Services\Downloads;
 
+use App\Services\LibraryScans\MediaProbeService;
+use App\Support\AtlasStorage;
 use App\Support\VideoPreviewSamplingPlan;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
 class FileVideoPreviewGenerator
 {
+    public function __construct(
+        private readonly AtlasStorage $appStorage,
+        private readonly MediaProbeService $probe,
+    ) {}
+
     /**
      * @return array{0: string|null, 1: string|null}
      */
@@ -19,24 +26,29 @@ class FileVideoPreviewGenerator
         }
 
         $previewWidth = (int) config('downloads.video_preview_width', 450);
-        $previewStartSecond = (float) config('downloads.video_preview_start_second', 1);
-        $previewTakeSeconds = (float) config('downloads.video_preview_take_seconds', 5);
-        $previewSkipSeconds = (float) config('downloads.video_preview_skip_seconds', 10);
-        $previewTakeCount = (int) config('downloads.video_preview_take_count', 5);
-        $posterSecond = (float) config('downloads.video_poster_second', $previewStartSecond);
+        $previewShortMaxSeconds = (float) config('downloads.video_preview_short_max_seconds', 60);
+        $previewClipSeconds = (float) config('downloads.video_preview_clip_seconds', 5);
+        $previewClipCount = (int) config('downloads.video_preview_clip_count', 10);
+        $posterSecond = (float) config('downloads.video_poster_second', 1);
         $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
-        $previewFilter = VideoPreviewSamplingPlan::selectFilter(
-            $previewStartSecond,
-            $previewTakeSeconds,
-            $previewSkipSeconds,
-            $previewTakeCount,
-        ).",scale={$previewWidth}:-2";
+        $durationSeconds = $this->durationSeconds($absolutePath);
+        $selectFilter = $durationSeconds === null
+            ? null
+            : VideoPreviewSamplingPlan::selectFilterForDuration(
+                $durationSeconds,
+                $previewShortMaxSeconds,
+                $previewClipSeconds,
+                $previewClipCount,
+            );
+        $previewFilter = implode(',', array_filter([
+            $selectFilter,
+            "scale={$previewWidth}:-2",
+        ]));
 
-        $directory = pathinfo($finalPath, PATHINFO_DIRNAME);
-        $filename = basename($finalPath);
-        $filename = pathinfo($filename, PATHINFO_FILENAME);
-        $previewPath = $directory.'/'.$filename.'.preview.mp4';
-        $posterPath = $directory.'/'.$filename.'.poster.jpg';
+        $filename = pathinfo(basename($finalPath), PATHINFO_FILENAME);
+        $previewPath = $this->appStorage->derivedPath($finalPath, 'preview', $filename.'.mp4');
+        $posterPath = $this->appStorage->derivedPath($finalPath, 'preview', $filename.'.jpg');
+        $directory = dirname($previewPath);
 
         if (! $disk->exists($directory)) {
             $disk->makeDirectory($directory, 0755, true);
@@ -100,6 +112,25 @@ class FileVideoPreviewGenerator
         }
 
         return [$previewPath, $posterPath];
+    }
+
+    private function durationSeconds(string $absolutePath): ?float
+    {
+        $probe = $this->probe->probe($absolutePath);
+        $formatDuration = $probe['format']['duration'] ?? null;
+        if (is_numeric($formatDuration)) {
+            return (float) $formatDuration;
+        }
+
+        $streams = is_array($probe['streams'] ?? null) ? $probe['streams'] : [];
+        foreach ($streams as $stream) {
+            $streamDuration = is_array($stream) ? ($stream['duration'] ?? null) : null;
+            if (is_numeric($streamDuration)) {
+                return (float) $streamDuration;
+            }
+        }
+
+        return null;
     }
 
     private function resolveFfmpegPath(string $ffmpegPath): ?string

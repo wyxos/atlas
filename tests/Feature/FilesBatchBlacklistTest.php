@@ -85,8 +85,8 @@ test('batch blacklist clears auto-blacklisted marker and removes existing reacti
         'blacklisted_at' => null,
         'previewed_count' => 3,
         'path' => 'downloads/reacted-file.jpg',
-        'preview_path' => 'thumbnails/reacted-file.jpg',
-        'poster_path' => 'posters/reacted-file.jpg',
+        'preview_path' => 'downloads/preview/reacted-file.jpg',
+        'poster_path' => 'downloads/preview/reacted-file-poster.jpg',
         'downloaded' => true,
         'downloaded_at' => now(),
     ]);
@@ -128,9 +128,9 @@ test('batch blacklist clears auto-blacklisted marker and removes existing reacti
         sort($paths);
 
         return $paths === [
+            'downloads/preview/reacted-file-poster.jpg',
+            'downloads/preview/reacted-file.jpg',
             'downloads/reacted-file.jpg',
-            'posters/reacted-file.jpg',
-            'thumbnails/reacted-file.jpg',
         ];
     });
 });

@@ -21,15 +21,15 @@ test('atlas:queue-missing-previews dispatches jobs for downloaded files missing 
         'downloaded' => true,
         'path' => 'downloads/test.mp4',
         'mime_type' => 'video/mp4',
-        'preview_path' => 'previews/test.webp',
+        'preview_path' => 'downloads/preview/test.mp4',
         'poster_path' => null,
     ]);
 
-    $legacyVideo = File::factory()->create([
+    $applicationMp4Video = File::factory()->create([
         'downloaded' => true,
-        'path' => 'downloads/legacy.mp4',
+        'path' => 'downloads/application-mp4.mp4',
         'mime_type' => 'application/mp4',
-        'preview_path' => 'previews/legacy.webp',
+        'preview_path' => 'downloads/preview/application-mp4.mp4',
         'poster_path' => null,
     ]);
 
@@ -37,7 +37,7 @@ test('atlas:queue-missing-previews dispatches jobs for downloaded files missing 
         'downloaded' => true,
         'path' => 'downloads/ok.jpg',
         'mime_type' => 'image/jpeg',
-        'preview_path' => 'previews/ok.webp',
+        'preview_path' => 'downloads/preview/ok.jpg',
     ]);
 
     $this->artisan('atlas:queue-missing-previews --queue=processing')
@@ -45,7 +45,7 @@ test('atlas:queue-missing-previews dispatches jobs for downloaded files missing 
 
     Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $image->id);
     Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $video->id);
-    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $legacyVideo->id);
+    Bus::assertDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $applicationMp4Video->id);
     Bus::assertNotDispatched(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job) => $job->fileId === $alreadyOk->id);
 });
 

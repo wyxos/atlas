@@ -52,14 +52,14 @@ function formatterContainer(array $attributes = []): Container
     return $container;
 }
 
-it('uses preview route for downloaded video thumbnails', function () {
+it('uses preview route for downloaded video previews', function () {
     $file = formatterFile([
         'id' => 101,
         'mime_type' => 'video/mp4',
         'downloaded' => true,
         'path' => 'downloads/aa/bb/test.mp4',
-        'preview_path' => 'downloads/aa/bb/test.preview.mp4',
-        'poster_path' => 'downloads/aa/bb/test.poster.jpg',
+        'preview_path' => 'downloads/aa/bb/preview/test.mp4',
+        'poster_path' => 'downloads/aa/bb/preview/test.jpg',
     ]);
 
     $items = FileItemFormatter::format([$file], 1);

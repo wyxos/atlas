@@ -237,7 +237,7 @@ class ScanLibraryRun implements ShouldQueue
             $size = is_int($size) ? $size : null;
             $mimeType = $this->detectMimeType($absolutePath);
             $extension = pathinfo($absolutePath, PATHINFO_EXTENSION) ?: null;
-            $filename = $appStorage->storedFilename(basename($absolutePath), $extension);
+            $filename = $appStorage->randomStoredFilename($extension);
             $disk = Storage::disk(AtlasStorage::DISK);
             $importedPath = $appStorage->uniqueSegmentedPath($disk, AtlasStorage::IMPORTS, $filename, $hash);
 
