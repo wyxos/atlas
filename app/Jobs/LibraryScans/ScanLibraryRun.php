@@ -22,6 +22,23 @@ class ScanLibraryRun implements ShouldQueue
 {
     use InteractsWithQueue, Queueable, SerializesModels;
 
+    private const array IGNORED_DIRECTORIES = [
+        '.git',
+        '.hg',
+        '.svn',
+        '__macosx',
+        '@eadir',
+    ];
+
+    private const array IGNORED_FILES = [
+        '.ds_store',
+        'desktop.ini',
+        'ehthumbs.db',
+        'ehthumbs_vista.db',
+        'thumb.db',
+        'thumbs.db',
+    ];
+
     public int $timeout = 1800;
 
     public function __construct(private readonly int $runId)
@@ -121,6 +138,14 @@ class ScanLibraryRun implements ShouldQueue
                     return false;
                 }
 
+                if ($current->isDir() && $this->shouldSkipDirectory($current)) {
+                    return false;
+                }
+
+                if ($current->isFile() && $this->shouldSkipFile($current)) {
+                    return false;
+                }
+
                 $path = $this->normalizePath($current->getPathname());
 
                 return ! str_starts_with($path, $appRoot);
@@ -130,6 +155,10 @@ class ScanLibraryRun implements ShouldQueue
         $iterator = new \RecursiveIteratorIterator($filter);
         foreach ($iterator as $file) {
             if (! $file instanceof \SplFileInfo || ! $file->isFile() || $file->isLink()) {
+                continue;
+            }
+
+            if ($this->shouldSkipFile($file)) {
                 continue;
             }
 
@@ -146,6 +175,19 @@ class ScanLibraryRun implements ShouldQueue
 
             $this->importFile($run, $file->getPathname(), $appStorage, $scans);
         }
+    }
+
+    private function shouldSkipDirectory(\SplFileInfo $directory): bool
+    {
+        return in_array(strtolower($directory->getFilename()), self::IGNORED_DIRECTORIES, true);
+    }
+
+    private function shouldSkipFile(\SplFileInfo $file): bool
+    {
+        $filename = strtolower($file->getFilename());
+
+        return str_starts_with($filename, '.')
+            || in_array($filename, self::IGNORED_FILES, true);
     }
 
     private function importFile(

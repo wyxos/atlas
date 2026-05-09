@@ -76,6 +76,34 @@ it('moves duplicate files but reuses the first file row by hash', function () {
         ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
 });
 
+it('skips filesystem metadata files and directories during library scans', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    Illuminate\Support\Facades\File::ensureDirectoryExists($root.DIRECTORY_SEPARATOR.'album');
+    Illuminate\Support\Facades\File::ensureDirectoryExists($root.DIRECTORY_SEPARATOR.'.git');
+    Illuminate\Support\Facades\File::ensureDirectoryExists($root.DIRECTORY_SEPARATOR.'@eaDir');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'track.mp3', 'audio payload');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'.gitignore', '*');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'Thumbs.db', 'thumbs');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'desktop.ini', 'desktop');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'.git'.DIRECTORY_SEPARATOR.'config', 'git config');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'@eaDir'.DIRECTORY_SEPARATOR.'track.mp3@SynoEAStream', 'synology metadata');
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    expect(File::query()->count())->toBe(1)
+        ->and(LibraryScanItem::query()->count())->toBe(1)
+        ->and(File::query()->first()->filename)->toBe('track.mp3')
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'track.mp3'))->toBeFalse()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'.gitignore'))->toBeTrue()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'Thumbs.db'))->toBeTrue()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'desktop.ini'))->toBeTrue()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'.git'.DIRECTORY_SEPARATOR.'config'))->toBeTrue()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'@eaDir'.DIRECTORY_SEPARATOR.'track.mp3@SynoEAStream'))->toBeTrue();
+});
+
 it('requires authentication for library scan APIs', function () {
     $this->postJson('/api/settings/library-scans')->assertUnauthorized();
 });
