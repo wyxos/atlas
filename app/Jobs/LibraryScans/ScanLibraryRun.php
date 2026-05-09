@@ -39,6 +39,17 @@ class ScanLibraryRun implements ShouldQueue
         'thumbs.db',
     ];
 
+    private const array REMOVABLE_EMPTY_PARENT_FILES = [
+        '.ds_store',
+        '.gitignore',
+        '.nomedia',
+        'desktop.ini',
+        'ehthumbs.db',
+        'ehthumbs_vista.db',
+        'thumb.db',
+        'thumbs.db',
+    ];
+
     public int $timeout = 1800;
 
     public function __construct(private readonly int $runId)
@@ -327,6 +338,20 @@ class ScanLibraryRun implements ShouldQueue
         $root = $this->normalizePath($atlasRoot);
         if ($parent === $root || ! str_starts_with($parent, $root)) {
             return;
+        }
+
+        $entries = scandir($directory);
+        if ($entries === false) {
+            return;
+        }
+
+        foreach (array_diff($entries, ['.', '..']) as $entry) {
+            $path = $directory.DIRECTORY_SEPARATOR.$entry;
+            if (! is_file($path) || ! in_array(strtolower($entry), self::REMOVABLE_EMPTY_PARENT_FILES, true)) {
+                return;
+            }
+
+            @unlink($path);
         }
 
         $entries = scandir($directory);

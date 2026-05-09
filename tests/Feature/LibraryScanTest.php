@@ -110,10 +110,10 @@ it('skips filesystem metadata files and directories during library scans', funct
         ->and(LibraryScanItem::query()->count())->toBe(1)
         ->and(File::query()->first()->filename)->toBe('track.mp3')
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'track.mp3'))->toBeFalse()
-        ->and(is_dir($root.DIRECTORY_SEPARATOR.'album'))->toBeTrue()
-        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'.gitignore'))->toBeTrue()
-        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'Thumbs.db'))->toBeTrue()
-        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'desktop.ini'))->toBeTrue()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'.gitignore'))->toBeFalse()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'Thumbs.db'))->toBeFalse()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'album'.DIRECTORY_SEPARATOR.'desktop.ini'))->toBeFalse()
+        ->and(is_dir($root.DIRECTORY_SEPARATOR.'album'))->toBeFalse()
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'.git'.DIRECTORY_SEPARATOR.'config'))->toBeTrue()
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'@eaDir'.DIRECTORY_SEPARATOR.'track.mp3@SynoEAStream'))->toBeTrue();
 });
