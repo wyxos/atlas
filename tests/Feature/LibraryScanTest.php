@@ -5,6 +5,7 @@ use App\Enums\LibraryScanMediaTask as MediaTask;
 use App\Enums\LibraryScanRunMode;
 use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
 use App\Jobs\LibraryScans\GenerateLibraryScanPreviewAssets;
+use App\Jobs\LibraryScans\ImportLibraryScanItem;
 use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
 use App\Jobs\LibraryScans\ReparseImportedFilesRun;
@@ -88,6 +89,7 @@ it('moves duplicate files but reuses the first file row by hash', function () {
     expect(File::query()->count())->toBe(1)
         ->and(LibraryScanItem::query()->count())->toBe(2)
         ->and(LibraryScanItem::query()->where('duplicate', true)->count())->toBe(1)
+        ->and(LibraryScanItem::query()->where('duplicate', true)->first()->parser)->toBeNull()
         ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
 });
 
@@ -107,6 +109,23 @@ it('uses discovered scan items as the stable scan total before importing', funct
         ->and($run->files_imported)->toBe(2)
         ->and(LibraryScanItem::query()->count())->toBe(2)
         ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
+});
+
+it('dispatches discovered files as separate import jobs', function () {
+    Queue::fake([ImportLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    file_put_contents($root.DIRECTORY_SEPARATOR.'first.txt', 'first payload');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'second.txt', 'second payload');
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    expect($run->fresh()->files_found)->toBe(2)
+        ->and($run->fresh()->status)->toBe('processing')
+        ->and(File::query()->count())->toBe(0);
+
+    Queue::assertPushed(ImportLibraryScanItem::class, 2);
 });
 
 it('continues importing from discovered pending scan items without rediscovering', function () {
@@ -146,6 +165,39 @@ it('continues importing from discovered pending scan items without rediscovering
         ->and(File::query()->count())->toBe(2)
         ->and(LibraryScanItem::query()->count())->toBe(2)
         ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
+});
+
+it('continues an import item that was already moved before a retry', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    $relativePath = 'legacy.txt';
+    $importedPath = 'imports/aa/bb/retry.txt';
+    Storage::disk(AtlasStorage::DISK)->put($importedPath, 'retry payload');
+
+    $run = LibraryScanRun::factory()->create([
+        'status' => 'processing',
+        'phase' => 'processing',
+        'files_found' => 1,
+        'scan_completed_at' => now(),
+    ]);
+    $item = LibraryScanItem::query()->create([
+        'library_scan_run_id' => $run->id,
+        'original_path' => $root.DIRECTORY_SEPARATOR.$relativePath,
+        'imported_path' => $importedPath,
+        'status' => LibraryScanItemStatus::IMPORTING,
+        'phase' => 'moving',
+    ]);
+
+    (new ImportLibraryScanItem($item->id))->handle(
+        app(AtlasStorage::class),
+        app(\App\Services\LibraryScans\LibraryScanItemImporter::class),
+        app(LibraryScanService::class),
+    );
+
+    expect(File::query()->count())->toBe(1)
+        ->and($item->fresh()->status)->toBe(LibraryScanItemStatus::COMPLETED)
+        ->and($item->fresh()->imported_path)->toBe($importedPath)
+        ->and($run->fresh()->files_processed)->toBe(1);
 });
 
 it('reconciles existing local file records by original atlas path and preserves reactions', function () {
@@ -769,5 +821,8 @@ it('fails the parser item when a conversion media task fails', function () {
 it('uses separate horizon queues for library scan media previews and conversions', function () {
     expect(config('horizon.defaults.supervisor-media-previews.queue'))->toBe([MediaTask::PREVIEW_QUEUE])
         ->and(config('horizon.defaults.supervisor-media-conversions.queue'))->toBe([MediaTask::CONVERSION_QUEUE])
-        ->and(config('horizon.defaults.supervisor-media-conversions.timeout'))->toBe(21600);
+        ->and(config('horizon.defaults.supervisor-media-conversions.timeout'))->toBe(21600)
+        ->and(config('horizon.defaults.supervisor-library-scans.connection'))->toBe('redis-library-scans')
+        ->and(config('horizon.defaults.supervisor-library-scans.timeout'))->toBe(1800)
+        ->and(config('queue.connections.redis-library-scans.retry_after'))->toBe(1920);
 });

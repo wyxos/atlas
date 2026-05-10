@@ -10,6 +10,7 @@ use App\Events\LibraryScanItemUpdated;
 use App\Events\LibraryScanRunUpdated;
 use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
 use App\Jobs\LibraryScans\GenerateLibraryScanPreviewAssets;
+use App\Jobs\LibraryScans\ImportLibraryScanItem;
 use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
 use App\Jobs\LibraryScans\ReparseImportedFilesRun;
@@ -18,6 +19,8 @@ use App\Models\LibraryScanItem;
 use App\Models\LibraryScanMediaTask as LibraryScanMediaTaskModel;
 use App\Models\LibraryScanRun;
 use App\Services\Local\LocalBrowseIndexSyncService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class LibraryScanService
 {
@@ -106,7 +109,7 @@ class LibraryScanService
         $this->broadcastRun($run);
 
         if ($shouldImportDiscoveredFiles) {
-            ScanLibraryRun::dispatch($run->id);
+            $this->dispatchPendingImports($run);
         } elseif ($run->scan_completed_at) {
             $this->dispatchPendingParsers($run, regeneratePreviewAssets: $run->mode === LibraryScanRunMode::REPARSE);
             $this->completeIfDone($run);
@@ -168,8 +171,13 @@ class LibraryScanService
             : $this->start();
     }
 
-    public function markItemFailed(LibraryScanItem $item, string $code, string $message, array $context = []): void
-    {
+    public function markItemFailed(
+        LibraryScanItem $item,
+        string $code,
+        string $message,
+        array $context = [],
+        bool $completeRun = true,
+    ): void {
         $item->update([
             'status' => LibraryScanItemStatus::FAILED,
             'phase' => 'failed',
@@ -180,7 +188,9 @@ class LibraryScanService
         ]);
 
         $this->broadcastItem($item->fresh());
-        $this->completeIfDone($item->run()->first());
+        if ($completeRun) {
+            $this->completeIfDone($item->run()->first());
+        }
     }
 
     /**
@@ -432,6 +442,94 @@ class LibraryScanService
         ));
     }
 
+    public function dispatchPendingImports(LibraryScanRun $run): void
+    {
+        if ($run->mode !== LibraryScanRunMode::SCAN) {
+            return;
+        }
+
+        $run = $this->refreshCounters($run);
+        $dispatched = 0;
+
+        $run->items()
+            ->select('id')
+            ->whereIn('status', [LibraryScanItemStatus::PENDING, LibraryScanItemStatus::IMPORTING])
+            ->orderBy('id')
+            ->chunkById(500, function ($items) use (&$dispatched): void {
+                foreach ($items as $item) {
+                    ImportLibraryScanItem::dispatch($item->id);
+                    $dispatched++;
+                }
+            });
+
+        if ($dispatched === 0) {
+            $this->completeScanImportIfDone($run->fresh());
+
+            return;
+        }
+
+        $this->broadcastRun($run->fresh());
+    }
+
+    public function recordScanItemCompleted(
+        LibraryScanRun $run,
+        bool $imported = false,
+        bool $duplicate = false,
+    ): LibraryScanRun {
+        $updates = [
+            'files_processed' => DB::raw('files_processed + 1'),
+            'updated_at' => now(),
+        ];
+
+        if ($imported) {
+            $updates['files_imported'] = DB::raw('files_imported + 1');
+        }
+
+        if ($duplicate) {
+            $updates['files_duplicate'] = DB::raw('files_duplicate + 1');
+        }
+
+        DB::table($run->getTable())
+            ->where('id', $run->id)
+            ->update($updates);
+
+        return $run->fresh();
+    }
+
+    public function completeScanImportIfDone(?LibraryScanRun $run): void
+    {
+        if (! $run
+            || $run->mode !== LibraryScanRunMode::SCAN
+            || ! $run->scan_completed_at
+            || in_array($run->status, [LibraryScanRunStatus::PAUSED, LibraryScanRunStatus::CANCELED], true)
+            || in_array($run->status, LibraryScanRunStatus::terminal(), true)
+        ) {
+            return;
+        }
+
+        if ($this->scanHasPendingImports($run)) {
+            return;
+        }
+
+        $lock = Cache::lock("library-scan-import-complete:{$run->id}", 300);
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            $run = $this->refreshCounters($run->fresh());
+            if ($this->scanHasPendingImports($run)) {
+                return;
+            }
+
+            $this->syncImportedFilesForRun($run);
+            $this->dispatchPendingParsers($run);
+            $this->completeIfDone($run->fresh());
+        } finally {
+            $lock->release();
+        }
+    }
+
     public function refreshCounters(LibraryScanRun $run): LibraryScanRun
     {
         $run->update([
@@ -512,5 +610,32 @@ class LibraryScanService
         }
 
         $this->markMediaTaskFailed($task, 'unknown_media_task', "Unknown media task [$task->type].");
+    }
+
+    private function scanHasPendingImports(LibraryScanRun $run): bool
+    {
+        return $run->items()
+            ->whereNotIn('status', LibraryScanItemStatus::terminal())
+            ->exists();
+    }
+
+    private function syncImportedFilesForRun(LibraryScanRun $run): void
+    {
+        $run->items()
+            ->select(['id', 'file_id'])
+            ->where('status', LibraryScanItemStatus::COMPLETED)
+            ->whereNotNull('file_id')
+            ->orderBy('id')
+            ->chunkById(500, function ($items): void {
+                $fileIds = $items
+                    ->pluck('file_id')
+                    ->filter()
+                    ->map(fn ($fileId): int => (int) $fileId)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                app(LocalBrowseIndexSyncService::class)->syncFilesByIds($fileIds);
+            });
     }
 }

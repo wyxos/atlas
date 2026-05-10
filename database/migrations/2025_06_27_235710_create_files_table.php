@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('ext')->nullable(); // File extension
             $table->unsignedBigInteger('size')->nullable(); // File size in bytes
             $table->string('mime_type')->nullable(); // MIME type (e.g., video/mp4)
-            $table->string('hash')->nullable(); // Full file hash (e.g., SHA256, up to 64 chars)
+            $table->string('hash', 64)->nullable(); // Full file hash (e.g., SHA256)
             $table->text('title')->nullable(); // Title (from source or filename)
             $table->text('description')->nullable(); // Description (from source or optional)
             $table->text('preview_url')->nullable(); // URL for preview (remote)
@@ -48,6 +48,7 @@ return new class extends Migration
 
             // Indexes
             $table->index('mime_type');
+            $table->index('hash', 'files_hash_index');
             $table->index('not_found');
             $table->index(['mime_type', 'size']); // Composite index for size calculations
             $table->index(['mime_type', 'id'], 'files_mime_type_id_index');

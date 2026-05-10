@@ -231,7 +231,7 @@ return [
             'nice' => 0,
         ],
         'supervisor-library-scans' => [
-            'connection' => 'redis',
+            'connection' => env('HORIZON_LIBRARY_SCAN_CONNECTION', 'redis-library-scans'),
             'queue' => ['library-scans'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
@@ -240,7 +240,7 @@ return [
             'maxJobs' => 0,
             'memory' => 384,
             'tries' => 3,
-            'timeout' => 600,
+            'timeout' => (int) env('LIBRARY_SCAN_IMPORT_TIMEOUT_SECONDS', 1800),
             'nice' => 0,
         ],
         'supervisor-media-previews' => [

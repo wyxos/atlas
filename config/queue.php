@@ -80,6 +80,18 @@ return [
             'after_commit' => false,
         ],
 
+        'redis-library-scans' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => env('REDIS_LIBRARY_SCAN_QUEUE', 'library-scans'),
+            'retry_after' => (int) env(
+                'REDIS_LIBRARY_SCAN_RETRY_AFTER',
+                (int) env('LIBRARY_SCAN_IMPORT_TIMEOUT_SECONDS', 1800) + 120,
+            ),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

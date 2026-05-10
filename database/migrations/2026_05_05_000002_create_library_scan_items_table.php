@@ -27,7 +27,7 @@ return new class extends Migration
             $table->json('error_context')->nullable();
             $table->timestamps();
 
-            $table->index(['library_scan_run_id', 'status']);
+            $table->index(['library_scan_run_id', 'status', 'id']);
             $table->index(['library_scan_run_id', 'created_at']);
         });
     }
