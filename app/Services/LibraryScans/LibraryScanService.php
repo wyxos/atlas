@@ -429,6 +429,7 @@ class LibraryScanService
     public function dispatchPendingParsers(LibraryScanRun $run, bool $regeneratePreviewAssets = false): void
     {
         $query = $run->items()
+            ->select('id')
             ->whereNotNull('parser')
             ->whereNull('parser_queued_at')
             ->when(
@@ -437,11 +438,13 @@ class LibraryScanService
                 fn ($query) => $query->where('status', LibraryScanItemStatus::IMPORTED),
             );
 
-        $query->each(function (LibraryScanItem $item) use ($regeneratePreviewAssets): void {
-            $this->queueParserForImportedScanItem(
-                $item,
-                regeneratePreviewAssets: $regeneratePreviewAssets,
-            );
+        $query->chunkById(500, function ($items) use ($regeneratePreviewAssets): void {
+            foreach ($items as $item) {
+                $this->queueParserForImportedScanItem(
+                    $item,
+                    regeneratePreviewAssets: $regeneratePreviewAssets,
+                );
+            }
         });
     }
 
