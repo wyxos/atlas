@@ -26,6 +26,7 @@ class LibraryScanItemFactory extends Factory
             'progress' => 0,
             'duplicate' => false,
             'parser' => null,
+            'parser_queued_at' => null,
         ];
     }
 }

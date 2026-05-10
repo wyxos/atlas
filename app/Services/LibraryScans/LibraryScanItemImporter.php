@@ -100,6 +100,7 @@ class LibraryScanItemImporter
 
                     $this->markImportedItem($item, $file, $mimeType);
                     $scans->recordScanItemCompleted($run, imported: ! $hadImportedPath);
+                    $scans->queueParserForImportedScanItem($item->fresh() ?? $item);
                     $scans->broadcastItem($item->fresh());
                     $scans->broadcastRun($run->fresh());
 
@@ -160,6 +161,7 @@ class LibraryScanItemImporter
 
                 $this->markImportedItem($item, $file, $mimeType);
                 $scans->recordScanItemCompleted($run, imported: ! $hadImportedPath);
+                $scans->queueParserForImportedScanItem($item->fresh() ?? $item);
                 $scans->broadcastItem($item->fresh());
                 $scans->broadcastRun($run->fresh());
             });

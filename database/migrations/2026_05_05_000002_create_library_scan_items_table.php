@@ -22,12 +22,14 @@ return new class extends Migration
             $table->unsignedTinyInteger('progress')->default(0);
             $table->boolean('duplicate')->default(false)->index();
             $table->string('parser')->nullable()->index();
+            $table->timestamp('parser_queued_at')->nullable()->index();
             $table->string('error_code')->nullable()->index();
             $table->text('error_message')->nullable();
             $table->json('error_context')->nullable();
             $table->timestamps();
 
             $table->index(['library_scan_run_id', 'status', 'id']);
+            $table->index(['library_scan_run_id', 'status', 'parser_queued_at']);
             $table->index(['library_scan_run_id', 'created_at']);
         });
     }

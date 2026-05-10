@@ -18,13 +18,15 @@ class ProcessLibraryScanItem implements ShouldQueue
 {
     use InteractsWithQueue, Queueable, SerializesModels;
 
+    public const string QUEUE = 'library-scan-parsers';
+
     public int $timeout = 300;
 
     public function __construct(
         public readonly int $itemId,
         public readonly bool $regeneratePreviewAssets = false,
     ) {
-        $this->onQueue('library-scans');
+        $this->onQueue(self::QUEUE);
     }
 
     public function handle(LibraryScanFileParser $parser, LibraryScanService $scans): void

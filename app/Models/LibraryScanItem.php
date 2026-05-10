@@ -25,6 +25,7 @@ class LibraryScanItem extends Model
         'progress',
         'duplicate',
         'parser',
+        'parser_queued_at',
         'error_code',
         'error_message',
         'error_context',
@@ -36,6 +37,7 @@ class LibraryScanItem extends Model
             'size' => 'integer',
             'progress' => 'integer',
             'duplicate' => 'boolean',
+            'parser_queued_at' => 'datetime',
             'error_context' => 'array',
         ];
     }

@@ -243,6 +243,19 @@ return [
             'timeout' => (int) env('LIBRARY_SCAN_IMPORT_TIMEOUT_SECONDS', 1800),
             'nice' => 0,
         ],
+        'supervisor-library-scan-parsers' => [
+            'connection' => env('HORIZON_LIBRARY_SCAN_PARSER_CONNECTION', 'redis-library-scan-parsers'),
+            'queue' => ['library-scan-parsers'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 384,
+            'tries' => 3,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
         'supervisor-media-previews' => [
             'connection' => 'redis',
             'queue' => ['media-previews'],
@@ -330,6 +343,12 @@ return [
                 'balanceCooldown' => 5,
                 'memory' => 384,
             ],
+            'supervisor-library-scan-parsers' => [
+                'maxProcesses' => (int) env('HORIZON_LIBRARY_SCAN_PARSER_MAX_PROCESSES', 2),
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 384,
+            ],
             'supervisor-media-previews' => [
                 'maxProcesses' => 2,
                 'balanceMaxShift' => 1,
@@ -364,6 +383,9 @@ return [
                 'maxProcesses' => 4,
             ],
             'supervisor-library-scans' => [
+                'maxProcesses' => 2,
+            ],
+            'supervisor-library-scan-parsers' => [
                 'maxProcesses' => 2,
             ],
             'supervisor-media-previews' => [

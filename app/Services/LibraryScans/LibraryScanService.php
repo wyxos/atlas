@@ -430,16 +430,47 @@ class LibraryScanService
     {
         $query = $run->items()
             ->whereNotNull('parser')
+            ->whereNull('parser_queued_at')
             ->when(
                 $run->mode === LibraryScanRunMode::SCAN,
                 fn ($query) => $query->where('status', LibraryScanItemStatus::COMPLETED),
                 fn ($query) => $query->where('status', LibraryScanItemStatus::IMPORTED),
             );
 
-        $query->each(fn (LibraryScanItem $item) => ProcessLibraryScanItem::dispatch(
-            $item->id,
+        $query->each(function (LibraryScanItem $item) use ($regeneratePreviewAssets): void {
+            $this->queueParserForImportedScanItem(
+                $item,
+                regeneratePreviewAssets: $regeneratePreviewAssets,
+            );
+        });
+    }
+
+    public function queueParserForImportedScanItem(
+        LibraryScanItem $item,
+        bool $regeneratePreviewAssets = false,
+    ): bool {
+        $queuedAt = now();
+        $updated = LibraryScanItem::query()
+            ->whereKey($item->id)
+            ->whereIn('status', [LibraryScanItemStatus::COMPLETED, LibraryScanItemStatus::IMPORTED])
+            ->whereNotNull('file_id')
+            ->whereNotNull('parser')
+            ->whereNull('parser_queued_at')
+            ->update([
+                'parser_queued_at' => $queuedAt,
+                'updated_at' => $queuedAt,
+            ]);
+
+        if ($updated === 0) {
+            return false;
+        }
+
+        ProcessLibraryScanItem::dispatch(
+            (int) $item->id,
             regeneratePreviewAssets: $regeneratePreviewAssets,
-        ));
+        );
+
+        return true;
     }
 
     public function dispatchPendingImports(LibraryScanRun $run): void

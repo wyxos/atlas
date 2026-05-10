@@ -19,6 +19,7 @@ use App\Models\Reaction;
 use App\Models\User;
 use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
 use App\Services\LibraryScans\LibraryScanFileParser;
+use App\Services\LibraryScans\LibraryScanItemImporter;
 use App\Services\LibraryScans\LibraryScanMediaProcessor;
 use App\Services\LibraryScans\LibraryScanService;
 use App\Services\LibraryScans\MediaProbeService;
@@ -227,7 +228,7 @@ it('continues an import item that was already moved before a retry', function ()
 
     (new ImportLibraryScanItem($item->id))->handle(
         app(AtlasStorage::class),
-        app(\App\Services\LibraryScans\LibraryScanItemImporter::class),
+        app(LibraryScanItemImporter::class),
         app(LibraryScanService::class),
     );
 
@@ -354,8 +355,10 @@ it('dispatches library scan parser jobs on the dedicated queue', function () {
     Queue::fake([ProcessLibraryScanItem::class]);
 
     $run = LibraryScanRun::factory()->create();
+    $file = File::factory()->create();
     LibraryScanItem::factory()->create([
         'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
         'status' => LibraryScanItemStatus::COMPLETED,
         'parser' => 'audio',
     ]);
@@ -364,9 +367,11 @@ it('dispatches library scan parser jobs on the dedicated queue', function () {
 
     Queue::assertPushed(
         ProcessLibraryScanItem::class,
-        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans'
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === ProcessLibraryScanItem::QUEUE
             && $job->regeneratePreviewAssets === false,
     );
+
+    expect(LibraryScanItem::query()->first()->parser_queued_at)->not->toBeNull();
 });
 
 it('completes scan progress after import while conversion parsing stays queued separately', function () {
@@ -393,7 +398,55 @@ it('completes scan progress after import while conversion parsing stays queued s
 
     Queue::assertPushed(
         ProcessLibraryScanItem::class,
-        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans'
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === ProcessLibraryScanItem::QUEUE
+            && $job->itemId === $item->id,
+    );
+});
+
+it('queues the parser when an import finishes even while other scan imports remain', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    $imagePath = $root.DIRECTORY_SEPARATOR.'image.png';
+    file_put_contents(
+        $imagePath,
+        base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='),
+    );
+
+    $run = LibraryScanRun::factory()->create([
+        'status' => 'processing',
+        'phase' => 'processing',
+        'files_found' => 2,
+        'scan_completed_at' => now(),
+    ]);
+    $item = LibraryScanItem::query()->create([
+        'library_scan_run_id' => $run->id,
+        'original_path' => $imagePath,
+        'status' => LibraryScanItemStatus::PENDING,
+        'phase' => 'discovered',
+    ]);
+    LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'status' => LibraryScanItemStatus::PENDING,
+        'phase' => 'discovered',
+    ]);
+
+    (new ImportLibraryScanItem($item->id))->handle(
+        app(AtlasStorage::class),
+        app(LibraryScanItemImporter::class),
+        app(LibraryScanService::class),
+    );
+
+    $item = $item->fresh();
+
+    expect($run->fresh()->status)->toBe('processing')
+        ->and($run->fresh()->files_processed)->toBe(1)
+        ->and($item->status)->toBe(LibraryScanItemStatus::COMPLETED)
+        ->and($item->parser)->toBe('image')
+        ->and($item->parser_queued_at)->not->toBeNull();
+
+    Queue::assertPushed(
+        ProcessLibraryScanItem::class,
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === ProcessLibraryScanItem::QUEUE
             && $job->itemId === $item->id,
     );
 });
@@ -424,7 +477,7 @@ it('queues imported file parser reruns with preview regeneration', function () {
 
     Queue::assertPushed(
         ProcessLibraryScanItem::class,
-        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans'
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === ProcessLibraryScanItem::QUEUE
             && $job->itemId === $item->id
             && $job->regeneratePreviewAssets === true,
     );
@@ -861,5 +914,8 @@ it('uses separate horizon queues for library scan media previews and conversions
         ->and(config('horizon.defaults.supervisor-media-conversions.timeout'))->toBe(21600)
         ->and(config('horizon.defaults.supervisor-library-scans.connection'))->toBe('redis-library-scans')
         ->and(config('horizon.defaults.supervisor-library-scans.timeout'))->toBe(1800)
-        ->and(config('queue.connections.redis-library-scans.retry_after'))->toBe(1920);
+        ->and(config('horizon.defaults.supervisor-library-scan-parsers.connection'))->toBe('redis-library-scan-parsers')
+        ->and(config('horizon.defaults.supervisor-library-scan-parsers.queue'))->toBe([ProcessLibraryScanItem::QUEUE])
+        ->and(config('queue.connections.redis-library-scans.retry_after'))->toBe(1920)
+        ->and(config('queue.connections.redis-library-scan-parsers.retry_after'))->toBe(420);
 });

@@ -92,6 +92,18 @@ return [
             'after_commit' => false,
         ],
 
+        'redis-library-scan-parsers' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => env('REDIS_LIBRARY_SCAN_PARSER_QUEUE', 'library-scan-parsers'),
+            'retry_after' => (int) env(
+                'REDIS_LIBRARY_SCAN_PARSER_RETRY_AFTER',
+                420,
+            ),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],
