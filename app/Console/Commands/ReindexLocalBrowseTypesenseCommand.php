@@ -2,22 +2,43 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Local\LocalBrowseReindexService;
 use Illuminate\Console\Command;
 
 class ReindexLocalBrowseTypesenseCommand extends Command
 {
-    protected $signature = 'atlas:reindex-local-browse {--suffix=}';
+    protected $signature = 'atlas:reindex-local-browse
+        {--suffix= : Collection suffix to use. Defaults to a UTC timestamp}
+        {--queue : Queue the reindex and return immediately}';
 
-    protected $description = 'Build fresh Typesense local-browse collections and swap the live aliases.';
+    protected $description = 'Build fresh Typesense local-browse collections and swap the live aliases';
 
-    public function handle(LocalBrowseIndexSyncService $syncService): int
+    public function handle(LocalBrowseReindexService $reindex): int
     {
-        $suffix = (string) ($this->option('suffix') ?: now()->utc()->format('Ymd_His'));
+        $suffix = (string) $this->option('suffix') ?: null;
 
-        $this->info('Rebuilding local browse Typesense collections with suffix '.$suffix);
+        if ($this->option('queue')) {
+            [$run, $queued] = $reindex->queue($suffix);
 
-        $summary = $syncService->rebuild($suffix, function (string $type, int $count): void {
+            $queued
+                ? $this->info("Queued local browse reindex #{$run->id} with suffix {$run->suffix}.")
+                : $this->warn("Local browse reindex #{$run->id} is already {$run->status}; not queueing another run.");
+
+            $this->line("Check progress with: php artisan atlas:local-browse-reindex-status {$run->id}");
+
+            return self::SUCCESS;
+        }
+
+        if ($activeRun = $reindex->activeRun()) {
+            $this->error("Local browse reindex #{$activeRun->id} is already {$activeRun->status}.");
+
+            return self::FAILURE;
+        }
+
+        $run = $reindex->createRun($suffix);
+        $this->info("Rebuilding local browse Typesense collections with suffix {$run->suffix}");
+
+        $summary = $reindex->run($run, function (string $type, int $count): void {
             $this->line(sprintf('Imported %d %s docs', $count, $type));
         });
 
