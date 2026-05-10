@@ -25,6 +25,7 @@ use App\Services\LibraryScans\MediaProbeService;
 use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Support\AtlasStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -91,6 +92,42 @@ it('moves duplicate files but reuses the first file row by hash', function () {
         ->and(LibraryScanItem::query()->where('duplicate', true)->count())->toBe(1)
         ->and(LibraryScanItem::query()->where('duplicate', true)->first()->parser)->toBeNull()
         ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
+});
+
+it('still deduplicates files within the current scan when the global files hash index is unavailable', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    Cache::put('library-scans:files-hash-index-exists', false, 600);
+    $root = configureLibraryScanStorage();
+    file_put_contents($root.DIRECTORY_SEPARATOR.'first.txt', 'same payload');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'second.txt', 'same payload');
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    expect(File::query()->count())->toBe(1)
+        ->and(LibraryScanItem::query()->where('duplicate', true)->count())->toBe(1);
+});
+
+it('skips the global files hash lookup when its supporting index is unavailable', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    Cache::put('library-scans:files-hash-index-exists', false, 600);
+    $root = configureLibraryScanStorage();
+    $payload = 'same as existing indexed file';
+    file_put_contents($root.DIRECTORY_SEPARATOR.'incoming.txt', $payload);
+    File::factory()->create([
+        'source' => 'local',
+        'path' => 'imports/existing.txt',
+        'hash' => hash('sha256', $payload),
+        'imported_at' => now(),
+    ]);
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    expect(File::query()->count())->toBe(2)
+        ->and(LibraryScanItem::query()->where('duplicate', true)->count())->toBe(0);
 });
 
 it('uses discovered scan items as the stable scan total before importing', function () {

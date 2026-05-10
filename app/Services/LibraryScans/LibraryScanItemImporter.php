@@ -9,6 +9,7 @@ use App\Models\LibraryScanRun;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class LibraryScanItemImporter
@@ -105,20 +106,9 @@ class LibraryScanItemImporter
                     return;
                 }
 
-                $existing = AtlasFile::query()
-                    ->where('hash', $hash)
-                    ->orderBy('id')
-                    ->first();
-
-                if ($existing) {
-                    $item->update([
-                        'file_id' => $existing->id,
-                        'status' => LibraryScanItemStatus::COMPLETED,
-                        'phase' => 'duplicate',
-                        'progress' => 100,
-                        'duplicate' => true,
-                        'parser' => null,
-                    ]);
+                $scanDuplicate = $this->existingScanItemByHash($item, $run, $hash);
+                if ($scanDuplicate) {
+                    $this->markDuplicateItem($item, (int) $scanDuplicate->file_id);
                     $scans->recordScanItemCompleted(
                         $run,
                         imported: ! $hadImportedPath,
@@ -128,6 +118,26 @@ class LibraryScanItemImporter
                     $scans->broadcastRun($run->fresh());
 
                     return;
+                }
+
+                if ($this->filesHashIndexExists()) {
+                    $existing = AtlasFile::query()
+                        ->where('hash', $hash)
+                        ->orderBy('id')
+                        ->first();
+
+                    if ($existing) {
+                        $this->markDuplicateItem($item, (int) $existing->id);
+                        $scans->recordScanItemCompleted(
+                            $run,
+                            imported: ! $hadImportedPath,
+                            duplicate: true,
+                        );
+                        $scans->broadcastItem($item->fresh());
+                        $scans->broadcastRun($run->fresh());
+
+                        return;
+                    }
                 }
 
                 $file = AtlasFile::query()->create([
@@ -161,6 +171,42 @@ class LibraryScanItemImporter
                 'exception' => $e::class,
             ], completeRun: false);
         }
+    }
+
+    private function existingScanItemByHash(LibraryScanItem $item, LibraryScanRun $run, string $hash): ?LibraryScanItem
+    {
+        return LibraryScanItem::query()
+            ->where('library_scan_run_id', $run->id)
+            ->where('id', '<', $item->id)
+            ->where('hash', $hash)
+            ->where('status', LibraryScanItemStatus::COMPLETED)
+            ->whereNotNull('file_id')
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function markDuplicateItem(LibraryScanItem $item, int $fileId): void
+    {
+        $item->update([
+            'file_id' => $fileId,
+            'status' => LibraryScanItemStatus::COMPLETED,
+            'phase' => 'duplicate',
+            'progress' => 100,
+            'duplicate' => true,
+            'parser' => null,
+        ]);
+    }
+
+    private function filesHashIndexExists(): bool
+    {
+        return Cache::remember('library-scans:files-hash-index-exists', 600, function (): bool {
+            $driver = DB::connection()->getDriverName();
+            if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+                return true;
+            }
+
+            return DB::select('SHOW INDEX FROM `files` WHERE Key_name = ?', ['files_hash_index']) !== [];
+        });
     }
 
     private function sourcePathForItem(LibraryScanItem $item, $disk): string

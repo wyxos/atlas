@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -37,6 +38,7 @@ class EnsureLibraryScanIndexes extends Command
 
         try {
             DB::statement('ALTER TABLE `files` ADD INDEX `files_hash_index` (`hash`), ALGORITHM=INPLACE, LOCK=NONE');
+            Cache::forget('library-scans:files-hash-index-exists');
             $this->info('Created files_hash_index.');
 
             return self::SUCCESS;
@@ -56,6 +58,7 @@ class EnsureLibraryScanIndexes extends Command
         }
 
         DB::statement('ALTER TABLE `files` ADD INDEX `files_hash_index` (`hash`), ALGORITHM=COPY');
+        Cache::forget('library-scans:files-hash-index-exists');
         $this->info('Created files_hash_index with ALGORITHM=COPY.');
 
         return self::SUCCESS;
