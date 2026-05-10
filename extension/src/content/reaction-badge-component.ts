@@ -26,8 +26,10 @@ export const AtlasReactionBadge = defineComponent({
                 isChecking: badge.isChecking.value,
                 controlsDisabled: badge.controlsDisabled.value,
                 activeReaction: badge.activeReaction.value,
+                isBlacklisted: badge.isBlacklisted.value,
                 hoveredReaction: badge.hoveredReaction.value,
                 submittingReactionType: badge.submittingReactionType.value,
+                submittingBlacklist: badge.submittingBlacklist.value,
                 closeTabAfterQueueMode: badge.closeTabAfterQueueMode.value,
                 closeTabAfterQueueSaving: badge.isSavingCloseTabAfterQueuePreference.value,
                 mediaResolution: badge.mediaResolution.value,
@@ -46,6 +48,9 @@ export const AtlasReactionBadge = defineComponent({
                 },
                 onReactionHover: (reactionType) => {
                     badge.hoveredReaction.value = reactionType;
+                },
+                onBlacklistClick: () => {
+                    void badge.handleReactionClick('blacklist');
                 },
                 onCloseTabAfterQueueToggle: () => {
                     void badge.cycleCloseTabAfterQueuePreference();

@@ -13,8 +13,10 @@ type BadgeViewModel = {
     isChecking: boolean;
     controlsDisabled: boolean;
     activeReaction: BadgeReactionType | null;
+    isBlacklisted: boolean;
     hoveredReaction: BadgeReactionType | null;
     submittingReactionType: BadgeReactionType | null;
+    submittingBlacklist: boolean;
     closeTabAfterQueueMode: CloseTabAfterQueueMode;
     closeTabAfterQueueSaving: boolean;
     mediaResolution: string | null;
@@ -31,11 +33,10 @@ type BadgeViewModel = {
 type BadgeViewHandlers = {
     onReactionClick: (type: BadgeReactionType) => void;
     onReactionHover: (type: BadgeReactionType | null) => void;
+    onBlacklistClick: () => void;
     onCloseTabAfterQueueToggle: () => void;
     onReactAllItemsInPostToggle: () => void;
 };
-
-const reactionOrder: BadgeReactionType[] = ['love', 'like', 'funny'];
 
 const reactionIconByType = {
     love: Heart,
@@ -104,6 +105,85 @@ function iconColor(type: BadgeReactionType, model: BadgeViewModel): string {
     return '#ffffff';
 }
 
+function renderReactionButton(reactionType: BadgeReactionType, model: BadgeViewModel, handlers: BadgeViewHandlers): VNode {
+    const IconComponent = reactionIconByType[reactionType];
+    const isSubmittingThisReaction = model.submittingReactionType === reactionType;
+
+    return h(
+        'button',
+        {
+            type: 'button',
+            disabled: model.controlsDisabled,
+            onClick: () => {
+                handlers.onReactionClick(reactionType);
+            },
+            onMouseenter: () => {
+                handlers.onReactionHover(reactionType);
+            },
+            onMouseleave: () => {
+                if (model.hoveredReaction === reactionType) {
+                    handlers.onReactionHover(null);
+                }
+            },
+            style: {
+                ...reactionButtonStyle,
+                background: model.activeReaction === reactionType
+                    ? reactionPalette[reactionType].activeBackground
+                    : 'transparent',
+                opacity: model.controlsDisabled ? 0.75 : 1,
+                cursor: model.controlsDisabled ? 'not-allowed' : 'pointer',
+            },
+        },
+        [
+            isSubmittingThisReaction
+                ? h(Loader2, {
+                    ...iconBaseStyle,
+                    style: {
+                        animation: 'atlas-badge-spin 0.9s linear infinite',
+                    },
+                })
+                : h(IconComponent, {
+                    ...iconBaseStyle,
+                    color: iconColor(reactionType, model),
+                }),
+        ],
+    );
+}
+
+function renderBlacklistButton(model: BadgeViewModel, handlers: BadgeViewHandlers): VNode {
+    const disabled = model.controlsDisabled || model.isBlacklisted;
+
+    return h(
+        'button',
+        {
+            type: 'button',
+            disabled,
+            'aria-label': 'Blacklist',
+            'aria-pressed': model.isBlacklisted,
+            onClick: handlers.onBlacklistClick,
+            style: {
+                ...reactionButtonStyle,
+                background: model.isBlacklisted ? '#dc2626' : 'transparent',
+                opacity: disabled ? 0.75 : 1,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+            },
+        },
+        [
+            model.submittingBlacklist
+                ? h(Loader2, {
+                    ...iconBaseStyle,
+                    style: {
+                        animation: 'atlas-badge-spin 0.9s linear infinite',
+                    },
+                })
+                : h(Ban, {
+                    ...iconBaseStyle,
+                    color: '#ffffff',
+                }),
+        ],
+    );
+}
+
 function renderIconRow(model: BadgeViewModel, handlers: BadgeViewHandlers): VNode {
     if (model.isChecking) {
         return h(
@@ -131,50 +211,12 @@ function renderIconRow(model: BadgeViewModel, handlers: BadgeViewHandlers): VNod
                 width: '100%',
             },
         },
-        reactionOrder.map((reactionType) => {
-            const IconComponent = reactionIconByType[reactionType];
-            const isSubmittingThisReaction = model.submittingReactionType === reactionType;
-
-            return h(
-                'button',
-                {
-                    type: 'button',
-                    disabled: model.controlsDisabled,
-                    onClick: () => {
-                        handlers.onReactionClick(reactionType);
-                    },
-                    onMouseenter: () => {
-                        handlers.onReactionHover(reactionType);
-                    },
-                    onMouseleave: () => {
-                        if (model.hoveredReaction === reactionType) {
-                            handlers.onReactionHover(null);
-                        }
-                    },
-                    style: {
-                        ...reactionButtonStyle,
-                        background: model.activeReaction === reactionType
-                            ? reactionPalette[reactionType].activeBackground
-                            : 'transparent',
-                        opacity: model.controlsDisabled ? 0.75 : 1,
-                        cursor: model.controlsDisabled ? 'not-allowed' : 'pointer',
-                    },
-                },
-                [
-                    isSubmittingThisReaction
-                        ? h(Loader2, {
-                            ...iconBaseStyle,
-                            style: {
-                                animation: 'atlas-badge-spin 0.9s linear infinite',
-                            },
-                        })
-                        : h(IconComponent, {
-                            ...iconBaseStyle,
-                            color: iconColor(reactionType, model),
-                        }),
-                ],
-            );
-        }),
+        [
+            renderReactionButton('love', model, handlers),
+            renderReactionButton('like', model, handlers),
+            renderBlacklistButton(model, handlers),
+            renderReactionButton('funny', model, handlers),
+        ],
     );
 }
 

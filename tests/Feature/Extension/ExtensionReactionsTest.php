@@ -4,6 +4,7 @@ use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -95,6 +96,52 @@ test('extension reactions endpoint creates file applies reaction and queues down
     Queue::assertPushed(DownloadFile::class, function (DownloadFile $job) use ($file): bool {
         return $job->fileId === $file?->id;
     });
+});
+
+test('extension reactions endpoint can blacklist from the browser widget', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $file = File::factory()->create([
+        'source' => 'example.test',
+        'url' => 'https://cdn.example.test/media/ban-from-widget.jpg',
+        'referrer_url' => 'https://www.example.test/post/ban-from-widget',
+        'preview_url' => 'https://cdn.example.test/media/ban-from-widget.jpg',
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'blacklist',
+        'url' => 'https://cdn.example.test/media/ban-from-widget.jpg',
+        'referrer_url_hash_aware' => 'https://www.example.test/post/ban-from-widget',
+        'page_url' => 'https://www.example.test/post/ban-from-widget',
+        'tag_name' => 'img',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('reaction', null);
+    $response->assertJsonPath('download.requested', false);
+    expect($response->json('blacklisted_at'))->toBeString();
+
+    $file->refresh();
+
+    expect($file->blacklisted_at)->not->toBeNull();
+    expect((int) $file->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
+    expect(Reaction::query()
+        ->where('user_id', $user->id)
+        ->where('file_id', $file->id)
+        ->exists())->toBeFalse();
+
+    Queue::assertNotPushed(DownloadFile::class);
 });
 
 test('extension reactions can update a downloaded file without queueing another download', function () {

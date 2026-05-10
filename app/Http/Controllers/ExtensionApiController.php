@@ -15,6 +15,7 @@ use App\Services\Extension\ExtensionListingMetadataOverridesNormalizer;
 use App\Services\Extension\ExtensionMediaMatchService;
 use App\Services\Extension\ExtensionReactionProcessor;
 use App\Services\ExtensionApiKeyService;
+use App\Services\FileBlacklistService;
 use App\Services\FileReactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -161,6 +162,7 @@ class ExtensionApiController extends Controller
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
         ExtensionContainerMetadataService $containerMetadataService,
+        FileBlacklistService $fileBlacklistService,
         FileReactionService $fileReactionService,
         ExtensionDownloadRuntimeContext $downloadRuntimeContext,
         ExtensionListingMetadataOverridesNormalizer $listingMetadataOverridesNormalizer,
@@ -174,7 +176,7 @@ class ExtensionApiController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:love,like,funny'],
+            'type' => ['required', 'string', 'in:love,like,funny,blacklist'],
             'url' => ['required', 'string', 'max:4096'],
             'download_behavior' => ['nullable', 'string', 'in:queue,skip,force'],
             'referrer_url' => ['nullable', 'string', 'max:4096'],
@@ -216,6 +218,7 @@ class ExtensionApiController extends Controller
             $validated['type'],
             $validated['download_behavior'] ?? 'queue',
             $fileReactionService,
+            $fileBlacklistService,
             $containerMetadataService,
             $user,
             $extensionChannel,
@@ -234,6 +237,7 @@ class ExtensionApiController extends Controller
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
         ExtensionContainerMetadataService $containerMetadataService,
+        FileBlacklistService $fileBlacklistService,
         FileReactionService $fileReactionService,
         ExtensionDownloadRuntimeContext $downloadRuntimeContext,
         ExtensionListingMetadataOverridesNormalizer $listingMetadataOverridesNormalizer,
@@ -247,7 +251,7 @@ class ExtensionApiController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:love,like,funny'],
+            'type' => ['required', 'string', 'in:love,like,funny,blacklist'],
             'download_behavior' => ['nullable', 'string', 'in:queue,skip,force'],
             'primary_candidate_id' => ['required', 'string', 'max:128'],
             'items' => ['required', 'array', 'min:2', 'max:300'],
@@ -300,6 +304,7 @@ class ExtensionApiController extends Controller
                 $validated['type'],
                 $validated['download_behavior'] ?? 'queue',
                 $fileReactionService,
+                $fileBlacklistService,
                 $containerMetadataService,
                 $user,
                 $extensionChannel,

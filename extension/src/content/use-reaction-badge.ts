@@ -38,6 +38,7 @@ type UseReactionBadgeProps = {
     media: MediaElement;
     onShortcutReady?: ((handler: ((type: BadgeReactionType) => void) | null) => void) | undefined;
 };
+type BadgeSubmitType = BadgeReactionType | 'blacklist';
 const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
 const RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS = [120, 400, 1000, 2200] as const;
 export function useReactionBadge(props: UseReactionBadgeProps) {
@@ -56,6 +57,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     const openTabCount = ref<number | null>(null);
     const hoveredReaction = ref<BadgeReactionType | null>(null);
     const submittingReactionType = ref<BadgeReactionType | null>(null);
+    const submittingBlacklist = ref(false);
     const isDownloadLocked = ref(false);
     const progressPercent = ref<number | null>(null);
     const transferStatus = ref<string | null>(null);
@@ -75,8 +77,9 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     let relatedPostThumbnailRetryTimer: number | null = null;
     let relatedPostThumbnailRetryIndex = 0;
     const controlsDisabled = computed(() => isChecking.value
-        || submittingReactionType.value !== null || isDownloadLocked.value || reactAllItemsInPostPreference.saving.value);
-    const activeReaction = computed(() => (matchResult.value.exists ? matchResult.value.reaction : null));
+        || submittingReactionType.value !== null || submittingBlacklist.value || isDownloadLocked.value || reactAllItemsInPostPreference.saving.value);
+    const isBlacklisted = computed(() => matchResult.value.blacklistedAt !== null);
+    const activeReaction = computed(() => (matchResult.value.exists && !isBlacklisted.value ? matchResult.value.reaction : null));
     const timestampText = computed<BadgeTimestampDisplay>(() => {
         const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
         if (blacklistedAt) {
@@ -192,6 +195,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         hoveredReaction.value = null;
         matchResult.value = shouldPreserveActiveTransfer ? preserveTrackedMatchResult(matchResult.value) : emptyMatchResult();
         submittingReactionType.value = null;
+        submittingBlacklist.value = false;
         if (!shouldPreserveActiveTransfer) {
             isDownloadLocked.value = false;
             progressPercent.value = null;
@@ -374,18 +378,23 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         }
     });
 
-    async function handleReactionClick(type: BadgeReactionType): Promise<void> {
-        if (controlsDisabled.value) {
+    async function handleReactionClick(type: BadgeSubmitType): Promise<void> {
+        const isBlacklist = type === 'blacklist';
+        if (controlsDisabled.value || (isBlacklist && matchResult.value.blacklistedAt !== null)) {
             return;
         }
 
-        submittingReactionType.value = type;
+        if (isBlacklist) {
+            submittingBlacklist.value = true;
+        } else {
+            submittingReactionType.value = type;
+        }
         hasSeenActiveTransfer.value = false;
 
         try {
             let batchItems = null;
             let listingMetadataOverrides = null;
-            if (showReactAllItemsInPost.value) {
+            if (!isBlacklist && showReactAllItemsInPost.value) {
                 await reactAllItemsInPostPreference.refresh();
             }
 
@@ -393,7 +402,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
                 listingMetadataOverrides = await collectCivitAiListingMetadataOverrides(props.media);
             }
 
-            if (showReactAllItemsInPost.value && reactAllItemsInPostPreference.enabled.value) {
+            if (!isBlacklist && showReactAllItemsInPost.value && reactAllItemsInPostPreference.enabled.value) {
                 suppressMediaContextUpdates = true;
                 try {
                     batchItems = await collectDeviantArtBatchReactionItems(props.media, {
@@ -410,7 +419,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
             const usesBatchEndpoint = (batchItems?.length ?? 0) >= 2;
             let downloadBehavior: SubmitDownloadBehavior | undefined;
-            if (!usesBatchEndpoint && matchResult.value.downloadedAt !== null) {
+            if (!isBlacklist && !usesBatchEndpoint && matchResult.value.downloadedAt !== null) {
                 const choice = await downloadedReactionDialog.prompt();
                 if (choice === 'cancel') {
                     return;
@@ -425,7 +434,8 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
                 ...(downloadBehavior !== undefined ? { downloadBehavior } : {}),
             });
             const closeTabAfterQueueMode = closeTabAfterQueuePreference.mode.value;
-            const shouldAutoCloseCurrentTab = result.ok
+            const shouldAutoCloseCurrentTab = !isBlacklist
+                && result.ok
                 && closeTabAfterQueueMode !== 'off'
                 && result.shouldCloseTabAfterQueue;
 
@@ -446,7 +456,8 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             matchResult.value = {
                 ...matchResult.value,
                 exists: result.exists || matchResult.value.exists,
-                reaction: result.reaction,
+                reaction: isBlacklist ? null : result.reaction,
+                blacklistedAt: result.blacklistedAt ?? null,
             };
             syncTrackedUrlsForCurrentMedia();
             trackedFileId.value = result.fileId;
@@ -454,9 +465,9 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             transferStatus.value = result.downloadStatus;
             progressPercent.value = result.downloadProgressPercent;
             hasSeenActiveTransfer.value = result.downloadStatus !== null && !isTerminalStatus(result.downloadStatus);
-            persistCurrentBadgeState(result.downloadRequested);
+            persistCurrentBadgeState(!isBlacklist && result.downloadRequested);
 
-            if (result.downloadRequested) {
+            if (!isBlacklist && result.downloadRequested) {
                 isDownloadLocked.value = true;
                 ensureProgressSubscription();
                 if (isTerminalStatus(result.downloadStatus)) {
@@ -469,6 +480,9 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         } finally {
             if (isActive && !isDownloadLocked.value) {
                 submittingReactionType.value = null;
+            }
+            if (isActive) {
+                submittingBlacklist.value = false;
             }
         }
     }
@@ -488,6 +502,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         handleReactAllItemsInPostToggle,
         handleReactionClick,
         hoveredReaction,
+        isBlacklisted,
         isChecking,
         isSavingCloseTabAfterQueuePreference: closeTabAfterQueuePreference.saving,
         mediaResolution,
@@ -496,6 +511,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         progressState,
         reactAllItemsInPost: reactAllItemsInPostPreference.enabled,
         showReactAllItemsInPost,
+        submittingBlacklist,
         submittingReactionType,
         timestampText,
         cycleCloseTabAfterQueuePreference: closeTabAfterQueuePreference.cycleMode,

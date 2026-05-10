@@ -4,25 +4,21 @@ import { cleanupUrlQueryParams } from '../referrer-cleanup';
 import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import type { BatchReactionItem, ListingMetadataOverrides } from './reaction-batch-types';
 import type { BadgeReactionType } from './reaction-check-queue';
-import type { ReverbConfig } from '../reverb-client';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
-import { getDownloadCloseTargets, type DownloadCloseTarget } from './reaction-submit-download-targets';
+import { getDownloadCloseTargets } from './reaction-submit-download-targets';
 import { applyMediaCleaner } from './media-cleaner';
 import { resolveSiteCustomizationForHostname } from '../site-customizations';
-
-export type SubmitReactionResult = {
-    ok: boolean;
-    reaction: BadgeReactionType | null;
-    exists: boolean;
-    fileId: number | null;
-    downloadRequested: boolean;
-    shouldCloseTabAfterQueue: boolean;
-    downloadTransferId: number | null;
-    downloadStatus: string | null;
-    downloadProgressPercent: number | null;
-    downloadCloseTargets: DownloadCloseTarget[];
-    reverbConfig: ReverbConfig | null;
-};
+import {
+    batchDownloadRequested,
+    batchQueuedDownloadRequested,
+    getBlacklistedAtFromPayload,
+    getExistsFromPayload,
+    getReactionFromPayload,
+    numberOrNull,
+    parseReverbConfig,
+    stringOrNull,
+    type SubmitReactionResult,
+} from './reaction-submit-response';
 
 export type SubmitDownloadBehavior = 'queue' | 'skip' | 'force';
 
@@ -49,133 +45,7 @@ type SubmitBadgeReactionOptions = {
     listingMetadataOverrides?: ListingMetadataOverrides | null;
 };
 
-function parseReactionType(value: unknown): BadgeReactionType | null {
-    if (value === 'love' || value === 'like' || value === 'funny') {
-        return value;
-    }
-
-    return null;
-}
-
-function getReactionFromPayload(payload: unknown): { found: boolean; reaction: BadgeReactionType | null } {
-    if (!payload || typeof payload !== 'object') {
-        return { found: false, reaction: null };
-    }
-
-    const rootPayload = payload as Record<string, unknown>;
-    const direct = rootPayload.reaction;
-
-    if (direct !== undefined) {
-        if (direct === null) {
-            return { found: true, reaction: null };
-        }
-
-        if (typeof direct === 'string') {
-            return { found: true, reaction: parseReactionType(direct) };
-        }
-
-        if (typeof direct === 'object' && direct !== null) {
-            const typed = parseReactionType((direct as Record<string, unknown>).type);
-            return { found: true, reaction: typed };
-        }
-    }
-
-    return { found: false, reaction: null };
-}
-
-function getExistsFromPayload(payload: unknown): boolean | null {
-    if (!payload || typeof payload !== 'object') {
-        return null;
-    }
-
-    const exists = (payload as Record<string, unknown>).exists;
-    return typeof exists === 'boolean' ? exists : null;
-}
-
-function numberOrNull(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-    }
-
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed === '') {
-            return null;
-        }
-
-        const parsed = Number(trimmed);
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-
-    return null;
-}
-
-function stringOrNull(value: unknown): string | null {
-    return typeof value === 'string' && value.trim() !== '' ? value : null;
-}
-
-function parseReverbConfig(value: unknown): ReverbConfig | null {
-    if (!value || typeof value !== 'object') {
-        return null;
-    }
-
-    const row = value as Record<string, unknown>;
-    const enabled = row.enabled === true;
-    const key = stringOrNull(row.key) ?? '';
-    const host = stringOrNull(row.host) ?? '';
-    const channel = stringOrNull(row.channel) ?? '';
-    const scheme = row.scheme === 'http' ? 'http' : 'https';
-    const port = numberOrNull(row.port) ?? 443;
-
-    return {
-        enabled,
-        key,
-        host,
-        port,
-        scheme,
-        channel,
-        auth: null,
-    };
-}
-
-
-function batchDownloadRequested(value: unknown): boolean {
-    if (!value || typeof value !== 'object') {
-        return false;
-    }
-
-    const batch = (value as Record<string, unknown>).batch;
-    if (!batch || typeof batch !== 'object') {
-        return false;
-    }
-
-    return (batch as Record<string, unknown>).download_requested === true;
-}
-
-function batchQueuedDownloadRequested(value: unknown): boolean {
-    if (!value || typeof value !== 'object') {
-        return false;
-    }
-
-    const batch = (value as Record<string, unknown>).batch;
-    if (!batch || typeof batch !== 'object') {
-        return false;
-    }
-
-    const items = (batch as Record<string, unknown>).items;
-    if (!Array.isArray(items)) {
-        return false;
-    }
-
-    return items.some((entry) => {
-        if (!entry || typeof entry !== 'object') {
-            return false;
-        }
-
-        const download = (entry as Record<string, unknown>).download;
-        return !!download && typeof download === 'object' && (download as Record<string, unknown>).requested === true;
-    });
-}
+type BadgeSubmitType = BadgeReactionType | 'blacklist';
 
 function normalizeCookieUrls(urls: Array<string | null>): string[] {
     const normalized = urls
@@ -319,7 +189,7 @@ function getSafeUserAgent(): string | null {
 
 export async function submitBadgeReaction(
     media: MediaElement,
-    reactionType: BadgeReactionType,
+    reactionType: BadgeSubmitType,
     options: SubmitBadgeReactionOptions = {},
 ): Promise<SubmitReactionResult> {
     const pageUrl = normalizeUrl(window.location.href);
@@ -334,6 +204,7 @@ export async function submitBadgeReaction(
             reaction: null,
             exists: false,
             fileId: null,
+            blacklistedAt: null,
             downloadRequested: false,
             shouldCloseTabAfterQueue: false,
             downloadTransferId: null,
@@ -352,6 +223,7 @@ export async function submitBadgeReaction(
                 reaction: null,
                 exists: false,
                 fileId: null,
+                blacklistedAt: null,
                 downloadRequested: false,
                 shouldCloseTabAfterQueue: false,
                 downloadTransferId: null,
@@ -369,7 +241,7 @@ export async function submitBadgeReaction(
                 ...batchItems.map((item) => item.referrerUrlHashAware),
             ])
             : normalizeCookieUrls([reactionUrl, pageUrl]);
-        const cookies = await getRuntimeCookies(cookieUrls);
+        const cookies = reactionType === 'blacklist' ? [] : await getRuntimeCookies(cookieUrls);
         const userAgent = getSafeUserAgent();
         const siteCustomization = getActivePageSiteCustomization()
             ?? resolveSiteCustomizationForHostname(stored.siteCustomizations, window.location.hostname);
@@ -390,7 +262,7 @@ export async function submitBadgeReaction(
         const requestBody = usesBatchEndpoint
             ? {
                 type: reactionType,
-                download_behavior: options.downloadBehavior,
+                download_behavior: reactionType === 'blacklist' ? 'skip' : options.downloadBehavior,
                 primary_candidate_id: batchItems[0]?.candidateId ?? null,
                 items: batchItems.map((item) => ({
                     candidate_id: item.candidateId,
@@ -408,7 +280,7 @@ export async function submitBadgeReaction(
             }
             : {
                 type: reactionType,
-                download_behavior: options.downloadBehavior,
+                download_behavior: reactionType === 'blacklist' ? 'skip' : options.downloadBehavior,
                 url: cleanedReactionUrl,
                 referrer_url_hash_aware: cleanedPageReferrerUrl,
                 page_url: window.location.href,
@@ -436,6 +308,7 @@ export async function submitBadgeReaction(
                     reaction: null,
                     exists: false,
                     fileId: null,
+                    blacklistedAt: null,
                     downloadRequested: false,
                     shouldCloseTabAfterQueue: false,
                     downloadTransferId: null,
@@ -463,6 +336,7 @@ export async function submitBadgeReaction(
                     reaction: null,
                     exists: false,
                     fileId: null,
+                    blacklistedAt: null,
                     downloadRequested: false,
                     shouldCloseTabAfterQueue: false,
                     downloadTransferId: null,
@@ -490,6 +364,7 @@ export async function submitBadgeReaction(
             ? rootPayload.file as Record<string, unknown>
             : {};
         const fileId = numberOrNull(filePayload.id);
+        const blacklistedAt = getBlacklistedAtFromPayload(payload);
         const downloadRequested = downloadPayload.requested === true;
         // Keep both checks while older Atlas deployments may omit the aggregated
         // batch.download_requested flag and only report queueing per item.
@@ -508,6 +383,7 @@ export async function submitBadgeReaction(
                 reaction: extractedReaction.reaction,
                 exists: extractedExists ?? true,
                 fileId,
+                blacklistedAt,
                 downloadRequested,
                 shouldCloseTabAfterQueue,
                 downloadTransferId,
@@ -520,9 +396,10 @@ export async function submitBadgeReaction(
 
         return {
             ok: true,
-            reaction: reactionType,
+            reaction: reactionType === 'blacklist' ? null : reactionType,
             exists: extractedExists ?? true,
             fileId,
+            blacklistedAt,
             downloadRequested,
             shouldCloseTabAfterQueue,
             downloadTransferId,
@@ -537,6 +414,7 @@ export async function submitBadgeReaction(
             reaction: null,
             exists: false,
             fileId: null,
+            blacklistedAt: null,
             downloadRequested: false,
             shouldCloseTabAfterQueue: false,
             downloadTransferId: null,

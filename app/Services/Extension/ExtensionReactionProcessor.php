@@ -7,6 +7,8 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\User;
 use App\Services\CivitAiImages;
+use App\Services\FileBlacklistService;
+use App\Services\FilePreviewService;
 use App\Services\FileReactionService;
 use App\Support\CivitAiMediaUrl;
 use App\Support\FileTypeDetector;
@@ -26,6 +28,7 @@ class ExtensionReactionProcessor
         string $reactionType,
         string $downloadBehavior,
         FileReactionService $fileReactionService,
+        FileBlacklistService $fileBlacklistService,
         ExtensionContainerMetadataService $containerMetadataService,
         User $user,
         string $extensionChannel,
@@ -57,6 +60,10 @@ class ExtensionReactionProcessor
             $tagName,
             $listingMetadataOverrides
         );
+        if ($reactionType === 'blacklist') {
+            return $this->blacklistFile($file, $fileBlacklistService, $user);
+        }
+
         $queueDownload = $this->shouldQueueExtensionDownload($reactionType, $downloadBehavior);
         $forceDownload = $this->shouldForceExtensionDownload($downloadBehavior);
         $result = $fileReactionService->set(
@@ -82,6 +89,41 @@ class ExtensionReactionProcessor
             'reacted_at' => $result['reacted_at'] ?? null,
             'download' => [
                 'requested' => $queueDownload,
+                'transfer_id' => $activeTransfer?->id,
+                'status' => $activeTransfer?->status,
+                'progress_percent' => $activeTransfer?->last_broadcast_percent,
+                'downloaded_at' => $file->downloaded_at?->toIso8601String(),
+            ],
+            'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function blacklistFile(File $file, FileBlacklistService $fileBlacklistService, User $user): array
+    {
+        $file->loadMissing('reactions');
+        $fileBlacklistService->apply(
+            [$file],
+            (int) $user->id,
+            minimumPreviewedCount: FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+            autoBlacklisted: false,
+        );
+        $file->refresh();
+        $activeTransfer = $this->findActiveTransfer((int) $file->id);
+
+        return [
+            'file' => [
+                'id' => $file->id,
+                'url' => $file->url,
+                'referrer_url' => $file->referrer_url,
+                'preview_url' => $file->preview_url,
+            ],
+            'reaction' => null,
+            'reacted_at' => null,
+            'download' => [
+                'requested' => false,
                 'transfer_id' => $activeTransfer?->id,
                 'status' => $activeTransfer?->status,
                 'progress_percent' => $activeTransfer?->last_broadcast_percent,
