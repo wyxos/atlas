@@ -325,7 +325,7 @@ return [
                 'memory' => 384,
             ],
             'supervisor-library-scans' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => (int) env('HORIZON_LIBRARY_SCAN_MAX_PROCESSES', 4),
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
                 'memory' => 384,
