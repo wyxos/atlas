@@ -14,6 +14,7 @@ use App\Models\FileMetadata;
 use App\Models\LibraryScanItem;
 use App\Models\LibraryScanMediaTask;
 use App\Models\LibraryScanRun;
+use App\Models\Reaction;
 use App\Models\User;
 use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
 use App\Services\LibraryScans\LibraryScanFileParser;
@@ -88,6 +89,62 @@ it('moves duplicate files but reuses the first file row by hash', function () {
         ->and(LibraryScanItem::query()->count())->toBe(2)
         ->and(LibraryScanItem::query()->where('duplicate', true)->count())->toBe(1)
         ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
+});
+
+it('reconciles existing local file records by original atlas path and preserves reactions', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    Illuminate\Support\Facades\File::ensureDirectoryExists($root.DIRECTORY_SEPARATOR.'0000 - Downloads');
+    $relativePath = '0000 - Downloads/legacy.txt';
+    $absolutePath = $root.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    file_put_contents($absolutePath, 'current legacy payload');
+
+    $existing = File::factory()->create([
+        'source' => 'local',
+        'path' => $relativePath,
+        'filename' => 'legacy.txt',
+        'ext' => 'txt',
+        'size' => 1,
+        'mime_type' => 'application/octet-stream',
+        'hash' => str_repeat('0', 64),
+        'preview_path' => 'thumbnails/legacy.jpg',
+        'poster_path' => 'thumbnails/legacy-poster.jpg',
+        'downloaded' => true,
+        'downloaded_at' => now(),
+        'imported_at' => null,
+    ]);
+    $user = User::factory()->create();
+    Reaction::query()->create([
+        'file_id' => $existing->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    $file = $existing->fresh();
+    $item = LibraryScanItem::query()->first();
+
+    expect(File::query()->count())->toBe(1)
+        ->and($file->id)->toBe($existing->id)
+        ->and($file->path)->toStartWith('imports/')
+        ->and($file->filename)->toBe(basename($file->path))
+        ->and($file->ext)->toBe('txt')
+        ->and($file->size)->toBe(strlen('current legacy payload'))
+        ->and($file->hash)->toBe(hash('sha256', 'current legacy payload'))
+        ->and($file->preview_path)->toBeNull()
+        ->and($file->poster_path)->toBeNull()
+        ->and($file->downloaded)->toBeFalse()
+        ->and($file->downloaded_at)->toBeNull()
+        ->and($file->imported_at)->not->toBeNull()
+        ->and($item->file_id)->toBe($existing->id)
+        ->and($item->duplicate)->toBeFalse()
+        ->and($item->imported_path)->toBe($file->path)
+        ->and(Reaction::query()->where('file_id', $existing->id)->count())->toBe(1)
+        ->and(file_exists($absolutePath))->toBeFalse()
+        ->and(Storage::disk(AtlasStorage::DISK)->exists($file->path))->toBeTrue();
 });
 
 it('skips filesystem metadata files and directories during library scans', function () {

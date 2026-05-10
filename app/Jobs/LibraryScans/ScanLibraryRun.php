@@ -185,7 +185,7 @@ class ScanLibraryRun implements ShouldQueue
                 return;
             }
 
-            $importedParent = $this->importFile($run, $file->getPathname(), $appStorage, $scans);
+            $importedParent = $this->importFile($run, $file->getPathname(), $atlasRoot, $appStorage, $scans);
             if ($importedParent) {
                 $importedParentDirectories[] = $importedParent;
             }
@@ -214,6 +214,7 @@ class ScanLibraryRun implements ShouldQueue
     private function importFile(
         LibraryScanRun $run,
         string $absolutePath,
+        string $atlasRoot,
         AtlasStorage $appStorage,
         LibraryScanService $scans,
     ): ?string {
@@ -240,6 +241,8 @@ class ScanLibraryRun implements ShouldQueue
             $filename = $appStorage->randomStoredFilename($extension);
             $disk = Storage::disk(AtlasStorage::DISK);
             $importedPath = $appStorage->uniqueSegmentedPath($disk, AtlasStorage::IMPORTS, $filename, $hash);
+            $originalRelativePath = $this->relativeAtlasPath($absolutePath, $atlasRoot);
+            $existingByOriginalPath = $this->existingLocalFileByOriginalPath($originalRelativePath);
 
             $item->update([
                 'hash' => $hash,
@@ -252,6 +255,25 @@ class ScanLibraryRun implements ShouldQueue
             $scans->broadcastItem($item->fresh());
 
             $this->moveToAppStorage($absolutePath, $disk->path($importedPath), $disk, dirname($importedPath));
+
+            if ($existingByOriginalPath) {
+                $file = $this->reconcileExistingLocalFile(
+                    $existingByOriginalPath,
+                    $importedPath,
+                    $extension,
+                    $size,
+                    $mimeType,
+                    $hash,
+                );
+
+                app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
+                $this->markImportedItem($item, $file, $mimeType);
+                $scans->refreshCounters($run->fresh());
+                $scans->broadcastItem($item->fresh());
+                $scans->broadcastRun($run->fresh());
+
+                return $sourceParent;
+            }
 
             $existing = AtlasFile::query()
                 ->where('hash', $hash)
@@ -294,24 +316,7 @@ class ScanLibraryRun implements ShouldQueue
 
             app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
 
-            $parser = FileMimeType::category($mimeType);
-            if ($parser === 'other') {
-                $item->update([
-                    'file_id' => $file->id,
-                    'status' => LibraryScanItemStatus::COMPLETED,
-                    'phase' => 'completed',
-                    'progress' => 100,
-                    'parser' => null,
-                ]);
-            } else {
-                $item->update([
-                    'file_id' => $file->id,
-                    'status' => LibraryScanItemStatus::IMPORTED,
-                    'phase' => 'queued',
-                    'progress' => 35,
-                    'parser' => $parser,
-                ]);
-            }
+            $this->markImportedItem($item, $file, $mimeType);
 
             $scans->refreshCounters($run->fresh());
             $scans->broadcastItem($item->fresh());
@@ -379,6 +384,79 @@ class ScanLibraryRun implements ShouldQueue
         @unlink($sourcePath);
     }
 
+    private function existingLocalFileByOriginalPath(?string $originalRelativePath): ?AtlasFile
+    {
+        if ($originalRelativePath === null) {
+            return null;
+        }
+
+        return AtlasFile::query()
+            ->where('source', 'local')
+            ->where('path', $originalRelativePath)
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function reconcileExistingLocalFile(
+        AtlasFile $file,
+        string $importedPath,
+        ?string $extension,
+        ?int $size,
+        ?string $mimeType,
+        string $hash,
+    ): AtlasFile {
+        $file->forceFill([
+            'path' => $importedPath,
+            'filename' => basename($importedPath),
+            'ext' => $extension ? strtolower($extension) : null,
+            'size' => $size,
+            'mime_type' => $mimeType,
+            'hash' => $hash,
+            'preview_path' => null,
+            'poster_path' => null,
+            'downloaded' => false,
+            'downloaded_at' => null,
+            'imported_at' => $file->imported_at ?? now(),
+            'download_progress' => 0,
+            'not_found' => false,
+        ]);
+
+        if (! is_string($file->title) || trim($file->title) === '') {
+            $file->title = pathinfo($importedPath, PATHINFO_FILENAME);
+        }
+
+        $file->save();
+
+        return $file;
+    }
+
+    private function markImportedItem(
+        LibraryScanItem $item,
+        AtlasFile $file,
+        ?string $mimeType,
+    ): void {
+        $parser = FileMimeType::category($mimeType);
+        if ($parser === 'other') {
+            $item->update([
+                'file_id' => $file->id,
+                'status' => LibraryScanItemStatus::COMPLETED,
+                'phase' => 'completed',
+                'progress' => 100,
+                'parser' => null,
+            ]);
+
+            return;
+        }
+
+        $item->update([
+            'file_id' => $file->id,
+            'status' => LibraryScanItemStatus::IMPORTED,
+            'phase' => 'queued',
+            'progress' => 35,
+            'parser' => $parser,
+        ]);
+    }
+
     private function detectMimeType(string $absolutePath): ?string
     {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -398,5 +476,27 @@ class ScanLibraryRun implements ShouldQueue
         $realPath = realpath($path);
 
         return str_replace('\\', '/', rtrim($realPath !== false ? $realPath : $path, '/')).'/';
+    }
+
+    private function relativeAtlasPath(string $absolutePath, string $atlasRoot): ?string
+    {
+        $root = $this->normalizePath($atlasRoot);
+        $path = $this->normalizeFilePath($absolutePath);
+
+        if (! str_starts_with($path, $root)) {
+            return null;
+        }
+
+        $relativePath = ltrim(substr($path, strlen($root)), '/');
+
+        return $relativePath !== '' ? $relativePath : null;
+    }
+
+    private function normalizeFilePath(string $path): string
+    {
+        $path = str_replace('\\', '/', rtrim($path, '\\/'));
+        $realPath = realpath($path);
+
+        return str_replace('\\', '/', rtrim($realPath !== false ? $realPath : $path, '/'));
     }
 }
