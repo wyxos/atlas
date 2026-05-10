@@ -50,6 +50,8 @@ class ScanLibraryRun implements ShouldQueue
         'thumbs.db',
     ];
 
+    private const int DISCOVERY_COUNTER_FLUSH_SIZE = 100;
+
     public int $timeout = 1800;
 
     public function __construct(private readonly int $runId)
@@ -82,14 +84,6 @@ class ScanLibraryRun implements ShouldQueue
 
         $storage->ensureManagedDirectories();
 
-        $run->update([
-            'status' => LibraryScanRunStatus::SCANNING,
-            'phase' => 'scanning',
-            'started_at' => $run->started_at ?? now(),
-            'error' => null,
-        ]);
-        $scans->broadcastRun($run->fresh());
-
         $atlasRoot = $this->normalizePath($storage->rootPath());
         $appRoot = $this->normalizePath($storage->appRootPath());
         if (! is_dir($atlasRoot)) {
@@ -105,7 +99,37 @@ class ScanLibraryRun implements ShouldQueue
         }
 
         try {
-            $this->scanFiles($run, $atlasRoot, $appRoot, $storage, $scans);
+            if (! $run->scan_completed_at) {
+                $run->update([
+                    'status' => LibraryScanRunStatus::SCANNING,
+                    'phase' => 'discovering',
+                    'started_at' => $run->started_at ?? now(),
+                    'error' => null,
+                    'files_found' => 0,
+                    'files_imported' => 0,
+                    'files_duplicate' => 0,
+                    'files_processed' => 0,
+                    'files_failed' => 0,
+                    'files_canceled' => 0,
+                ]);
+                $scans->broadcastRun($run->fresh());
+
+                $this->discoverFiles($run, $atlasRoot, $appRoot, $scans);
+            }
+
+            $run = $run->fresh();
+            if ($run->status === LibraryScanRunStatus::PAUSED || $run->status === LibraryScanRunStatus::CANCELED) {
+                return;
+            }
+
+            $run->update([
+                'status' => LibraryScanRunStatus::PROCESSING,
+                'phase' => 'processing',
+                'scan_completed_at' => $run->scan_completed_at ?? now(),
+            ]);
+            $scans->broadcastRun($run->fresh());
+
+            $this->importDiscoveredFiles($run->fresh(), $atlasRoot, $storage, $scans);
         } catch (\Throwable $e) {
             $run->update([
                 'status' => LibraryScanRunStatus::FAILED,
@@ -126,7 +150,6 @@ class ScanLibraryRun implements ShouldQueue
         $run->update([
             'status' => LibraryScanRunStatus::PROCESSING,
             'phase' => 'processing',
-            'scan_completed_at' => now(),
         ]);
 
         $scans->dispatchPendingParsers($run->fresh());
@@ -134,14 +157,14 @@ class ScanLibraryRun implements ShouldQueue
         $scans->broadcastRun($run->fresh());
     }
 
-    private function scanFiles(
+    private function discoverFiles(
         LibraryScanRun $run,
         string $atlasRoot,
         string $appRoot,
-        AtlasStorage $appStorage,
         LibraryScanService $scans,
     ): void {
-        $importedParentDirectories = [];
+        $run->items()->delete();
+
         $directory = new \RecursiveDirectoryIterator($atlasRoot, \FilesystemIterator::SKIP_DOTS);
         $filter = new \RecursiveCallbackFilterIterator(
             $directory,
@@ -164,6 +187,7 @@ class ScanLibraryRun implements ShouldQueue
             },
         );
 
+        $found = 0;
         $iterator = new \RecursiveIteratorIterator($filter);
         foreach ($iterator as $file) {
             if (! $file instanceof \SplFileInfo || ! $file->isFile() || $file->isLink()) {
@@ -185,13 +209,51 @@ class ScanLibraryRun implements ShouldQueue
                 return;
             }
 
-            $importedParent = $this->importFile($run, $file->getPathname(), $atlasRoot, $appStorage, $scans);
-            if ($importedParent) {
-                $importedParentDirectories[] = $importedParent;
+            LibraryScanItem::query()->create([
+                'library_scan_run_id' => $run->id,
+                'original_path' => $file->getPathname(),
+                'status' => LibraryScanItemStatus::PENDING,
+                'phase' => 'discovered',
+            ]);
+
+            $found++;
+            if ($found % self::DISCOVERY_COUNTER_FLUSH_SIZE === 0) {
+                $run->update(['files_found' => $found]);
+                $scans->broadcastRun($run->fresh());
             }
         }
 
         unset($iterator, $filter, $directory);
+
+        $run->update(['files_found' => $found]);
+        $scans->broadcastRun($run->fresh());
+    }
+
+    private function importDiscoveredFiles(
+        LibraryScanRun $run,
+        string $atlasRoot,
+        AtlasStorage $appStorage,
+        LibraryScanService $scans,
+    ): void {
+        $importedParentDirectories = [];
+
+        foreach ($run->items()->whereIn('status', [LibraryScanItemStatus::PENDING, LibraryScanItemStatus::IMPORTING])->orderBy('id')->cursor() as $item) {
+            $run->refresh();
+            if ($run->status === LibraryScanRunStatus::CANCELED) {
+                return;
+            }
+
+            if ($run->status === LibraryScanRunStatus::PAUSED) {
+                $scans->broadcastRun($run);
+
+                return;
+            }
+
+            $importedParent = $this->importFile($item, $run, $item->original_path, $atlasRoot, $appStorage, $scans);
+            if ($importedParent) {
+                $importedParentDirectories[] = $importedParent;
+            }
+        }
 
         foreach (array_unique($importedParentDirectories) as $directory) {
             $this->deleteEmptyDirectParent($directory, $atlasRoot);
@@ -212,6 +274,7 @@ class ScanLibraryRun implements ShouldQueue
     }
 
     private function importFile(
+        LibraryScanItem $item,
         LibraryScanRun $run,
         string $absolutePath,
         string $atlasRoot,
@@ -219,9 +282,7 @@ class ScanLibraryRun implements ShouldQueue
         LibraryScanService $scans,
     ): ?string {
         $sourceParent = dirname($absolutePath);
-        $item = LibraryScanItem::query()->create([
-            'library_scan_run_id' => $run->id,
-            'original_path' => $absolutePath,
+        $item->update([
             'status' => LibraryScanItemStatus::IMPORTING,
             'phase' => 'hashing',
             'progress' => 5,
@@ -450,9 +511,9 @@ class ScanLibraryRun implements ShouldQueue
 
         $item->update([
             'file_id' => $file->id,
-            'status' => LibraryScanItemStatus::IMPORTED,
-            'phase' => 'queued',
-            'progress' => 35,
+            'status' => LibraryScanItemStatus::COMPLETED,
+            'phase' => 'imported',
+            'progress' => 100,
             'parser' => $parser,
         ]);
     }

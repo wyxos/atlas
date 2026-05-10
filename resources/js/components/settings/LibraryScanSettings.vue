@@ -100,6 +100,14 @@ const libraryScanProgress = computed(() => {
 
     return Math.min(100, Math.round((completed / run.files_found) * 100));
 });
+const libraryScanProgressLabel = computed(() => {
+    const run = activeLibraryScan.value;
+    if (run?.phase === 'discovering') {
+        return `${run.files_found.toLocaleString()} found`;
+    }
+
+    return `${libraryScanProgress.value}%`;
+});
 
 function setLibraryScanNotice(message: string, tone: 'success' | 'error' | 'neutral' = 'neutral'): void {
     libraryScanNotice.value = message;
@@ -383,7 +391,7 @@ onBeforeUnmount(() => {
                 </p>
                 <p>
                     <span class="text-twilight-indigo-300">Progress:</span>
-                    {{ libraryScanProgress }}%
+                    {{ libraryScanProgressLabel }}
                 </p>
                 <p>
                     <span class="text-twilight-indigo-300">Found:</span>

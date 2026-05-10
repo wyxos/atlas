@@ -153,6 +153,25 @@ describe('LibraryScanSettings', () => {
         expect(wrapper.text()).toContain('ffmpeg failed');
     });
 
+    it('shows discovered count while the filesystem crawl is still running', async () => {
+        installAxiosMock(makeRun({
+            status: 'scanning',
+            phase: 'discovering',
+            files_found: 1200,
+            files_imported: 0,
+            files_duplicate: 0,
+            files_processed: 0,
+            files_failed: 0,
+            files_canceled: 0,
+            scan_completed_at: null,
+        }), []);
+        installEchoMock();
+
+        const wrapper = await mountScanSettings();
+
+        expect(wrapper.text()).toContain('1,200 found');
+    });
+
     it('enables resume and restart controls for paused scans', async () => {
         const run = makeRun({ status: 'paused', phase: 'paused' });
         const axios = installAxiosMock(run, []);

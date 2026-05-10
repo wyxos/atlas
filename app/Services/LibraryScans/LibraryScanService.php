@@ -90,16 +90,24 @@ class LibraryScanService
             return $run;
         }
 
+        $shouldImportDiscoveredFiles = $run->mode === LibraryScanRunMode::SCAN
+            && $run->scan_completed_at
+            && $run->items()->whereIn('status', [LibraryScanItemStatus::PENDING, LibraryScanItemStatus::IMPORTING])->exists();
+
         $run->update([
             'status' => $run->scan_completed_at ? LibraryScanRunStatus::PROCESSING : LibraryScanRunStatus::SCANNING,
-            'phase' => $run->scan_completed_at ? 'processing' : 'scanning',
+            'phase' => $run->scan_completed_at
+                ? 'processing'
+                : 'discovering',
             'paused_at' => null,
         ]);
 
         $run = $run->fresh();
         $this->broadcastRun($run);
 
-        if ($run->scan_completed_at) {
+        if ($shouldImportDiscoveredFiles) {
+            ScanLibraryRun::dispatch($run->id);
+        } elseif ($run->scan_completed_at) {
             $this->dispatchPendingParsers($run, regeneratePreviewAssets: $run->mode === LibraryScanRunMode::REPARSE);
             $this->completeIfDone($run);
         } else {
@@ -204,12 +212,14 @@ class LibraryScanService
             $queuedTasks[] = $task;
         }
 
-        if ($queuedTasks !== []) {
+        if ($queuedTasks !== [] && ! $item->isTerminal()) {
             $item->update([
                 'status' => LibraryScanItemStatus::PROCESSING,
                 'phase' => MediaTask::PHASE_MEDIA_QUEUED,
                 'progress' => 50,
             ]);
+            $this->broadcastItem($item->fresh(['mediaTasks']));
+        } elseif ($queuedTasks !== []) {
             $this->broadcastItem($item->fresh(['mediaTasks']));
         }
 
@@ -234,7 +244,11 @@ class LibraryScanService
 
         $item = $task->item()->with(['run', 'mediaTasks'])->first();
         if ($item) {
-            $this->refreshItemMediaProgress($item);
+            if ($item->status === LibraryScanItemStatus::COMPLETED) {
+                $this->broadcastItem($item->fresh(['mediaTasks']));
+            } else {
+                $this->refreshItemMediaProgress($item);
+            }
         }
     }
 
@@ -312,6 +326,11 @@ class LibraryScanService
     public function completeItemIfMediaTasksDone(LibraryScanItem $item): void
     {
         if ($item->isTerminal()) {
+            if ($item->status === LibraryScanItemStatus::COMPLETED && $item->file_id) {
+                app(LocalBrowseIndexSyncService::class)->syncFilesByIds([(int) $item->file_id]);
+            }
+            $this->broadcastItem($item->fresh(['mediaTasks']));
+
             return;
         }
 
@@ -374,7 +393,7 @@ class LibraryScanService
             return;
         }
 
-        $this->refreshCounters($run);
+        $run = $this->refreshCounters($run);
 
         if (! $run->scan_completed_at) {
             return;
@@ -399,13 +418,18 @@ class LibraryScanService
 
     public function dispatchPendingParsers(LibraryScanRun $run, bool $regeneratePreviewAssets = false): void
     {
-        $run->items()
-            ->where('status', LibraryScanItemStatus::IMPORTED)
+        $query = $run->items()
             ->whereNotNull('parser')
-            ->each(fn (LibraryScanItem $item) => ProcessLibraryScanItem::dispatch(
-                $item->id,
-                regeneratePreviewAssets: $regeneratePreviewAssets,
-            ));
+            ->when(
+                $run->mode === LibraryScanRunMode::SCAN,
+                fn ($query) => $query->where('status', LibraryScanItemStatus::COMPLETED),
+                fn ($query) => $query->where('status', LibraryScanItemStatus::IMPORTED),
+            );
+
+        $query->each(fn (LibraryScanItem $item) => ProcessLibraryScanItem::dispatch(
+            $item->id,
+            regeneratePreviewAssets: $regeneratePreviewAssets,
+        ));
     }
 
     public function refreshCounters(LibraryScanRun $run): LibraryScanRun

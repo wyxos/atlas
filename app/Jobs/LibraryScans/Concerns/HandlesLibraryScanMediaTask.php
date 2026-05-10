@@ -4,6 +4,7 @@ namespace App\Jobs\LibraryScans\Concerns;
 
 use App\Enums\LibraryScanItemStatus;
 use App\Enums\LibraryScanMediaTask as MediaTask;
+use App\Enums\LibraryScanRunMode;
 use App\Enums\LibraryScanRunStatus;
 use App\Models\LibraryScanMediaTask;
 use App\Services\LibraryScans\LibraryScanService;
@@ -41,7 +42,10 @@ trait HandlesLibraryScanMediaTask
             return false;
         }
 
-        if ($item->isTerminal()) {
+        $isBackgroundScanMediaTask = $item->status === LibraryScanItemStatus::COMPLETED
+            && $run->mode === LibraryScanRunMode::SCAN;
+
+        if ($item->isTerminal() && ! $isBackgroundScanMediaTask) {
             return false;
         }
 

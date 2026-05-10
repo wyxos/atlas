@@ -91,6 +91,63 @@ it('moves duplicate files but reuses the first file row by hash', function () {
         ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
 });
 
+it('uses discovered scan items as the stable scan total before importing', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    file_put_contents($root.DIRECTORY_SEPARATOR.'first.txt', 'first payload');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'second.txt', 'second payload');
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    $run = $run->fresh();
+
+    expect($run->files_found)->toBe(2)
+        ->and($run->files_imported)->toBe(2)
+        ->and(LibraryScanItem::query()->count())->toBe(2)
+        ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
+});
+
+it('continues importing from discovered pending scan items without rediscovering', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    $firstPath = $root.DIRECTORY_SEPARATOR.'first.txt';
+    $secondPath = $root.DIRECTORY_SEPARATOR.'second.txt';
+    file_put_contents($firstPath, 'first payload');
+    file_put_contents($secondPath, 'second payload');
+
+    $run = LibraryScanRun::factory()->create([
+        'status' => 'processing',
+        'phase' => 'processing',
+        'files_found' => 2,
+        'scan_completed_at' => now(),
+    ]);
+
+    LibraryScanItem::query()->create([
+        'library_scan_run_id' => $run->id,
+        'original_path' => $firstPath,
+        'status' => LibraryScanItemStatus::PENDING,
+        'phase' => 'discovered',
+    ]);
+    LibraryScanItem::query()->create([
+        'library_scan_run_id' => $run->id,
+        'original_path' => $secondPath,
+        'status' => LibraryScanItemStatus::PENDING,
+        'phase' => 'discovered',
+    ]);
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    $run = $run->fresh();
+
+    expect($run->files_found)->toBe(2)
+        ->and($run->files_imported)->toBe(2)
+        ->and(File::query()->count())->toBe(2)
+        ->and(LibraryScanItem::query()->count())->toBe(2)
+        ->and(LibraryScanItem::query()->whereNotNull('imported_path')->count())->toBe(2);
+});
+
 it('reconciles existing local file records by original atlas path and preserves reactions', function () {
     Queue::fake([ProcessLibraryScanItem::class]);
     $root = configureLibraryScanStorage();
@@ -210,7 +267,7 @@ it('dispatches library scan parser jobs on the dedicated queue', function () {
     $run = LibraryScanRun::factory()->create();
     LibraryScanItem::factory()->create([
         'library_scan_run_id' => $run->id,
-        'status' => LibraryScanItemStatus::IMPORTED,
+        'status' => LibraryScanItemStatus::COMPLETED,
         'parser' => 'audio',
     ]);
 
@@ -220,6 +277,35 @@ it('dispatches library scan parser jobs on the dedicated queue', function () {
         ProcessLibraryScanItem::class,
         fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans'
             && $job->regeneratePreviewAssets === false,
+    );
+});
+
+it('completes scan progress after import while conversion parsing stays queued separately', function () {
+    Queue::fake([ProcessLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    file_put_contents(
+        $root.DIRECTORY_SEPARATOR.'image.png',
+        base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='),
+    );
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    $run = $run->fresh();
+    $item = LibraryScanItem::query()->first();
+
+    expect($run->status)->toBe('completed')
+        ->and($run->files_found)->toBe(1)
+        ->and($run->files_processed)->toBe(1)
+        ->and($item->status)->toBe(LibraryScanItemStatus::COMPLETED)
+        ->and($item->progress)->toBe(100)
+        ->and($item->parser)->toBe('image');
+
+    Queue::assertPushed(
+        ProcessLibraryScanItem::class,
+        fn (ProcessLibraryScanItem $job): bool => $job->queue === 'library-scans'
+            && $job->itemId === $item->id,
     );
 });
 
@@ -304,6 +390,59 @@ it('queues imported file preview regeneration as media work before completing th
         fn (GenerateLibraryScanPreviewAssets $job): bool => $job->queue === MediaTask::PREVIEW_QUEUE
             && $job->taskId === $task->id
             && $job->regeneratePreviewAssets === true,
+    );
+});
+
+it('keeps completed scan items completed while media conversion tasks run separately', function () {
+    Queue::fake([GenerateLibraryScanPreviewAssets::class]);
+    $run = LibraryScanRun::factory()->create([
+        'mode' => LibraryScanRunMode::SCAN,
+        'status' => 'completed',
+        'phase' => 'completed',
+        'scan_completed_at' => now(),
+        'finished_at' => now(),
+    ]);
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/image.jpg',
+        'mime_type' => 'image/jpeg',
+        'imported_at' => now(),
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'status' => LibraryScanItemStatus::COMPLETED,
+        'phase' => 'imported',
+        'progress' => 100,
+        'parser' => 'image',
+    ]);
+
+    $parser = \Mockery::mock(LibraryScanFileParser::class);
+    $parser->shouldReceive('parse')
+        ->once()
+        ->andReturn([
+            'updates' => [],
+            'metadata' => [],
+            'tasks' => [MediaTask::TASK_PREVIEW_ASSETS],
+        ]);
+    $this->app->instance(LibraryScanFileParser::class, $parser);
+
+    (new ProcessLibraryScanItem($item->id))->handle(
+        app(LibraryScanFileParser::class),
+        app(LibraryScanService::class),
+    );
+
+    $task = LibraryScanMediaTask::query()->where('library_scan_item_id', $item->id)->first();
+
+    expect($task)->not->toBeNull()
+        ->and($task->status)->toBe(MediaTask::STATUS_PENDING)
+        ->and($item->fresh()->status)->toBe(LibraryScanItemStatus::COMPLETED)
+        ->and($item->fresh()->progress)->toBe(100)
+        ->and($run->fresh()->status)->toBe('completed');
+
+    Queue::assertPushed(
+        GenerateLibraryScanPreviewAssets::class,
+        fn (GenerateLibraryScanPreviewAssets $job): bool => $job->queue === MediaTask::PREVIEW_QUEUE
+            && $job->taskId === $task->id,
     );
 });
 
