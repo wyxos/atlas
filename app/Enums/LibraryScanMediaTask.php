@@ -28,6 +28,8 @@ final class LibraryScanMediaTask
 
     public const string PHASE_QUEUED = 'queued';
 
+    public const string PHASE_PAUSED = 'paused';
+
     public const string PHASE_MEDIA_QUEUED = 'media_queued';
 
     public const string PHASE_MEDIA_PROCESSING = 'media_processing';

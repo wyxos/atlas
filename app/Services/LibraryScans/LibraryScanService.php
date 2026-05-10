@@ -107,6 +107,7 @@ class LibraryScanService
 
         $run = $run->fresh();
         $this->broadcastRun($run);
+        $this->dispatchPausedMediaTasksForRun($run);
 
         if ($shouldImportDiscoveredFiles) {
             $this->dispatchPendingImports($run);
@@ -238,6 +239,24 @@ class LibraryScanService
         }
 
         return count($queuedTasks);
+    }
+
+    public function deferMediaTask(?LibraryScanMediaTaskModel $task): void
+    {
+        if (! $task || in_array($task->status, MediaTask::terminal(), true)) {
+            return;
+        }
+
+        $task->update([
+            'status' => MediaTask::STATUS_PENDING,
+            'phase' => MediaTask::PHASE_PAUSED,
+            'progress' => 0,
+        ]);
+
+        $item = $task->item()->with(['run', 'mediaTasks'])->first();
+        if ($item) {
+            $this->broadcastItem($item->fresh(['mediaTasks']));
+        }
     }
 
     public function markMediaTaskProcessing(?LibraryScanMediaTaskModel $task, string $phase, int $progress = 0): void
@@ -446,6 +465,27 @@ class LibraryScanService
                 );
             }
         });
+    }
+
+    public function dispatchPausedMediaTasksForRun(LibraryScanRun $run): void
+    {
+        $regeneratePreviewAssets = $run->mode === LibraryScanRunMode::REPARSE;
+
+        LibraryScanMediaTaskModel::query()
+            ->where('status', MediaTask::STATUS_PENDING)
+            ->where('phase', MediaTask::PHASE_PAUSED)
+            ->whereHas('item', fn ($query) => $query->where('library_scan_run_id', $run->id))
+            ->orderBy('id')
+            ->chunkById(500, function ($tasks) use ($regeneratePreviewAssets): void {
+                foreach ($tasks as $task) {
+                    $task->update([
+                        'phase' => MediaTask::PHASE_QUEUED,
+                        'updated_at' => now(),
+                    ]);
+
+                    $this->dispatchMediaTask($task, $regeneratePreviewAssets);
+                }
+            });
     }
 
     public function queueParserForImportedScanItem(

@@ -50,7 +50,7 @@ trait HandlesLibraryScanMediaTask
         }
 
         if ($run->status === LibraryScanRunStatus::PAUSED) {
-            $this->release(30);
+            $scans->deferMediaTask($task);
 
             return false;
         }

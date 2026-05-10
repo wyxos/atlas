@@ -3,6 +3,7 @@
 use App\Enums\LibraryScanItemStatus;
 use App\Enums\LibraryScanMediaTask as MediaTask;
 use App\Enums\LibraryScanRunMode;
+use App\Enums\LibraryScanRunStatus;
 use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
 use App\Jobs\LibraryScans\GenerateLibraryScanPreviewAssets;
 use App\Jobs\LibraryScans\ImportLibraryScanItem;
@@ -923,6 +924,82 @@ it('fails the parser item when a conversion media task fails', function () {
         ->and($item->fresh()->status)->toBe(LibraryScanItemStatus::FAILED)
         ->and($item->fresh()->error_code)->toBe('video_streamable_failed')
         ->and($run->fresh()->status)->toBe('failed');
+});
+
+it('parks media conversion work while a scan is paused', function () {
+    $run = LibraryScanRun::factory()->create([
+        'mode' => LibraryScanRunMode::SCAN,
+        'status' => LibraryScanRunStatus::PAUSED,
+        'phase' => 'processing',
+        'scan_completed_at' => now(),
+    ]);
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/track.mp3',
+        'mime_type' => 'audio/mpeg',
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'status' => LibraryScanItemStatus::COMPLETED,
+        'parser' => 'audio',
+    ]);
+    $task = LibraryScanMediaTask::factory()->create([
+        'library_scan_item_id' => $item->id,
+        'file_id' => $file->id,
+        'type' => MediaTask::TASK_AUDIO_NORMALIZATION,
+        'status' => MediaTask::STATUS_PENDING,
+        'phase' => MediaTask::PHASE_QUEUED,
+    ]);
+
+    $processor = \Mockery::mock(LibraryScanMediaProcessor::class);
+    $processor->shouldReceive('normalizeAudio')->never();
+    $this->app->instance(LibraryScanMediaProcessor::class, $processor);
+
+    (new NormalizeLibraryScanAudio($task->id))->handle(
+        app(LibraryScanMediaProcessor::class),
+        app(LibraryScanService::class),
+    );
+
+    expect($task->fresh()->status)->toBe(MediaTask::STATUS_PENDING)
+        ->and($task->fresh()->phase)->toBe(MediaTask::PHASE_PAUSED)
+        ->and($task->fresh()->progress)->toBe(0)
+        ->and($item->fresh()->status)->toBe(LibraryScanItemStatus::COMPLETED);
+});
+
+it('dispatches paused media conversion work when a scan resumes', function () {
+    Queue::fake([NormalizeLibraryScanAudio::class]);
+
+    $run = LibraryScanRun::factory()->create([
+        'mode' => LibraryScanRunMode::SCAN,
+        'status' => LibraryScanRunStatus::PAUSED,
+        'phase' => 'processing',
+        'scan_completed_at' => now(),
+    ]);
+    $file = File::factory()->create([
+        'path' => 'imports/aa/bb/track.mp3',
+        'mime_type' => 'audio/mpeg',
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'status' => LibraryScanItemStatus::COMPLETED,
+    ]);
+    $task = LibraryScanMediaTask::factory()->create([
+        'library_scan_item_id' => $item->id,
+        'file_id' => $file->id,
+        'type' => MediaTask::TASK_AUDIO_NORMALIZATION,
+        'status' => MediaTask::STATUS_PENDING,
+        'phase' => MediaTask::PHASE_PAUSED,
+    ]);
+
+    app(LibraryScanService::class)->resume($run);
+
+    expect($task->fresh()->phase)->toBe(MediaTask::PHASE_QUEUED);
+    Queue::assertPushed(
+        NormalizeLibraryScanAudio::class,
+        fn (NormalizeLibraryScanAudio $job): bool => $job->queue === MediaTask::CONVERSION_QUEUE
+            && $job->taskId === $task->id,
+    );
 });
 
 it('uses separate horizon queues for library scan media previews and conversions', function () {
