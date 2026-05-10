@@ -78,6 +78,23 @@ it('scans atlas root, excludes app storage, moves files to imports, and creates 
         ->and(file_exists($root.DIRECTORY_SEPARATOR.'.app'.DIRECTORY_SEPARATOR.'downloads'.DIRECTORY_SEPARATOR.'ignored.txt'))->toBeTrue();
 });
 
+it('excludes root typesense data from library scan discovery', function () {
+    Queue::fake([ImportLibraryScanItem::class]);
+    $root = configureLibraryScanStorage();
+    Illuminate\Support\Facades\File::ensureDirectoryExists($root.DIRECTORY_SEPARATOR.'typesense-data'.DIRECTORY_SEPARATOR.'db');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'typesense-data'.DIRECTORY_SEPARATOR.'db'.DIRECTORY_SEPARATOR.'state.log', 'typesense payload');
+    file_put_contents($root.DIRECTORY_SEPARATOR.'sample.txt', 'payload');
+
+    $run = LibraryScanRun::factory()->create();
+
+    (new ScanLibraryRun($run->id))->handle(app(AtlasStorage::class), app(LibraryScanService::class));
+
+    expect($run->fresh()->files_found)->toBe(1)
+        ->and(LibraryScanItem::query()->count())->toBe(1)
+        ->and(LibraryScanItem::query()->where('original_path', 'like', '%typesense-data%')->exists())->toBeFalse()
+        ->and(file_exists($root.DIRECTORY_SEPARATOR.'typesense-data'.DIRECTORY_SEPARATOR.'db'.DIRECTORY_SEPARATOR.'state.log'))->toBeTrue();
+});
+
 it('moves duplicate files but reuses the first file row by hash', function () {
     Queue::fake([ProcessLibraryScanItem::class]);
     $root = configureLibraryScanStorage();

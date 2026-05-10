@@ -24,6 +24,7 @@ class ScanLibraryRun implements ShouldQueue
         '.svn',
         '__macosx',
         '@eadir',
+        'typesense-data',
     ];
 
     private const array IGNORED_FILES = [
