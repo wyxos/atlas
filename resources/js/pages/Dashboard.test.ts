@@ -6,14 +6,24 @@ import Dashboard from './Dashboard.vue';
 type DashboardMetrics = {
     files: {
         total: number;
+        active_total: number;
         downloaded: number;
         stored: number;
         records_only: number;
+        downloaded_stored_not_blacklisted: number;
+        stored_not_blacklisted: number;
+        records_only_not_blacklisted: number;
         local: number;
         non_local: number;
         local_available: number;
         non_local_available: number;
         file_types: {
+            image: number;
+            video: number;
+            audio: number;
+            other: number;
+        };
+        file_types_stored_not_blacklisted: {
             image: number;
             video: number;
             audio: number;
@@ -33,6 +43,7 @@ type DashboardMetrics = {
         blacklisted_auto_in_feed: number;
         auto_blacklisted: number;
         not_found: number;
+        not_found_records_only_not_blacklisted: number;
         previewed_not_blacklisted: number;
         unpreviewed_not_blacklisted: number;
         unreacted_not_blacklisted: number;
@@ -84,14 +95,24 @@ type DashboardMetrics = {
 const createMetrics = (): DashboardMetrics => ({
     files: {
         total: 0,
+        active_total: 0,
         downloaded: 0,
         stored: 0,
         records_only: 0,
+        downloaded_stored_not_blacklisted: 0,
+        stored_not_blacklisted: 0,
+        records_only_not_blacklisted: 0,
         local: 0,
         non_local: 0,
         local_available: 0,
         non_local_available: 0,
         file_types: {
+            image: 0,
+            video: 0,
+            audio: 0,
+            other: 0,
+        },
+        file_types_stored_not_blacklisted: {
             image: 0,
             video: 0,
             audio: 0,
@@ -111,6 +132,7 @@ const createMetrics = (): DashboardMetrics => ({
         blacklisted_auto_in_feed: 0,
         auto_blacklisted: 0,
         not_found: 0,
+        not_found_records_only_not_blacklisted: 0,
         previewed_not_blacklisted: 0,
         unpreviewed_not_blacklisted: 0,
         unreacted_not_blacklisted: 0,
@@ -202,9 +224,13 @@ describe('Dashboard', () => {
         metrics.files.blacklisted_auto_in_feed = 3;
         metrics.files.auto_blacklisted = 3;
         metrics.files.blacklisted_feed_removed = 2;
+        metrics.files.active_total = 91;
         metrics.files.stored = 40;
         metrics.files.records_only = 60;
+        metrics.files.stored_not_blacklisted = 40;
+        metrics.files.records_only_not_blacklisted = 51;
         metrics.files.downloaded = 25;
+        metrics.files.downloaded_stored_not_blacklisted = 25;
         metrics.files.local = 30;
         metrics.files.non_local = 70;
         metrics.files.local_available = 20;
@@ -213,7 +239,12 @@ describe('Dashboard', () => {
         metrics.files.file_types.video = 30;
         metrics.files.file_types.audio = 15;
         metrics.files.file_types.other = 10;
+        metrics.files.file_types_stored_not_blacklisted.image = 20;
+        metrics.files.file_types_stored_not_blacklisted.video = 10;
+        metrics.files.file_types_stored_not_blacklisted.audio = 5;
+        metrics.files.file_types_stored_not_blacklisted.other = 5;
         metrics.files.not_found = 5;
+        metrics.files.not_found_records_only_not_blacklisted = 5;
         metrics.files.previewed_not_blacklisted = 50;
         metrics.files.unpreviewed_not_blacklisted = 41;
         metrics.files.reacted = 60;
@@ -254,7 +285,8 @@ describe('Dashboard', () => {
         expect(text).toContain('Videos');
         expect(text).toContain('Audio');
         expect(text).toContain('Other');
-        expect(text).toContain('45 / 100');
+        expect(text).toContain('40 / 91');
+        expect(text).toContain('20 / 40');
         expect(text).toContain('Reaction state');
         expect(text).toContain('Reacted');
         expect(text).toContain('Unreacted');

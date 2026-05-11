@@ -135,7 +135,7 @@ class FileDownloadFinalizer
         $file->update($updates);
         app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
 
-        $metrics->applyDownload($file, $wasDownloaded, $hadPath);
+        $metrics->applyDownload($file, $wasDownloaded, $hadPath, $wasBlacklisted);
         if ($wasBlacklisted) {
             $metrics->applyBlacklistClear(
                 $file,

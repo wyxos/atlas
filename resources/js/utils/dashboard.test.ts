@@ -6,14 +6,24 @@ function metrics(overrides: Partial<DashboardMetrics['files']> = {}): DashboardM
     return {
         files: {
             total: 10,
+            active_total: 8,
             downloaded: 0,
             stored: 0,
             records_only: 0,
+            downloaded_stored_not_blacklisted: 0,
+            stored_not_blacklisted: 0,
+            records_only_not_blacklisted: 8,
             local: 0,
             non_local: 0,
             local_available: 0,
             non_local_available: 0,
             file_types: {
+                image: 0,
+                video: 0,
+                audio: 0,
+                other: 0,
+            },
+            file_types_stored_not_blacklisted: {
                 image: 0,
                 video: 0,
                 audio: 0,
@@ -33,6 +43,7 @@ function metrics(overrides: Partial<DashboardMetrics['files']> = {}): DashboardM
             blacklisted_auto_in_feed: 0,
             auto_blacklisted: 0,
             not_found: 1,
+            not_found_records_only_not_blacklisted: 1,
             previewed_not_blacklisted: 5,
             unpreviewed_not_blacklisted: 3,
             unreacted_not_blacklisted: 4,

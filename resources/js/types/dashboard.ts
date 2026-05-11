@@ -11,14 +11,24 @@ export type ContainerMetricItem = {
 export type DashboardMetrics = {
     files: {
         total: number;
+        active_total: number;
         downloaded: number;
         stored: number;
         records_only: number;
+        downloaded_stored_not_blacklisted: number;
+        stored_not_blacklisted: number;
+        records_only_not_blacklisted: number;
         local: number;
         non_local: number;
         local_available: number;
         non_local_available: number;
         file_types: {
+            image: number;
+            video: number;
+            audio: number;
+            other: number;
+        };
+        file_types_stored_not_blacklisted: {
             image: number;
             video: number;
             audio: number;
@@ -38,6 +48,7 @@ export type DashboardMetrics = {
         blacklisted_auto_in_feed: number;
         auto_blacklisted: number;
         not_found: number;
+        not_found_records_only_not_blacklisted: number;
         previewed_not_blacklisted: number;
         unpreviewed_not_blacklisted: number;
         unreacted_not_blacklisted: number;

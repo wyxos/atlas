@@ -131,20 +131,22 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
 
 export function createDashboardMetricPanels(metrics: DashboardMetrics | null): DashboardMetricPanel[] {
     const files = metrics?.files;
-    const total = files?.total ?? 0;
-    const downloaded = files?.downloaded ?? 0;
-    const stored = files?.stored ?? 0;
-    const recordsOnly = files?.records_only ?? Math.max(0, total - stored);
+    const rawTotal = files?.total ?? 0;
+    const total = files?.active_total ?? Math.max(0, rawTotal - (files?.blacklisted ?? 0));
+    const stored = Math.min(files?.stored_not_blacklisted ?? files?.stored ?? 0, total);
+    const recordsOnly = files?.records_only_not_blacklisted ?? Math.max(0, total - stored);
+    const downloaded = Math.min(files?.downloaded_stored_not_blacklisted ?? files?.downloaded ?? 0, stored);
     const importedStored = Math.max(0, stored - downloaded);
-    const notFound = files?.not_found ?? 0;
+    const notFound = files?.not_found_records_only_not_blacklisted ?? files?.not_found ?? 0;
     const notFoundRecords = Math.min(notFound, recordsOnly);
     const onlineRecords = Math.max(0, recordsOnly - notFoundRecords);
-    const fileTypes = files?.file_types ?? {
+    const fileTypes = files?.file_types_stored_not_blacklisted ?? files?.file_types ?? {
         image: 0,
         video: 0,
         audio: 0,
         other: 0,
     };
+    const fileTypesTotal = stored;
 
     return [
         {
@@ -165,12 +167,12 @@ export function createDashboardMetricPanels(metrics: DashboardMetrics | null): D
                     createMetricRow('downloaded', 'Downloaded', downloaded, colors.downloaded, stored, 'of stored media'),
                     createMetricRow('imported', 'Imported', importedStored, colors.imported, stored, 'of stored media'),
                 ], stored),
-                createMetricDistribution('file-types', 'File types', 'Records grouped by media type', [
-                    createMetricRow('image', 'Images', fileTypes.image, colors.image, total, 'of records'),
-                    createMetricRow('video', 'Videos', fileTypes.video, colors.video, total, 'of records'),
-                    createMetricRow('audio', 'Audio', fileTypes.audio, colors.audio, total, 'of records'),
-                    createMetricRow('other', 'Other', fileTypes.other, colors.other, total, 'of records'),
-                ], total),
+                createMetricDistribution('file-types', 'File types', 'On-disk files grouped by media type', [
+                    createMetricRow('image', 'Images', fileTypes.image, colors.image, fileTypesTotal, 'of on-disk files'),
+                    createMetricRow('video', 'Videos', fileTypes.video, colors.video, fileTypesTotal, 'of on-disk files'),
+                    createMetricRow('audio', 'Audio', fileTypes.audio, colors.audio, fileTypesTotal, 'of on-disk files'),
+                    createMetricRow('other', 'Other', fileTypes.other, colors.other, fileTypesTotal, 'of on-disk files'),
+                ], fileTypesTotal),
             ],
             rows: [],
         },
