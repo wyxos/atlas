@@ -129,8 +129,8 @@ test('dashboard metrics report file and reaction totals', function () {
                 'audio' => 1,
                 'other' => 2,
             ],
-            'reacted' => 3,
-            'unreacted' => 1,
+            'reacted' => 1,
+            'unreacted' => 2,
             'blacklisted' => 2,
             'blacklisted_manual' => 1,
             'blacklisted_feed_removed' => 1,
@@ -138,6 +138,8 @@ test('dashboard metrics report file and reaction totals', function () {
             'blacklisted_auto_in_feed' => 0,
             'auto_blacklisted' => 1,
             'not_found' => 1,
+            'previewed_not_blacklisted' => 1,
+            'unpreviewed_not_blacklisted' => 2,
             'unreacted_not_blacklisted' => 1,
             'unreacted_previewed_not_blacklisted' => 1,
             'unreacted_unpreviewed_not_blacklisted' => 0,
@@ -228,6 +230,56 @@ test('not found transitions remove unreacted files from the actionable backlog',
     ]))->toBe([
         MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED => 1,
         MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED => 1,
+    ]);
+});
+
+test('preview and reaction dashboard counters follow non-blacklisted transitions', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'blacklisted_at' => null,
+        'not_found' => false,
+        'previewed_count' => 0,
+    ]);
+    $metrics = app(MetricsService::class);
+
+    $metrics->syncAll();
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED,
+        MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED => 0,
+        MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED => 0,
+    ]);
+
+    $metrics->applyPreviewIncrement([$file->id]);
+    $file->forceFill(['previewed_count' => 1])->save();
+
+    $metrics->applyReactionChange($file->fresh(), null, 'love', false, false);
+    Reaction::create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED,
+        MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED => 1,
+        MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED => 1,
+    ]);
+
+    $metrics->applyBlacklistAdd([$file->id]);
+    $metrics->applyReactionChange($file->fresh(), 'love', null, false, true);
+    Reaction::where('file_id', $file->id)->delete();
+    $file->forceFill(['blacklisted_at' => now()])->save();
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED,
+        MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED => 0,
+        MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED => 0,
     ]);
 });
 

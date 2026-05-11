@@ -43,6 +43,7 @@ test('compiler builds source downloaded file-type and random filters', function 
         'sort' => 'random',
         'seed' => 123,
         'fileTypes' => ['video'],
+        'imported' => 'yes',
         'maxPreviewed' => 2,
         'reactionMode' => 'any',
         'reactionTypes' => null,
@@ -53,6 +54,7 @@ test('compiler builds source downloaded file-type and random filters', function 
     expect($compiled['options']['filter_by'])->toContain('source:=`Wallhaven`')
         ->and($compiled['options']['filter_by'])->toContain('not_found:=false')
         ->and($compiled['options']['filter_by'])->toContain('downloaded:=false')
+        ->and($compiled['options']['filter_by'])->toContain('imported_at:>0')
         ->and($compiled['options']['filter_by'])->toContain('previewed_count:<=2')
         ->and($compiled['options']['filter_by'])->toContain('mime_group:=[`video`]')
         ->and($compiled['options']['sort_by'])->toBe('_rand(123):desc,sort_id:desc');

@@ -33,6 +33,8 @@ type DashboardMetrics = {
         blacklisted_auto_in_feed: number;
         auto_blacklisted: number;
         not_found: number;
+        previewed_not_blacklisted: number;
+        unpreviewed_not_blacklisted: number;
         unreacted_not_blacklisted: number;
         unreacted_previewed_not_blacklisted: number;
         unreacted_unpreviewed_not_blacklisted: number;
@@ -109,6 +111,8 @@ const createMetrics = (): DashboardMetrics => ({
         blacklisted_auto_in_feed: 0,
         auto_blacklisted: 0,
         not_found: 0,
+        previewed_not_blacklisted: 0,
+        unpreviewed_not_blacklisted: 0,
         unreacted_not_blacklisted: 0,
         unreacted_previewed_not_blacklisted: 0,
         unreacted_unpreviewed_not_blacklisted: 0,
@@ -183,13 +187,13 @@ describe('Dashboard', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('Moderation coverage');
+        expect(wrapper.text()).toContain('Review coverage');
         expect(wrapper.text()).toContain('Library inventory');
         expect(wrapper.text()).not.toContain('Positive reaction categories');
         expect(wrapper.text()).not.toContain('Removal impact');
     });
 
-    it('renders moderation coverage and regrouped metric labels', async () => {
+    it('renders review coverage and regrouped metric labels', async () => {
         const metrics = createMetrics();
         metrics.files.total = 100;
         metrics.files.blacklisted = 9;
@@ -210,8 +214,10 @@ describe('Dashboard', () => {
         metrics.files.file_types.audio = 15;
         metrics.files.file_types.other = 10;
         metrics.files.not_found = 5;
-        metrics.files.reacted = 89;
-        metrics.files.unreacted = 11;
+        metrics.files.previewed_not_blacklisted = 50;
+        metrics.files.unpreviewed_not_blacklisted = 41;
+        metrics.files.reacted = 60;
+        metrics.files.unreacted = 31;
         metrics.files.reactions.love = 5;
         metrics.files.reactions.like = 3;
         metrics.files.reactions.funny = 2;
@@ -232,13 +238,11 @@ describe('Dashboard', () => {
         await wrapper.vm.$nextTick();
 
         const text = wrapper.text();
-        expect(text).toContain('Decision coverage');
-        expect(text).toContain('89%');
-        expect(text).toContain('Unseen');
-        expect(text).toContain('Seen, no decision');
-        expect(text).toContain('Kept');
-        expect(text).toContain('Removed');
-        expect(text).toContain('Total records');
+        expect(text).toContain('Previewed');
+        expect(text).toContain('55%');
+        expect(text).toContain('Preview state');
+        expect(text).toContain('Not previewed');
+        expect(text).toContain('Total files');
         expect(text).toContain('Storage coverage');
         expect(text).toContain('On disk');
         expect(text).toContain('Online records');
@@ -253,12 +257,11 @@ describe('Dashboard', () => {
         expect(text).toContain('45 / 100');
         expect(text).toContain('Reaction state');
         expect(text).toContain('Reacted');
-        expect(text).toContain('Not reacted');
-        expect(text).toContain('11 / 86');
+        expect(text).toContain('Unreacted');
+        expect(text).toContain('31 / 91');
         expect(text).toContain('Downloaded');
-        expect(text).toContain('Decision coverage');
+        expect(text).not.toContain('Decision coverage');
         expect(text).not.toContain('Backlog split');
-        expect(text).not.toContain('Not previewed');
         expect(text).toContain('Reaction types');
         expect(text).toContain('Favorite');
         expect(text).toContain('50%');

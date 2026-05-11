@@ -38,6 +38,8 @@ export type DashboardMetrics = {
         blacklisted_auto_in_feed: number;
         auto_blacklisted: number;
         not_found: number;
+        previewed_not_blacklisted: number;
+        unpreviewed_not_blacklisted: number;
         unreacted_not_blacklisted: number;
         unreacted_previewed_not_blacklisted: number;
         unreacted_unpreviewed_not_blacklisted: number;
@@ -74,7 +76,7 @@ export type DashboardMetricIcon =
     | 'video';
 
 export type DashboardCoverageSegment = {
-    key: 'unseen' | 'pending' | 'kept' | 'removed';
+    key: 'previewed' | 'not-previewed';
     label: string;
     value: number;
     barPercent: number;
@@ -84,8 +86,8 @@ export type DashboardCoverageSegment = {
 
 export type DashboardCoverage = {
     total: number;
-    moderated: number;
-    moderatedPercent: string;
+    previewed: number;
+    previewedPercent: string;
     segments: DashboardCoverageSegment[];
     distributions: DashboardMetricDistribution[];
 };

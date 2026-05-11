@@ -146,6 +146,10 @@ class LocalBrowseTypesenseCompiler
             $filters[] = 'downloaded:=false';
         }
 
+        if ((string) ($context['imported'] ?? 'any') === 'yes') {
+            $filters[] = 'imported_at:>0';
+        }
+
         $blacklisted = (string) ($context['blacklisted'] ?? 'any');
         if ($blacklisted === 'yes') {
             $filters[] = 'blacklisted:=true';

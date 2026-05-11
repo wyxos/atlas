@@ -33,6 +33,7 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($local['defaults']['reaction_mode'])->toBe('any');
     expect($local['defaults']['reaction'])->toBe(['love', 'like', 'funny']);
     expect($local['defaults']['downloaded'])->toBe('any');
+    expect($local['defaults']['imported'])->toBe('any');
     expect($local['defaults']['not_found'])->toBe('no');
     expect($local['defaults']['blacklisted'])->toBe('any');
     expect($local['defaults']['auto_blacklisted'])->toBe('any');
@@ -70,6 +71,13 @@ test('browse services endpoint returns civitai schema with expected field mappin
         ['label' => '200', 'value' => 200],
         ['label' => '250', 'value' => 250],
     ]);
+
+    $localSort = collect($localFields)->firstWhere('uiKey', 'sort');
+    expect($localSort['options'])
+        ->toContain(['label' => 'Created At (Newest)', 'value' => 'created_at'])
+        ->toContain(['label' => 'Created At (Oldest)', 'value' => 'created_at_asc'])
+        ->toContain(['label' => 'Updated At (Newest)', 'value' => 'updated_at'])
+        ->toContain(['label' => 'Updated At (Oldest)', 'value' => 'updated_at_asc']);
 
     $civit = collect($services)->firstWhere('key', 'civit-ai-images');
     expect($civit)->not->toBeNull();

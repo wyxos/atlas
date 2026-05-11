@@ -88,6 +88,21 @@ describe('TabFilter', () => {
         });
     });
 
+    it('provides an imported-files local preset', () => {
+        const commonGroup = LOCAL_TAB_FILTER_PRESET_GROUPS.find((group) => group.label === 'Common');
+
+        expect(commonGroup?.presets.map((preset) => preset.label)).toEqual([
+            'All',
+            'Inbox (Fresh)',
+            'Imported Files',
+        ]);
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'imported_files')?.filters).toMatchObject({
+            imported: 'yes',
+            reaction_mode: 'any',
+            sort: 'updated_at',
+        });
+    });
+
     it('prefills civitai username from tab params after sync', async () => {
         const form = createBrowseForm();
 
@@ -323,6 +338,7 @@ describe('TabFilter', () => {
         await nextTick();
 
         expect(wrapper.text()).toContain('Common');
+        expect(wrapper.text()).toContain('Imported Files');
         expect(wrapper.text()).toContain('Unreacted');
         expect(wrapper.text()).toContain('Unreacted (Random)');
         expect(wrapper.text()).toContain('Unreacted (Newest)');

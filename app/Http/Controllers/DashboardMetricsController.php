@@ -17,6 +17,17 @@ class DashboardMetricsController extends Controller
     private function metricsFromTable(): array
     {
         $metrics = app(MetricsService::class)->getMetrics($this->metricKeys());
+        $total = $metrics[MetricsService::KEY_FILES_TOTAL] ?? 0;
+        $blacklisted = $metrics[MetricsService::KEY_FILES_BLACKLISTED_TOTAL] ?? 0;
+        $filesExcludingBlacklisted = max(0, $total - $blacklisted);
+        $previewedNotBlacklisted = min(
+            $metrics[MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED] ?? 0,
+            $filesExcludingBlacklisted,
+        );
+        $reactedNotBlacklisted = min(
+            $metrics[MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED] ?? 0,
+            $filesExcludingBlacklisted,
+        );
 
         $reactions = [
             'love' => $metrics[MetricsService::KEY_REACTIONS_LOVE] ?? 0,
@@ -26,12 +37,12 @@ class DashboardMetricsController extends Controller
 
         return [
             'files' => [
-                'total' => $metrics[MetricsService::KEY_FILES_TOTAL] ?? 0,
+                'total' => $total,
                 'downloaded' => $metrics[MetricsService::KEY_FILES_DOWNLOADED] ?? 0,
                 'stored' => $metrics[MetricsService::KEY_FILES_WITH_PATH] ?? 0,
-                'records_only' => max(0, ($metrics[MetricsService::KEY_FILES_TOTAL] ?? 0) - ($metrics[MetricsService::KEY_FILES_WITH_PATH] ?? 0)),
+                'records_only' => max(0, $total - ($metrics[MetricsService::KEY_FILES_WITH_PATH] ?? 0)),
                 'local' => $metrics[MetricsService::KEY_FILES_LOCAL] ?? 0,
-                'non_local' => max(0, ($metrics[MetricsService::KEY_FILES_TOTAL] ?? 0) - ($metrics[MetricsService::KEY_FILES_LOCAL] ?? 0)),
+                'non_local' => max(0, $total - ($metrics[MetricsService::KEY_FILES_LOCAL] ?? 0)),
                 'local_available' => $metrics[MetricsService::KEY_FILES_LOCAL_AVAILABLE] ?? 0,
                 'non_local_available' => $metrics[MetricsService::KEY_FILES_NON_LOCAL_AVAILABLE] ?? 0,
                 'file_types' => [
@@ -41,15 +52,17 @@ class DashboardMetricsController extends Controller
                     'other' => $metrics[MetricsService::KEY_FILES_TYPE_OTHER] ?? 0,
                 ],
                 'reactions' => $reactions,
-                'reacted' => $metrics[MetricsService::KEY_FILES_REACTED] ?? 0,
-                'unreacted' => $metrics[MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED] ?? 0,
-                'blacklisted' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_TOTAL] ?? 0,
+                'reacted' => $reactedNotBlacklisted,
+                'unreacted' => max(0, $filesExcludingBlacklisted - $reactedNotBlacklisted),
+                'blacklisted' => $blacklisted,
                 'blacklisted_manual' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_MANUAL] ?? 0,
                 'blacklisted_feed_removed' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_FEED_REMOVED] ?? 0,
                 'blacklisted_manual_in_feed' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED] ?? 0,
                 'blacklisted_auto_in_feed' => $metrics[MetricsService::KEY_FILES_BLACKLISTED_AUTO_IN_FEED] ?? 0,
                 'auto_blacklisted' => $metrics[MetricsService::KEY_FILES_AUTO_BLACKLISTED] ?? 0,
                 'not_found' => $metrics[MetricsService::KEY_FILES_NOT_FOUND] ?? 0,
+                'previewed_not_blacklisted' => $previewedNotBlacklisted,
+                'unpreviewed_not_blacklisted' => max(0, $filesExcludingBlacklisted - $previewedNotBlacklisted),
                 'unreacted_not_blacklisted' => $metrics[MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED] ?? 0,
                 'unreacted_previewed_not_blacklisted' => $metrics[MetricsService::KEY_FILES_UNREACTED_PREVIEWED_NOT_BLACKLISTED] ?? 0,
                 'unreacted_unpreviewed_not_blacklisted' => $metrics[MetricsService::KEY_FILES_UNREACTED_UNPREVIEWED_NOT_BLACKLISTED] ?? 0,
@@ -75,7 +88,8 @@ class DashboardMetricsController extends Controller
             MetricsService::KEY_FILES_TYPE_VIDEO,
             MetricsService::KEY_FILES_TYPE_AUDIO,
             MetricsService::KEY_FILES_TYPE_OTHER,
-            MetricsService::KEY_FILES_REACTED,
+            MetricsService::KEY_FILES_REACTED_NOT_BLACKLISTED,
+            MetricsService::KEY_FILES_PREVIEWED_NOT_BLACKLISTED,
             MetricsService::KEY_FILES_BLACKLISTED_TOTAL,
             MetricsService::KEY_FILES_BLACKLISTED_MANUAL,
             MetricsService::KEY_FILES_BLACKLISTED_FEED_REMOVED,

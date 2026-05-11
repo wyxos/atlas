@@ -22,6 +22,8 @@ const colors = {
     video: '#38bdf8',
     audio: '#a78bfa',
     other: 'var(--color-blue-slate-500)',
+    previewed: 'var(--color-smart-blue-500)',
+    notPreviewed: 'var(--color-blue-slate-500)',
     unseen: 'var(--color-blue-slate-500)',
     pending: '#f97316',
     kept: 'var(--color-success-400)',
@@ -46,6 +48,8 @@ const metricIcons: Record<string, DashboardMetricIcon> = {
     video: 'video',
     audio: 'music',
     other: 'file',
+    previewed: 'eye',
+    'not-previewed': 'eye-off',
     unseen: 'eye-off',
     pending: 'eye',
     kept: 'thumbs-up',
@@ -78,21 +82,18 @@ export function formatDashboardPercent(value: number): string {
 
 export function createDashboardCoverage(metrics: DashboardMetrics | null): DashboardCoverage {
     const files = metrics?.files;
-    const total = files?.total ?? 0;
+    const rawTotal = files?.total ?? 0;
     const reactions = files?.reactions;
     const removed = files?.blacklisted ?? 0;
-    const notFound = files?.not_found ?? 0;
-    const unseen = files?.unreacted_unpreviewed_not_blacklisted ?? 0;
-    const pending = files?.unreacted_previewed_not_blacklisted ?? 0;
-    const backlog = files?.unreacted_not_blacklisted ?? 0;
-    const reactionTotal = Math.max(0, total - removed - notFound);
-    const unreacted = Math.min(files?.unreacted ?? backlog, reactionTotal);
-    const reacted = Math.max(0, reactionTotal - unreacted);
+    const total = Math.max(0, rawTotal - removed);
+    const previewed = Math.min(files?.previewed_not_blacklisted ?? 0, total);
+    const notPreviewed = Math.max(0, total - previewed);
+    const reactionTotal = total;
+    const reacted = Math.min(files?.reacted ?? 0, reactionTotal);
+    const unreacted = Math.max(0, reactionTotal - reacted);
     const manualInFeed = files?.blacklisted_manual_in_feed ?? 0;
     const autoInFeed = files?.blacklisted_auto_in_feed ?? 0;
     const outOfFeed = files?.blacklisted_feed_removed ?? 0;
-    const kept = Math.max(0, total - unseen - pending - removed);
-    const moderated = kept + removed;
     const favoriteReactions = reactions?.love ?? 0;
     const likeReactions = reactions?.like ?? 0;
     const funnyReactions = reactions?.funny ?? 0;
@@ -103,22 +104,20 @@ export function createDashboardCoverage(metrics: DashboardMetrics | null): Dashb
         createMetricRow('funny', 'Funny', funnyReactions, colors.funny, reactionSignals, 'of reaction signals'),
     ];
     const segments = [
-        createCoverageSegment('unseen', 'Unseen', unseen, total, colors.unseen),
-        createCoverageSegment('pending', 'Seen, no decision', pending, total, colors.pending),
-        createCoverageSegment('kept', 'Kept', kept, total, colors.kept),
-        createCoverageSegment('removed', 'Removed', removed, total, colors.removed),
+        createCoverageSegment('previewed', 'Previewed', previewed, total, colors.previewed),
+        createCoverageSegment('not-previewed', 'Not previewed', notPreviewed, total, colors.notPreviewed),
     ];
 
     return {
         total,
-        moderated,
-        moderatedPercent: formatDashboardPercent(percent(moderated, total)),
+        previewed,
+        previewedPercent: formatDashboardPercent(percent(previewed, total)),
         segments,
         distributions: [
-            createMetricDistribution('coverage', 'Coverage split', 'Unseen, pending, kept, and removed records', segments, total),
-            createMetricDistribution('reaction-state', 'Reaction state', 'Available, non-blacklisted records by reaction state', [
-                createMetricRow('reacted', 'Reacted', reacted, colors.reacted, reactionTotal, 'of available records'),
-                createMetricRow('unreacted', 'Not reacted', unreacted, colors.unreacted, reactionTotal, 'of available records'),
+            createMetricDistribution('coverage', 'Preview state', 'Previewed and not previewed files, excluding removed files', segments, total),
+            createMetricDistribution('reaction-state', 'Reaction state', 'Reacted and unreacted files, excluding blacklisted files', [
+                createMetricRow('reacted', 'Reacted', reacted, colors.reacted, reactionTotal, 'of non-blacklisted files'),
+                createMetricRow('unreacted', 'Unreacted', unreacted, colors.unreacted, reactionTotal, 'of non-blacklisted files'),
             ], reactionTotal),
             createMetricDistribution('reaction-types', 'Reaction types', 'Reaction signals by type', reactionRows, reactionSignals),
             createMetricDistribution('removal-state', 'Removal state', 'Manual and auto counts only include blacklisted records still in feed', [

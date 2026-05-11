@@ -11,6 +11,7 @@ class LocalFetchParams
      *   limit: int,
      *   source: array<int, string>,
      *   downloaded: string,
+     *   imported: string,
      *   notFound: string,
      *   blacklisted: string,
      *   sort: string,
@@ -32,6 +33,7 @@ class LocalFetchParams
         $source = self::normalizeSources($params['source'] ?? 'all');
         $params['source'] = count($source) === 1 ? $source[0] : $source;
         $downloaded = is_string($params['downloaded'] ?? null) ? (string) $params['downloaded'] : 'any';
+        $imported = is_string($params['imported'] ?? null) ? (string) $params['imported'] : 'any';
         $notFound = is_string($params['not_found'] ?? null) ? (string) $params['not_found'] : 'no';
         $blacklisted = is_string($params['blacklisted'] ?? null) ? (string) $params['blacklisted'] : 'any';
         $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'stored_at';
@@ -62,6 +64,7 @@ class LocalFetchParams
                 'limit' => $limit,
                 'source' => $source,
                 'downloaded' => $downloaded,
+                'imported' => $imported,
                 'notFound' => $notFound,
                 'blacklisted' => $blacklisted,
                 'sort' => $sort,
@@ -88,6 +91,7 @@ class LocalFetchParams
             'limit' => $limit,
             'source' => $source,
             'downloaded' => $downloaded,
+            'imported' => $imported,
             'notFound' => $notFound,
             'blacklisted' => $blacklisted,
             'sort' => $sort,

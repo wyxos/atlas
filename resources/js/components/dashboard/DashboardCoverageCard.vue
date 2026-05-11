@@ -16,23 +16,23 @@ defineProps<Props>();
     <section class="flex h-full flex-col gap-5 rounded-lg border border-twilight-indigo-500/40 bg-prussian-blue-600 p-5">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <h2 class="text-base font-semibold text-regal-navy-100">Moderation coverage</h2>
+                <h2 class="text-base font-semibold text-regal-navy-100">Review coverage</h2>
                 <p class="text-sm text-twilight-indigo-200">
-                    Library progress from unseen records to decisions and removals.
+                    Preview and reaction progress for active library files.
                 </p>
             </div>
 
             <div class="flex shrink-0 flex-wrap items-start justify-end gap-x-6 gap-y-2 text-right">
                 <div class="min-w-20">
-                    <div class="text-xs text-twilight-indigo-300">Total records</div>
+                    <div class="text-xs text-twilight-indigo-300">Total files</div>
                     <div class="text-lg font-semibold tabular-nums text-regal-navy-100">
                         {{ formatDashboardCount(coverage.total) }}
                     </div>
                 </div>
                 <div class="min-w-20">
-                    <div class="text-xs text-twilight-indigo-300">Decision coverage</div>
+                    <div class="text-xs text-twilight-indigo-300">Previewed</div>
                     <div class="text-lg font-semibold tabular-nums text-success-300">
-                        {{ coverage.moderatedPercent }}
+                        {{ coverage.previewedPercent }}
                     </div>
                 </div>
             </div>

@@ -54,6 +54,16 @@ it('defaults not found filtering to no and keeps explicit values', function () {
         ->and($notFoundContext['notFound'])->toBe('yes');
 });
 
+it('normalizes imported-only local filtering', function () {
+    $defaultContext = LocalFetchParams::normalize([]);
+    $importedContext = LocalFetchParams::normalize([
+        'imported' => 'yes',
+    ]);
+
+    expect($defaultContext['imported'])->toBe('any')
+        ->and($importedContext['imported'])->toBe('yes');
+});
+
 it('normalizes file types to all when empty or invalid', function () {
     $context = LocalFetchParams::normalize([
         'file_type' => ['invalid-type'],

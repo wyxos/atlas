@@ -34,6 +34,10 @@ class MetricsService
 
     public const string KEY_FILES_REACTED = 'files_reacted';
 
+    public const string KEY_FILES_REACTED_NOT_BLACKLISTED = 'files_reacted_not_blacklisted';
+
+    public const string KEY_FILES_PREVIEWED_NOT_BLACKLISTED = 'files_previewed_not_blacklisted';
+
     public const string KEY_FILES_BLACKLISTED_TOTAL = 'files_blacklisted_total';
 
     public const string KEY_FILES_BLACKLISTED_MANUAL = 'files_blacklisted_manual';
@@ -307,6 +311,13 @@ class MetricsService
             $this->incrementMetric(self::KEY_FILES_REACTED, $afterReacted ? 1 : -1);
         }
 
+        $beforeReactedNotBlacklisted = $beforeReacted && ! $wasBlacklisted;
+        $afterBlacklistedForReactionState = $newType === null ? $wasBlacklisted : $isBlacklisted;
+        $afterReactedNotBlacklisted = $afterReacted && ! $afterBlacklistedForReactionState;
+        if ($beforeReactedNotBlacklisted !== $afterReactedNotBlacklisted) {
+            $this->incrementMetric(self::KEY_FILES_REACTED_NOT_BLACKLISTED, $afterReactedNotBlacklisted ? 1 : -1);
+        }
+
         if ($loveDelta !== 0) {
             $this->incrementContainersForFileIds([$file->id], 'files_favorited', $loveDelta);
         }
@@ -417,6 +428,13 @@ class MetricsService
             );
         }
 
+        $previewedCount = $eligibleFiles
+            ->filter(fn (File $file): bool => (int) $file->previewed_count > 0)
+            ->count();
+        if ($previewedCount > 0) {
+            $this->incrementMetric(self::KEY_FILES_PREVIEWED_NOT_BLACKLISTED, -$previewedCount);
+        }
+
         $filesWithoutReactions = DB::table('files')
             ->select(['id', 'previewed_count'])
             ->whereIn('id', $eligibleIds)
@@ -460,8 +478,16 @@ class MetricsService
             );
         }
 
+        $hasReactions = Reaction::where('file_id', $file->id)->exists();
+        if ($adjustUnreacted && $hasReactions) {
+            $this->incrementMetric(self::KEY_FILES_REACTED_NOT_BLACKLISTED, 1);
+        }
+
+        if ((int) $file->previewed_count > 0) {
+            $this->incrementMetric(self::KEY_FILES_PREVIEWED_NOT_BLACKLISTED, 1);
+        }
+
         if ($adjustUnreacted) {
-            $hasReactions = Reaction::where('file_id', $file->id)->exists();
             if (! $hasReactions && ! $this->isNotFound($file)) {
                 $this->incrementUnreactedNotBlacklistedForFile($file, 1);
             }
@@ -479,6 +505,16 @@ class MetricsService
     {
         if (empty($fileIds)) {
             return;
+        }
+
+        $newlyPreviewed = DB::table('files')
+            ->whereIn('id', $fileIds)
+            ->whereNull('blacklisted_at')
+            ->where('previewed_count', 0)
+            ->count();
+
+        if ($newlyPreviewed > 0) {
+            $this->incrementMetric(self::KEY_FILES_PREVIEWED_NOT_BLACKLISTED, $newlyPreviewed);
         }
 
         $newlyPreviewedUnreacted = DB::table('files')
@@ -508,6 +544,16 @@ class MetricsService
     {
         if (empty($fileIds)) {
             return;
+        }
+
+        $resetPreviewed = DB::table('files')
+            ->whereIn('id', $fileIds)
+            ->whereNull('blacklisted_at')
+            ->where('previewed_count', '>', 0)
+            ->count();
+
+        if ($resetPreviewed > 0) {
+            $this->incrementMetric(self::KEY_FILES_PREVIEWED_NOT_BLACKLISTED, -$resetPreviewed);
         }
 
         $resetUnreacted = DB::table('files')
@@ -655,6 +701,7 @@ class MetricsService
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND auto_blacklisted = 0 AND previewed_count < '.FilePreviewService::FEED_REMOVED_PREVIEW_COUNT.' THEN 1 ELSE 0 END) as blacklisted_manual_in_feed_total')
             ->selectRaw('SUM(CASE WHEN blacklisted_at IS NOT NULL AND auto_blacklisted = 1 AND previewed_count < '.FilePreviewService::FEED_REMOVED_PREVIEW_COUNT.' THEN 1 ELSE 0 END) as blacklisted_auto_in_feed_total')
             ->selectRaw('SUM(CASE WHEN auto_blacklisted = 1 THEN 1 ELSE 0 END) as auto_blacklisted_total')
+            ->selectRaw('SUM(CASE WHEN blacklisted_at IS NULL AND previewed_count > 0 THEN 1 ELSE 0 END) as previewed_not_blacklisted_total')
             ->first();
 
         $unreactedCounts = File::query()
@@ -681,6 +728,11 @@ class MetricsService
         $reactedTotal = Reaction::query()
             ->distinct('file_id')
             ->count('file_id');
+        $reactedNotBlacklistedTotal = Reaction::query()
+            ->join('files', 'files.id', '=', 'reactions.file_id')
+            ->whereNull('files.blacklisted_at')
+            ->distinct('reactions.file_id')
+            ->count('reactions.file_id');
 
         $this->setMetric(self::KEY_FILES_TOTAL, (int) ($fileCounts->total ?? 0), 'Total files');
         $this->setMetric(self::KEY_FILES_DOWNLOADED, (int) ($fileCounts->downloaded_total ?? 0), 'Downloaded files');
@@ -694,6 +746,8 @@ class MetricsService
         $this->setMetric(self::KEY_FILES_TYPE_AUDIO, (int) ($fileCounts->type_audio_total ?? 0), 'Audio files');
         $this->setMetric(self::KEY_FILES_TYPE_OTHER, (int) ($fileCounts->type_other_total ?? 0), 'Other file types');
         $this->setMetric(self::KEY_FILES_REACTED, $reactedTotal, 'Files with any reaction');
+        $this->setMetric(self::KEY_FILES_REACTED_NOT_BLACKLISTED, $reactedNotBlacklistedTotal, 'Non-blacklisted files with any reaction');
+        $this->setMetric(self::KEY_FILES_PREVIEWED_NOT_BLACKLISTED, (int) ($fileCounts->previewed_not_blacklisted_total ?? 0), 'Previewed, not blacklisted files');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_TOTAL, (int) ($fileCounts->blacklisted_total ?? 0), 'Blacklisted files');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_MANUAL, (int) ($fileCounts->blacklisted_manual_total ?? 0), 'Manual blacklisted files');
         $this->setMetric(self::KEY_FILES_BLACKLISTED_FEED_REMOVED, (int) ($fileCounts->blacklisted_feed_removed_total ?? 0), 'Feed-removed blacklisted files');
