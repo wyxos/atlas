@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
@@ -26,6 +27,20 @@ class LoginController extends Controller
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ]);
+
+        $key = 'login:'.$request->email.'|'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($key, 6)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            throw ValidationException::withMessages([
+                'email' => __('Too many login attempts. Please try again in :seconds seconds.', [
+                    ':seconds' => $seconds,
+                ]),
+            ]);
+        }
+
+        RateLimiter::hit($key, 60);
 
         if (Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             $request->session()->regenerate();

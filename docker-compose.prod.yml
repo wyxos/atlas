@@ -1,0 +1,37 @@
+# Production override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Changes from base:
+# - Removes exposed ports on internal services (mariadb, redis, typesense)
+# - Disables phpmyadmin
+# - Sets strong DB passwords via ${DB_PASSWORD} env var
+# - Externalizes TYPESENSE_API_KEY as ${TYPESENSE_API_KEY}
+# - Keeps nginx on 8080:80 (public-facing port)
+
+services:
+  mariadb:
+    ports: []
+    environment:
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "no"
+
+  redis:
+    ports: []
+
+  typesense:
+    ports: []
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY}
+
+  php:
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY}
+
+  nginx:
+    ports:
+      - "8080:80"
+
+  phpmyadmin:
+    profiles:
+      - disabled

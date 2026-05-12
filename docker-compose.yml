@@ -29,7 +29,7 @@ services:
       - TYPESENSE_HOST=typesense
       - TYPESENSE_PORT=8108
       - TYPESENSE_PROTOCOL=http
-      - TYPESENSE_API_KEY=xyz
+      - TYPESENSE_API_KEY=${TYPESENSE_API_KEY}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1/up"]
       interval: 30s
@@ -109,7 +109,7 @@ services:
     networks:
       - atlas-network
     environment:
-      - TYPESENSE_API_KEY=xyz
+      - TYPESENSE_API_KEY=${TYPESENSE_API_KEY}
       - TYPESENSE_ENABLE_CORS=true
       - TYPESENSE_DATA_DIR=/data
     command: >
