@@ -112,4 +112,16 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Local Authentication
+    |--------------------------------------------------------------------------
+    |
+    | When disabled, local email/password login is unavailable and users must
+    | authenticate via SSO (Authentik). Keep enabled as an admin fallback.
+    |
+    */
+
+    'local_enabled' => env('AUTH_LOCAL_ENABLED', false),
+
 ];

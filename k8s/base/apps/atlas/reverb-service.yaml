@@ -1,0 +1,12 @@
+# reverb-service.yaml - Laravel Reverb service for Atlas
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-reverb
+  namespace: apps
+spec:
+  clusterIP: None
+  selector:
+    app: atlas-reverb
+  ports:
+    - port: 8080

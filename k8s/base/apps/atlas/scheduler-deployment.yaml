@@ -1,0 +1,35 @@
+# scheduler-deployment.yaml - Laravel Scheduler deployment for Atlas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-scheduler
+  namespace: apps
+spec:
+  replicas: 1  # CRITICAL: exactly 1 replica to prevent duplicate runs
+  selector:
+    matchLabels:
+      app: atlas-scheduler
+  template:
+    metadata:
+      labels:
+        app: atlas-scheduler
+    spec:
+      containers:
+        - name: scheduler
+          image: atlas-php:placeholder
+          command:
+            - php
+            - artisan
+            - schedule:work
+          envFrom:
+            - configMapRef:
+                name: atlas-config
+            - secretRef:
+                name: atlas-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"

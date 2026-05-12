@@ -1,0 +1,88 @@
+# nginx-configmap.yaml - Nginx configuration for Atlas
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlas-nginx-config
+  namespace: apps
+data:
+  default.conf: |
+    server {
+        listen 80;
+        index index.php index.html;
+        error_log /var/log/nginx/error.log;
+        access_log /var/log/nginx/access.log;
+        root /var/www/html/public;
+
+        client_max_body_size 100M;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        open_file_cache max=10000 inactive=60s;
+        open_file_cache_valid 120s;
+        open_file_cache_min_uses 2;
+
+        gzip on;
+        gzip_comp_level 4;
+        gzip_min_length 1024;
+        gzip_types text/plain text/css application/json application/javascript image/svg+xml application/wasm;
+
+        location = /up {
+            default_type text/plain;
+            return 200 '200';
+        }
+
+        # Proxy WebSocket connections to Reverb
+        location /app {
+            proxy_pass http://atlas-reverb:8080;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "Upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 86400;
+        }
+
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_split_path_info ^(.+\.php)(/.+)$;
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_index index.php;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param PATH_INFO $fastcgi_path_info;
+            fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
+            fastcgi_param HTTP_X_FORWARDED_HOST $host;
+            fastcgi_param HTTP_X_FORWARDED_PROTO $scheme;
+            fastcgi_param HTTP_X_FORWARDED_PORT 443;
+        }
+
+        location ^~ /_media/ {
+            internal;
+            alias /var/www/html/storage/app/atlas/.app/;
+            add_header Accept-Ranges bytes always;
+            sendfile on;
+            tcp_nopush on;
+            sendfile_max_chunk 1m;
+        }
+
+        location = /build/manifest.json {
+            expires off;
+        }
+
+        location /build/ {
+            expires 1y;
+            add_header Cache-Control "public, max-age=31536000, immutable" always;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+            gzip_static on;
+        }
+
+        location ~ /\.(?!well-known).* {
+            deny all;
+        }
+    }

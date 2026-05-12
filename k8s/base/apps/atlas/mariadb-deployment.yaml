@@ -1,0 +1,50 @@
+# mariadb-deployment.yaml - MariaDB deployment for Atlas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-mariadb
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atlas-mariadb
+  template:
+    metadata:
+      labels:
+        app: atlas-mariadb
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:10.11
+          env:
+            - name: MYSQL_DATABASE
+              value: laravel
+            - name: MYSQL_USER
+              value: root
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-secrets
+                  key: DB_PASSWORD
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-secrets
+                  key: DB_PASSWORD
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      volumes:
+        - name: mariadb-data
+          persistentVolumeClaim:
+            claimName: atlas-mariadb-pvc

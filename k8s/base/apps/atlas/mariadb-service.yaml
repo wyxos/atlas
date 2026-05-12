@@ -1,0 +1,12 @@
+# mariadb-service.yaml - MariaDB service for Atlas
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: apps
+spec:
+  clusterIP: None
+  selector:
+    app: atlas-mariadb
+  ports:
+    - port: 3306

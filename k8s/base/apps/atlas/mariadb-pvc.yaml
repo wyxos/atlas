@@ -1,0 +1,13 @@
+# mariadb-pvc.yaml - PersistentVolumeClaim for MariaDB
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: atlas-mariadb-pvc
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 20Gi

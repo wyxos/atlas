@@ -1,0 +1,38 @@
+# reverb-deployment.yaml - Laravel Reverb deployment for Atlas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-reverb
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atlas-reverb
+  template:
+    metadata:
+      labels:
+        app: atlas-reverb
+    spec:
+      containers:
+        - name: reverb
+          image: atlas-php:placeholder
+          command:
+            - php
+            - artisan
+            - reverb:start
+            - --host=0.0.0.0
+          envFrom:
+            - configMapRef:
+                name: atlas-config
+            - secretRef:
+                name: atlas-secrets
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

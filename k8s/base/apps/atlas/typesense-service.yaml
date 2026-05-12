@@ -1,0 +1,12 @@
+# typesense-service.yaml - Typesense service for Atlas
+apiVersion: v1
+kind: Service
+metadata:
+  name: typesense
+  namespace: apps
+spec:
+  clusterIP: None
+  selector:
+    app: atlas-typesense
+  ports:
+    - port: 8108

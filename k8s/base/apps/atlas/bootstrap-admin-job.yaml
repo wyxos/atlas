@@ -1,0 +1,23 @@
+# bootstrap-admin-job.yaml - Bootstrap admin user job for Atlas
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: atlas-bootstrap-admin
+  namespace: apps
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: atlas-php:placeholder
+          command:
+            - php
+            - artisan
+            - app:setup
+          envFrom:
+            - configMapRef:
+                name: atlas-config
+            - secretRef:
+                name: atlas-secrets

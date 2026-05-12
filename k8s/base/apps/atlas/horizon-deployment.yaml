@@ -1,0 +1,35 @@
+# horizon-deployment.yaml - Laravel Horizon deployment for Atlas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-horizon
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atlas-horizon
+  template:
+    metadata:
+      labels:
+        app: atlas-horizon
+    spec:
+      containers:
+        - name: horizon
+          image: atlas-php:placeholder
+          command:
+            - php
+            - artisan
+            - horizon
+          envFrom:
+            - configMapRef:
+                name: atlas-config
+            - secretRef:
+                name: atlas-secrets
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "100m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"

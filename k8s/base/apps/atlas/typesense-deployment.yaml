@@ -1,0 +1,47 @@
+# typesense-deployment.yaml - Typesense deployment for Atlas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-typesense
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atlas-typesense
+  template:
+    metadata:
+      labels:
+        app: atlas-typesense
+    spec:
+      containers:
+        - name: typesense
+          image: typesense/typesense:27.0
+          env:
+            - name: TYPESENSE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-secrets
+                  key: TYPESENSE_API_KEY
+          ports:
+            - containerPort: 8108
+          command:
+            - typesense
+            - --data-dir=/data
+            - --api-key=$(TYPESENSE_API_KEY)
+            - --memory-used-max-percentage=80
+            - --enable-cors
+          volumeMounts:
+            - name: typesense-data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      volumes:
+        - name: typesense-data
+          persistentVolumeClaim:
+            claimName: atlas-typesense-pvc

@@ -1,0 +1,14 @@
+# pvc.yaml - PersistentVolumeClaim for Atlas media storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: atlas-media-pvc
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 100Gi
+

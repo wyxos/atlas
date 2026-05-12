@@ -1,0 +1,13 @@
+# typesense-pvc.yaml - PersistentVolumeClaim for Typesense
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: atlas-typesense-pvc
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi

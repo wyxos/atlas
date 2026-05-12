@@ -23,6 +23,10 @@ class LoginController extends Controller
      */
     public function login(Request $request)
     {
+        if (! config('auth.local_enabled')) {
+            return redirect()->route('auth.authentik');
+        }
+
         $request->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],

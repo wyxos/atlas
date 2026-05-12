@@ -1,0 +1,105 @@
+# web-deployment.yaml - Atlas web pod deployment (nginx + php-fpm sidecar)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-web
+  namespace: apps
+  labels:
+    app: atlas-web
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: atlas-web
+  template:
+    metadata:
+      labels:
+        app: atlas-web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 1000
+      containers:
+        - name: php-fpm
+          image: atlas-php:placeholder
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: atlas-config
+            - secretRef:
+                name: atlas-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: media-storage
+              mountPath: /var/www/html/storage/app/atlas
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+        - name: nginx
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: atlas-config
+            - secretRef:
+                name: atlas-secrets
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: media-storage
+              mountPath: /var/www/html/storage/app/atlas
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: atlas-nginx-config
+        - name: media-storage
+          persistentVolumeClaim:
+            claimName: atlas-storage

@@ -1,0 +1,17 @@
+# web-service.yaml - Atlas web service
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-web
+  namespace: apps
+  labels:
+    app: atlas-web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: atlas-web

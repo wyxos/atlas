@@ -54,4 +54,11 @@ return [
         'api_base_url' => env('SPOTIFY_API_BASE_URL', 'https://api.spotify.com/v1'),
     ],
 
+    'authentik' => [
+        'client_id' => env('AUTHENTIK_CLIENT_ID'),
+        'client_secret' => env('AUTHENTIK_CLIENT_SECRET'),
+        'redirect' => env('AUTHENTIK_REDIRECT_URI'),
+        'base_url' => env('AUTHENTIK_BASE_URL'),
+    ],
+
 ];

@@ -2,6 +2,7 @@
 
 use App\Events\DownloadTransferProgressUpdated;
 use App\Events\DownloadTransferQueued;
+use App\Http\Controllers\Auth\AuthentikController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardMetricsController;
 use App\Models\DownloadTransfer;
@@ -20,6 +21,9 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:6,1');
+
+    Route::get('/auth/authentik', [AuthentikController::class, 'redirect'])->name('auth.authentik');
+    Route::get('/auth/authentik/callback', [AuthentikController::class, 'callback']);
 });
 
 // Lightweight endpoint to refresh the XSRF cookie for SPA requests.

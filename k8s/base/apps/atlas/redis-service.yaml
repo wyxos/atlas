@@ -1,0 +1,12 @@
+# redis-service.yaml - Redis service for Atlas
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: apps
+spec:
+  clusterIP: None
+  selector:
+    app: atlas-redis
+  ports:
+    - port: 6379
