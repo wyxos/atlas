@@ -1,0 +1,10 @@
+NAME               IMAGE                       COMMAND                  SERVICE      CREATED          STATUS                             PORTS
+atlas-horizon      atlas-horizon               "/usr/local/bin/entr…"   horizon      22 seconds ago   Up 17 seconds (health: starting)   9000/tcp
+atlas-mariadb      mariadb:10.11               "docker-entrypoint.s…"   mariadb      10 hours ago     Up 10 hours (healthy)              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp
+atlas-nginx        nginx:alpine                "/docker-entrypoint.…"   nginx        35 minutes ago   Up 35 minutes (healthy)            0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
+atlas-php          atlas-php                   "/usr/local/bin/entr…"   php          28 seconds ago   Up 17 seconds (health: starting)   9000/tcp
+atlas-phpmyadmin   phpmyadmin/phpmyadmin:5.2   "/docker-entrypoint.…"   phpmyadmin   19 minutes ago   Up 19 minutes (healthy)            0.0.0.0:8081->80/tcp, [::]:8081->80/tcp
+atlas-redis        redis:7-alpine              "docker-entrypoint.s…"   redis        10 hours ago     Up 10 hours (healthy)              0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
+atlas-reverb       atlas-reverb                "/usr/local/bin/entr…"   reverb       22 seconds ago   Up 17 seconds (health: starting)   9000/tcp
+atlas-scheduler    atlas-php                   "/usr/local/bin/entr…"   scheduler    22 seconds ago   Up 17 seconds                      9000/tcp
+atlas-typesense    typesense/typesense:27.0    "/opt/typesense-serv…"   typesense    35 minutes ago   Up 35 minutes (healthy)            0.0.0.0:8108->8108/tcp, [::]:8108->8108/tcp

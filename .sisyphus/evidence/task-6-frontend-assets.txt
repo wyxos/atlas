@@ -1,0 +1,16 @@
+build/assets/app-DZJf395r.css
+build/assets/vendor-vue-DppCjOAl.css
+build/assets/vendor-yDLVNd4M.css
+build/assets/app-Bgrdn4MX.css
+build/assets/app-BJCrGED6.js
+build/assets/vendor-vue-AObsrhTT.js
+build/assets/vendor-ui--eiUzdGY.js
+build/assets/vendor-DPrDuWo5.js
+build/assets/vendor-icons-DHlLn0VD.js
+build/assets/vendor-charts-BRGaPQcV.js
+build/assets/vendor-realtime-BeYMp5wj.js
+build/assets/app-DZJf395r.css
+build/assets/vendor-vue-DppCjOAl.css
+build/assets/vendor-yDLVNd4M.css
+build/assets/app-Bgrdn4MX.css
+build/assets/app-BJCrGED6.js

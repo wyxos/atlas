@@ -1,0 +1,7 @@
+Syntax check: PASSED
+---
+#!/bin/bash
+set -e
+
+echo "Starting Atlas Docker setup..."
+

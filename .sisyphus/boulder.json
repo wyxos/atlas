@@ -1,0 +1,150 @@
+{
+  "active_plan": "/Volumes/Topper2TB/Git/atlas/.sisyphus/plans/production-deployment.md",
+  "started_at": "2026-05-12T03:13:34.423Z",
+  "session_ids": [
+    "ses_1e5d30b3bffeUVfRZ4FMTAxszw",
+    "ses_1e5d1ac10ffeALhkW5oHaN5UlA",
+    "ses_1e5b3b749ffeUCbWh0RJL7xykP"
+  ],
+  "session_origins": {
+    "ses_1e5d30b3bffeUVfRZ4FMTAxszw": "direct",
+    "ses_1e5d1ac10ffeALhkW5oHaN5UlA": "direct",
+    "ses_1e5b3b749ffeUCbWh0RJL7xykP": "direct"
+  },
+  "plan_name": "production-deployment",
+  "agent": "atlas",
+  "task_sessions": {},
+  "active_work_id": "production-deployment-6b44d98e",
+  "status": "active",
+  "updated_at": "2026-05-12T03:47:47.523Z",
+  "schema_version": 2,
+  "works": {
+    "docker-hardening-legacy": {
+      "work_id": "docker-hardening-legacy",
+      "active_plan": "/Volumes/Topper2TB/Git/atlas/.sisyphus/plans/docker-hardening.md",
+      "plan_name": "docker-hardening",
+      "started_at": "2026-05-06T05:31:41.257Z",
+      "session_ids": [
+        "ses_2043ac0bcffesNGsIn3poeAVeE"
+      ],
+      "session_origins": {
+        "ses_2043ac0bcffesNGsIn3poeAVeE": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "Add Opcache to Dockerfile and create tuned opcache.ini",
+          "session_id": "ses_204344d12ffeNCWVo4f1luVXqF",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "updated_at": "2026-05-06T05:39:55.682Z"
+        },
+        "todo:5": {
+          "task_key": "todo:5",
+          "task_label": "5",
+          "task_title": "Multi-stage Dockerfile refactor",
+          "session_id": "ses_2042bbef0ffeuPoAiwW5fxn12Z",
+          "agent": "Sisyphus-Junior",
+          "category": "deep",
+          "updated_at": "2026-05-06T05:56:49.750Z"
+        },
+        "todo:9": {
+          "task_key": "todo:9",
+          "task_label": "9",
+          "task_title": "FileStorageResponseService X-Accel-Redirect support with non-Docker fallback",
+          "session_id": "ses_20414510bffeN4zS5dktIYfiPk",
+          "agent": "Sisyphus-Junior",
+          "category": "deep",
+          "updated_at": "2026-05-06T06:16:12.048Z"
+        },
+        "todo:11": {
+          "task_key": "todo:11",
+          "task_label": "11",
+          "task_title": "Full Docker build and end-to-end verification",
+          "session_id": "ses_2040da743ffefwFShw72xWVQiI",
+          "agent": "Sisyphus-Junior",
+          "category": "deep",
+          "updated_at": "2026-05-06T06:46:12.520Z"
+        },
+        "final-wave:f1": {
+          "task_key": "final-wave:f1",
+          "task_label": "F1",
+          "task_title": "**Plan Compliance Audit** — `oracle`",
+          "session_id": "ses_20354a412ffeNeRbicwzn61Zl1",
+          "agent": "oracle",
+          "updated_at": "2026-05-06T10:03:01.963Z"
+        }
+      }
+    },
+    "production-deployment-6b44d98e": {
+      "work_id": "production-deployment-6b44d98e",
+      "active_plan": "/Volumes/Topper2TB/Git/atlas/.sisyphus/plans/production-deployment.md",
+      "plan_name": "production-deployment",
+      "status": "active",
+      "started_at": "2026-05-12T03:13:34.423Z",
+      "updated_at": "2026-05-12T03:47:47.523Z",
+      "session_ids": [
+        "ses_1e5d30b3bffeUVfRZ4FMTAxszw",
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA",
+        "ses_1e5b3b749ffeUCbWh0RJL7xykP"
+      ],
+      "session_origins": {
+        "ses_1e5d30b3bffeUVfRZ4FMTAxszw": "direct",
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA": "direct",
+        "ses_1e5b3b749ffeUCbWh0RJL7xykP": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    },
+    "production-deployment-43d62ed7": {
+      "work_id": "production-deployment-43d62ed7",
+      "active_plan": "/Volumes/Topper2TB/Git/atlas/.sisyphus/plans/production-deployment.md",
+      "plan_name": "production-deployment",
+      "status": "active",
+      "started_at": "2026-05-12T03:15:04.314Z",
+      "updated_at": "2026-05-12T03:15:04.314Z",
+      "session_ids": [
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA"
+      ],
+      "session_origins": {
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    },
+    "production-deployment-adde95f4": {
+      "work_id": "production-deployment-adde95f4",
+      "active_plan": "/Volumes/Topper2TB/Git/atlas/.sisyphus/plans/production-deployment.md",
+      "plan_name": "production-deployment",
+      "status": "active",
+      "started_at": "2026-05-12T03:15:04.320Z",
+      "updated_at": "2026-05-12T03:15:04.320Z",
+      "session_ids": [
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA"
+      ],
+      "session_origins": {
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    },
+    "production-deployment-08284ae1": {
+      "work_id": "production-deployment-08284ae1",
+      "active_plan": "/Volumes/Topper2TB/Git/atlas/.sisyphus/plans/production-deployment.md",
+      "plan_name": "production-deployment",
+      "status": "active",
+      "started_at": "2026-05-12T03:15:04.705Z",
+      "updated_at": "2026-05-12T03:15:04.705Z",
+      "session_ids": [
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA"
+      ],
+      "session_origins": {
+        "ses_1e5d1ac10ffeALhkW5oHaN5UlA": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    }
+  }
+}

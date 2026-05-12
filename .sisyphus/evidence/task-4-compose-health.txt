@@ -1,0 +1,16 @@
+NAME               IMAGE                       COMMAND                  SERVICE      CREATED          STATUS                    PORTS
+atlas-horizon      atlas-horizon               "docker-php-entrypoi…"   horizon      47 minutes ago   Up 47 minutes             9000/tcp
+atlas-mariadb      mariadb:10.11               "docker-entrypoint.s…"   mariadb      47 minutes ago   Up 47 minutes (healthy)   0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp
+atlas-nginx        nginx:alpine                "/docker-entrypoint.…"   nginx        47 minutes ago   Up 47 minutes             0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
+atlas-php          atlas-php                   "/usr/local/bin/entr…"   php          47 minutes ago   Up 47 minutes             9000/tcp
+atlas-phpmyadmin   phpmyadmin/phpmyadmin:5.2   "/docker-entrypoint.…"   phpmyadmin   47 minutes ago   Up 47 minutes             0.0.0.0:8081->80/tcp, [::]:8081->80/tcp
+atlas-redis        redis:7-alpine              "docker-entrypoint.s…"   redis        47 minutes ago   Up 47 minutes (healthy)   0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
+atlas-reverb       atlas-reverb                "docker-php-entrypoi…"   reverb       47 minutes ago   Up 47 minutes             9000/tcp
+atlas-typesense    typesense/typesense:27.0    "/opt/typesense-serv…"   typesense    47 minutes ago   Up 47 minutes (healthy)   0.0.0.0:8108->8108/tcp, [::]:8108->8108/tcp
+---
+MariaDB:
+mysqld is alive
+Redis:
+PONG
+Typesense:
+{"ok":true}

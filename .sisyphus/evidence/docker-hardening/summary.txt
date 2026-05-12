@@ -1,0 +1,101 @@
+PASS | exit=0 | expected=8 | actual=8
+FAIL | exit=0 | expected=ok | actual=<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Laravel</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap" rel="stylesheet" />
+
+    <!-- Styles -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <style type="text/tailwindcss">
+        @theme {
+            --font-sans: 'Figtree', 'ui-sans-serif', 'system-ui', 'sans-serif', "Apple Color Emoji", "Segoe UI Emoji";
+        }
+    </style>
+</head>
+<body class="antialiased">
+<div class="relative flex justify-center items-center min-h-screen bg-gray-100 selection:bg-red-500 selection:text-white">
+    <div class="w-full sm:w-3/4 xl:w-1/2 mx-auto p-6">
+        <div class="px-6 py-4 bg-white from-gray-700/50 via-transparent rounded-lg shadow-2xl shadow-gray-500/20 flex items-center focus:outline focus:outline-2 focus:outline-red-500">
+            <div class="relative flex h-3 w-3 group ">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 group-[.status-down]:bg-red-600 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-400 group-[.status-down]:bg-red-600"></span>
+            </div>
+
+            <div class="ml-6">
+                <h2 class="text-xl font-semibold text-gray-900">Application up</h2>
+
+                <p class="mt-2 text-gray-500 dark:text-gray-400 text-sm leading-relaxed">
+                    HTTP request received.
+
+                                            Response rendered in 9ms.
+                                    </p>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+FAIL | exit=0 | expected=Zend OPcache | actual=Zend OPcache
+Zend OPcache
+FAIL | exit=1 | expected=no-debug | actual=
+   ErrorException 
+
+  Writing to directory /var/www/.config/psysh is not allowed.
+
+  at vendor/psy/psysh/src/ConfigPaths.php:395
+    391▕             @\mkdir($dir, 0700, true);
+    392▕         }
+    393▕ 
+    394▕         if (!\is_dir($dir) || !\is_writable($dir)) {
+  ➜ 395▕             \trigger_error(\sprintf('Writing to directory %s is not allowed.', $dir), \E_USER_NOTICE);
+    396▕ 
+    397▕             return false;
+    398▕         }
+    399▕
+
+      [2m+20 vendor frames [22m
+
+  21  artisan:16
+      Illuminate\Foundation\Application::handleCommand(Object(Symfony\Component\Console\Input\ArgvInput))
+FAIL | exit=1 | expected=production | actual=
+   ErrorException 
+
+  Writing to directory /var/www/.config/psysh is not allowed.
+
+  at vendor/psy/psysh/src/ConfigPaths.php:395
+    391▕             @\mkdir($dir, 0700, true);
+    392▕         }
+    393▕ 
+    394▕         if (!\is_dir($dir) || !\is_writable($dir)) {
+  ➜ 395▕             \trigger_error(\sprintf('Writing to directory %s is not allowed.', $dir), \E_USER_NOTICE);
+    396▕ 
+    397▕             return false;
+    398▕         }
+    399▕
+
+      [2m+20 vendor frames [22m
+
+  21  artisan:16
+      Illuminate\Foundation\Application::handleCommand(Object(Symfony\Component\Console\Input\ArgvInput))
+FAIL | exit=0 | expected=Horizon is running. | actual=
+   INFO  Horizon is running.
+PASS | exit=1 | expected_exit=1 | output=
+PASS | exit=1 | expected_exit=1 | output=
+PASS | exit=0 | expected=/usr/bin/ffmpeg | actual=/usr/bin/ffmpeg
+PASS | exit=0 | expected=/usr/bin/yt-dlp | actual=/usr/bin/yt-dlp
+PASS | exit=0 | expected=www-data | actual=www-data
+PASS | exit=0 | expected=pm.max_children = 16 | actual=pm.max_children = 16
+FAIL | exit=0 | expected=404 | actual=  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   334    0   334    0     0   8262      0 --:--:-- --:--:-- --:--:--  8350
+302
+FAIL | exit=0 | expected=1 | actual=3
+PASS=7 FAIL=7

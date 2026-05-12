@@ -1,0 +1,9 @@
+NAME               STATUS
+atlas-horizon      Up 35 minutes
+atlas-mariadb      Up 35 minutes (healthy)
+atlas-nginx        Up 35 minutes
+atlas-php          Up 35 minutes
+atlas-phpmyadmin   Up 35 minutes
+atlas-redis        Up 35 minutes (healthy)
+atlas-reverb       Up 35 minutes
+atlas-typesense    Up 35 minutes (healthy)

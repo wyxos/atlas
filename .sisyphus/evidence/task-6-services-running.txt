@@ -1,0 +1,8 @@
+atlas-horizon: running
+atlas-mariadb: running
+atlas-nginx: running
+atlas-php: running
+atlas-phpmyadmin: running
+atlas-redis: running
+atlas-reverb: running
+atlas-typesense: running

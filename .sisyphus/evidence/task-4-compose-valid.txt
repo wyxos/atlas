@@ -1,0 +1,269 @@
+name: atlas
+services:
+  horizon:
+    build:
+      context: /Users/brethoffman/Git/atlas
+      dockerfile: docker/php/Dockerfile
+    command:
+      - php
+      - artisan
+      - horizon
+    container_name: atlas-horizon
+    depends_on:
+      php:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      APP_DEBUG: "true"
+      APP_ENV: local
+      APP_KEY: ""
+      APP_NAME: Laravel
+      APP_URL: http://localhost:8080
+      BROADCAST_CONNECTION: reverb
+      DB_CONNECTION: mariadb
+      DB_DATABASE: laravel
+      DB_HOST: mariadb
+      DB_PASSWORD: ""
+      DB_PORT: "3306"
+      DB_USERNAME: root
+      QUEUE_CONNECTION: database
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "null"
+      REDIS_PORT: "6379"
+      REVERB_APP_ID: "1001"
+      REVERB_APP_KEY: laravel-herd
+      REVERB_APP_SECRET: secret
+      REVERB_HOST: reverb
+      REVERB_PORT: "8080"
+      REVERB_SCHEME: http
+      TYPESENSE_API_KEY: xyz
+      TYPESENSE_HOST: typesense
+      TYPESENSE_PORT: "8108"
+      TYPESENSE_PROTOCOL: http
+    image: atlas-horizon
+    networks:
+      atlas-network: null
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/brethoffman/Git/atlas
+        target: /var/www/html
+        bind: {}
+  mariadb:
+    container_name: atlas-mariadb
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: laravel
+      MYSQL_PASSWORD: ""
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_USER: root
+    healthcheck:
+      test:
+        - CMD
+        - mariadb-admin
+        - ping
+        - -h
+        - localhost
+      timeout: 5s
+      interval: 10s
+      retries: 3
+    image: mariadb:10.11
+    networks:
+      atlas-network: null
+    ports:
+      - mode: ingress
+        target: 3306
+        published: "3306"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: atlas-mariadb-data
+        target: /var/lib/mysql
+        volume: {}
+  nginx:
+    container_name: atlas-nginx
+    depends_on:
+      php:
+        condition: service_started
+        required: true
+    image: nginx:alpine
+    networks:
+      atlas-network: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "8080"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/brethoffman/Git/atlas
+        target: /var/www/html
+        bind: {}
+      - type: bind
+        source: /Users/brethoffman/Git/atlas/docker/nginx/default.conf
+        target: /etc/nginx/conf.d/default.conf
+        bind: {}
+  php:
+    build:
+      context: /Users/brethoffman/Git/atlas
+      dockerfile: docker/php/Dockerfile
+    container_name: atlas-php
+    depends_on:
+      mariadb:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+      typesense:
+        condition: service_started
+        required: true
+    image: atlas-php
+    networks:
+      atlas-network: null
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/brethoffman/Git/atlas
+        target: /var/www/html
+        bind: {}
+  phpmyadmin:
+    container_name: atlas-phpmyadmin
+    depends_on:
+      mariadb:
+        condition: service_started
+        required: true
+    environment:
+      PMA_HOST: mariadb
+      PMA_PASSWORD: ""
+      PMA_USER: root
+    image: phpmyadmin/phpmyadmin:5.2
+    networks:
+      atlas-network: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "8081"
+        protocol: tcp
+    restart: unless-stopped
+  redis:
+    container_name: atlas-redis
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 5s
+      interval: 10s
+      retries: 3
+    image: redis:7-alpine
+    networks:
+      atlas-network: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: atlas-redis-data
+        target: /data
+        volume: {}
+  reverb:
+    build:
+      context: /Users/brethoffman/Git/atlas
+      dockerfile: docker/php/Dockerfile
+    command:
+      - php
+      - artisan
+      - reverb:start
+    container_name: atlas-reverb
+    depends_on:
+      php:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      APP_DEBUG: "true"
+      APP_ENV: local
+      APP_KEY: ""
+      APP_NAME: Laravel
+      APP_URL: http://localhost:8080
+      BROADCAST_CONNECTION: reverb
+      DB_CONNECTION: mariadb
+      DB_DATABASE: laravel
+      DB_HOST: mariadb
+      DB_PASSWORD: ""
+      DB_PORT: "3306"
+      DB_USERNAME: root
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "null"
+      REDIS_PORT: "6379"
+      REVERB_APP_ID: "1001"
+      REVERB_APP_KEY: laravel-herd
+      REVERB_APP_SECRET: secret
+      REVERB_HOST: reverb
+      REVERB_PORT: "8080"
+      REVERB_SCHEME: http
+      TYPESENSE_API_KEY: xyz
+      TYPESENSE_HOST: typesense
+      TYPESENSE_PORT: "8108"
+      TYPESENSE_PROTOCOL: http
+    image: atlas-reverb
+    networks:
+      atlas-network: null
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/brethoffman/Git/atlas
+        target: /var/www/html
+        bind: {}
+  typesense:
+    container_name: atlas-typesense
+    environment:
+      TYPESENSE_API_KEY: xyz
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_ENABLE_CORS: "true"
+    healthcheck:
+      test:
+        - CMD
+        - sh
+        - -c
+        - timeout 1 bash -c 'echo > /dev/tcp/localhost/8108' 2>/dev/null
+      timeout: 5s
+      interval: 10s
+      retries: 3
+    image: typesense/typesense:27.0
+    networks:
+      atlas-network: null
+    ports:
+      - mode: ingress
+        target: 8108
+        published: "8108"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: atlas-typesense-data
+        target: /data
+        volume: {}
+networks:
+  atlas-network:
+    name: atlas_atlas-network
+    driver: bridge
+volumes:
+  atlas-mariadb-data:
+    name: atlas_atlas-mariadb-data
+  atlas-redis-data:
+    name: atlas_atlas-redis-data
+  atlas-typesense-data:
+    name: atlas_atlas-typesense-data
+EXIT_CODE: 0

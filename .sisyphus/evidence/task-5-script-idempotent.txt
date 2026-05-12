@@ -1,0 +1,5 @@
+1
+Has set -e: yes
+---
+2
+Has idempotency checks: yes

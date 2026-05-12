@@ -1,0 +1,3 @@
+-rwxr-xr-x  1 brethoffman  staff  1796 May  4 16:50 docker-setup.sh
+---
+docker-setup.sh: Bourne-Again shell script text executable, ASCII text
