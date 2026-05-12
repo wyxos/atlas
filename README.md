@@ -54,6 +54,15 @@ More sources can be added over time.
 
 ## Docker
 
+**Authentication Flow Update**
+
+- Local email/password login is now enabled by default in the test environment.
+- The `auth.local_enabled` config flag controls SSO redirection. In development and testing, set `AUTH_LOCAL_ENABLED=true` to use the standard login form.
+- Remember-me functionality updates the user's `remember_token`.
+- Successful login updates `last_login_at` timestamp.
+
+## Docker
+
 Run the entire stack with a single command:
 
 ```bash
