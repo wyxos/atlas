@@ -2,8 +2,12 @@
 
 namespace App\Services\Downloads;
 
+use App\Enums\MediaProcessorOperation;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Models\LibraryScanMediaTask;
+use App\Models\MediaProcessorTask;
+use App\Services\MediaProcessing\RemoteMediaProcessorClient;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
 use Illuminate\Contracts\Filesystem\Filesystem;
@@ -16,12 +20,13 @@ class FileDownloadPreviewAssetGenerator
         private readonly FileThumbnailMemoryGuard $memoryGuard,
         private readonly FileVideoPreviewGenerator $videoPreviewGenerator,
         private readonly AtlasStorage $appStorage,
+        private readonly RemoteMediaProcessorClient $remoteProcessor,
     ) {}
 
     /**
      * @return array{preview_path?: string, poster_path?: string}
      */
-    public function generatePreviewAssets(File $file): array
+    public function generatePreviewAssets(File $file, ?LibraryScanMediaTask $libraryScanMediaTask = null): array
     {
         if (! $file->path) {
             return [];
@@ -35,6 +40,10 @@ class FileDownloadPreviewAssetGenerator
 
         $absolutePath = $disk->path($file->path);
         $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->getMimeTypeFromFile($absolutePath));
+
+        if ($remoteTask = $this->submitRemotePreviewIfNeeded($file, $absolutePath, $file->path, $mimeType, false, $libraryScanMediaTask)) {
+            return $libraryScanMediaTask ? $this->remoteSubmissionResult($remoteTask) : [];
+        }
 
         $updates = [];
 
@@ -80,6 +89,10 @@ class FileDownloadPreviewAssetGenerator
             return [];
         }
 
+        if ($this->submitRemotePreviewIfNeeded($file, $absolutePath, $file->path, $mimeType, true)) {
+            return [];
+        }
+
         [$previewPath, $posterPath] = $this->videoPreviewGenerator->generate($disk, $absolutePath, $file->path);
 
         $updates = [];
@@ -96,7 +109,7 @@ class FileDownloadPreviewAssetGenerator
     /**
      * @return array{preview_path?: string, poster_path?: string}
      */
-    public function regeneratePreviewAssets(File $file): array
+    public function regeneratePreviewAssets(File $file, ?LibraryScanMediaTask $libraryScanMediaTask = null): array
     {
         if (! $file->path) {
             return [];
@@ -109,6 +122,10 @@ class FileDownloadPreviewAssetGenerator
 
         $absolutePath = $disk->path($file->path);
         $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->getMimeTypeFromFile($absolutePath));
+
+        if ($remoteTask = $this->submitRemotePreviewIfNeeded($file, $absolutePath, $file->path, $mimeType, true, $libraryScanMediaTask)) {
+            return $libraryScanMediaTask ? $this->remoteSubmissionResult($remoteTask) : [];
+        }
 
         return $this->generateFinalizedPreviewAssets(
             $file,
@@ -128,7 +145,12 @@ class FileDownloadPreviewAssetGenerator
         string $absolutePath,
         string $finalPath,
         ?string $mimeType,
+        ?LibraryScanMediaTask $libraryScanMediaTask = null,
     ): array {
+        if ($remoteTask = $this->submitRemotePreviewIfNeeded($file, $absolutePath, $finalPath, $mimeType, true, $libraryScanMediaTask)) {
+            return $libraryScanMediaTask ? $this->remoteSubmissionResult($remoteTask) : [];
+        }
+
         $updates = [];
 
         if ($this->isImageMimeType($mimeType)) {
@@ -200,9 +222,8 @@ class FileDownloadPreviewAssetGenerator
         [$previewWidth, $previewHeight] = $this->resolveImagePreviewDimensions($originalWidth, $originalHeight);
 
         $imageType = $this->detectImageType($absolutePath);
-        $previewExtension = $this->resolveImagePreviewOutputExtension($imageType);
-        $previewFilename = $this->appStorage->filenameWithExtension(basename($sourcePath), $previewExtension);
-        $previewPath = $this->appStorage->derivedPath($sourcePath, 'preview', $previewFilename);
+        $previewPath = $this->imagePreviewOutputPath($absolutePath, $sourcePath, $imageType);
+        $previewExtension = pathinfo($previewPath, PATHINFO_EXTENSION) ?: 'jpg';
 
         $previewDirectory = dirname($previewPath);
         if (! $disk->exists($previewDirectory)) {
@@ -306,6 +327,76 @@ class FileDownloadPreviewAssetGenerator
         }
 
         return 'jpg';
+    }
+
+    private function imagePreviewOutputPath(string $absolutePath, string $sourcePath, int|false|null $imageType = null): string
+    {
+        $imageType ??= $this->detectImageType($absolutePath);
+        $previewExtension = $this->resolveImagePreviewOutputExtension($imageType);
+        $previewFilename = $this->appStorage->filenameWithExtension(basename($sourcePath), $previewExtension);
+
+        return $this->appStorage->derivedPath($sourcePath, 'preview', $previewFilename);
+    }
+
+    private function submitRemotePreviewIfNeeded(
+        File $file,
+        string $absolutePath,
+        string $sourcePath,
+        ?string $mimeType,
+        bool $force,
+        ?LibraryScanMediaTask $libraryScanMediaTask = null,
+    ): ?MediaProcessorTask {
+        if (! $this->remoteProcessor->enabled()) {
+            return null;
+        }
+
+        if ($this->isImageMimeType($mimeType) && ($force || ! $file->preview_path)) {
+            $this->persistImageDimensions($file, $absolutePath);
+            $imageSize = @getimagesize($absolutePath);
+            $originalWidth = is_array($imageSize) && isset($imageSize[0]) ? (int) $imageSize[0] : 0;
+            $originalHeight = is_array($imageSize) && isset($imageSize[1]) ? (int) $imageSize[1] : 0;
+            [$previewWidth, $previewHeight] = $originalWidth > 0 && $originalHeight > 0
+                ? $this->resolveImagePreviewDimensions($originalWidth, $originalHeight)
+                : [(int) config('downloads.video_preview_width', 450), 0];
+
+            return $this->remoteProcessor->submit(
+                $file,
+                MediaProcessorOperation::IMAGE_PREVIEW,
+                $sourcePath,
+                ['preview_path' => $this->imagePreviewOutputPath($absolutePath, $sourcePath)],
+                [
+                    'width' => $previewWidth,
+                    'height' => $previewHeight,
+                ],
+                $libraryScanMediaTask,
+            );
+
+        }
+
+        if ($this->isVideoMimeType($mimeType) && ($force || ! $file->preview_path || ! $file->poster_path)) {
+            return $this->remoteProcessor->submit(
+                $file,
+                MediaProcessorOperation::VIDEO_PREVIEW,
+                $sourcePath,
+                $this->videoPreviewGenerator->outputPaths($sourcePath),
+                $this->videoPreviewGenerator->previewOptions(),
+                $libraryScanMediaTask,
+            );
+
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{remote_task_id: string, remote_status: string}
+     */
+    private function remoteSubmissionResult(MediaProcessorTask $task): array
+    {
+        return [
+            'remote_task_id' => $task->id,
+            'remote_status' => $task->status,
+        ];
     }
 
     private function generateImagePreviewWithFfmpeg(

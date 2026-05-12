@@ -25,11 +25,12 @@ class FileVideoPreviewGenerator
             return [null, null];
         }
 
-        $previewWidth = (int) config('downloads.video_preview_width', 450);
-        $previewShortMaxSeconds = (float) config('downloads.video_preview_short_max_seconds', 60);
-        $previewClipSeconds = (float) config('downloads.video_preview_clip_seconds', 5);
-        $previewClipCount = (int) config('downloads.video_preview_clip_count', 10);
-        $posterSecond = (float) config('downloads.video_poster_second', 1);
+        $options = $this->previewOptions();
+        $previewWidth = $options['width'];
+        $previewShortMaxSeconds = $options['short_max_seconds'];
+        $previewClipSeconds = $options['clip_seconds'];
+        $previewClipCount = $options['clip_count'];
+        $posterSecond = $options['poster_second'];
         $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
         $durationSeconds = $this->durationSeconds($absolutePath);
         $selectFilter = $durationSeconds === null
@@ -45,9 +46,7 @@ class FileVideoPreviewGenerator
             "scale={$previewWidth}:-2",
         ]));
 
-        $filename = pathinfo(basename($finalPath), PATHINFO_FILENAME);
-        $previewPath = $this->appStorage->derivedPath($finalPath, 'preview', $filename.'.mp4');
-        $posterPath = $this->appStorage->derivedPath($finalPath, 'preview', $filename.'.jpg');
+        ['preview_path' => $previewPath, 'poster_path' => $posterPath] = $this->outputPaths($finalPath);
         $directory = dirname($previewPath);
 
         if (! $disk->exists($directory)) {
@@ -112,6 +111,33 @@ class FileVideoPreviewGenerator
         }
 
         return [$previewPath, $posterPath];
+    }
+
+    /**
+     * @return array{preview_path: string, poster_path: string}
+     */
+    public function outputPaths(string $finalPath): array
+    {
+        $filename = pathinfo(basename($finalPath), PATHINFO_FILENAME);
+
+        return [
+            'preview_path' => $this->appStorage->derivedPath($finalPath, 'preview', $filename.'.mp4'),
+            'poster_path' => $this->appStorage->derivedPath($finalPath, 'preview', $filename.'.jpg'),
+        ];
+    }
+
+    /**
+     * @return array{width: int, short_max_seconds: float, clip_seconds: float, clip_count: int, poster_second: float}
+     */
+    public function previewOptions(): array
+    {
+        return [
+            'width' => (int) config('downloads.video_preview_width', 450),
+            'short_max_seconds' => (float) config('downloads.video_preview_short_max_seconds', 60),
+            'clip_seconds' => (float) config('downloads.video_preview_clip_seconds', 5),
+            'clip_count' => (int) config('downloads.video_preview_clip_count', 10),
+            'poster_second' => (float) config('downloads.video_poster_second', 1),
+        ];
     }
 
     private function durationSeconds(string $absolutePath): ?float

@@ -39,10 +39,14 @@ class NormalizeLibraryScanAudio implements ShouldQueue
         $scans->markMediaTaskProcessing($task, 'normalizing_audio', 10);
 
         try {
-            $scans->markMediaTaskCompleted(
-                $task->fresh() ?? $task,
-                $processor->normalizeAudio($task->file),
-            );
+            $result = $processor->normalizeAudio($task->file, $task);
+            if (isset($result['remote_task_id'])) {
+                $scans->markMediaTaskProcessing($task->fresh() ?? $task, 'remote_audio_queued', 15);
+
+                return;
+            }
+
+            $scans->markMediaTaskCompleted($task->fresh() ?? $task, $result);
         } catch (\Throwable $e) {
             $scans->markMediaTaskFailed($task->fresh() ?? $task, 'audio_normalization_failed', $e->getMessage(), [
                 'exception' => $e::class,

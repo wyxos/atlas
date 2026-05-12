@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [
             'api/extension/*',
+            'api/media-processor/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

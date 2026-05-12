@@ -49,6 +49,9 @@ Route::post('/api/extension/browse-tabs/civitai-user', [\App\Http\Controllers\Ex
 Route::post('/api/extension/broadcasting/auth', [\App\Http\Controllers\ExtensionApiController::class, 'broadcastAuth'])
     ->name('api.extension.broadcast-auth');
 
+Route::post('/api/media-processor/tasks/{mediaProcessorTask}/events', \App\Http\Controllers\MediaProcessorTaskEventController::class)
+    ->name('api.media-processor.tasks.events');
+
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 

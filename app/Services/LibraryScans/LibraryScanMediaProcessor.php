@@ -2,9 +2,12 @@
 
 namespace App\Services\LibraryScans;
 
+use App\Enums\MediaProcessorOperation;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Models\LibraryScanMediaTask;
 use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
+use App\Services\MediaProcessing\RemoteMediaProcessorClient;
 use App\Support\AtlasPathResolver;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
@@ -19,16 +22,34 @@ class LibraryScanMediaProcessor
         private readonly FileDownloadPreviewAssetGenerator $previewAssetGenerator,
         private readonly MediaProbeService $probe,
         private readonly AtlasStorage $appStorage,
+        private readonly RemoteMediaProcessorClient $remoteProcessor,
     ) {}
 
     /**
      * @return array{updates: array<string, mixed>}
      */
-    public function generatePreviewAssets(File $file, bool $regeneratePreviewAssets = false): array
-    {
-        $updates = $regeneratePreviewAssets
-            ? $this->previewAssetGenerator->regeneratePreviewAssets($file)
-            : $this->previewAssetGenerator->generatePreviewAssets($file);
+    public function generatePreviewAssets(
+        File $file,
+        bool $regeneratePreviewAssets = false,
+        ?LibraryScanMediaTask $libraryScanMediaTask = null,
+    ): array {
+        $remoteAwareTask = $this->remoteProcessor->enabled() ? $libraryScanMediaTask : null;
+
+        if ($regeneratePreviewAssets) {
+            $result = $remoteAwareTask
+                ? $this->previewAssetGenerator->regeneratePreviewAssets($file, $remoteAwareTask)
+                : $this->previewAssetGenerator->regeneratePreviewAssets($file);
+        } else {
+            $result = $remoteAwareTask
+                ? $this->previewAssetGenerator->generatePreviewAssets($file, $remoteAwareTask)
+                : $this->previewAssetGenerator->generatePreviewAssets($file);
+        }
+
+        if (isset($result['remote_task_id'])) {
+            return $result;
+        }
+
+        $updates = $result;
 
         if ($updates !== []) {
             $file->forceFill($updates)->save();
@@ -42,11 +63,25 @@ class LibraryScanMediaProcessor
     /**
      * @return array<string, mixed>
      */
-    public function normalizeAudio(File $file): array
+    public function normalizeAudio(File $file, ?LibraryScanMediaTask $libraryScanMediaTask = null): array
     {
-        $resolved = $this->resolveFilePath($file);
-
         $targetPath = $this->conversionPath($file, 'mp3');
+
+        if ($this->remoteProcessor->enabled()) {
+            return $this->submitRemoteConversion(
+                $file,
+                $libraryScanMediaTask,
+                MediaProcessorOperation::AUDIO_NORMALIZATION,
+                'normalized_audio',
+                $targetPath,
+                [
+                    'audio_codec' => 'libmp3lame',
+                    'quality' => 2,
+                ],
+            );
+        }
+
+        $resolved = $this->resolveFilePath($file);
         $result = $this->runFfmpegConversion([
             '-y',
             '-i',
@@ -67,8 +102,26 @@ class LibraryScanMediaProcessor
     /**
      * @return array<string, mixed>
      */
-    public function createStreamableVideo(File $file): array
+    public function createStreamableVideo(File $file, ?LibraryScanMediaTask $libraryScanMediaTask = null): array
     {
+        $targetPath = $this->conversionPath($file, 'mp4');
+
+        if ($this->remoteProcessor->enabled()) {
+            return $this->submitRemoteConversion(
+                $file,
+                $libraryScanMediaTask,
+                MediaProcessorOperation::STREAMABLE_VIDEO,
+                'streamable_video',
+                $targetPath,
+                [
+                    'max_width' => 1920,
+                    'max_height' => 1080,
+                    'video_codec' => 'libx264',
+                    'audio_codec' => 'aac',
+                ],
+            );
+        }
+
         $resolved = $this->resolveFilePath($file);
         $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->detectMimeType($resolved));
         $probe = $this->probe->probe($resolved);
@@ -77,7 +130,6 @@ class LibraryScanMediaProcessor
             return [];
         }
 
-        $targetPath = $this->conversionPath($file, 'mp4');
         $args = [
             '-y',
             '-i',
@@ -112,6 +164,33 @@ class LibraryScanMediaProcessor
         $this->mergeMetadata($file, ['conversions' => $result]);
 
         return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
+    private function submitRemoteConversion(
+        File $file,
+        ?LibraryScanMediaTask $libraryScanMediaTask,
+        string $operation,
+        string $outputKey,
+        string $targetPath,
+        array $options = [],
+    ): array {
+        $task = $this->remoteProcessor->submit(
+            $file,
+            $operation,
+            (string) $file->path,
+            [$outputKey => $targetPath],
+            $options,
+            $libraryScanMediaTask,
+        );
+
+        return [
+            'remote_task_id' => $task->id,
+            'remote_status' => $task->status,
+        ];
     }
 
     private function resolveFilePath(File $file): string

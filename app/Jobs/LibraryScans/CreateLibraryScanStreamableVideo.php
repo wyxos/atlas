@@ -39,10 +39,14 @@ class CreateLibraryScanStreamableVideo implements ShouldQueue
         $scans->markMediaTaskProcessing($task, 'creating_streamable_video', 10);
 
         try {
-            $scans->markMediaTaskCompleted(
-                $task->fresh() ?? $task,
-                $processor->createStreamableVideo($task->file),
-            );
+            $result = $processor->createStreamableVideo($task->file, $task);
+            if (isset($result['remote_task_id'])) {
+                $scans->markMediaTaskProcessing($task->fresh() ?? $task, 'remote_video_queued', 15);
+
+                return;
+            }
+
+            $scans->markMediaTaskCompleted($task->fresh() ?? $task, $result);
         } catch (\Throwable $e) {
             $scans->markMediaTaskFailed($task->fresh() ?? $task, 'video_streamable_failed', $e->getMessage(), [
                 'exception' => $e::class,

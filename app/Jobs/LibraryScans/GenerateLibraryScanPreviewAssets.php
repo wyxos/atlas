@@ -41,10 +41,14 @@ class GenerateLibraryScanPreviewAssets implements ShouldQueue
         $scans->markMediaTaskProcessing($task, 'previewing', 10);
 
         try {
-            $scans->markMediaTaskCompleted(
-                $task->fresh() ?? $task,
-                $processor->generatePreviewAssets($task->file, $this->regeneratePreviewAssets),
-            );
+            $result = $processor->generatePreviewAssets($task->file, $this->regeneratePreviewAssets, $task);
+            if (isset($result['remote_task_id'])) {
+                $scans->markMediaTaskProcessing($task->fresh() ?? $task, 'remote_preview_queued', 15);
+
+                return;
+            }
+
+            $scans->markMediaTaskCompleted($task->fresh() ?? $task, $result);
         } catch (\Throwable $e) {
             $scans->markMediaTaskFailed($task->fresh() ?? $task, 'preview_failed', $e->getMessage(), [
                 'exception' => $e::class,
