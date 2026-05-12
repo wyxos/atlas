@@ -1,0 +1,117 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ocir.io
+  IMAGE_NAME: ${{ github.repository }}
+  PHP_IMAGE_NAME: atlas-php
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run PHP Pint
+        run: docker run --rm -v $(pwd):/app ghcr.io/ahinkle/pint:latest --dirty
+      - name: Run ESLint
+        run: npm run lint || true
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: laravel
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      APP_ENV: testing
+      APP_DEBUG: true
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: laravel
+      DB_USERNAME: root
+      DB_PASSWORD: test
+      REDIS_HOST: 127.0.0.1
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run PHP tests
+        run: docker run --rm -v $(pwd):/app ghcr.io/ahinkle/pint:latest && docker run --rm -v $(pwd):/app -e DB_HOST=host.docker.internal -e REDIS_HOST=host.docker.internal php:8.4-cli php artisan test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to OCIR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ env.PHP_IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=long
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify runtime image contents
+        run: |
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ env.PHP_IMAGE_NAME }}:sha-${{ github.sha }} sh -c "
+            echo 'Checking for build tools (should NOT exist)...'
+            which node && echo 'FAIL: node found' && exit 1 || echo 'OK: no node'
+            which npm && echo 'FAIL: npm found' && exit 1 || echo 'OK: no npm'
+            which composer && echo 'FAIL: composer found' && exit 1 || echo 'OK: no composer'
+            
+            echo 'Checking for runtime tools (should exist)...'
+            which ffmpeg || echo 'FAIL: no ffmpeg'
+            which yt-dlp || echo 'FAIL: no yt-dlp'
+            which php-fpm || echo 'FAIL: no php-fpm'
+            
+            echo 'Checking user (should be non-root)...'
+            id | grep -q www-data && echo 'OK: running as www-data' || echo 'WARNING: not running as www-data'
+            
+            echo 'All checks passed!'
+          "

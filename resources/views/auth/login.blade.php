@@ -45,70 +45,83 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('login') }}" class="space-y-6">
-                        @csrf
+        {{-- Authentik SSO Button (always visible) --}}
+        <div class="mb-6">
+            <a href="{{ route('auth.authentik') }}" class="flex w-full justify-center items-center px-6 py-3 rounded-lg shadow-lg font-medium text-sm transition-colors bg-smart-blue-600 hover:bg-smart-blue-700 text-white">
+                Sign in with Authentik
+            </a>
+        </div>
 
-                        <div>
-                            <label for="email" class="block text-sm font-medium mb-2 text-smart-blue-900">
-                                Email Address
-                            </label>
-                            <input
-                                type="email"
-                                name="email"
-                                id="email"
-                                value="{{ old('email') }}"
-                                required
-                                autofocus
-                                autocomplete="email"
-                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
-                                placeholder="you@example.com"
-                            >
-                            @error('email')
-                                <p class="mt-1 text-sm text-danger-800">{{ $message }}</p>
-                            @enderror
-                        </div>
+        {{-- Local login form (only if AUTH_LOCAL_ENABLED) --}}
+        @if(config('auth.local_enabled'))
+        <div class="text-center text-sm text-twilight-indigo-300 mb-4">
+            or sign in with email
+        </div>
+        <form method="POST" action="{{ route('login') }}" class="space-y-6">
+            @csrf
 
-                        <div>
-                            <label for="password" class="block text-sm font-medium mb-2 text-smart-blue-900">
-                                Password
-                            </label>
-                            <input
-                                type="password"
-                                name="password"
-                                id="password"
-                                required
-                                autocomplete="current-password"
-                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
-                                placeholder="••••••••"
-                            >
-                            @error('password')
-                                <p class="mt-1 text-sm text-danger-800">{{ $message }}</p>
-                            @enderror
-                        </div>
+            <div>
+                <label for="email" class="block text-sm font-medium mb-2 text-smart-blue-900">
+                    Email Address
+                </label>
+                <input
+                    type="email"
+                    name="email"
+                    id="email"
+                    value="{{ old('email') }}"
+                    required
+                    autofocus
+                    autocomplete="email"
+                    class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                    placeholder="you@example.com"
+                >
+                @error('email')
+                    <p class="mt-1 text-sm text-danger-800">{{ $message }}</p>
+                @enderror
+            </div>
 
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    name="remember"
-                                    id="remember"
-                                    class="w-4 h-4 rounded focus:ring-2 accent-smart-blue-500"
-                                >
-                                <label for="remember" class="ml-2 text-sm text-twilight-indigo-300">
-                                    Remember me
-                                </label>
-                            </div>
-                        </div>
+            <div>
+                <label for="password" class="block text-sm font-medium mb-2 text-smart-blue-900">
+                    Password
+                </label>
+                <input
+                    type="password"
+                    name="password"
+                    id="password"
+                    required
+                    autocomplete="current-password"
+                    class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                    placeholder="••••••••"
+                >
+                @error('password')
+                    <p class="mt-1 text-sm text-danger-800">{{ $message }}</p>
+                @enderror
+            </div>
 
-                        <div>
-                            <x-ui.button
-                                type="submit"
-                                class="w-full px-6 py-3 shadow-lg"
-                            >
-                                Sign In
-                            </x-ui.button>
-                        </div>
-                    </form>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <input
+                        type="checkbox"
+                        name="remember"
+                        id="remember"
+                        class="w-4 h-4 rounded focus:ring-2 accent-smart-blue-500"
+                    >
+                    <label for="remember" class="ml-2 text-sm text-twilight-indigo-300">
+                        Remember me
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <x-ui.button
+                    type="submit"
+                    class="w-full px-6 py-3 shadow-lg"
+                >
+                    Sign In
+                </x-ui.button>
+            </div>
+        </form>
+        @endif
 
                     <div class="mt-6 text-center">
                         <a href="{{ route('home') }}" class="text-sm font-medium transition-colors text-smart-blue-300 hover:text-smart-blue-200">

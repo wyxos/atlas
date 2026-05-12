@@ -38,18 +38,14 @@ FROM php:8.4-fpm AS runtime
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    libfreetype6-dev \
-    libjpeg62-turbo-dev \
-    libmagickwand-dev \
-    libonig-dev \
-    libpng-dev \
-    libzip-dev \
     yt-dlp \
+    libcurl4-openssl-dev \
+    libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip sockets opcache && \
+    docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip sockets opcache xml curl && \
     pecl install redis imagick && \
     docker-php-ext-enable redis imagick
 

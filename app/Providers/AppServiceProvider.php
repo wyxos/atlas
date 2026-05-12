@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Laravel\Horizon\Horizon;
 use Typesense\Client;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Horizon::auth(function ($request) {
+            return $request->user()?->is_admin === true;
+        });
     }
 }
