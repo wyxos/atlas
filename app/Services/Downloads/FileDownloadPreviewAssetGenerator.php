@@ -318,7 +318,11 @@ class FileDownloadPreviewAssetGenerator
 
     private function resolveImagePreviewOutputExtension(int|false $imageType): string
     {
-        if (in_array($imageType, [IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP], true)) {
+        if ($imageType === IMAGETYPE_GIF) {
+            return 'gif';
+        }
+
+        if (in_array($imageType, [IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
             return 'png';
         }
 
@@ -421,7 +425,7 @@ class FileDownloadPreviewAssetGenerator
         $tempFile = $baseTempFile.'.'.$previewExtension;
         $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
 
-        $process = new Process([
+        $processArgs = [
             $ffmpegPath,
             '-y',
             '-loglevel',
@@ -430,12 +434,19 @@ class FileDownloadPreviewAssetGenerator
             $absolutePath,
             '-vf',
             "scale={$previewWidth}:{$previewHeight}:force_original_aspect_ratio=decrease",
-            '-frames:v',
-            '1',
-            '-update',
-            '1',
-            $tempFile,
-        ]);
+        ];
+
+        if (! in_array($previewExtension, ['gif', 'webp'], true)) {
+            $processArgs = [
+                ...$processArgs,
+                '-frames:v',
+                '1',
+                '-update',
+                '1',
+            ];
+        }
+
+        $process = new Process([...$processArgs, $tempFile]);
         $process->setTimeout($timeout);
 
         try {

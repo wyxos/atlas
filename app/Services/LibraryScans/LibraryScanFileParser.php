@@ -13,6 +13,7 @@ class LibraryScanFileParser
 {
     public function __construct(
         private readonly MediaProbeService $probe,
+        private readonly BrowserVideoSupport $browserVideoSupport,
     ) {}
 
     /**
@@ -60,74 +61,12 @@ class LibraryScanFileParser
             'audio' => [LibraryScanMediaTask::TASK_AUDIO_NORMALIZATION],
             'video' => [
                 LibraryScanMediaTask::TASK_PREVIEW_ASSETS,
-                ...($this->shouldCreateStreamableVideo($mimeType, $probe)
+                ...($this->browserVideoSupport->shouldCreateStreamableVideo($mimeType, $probe)
                     ? [LibraryScanMediaTask::TASK_VIDEO_STREAMABLE]
                     : []),
             ],
             default => [],
         };
-    }
-
-    /**
-     * @param  array<string, mixed>  $probe
-     */
-    private function shouldCreateStreamableVideo(?string $mimeType, array $probe): bool
-    {
-        if ($mimeType !== 'video/mp4') {
-            return true;
-        }
-
-        $videoStream = $this->firstStreamOfType($probe, 'video');
-        if ($videoStream === null) {
-            return false;
-        }
-
-        $codec = strtolower((string) ($videoStream['codec_name'] ?? ''));
-        if ($codec !== '' && ! in_array($codec, ['h264', 'avc1'], true)) {
-            return true;
-        }
-
-        $audioStream = $this->firstStreamOfType($probe, 'audio');
-        $audioCodec = strtolower((string) ($audioStream['codec_name'] ?? ''));
-        if ($audioCodec !== '' && ! in_array($audioCodec, ['aac', 'mp3', 'mp4a'], true)) {
-            return true;
-        }
-
-        return $this->hasOversizedVideoStream($probe);
-    }
-
-    /**
-     * @param  array<string, mixed>  $probe
-     */
-    private function hasOversizedVideoStream(array $probe): bool
-    {
-        $videoStream = $this->firstStreamOfType($probe, 'video');
-        if ($videoStream === null) {
-            return false;
-        }
-
-        $width = is_numeric($videoStream['width'] ?? null) ? (int) $videoStream['width'] : 0;
-        $height = is_numeric($videoStream['height'] ?? null) ? (int) $videoStream['height'] : 0;
-
-        return $width > 1920 || $height > 1080;
-    }
-
-    /**
-     * @param  array<string, mixed>  $probe
-     * @return array<string, mixed>|null
-     */
-    private function firstStreamOfType(array $probe, string $type): ?array
-    {
-        $streams = is_array($probe['streams'] ?? null) ? $probe['streams'] : [];
-        foreach ($streams as $stream) {
-            if (! is_array($stream) || ($stream['codec_type'] ?? null) !== $type) {
-                continue;
-            }
-
-            return $stream;
-        }
-
-        return null;
     }
 
     private function detectMimeType(string $absolutePath): ?string

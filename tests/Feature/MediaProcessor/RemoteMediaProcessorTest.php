@@ -5,6 +5,7 @@ use App\Enums\LibraryScanMediaTask as LibraryMediaTask;
 use App\Enums\LibraryScanRunStatus;
 use App\Enums\MediaProcessorOperation;
 use App\Enums\MediaProcessorTaskStatus;
+use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
 use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Models\File;
 use App\Models\LibraryScanItem;
@@ -12,6 +13,7 @@ use App\Models\LibraryScanMediaTask;
 use App\Models\LibraryScanRun;
 use App\Models\MediaProcessorTask;
 use App\Services\Downloads\FileDownloadFinalizer;
+use App\Services\LibraryScans\MediaProbeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -57,6 +59,69 @@ it('submits downloaded video preview work to the remote processor with managed h
             && $payload['input_path'] === "downloads/aa/aa/{$hash}.mp4"
             && $payload['websocket_required'] === true;
     });
+});
+
+it('submits GIF image preview work with an animated preview extension', function () {
+    configureRemoteMediaProcessor();
+    Http::fake([
+        'processor.test/tasks' => Http::response(['accepted' => true], 202),
+    ]);
+    Storage::fake('atlas');
+
+    $hash = str_repeat('d', 40);
+    $path = "downloads/dd/dd/{$hash}.gif";
+    Storage::disk('atlas')->put($path, base64_decode('R0lGODlhAQABAIABAAAAAP///ywAAAAAAQABAAACAkQBADs='));
+    $file = File::factory()->create([
+        'path' => $path,
+        'mime_type' => 'image/gif',
+        'preview_path' => null,
+        'poster_path' => null,
+    ]);
+
+    $updates = app(FileDownloadFinalizer::class)->generatePreviewAssets($file);
+
+    expect($updates)->toBe([])
+        ->and(MediaProcessorTask::query()->count())->toBe(1);
+
+    $task = MediaProcessorTask::query()->firstOrFail();
+    expect($task->operation)->toBe(MediaProcessorOperation::IMAGE_PREVIEW)
+        ->and($task->input_path)->toBe($path)
+        ->and($task->output_paths)->toBe([
+            'preview_path' => "downloads/dd/dd/preview/{$hash}.gif",
+        ]);
+
+    Http::assertSent(function ($request) use ($hash): bool {
+        $payload = $request->data();
+
+        return $payload['input_path'] === "downloads/dd/dd/{$hash}.gif"
+            && $payload['output_paths']['preview_path'] === "downloads/dd/dd/preview/{$hash}.gif";
+    });
+});
+
+it('keeps WebP image preview work on the standard PNG preview extension', function () {
+    configureRemoteMediaProcessor();
+    Http::fake([
+        'processor.test/tasks' => Http::response(['accepted' => true], 202),
+    ]);
+    Storage::fake('atlas');
+
+    $hash = str_repeat('e', 40);
+    $path = "downloads/ee/ee/{$hash}.webp";
+    Storage::disk('atlas')->put($path, base64_decode('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA'));
+    $file = File::factory()->create([
+        'path' => $path,
+        'mime_type' => 'image/webp',
+        'preview_path' => null,
+        'poster_path' => null,
+    ]);
+
+    app(FileDownloadFinalizer::class)->generatePreviewAssets($file);
+
+    $task = MediaProcessorTask::query()->firstOrFail();
+    expect($task->operation)->toBe(MediaProcessorOperation::IMAGE_PREVIEW)
+        ->and($task->output_paths)->toBe([
+            'preview_path' => "downloads/ee/ee/preview/{$hash}.png",
+        ]);
 });
 
 it('accepts a signed completion callback and stores preview paths', function () {
@@ -147,6 +212,57 @@ it('queues library scan audio normalization remotely without reading local media
             'normalized_audio' => "imports/cc/cc/conversions/{$hash}.mp3",
         ])
         ->and($mediaTask->fresh()?->status)->toBe(LibraryMediaTask::STATUS_PROCESSING);
+});
+
+it('completes browser-supported silent MP4 streamable tasks without remote submission', function () {
+    configureRemoteMediaProcessor();
+    Http::fake();
+    Storage::fake('atlas');
+    app()->instance(MediaProbeService::class, new class extends MediaProbeService
+    {
+        public function probe(string $absolutePath): array
+        {
+            return [
+                'streams' => [
+                    ['codec_type' => 'video', 'codec_name' => 'h264'],
+                ],
+            ];
+        }
+    });
+
+    $hash = str_repeat('f', 40);
+    $path = "imports/ff/ff/{$hash}.mp4";
+    Storage::disk('atlas')->put($path, 'synthetic-video');
+    $file = File::factory()->create([
+        'source' => 'local',
+        'path' => $path,
+        'mime_type' => 'video/mp4',
+    ]);
+    $run = LibraryScanRun::factory()->create([
+        'status' => LibraryScanRunStatus::PROCESSING,
+    ]);
+    $item = LibraryScanItem::factory()->create([
+        'library_scan_run_id' => $run->id,
+        'file_id' => $file->id,
+        'original_path' => 'synthetic/source/hash',
+        'status' => LibraryScanItemStatus::PROCESSING,
+    ]);
+    $mediaTask = LibraryScanMediaTask::factory()->create([
+        'library_scan_item_id' => $item->id,
+        'file_id' => $file->id,
+        'type' => LibraryMediaTask::TASK_VIDEO_STREAMABLE,
+        'status' => LibraryMediaTask::STATUS_PENDING,
+    ]);
+
+    (new CreateLibraryScanStreamableVideo($mediaTask->id))->handle(
+        app(\App\Services\LibraryScans\LibraryScanMediaProcessor::class),
+        app(\App\Services\LibraryScans\LibraryScanService::class),
+    );
+
+    expect(MediaProcessorTask::query()->count())->toBe(0)
+        ->and($mediaTask->fresh()?->status)->toBe(LibraryMediaTask::STATUS_COMPLETED)
+        ->and($mediaTask->fresh()?->result)->toBe([]);
+    Http::assertNothingSent();
 });
 
 function configureRemoteMediaProcessor(): void

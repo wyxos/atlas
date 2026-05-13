@@ -23,6 +23,7 @@ class LibraryScanMediaProcessor
         private readonly MediaProbeService $probe,
         private readonly AtlasStorage $appStorage,
         private readonly RemoteMediaProcessorClient $remoteProcessor,
+        private readonly BrowserVideoSupport $browserVideoSupport,
     ) {}
 
     /**
@@ -104,6 +105,14 @@ class LibraryScanMediaProcessor
      */
     public function createStreamableVideo(File $file, ?LibraryScanMediaTask $libraryScanMediaTask = null): array
     {
+        $resolved = $this->resolveFilePath($file);
+        $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->detectMimeType($resolved));
+        $probe = $this->probe->probe($resolved);
+
+        if (! $this->browserVideoSupport->shouldCreateStreamableVideo($mimeType, $probe)) {
+            return [];
+        }
+
         $targetPath = $this->conversionPath($file, 'mp4');
 
         if ($this->remoteProcessor->enabled()) {
@@ -120,14 +129,6 @@ class LibraryScanMediaProcessor
                     'audio_codec' => 'aac',
                 ],
             );
-        }
-
-        $resolved = $this->resolveFilePath($file);
-        $mimeType = FileMimeType::canonicalize($file->mime_type ?? $this->detectMimeType($resolved));
-        $probe = $this->probe->probe($resolved);
-
-        if ($probe !== [] && ! $this->shouldCreateStreamableVideo($mimeType, $probe)) {
-            return [];
         }
 
         $args = [
@@ -243,34 +244,6 @@ class LibraryScanMediaProcessor
         $filename = $this->appStorage->filenameWithExtension(basename((string) $file->path), $extension);
 
         return $this->appStorage->derivedPath((string) $file->path, 'conversions', $filename);
-    }
-
-    /**
-     * @param  array<string, mixed>  $probe
-     */
-    private function shouldCreateStreamableVideo(?string $mimeType, array $probe): bool
-    {
-        if ($mimeType !== 'video/mp4') {
-            return true;
-        }
-
-        $videoStream = $this->firstStreamOfType($probe, 'video');
-        if ($videoStream === null) {
-            return false;
-        }
-
-        $codec = strtolower((string) ($videoStream['codec_name'] ?? ''));
-        if ($codec !== '' && ! in_array($codec, ['h264', 'avc1'], true)) {
-            return true;
-        }
-
-        $audioStream = $this->firstStreamOfType($probe, 'audio');
-        $audioCodec = strtolower((string) ($audioStream['codec_name'] ?? ''));
-        if ($audioCodec !== '' && ! in_array($audioCodec, ['aac', 'mp3', 'mp4a'], true)) {
-            return true;
-        }
-
-        return $this->hasOversizedVideoStream($probe);
     }
 
     /**

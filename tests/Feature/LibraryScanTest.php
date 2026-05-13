@@ -800,7 +800,7 @@ it('uses the generated import filename for audio conversions without variant suf
     expect($result['normalized_audio'])->not->toContain('.normalized.');
 });
 
-it('plans streamable video conversion work for oversized imported mp4 files without inline conversions', function () {
+it('skips streamable video conversion work for browser-supported imported mp4 files regardless of resolution', function () {
     configureLibraryScanStorage();
     Storage::disk(AtlasStorage::DISK)->put('imports/aa/bb/video.mp4', 'video');
 
@@ -829,7 +829,6 @@ it('plans streamable video conversion work for oversized imported mp4 files with
 
     expect($result['tasks'])->toBe([
         MediaTask::TASK_PREVIEW_ASSETS,
-        MediaTask::TASK_VIDEO_STREAMABLE,
     ])
         ->and($result['metadata'])->not->toHaveKey('conversions');
     expect(FileMetadata::query()->where('file_id', $file->id)->exists())->toBeTrue();
@@ -916,7 +915,14 @@ it('fails the parser item when a conversion media task fails', function () {
     ]);
 
     $probe = \Mockery::mock(MediaProbeService::class);
-    $probe->shouldReceive('probe')->once()->andReturn([]);
+    $probe->shouldReceive('probe')->once()->andReturn([
+        'streams' => [
+            [
+                'codec_type' => 'video',
+                'codec_name' => 'h264',
+            ],
+        ],
+    ]);
     $probe->shouldReceive('resolveFfmpegPath')->once()->andReturn(null);
     $this->app->instance(MediaProbeService::class, $probe);
 
