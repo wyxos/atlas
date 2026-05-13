@@ -59,7 +59,7 @@ test('auto blacklists files from blacklisted containers', function () {
     expect($file->fresh()->auto_blacklisted)->toBeTrue();
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
     expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(DeleteStoredFileJob::class);
 });
 
 test('blacklists files for blacklist action type', function () {
@@ -167,7 +167,7 @@ test('does not dispatch delete job when file has no path', function () {
 
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(DeleteStoredFileJob::class);
 });
 
 test('handles multiple files with different action types', function () {

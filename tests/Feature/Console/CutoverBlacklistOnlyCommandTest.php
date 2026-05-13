@@ -6,22 +6,12 @@ use App\Models\File;
 use App\Models\ModerationRule;
 use App\Models\Reaction;
 use App\Models\User;
-use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Services\MetricsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
-use function Pest\Laravel\mock;
-
 uses(RefreshDatabase::class);
-
-function mockBlacklistOnlyCutoverIndexSync(): void
-{
-    $sync = mock(LocalBrowseIndexSyncService::class);
-    $sync->shouldReceive('syncFilesByIds')->zeroOrMoreTimes()->andReturnNull();
-    $sync->shouldReceive('syncReactionsForFileIds')->zeroOrMoreTimes()->andReturnNull();
-}
 
 test('dry run reports legacy negative state without mutating rows', function () {
     $user = User::factory()->create();
@@ -53,7 +43,6 @@ test('dry run reports legacy negative state without mutating rows', function () 
 
 test('converts auto-blacklisted files and legacy dislike reactions to blacklist-only state in chunks', function () {
     Queue::fake();
-    mockBlacklistOnlyCutoverIndexSync();
 
     $user = User::factory()->create();
     $autoFile = File::factory()->create([

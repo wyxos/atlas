@@ -1,17 +1,20 @@
 <?php
 
 use App\Events\FileMarkedNotFound;
+use App\Jobs\SyncLocalBrowseIndex;
 use App\Models\File;
 use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
 test('preview failure marks civitai files as not found, detaches them from all tabs, and broadcasts affected tabs', function () {
     Event::fake([FileMarkedNotFound::class]);
+    Queue::fake([SyncLocalBrowseIndex::class]);
 
     $requester = User::factory()->admin()->create();
     $otherUser = User::factory()->admin()->create();
@@ -71,6 +74,12 @@ test('preview failure marks civitai files as not found, detaches them from all t
             && $event->fileId === $file->id
             && $tabIds === [$otherTabA->id, $otherTabB->id];
     });
+    Queue::assertPushed(
+        SyncLocalBrowseIndex::class,
+        fn (SyncLocalBrowseIndex $job): bool => $job->fileIds === [$file->id]
+            && $job->syncFiles
+            && ! $job->syncReactions,
+    );
 });
 
 test('preview failure does not mark file when only one civitai url returns 404', function () {

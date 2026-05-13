@@ -12,6 +12,7 @@ type QueueDefinition<Result> = {
     maxBatchSize: number;
     cacheTtlMs: number;
     endpointPath: string;
+    extendBatchWindowOnNewItem?: boolean;
     buildRequestItem: (requestId: string, entry: PendingQueueItem<Result>) => Record<string, string>;
     emptyPayload: () => Result;
     parsePayloadItem: (row: MatchResponseItem) => Result;
@@ -158,7 +159,11 @@ function createBackgroundAtlasCheckQueue<Result>(
 
     function scheduleFlush(): void {
         if (flushTimer !== null) {
-            return;
+            if (definition.extendBatchWindowOnNewItem !== true) {
+                return;
+            }
+
+            clearTimeout(flushTimer);
         }
 
         flushTimer = setTimeout(() => {
@@ -428,10 +433,11 @@ const badgeCheckQueue = createBackgroundAtlasCheckQueue<BadgeMatchResult>({
 });
 
 const referrerCheckQueue = createBackgroundAtlasCheckQueue<ReferrerMatchResult>({
-    batchDelayMs: 12,
+    batchDelayMs: 100,
     maxBatchSize: 20,
     cacheTtlMs: 5 * 60 * 1000,
     endpointPath: '/api/extension/referrer-checks',
+    extendBatchWindowOnNewItem: true,
     buildRequestItem: (requestId, entry) => ({
         request_id: requestId,
         referrer_hash: entry.inputHash,

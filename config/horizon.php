@@ -103,6 +103,7 @@ return [
         'redis:maintenance' => 600,
         'redis:media-conversions' => 3600,
         'redis:media-previews' => 600,
+        'redis:local-browse-sync' => 300,
         'redis:local-browse-reindex' => 3600,
         'redis:processing' => 300,
         'redis:scout' => 300,
@@ -322,6 +323,19 @@ return [
             'timeout' => (int) env('LOCAL_BROWSE_REINDEX_TIMEOUT_SECONDS', 21600),
             'nice' => 0,
         ],
+        'supervisor-local-browse-sync' => [
+            'connection' => 'redis',
+            'queue' => ['local-browse-sync'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
         'supervisor-scout' => [
             'connection' => 'redis',
             'queue' => ['scout'],
@@ -387,6 +401,12 @@ return [
                 'maxProcesses' => 1,
                 'memory' => 384,
             ],
+            'supervisor-local-browse-sync' => [
+                'maxProcesses' => 2,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 256,
+            ],
             'supervisor-scout' => [
                 'maxProcesses' => 4,
                 'memory' => 128,
@@ -420,6 +440,9 @@ return [
             ],
             'supervisor-local-browse-reindex' => [
                 'maxProcesses' => 1,
+            ],
+            'supervisor-local-browse-sync' => [
+                'maxProcesses' => 2,
             ],
             'supervisor-scout' => [
                 'maxProcesses' => 2,

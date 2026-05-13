@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Jobs\DeleteStoredFileJob;
 use App\Models\File;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Local\LocalBrowseIndexSyncDispatcher;
 use App\Support\AtlasPathResolver;
 use Illuminate\Support\Facades\Storage;
 
@@ -14,6 +14,7 @@ class DownloadedFileClearService
 
     public function __construct(
         private MetricsService $metricsService,
+        private LocalBrowseIndexSyncDispatcher $localBrowseIndexSyncDispatcher,
     ) {}
 
     public function hasStoredAssets(File $file): bool
@@ -66,7 +67,7 @@ class DownloadedFileClearService
 
         $this->clearStateByIds($fileIds);
         if ($syncIndex) {
-            app(LocalBrowseIndexSyncService::class)->syncFilesByIds($fileIds);
+            $this->localBrowseIndexSyncDispatcher->files($fileIds);
         }
 
         if ($queueDelete) {

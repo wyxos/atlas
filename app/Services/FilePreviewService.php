@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Local\LocalBrowseIndexSyncDispatcher;
 use Illuminate\Support\Collection;
 
 class FilePreviewService
@@ -17,7 +17,7 @@ class FilePreviewService
 
     public function __construct(
         private readonly FileBlacklistService $fileBlacklistService,
-        private readonly LocalBrowseIndexSyncService $localBrowseIndexSyncService,
+        private readonly LocalBrowseIndexSyncDispatcher $localBrowseIndexSyncDispatcher,
     ) {}
 
     /**
@@ -118,8 +118,7 @@ class FilePreviewService
                 ]);
         }
 
-        $this->localBrowseIndexSyncService->syncFilesByIds($fileIds);
-        $this->localBrowseIndexSyncService->syncReactionsForFileIds($fileIds);
+        $this->localBrowseIndexSyncDispatcher->filesAndReactions($fileIds);
 
         return $this->formatResults($fileIds, $userId);
     }

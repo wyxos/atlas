@@ -68,7 +68,7 @@ test('auto blacklists files from blacklisted containers', function () {
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
     expect($file->fresh()->previewed_count)->toBe(3);
     expect(Reaction::query()->where('file_id', $file->id)->exists())->toBeFalse();
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(DeleteStoredFileJob::class);
 });
 
 test('blacklisted containers can set previewed count to feed removed count', function () {
@@ -98,7 +98,7 @@ test('blacklisted containers can set previewed count to feed removed count', fun
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
     expect($file->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(DeleteStoredFileJob::class);
 });
 
 test('feed removed container wins over earlier preserve container', function () {
@@ -130,7 +130,7 @@ test('feed removed container wins over earlier preserve container', function () 
     $this->service->moderate(collect([$file]));
 
     expect($file->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(DeleteStoredFileJob::class);
 });
 
 test('blacklists files for blacklist action type', function () {

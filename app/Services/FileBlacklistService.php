@@ -4,14 +4,14 @@ namespace App\Services;
 
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Local\LocalBrowseIndexSyncDispatcher;
 use Illuminate\Support\Facades\DB;
 
 class FileBlacklistService
 {
     public function __construct(
         private readonly DownloadedFileClearService $downloadedFileClearService,
-        private readonly LocalBrowseIndexSyncService $localBrowseIndexSyncService,
+        private readonly LocalBrowseIndexSyncDispatcher $localBrowseIndexSyncDispatcher,
         private readonly MetricsService $metricsService,
     ) {}
 
@@ -116,10 +116,9 @@ class FileBlacklistService
             app(TabFileService::class)->detachFilesFromUserTabs($userId, $fileIds);
         }
 
-        $this->downloadedFileClearService->clearMany($files, queueDelete: $queueDelete);
+        $this->downloadedFileClearService->clearMany($files, queueDelete: $queueDelete, syncIndex: false);
 
-        $this->localBrowseIndexSyncService->syncFilesByIds($fileIds);
-        $this->localBrowseIndexSyncService->syncReactionsForFileIds($fileIds);
+        $this->localBrowseIndexSyncDispatcher->filesAndReactions($fileIds);
 
         return $fileIds;
     }

@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Events\FileMarkedNotFound;
 use App\Models\File;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Local\LocalBrowseIndexSyncDispatcher;
 use App\Support\CivitAiMediaUrl;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
@@ -49,7 +49,7 @@ class FileNotFoundService
                         ])->save();
 
                         app(MetricsService::class)->applyNotFoundMark($file, $wasMarkedNotFound);
-                        app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
+                        app(LocalBrowseIndexSyncDispatcher::class)->files([$file->id]);
                     }
 
                     return $affectedTabsByUser;

@@ -101,12 +101,66 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(12);
+        await vi.advanceTimersByTimeAsync(100);
         const [firstResponse, secondResponse] = await Promise.all([first, second]);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(firstResponse.payload.reaction).toBe('funny');
         expect(secondResponse).toEqual(firstResponse);
+    });
+
+    it('extends the referrer batch window when new urls arrive before the flush', async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal('crypto', {
+            ...crypto,
+            subtle: {
+                digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
+            },
+        });
+        const fetchMock = vi.fn().mockImplementation((_endpoint: string, init?: RequestInit) => {
+            const body = JSON.parse(String(init?.body ?? '{}')) as {
+                items?: Array<{ request_id?: string }>;
+            };
+
+            return Promise.resolve(createMatchResponse(
+                (body.items ?? []).map((item) => ({
+                    request_id: item.request_id,
+                    exists: false,
+                    reaction: null,
+                })),
+            ));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { enqueueGlobalReferrerCheck } = await import('./background-atlas-check-queue');
+
+        const first = enqueueGlobalReferrerCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedReferrerUrl: 'https://example.com/post#image-1',
+        });
+
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(80);
+
+        const second = enqueueGlobalReferrerCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedReferrerUrl: 'https://example.com/post#image-2',
+        });
+
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(99);
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+        await Promise.all([first, second]);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? '{}')) as {
+            items?: unknown[];
+        };
+        expect(body.items).toHaveLength(2);
     });
 
     it('flushes short badge batches on the debounce timer and long batches immediately at the threshold', async () => {
