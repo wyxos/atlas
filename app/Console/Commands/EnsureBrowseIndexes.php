@@ -11,7 +11,7 @@ class EnsureBrowseIndexes extends Command
         {--dry-run : Preview missing browse indexes without executing DDL}
         {--only= : Restrict execution to "files" or "reactions"}';
 
-    protected $description = 'Ensure the large-table indexes used by local browse exist';
+    protected $description = 'Ensure the large-table indexes used by Library exist';
 
     public function handle(): int
     {

@@ -2,26 +2,26 @@
 
 namespace App\Console\Commands;
 
-use App\Models\LocalBrowseReindexRun;
-use App\Services\Local\LocalBrowseReindexService;
+use App\Models\LibraryReindexRun;
+use App\Services\Library\LibraryReindexService;
 use Illuminate\Console\Command;
 
-class LocalBrowseReindexStatusCommand extends Command
+class LibraryReindexStatusCommand extends Command
 {
-    protected $signature = 'atlas:local-browse-reindex-status
+    protected $signature = 'atlas:library-reindex-status
         {run? : Reindex run ID. Defaults to latest run}
         {--json : Output machine-readable JSON}';
 
-    protected $description = 'Show progress for a queued local-browse Typesense reindex run';
+    protected $description = 'Show progress for a queued library Typesense reindex run';
 
-    public function handle(LocalBrowseReindexService $reindex): int
+    public function handle(LibraryReindexService $reindex): int
     {
         $run = $this->argument('run')
-            ? LocalBrowseReindexRun::query()->find((int) $this->argument('run'))
-            : LocalBrowseReindexRun::query()->latest()->first();
+            ? LibraryReindexRun::query()->find((int) $this->argument('run'))
+            : LibraryReindexRun::query()->latest()->first();
 
         if (! $run) {
-            $this->warn('No local-browse reindex run found.');
+            $this->warn('No library reindex run found.');
 
             return self::SUCCESS;
         }
@@ -34,7 +34,7 @@ class LocalBrowseReindexStatusCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->info("Local browse reindex #{$run->id}: {$run->status} ({$run->phase})");
+        $this->info("Library reindex #{$run->id}: {$run->status} ({$run->phase})");
         $this->line("Suffix: {$run->suffix}");
         $this->line(sprintf(
             'Files: %s / %s',

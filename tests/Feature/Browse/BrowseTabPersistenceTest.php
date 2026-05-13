@@ -91,7 +91,7 @@ test('browse persists current page token for local tabs', function () {
         'source' => 'CivitAI',
     ]);
 
-    mockLocalBrowseGateway([$file], nextCursor: 3, total: 3);
+    mockLibraryGateway([$file], nextCursor: 3, total: 3);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=1&page=2");
 
@@ -128,7 +128,7 @@ test('browse persists local limit and preset params for tab restore', function (
         'source' => 'CivitAI',
     ]);
 
-    mockLocalBrowseGateway([], nextCursor: 51, total: 0);
+    mockLibraryGateway([], nextCursor: 51, total: 0);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=100&page=50&local_preset=inbox_fresh&reaction_mode=unreacted");
 
@@ -159,7 +159,7 @@ test('browse persists unreacted random preset params for tab restore', function 
         'source' => 'CivitAI',
     ]);
 
-    mockLocalBrowseGateway([], nextCursor: 4, total: 0);
+    mockLibraryGateway([], nextCursor: 4, total: 0);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&page=3&local_preset=unreacted_random&reaction_mode=unreacted&sort=random&seed=12345&blacklisted=no&auto_blacklisted=no");
 
@@ -214,7 +214,7 @@ test('local reaction_at funny browse returns typesense totals and keeps reaction
         'type' => 'funny',
     ])->update(['created_at' => now()->subHours(1), 'updated_at' => now()->subHours(1)]);
 
-    mockLocalBrowseGateway([$newer, $older], nextCursor: null, total: 2);
+    mockLibraryGateway([$newer, $older], nextCursor: null, total: 2);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&reaction_mode=types&reaction[]=funny&sort=reaction_at&blacklisted=no&auto_blacklisted=no&max_previewed_count=2");
 
@@ -263,7 +263,7 @@ test('local reaction_at funny browse can include total count when requested', fu
         'type' => 'funny',
     ])->update(['created_at' => now()->subHours(1), 'updated_at' => now()->subHours(1)]);
 
-    mockLocalBrowseGateway([$newer, $older], nextCursor: null, total: 2);
+    mockLibraryGateway([$newer, $older], nextCursor: null, total: 2);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&reaction_mode=types&reaction[]=funny&sort=reaction_at&blacklisted=no&auto_blacklisted=no&max_previewed_count=2&include_total=1");
 

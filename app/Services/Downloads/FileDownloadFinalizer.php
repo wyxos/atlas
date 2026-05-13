@@ -4,7 +4,7 @@ namespace App\Services\Downloads;
 
 use App\Models\File;
 use App\Services\FilePreviewService;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\MetricsService;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
@@ -133,7 +133,7 @@ class FileDownloadFinalizer
         }
 
         $file->update($updates);
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds([$file->id]);
+        app(LibraryIndexSyncDispatcher::class)->files([$file->id]);
 
         $metrics->applyDownload($file, $wasDownloaded, $hadPath, $wasBlacklisted);
         if ($wasBlacklisted) {

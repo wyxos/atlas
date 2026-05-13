@@ -36,7 +36,7 @@ function updateOpen(value: boolean): void {
     <Dialog :model-value="open" @update:model-value="updateOpen">
         <DialogContent class="sm:max-w-[460px] bg-prussian-blue-600 border-danger-500/30">
             <DialogHeader>
-                <DialogTitle class="text-danger-400">Delete Local File</DialogTitle>
+                <DialogTitle class="text-danger-400">Delete Library File</DialogTitle>
                 <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
                     Delete
                     <span v-if="props.filename" class="font-semibold text-danger-300">{{ props.filename }}</span>

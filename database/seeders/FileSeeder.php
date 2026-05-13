@@ -229,7 +229,7 @@ class FileSeeder extends Seeder
             $this->copyFixtureToStorage($fixture['path'], $fixture['filename'], $fixture['mime_type']);
         }
 
-        // Generate 10 local files (with path, no URL, downloaded = false)
+        // Generate 10 Library (with path, no URL, downloaded = false)
         for ($i = 0; $i < 10; $i++) {
             $fixture = $this->getFixture($i);
             $fileInfo = $this->findFileInStorage($fixture['filename'], $fixture['type']);

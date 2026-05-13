@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
 use App\Models\File;
 
-class LocalBrowseQueryBuilder
+class LibraryQueryBuilder
 {
     /**
-     * Hydrate local browse hits in the exact order returned by Typesense.
+     * Hydrate Library hits in the exact order returned by Typesense.
      *
      * @param  array<int, int>  $ids
      * @return array<int, File>

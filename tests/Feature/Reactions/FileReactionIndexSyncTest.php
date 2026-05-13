@@ -1,7 +1,7 @@
 <?php
 
 use App\Jobs\DownloadFile;
-use App\Jobs\SyncLocalBrowseIndex;
+use App\Jobs\SyncLibraryIndex;
 use App\Models\File;
 use App\Models\User;
 use App\Services\FileReactionService;
@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
-it('syncs browse file and reaction projections when a reaction is added', function () {
-    Queue::fake([DownloadFile::class, SyncLocalBrowseIndex::class]);
+it('syncs library file and reaction projections when a reaction is added', function () {
+    Queue::fake([DownloadFile::class, SyncLibraryIndex::class]);
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -25,16 +25,16 @@ it('syncs browse file and reaction projections when a reaction is added', functi
     app(FileReactionService::class)->toggle($file, $user, 'like');
 
     Queue::assertPushed(
-        SyncLocalBrowseIndex::class,
-        fn (SyncLocalBrowseIndex $job): bool => $job->fileIds === [$file->id]
+        SyncLibraryIndex::class,
+        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
             && $job->syncFiles
             && $job->syncReactions
-            && $job->queue === 'local-browse-sync',
+            && $job->queue === 'library-sync',
     );
 });
 
-it('syncs browse file and reaction projections when a reaction is removed', function () {
-    Queue::fake([DownloadFile::class, SyncLocalBrowseIndex::class]);
+it('syncs library file and reaction projections when a reaction is removed', function () {
+    Queue::fake([DownloadFile::class, SyncLibraryIndex::class]);
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -51,10 +51,10 @@ it('syncs browse file and reaction projections when a reaction is removed', func
     $service->toggle($file, $user, 'like');
 
     Queue::assertPushed(
-        SyncLocalBrowseIndex::class,
-        fn (SyncLocalBrowseIndex $job): bool => $job->fileIds === [$file->id]
+        SyncLibraryIndex::class,
+        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
             && $job->syncFiles
             && $job->syncReactions,
     );
-    Queue::assertPushed(SyncLocalBrowseIndex::class, 2);
+    Queue::assertPushed(SyncLibraryIndex::class, 2);
 });

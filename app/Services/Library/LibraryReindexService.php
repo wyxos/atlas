@@ -1,29 +1,29 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
-use App\Jobs\ReindexLocalBrowseTypesense;
-use App\Models\LocalBrowseReindexRun;
+use App\Jobs\ReindexLibraryTypesense;
+use App\Models\LibraryReindexRun;
 use App\Models\Reaction;
-use App\Models\Search\LocalBrowseFileDocument;
+use App\Models\Search\LibraryFileDocument;
 
-class LocalBrowseReindexService
+class LibraryReindexService
 {
     public function __construct(
-        private LocalBrowseIndexSyncService $syncService,
-        private LocalBrowseTypesenseNames $names,
+        private LibraryIndexSyncService $syncService,
+        private LibraryTypesenseNames $names,
     ) {}
 
-    public function activeRun(): ?LocalBrowseReindexRun
+    public function activeRun(): ?LibraryReindexRun
     {
-        return LocalBrowseReindexRun::query()
-            ->whereIn('status', LocalBrowseReindexRun::activeStatuses())
+        return LibraryReindexRun::query()
+            ->whereIn('status', LibraryReindexRun::activeStatuses())
             ->latest()
             ->first();
     }
 
     /**
-     * @return array{0: LocalBrowseReindexRun, 1: bool}
+     * @return array{0: LibraryReindexRun, 1: bool}
      */
     public function queue(?string $suffix = null): array
     {
@@ -33,15 +33,15 @@ class LocalBrowseReindexService
         }
 
         $run = $this->createRun($suffix);
-        ReindexLocalBrowseTypesense::dispatch($run->id);
+        ReindexLibraryTypesense::dispatch($run->id);
 
         return [$run, true];
     }
 
-    public function createRun(?string $suffix = null): LocalBrowseReindexRun
+    public function createRun(?string $suffix = null): LibraryReindexRun
     {
-        return LocalBrowseReindexRun::query()->create([
-            'status' => LocalBrowseReindexRun::STATUS_PENDING,
+        return LibraryReindexRun::query()->create([
+            'status' => LibraryReindexRun::STATUS_PENDING,
             'phase' => 'queued',
             'suffix' => $suffix ?: now()->utc()->format('Ymd_His'),
         ]);
@@ -50,17 +50,17 @@ class LocalBrowseReindexService
     /**
      * @return array<string, mixed>
      */
-    public function run(LocalBrowseReindexRun $run, ?callable $progress = null): array
+    public function run(LibraryReindexRun $run, ?callable $progress = null): array
     {
         if ($run->isTerminal()) {
             return $this->summary($run);
         }
 
-        $filesTotal = (int) LocalBrowseFileDocument::query()->count();
+        $filesTotal = (int) LibraryFileDocument::query()->count();
         $reactionsTotal = (int) Reaction::query()->count();
 
         $run->update([
-            'status' => LocalBrowseReindexRun::STATUS_RUNNING,
+            'status' => LibraryReindexRun::STATUS_RUNNING,
             'phase' => 'files',
             'files_alias' => $this->names->filesAlias(),
             'files_collection' => $this->names->filesCollection($run->suffix),
@@ -91,7 +91,7 @@ class LocalBrowseReindexService
             });
 
             $run->update([
-                'status' => LocalBrowseReindexRun::STATUS_COMPLETED,
+                'status' => LibraryReindexRun::STATUS_COMPLETED,
                 'phase' => 'completed',
                 'files_alias' => $summary['files_alias'],
                 'files_collection' => $summary['files_collection'],
@@ -108,7 +108,7 @@ class LocalBrowseReindexService
             return $this->summary($run->fresh());
         } catch (\Throwable $e) {
             $run->update([
-                'status' => LocalBrowseReindexRun::STATUS_FAILED,
+                'status' => LibraryReindexRun::STATUS_FAILED,
                 'phase' => 'failed',
                 'finished_at' => now(),
                 'error' => $e->getMessage(),
@@ -121,7 +121,7 @@ class LocalBrowseReindexService
     /**
      * @return array<string, mixed>
      */
-    public function summary(LocalBrowseReindexRun $run): array
+    public function summary(LibraryReindexRun $run): array
     {
         return [
             'id' => $run->id,

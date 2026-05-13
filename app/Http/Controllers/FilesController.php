@@ -9,7 +9,7 @@ use App\Services\FileBlacklistService;
 use App\Services\FileNotFoundService;
 use App\Services\FilePreviewService;
 use App\Services\FileStorageResponseService;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\MetricsService;
 use App\Support\AtlasStorage;
 use Illuminate\Http\JsonResponse;
@@ -146,7 +146,7 @@ SVG;
         if (! $alsoFromDisk || $alsoDeleteRecord) {
             $deletedFileId = (int) $file->id;
             $file->delete();
-            app(LocalBrowseIndexSyncService::class)->deleteFilesByIds([$deletedFileId]);
+            app(LibraryIndexSyncDispatcher::class)->deleteFiles([$deletedFileId]);
 
             return response()->json([
                 'message' => $alsoFromDisk
@@ -279,7 +279,7 @@ SVG;
             'previewed_count' => 0,
             'previewed_at' => null,
         ]);
-        app(LocalBrowseIndexSyncService::class)->syncFilesByIds(array_map('intval', $fileIds));
+        app(LibraryIndexSyncDispatcher::class)->files(array_map('intval', $fileIds));
 
         $files = File::query()
             ->whereIn('id', $fileIds)
@@ -334,7 +334,7 @@ SVG;
     {
         $deletedCount = File::count();
         File::query()->delete();
-        app(LocalBrowseIndexSyncService::class)->deleteAll();
+        app(LibraryIndexSyncDispatcher::class)->deleteAll();
 
         // Empty atlas app storage (including directory structure)
         $atlasDisk = Storage::disk(AtlasStorage::DISK);

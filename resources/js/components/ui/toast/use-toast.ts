@@ -16,9 +16,9 @@ type ToastOptions = ExternalToast & {
     bodyClassName?: string;
 };
 
-const LOCAL_BROWSE_UNAVAILABLE_MESSAGE = 'Local browse unavailable';
-const LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS = 5000;
-const LOCAL_BROWSE_UNAVAILABLE_TOAST_ID = 'local-browse-unavailable';
+const LIBRARY_UNAVAILABLE_MESSAGE = 'Library unavailable';
+const LIBRARY_UNAVAILABLE_TOAST_DURATION_MS = 5000;
+const LIBRARY_UNAVAILABLE_TOAST_ID = 'library-unavailable';
 
 type ToastApi = ((content: ToastContent, options?: ToastOptions) => string | number) & {
     success: (content: string, options?: ToastOptions) => string | number;
@@ -29,15 +29,15 @@ type ToastApi = ((content: ToastContent, options?: ToastOptions) => string | num
 };
 
 function getDefaultDuration(content: ToastContent): number {
-    return content === LOCAL_BROWSE_UNAVAILABLE_MESSAGE
-        ? LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS
+    return content === LIBRARY_UNAVAILABLE_MESSAGE
+        ? LIBRARY_UNAVAILABLE_TOAST_DURATION_MS
         : Infinity;
 }
 
 function mapToastOptions(content: ToastContent, options?: ToastOptions): ExternalToast {
     if (!options) {
         return {
-            id: content === LOCAL_BROWSE_UNAVAILABLE_MESSAGE ? LOCAL_BROWSE_UNAVAILABLE_TOAST_ID : undefined,
+            id: content === LIBRARY_UNAVAILABLE_MESSAGE ? LIBRARY_UNAVAILABLE_TOAST_ID : undefined,
             duration: getDefaultDuration(content),
         };
     }
@@ -55,7 +55,7 @@ function mapToastOptions(content: ToastContent, options?: ToastOptions): Externa
 
     return {
         ...rest,
-        id: rest.id ?? (content === LOCAL_BROWSE_UNAVAILABLE_MESSAGE ? LOCAL_BROWSE_UNAVAILABLE_TOAST_ID : undefined),
+        id: rest.id ?? (content === LIBRARY_UNAVAILABLE_MESSAGE ? LIBRARY_UNAVAILABLE_TOAST_ID : undefined),
         class: cn(className, toastClassName),
         descriptionClass: cn(descriptionClass, bodyClassName),
         dismissible: dismissible ?? (closeOnClick === false ? false : undefined),
@@ -66,7 +66,7 @@ function mapToastOptions(content: ToastContent, options?: ToastOptions): Externa
 }
 
 function scheduleAutoDismiss(content: ToastContent, id: string | number, options: ExternalToast): void {
-    if (content !== LOCAL_BROWSE_UNAVAILABLE_MESSAGE || options.duration !== LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS) {
+    if (content !== LIBRARY_UNAVAILABLE_MESSAGE || options.duration !== LIBRARY_UNAVAILABLE_TOAST_DURATION_MS) {
         return;
     }
 
@@ -79,7 +79,7 @@ function scheduleAutoDismiss(content: ToastContent, id: string | number, options
     window.setTimeout(() => {
         sonnerToast.dismiss(toastId);
         sonnerToast.dismiss();
-    }, LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS);
+    }, LIBRARY_UNAVAILABLE_TOAST_DURATION_MS);
 }
 
 function showToast(content: ToastContent, options?: ToastOptions): string | number {

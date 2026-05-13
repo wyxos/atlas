@@ -2,14 +2,14 @@
 
 namespace App\Jobs;
 
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Library\LibraryIndexSyncService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class SyncLocalBrowseIndex implements ShouldQueue
+class SyncLibraryIndex implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -27,9 +27,10 @@ class SyncLocalBrowseIndex implements ShouldQueue
         array $fileIds,
         public bool $syncFiles = true,
         public bool $syncReactions = false,
+        public string $operation = 'sync',
     ) {
         $this->fileIds = $this->normalizeIds($fileIds);
-        $this->onQueue((string) config('local_browse.typesense.sync_queue', 'local-browse-sync'));
+        $this->onQueue((string) config('library.typesense.sync_queue', 'library-sync'));
     }
 
     /**
@@ -40,8 +41,22 @@ class SyncLocalBrowseIndex implements ShouldQueue
         return [10, 30, 60];
     }
 
-    public function handle(LocalBrowseIndexSyncService $syncService): void
+    public function handle(LibraryIndexSyncService $syncService): void
     {
+        if ($this->operation === 'deleteAll') {
+            $syncService->deleteAll();
+
+            return;
+        }
+
+        if ($this->operation === 'deleteFiles') {
+            if ($this->fileIds !== []) {
+                $syncService->deleteFilesByIds($this->fileIds);
+            }
+
+            return;
+        }
+
         if ($this->fileIds === [] || (! $this->syncFiles && ! $this->syncReactions)) {
             return;
         }

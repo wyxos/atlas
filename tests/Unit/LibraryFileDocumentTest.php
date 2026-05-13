@@ -1,11 +1,11 @@
 <?php
 
-use App\Models\Search\LocalBrowseFileDocument;
+use App\Models\Search\LibraryFileDocument;
 
 uses(Tests\TestCase::class);
 
 it('indexes imported files as stored without marking them downloaded', function () {
-    $file = new LocalBrowseFileDocument([
+    $file = new LibraryFileDocument([
         'source' => 'local',
         'path' => 'imports/aa/bb/song.mp3',
         'downloaded' => false,

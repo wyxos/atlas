@@ -11,6 +11,7 @@ use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
 use App\Jobs\LibraryScans\ReparseImportedFilesRun;
 use App\Jobs\LibraryScans\ScanLibraryRun;
+use App\Jobs\SyncLibraryIndex;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\LibraryScanItem;
@@ -24,7 +25,6 @@ use App\Services\LibraryScans\LibraryScanItemImporter;
 use App\Services\LibraryScans\LibraryScanMediaProcessor;
 use App\Services\LibraryScans\LibraryScanService;
 use App\Services\LibraryScans\MediaProbeService;
-use App\Services\Local\LocalBrowseIndexSyncService;
 use App\Support\AtlasStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -836,6 +836,8 @@ it('plans streamable video conversion work for oversized imported mp4 files with
 });
 
 it('completes a parser item after its media preview task completes', function () {
+    Queue::fake([SyncLibraryIndex::class]);
+
     $run = LibraryScanRun::factory()->create([
         'status' => 'processing',
         'phase' => 'processing',
@@ -867,13 +869,16 @@ it('completes a parser item after its media preview task completes', function ()
     $preview->shouldReceive('generatePreviewAssets')->never();
     $this->app->instance(FileDownloadPreviewAssetGenerator::class, $preview);
 
-    $sync = \Mockery::mock(LocalBrowseIndexSyncService::class);
-    $sync->shouldReceive('syncFilesByIds')->once()->with([$file->id])->andReturnNull();
-    $this->app->instance(LocalBrowseIndexSyncService::class, $sync);
-
     (new GenerateLibraryScanPreviewAssets($task->id, regeneratePreviewAssets: true))->handle(
         app(LibraryScanMediaProcessor::class),
         app(LibraryScanService::class),
+    );
+
+    Queue::assertPushed(
+        SyncLibraryIndex::class,
+        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
+            && $job->syncFiles === true
+            && $job->syncReactions === false
     );
 
     expect($task->fresh()->status)->toBe(MediaTask::STATUS_COMPLETED)

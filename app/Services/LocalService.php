@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Services\Local\LocalBrowseTypesenseGateway;
+use App\Services\Library\LibraryTypesenseGateway;
 use App\Services\Local\LocalFetchParams;
 
 class LocalService extends BaseService
@@ -11,10 +11,10 @@ class LocalService extends BaseService
 
     public const string SOURCE = 'Local';
 
-    public const string LABEL = 'Local Files';
+    public const string LABEL = 'Library';
 
     public function __construct(
-        private LocalBrowseTypesenseGateway $typesenseGateway,
+        private LibraryTypesenseGateway $typesenseGateway,
         array $params = [],
     ) {
         parent::__construct($params);

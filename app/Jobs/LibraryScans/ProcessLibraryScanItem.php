@@ -6,9 +6,9 @@ use App\Enums\LibraryScanItemStatus;
 use App\Enums\LibraryScanRunMode;
 use App\Enums\LibraryScanRunStatus;
 use App\Models\LibraryScanItem;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\LibraryScans\LibraryScanFileParser;
 use App\Services\LibraryScans\LibraryScanService;
-use App\Services\Local\LocalBrowseIndexSyncService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -98,7 +98,7 @@ class ProcessLibraryScanItem implements ShouldQueue
                 return;
             }
 
-            app(LocalBrowseIndexSyncService::class)->syncFilesByIds([(int) $item->file_id]);
+            app(LibraryIndexSyncDispatcher::class)->files([(int) $item->file_id]);
             if ($isBackgroundScanParser) {
                 $scans->broadcastItem($item->fresh(['mediaTasks']));
             } else {

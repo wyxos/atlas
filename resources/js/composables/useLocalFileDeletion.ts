@@ -29,7 +29,7 @@ function getDeleteErrorMessage(error: unknown): string {
         return 'You do not have permission to delete this file.';
     }
 
-    return 'Failed to delete the local file. Please try again.';
+    return 'Failed to delete the library file. Please try again.';
 }
 
 export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
@@ -85,7 +85,7 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
             try {
                 await options.masonry.value.remove(item);
             } catch (error) {
-                console.error('Failed to remove deleted local item from masonry:', error);
+                console.error('Failed to remove deleted library item from masonry:', error);
             }
         }
     }

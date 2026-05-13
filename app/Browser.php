@@ -2,7 +2,7 @@
 
 namespace App;
 
-use App\Exceptions\LocalBrowseUnavailableException;
+use App\Exceptions\LibraryUnavailableException;
 use App\Models\File;
 use App\Services\BrowseModerationService;
 use App\Services\BrowsePersister;
@@ -112,7 +112,7 @@ class Browser
                     'items' => [],
                 ];
             }
-        } catch (LocalBrowseUnavailableException $e) {
+        } catch (LibraryUnavailableException $e) {
             throw $e;
         } catch (ConnectionException $e) {
             $serviceError = [
@@ -153,7 +153,7 @@ class Browser
             }
         }
 
-        // Only persist files if not in local mode (local files already exist in DB)
+        // Only persist files if not in local mode; library rows already exist in the DB.
         // For local mode, files are already File models from LocalService.transform().
         // We intentionally lazy-load per-page relationships to avoid Scout total-count caps.
         if ($isLocalMode) {

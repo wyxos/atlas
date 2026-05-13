@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Model;
 
-class LocalBrowseReindexRun extends Model
+class LibraryReindexRun extends Model
 {
     public const string STATUS_PENDING = 'pending';
 

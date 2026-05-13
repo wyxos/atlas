@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
 use Typesense\Client;
 use Typesense\Exceptions\TypesenseClientError;
 
-class LocalBrowseTypesenseNames
+class LibraryTypesenseNames
 {
     /**
      * @var array<string, string|null>
@@ -18,12 +18,12 @@ class LocalBrowseTypesenseNames
 
     public function filesAlias(): string
     {
-        return (string) config('local_browse.typesense.files_alias');
+        return (string) config('library.typesense.files_alias');
     }
 
     public function reactionsAlias(): string
     {
-        return (string) config('local_browse.typesense.reactions_alias');
+        return (string) config('library.typesense.reactions_alias');
     }
 
     public function versionSuffix(?string $suffix = null): string

@@ -4,14 +4,14 @@ namespace App\Models\Search;
 
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\Local\LocalBrowseTypesenseNames;
-use App\Services\Local\LocalBrowseTypesenseSchemaFactory;
+use App\Services\Library\LibraryTypesenseNames;
+use App\Services\Library\LibraryTypesenseSchemaFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Laravel\Scout\Searchable;
 
-class LocalBrowseFileDocument extends File
+class LibraryFileDocument extends File
 {
     use Searchable;
 
@@ -19,7 +19,7 @@ class LocalBrowseFileDocument extends File
 
     public function searchableAs()
     {
-        return app(LocalBrowseTypesenseNames::class)->filesAlias();
+        return app(LibraryTypesenseNames::class)->filesAlias();
     }
 
     public function indexableAs()
@@ -62,7 +62,7 @@ class LocalBrowseFileDocument extends File
 
     public function typesenseCollectionSchema(): array
     {
-        return app(LocalBrowseTypesenseSchemaFactory::class)->fileSchema($this->searchableAs());
+        return app(LibraryTypesenseSchemaFactory::class)->fileSchema($this->searchableAs());
     }
 
     public function typesenseSearchParameters(): array

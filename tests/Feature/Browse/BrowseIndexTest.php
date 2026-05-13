@@ -3,9 +3,9 @@
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
-use App\Services\Local\LocalBrowseTypesenseCompiler;
-use App\Services\Local\LocalBrowseTypesenseGateway;
-use App\Services\Local\LocalBrowseTypesenseNames;
+use App\Services\Library\LibraryTypesenseCompiler;
+use App\Services\Library\LibraryTypesenseGateway;
+use App\Services\Library\LibraryTypesenseNames;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -365,7 +365,7 @@ test('browse uses LocalService when feed is local', function () {
         'params' => ['feed' => 'local'],
     ]);
 
-    // Create local files with downloaded_at set
+    // Create Library with downloaded_at set
     $file1 = \App\Models\File::factory()->create([
         'downloaded' => true,
         'downloaded_at' => now()->subDay(),
@@ -381,7 +381,7 @@ test('browse uses LocalService when feed is local', function () {
         'source' => 'Wallhaven',
     ]);
 
-    mockLocalBrowseGateway([$file2, $file1], nextCursor: null, total: 2);
+    mockLibraryGateway([$file2, $file1], nextCursor: null, total: 2);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20");
 
@@ -419,7 +419,7 @@ test('browse filters by source in local mode', function () {
         'source' => 'Wallhaven',
     ]);
 
-    mockLocalBrowseGateway([$file1], nextCursor: null, total: 1);
+    mockLibraryGateway([$file1], nextCursor: null, total: 1);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=CivitAI&limit=20");
 
@@ -431,7 +431,7 @@ test('browse filters by source in local mode', function () {
     expect(count($data['items']))->toBeGreaterThanOrEqual(0);
 });
 
-test('local browse can return blacklisted files when blacklisted filter is yes', function () {
+test('Library can return blacklisted files when blacklisted filter is yes', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
         'params' => ['feed' => 'local'],
@@ -452,7 +452,7 @@ test('local browse can return blacklisted files when blacklisted filter is yes',
         'source' => 'Wallhaven',
     ]);
 
-    mockLocalBrowseGateway([$blacklisted], nextCursor: null, total: 1);
+    mockLibraryGateway([$blacklisted], nextCursor: null, total: 1);
 
     $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&blacklisted=yes");
 
@@ -467,18 +467,18 @@ test('local browse can return blacklisted files when blacklisted filter is yes',
     expect($ids)->not->toContain($notBlacklisted->id);
 });
 
-test('local browse returns 503 when typesense aliases are missing', function () {
+test('Library returns 503 when typesense aliases are missing', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
         'params' => ['feed' => 'local'],
     ]);
 
-    $names = \Mockery::mock(LocalBrowseTypesenseNames::class);
+    $names = \Mockery::mock(LibraryTypesenseNames::class);
     $names->shouldReceive('hasFilesAlias')->andReturn(false);
 
-    app()->instance(LocalBrowseTypesenseNames::class, $names);
-    app()->instance(LocalBrowseTypesenseGateway::class, new LocalBrowseTypesenseGateway(
-        app(LocalBrowseTypesenseCompiler::class),
+    app()->instance(LibraryTypesenseNames::class, $names);
+    app()->instance(LibraryTypesenseGateway::class, new LibraryTypesenseGateway(
+        app(LibraryTypesenseCompiler::class),
         $names,
     ));
 
@@ -486,27 +486,27 @@ test('local browse returns 503 when typesense aliases are missing', function () 
 
     $response->assertStatus(503);
     $response->assertExactJson([
-        'message' => 'Local browse unavailable',
+        'message' => 'Library unavailable',
         'service' => 'local',
         'reason' => 'typesense_unavailable',
     ]);
 });
 
-test('local browse returns 503 when typesense search execution fails', function () {
+test('Library returns 503 when typesense search execution fails', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
         'params' => ['feed' => 'local'],
     ]);
 
-    $names = \Mockery::mock(LocalBrowseTypesenseNames::class);
+    $names = \Mockery::mock(LibraryTypesenseNames::class);
     $names->shouldReceive('hasFilesAlias')->andReturn(true);
     $names->shouldReceive('hasReactionsAlias')->andReturn(true);
-    $names->shouldReceive('currentReactionJoinCollection')->andReturn('atlas_local_local_browse_files__vtest');
-    $names->shouldReceive('filesAlias')->andReturn('atlas_local_local_browse_files');
-    $names->shouldReceive('reactionsAlias')->andReturn('atlas_local_local_browse_reactions');
+    $names->shouldReceive('currentReactionJoinCollection')->andReturn('atlas_local_library_files__vtest');
+    $names->shouldReceive('filesAlias')->andReturn('atlas_local_library_files');
+    $names->shouldReceive('reactionsAlias')->andReturn('atlas_local_library_reactions');
 
-    app()->instance(LocalBrowseTypesenseNames::class, $names);
-    app()->instance(LocalBrowseTypesenseGateway::class, new class(app(LocalBrowseTypesenseCompiler::class), $names) extends LocalBrowseTypesenseGateway
+    app()->instance(LibraryTypesenseNames::class, $names);
+    app()->instance(LibraryTypesenseGateway::class, new class(app(LibraryTypesenseCompiler::class), $names) extends LibraryTypesenseGateway
     {
         protected function runScoutSearch(array $compiled): array
         {
@@ -518,7 +518,7 @@ test('local browse returns 503 when typesense search execution fails', function 
 
     $response->assertStatus(503);
     $response->assertExactJson([
-        'message' => 'Local browse unavailable',
+        'message' => 'Library unavailable',
         'service' => 'local',
         'reason' => 'typesense_unavailable',
     ]);

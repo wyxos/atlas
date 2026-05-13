@@ -35,14 +35,14 @@ describe('toast', () => {
         }));
     });
 
-    it('auto-hides local browse unavailable toasts from any caller', () => {
+    it('auto-hides Library unavailable toasts from any caller', () => {
         vi.useFakeTimers();
 
-        toast.error('Local browse unavailable');
+        toast.error('Library unavailable');
 
-        expect(sonnerToast.error).toHaveBeenCalledWith('Local browse unavailable', expect.objectContaining({
+        expect(sonnerToast.error).toHaveBeenCalledWith('Library unavailable', expect.objectContaining({
             duration: 5000,
-            id: 'local-browse-unavailable',
+            id: 'library-unavailable',
         }));
         expect(sonnerToast.dismiss).not.toHaveBeenCalled();
 

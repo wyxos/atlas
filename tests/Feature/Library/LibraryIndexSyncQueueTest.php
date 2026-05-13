@@ -1,21 +1,21 @@
 <?php
 
 use App\Jobs\DeleteStoredFileJob;
-use App\Jobs\SyncLocalBrowseIndex;
+use App\Jobs\SyncLibraryIndex;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use App\Services\DownloadedFileClearService;
 use App\Services\FileBlacklistService;
 use App\Services\FilePreviewService;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Library\LibraryIndexSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
-it('sync local browse index job normalizes ids and syncs selected projections', function () {
-    $sync = \Mockery::mock(LocalBrowseIndexSyncService::class);
+it('syncs library index job normalizes ids and syncs selected projections', function () {
+    $sync = \Mockery::mock(LibraryIndexSyncService::class);
     $sync->shouldReceive('syncFilesByIds')
         ->once()
         ->with([3, 5])
@@ -25,16 +25,16 @@ it('sync local browse index job normalizes ids and syncs selected projections', 
         ->with([3, 5])
         ->andReturnNull();
 
-    $job = new SyncLocalBrowseIndex([3, '5', 3, 'invalid'], syncFiles: true, syncReactions: true);
+    $job = new SyncLibraryIndex([3, '5', 3, 'invalid'], syncFiles: true, syncReactions: true);
 
     expect($job->fileIds)->toBe([3, 5])
-        ->and($job->queue)->toBe('local-browse-sync');
+        ->and($job->queue)->toBe('library-sync');
 
     $job->handle($sync);
 });
 
-it('queues file-only local browse sync when downloaded file state is cleared', function () {
-    Queue::fake([DeleteStoredFileJob::class, SyncLocalBrowseIndex::class]);
+it('queues file-only library sync when downloaded file state is cleared', function () {
+    Queue::fake([DeleteStoredFileJob::class, SyncLibraryIndex::class]);
 
     $file = File::factory()->create([
         'path' => 'downloads/example.jpg',
@@ -47,15 +47,15 @@ it('queues file-only local browse sync when downloaded file state is cleared', f
     app(DownloadedFileClearService::class)->clearMany([$file], queueDelete: true);
 
     Queue::assertPushed(
-        SyncLocalBrowseIndex::class,
-        fn (SyncLocalBrowseIndex $job): bool => $job->fileIds === [$file->id]
+        SyncLibraryIndex::class,
+        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
             && $job->syncFiles
             && ! $job->syncReactions,
     );
 });
 
-it('queues a single file and reaction local browse sync when files are blacklisted', function () {
-    Queue::fake([DeleteStoredFileJob::class, SyncLocalBrowseIndex::class]);
+it('queues a single file and reaction library sync when files are blacklisted', function () {
+    Queue::fake([DeleteStoredFileJob::class, SyncLibraryIndex::class]);
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -75,16 +75,16 @@ it('queues a single file and reaction local browse sync when files are blacklist
     app(FileBlacklistService::class)->apply([$file], $user->id, queueDelete: true);
 
     Queue::assertPushed(
-        SyncLocalBrowseIndex::class,
-        fn (SyncLocalBrowseIndex $job): bool => $job->fileIds === [$file->id]
+        SyncLibraryIndex::class,
+        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
             && $job->syncFiles
             && $job->syncReactions,
     );
-    Queue::assertPushed(SyncLocalBrowseIndex::class, 1);
+    Queue::assertPushed(SyncLibraryIndex::class, 1);
 });
 
-it('queues file and reaction local browse sync when preview counts change', function () {
-    Queue::fake([DeleteStoredFileJob::class, SyncLocalBrowseIndex::class]);
+it('queues file and reaction library sync when preview counts change', function () {
+    Queue::fake([DeleteStoredFileJob::class, SyncLibraryIndex::class]);
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -97,8 +97,8 @@ it('queues file and reaction local browse sync when preview counts change', func
     app(FilePreviewService::class)->increment($file, $user->id);
 
     Queue::assertPushed(
-        SyncLocalBrowseIndex::class,
-        fn (SyncLocalBrowseIndex $job): bool => $job->fileIds === [$file->id]
+        SyncLibraryIndex::class,
+        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
             && $job->syncFiles
             && $job->syncReactions,
     );

@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
-use App\Models\Search\LocalBrowseFileDocument;
-use App\Models\Search\LocalBrowseReactionDocument;
+use App\Models\Search\LibraryFileDocument;
+use App\Models\Search\LibraryReactionDocument;
 
-class LocalBrowseTypesenseCompiler
+class LibraryTypesenseCompiler
 {
     private const string EMPTY_FILTER = 'sort_id:=-1';
 
@@ -27,8 +27,8 @@ class LocalBrowseTypesenseCompiler
         return [
             'empty' => false,
             'mode' => 'files',
-            'model' => LocalBrowseFileDocument::class,
-            'collection' => app(LocalBrowseTypesenseNames::class)->filesAlias(),
+            'model' => LibraryFileDocument::class,
+            'collection' => app(LibraryTypesenseNames::class)->filesAlias(),
             'page' => $page,
             'limit' => $limit,
             'options' => [
@@ -83,7 +83,7 @@ class LocalBrowseTypesenseCompiler
 
         $joinCollection = is_string($reactionJoinCollection) && $reactionJoinCollection !== ''
             ? $reactionJoinCollection
-            : app(LocalBrowseTypesenseNames::class)->filesAlias();
+            : app(LibraryTypesenseNames::class)->filesAlias();
         $fileFilter = $this->compileFileFilter([
             ...$context,
             'reactionMode' => 'any',
@@ -102,8 +102,8 @@ class LocalBrowseTypesenseCompiler
         return [
             'empty' => false,
             'mode' => 'reactions',
-            'model' => LocalBrowseReactionDocument::class,
-            'collection' => app(LocalBrowseTypesenseNames::class)->reactionsAlias(),
+            'model' => LibraryReactionDocument::class,
+            'collection' => app(LibraryTypesenseNames::class)->reactionsAlias(),
             'page' => $page,
             'limit' => $limit,
             'options' => [

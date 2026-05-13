@@ -8,7 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('local_browse_reindex_runs', function (Blueprint $table) {
+        if (Schema::hasTable('library_reindex_runs')) {
+            return;
+        }
+
+        $legacyTable = 'local_'.'browse_reindex_runs';
+
+        if (Schema::hasTable($legacyTable)) {
+            Schema::rename($legacyTable, 'library_reindex_runs');
+
+            return;
+        }
+
+        Schema::create('library_reindex_runs', function (Blueprint $table) {
             $table->id();
             $table->string('status')->index();
             $table->string('phase')->nullable()->index();
@@ -32,6 +44,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('local_browse_reindex_runs');
+        Schema::dropIfExists('library_reindex_runs');
     }
 };

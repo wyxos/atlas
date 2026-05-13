@@ -188,7 +188,7 @@ describe('tabContentV2 resolve', () => {
         expect(totalAvailable.value).toBeNull();
     });
 
-    it('auto-hides the local browse unavailable toast', async () => {
+    it('auto-hides the Library unavailable toast', async () => {
         const toast = {
             error: vi.fn(),
         };
@@ -196,7 +196,7 @@ describe('tabContentV2 resolve', () => {
         window.axios.get = vi.fn().mockRejectedValue({
             response: {
                 data: {
-                    message: 'Local browse unavailable',
+                    message: 'Library unavailable',
                 },
             },
         }) as typeof window.axios.get;
@@ -217,9 +217,9 @@ describe('tabContentV2 resolve', () => {
             toast,
         });
 
-        await expect(resolve({ cursor: 1, pageSize: 20 })).rejects.toThrow('Local browse unavailable');
+        await expect(resolve({ cursor: 1, pageSize: 20 })).rejects.toThrow('Library unavailable');
 
-        expect(toast.error).toHaveBeenCalledWith('Local browse unavailable', { duration: 5000 });
+        expect(toast.error).toHaveBeenCalledWith('Library unavailable', { duration: 5000 });
     });
 
     it('marks audio and video previews with explicit renderable media types', () => {

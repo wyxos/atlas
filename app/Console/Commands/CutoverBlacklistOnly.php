@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\File;
 use App\Services\DownloadedFileClearService;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\MetricsService;
 use Illuminate\Console\Command;
 use Illuminate\Database\Schema\Blueprint;
@@ -64,7 +64,7 @@ class CutoverBlacklistOnly extends Command
         app(MetricsService::class)->syncAll();
 
         if ($autoColumn === 'auto_blacklisted') {
-            $this->syncLocalIndexes($chunk);
+            $this->queueLibraryIndexSync($chunk);
         }
 
         $this->info('Blacklist-only cutover complete.');
@@ -254,22 +254,17 @@ class CutoverBlacklistOnly extends Command
             || str_contains($message, '1846');
     }
 
-    private function syncLocalIndexes(int $chunk): void
+    private function queueLibraryIndexSync(int $chunk): void
     {
-        $this->info('Syncing local browse indexes for blacklisted rows...');
+        $this->info('Queueing library index sync for blacklisted rows...');
 
-        $syncService = app(LocalBrowseIndexSyncService::class);
+        $syncDispatcher = app(LibraryIndexSyncDispatcher::class);
 
         $this->chunkFileIds(
             DB::table('files')->select('id')->whereNotNull('blacklisted_at'),
             $chunk,
-            function (array $fileIds) use ($syncService): void {
-                try {
-                    $syncService->syncFilesByIds($fileIds);
-                    $syncService->syncReactionsForFileIds($fileIds);
-                } catch (\Throwable $e) {
-                    $this->warn('Local browse index sync failed for chunk ending at file '.$fileIds[array_key_last($fileIds)].': '.$e->getMessage());
-                }
+            function (array $fileIds) use ($syncDispatcher): void {
+                $syncDispatcher->filesAndReactions($fileIds);
             },
         );
     }

@@ -9,7 +9,7 @@ use App\Models\Tab;
 use App\Models\User;
 use App\Services\ContainerModerationService;
 use App\Services\FilePreviewService;
-use App\Services\Local\LocalBrowseTypesenseGateway;
+use App\Services\Library\LibraryTypesenseGateway;
 use App\Services\LocalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -190,7 +190,7 @@ test('blacklists files for blacklist action type', function () {
         ];
     });
 
-    mock(LocalBrowseTypesenseGateway::class)
+    mock(LibraryTypesenseGateway::class)
         ->shouldReceive('search')
         ->once()
         ->andReturn([
@@ -201,11 +201,11 @@ test('blacklists files for blacklist action type', function () {
             ],
         ]);
 
-    $localBrowse = app(LocalService::class)->fetch([
+    $library = app(LocalService::class)->fetch([
         'blacklisted' => 'yes',
     ]);
 
-    expect(collect($localBrowse['files'])->pluck('id'))->toContain($file->id);
+    expect(collect($library['files'])->pluck('id'))->toContain($file->id);
 });
 
 test('skips blacklisting files from blacklisted containers when any reaction already exists', function () {

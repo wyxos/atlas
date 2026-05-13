@@ -18,7 +18,7 @@ use App\Jobs\LibraryScans\ScanLibraryRun;
 use App\Models\LibraryScanItem;
 use App\Models\LibraryScanMediaTask as LibraryScanMediaTaskModel;
 use App\Models\LibraryScanRun;
-use App\Services\Local\LocalBrowseIndexSyncService;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -356,7 +356,7 @@ class LibraryScanService
     {
         if ($item->isTerminal()) {
             if ($item->status === LibraryScanItemStatus::COMPLETED && $item->file_id) {
-                app(LocalBrowseIndexSyncService::class)->syncFilesByIds([(int) $item->file_id]);
+                app(LibraryIndexSyncDispatcher::class)->files([(int) $item->file_id]);
             }
             $this->broadcastItem($item->fresh(['mediaTasks']));
 
@@ -399,7 +399,7 @@ class LibraryScanService
             ]);
         } else {
             if ($item->file_id) {
-                app(LocalBrowseIndexSyncService::class)->syncFilesByIds([(int) $item->file_id]);
+                app(LibraryIndexSyncDispatcher::class)->files([(int) $item->file_id]);
             }
 
             $item->update([
@@ -709,7 +709,7 @@ class LibraryScanService
                     ->values()
                     ->all();
 
-                app(LocalBrowseIndexSyncService::class)->syncFilesByIds($fileIds);
+                app(LibraryIndexSyncDispatcher::class)->files($fileIds);
             });
     }
 }

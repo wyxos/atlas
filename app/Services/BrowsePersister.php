@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
-use App\Services\Local\LocalBrowseIndexSyncDispatcher;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -139,7 +139,7 @@ class BrowsePersister
 
         // Create containers and attach files in batch
         $this->createContainersForFiles($allFiles);
-        app(LocalBrowseIndexSyncDispatcher::class)->files(
+        app(LibraryIndexSyncDispatcher::class)->files(
             $allFiles->pluck('id')->map(fn ($id) => (int) $id)->all()
         );
 

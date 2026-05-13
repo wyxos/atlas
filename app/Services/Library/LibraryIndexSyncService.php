@@ -1,20 +1,20 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
 use App\Models\Reaction;
-use App\Models\Search\LocalBrowseFileDocument;
-use App\Models\Search\LocalBrowseReactionDocument;
+use App\Models\Search\LibraryFileDocument;
+use App\Models\Search\LibraryReactionDocument;
 use Typesense\Client;
 use Typesense\Exceptions\ObjectNotFound;
 use Typesense\Exceptions\TypesenseClientError;
 
-class LocalBrowseIndexSyncService
+class LibraryIndexSyncService
 {
     public function __construct(
         private Client $client,
-        private LocalBrowseTypesenseNames $names,
-        private LocalBrowseTypesenseSchemaFactory $schemaFactory,
+        private LibraryTypesenseNames $names,
+        private LibraryTypesenseSchemaFactory $schemaFactory,
     ) {}
 
     /**
@@ -29,13 +29,13 @@ class LocalBrowseIndexSyncService
             return;
         }
 
-        $documents = LocalBrowseFileDocument::query()
+        $documents = LibraryFileDocument::query()
             ->whereIn('id', $fileIds)
             ->with([
                 'reactions' => fn ($builder) => $builder->select(['id', 'file_id', 'user_id', 'type']),
             ])
             ->get()
-            ->map(fn (LocalBrowseFileDocument $file) => $file->toSearchableArray())
+            ->map(fn (LibraryFileDocument $file) => $file->toSearchableArray())
             ->values()
             ->all();
 
@@ -60,10 +60,10 @@ class LocalBrowseIndexSyncService
 
         $this->deleteDocuments($collection, 'file_id:=['.$this->implodeIds($fileIds).']');
 
-        $documents = LocalBrowseReactionDocument::query()
+        $documents = LibraryReactionDocument::query()
             ->whereIn('file_id', $fileIds)
             ->get()
-            ->map(fn (LocalBrowseReactionDocument $reaction) => $reaction->toSearchableArray())
+            ->map(fn (LibraryReactionDocument $reaction) => $reaction->toSearchableArray())
             ->values()
             ->all();
 
@@ -86,10 +86,10 @@ class LocalBrowseIndexSyncService
             return;
         }
 
-        $documents = LocalBrowseReactionDocument::query()
+        $documents = LibraryReactionDocument::query()
             ->whereIn('id', $reactionIds)
             ->get()
-            ->map(fn (LocalBrowseReactionDocument $reaction) => $reaction->toSearchableArray())
+            ->map(fn (LibraryReactionDocument $reaction) => $reaction->toSearchableArray())
             ->values()
             ->all();
 
@@ -158,15 +158,15 @@ class LocalBrowseIndexSyncService
 
         $this->createOrReplaceCollection($filesCollection, $this->schemaFactory->fileSchema($filesCollection));
 
-        $fileChunkSize = max(1, (int) config('local_browse.typesense.chunk', 500));
-        LocalBrowseFileDocument::query()
+        $fileChunkSize = max(1, (int) config('library.typesense.chunk', 500));
+        LibraryFileDocument::query()
             ->with([
                 'reactions' => fn ($builder) => $builder->select(['id', 'file_id', 'user_id', 'type']),
             ])
             ->orderBy('id')
             ->chunkById($fileChunkSize, function ($files) use ($filesCollection, $progress): void {
                 $documents = $files
-                    ->map(fn (LocalBrowseFileDocument $file) => $file->toSearchableArray())
+                    ->map(fn (LibraryFileDocument $file) => $file->toSearchableArray())
                     ->values()
                     ->all();
 
@@ -187,11 +187,11 @@ class LocalBrowseIndexSyncService
             $this->schemaFactory->reactionSchema($reactionsCollection, $filesCollection),
         );
 
-        LocalBrowseReactionDocument::query()
+        LibraryReactionDocument::query()
             ->orderBy('id')
             ->chunkById($fileChunkSize, function ($reactions) use ($reactionsCollection, $progress): void {
                 $documents = $reactions
-                    ->map(fn (LocalBrowseReactionDocument $reaction) => $reaction->toSearchableArray())
+                    ->map(fn (LibraryReactionDocument $reaction) => $reaction->toSearchableArray())
                     ->values()
                     ->all();
 
@@ -212,7 +212,7 @@ class LocalBrowseIndexSyncService
             'files_collection' => $filesCollection,
             'reactions_alias' => $this->names->reactionsAlias(),
             'reactions_collection' => $reactionsCollection,
-            'files_total' => (int) LocalBrowseFileDocument::query()->count(),
+            'files_total' => (int) LibraryFileDocument::query()->count(),
             'reactions_total' => (int) Reaction::query()->count(),
         ];
     }

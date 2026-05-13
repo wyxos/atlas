@@ -34,7 +34,7 @@ describe('browseTabLabel', () => {
         })).toBe('CivitAI Images: User atlasUser - CURSOR_1');
     });
 
-    it('builds a label for local browse state with preset label context', () => {
+    it('builds a label for Library state with preset label context', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
                 feed: 'local',
@@ -44,11 +44,11 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 3,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Inbox (Fresh) - 3');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Inbox (Fresh) - 3');
     });
 
-    it('uses the configured label for new favorite presets in local tab labels', () => {
+    it('uses the configured label for new favorite presets in library tab labels', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
                 feed: 'local',
@@ -58,11 +58,11 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 7,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Favorite (Random) - 7');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Favorite (Random) - 7');
     });
 
-    it('uses the configured label for like presets in local tab labels', () => {
+    it('uses the configured label for like presets in library tab labels', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
                 feed: 'local',
@@ -72,8 +72,8 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 4,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Likes (Newest) - 4');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Likes (Newest) - 4');
     });
 
     it('keeps the existing favorite latest preset value labeled as newest', () => {
@@ -86,11 +86,11 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 6,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Favorite (Newest) - 6');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Favorite (Newest) - 6');
     });
 
-    it('uses the configured label for saved blacklist presets in local tab labels', () => {
+    it('uses the configured label for saved blacklist presets in library tab labels', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
                 feed: 'local',
@@ -100,11 +100,11 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 5,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Saved Blacklisted - 5');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Saved Blacklisted - 5');
     });
 
-    it('uses the configured label for blacklisted oldest presets in local tab labels', () => {
+    it('uses the configured label for blacklisted oldest presets in library tab labels', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
                 feed: 'local',
@@ -114,11 +114,11 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 2,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Blacklisted (Oldest) - 2');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Blacklisted (Oldest) - 2');
     });
 
-    it('uses the configured label for not found reacted presets in local tab labels', () => {
+    it('uses the configured label for not found reacted presets in library tab labels', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
                 feed: 'local',
@@ -128,11 +128,11 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 8,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Not Found (Reacted) - 8');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Not Found (Reacted) - 8');
     });
 
-    it('restores renamed unreacted preset labels for existing local tabs', () => {
+    it('restores renamed unreacted preset labels for existing library tabs', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
                 feed: 'local',
@@ -142,8 +142,8 @@ describe('browseTabLabel', () => {
             }),
             pageToken: 9,
             availableServices: [],
-            localService: { key: 'local', label: 'Local' },
-        })).toBe('Local - Unreacted (Oldest) - 9');
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Unreacted (Oldest) - 9');
     });
 
     it('returns null when online browse has no selected service yet', () => {

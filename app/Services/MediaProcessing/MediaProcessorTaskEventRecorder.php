@@ -7,15 +7,15 @@ use App\Enums\MediaProcessorTaskStatus;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\MediaProcessorTask;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\LibraryScans\LibraryScanService;
-use App\Services\Local\LocalBrowseIndexSyncService;
 
 class MediaProcessorTaskEventRecorder
 {
     public function __construct(
         private readonly MediaProcessorPathValidator $paths,
         private readonly LibraryScanService $libraryScans,
-        private readonly LocalBrowseIndexSyncService $browseIndex,
+        private readonly LibraryIndexSyncDispatcher $libraryIndex,
     ) {}
 
     /**
@@ -129,7 +129,7 @@ class MediaProcessorTaskEventRecorder
 
         if ($updates !== []) {
             $file->forceFill($updates)->save();
-            $this->browseIndex->syncFilesByIds([$file->id]);
+            $this->libraryIndex->files([$file->id]);
         }
 
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];

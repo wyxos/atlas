@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\File;
-use App\Services\Local\LocalBrowseTypesenseGateway;
+use App\Services\Library\LibraryTypesenseGateway;
 use App\Services\LocalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -16,13 +16,13 @@ beforeEach(function () {
 test('returns correct key source and label', function () {
     expect(LocalService::key())->toBe('local');
     expect(LocalService::source())->toBe('Local');
-    expect(LocalService::label())->toBe('Local Files');
+    expect(LocalService::label())->toBe('Library');
 });
 
 test('fetch delegates normalized params to the typesense gateway', function () {
     $file = File::factory()->create();
 
-    mock(LocalBrowseTypesenseGateway::class)
+    mock(LibraryTypesenseGateway::class)
         ->shouldReceive('search')
         ->once()
         ->withArgs(function (array $context): bool {
@@ -62,7 +62,7 @@ test('fetch delegates normalized params to the typesense gateway', function () {
 });
 
 test('fetch returns empty response without querying typesense when typed reactions are empty', function () {
-    mock(LocalBrowseTypesenseGateway::class)
+    mock(LibraryTypesenseGateway::class)
         ->shouldReceive('search')
         ->never();
 
@@ -81,7 +81,7 @@ test('fetch returns empty response without querying typesense when typed reactio
 });
 
 test('fetch preserves explicit random seeds for typesense browse', function () {
-    mock(LocalBrowseTypesenseGateway::class)
+    mock(LibraryTypesenseGateway::class)
         ->shouldReceive('search')
         ->once()
         ->withArgs(function (array $context): bool {

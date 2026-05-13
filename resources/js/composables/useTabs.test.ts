@@ -404,7 +404,7 @@ describe('useTabs', () => {
             mockAxios.put.mockResolvedValueOnce({
                 data: {
                     id: 52,
-                    label: 'Local Files - Reacted (Random) - 9',
+                    label: 'Library - Reacted (Random) - 9',
                     custom_label: 'Reacted - random',
                     params: { feed: 'local' },
                     position: 6,
@@ -416,9 +416,9 @@ describe('useTabs', () => {
             const { loadTabs, updateTabLabel } = useTabs();
             await loadTabs();
 
-            updateTabLabel(52, 'Local Files - Reacted (Random) - 8');
-            updateTabLabel(52, 'Local Files - Reacted (Random) - 9');
-            updateTabLabel(52, 'Local Files - Reacted (Random) - 9');
+            updateTabLabel(52, 'Library - Reacted (Random) - 8');
+            updateTabLabel(52, 'Library - Reacted (Random) - 9');
+            updateTabLabel(52, 'Library - Reacted (Random) - 9');
 
             await vi.advanceTimersByTimeAsync(499);
             expect(mockAxios.put).not.toHaveBeenCalled();
@@ -426,7 +426,7 @@ describe('useTabs', () => {
             await vi.advanceTimersByTimeAsync(1);
             expect(mockAxios.put).toHaveBeenCalledTimes(1);
             expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/52', {
-                label: 'Local Files - Reacted (Random) - 9',
+                label: 'Library - Reacted (Random) - 9',
                 custom_label: 'Reacted - random',
                 position: 6,
             });

@@ -189,7 +189,7 @@ watch(
                             @update:model-value="setLocalMode"
                             data-test="source-type-switch" />
                         <span class="text-sm text-twilight-indigo-300"
-                            :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Local</span>
+                            :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Library</span>
                     </div>
                 </div>
 

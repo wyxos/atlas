@@ -89,7 +89,7 @@ class FileResource extends JsonResource
             if ($this->url) {
                 $fileUrl = $this->url;
             } elseif ($this->path) {
-                // Generate URL for local files
+                // Generate URL for stored library files.
                 $fileUrl = FileApiPath::serve($this->id);
             }
         }

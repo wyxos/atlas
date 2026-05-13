@@ -1,18 +1,18 @@
 <?php
 
-use App\Services\Local\LocalBrowseTypesenseCompiler;
-use App\Services\Local\LocalBrowseTypesenseNames;
+use App\Services\Library\LibraryTypesenseCompiler;
+use App\Services\Library\LibraryTypesenseNames;
 use Tests\TestCase;
 
 uses(TestCase::class);
 
 beforeEach(function () {
-    config()->set('local_browse.typesense.files_alias', 'atlas_local_local_browse_files');
-    config()->set('local_browse.typesense.reactions_alias', 'atlas_local_local_browse_reactions');
+    config()->set('library.typesense.files_alias', 'atlas_local_library_files');
+    config()->set('library.typesense.reactions_alias', 'atlas_local_library_reactions');
 });
 
 test('compiler builds default browse query', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $compiled = $compiler->compile([
         'page' => 1,
@@ -27,13 +27,13 @@ test('compiler builds default browse query', function () {
     ], 7);
 
     expect($compiled['mode'])->toBe('files')
-        ->and($compiled['collection'])->toBe(app(LocalBrowseTypesenseNames::class)->filesAlias())
+        ->and($compiled['collection'])->toBe(app(LibraryTypesenseNames::class)->filesAlias())
         ->and($compiled['options']['filter_by'])->toBe('not_found:=false')
         ->and($compiled['options']['sort_by'])->toBe('stored_at:desc,updated_at:desc,sort_id:desc');
 });
 
 test('compiler builds source downloaded file-type and random filters', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $compiled = $compiler->compile([
         'page' => 3,
@@ -61,7 +61,7 @@ test('compiler builds source downloaded file-type and random filters', function 
 });
 
 test('compiler builds multiple source filter', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $filter = $compiler->compileFileFilter([
         'source' => ['CivitAI', 'Wallhaven'],
@@ -78,7 +78,7 @@ test('compiler builds multiple source filter', function () {
 });
 
 test('compiler ignores source filters when all is selected with other sources', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $filter = $compiler->compileFileFilter([
         'source' => ['all', 'CivitAI'],
@@ -95,7 +95,7 @@ test('compiler ignores source filters when all is selected with other sources', 
 });
 
 test('compiler builds blacklisted and Auto blacklisted filters', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $filter = $compiler->compileFileFilter([
         'blacklisted' => 'yes',
@@ -112,7 +112,7 @@ test('compiler builds blacklisted and Auto blacklisted filters', function () {
 });
 
 test('compiler builds not found filters', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $notFound = $compiler->compileFileFilter([
         'notFound' => 'yes',
@@ -140,7 +140,7 @@ test('compiler builds not found filters', function () {
 });
 
 test('compiler builds reacted types and unreacted filters', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $reacted = $compiler->compileFileFilter([
         'reactionMode' => 'reacted',
@@ -181,7 +181,7 @@ test('compiler builds reacted types and unreacted filters', function () {
 });
 
 test('compiler builds reaction timestamp queries for descending and ascending sorts', function () {
-    $compiler = app(LocalBrowseTypesenseCompiler::class);
+    $compiler = app(LibraryTypesenseCompiler::class);
 
     $desc = $compiler->compile([
         'page' => 2,
@@ -196,7 +196,7 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'reactionTypes' => null,
         'autoBlacklisted' => 'no',
         'allTypes' => ['love', 'like', 'funny'],
-    ], 5, 'atlas_local_local_browse_files__v20260331_000000');
+    ], 5, 'atlas_local_library_files__v20260331_000000');
 
     $asc = $compiler->compile([
         'page' => 1,
@@ -211,7 +211,7 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'reactionTypes' => ['funny'],
         'autoBlacklisted' => 'no',
         'allTypes' => ['love', 'like', 'funny'],
-    ], 5, 'atlas_local_local_browse_files__v20260331_000000');
+    ], 5, 'atlas_local_library_files__v20260331_000000');
     $notFoundReacted = $compiler->compile([
         'page' => 1,
         'limit' => 25,
@@ -224,13 +224,13 @@ test('compiler builds reaction timestamp queries for descending and ascending so
         'reactionTypes' => null,
         'autoBlacklisted' => 'any',
         'allTypes' => ['love', 'like', 'funny'],
-    ], 5, 'atlas_local_local_browse_files__v20260331_000000');
+    ], 5, 'atlas_local_library_files__v20260331_000000');
 
     expect($desc['mode'])->toBe('reactions')
-        ->and($desc['collection'])->toBe(app(LocalBrowseTypesenseNames::class)->reactionsAlias())
+        ->and($desc['collection'])->toBe(app(LibraryTypesenseNames::class)->reactionsAlias())
         ->and($desc['options']['filter_by'])->toContain('user_id:=5')
         ->and($desc['options']['filter_by'])->toContain('type:=[`love`, `like`, `funny`]')
-        ->and($desc['options']['filter_by'])->toContain('$atlas_local_local_browse_files__v20260331_000000(')
+        ->and($desc['options']['filter_by'])->toContain('$atlas_local_library_files__v20260331_000000(')
         ->and($desc['options']['filter_by'])->toContain('not_found:=false')
         ->and($desc['options']['filter_by'])->toContain('source:=`CivitAI`')
         ->and($desc['options']['filter_by'])->toContain('downloaded:=true')

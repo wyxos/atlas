@@ -2,6 +2,10 @@
 
 use Illuminate\Support\Str;
 
+$librarySyncQueue = env('LIBRARY_SYNC_QUEUE', 'library-sync');
+$libraryReindexQueue = env('LIBRARY_REINDEX_QUEUE', 'library-reindex');
+$libraryReindexTimeout = (int) env('LIBRARY_REINDEX_TIMEOUT_SECONDS', 21600);
+
 return [
 
     /*
@@ -103,8 +107,8 @@ return [
         'redis:maintenance' => 600,
         'redis:media-conversions' => 3600,
         'redis:media-previews' => 600,
-        'redis:local-browse-sync' => 300,
-        'redis:local-browse-reindex' => 3600,
+        'redis:'.$librarySyncQueue => 300,
+        'redis:'.$libraryReindexQueue => 3600,
         'redis:processing' => 300,
         'redis:scout' => 300,
     ],
@@ -310,9 +314,9 @@ return [
             'timeout' => 600,
             'nice' => 0,
         ],
-        'supervisor-local-browse-reindex' => [
+        'supervisor-library-reindex' => [
             'connection' => 'redis',
-            'queue' => ['local-browse-reindex'],
+            'queue' => [$libraryReindexQueue],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,
@@ -320,12 +324,12 @@ return [
             'maxJobs' => 0,
             'memory' => 384,
             'tries' => 1,
-            'timeout' => (int) env('LOCAL_BROWSE_REINDEX_TIMEOUT_SECONDS', 21600),
+            'timeout' => $libraryReindexTimeout,
             'nice' => 0,
         ],
-        'supervisor-local-browse-sync' => [
+        'supervisor-library-sync' => [
             'connection' => 'redis',
-            'queue' => ['local-browse-sync'],
+            'queue' => [$librarySyncQueue],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,
@@ -397,11 +401,11 @@ return [
                 'maxProcesses' => 1,
                 'memory' => 384,
             ],
-            'supervisor-local-browse-reindex' => [
+            'supervisor-library-reindex' => [
                 'maxProcesses' => 1,
                 'memory' => 384,
             ],
-            'supervisor-local-browse-sync' => [
+            'supervisor-library-sync' => [
                 'maxProcesses' => 2,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
@@ -438,10 +442,10 @@ return [
             'supervisor-maintenance' => [
                 'maxProcesses' => 1,
             ],
-            'supervisor-local-browse-reindex' => [
+            'supervisor-library-reindex' => [
                 'maxProcesses' => 1,
             ],
-            'supervisor-local-browse-sync' => [
+            'supervisor-library-sync' => [
                 'maxProcesses' => 2,
             ],
             'supervisor-scout' => [

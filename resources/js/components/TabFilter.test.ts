@@ -47,7 +47,7 @@ describe('TabFilter', () => {
         });
     });
 
-    it('provides newest and oldest presets for blacklisted local files', () => {
+    it('provides newest and oldest presets for blacklisted Library', () => {
         const moderationGroup = LOCAL_TAB_FILTER_PRESET_GROUPS.find((group) => group.label === 'Moderation');
 
         expect(moderationGroup?.presets.map((preset) => preset.label)).toEqual([
@@ -220,7 +220,7 @@ describe('TabFilter', () => {
                 availableServices: [],
                 localDef: {
                     key: 'local',
-                    label: 'Local Files',
+                    label: 'Library',
                     defaults: {},
                     schema: {
                         fields: [
@@ -291,7 +291,7 @@ describe('TabFilter', () => {
                 availableServices: [],
                 localDef: {
                     key: 'local',
-                    label: 'Local Files',
+                    label: 'Library',
                     defaults: {},
                     schema: {
                         fields: [

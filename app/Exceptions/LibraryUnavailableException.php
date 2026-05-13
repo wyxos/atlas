@@ -5,10 +5,10 @@ namespace App\Exceptions;
 use RuntimeException;
 use Throwable;
 
-class LocalBrowseUnavailableException extends RuntimeException
+class LibraryUnavailableException extends RuntimeException
 {
     public function __construct(
-        string $message = 'Local browse unavailable',
+        string $message = 'Library unavailable',
         private readonly string $service = 'local',
         private readonly string $reason = 'typesense_unavailable',
         ?Throwable $previous = null,

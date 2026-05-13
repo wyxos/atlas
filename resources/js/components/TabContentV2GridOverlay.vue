@@ -98,7 +98,7 @@ const showReactions = computed(() => (
                 variant="ghost"
                 size="sm"
                 class="h-7 w-7 bg-danger-700/80 p-0 text-white hover:bg-danger-600"
-                aria-label="Delete local file"
+                aria-label="Delete library file"
                 data-test="local-file-delete-trigger"
                 @click.stop="localFileDeletion.actions.open(item)"
             >

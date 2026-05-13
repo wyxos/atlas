@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
-class LocalBrowseTypesenseSchemaFactory
+class LibraryTypesenseSchemaFactory
 {
     public function fileSchema(string $collectionName): array
     {

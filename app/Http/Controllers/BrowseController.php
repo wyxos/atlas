@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Browser;
-use App\Exceptions\LocalBrowseUnavailableException;
+use App\Exceptions\LibraryUnavailableException;
 use App\Services\LocalService;
 use App\Support\ServiceFilterSchema;
 use Illuminate\Http\JsonResponse;
@@ -22,9 +22,9 @@ class BrowseController extends Controller
     {
         try {
             $payload = Browser::handle();
-        } catch (LocalBrowseUnavailableException $e) {
+        } catch (LibraryUnavailableException $e) {
             return response()->json([
-                'message' => 'Local browse unavailable',
+                'message' => 'Library unavailable',
                 'service' => 'local',
                 'reason' => 'typesense_unavailable',
             ], 503, self::NO_STORE_HEADERS);

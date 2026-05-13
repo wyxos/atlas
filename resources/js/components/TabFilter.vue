@@ -144,7 +144,7 @@ function handleFieldUpdate(field: TabFilterFieldUpdate): void {
                             :class="inputClass"
                             @update:model-value="updateLocalPage"
                         />
-                        <p class="form-help">Jump to a specific local page (1-based).</p>
+                        <p class="form-help">Jump to a specific library page (1-based).</p>
                     </div>
 
                     <div v-if="localSourceField" class="form-field">

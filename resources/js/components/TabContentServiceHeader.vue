@@ -55,7 +55,7 @@ const localSourceOptions = computed(() => createLocalSourceOptions(props.availab
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
-                        <SelectItem value="local" data-test="source-type-local">Local</SelectItem>
+                        <SelectItem value="local" data-test="source-type-local">Library</SelectItem>
                     </SelectContent>
                 </Select>
             </div>

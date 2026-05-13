@@ -3,11 +3,11 @@
 namespace App\Models\Search;
 
 use App\Models\Reaction;
-use App\Services\Local\LocalBrowseTypesenseNames;
-use App\Services\Local\LocalBrowseTypesenseSchemaFactory;
+use App\Services\Library\LibraryTypesenseNames;
+use App\Services\Library\LibraryTypesenseSchemaFactory;
 use Laravel\Scout\Searchable;
 
-class LocalBrowseReactionDocument extends Reaction
+class LibraryReactionDocument extends Reaction
 {
     use Searchable;
 
@@ -15,7 +15,7 @@ class LocalBrowseReactionDocument extends Reaction
 
     public function searchableAs()
     {
-        return app(LocalBrowseTypesenseNames::class)->reactionsAlias();
+        return app(LibraryTypesenseNames::class)->reactionsAlias();
     }
 
     public function indexableAs()
@@ -38,9 +38,9 @@ class LocalBrowseReactionDocument extends Reaction
 
     public function typesenseCollectionSchema(): array
     {
-        return app(LocalBrowseTypesenseSchemaFactory::class)->reactionSchema(
+        return app(LibraryTypesenseSchemaFactory::class)->reactionSchema(
             $this->searchableAs(),
-            app(LocalBrowseTypesenseNames::class)->filesAlias(),
+            app(LibraryTypesenseNames::class)->filesAlias(),
         );
     }
 

@@ -48,6 +48,6 @@ Built to handle these.
 
 - CivitAI Images
 - Wallhaven
-- Local files you already have
+- Your Atlas library
 
 More sources can be added over time.

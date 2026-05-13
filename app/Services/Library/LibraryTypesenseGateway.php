@@ -1,15 +1,16 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
-use App\Exceptions\LocalBrowseUnavailableException;
+use App\Exceptions\LibraryUnavailableException;
+use App\Services\Local\LocalFetchParams;
 use Throwable;
 
-class LocalBrowseTypesenseGateway
+class LibraryTypesenseGateway
 {
     public function __construct(
-        private LocalBrowseTypesenseCompiler $compiler,
-        private LocalBrowseTypesenseNames $names,
+        private LibraryTypesenseCompiler $compiler,
+        private LibraryTypesenseNames $names,
     ) {}
 
     /**
@@ -29,10 +30,10 @@ class LocalBrowseTypesenseGateway
 
         try {
             $results = $this->runScoutSearch($compiled);
-        } catch (LocalBrowseUnavailableException $e) {
+        } catch (LibraryUnavailableException $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new LocalBrowseUnavailableException(previous: $e);
+            throw new LibraryUnavailableException(previous: $e);
         }
 
         $ids = $this->extractIds($compiled, $results);
@@ -41,7 +42,7 @@ class LocalBrowseTypesenseGateway
         $limit = max(1, (int) ($compiled['limit'] ?? 20));
 
         return [
-            'files' => LocalBrowseQueryBuilder::hydrateFiles($ids),
+            'files' => LibraryQueryBuilder::hydrateFiles($ids),
             'metadata' => [
                 'nextCursor' => ($page * $limit) < $total ? $page + 1 : null,
                 'total' => $total,
@@ -71,11 +72,11 @@ class LocalBrowseTypesenseGateway
     private function ensureAliasesAvailable(string $sort): void
     {
         if (! $this->names->hasFilesAlias()) {
-            throw new LocalBrowseUnavailableException;
+            throw new LibraryUnavailableException;
         }
 
         if (($sort === 'reaction_at' || $sort === 'reaction_at_asc') && ! $this->names->hasReactionsAlias()) {
-            throw new LocalBrowseUnavailableException;
+            throw new LibraryUnavailableException;
         }
     }
 

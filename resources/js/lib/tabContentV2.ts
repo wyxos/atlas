@@ -31,8 +31,8 @@ type TabContentV2ResolveArgs = {
     };
 };
 
-const LOCAL_BROWSE_UNAVAILABLE_MESSAGE = 'Local browse unavailable';
-const LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS = 5000;
+const LIBRARY_UNAVAILABLE_MESSAGE = 'Library unavailable';
+const LIBRARY_UNAVAILABLE_TOAST_DURATION_MS = 5000;
 
 export function createTabContentV2EmptyStatus(): VibeStatus {
     return {
@@ -124,8 +124,8 @@ function showBrowseErrorToast(
     toast: TabContentV2ResolveArgs['toast'],
     message: string,
 ): void {
-    if (message === LOCAL_BROWSE_UNAVAILABLE_MESSAGE) {
-        toast.error(message, { duration: LOCAL_BROWSE_UNAVAILABLE_TOAST_DURATION_MS });
+    if (message === LIBRARY_UNAVAILABLE_MESSAGE) {
+        toast.error(message, { duration: LIBRARY_UNAVAILABLE_TOAST_DURATION_MS });
         return;
     }
 

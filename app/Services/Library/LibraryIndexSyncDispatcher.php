@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services\Local;
+namespace App\Services\Library;
 
-use App\Jobs\SyncLocalBrowseIndex;
+use App\Jobs\SyncLibraryIndex;
 
-class LocalBrowseIndexSyncDispatcher
+class LibraryIndexSyncDispatcher
 {
     /**
      * @param  array<int, int>  $fileIds
@@ -25,6 +25,27 @@ class LocalBrowseIndexSyncDispatcher
     /**
      * @param  array<int, int>  $fileIds
      */
+    public function deleteFiles(array $fileIds): void
+    {
+        $fileIds = $this->normalizeIds($fileIds);
+
+        if ($fileIds === []) {
+            return;
+        }
+
+        foreach (array_chunk($fileIds, $this->chunkSize()) as $chunk) {
+            SyncLibraryIndex::dispatch($chunk, syncFiles: false, syncReactions: false, operation: 'deleteFiles')->afterCommit();
+        }
+    }
+
+    public function deleteAll(): void
+    {
+        SyncLibraryIndex::dispatch([], syncFiles: false, syncReactions: false, operation: 'deleteAll')->afterCommit();
+    }
+
+    /**
+     * @param  array<int, int>  $fileIds
+     */
     private function dispatch(array $fileIds, bool $syncFiles, bool $syncReactions): void
     {
         $fileIds = $this->normalizeIds($fileIds);
@@ -34,7 +55,7 @@ class LocalBrowseIndexSyncDispatcher
         }
 
         foreach (array_chunk($fileIds, $this->chunkSize()) as $chunk) {
-            SyncLocalBrowseIndex::dispatch($chunk, $syncFiles, $syncReactions)->afterCommit();
+            SyncLibraryIndex::dispatch($chunk, $syncFiles, $syncReactions)->afterCommit();
         }
     }
 
@@ -49,6 +70,6 @@ class LocalBrowseIndexSyncDispatcher
 
     private function chunkSize(): int
     {
-        return max(1, (int) config('local_browse.typesense.chunk', 500));
+        return max(1, (int) config('library.typesense.chunk', 500));
     }
 }

@@ -2,18 +2,18 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Local\LocalBrowseReindexService;
+use App\Services\Library\LibraryReindexService;
 use Illuminate\Console\Command;
 
-class ReindexLocalBrowseTypesenseCommand extends Command
+class ReindexLibraryTypesenseCommand extends Command
 {
-    protected $signature = 'atlas:reindex-local-browse
+    protected $signature = 'atlas:reindex-library
         {--suffix= : Collection suffix to use. Defaults to a UTC timestamp}
         {--queue : Queue the reindex and return immediately}';
 
-    protected $description = 'Build fresh Typesense local-browse collections and swap the live aliases';
+    protected $description = 'Build fresh Typesense library collections and swap the live aliases';
 
-    public function handle(LocalBrowseReindexService $reindex): int
+    public function handle(LibraryReindexService $reindex): int
     {
         $suffix = (string) $this->option('suffix') ?: null;
 
@@ -21,29 +21,29 @@ class ReindexLocalBrowseTypesenseCommand extends Command
             [$run, $queued] = $reindex->queue($suffix);
 
             $queued
-                ? $this->info("Queued local browse reindex #{$run->id} with suffix {$run->suffix}.")
-                : $this->warn("Local browse reindex #{$run->id} is already {$run->status}; not queueing another run.");
+                ? $this->info("Queued library reindex #{$run->id} with suffix {$run->suffix}.")
+                : $this->warn("Library reindex #{$run->id} is already {$run->status}; not queueing another run.");
 
-            $this->line("Check progress with: php artisan atlas:local-browse-reindex-status {$run->id}");
+            $this->line("Check progress with: php artisan atlas:library-reindex-status {$run->id}");
 
             return self::SUCCESS;
         }
 
         if ($activeRun = $reindex->activeRun()) {
-            $this->error("Local browse reindex #{$activeRun->id} is already {$activeRun->status}.");
+            $this->error("Library reindex #{$activeRun->id} is already {$activeRun->status}.");
 
             return self::FAILURE;
         }
 
         $run = $reindex->createRun($suffix);
-        $this->info("Rebuilding local browse Typesense collections with suffix {$run->suffix}");
+        $this->info("Rebuilding library Typesense collections with suffix {$run->suffix}");
 
         $summary = $reindex->run($run, function (string $type, int $count): void {
             $this->line(sprintf('Imported %d %s docs', $count, $type));
         });
 
         $this->newLine();
-        $this->info('Browse aliases updated.');
+        $this->info('Library aliases updated.');
         $this->line('Files alias: '.$summary['files_alias']);
         $this->line('Files collection: '.$summary['files_collection']);
         $this->line('Reactions alias: '.$summary['reactions_alias']);

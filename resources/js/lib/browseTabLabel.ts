@@ -56,7 +56,7 @@ export function buildBrowseTabLabel(options: BuildBrowseTabLabelOptions): string
     }
 
     const baseServiceLabel = options.formData.feed === 'local'
-        ? (options.localService?.label ?? 'Local')
+        ? (options.localService?.label ?? 'Library')
         : (
             options.availableServices.find((service) => service.key === options.formData.service)?.label
             ?? options.formData.service

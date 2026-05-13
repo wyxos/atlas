@@ -44,7 +44,7 @@ describe('browseCatalog', () => {
             { key: 'civit-ai-images', label: 'CivitAI Images' },
             { key: 'wallhaven', label: 'Wallhaven' },
         ];
-        const localService = { key: 'local', label: 'Local' };
+        const localService = { key: 'local', label: 'Library' };
 
         mockAxios.get.mockResolvedValue({
             data: {
