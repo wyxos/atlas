@@ -36,9 +36,9 @@ import { isCivitAiHostname } from '../civitai-domains';
 
 type UseReactionBadgeProps = {
     media: MediaElement;
-    onShortcutReady?: ((handler: ((type: BadgeReactionType) => void) | null) => void) | undefined;
+    onShortcutReady?: ((handler: ((type: BadgeSubmitType) => void) | null) => void) | undefined;
 };
-type BadgeSubmitType = BadgeReactionType | 'blacklist';
+export type BadgeSubmitType = BadgeReactionType | 'blacklist';
 const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
 const RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS = [120, 400, 1000, 2200] as const;
 export function useReactionBadge(props: UseReactionBadgeProps) {
@@ -315,7 +315,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
     onMounted(() => {
         syncResolution();
-        props.onShortcutReady?.((type: BadgeReactionType) => {
+        props.onShortcutReady?.((type: BadgeSubmitType) => {
             void handleReactionClick(type);
         });
 

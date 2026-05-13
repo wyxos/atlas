@@ -2,8 +2,7 @@ import type { PropType } from 'vue';
 import { defineComponent } from 'vue';
 import { renderReactionBadge } from './reaction-badge-view';
 import type { MediaElement } from './media-utils';
-import type { BadgeReactionType } from './reaction-check-queue';
-import { useReactionBadge } from './use-reaction-badge';
+import { type BadgeSubmitType, useReactionBadge } from './use-reaction-badge';
 
 export const AtlasReactionBadge = defineComponent({
     name: 'AtlasReactionBadge',
@@ -13,7 +12,7 @@ export const AtlasReactionBadge = defineComponent({
             required: true,
         },
         onShortcutReady: {
-            type: Function as PropType<((handler: ((type: BadgeReactionType) => void) | null) => void) | undefined>,
+            type: Function as PropType<((handler: ((type: BadgeSubmitType) => void) | null) => void) | undefined>,
             required: false,
             default: undefined,
         },

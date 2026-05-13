@@ -135,4 +135,25 @@ describe('createReactionBadgeHost blacklist control', () => {
 
         host.unmount();
     });
+
+    it('submits blacklist from the shortcut handler', async () => {
+        const { createReactionBadgeHost } = await import('./reaction-badge-app');
+        const image = document.createElement('img');
+        image.src = 'https://images.example.com/shortcut-blacklist-me.jpg';
+        document.body.appendChild(image);
+
+        const host = createReactionBadgeHost(image);
+        document.body.appendChild(host.element);
+
+        await flushPromises();
+        await flushPromises();
+
+        host.triggerReaction('blacklist');
+        await flushPromises();
+        await flushPromises();
+
+        expect(mockSubmitBadgeReaction).toHaveBeenCalledWith(image, 'blacklist', {});
+
+        host.unmount();
+    });
 });

@@ -1,13 +1,13 @@
 import type { MediaElement } from './media-utils';
 import { createReactionBadgeHost } from './reaction-badge-app';
-import type { BadgeReactionType } from './reaction-check-queue';
+import type { BadgeSubmitType } from './use-reaction-badge';
 
 const BADGE_ATTR = 'data-atlas-media-red-badge';
 const APPLIED_ATTR = 'data-atlas-media-red-applied';
 
 type BadgeHost = {
     element: HTMLDivElement;
-    triggerReaction: (type: BadgeReactionType) => void;
+    triggerReaction: (type: BadgeSubmitType) => void;
     unmount: () => void;
 };
 
@@ -36,6 +36,7 @@ export class OverlayManager {
         if (this.activeMedia.size === 0 && this.isGlobalShortcutBound) {
             window.removeEventListener('click', this.handleGlobalClick, true);
             window.removeEventListener('mousedown', this.handleGlobalMousedown, true);
+            window.removeEventListener('contextmenu', this.handleGlobalContextMenu, true);
             this.isGlobalShortcutBound = false;
         }
     }
@@ -80,6 +81,7 @@ export class OverlayManager {
         }
         window.addEventListener('click', this.handleGlobalClick, true);
         window.addEventListener('mousedown', this.handleGlobalMousedown, true);
+        window.addEventListener('contextmenu', this.handleGlobalContextMenu, true);
         this.isGlobalShortcutBound = true;
     }
 
@@ -91,16 +93,16 @@ export class OverlayManager {
         this.handleGlobalMouseShortcut(event, 'like', 1);
     };
 
-    private handleGlobalMouseShortcut(event: MouseEvent, type: BadgeReactionType, button?: number): void {
+    private readonly handleGlobalContextMenu = (event: MouseEvent): void => {
+        this.handleGlobalMouseShortcut(event, 'blacklist', 2);
+    };
+
+    private handleGlobalMouseShortcut(event: MouseEvent, type: BadgeSubmitType, button: number): void {
         if (!event.altKey) {
             return;
         }
 
-        if (button !== undefined && event.button !== button) {
-            return;
-        }
-
-        if (button === undefined && event.type !== 'contextmenu') {
+        if (event.button !== button) {
             return;
         }
 
@@ -129,7 +131,8 @@ export class OverlayManager {
 
         return this.pickNearestMediaCandidate(pointCandidates, x, y);
     }
-    private triggerReaction(media: MediaElement, type: BadgeReactionType): void {
+
+    private triggerReaction(media: MediaElement, type: BadgeSubmitType): void {
         const host = this.badgesByMedia.get(media);
         if (!host) {
             return;

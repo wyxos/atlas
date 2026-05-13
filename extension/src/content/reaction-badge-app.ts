@@ -1,20 +1,20 @@
 import { createApp } from 'vue';
 import type { MediaElement } from './media-utils';
-import type { BadgeReactionType } from './reaction-check-queue';
+import type { BadgeSubmitType } from './use-reaction-badge';
 import { AtlasReactionBadge } from './reaction-badge-component';
 
 export type MountedBadge = {
     element: HTMLDivElement;
-    triggerReaction: (type: BadgeReactionType) => void;
+    triggerReaction: (type: BadgeSubmitType) => void;
     unmount: () => void;
 };
 
 export function createReactionBadgeHost(media: MediaElement): MountedBadge {
     const element = document.createElement('div');
-    let triggerReactionHandler: ((type: BadgeReactionType) => void) | null = null;
+    let triggerReactionHandler: ((type: BadgeSubmitType) => void) | null = null;
     const app = createApp(AtlasReactionBadge, {
         media,
-        onShortcutReady: (handler: ((type: BadgeReactionType) => void) | null) => {
+        onShortcutReady: (handler: ((type: BadgeSubmitType) => void) | null) => {
             triggerReactionHandler = handler;
         },
     });
@@ -22,7 +22,7 @@ export function createReactionBadgeHost(media: MediaElement): MountedBadge {
 
     return {
         element,
-        triggerReaction: (type: BadgeReactionType) => {
+        triggerReaction: (type: BadgeSubmitType) => {
             triggerReactionHandler?.(type);
         },
         unmount: () => {

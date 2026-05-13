@@ -116,21 +116,12 @@ describe('OverlayManager', () => {
         manager.remove(image);
     });
 
-    it('ignores Alt+contextmenu while liking media on Alt+middle click', async () => {
+    it('likes media on Alt+middle click', async () => {
         const { OverlayManager } = await import('./overlay-manager');
         const manager = new OverlayManager();
         const { image } = appendTrackedImage();
 
         manager.apply(image);
-
-        const contextmenuEvent = new MouseEvent('contextmenu', {
-            altKey: true,
-            bubbles: true,
-            cancelable: true,
-            clientX: 90,
-            clientY: 100,
-        });
-        image.dispatchEvent(contextmenuEvent);
 
         const middleClickEvent = new MouseEvent('mousedown', {
             altKey: true,
@@ -142,10 +133,33 @@ describe('OverlayManager', () => {
         });
         image.dispatchEvent(middleClickEvent);
 
-        expect(contextmenuEvent.defaultPrevented).toBe(false);
         expect(middleClickEvent.defaultPrevented).toBe(true);
         expect(triggerReaction).toHaveBeenCalledTimes(1);
         expect(triggerReaction).toHaveBeenNthCalledWith(1, 'like');
+
+        manager.remove(image);
+    });
+
+    it('blacklists media on Alt+right click', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const { image } = appendTrackedImage();
+
+        manager.apply(image);
+
+        const contextmenuEvent = new MouseEvent('contextmenu', {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 90,
+            clientY: 100,
+        });
+        image.dispatchEvent(contextmenuEvent);
+
+        expect(contextmenuEvent.defaultPrevented).toBe(true);
+        expect(triggerReaction).toHaveBeenCalledTimes(1);
+        expect(triggerReaction).toHaveBeenNthCalledWith(1, 'blacklist');
 
         manager.remove(image);
     });
