@@ -13,6 +13,8 @@ data:
         access_log /var/log/nginx/access.log;
         root /var/www/html/public;
 
+        resolver kube-dns.kube-system.svc.cluster.local valid=10s;
+
         client_max_body_size 100M;
 
         sendfile on;
@@ -34,7 +36,8 @@ data:
 
         # Proxy WebSocket connections to Reverb
         location /app {
-            proxy_pass http://atlas-reverb:8080;
+            set $reverb_backend http://atlas-reverb:8080;
+            proxy_pass $reverb_backend;
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "Upgrade";

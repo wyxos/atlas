@@ -1,17 +1,19 @@
 # ingressroute.yaml - Traefik IngressRoute for Atlas
-apiVersion: traefik.containo.us/v1alpha1
+# cloudflared tunnels atlas.rustybret.com → localhost:80 → Traefik → atlas-web
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: atlas
   namespace: apps
 spec:
   entryPoints:
-    - websecure
+    - web
   routes:
     - kind: Rule
       match: Host(`atlas.rustybret.com`)
+      middlewares:
+        - name: https-headers
+        - name: authentik-forward-auth
       services:
         - name: atlas-web
           port: 80
-  tls:
-    certResolver: le

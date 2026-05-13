@@ -5,8 +5,8 @@ metadata:
   name: atlas-reverb
   namespace: apps
 spec:
-  clusterIP: None
   selector:
     app: atlas-reverb
   ports:
     - port: 8080
+      targetPort: 8080

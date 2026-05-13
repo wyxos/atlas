@@ -14,9 +14,30 @@ spec:
       labels:
         app: atlas-redis
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: altos
+                    operator: In
+                    values:
+                      - "true"
       containers:
         - name: redis
           image: redis:7-alpine
+          command:
+            - redis-server
+            - --requirepass
+            - $(REDIS_PASSWORD)
+            - --appendonly
+            - "yes"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-secrets
+                  key: REDIS_PASSWORD
           ports:
             - containerPort: 6379
           resources:

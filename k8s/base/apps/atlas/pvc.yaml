@@ -10,5 +10,5 @@ spec:
   storageClassName: local-path
   resources:
     requests:
-      storage: 100Gi
+      storage: 50Gi
 

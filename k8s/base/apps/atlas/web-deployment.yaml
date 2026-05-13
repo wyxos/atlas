@@ -21,13 +21,21 @@ spec:
       labels:
         app: atlas-web
     spec:
-      securityContext:
-        runAsNonRoot: true
-        fsGroup: 1000
+      imagePullSecrets:
+        - name: ocir-pull-secret
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: altos
+                    operator: In
+                    values:
+                      - "true"
       containers:
         - name: php-fpm
-          image: atlas-php:placeholder
-          imagePullPolicy: IfNotPresent
+          image: ocir.us-sanjose-1.oci.oraclecloud.com/axarjcg9zmg6/atlas-php:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 9000
               protocol: TCP
@@ -73,11 +81,6 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "200m"
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
           readinessProbe:
             httpGet:
               path: /up
@@ -102,4 +105,4 @@ spec:
             name: atlas-nginx-config
         - name: media-storage
           persistentVolumeClaim:
-            claimName: atlas-storage
+            claimName: atlas-media-pvc

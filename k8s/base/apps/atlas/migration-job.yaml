@@ -9,9 +9,20 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: altos
+                    operator: In
+                    values:
+                      - "true"
+      imagePullSecrets:
+        - name: ocir-pull-secret
       containers:
         - name: migration
-          image: atlas-php:placeholder
+          image: ocir.us-sanjose-1.oci.oraclecloud.com/axarjcg9zmg6/atlas-php:latest
           command:
             - php
             - artisan

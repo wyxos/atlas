@@ -14,6 +14,15 @@ spec:
       labels:
         app: atlas-typesense
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: altos
+                    operator: In
+                    values:
+                      - "true"
       containers:
         - name: typesense
           image: typesense/typesense:27.0
@@ -26,7 +35,7 @@ spec:
           ports:
             - containerPort: 8108
           command:
-            - typesense
+            - /opt/typesense-server
             - --data-dir=/data
             - --api-key=$(TYPESENSE_API_KEY)
             - --memory-used-max-percentage=80

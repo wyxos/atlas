@@ -14,9 +14,20 @@ spec:
       labels:
         app: atlas-horizon
     spec:
+      imagePullSecrets:
+        - name: ocir-pull-secret
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: altos
+                    operator: In
+                    values:
+                      - "true"
       containers:
         - name: horizon
-          image: atlas-php:placeholder
+          image: ocir.us-sanjose-1.oci.oraclecloud.com/axarjcg9zmg6/atlas-php:latest
           command:
             - php
             - artisan

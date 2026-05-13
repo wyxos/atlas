@@ -14,6 +14,15 @@ spec:
       labels:
         app: atlas-mariadb
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: altos
+                    operator: In
+                    values:
+                      - "true"
       containers:
         - name: mariadb
           image: mariadb:10.11

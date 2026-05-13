@@ -35,12 +35,18 @@ RUN composer install --no-dev --optimize-autoloader --classmap-authoritative && 
 
 FROM php:8.4-fpm AS runtime
 
-# Install runtime dependencies
+# Install runtime dependencies (including build deps for PHP extensions)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     yt-dlp \
     libcurl4-openssl-dev \
     libxml2-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libzip-dev \
+    libonig-dev \
+    libmagickwand-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
@@ -78,6 +84,6 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EXPOSE 9000
 
 # Start php-fpm server
-CMD ["php-fpm"]
+CMD ["php-fpm", "-F"]
 
 USER www-data

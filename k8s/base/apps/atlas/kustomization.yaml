@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: apps
+resources:
+  - configmap.yaml
+  - nginx-configmap.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - mariadb-deployment.yaml
+  - mariadb-service.yaml
+  - mariadb-pvc.yaml
+  - redis-deployment.yaml
+  - redis-service.yaml
+  - typesense-deployment.yaml
+  - typesense-service.yaml
+  - typesense-pvc.yaml
+  - reverb-deployment.yaml
+  - reverb-service.yaml
+  - horizon-deployment.yaml
+  - scheduler-deployment.yaml
+  - pvc.yaml
+  - ingressroute.yaml
+  - migration-job.yaml
+  - bootstrap-admin-job.yaml
