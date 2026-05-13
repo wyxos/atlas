@@ -58,3 +58,21 @@ it('syncs library file and reaction projections when a reaction is removed', fun
     );
     Queue::assertPushed(SyncLibraryIndex::class, 2);
 });
+
+it('can defer library projection sync for batch callers', function () {
+    Queue::fake([DownloadFile::class, SyncLibraryIndex::class]);
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'downloaded' => true,
+        'blacklisted_at' => null,
+        'auto_blacklisted' => false,
+    ]);
+
+    app(FileReactionService::class)->set($file, $user, 'love', [
+        'queueDownload' => false,
+        'queueLibrarySync' => false,
+    ]);
+
+    Queue::assertNotPushed(SyncLibraryIndex::class);
+});

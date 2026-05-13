@@ -17,6 +17,7 @@ use App\Services\Extension\ExtensionReactionProcessor;
 use App\Services\ExtensionApiKeyService;
 use App\Services\FileBlacklistService;
 use App\Services\FileReactionService;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -242,6 +243,7 @@ class ExtensionApiController extends Controller
         ExtensionDownloadRuntimeContext $downloadRuntimeContext,
         ExtensionListingMetadataOverridesNormalizer $listingMetadataOverridesNormalizer,
         ExtensionReactionProcessor $reactionProcessor,
+        LibraryIndexSyncDispatcher $libraryIndexSyncDispatcher,
     ): JsonResponse {
         $user = $this->resolveExtensionUser($request, $extensionApiKey);
         if (! $user) {
@@ -297,6 +299,7 @@ class ExtensionApiController extends Controller
         $primaryPayload = null;
         $primaryCandidateId = $validated['primary_candidate_id'];
         $batchDownloadRequested = false;
+        $fileIds = [];
 
         foreach ($validated['items'] as $item) {
             $payload = $reactionProcessor->process(
@@ -309,7 +312,11 @@ class ExtensionApiController extends Controller
                 $user,
                 $extensionChannel,
                 $runtimeContext,
-                $listingMetadataOverrides
+                $listingMetadataOverrides,
+                [
+                    'loadActiveTransfer' => false,
+                    'queueLibrarySync' => false,
+                ],
             );
 
             $candidatePayload = [
@@ -317,6 +324,10 @@ class ExtensionApiController extends Controller
                 ...$payload,
             ];
             $batchItems[] = $candidatePayload;
+            $fileId = data_get($payload, 'file.id');
+            if (is_numeric($fileId)) {
+                $fileIds[] = (int) $fileId;
+            }
             if (data_get($payload, 'download.requested') === true) {
                 $batchDownloadRequested = true;
             }
@@ -332,7 +343,20 @@ class ExtensionApiController extends Controller
             ]);
         }
 
+        $this->attachActiveTransfers(
+            $batchItems,
+            $reactionProcessor->activeTransfersByFileId($fileIds),
+        );
+        foreach ($batchItems as $batchItem) {
+            if ($batchItem['candidate_id'] === $primaryCandidateId) {
+                $primaryPayload = $batchItem;
+                unset($primaryPayload['candidate_id']);
+                break;
+            }
+        }
+
         $this->attachDerivedContainers($batchItems, $listingMetadataOverrides);
+        $libraryIndexSyncDispatcher->filesAndReactions($fileIds);
 
         return response()->json([
             ...$primaryPayload,
@@ -556,6 +580,31 @@ class ExtensionApiController extends Controller
                 ->whereIn('id', array_values(array_unique($fileIds)))
                 ->get()
         );
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $payloads
+     * @param  array<int, DownloadTransfer>  $activeTransfersByFileId
+     */
+    private function attachActiveTransfers(array &$payloads, array $activeTransfersByFileId): void
+    {
+        foreach ($payloads as &$payload) {
+            $fileId = data_get($payload, 'file.id');
+            if (! is_numeric($fileId)) {
+                continue;
+            }
+
+            $download = is_array($payload['download'] ?? null) ? $payload['download'] : [];
+            $activeTransfer = $activeTransfersByFileId[(int) $fileId] ?? null;
+            $payload['download'] = [
+                'requested' => $download['requested'] ?? false,
+                'transfer_id' => $activeTransfer?->id,
+                'status' => $activeTransfer?->status,
+                'progress_percent' => $activeTransfer?->last_broadcast_percent,
+                'downloaded_at' => $download['downloaded_at'] ?? null,
+            ];
+        }
+        unset($payload);
     }
 
     private function extensionChannelHash(string $apiKey): string

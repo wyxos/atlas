@@ -45,6 +45,7 @@ class FileReactionService
         $forceDownload = $options['forceDownload'] ?? false;
         $detachFromTabsOnNoop = $options['detachFromTabsOnNoop'] ?? false;
         $downloadRuntimeContext = $options['downloadRuntimeContext'] ?? [];
+        $queueLibrarySync = $options['queueLibrarySync'] ?? true;
         $existingReaction = Reaction::query()
             ->where('user_id', $user->id)
             ->where('file_id', $file->id)
@@ -81,6 +82,7 @@ class FileReactionService
                 $queueDownload,
                 $forceDownload,
                 $downloadRuntimeContext,
+                $queueLibrarySync,
             );
 
             return [
@@ -98,6 +100,7 @@ class FileReactionService
             $queueDownload,
             $forceDownload,
             $downloadRuntimeContext,
+            $queueLibrarySync,
         );
 
         return [
@@ -149,6 +152,7 @@ class FileReactionService
         bool $queueDownload = true,
         bool $forceDownload = false,
         array $downloadRuntimeContext = [],
+        bool $queueLibrarySync = true,
     ): Reaction {
         $metrics = app(MetricsService::class);
         $oldType = $existingReaction?->type;
@@ -193,7 +197,9 @@ class FileReactionService
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
-        app(LibraryIndexSyncDispatcher::class)->filesAndReactions([$file->id]);
+        if ($queueLibrarySync) {
+            app(LibraryIndexSyncDispatcher::class)->filesAndReactions([$file->id]);
+        }
 
         return $reaction;
     }
