@@ -51,6 +51,11 @@ it('audits imported videos that need streamable output without exposing file pat
     FileMetadata::factory()->create([
         'file_id' => $unsupportedExisting->id,
         'payload' => [
+            'probe' => [
+                'streams' => [
+                    ['codec_type' => 'video', 'codec_name' => 'hevc'],
+                ],
+            ],
             'conversions' => [
                 'streamable_video' => $streamablePath,
             ],
@@ -81,6 +86,8 @@ it('audits imported videos that need streamable output without exposing file pat
         'streamable_required_without_output_files' => 1,
         'streamable_required_without_output_bytes' => $unsupportedMissingBytes,
         'stale_streamable_metadata_files' => 0,
+        'metadata_probe_files' => 1,
+        'disk_probe_files' => 2,
         'probe_failures' => 0,
     ]);
 

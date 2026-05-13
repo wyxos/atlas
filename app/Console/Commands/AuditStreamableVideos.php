@@ -98,6 +98,8 @@ class AuditStreamableVideos extends Command
             'streamable_required_without_output_files' => 0,
             'streamable_required_without_output_bytes' => 0,
             'stale_streamable_metadata_files' => 0,
+            'metadata_probe_files' => 0,
+            'disk_probe_files' => 0,
             'probe_failures' => 0,
         ];
 
@@ -164,10 +166,17 @@ class AuditStreamableVideos extends Command
             $sourceBytes = 0;
         }
 
-        try {
-            $sourceProbe = $probe->probe($resolved['full_path']);
-        } catch (Throwable) {
-            $sourceProbe = [];
+        $sourceProbe = $this->metadataProbe($file);
+        if ($sourceProbe !== null) {
+            $summary['metadata_probe_files']++;
+        } else {
+            $summary['disk_probe_files']++;
+
+            try {
+                $sourceProbe = $probe->probe($resolved['full_path']);
+            } catch (Throwable) {
+                $sourceProbe = [];
+            }
         }
 
         if ($sourceProbe === []) {
@@ -207,6 +216,14 @@ class AuditStreamableVideos extends Command
         }
 
         return is_numeric($file->size) && (int) $file->size >= 0 ? (int) $file->size : null;
+    }
+
+    private function metadataProbe(File $file): ?array
+    {
+        $payload = $file->metadata?->payload;
+        $probe = data_get(is_array($payload) ? $payload : [], 'probe');
+
+        return is_array($probe) && $probe !== [] ? $probe : null;
     }
 
     private function streamableOutputState(File $file): string
