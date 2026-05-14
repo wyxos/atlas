@@ -28,8 +28,8 @@ return new class extends Migration
             $table->json('error_context')->nullable();
             $table->timestamps();
 
-            $table->index(['library_scan_run_id', 'status', 'id']);
-            $table->index(['library_scan_run_id', 'status', 'parser_queued_at']);
+            $table->index(['library_scan_run_id', 'status']);
+            $table->index(['library_scan_run_id', 'status', 'parser_queued_at'], 'scan_items_run_status_parser_queued_idx');
             $table->index(['library_scan_run_id', 'created_at']);
         });
     }

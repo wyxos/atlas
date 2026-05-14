@@ -1,5 +1,5 @@
 import { h, type VNode } from 'vue';
-import { Ban, Download, Heart, Loader2, Smile, ThumbsUp } from 'lucide-vue-next';
+import { Ban, Download, Heart, Layers, Loader2, Smile, ThumbsUp } from 'lucide-vue-next';
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { CloseTabAfterQueueMode } from '../atlas-options';
 import { formatTabCountSummary } from '../tab-counts';
@@ -92,6 +92,123 @@ const closeTabAfterQueueModeLabel: Record<CloseTabAfterQueueMode, string> = {
     queued: 'Queued',
     completed: 'Complete',
 };
+
+function renderTabCount(model: BadgeViewModel): VNode {
+    const tabCount = formatTabCountSummary(model.openTabCount === null
+        ? null
+        : {
+            similarDomainCount: model.similarDomainTabCount,
+            totalCount: model.openTabCount,
+        });
+
+    return h(
+        'span',
+        {
+            title: `Tabs ${tabCount}`,
+            'aria-label': `Tabs ${tabCount}`,
+            style: {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                opacity: 0.92,
+            },
+        },
+        [
+            h(Layers, { size: 12, strokeWidth: 2 }),
+            h('span', tabCount),
+        ],
+    );
+}
+
+function renderCloseTabAfterQueueControl(model: BadgeViewModel, handlers: BadgeViewHandlers): VNode {
+    return h(
+        'div',
+        {
+            style: {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                opacity: 0.92,
+            },
+        },
+        [
+            h('span', 'Auto-close'),
+            h(
+                'button',
+                {
+                    type: 'button',
+                    onClick: handlers.onCloseTabAfterQueueToggle,
+                    disabled: model.closeTabAfterQueueSaving,
+                    style: {
+                        borderRadius: '999px',
+                        border: 'none',
+                        padding: '2px 7px',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                        cursor: model.closeTabAfterQueueSaving ? 'not-allowed' : 'pointer',
+                        opacity: model.closeTabAfterQueueSaving ? 0.7 : 1,
+                        background: model.closeTabAfterQueueMode === 'off' ? 'rgba(255,255,255,0.22)' : '#14b8a6',
+                        color: model.closeTabAfterQueueMode === 'off' ? '#ffffff' : '#052e2b',
+                    },
+                },
+                model.closeTabAfterQueueSaving
+                    ? 'Saving...'
+                    : closeTabAfterQueueModeLabel[model.closeTabAfterQueueMode],
+            ),
+        ],
+    );
+}
+
+function renderProgressBorder(model: BadgeViewModel): VNode {
+    return h(
+        'div',
+        {
+            style: {
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: '13px',
+                borderRadius: '0 0 8px 8px',
+                background: 'rgba(255,255,255,0.16)',
+                overflow: 'hidden',
+            },
+        },
+        [
+            h('div', {
+                style: {
+                    position: 'absolute',
+                    inset: '0 auto 0 0',
+                    width: `${model.progressDisplayValue}%`,
+                    background: model.progressColor,
+                    transition: 'width 180ms ease',
+                },
+            }),
+            h(
+                'div',
+                {
+                    style: {
+                        position: 'relative',
+                        zIndex: 1,
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0 8px',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        lineHeight: '1',
+                        color: '#ffffff',
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.85)',
+                        whiteSpace: 'nowrap',
+                    },
+                },
+                `${model.transferStatus ?? 'idle'} · ${model.progressDisplayValue}%`,
+            ),
+        ],
+    );
+}
 
 function iconColor(type: BadgeReactionType, model: BadgeViewModel): string {
     if (model.activeReaction === type) {
@@ -265,6 +382,7 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
         'div',
         {
             style: {
+                position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -275,10 +393,11 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                 color: '#ffffff',
                 pointerEvents: 'auto',
                 gap: '4px',
-                padding: '6px 8px',
-                width: '320px',
-                minWidth: '320px',
-                maxWidth: '320px',
+                padding: '6px 8px 17px',
+                width: '300px',
+                minWidth: '300px',
+                maxWidth: '300px',
+                overflow: 'hidden',
             },
         },
         [
@@ -290,7 +409,7 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         width: '100%',
-                        gap: '8px',
+                        gap: '6px',
                         fontSize: '11px',
                         lineHeight: '1.2',
                         whiteSpace: 'nowrap',
@@ -298,7 +417,12 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                 },
                 [
                     model.mediaResolution
-                        ? h('span', `Res ${model.mediaResolution}`)
+                        ? h('span', {
+                            style: {
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                            },
+                        }, model.mediaResolution)
                         : h('span', {
                             style: {
                                 width: '72px',
@@ -310,12 +434,19 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
                         }),
                     h(
                         'span',
-                        `Tabs ${formatTabCountSummary(model.openTabCount === null
-                            ? null
-                            : {
-                                similarDomainCount: model.similarDomainTabCount,
-                                totalCount: model.openTabCount,
-                            })}`,
+                        {
+                            style: {
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'flex-end',
+                                gap: '8px',
+                                flexShrink: 0,
+                            },
+                        },
+                        [
+                            renderTabCount(model),
+                            renderCloseTabAfterQueueControl(model, handlers),
+                        ],
                     ),
                     model.timestampText === null
                         ? null
@@ -338,95 +469,7 @@ export function renderReactionBadge(model: BadgeViewModel, handlers: BadgeViewHa
             ),
             renderIconRow(model, handlers),
             renderReactAllItemsRow(model, handlers),
-            h(
-                'div',
-                {
-                    style: {
-                        width: '100%',
-                        marginTop: '1px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '8px',
-                        fontSize: '10px',
-                        opacity: 0.9,
-                    },
-                },
-                [
-                    h('span', 'Auto-close'),
-                    h(
-                        'button',
-                        {
-                            type: 'button',
-                            onClick: handlers.onCloseTabAfterQueueToggle,
-                            disabled: model.closeTabAfterQueueSaving,
-                            style: {
-                                borderRadius: '999px',
-                                border: 'none',
-                                padding: '3px 8px',
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                cursor: model.closeTabAfterQueueSaving ? 'not-allowed' : 'pointer',
-                                opacity: model.closeTabAfterQueueSaving ? 0.7 : 1,
-                                background: model.closeTabAfterQueueMode === 'off' ? 'rgba(255,255,255,0.22)' : '#14b8a6',
-                                color: model.closeTabAfterQueueMode === 'off' ? '#ffffff' : '#052e2b',
-                            },
-                        },
-                        model.closeTabAfterQueueSaving
-                            ? 'Saving...'
-                            : closeTabAfterQueueModeLabel[model.closeTabAfterQueueMode],
-                    ),
-                ],
-            ),
-            h(
-                'div',
-                {
-                    style: {
-                        width: '100%',
-                        marginTop: '2px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '3px',
-                    },
-                },
-                [
-                    h('div', {
-                        style: {
-                            height: '4px',
-                            width: '100%',
-                            borderRadius: '999px',
-                            background: 'rgba(255,255,255,0.2)',
-                            overflow: 'hidden',
-                        },
-                    }, [
-                        h('div', {
-                            style: {
-                                height: '100%',
-                                width: `${model.progressDisplayValue}%`,
-                                background: model.progressColor,
-                                transition: 'width 180ms ease',
-                            },
-                        }),
-                    ]),
-                    h(
-                        'div',
-                        {
-                            style: {
-                                fontSize: '10px',
-                                opacity: 0.9,
-                                textAlign: 'right',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                            },
-                        },
-                        [
-                            h('span', model.transferStatus ?? 'idle'),
-                            h('span', `${model.progressDisplayValue}%`),
-                        ],
-                    ),
-                ],
-            ),
+            renderProgressBorder(model),
         ],
     );
 }
