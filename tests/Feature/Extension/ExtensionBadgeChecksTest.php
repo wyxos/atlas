@@ -43,6 +43,22 @@ test('extension badge checks endpoint requires a valid api key', function () {
     $response->assertUnauthorized();
 });
 
+test('extension badge checks cors preflight is cacheable', function () {
+    $origin = 'chrome-extension://dhhmiflbhoaffjmlfpihmpioflgocekg';
+
+    $response = $this->withHeaders([
+        'Origin' => $origin,
+        'Access-Control-Request-Method' => 'POST',
+        'Access-Control-Request-Headers' => 'content-type,x-atlas-api-key',
+    ])->options('/api/extension/badges/checks');
+
+    $response->assertNoContent();
+    $response->assertHeader('Access-Control-Allow-Origin', $origin);
+    $response->assertHeader('Access-Control-Allow-Methods', 'POST');
+    $response->assertHeader('Access-Control-Allow-Headers', 'content-type,x-atlas-api-key');
+    $response->assertHeader('Access-Control-Max-Age', '600');
+});
+
 test('extension badge checks endpoint returns deterministic per-item status', function () {
     $user = User::factory()->create();
     setBadgeChecksExtensionApiKey('valid-api-key', $user->id);
