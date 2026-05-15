@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/PageLayout.vue';
 import LibraryScanSettings from '@/components/settings/LibraryScanSettings.vue';
+import ModerationFeedRemovalBackfillSettings from '@/components/settings/ModerationFeedRemovalBackfillSettings.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -456,6 +457,8 @@ onMounted(() => {
                 </div>
 
                 <LibraryScanSettings />
+
+                <ModerationFeedRemovalBackfillSettings />
 
                 <div class="border border-danger-500/30 rounded-lg p-6 bg-prussian-blue-700/50">
                     <h5 class="text-lg font-semibold text-danger-400 mb-2">Danger Zone</h5>

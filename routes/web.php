@@ -77,6 +77,12 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.library-scans.store');
     Route::post('/api/settings/library-scans/reparse-imported', [\App\Http\Controllers\LibraryScanController::class, 'reparseImported'])
         ->name('api.settings.library-scans.reparse-imported');
+    Route::get('/api/settings/moderation-feed-removal-runs', [\App\Http\Controllers\ModerationFeedRemovalRunController::class, 'index'])
+        ->name('api.settings.moderation-feed-removal-runs.index');
+    Route::post('/api/settings/moderation-feed-removal-runs/preview', [\App\Http\Controllers\ModerationFeedRemovalRunController::class, 'preview'])
+        ->name('api.settings.moderation-feed-removal-runs.preview');
+    Route::post('/api/settings/moderation-feed-removal-runs/{moderationFeedRemovalRun}/apply', [\App\Http\Controllers\ModerationFeedRemovalRunController::class, 'apply'])
+        ->name('api.settings.moderation-feed-removal-runs.apply');
     Route::get('/api/settings/library-scans/{libraryScanRun}', [\App\Http\Controllers\LibraryScanController::class, 'show'])
         ->name('api.settings.library-scans.show');
     Route::post('/api/settings/library-scans/{libraryScanRun}/pause', [\App\Http\Controllers\LibraryScanController::class, 'pause'])
