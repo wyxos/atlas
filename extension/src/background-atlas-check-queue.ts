@@ -63,6 +63,9 @@ type BackgroundAtlasCheckQueue<Result> = {
     }) => void;
 };
 
+const ATLAS_CHECK_BATCH_DELAY_MS = 700;
+const ATLAS_CHECK_MAX_BATCH_SIZE = 50;
+
 function emptyBadgeCheckResult(): BadgeMatchResult {
     return {
         exists: false,
@@ -414,8 +417,8 @@ function createBackgroundAtlasCheckQueue<Result>(
 }
 
 const badgeCheckQueue = createBackgroundAtlasCheckQueue<BadgeMatchResult>({
-    batchDelayMs: 150,
-    maxBatchSize: 50,
+    batchDelayMs: ATLAS_CHECK_BATCH_DELAY_MS,
+    maxBatchSize: ATLAS_CHECK_MAX_BATCH_SIZE,
     cacheTtlMs: 5 * 60 * 1000,
     endpointPath: '/api/extension/badges/checks',
     extendBatchWindowOnNewItem: true,
@@ -434,8 +437,8 @@ const badgeCheckQueue = createBackgroundAtlasCheckQueue<BadgeMatchResult>({
 });
 
 const referrerCheckQueue = createBackgroundAtlasCheckQueue<ReferrerMatchResult>({
-    batchDelayMs: 150,
-    maxBatchSize: 50,
+    batchDelayMs: ATLAS_CHECK_BATCH_DELAY_MS,
+    maxBatchSize: ATLAS_CHECK_MAX_BATCH_SIZE,
     cacheTtlMs: 5 * 60 * 1000,
     endpointPath: '/api/extension/referrer-checks',
     extendBatchWindowOnNewItem: true,

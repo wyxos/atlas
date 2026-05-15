@@ -20,6 +20,13 @@ describe('background-atlas-check-queue', () => {
     });
 
     it('coalesces concurrent badge checks for the same url into one fetch', async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal('crypto', {
+            ...crypto,
+            subtle: {
+                digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
+            },
+        });
         const fetchMock = vi.fn().mockImplementation((_endpoint: string, init?: RequestInit) => {
             const body = JSON.parse(String(init?.body ?? '{}')) as {
                 items?: Array<{ request_id?: string }>;
@@ -50,9 +57,8 @@ describe('background-atlas-check-queue', () => {
 
         expect(fetchMock).not.toHaveBeenCalled();
 
-        await vi.waitFor(() => {
-            expect(fetchMock).toHaveBeenCalledTimes(1);
-        });
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(700);
         const [firstResponse, secondResponse] = await Promise.all([first, second]);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -72,6 +78,12 @@ describe('background-atlas-check-queue', () => {
 
     it('coalesces concurrent referrer checks for the same url into one fetch', async () => {
         vi.useFakeTimers();
+        vi.stubGlobal('crypto', {
+            ...crypto,
+            subtle: {
+                digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
+            },
+        });
         const fetchMock = vi.fn().mockImplementation((_endpoint: string, init?: RequestInit) => {
             const body = JSON.parse(String(init?.body ?? '{}')) as {
                 items?: Array<{ request_id?: string }>;
@@ -101,7 +113,7 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(150);
+        await vi.advanceTimersByTimeAsync(700);
         const [firstResponse, secondResponse] = await Promise.all([first, second]);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -141,7 +153,7 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(120);
+        await vi.advanceTimersByTimeAsync(650);
 
         const second = enqueueGlobalReferrerCheck({
             atlasDomain: 'https://atlas.test',
@@ -150,7 +162,7 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(149);
+        await vi.advanceTimersByTimeAsync(699);
         expect(fetchMock).not.toHaveBeenCalled();
 
         await vi.advanceTimersByTimeAsync(1);
@@ -195,7 +207,7 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(120);
+        await vi.advanceTimersByTimeAsync(650);
 
         const second = enqueueGlobalBadgeCheck({
             atlasDomain: 'https://atlas.test',
@@ -204,7 +216,7 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(149);
+        await vi.advanceTimersByTimeAsync(699);
         expect(fetchMock).not.toHaveBeenCalled();
 
         await vi.advanceTimersByTimeAsync(1);
@@ -244,7 +256,7 @@ describe('background-atlas-check-queue', () => {
 
         expect(fetchMock).not.toHaveBeenCalled();
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(149);
+        await vi.advanceTimersByTimeAsync(699);
         expect(fetchMock).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);
         await Promise.all(smallBatch);
