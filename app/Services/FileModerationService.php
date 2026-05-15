@@ -9,6 +9,7 @@ use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\File;
 use App\Models\FileModerationAction;
 use App\Models\ModerationRule;
+use App\Services\Moderation\FilePromptResolver;
 use App\Services\Moderation\Moderator;
 use Illuminate\Support\Collection;
 
@@ -23,26 +24,15 @@ final class FileModerationService extends BaseModerationService
      */
     private array $recordedActions = [];
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly FilePromptResolver $promptResolver,
+    ) {
         $this->moderator = new Moderator;
     }
 
     private function getPromptForFile(File $file): ?string
     {
-        $payload = (array) optional($file->metadata)->payload;
-
-        $prompt = data_get($payload, 'prompt')
-            ?? data_get($payload, 'meta.prompt')
-            ?? data_get($file->detail_metadata, 'prompt')
-            ?? data_get($file->listing_metadata, 'meta.prompt')
-            ?? data_get($file->listing_metadata, 'meta.meta.prompt');
-
-        if (! is_string($prompt) || $prompt === '') {
-            return null;
-        }
-
-        return $prompt;
+        return $this->promptResolver->resolve($file);
     }
 
     /**
