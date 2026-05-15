@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockEnqueueReactionCheck = vi.fn();
 const mockSubmitBadgeReaction = vi.fn();
 const mockHasRelatedPostThumbnailsBelowMedia = vi.fn();
+const mockRequestCloseCurrentTab = vi.fn();
 
 vi.mock('./match-timestamp', () => ({
     formatMatchTimestamp: () => null,
@@ -52,7 +53,7 @@ vi.mock('./reaction-badge-runtime-style', () => ({
 }));
 
 vi.mock('./reaction-badge-tab-runtime', () => ({
-    requestCloseCurrentTab: vi.fn(),
+    requestCloseCurrentTab: mockRequestCloseCurrentTab,
     requestTabCount: vi.fn().mockResolvedValue(2),
     subscribeToTabCountChanged: vi.fn(() => () => {}),
 }));
@@ -128,6 +129,7 @@ describe('createReactionBadgeHost blacklist control', () => {
         await flushPromises();
 
         expect(mockSubmitBadgeReaction).toHaveBeenCalledWith(image, 'blacklist', {});
+        expect(mockRequestCloseCurrentTab).toHaveBeenCalledTimes(1);
 
         const updated = host.element.querySelector('button[aria-label="Blacklist"]') as HTMLButtonElement | null;
         expect(updated?.getAttribute('aria-pressed')).toBe('true');

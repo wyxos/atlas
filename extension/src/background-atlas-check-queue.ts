@@ -414,10 +414,11 @@ function createBackgroundAtlasCheckQueue<Result>(
 }
 
 const badgeCheckQueue = createBackgroundAtlasCheckQueue<BadgeMatchResult>({
-    batchDelayMs: 10,
-    maxBatchSize: 20,
+    batchDelayMs: 150,
+    maxBatchSize: 50,
     cacheTtlMs: 5 * 60 * 1000,
     endpointPath: '/api/extension/badges/checks',
+    extendBatchWindowOnNewItem: true,
     buildRequestItem: (requestId, entry) => ({
         request_id: requestId,
         url_hash: entry.inputHash,
@@ -433,8 +434,8 @@ const badgeCheckQueue = createBackgroundAtlasCheckQueue<BadgeMatchResult>({
 });
 
 const referrerCheckQueue = createBackgroundAtlasCheckQueue<ReferrerMatchResult>({
-    batchDelayMs: 100,
-    maxBatchSize: 20,
+    batchDelayMs: 150,
+    maxBatchSize: 50,
     cacheTtlMs: 5 * 60 * 1000,
     endpointPath: '/api/extension/referrer-checks',
     extendBatchWindowOnNewItem: true,

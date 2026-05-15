@@ -41,6 +41,8 @@ type BrowserTab = {
 const openComparableUrlByTabId = new Map<number, string>();
 const openComparableUrlCountByUrl = new Map<string, number>();
 let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
+const DISCARD_INACTIVE_TABS_BATCH_SIZE = 8;
+const DISCARD_INACTIVE_TABS_BATCH_PAUSE_MS = 50;
 
 function updateTrackedComparableTabUrl(tabId: number, nextComparableUrl: string | null): string[] {
     const previousComparableUrl = openComparableUrlByTabId.get(tabId) ?? null;
@@ -176,6 +178,12 @@ function discardTab(tabId: number): Promise<boolean> {
     });
 }
 
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
 async function discardInactiveTabs(): Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> {
     const tabs = await new Promise<BrowserTab[]>((resolve) => {
         chrome.tabs.query({}, (items: BrowserTab[]) => {
@@ -196,20 +204,32 @@ async function discardInactiveTabs(): Promise<{ discardedCount: number; failedCo
     let failedCount = 0;
     let skippedCount = 0;
 
-    await Promise.all(candidateTabs.map(async (tab) => {
+    const tabsToDiscard = candidateTabs.filter((tab): boolean => {
         if (tab.discarded === true) {
             skippedCount += 1;
-            return;
+            return false;
         }
 
-        const didDiscard = await discardTab(tab.id);
-        if (didDiscard) {
-            discardedCount += 1;
-            return;
-        }
+        return true;
+    });
 
-        failedCount += 1;
-    }));
+    for (let index = 0; index < tabsToDiscard.length; index += DISCARD_INACTIVE_TABS_BATCH_SIZE) {
+        const batch = tabsToDiscard.slice(index, index + DISCARD_INACTIVE_TABS_BATCH_SIZE);
+
+        await Promise.all(batch.map(async (tab) => {
+            const didDiscard = await discardTab(tab.id);
+            if (didDiscard) {
+                discardedCount += 1;
+                return;
+            }
+
+            failedCount += 1;
+        }));
+
+        if ((index + DISCARD_INACTIVE_TABS_BATCH_SIZE) < tabsToDiscard.length) {
+            await wait(DISCARD_INACTIVE_TABS_BATCH_PAUSE_MS);
+        }
+    }
 
     return { discardedCount, failedCount, skippedCount };
 }

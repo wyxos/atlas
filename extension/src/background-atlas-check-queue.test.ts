@@ -101,7 +101,7 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(100);
+        await vi.advanceTimersByTimeAsync(150);
         const [firstResponse, secondResponse] = await Promise.all([first, second]);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -141,7 +141,7 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(80);
+        await vi.advanceTimersByTimeAsync(120);
 
         const second = enqueueGlobalReferrerCheck({
             atlasDomain: 'https://atlas.test',
@@ -150,7 +150,61 @@ describe('background-atlas-check-queue', () => {
         });
 
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(99);
+        await vi.advanceTimersByTimeAsync(149);
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+        await Promise.all([first, second]);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? '{}')) as {
+            items?: unknown[];
+        };
+        expect(body.items).toHaveLength(2);
+    });
+
+    it('extends the badge batch window when new urls arrive before the flush', async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal('crypto', {
+            ...crypto,
+            subtle: {
+                digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
+            },
+        });
+        const fetchMock = vi.fn().mockImplementation((_endpoint: string, init?: RequestInit) => {
+            const body = JSON.parse(String(init?.body ?? '{}')) as {
+                items?: Array<{ request_id?: string }>;
+            };
+
+            return Promise.resolve(createMatchResponse(
+                (body.items ?? []).map((item) => ({
+                    request_id: item.request_id,
+                    exists: false,
+                    reaction: null,
+                })),
+            ));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { enqueueGlobalBadgeCheck } = await import('./background-atlas-check-queue');
+
+        const first = enqueueGlobalBadgeCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedMediaUrl: 'https://cdn.example.com/image-1.jpg',
+        });
+
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(120);
+
+        const second = enqueueGlobalBadgeCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedMediaUrl: 'https://cdn.example.com/image-2.jpg',
+        });
+
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(149);
         expect(fetchMock).not.toHaveBeenCalled();
 
         await vi.advanceTimersByTimeAsync(1);
@@ -182,7 +236,7 @@ describe('background-atlas-check-queue', () => {
 
         const { enqueueGlobalBadgeCheck } = await import('./background-atlas-check-queue');
 
-        const smallBatch = Array.from({ length: 19 }, (_, index) => enqueueGlobalBadgeCheck({
+        const smallBatch = Array.from({ length: 49 }, (_, index) => enqueueGlobalBadgeCheck({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
             normalizedMediaUrl: `https://cdn.example.com/small-${index}.jpg`,
@@ -190,7 +244,7 @@ describe('background-atlas-check-queue', () => {
 
         expect(fetchMock).not.toHaveBeenCalled();
         await flushPromises();
-        await vi.advanceTimersByTimeAsync(9);
+        await vi.advanceTimersByTimeAsync(149);
         expect(fetchMock).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);
         await Promise.all(smallBatch);
@@ -198,7 +252,7 @@ describe('background-atlas-check-queue', () => {
 
         fetchMock.mockClear();
 
-        const largeBatch = Array.from({ length: 20 }, (_, index) => enqueueGlobalBadgeCheck({
+        const largeBatch = Array.from({ length: 50 }, (_, index) => enqueueGlobalBadgeCheck({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token',
             normalizedMediaUrl: `https://cdn.example.com/large-${index}.jpg`,

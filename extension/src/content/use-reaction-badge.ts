@@ -434,16 +434,15 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
                 ...(downloadBehavior !== undefined ? { downloadBehavior } : {}),
             });
             const closeTabAfterQueueMode = closeTabAfterQueuePreference.mode.value;
-            const shouldAutoCloseCurrentTab = !isBlacklist
-                && result.ok
+            const shouldAutoCloseCurrentTab = result.ok
                 && closeTabAfterQueueMode !== 'off'
-                && result.shouldCloseTabAfterQueue;
+                && (isBlacklist || result.shouldCloseTabAfterQueue);
 
             // DeviantArt gallery navigation can replace the active media node and unmount this
             // badge instance before the batch submit resolves. The tab-close side effect still
             // belongs to the successful submit, even if this component instance is now stale.
             if (shouldAutoCloseCurrentTab) {
-                if (closeTabAfterQueueMode === 'queued') {
+                if (isBlacklist || closeTabAfterQueueMode === 'queued') {
                     void requestCloseCurrentTab();
                 } else {
                     queueCloseCurrentTabAfterDownloadComplete(result.downloadCloseTargets);

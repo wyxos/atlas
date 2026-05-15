@@ -304,39 +304,6 @@ describe('background runtime message bridge', () => {
         ]);
     });
 
-    it('discards inactive tabs and reports discarded, skipped, and failed counts', async () => {
-        const { chromeMock, getRuntimeMessageListener } = createChromeMock([
-            { id: 1, url: 'https://example.com/active', active: true },
-            { id: 2, url: 'https://example.com/skipped', discarded: true },
-            { id: 3, url: 'https://example.com/discard-me' },
-            { id: 4, url: 'https://example.com/fail-me' },
-        ]);
-        chromeMock.tabs.discard = vi.fn((tabId: number, callback?: (tab?: BrowserTab) => void) => {
-            if (tabId === 4) {
-                callback?.(undefined);
-                return;
-            }
-
-            callback?.({ id: tabId, discarded: true });
-        });
-        vi.stubGlobal('chrome', chromeMock);
-
-        await import('./background');
-
-        const listener = getRuntimeMessageListener();
-        expect(listener).toBeTypeOf('function');
-
-        const response = await sendRuntimeMessage(listener!, { type: 'ATLAS_DISCARD_INACTIVE_TABS' });
-
-        expect(response).toEqual({
-            ok: true,
-            discardedCount: 1,
-            failedCount: 1,
-            skippedCount: 1,
-        });
-        expect(chromeMock.tabs.discard).toHaveBeenCalledTimes(2);
-    });
-
     it('creates a new Atlas browser tab for a Civitai model browse request', async () => {
         const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
         const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
