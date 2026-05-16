@@ -1,6 +1,5 @@
 import { onMounted, onUnmounted, triggerRef, type Ref, type ShallowRef } from 'vue';
 import type { FeedItem, TabData } from './useTabs';
-import type { BrowseFeedHandle } from '@/types/browse';
 
 type EchoChannel = {
     listen: (event: string, callback: (payload: unknown) => void) => void;
@@ -20,16 +19,10 @@ type PreviewFailureResponse = {
 type UseTabContentNotFoundReconciliationOptions = {
     items: ShallowRef<FeedItem[]>;
     tab: Ref<TabData | null>;
-    masonry: Ref<BrowseFeedHandle | null>;
-    hoveredItemId: Ref<number | null>;
-    clearHover: () => void;
 };
-
-const NOT_FOUND_REMOVAL_DELAY_MS = 5000;
 
 export function useTabContentNotFoundReconciliation(options: UseTabContentNotFoundReconciliationOptions) {
     const previewFailureReportInFlightIds = new Set<number>();
-    const notFoundRemovalTimers = new Map<number, number>();
 
     let echoChannelName: string | null = null;
 
@@ -60,44 +53,6 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
         return isCivitAiMediaUrl(item.preview ?? item.src)
             || isCivitAiMediaUrl(item.original)
             || isCivitAiMediaUrl(item.url);
-    }
-
-    function clearNotFoundRemovalTimers(): void {
-        for (const timerId of notFoundRemovalTimers.values()) {
-            clearTimeout(timerId);
-        }
-
-        notFoundRemovalTimers.clear();
-    }
-
-    function scheduleNotFoundRemoval(fileId: number): void {
-        const existingTimerId = notFoundRemovalTimers.get(fileId);
-
-        if (existingTimerId !== undefined) {
-            clearTimeout(existingTimerId);
-        }
-
-        const timerId = window.setTimeout(() => {
-            notFoundRemovalTimers.delete(fileId);
-
-            const item = options.items.value.find((candidate) => candidate.id === fileId);
-            if (!item) {
-                return;
-            }
-
-            if (options.hoveredItemId.value === fileId) {
-                options.clearHover();
-            }
-
-            const removeResult = options.masonry.value?.remove(item);
-            if (removeResult !== undefined) {
-                void Promise.resolve(removeResult).catch((error: unknown) => {
-                    console.error('Failed to remove not-found item from masonry:', error);
-                });
-            }
-        }, NOT_FOUND_REMOVAL_DELAY_MS);
-
-        notFoundRemovalTimers.set(fileId, timerId);
     }
 
     function normalizeTabIds(value: unknown): number[] {
@@ -131,7 +86,6 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
     function markItemNotFound(item: FeedItem): void {
         item.notFound = true;
         triggerRef(options.items);
-        scheduleNotFoundRemoval(item.id);
     }
 
     function handleFileMarkedNotFound(payload: unknown): void {
@@ -227,7 +181,6 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
     });
 
     onUnmounted(() => {
-        clearNotFoundRemovalTimers();
         stopEchoListeners();
     });
 

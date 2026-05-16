@@ -146,9 +146,6 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     const notFoundReconciliation = useTabContentNotFoundReconciliation({
         items: options.items,
         tab: options.tab,
-        masonry: options.masonry,
-        hoveredItemId,
-        clearHover: clearHoverState,
     });
 
     function findNearestVideoElement(from: EventTarget | null): HTMLVideoElement | null {
