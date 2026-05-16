@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AudioIdListingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AudioController extends Controller
 {
@@ -34,6 +35,6 @@ class AudioController extends Controller
             'ids.*' => ['required', 'integer', 'min:1'],
         ]);
 
-        return response()->json($listing->fetchDetails($validated['ids']));
+        return response()->json($listing->fetchDetails($validated['ids'], Auth::id()));
     }
 }

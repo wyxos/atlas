@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\File;
+use App\Support\FileApiPath;
 use Illuminate\Support\Facades\DB;
 
 class AudioIdListingService
@@ -86,11 +87,17 @@ class AudioIdListingService
      *         title: string|null,
      *         source: string|null,
      *         artists: list<string>,
-     *         albums: list<string>
+     *         albums: list<string>,
+     *         cover_url: string|null,
+     *         duration_seconds: int|null,
+     *         reaction: array{type:string}|null,
+     *         blacklisted_at: string|null,
+     *         previewed_count: int,
+     *         seen_count: int
      *     }>
      * }
      */
-    public function fetchDetails(array $ids): array
+    public function fetchDetails(array $ids, ?int $userId = null): array
     {
         $ids = array_values(array_filter(array_unique(array_map(
             static fn ($id): int => (int) $id,
@@ -102,12 +109,27 @@ class AudioIdListingService
         }
 
         $filesById = File::query()
-            ->select(['id', 'title', 'filename', 'source'])
+            ->select([
+                'id',
+                'title',
+                'filename',
+                'source',
+                'listing_metadata',
+                'preview_url',
+                'preview_path',
+                'poster_path',
+                'blacklisted_at',
+                'previewed_count',
+                'seen_count',
+            ])
             ->whereIn('id', $ids)
             ->where('mime_type', 'like', 'audio/%')
             ->with([
                 'metadata:file_id,payload',
                 'containers:id,type,source_id',
+                'reactions' => fn ($query) => $query
+                    ->select(['id', 'file_id', 'user_id', 'type'])
+                    ->where('user_id', $userId ?? 0),
             ])
             ->get()
             ->keyBy('id');
@@ -157,6 +179,7 @@ class AudioIdListingService
 
             $title = trim((string) (data_get($payload, 'title') ?? $file->title ?? $file->filename ?? ''));
             $source = trim((string) ($file->source ?? ''));
+            $reaction = $file->reactions->first();
 
             $items[] = [
                 'id' => (int) $file->id,
@@ -164,10 +187,63 @@ class AudioIdListingService
                 'source' => $source !== '' ? $source : null,
                 'artists' => $artists,
                 'albums' => $albums,
+                'cover_url' => $this->coverUrl($file),
+                'duration_seconds' => $this->durationSeconds($file, $payload),
+                'reaction' => $reaction ? ['type' => (string) $reaction->type] : null,
+                'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
+                'previewed_count' => (int) ($file->previewed_count ?? 0),
+                'seen_count' => (int) ($file->seen_count ?? 0),
             ];
         }
 
         return ['items' => $items];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function durationSeconds(File $file, array $payload): ?int
+    {
+        $seconds = data_get($payload, 'duration_seconds')
+            ?? data_get($payload, 'duration')
+            ?? data_get($payload, 'probe.format.duration')
+            ?? data_get($file->listing_metadata, 'duration_seconds');
+
+        if (! is_numeric($seconds)) {
+            $streams = data_get($payload, 'probe.streams');
+            if (is_array($streams)) {
+                foreach ($streams as $stream) {
+                    $streamDuration = is_array($stream) ? ($stream['duration'] ?? null) : null;
+                    if (is_numeric($streamDuration)) {
+                        $seconds = $streamDuration;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (! is_numeric($seconds)) {
+            return null;
+        }
+
+        $normalized = (int) round((float) $seconds);
+
+        return $normalized > 0 ? $normalized : null;
+    }
+
+    private function coverUrl(File $file): ?string
+    {
+        if (is_string($file->poster_path) && trim($file->poster_path) !== '') {
+            return FileApiPath::poster((int) $file->id);
+        }
+
+        if (is_string($file->preview_path) && trim($file->preview_path) !== '') {
+            return FileApiPath::preview((int) $file->id);
+        }
+
+        $previewUrl = trim((string) ($file->preview_url ?? ''));
+
+        return $previewUrl !== '' ? $previewUrl : null;
     }
 
     /**

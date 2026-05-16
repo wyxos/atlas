@@ -196,6 +196,25 @@ describe('FileReactions', () => {
         expect(wrapper.find('button[aria-label="Blacklist"]').exists()).toBe(false);
     });
 
+    it('can show blacklist in reaction-only mode without the default surface', () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                mode: 'reaction-only',
+                variant: 'small',
+                showBlacklist: true,
+                surface: 'none',
+                iconSize: 22,
+                reaction: null,
+            },
+        });
+
+        expect(wrapper.get('[data-test="file-reactions"]').classes()).toContain('gap-3');
+        expect(wrapper.get('[data-test="file-reactions"]').classes()).not.toContain('bg-black/60');
+        expect(wrapper.find('button[aria-label="Blacklist"]').exists()).toBe(true);
+        expect(wrapper.get('button[aria-label="Blacklist"] svg').attributes('width')).toBe('22');
+    });
+
     it('updates reaction display when reaction prop changes', async () => {
         const wrapper = mount(FileReactions, {
             props: {

@@ -1,45 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
+import AudioPlaylistPanel from '../components/AudioPlaylistPanel.vue';
+import AudioTrackRow from '../components/AudioTrackRow.vue';
 import VirtualList from '../components/VirtualList.vue';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
-
-type AudioIdsResponse = {
-    ids: number[];
-    sources: Record<number, string | null>;
-    cursor: {
-        after_id: number;
-        next_after_id: number | null;
-        has_more: boolean;
-        max_id: number;
-    };
-    pagination: {
-        per_page: number;
-        total: number | null;
-        total_pages: number | null;
-    };
-};
-
-type AudioDetailsResponse = {
-    items: Array<{
-        id: number;
-        title: string | null;
-        source: string | null;
-        artists: string[];
-        albums: string[];
-    }>;
-};
-
-type AudioDetail = {
-    title: string | null;
-    source: string | null;
-    artists: string[];
-    albums: string[];
-};
-
-type AudioSourceFilter = 'all' | 'spotify' | 'local';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import type { AudioDetail, AudioDetailsResponse, AudioIdsResponse, AudioSourceFilter } from '@/types/audio';
+import type { ReactionType } from '@/types/reaction';
 
 const PER_PAGE = 100;
 const SCROLL_IDLE_MS = 180;
@@ -53,6 +21,7 @@ const totalAudioFiles = ref(0);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const isFilterSheetOpen = ref(false);
+const isPlaylistPanelOpen = ref(false);
 const activeFilter = ref<AudioSourceFilter>('all');
 const showProgressPanel = ref(true);
 const visibleIds = ref<number[]>([]);
@@ -178,16 +147,22 @@ function hasDetails(audioId: number): boolean {
     return detailsById.value[audioId] !== undefined;
 }
 
-function detailSubtitle(audioId: number): string {
+function detailArtists(audioId: number): string {
     const details = detailsById.value[audioId];
     if (!details) {
         return 'Loading metadata...';
     }
 
-    const artists = details.artists.length > 0 ? details.artists.join(', ') : 'Unknown artist';
-    const albums = details.albums.length > 0 ? details.albums.join(', ') : 'Unknown album';
+    return details.artists.length > 0 ? details.artists.join(', ') : 'Unknown artist';
+}
 
-    return `${artists} • ${albums}`;
+function detailAlbum(audioId: number): string {
+    const details = detailsById.value[audioId];
+    if (!details) {
+        return 'Loading metadata...';
+    }
+
+    return details.albums.length > 0 ? details.albums[0] ?? 'Unknown album' : 'Unknown album';
 }
 
 function detailSource(audioId: number): string | null {
@@ -200,18 +175,84 @@ function sourceForAudioId(audioId: number): string | null {
     return detailSource(audioId);
 }
 
-function isSpotifySource(source: string | null): boolean {
-    return source !== null && source.toLowerCase() === 'spotify';
+function detailCoverUrl(audioId: number): string | null {
+    return detailsById.value[audioId]?.cover_url ?? null;
 }
 
-function isSpotifyTrack(audioId: number): boolean {
-    return isSpotifySource(detailSource(audioId));
+function detailReaction(audioId: number): { type: ReactionType } | null {
+    return detailsById.value[audioId]?.reaction ?? null;
 }
 
-function sourceTooltip(audioId: number): string {
-    const source = detailSource(audioId);
+function detailBlacklistedAt(audioId: number): string | null {
+    return detailsById.value[audioId]?.blacklisted_at ?? null;
+}
 
-    return source ? `Source: ${source}` : 'Source: Unknown';
+function detailPreviewedCount(audioId: number): number {
+    return detailsById.value[audioId]?.previewed_count ?? 0;
+}
+
+function detailSeenCount(audioId: number): number {
+    return detailsById.value[audioId]?.seen_count ?? 0;
+}
+
+function detailDuration(audioId: number): string {
+    const seconds = detailsById.value[audioId]?.duration_seconds;
+    if (!seconds || seconds <= 0) {
+        return '--:--';
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+async function handleAudioReaction(audioId: number, type: ReactionType): Promise<void> {
+    const { data } = await window.axios.post<{ reaction: { type: ReactionType } }>(`/api/files/${audioId}/reaction`, {
+        type,
+    });
+    const details = detailsById.value[audioId];
+    if (!details) {
+        return;
+    }
+
+    detailsById.value = {
+        ...detailsById.value,
+        [audioId]: {
+            ...details,
+            reaction: data.reaction,
+        },
+    };
+}
+
+async function handleAudioBlacklist(audioId: number): Promise<void> {
+    const details = detailsById.value[audioId];
+    if (!details || details.blacklisted_at) {
+        return;
+    }
+
+    const { data } = await window.axios.post<{
+        results?: Array<{
+            id: number;
+            blacklisted_at: string | null;
+            previewed_count?: number;
+        }>;
+    }>('/api/files/blacklist/batch', {
+        file_ids: [audioId],
+    });
+    const result = data.results?.find((item) => item.id === audioId);
+    if (!result) {
+        return;
+    }
+
+    detailsById.value = {
+        ...detailsById.value,
+        [audioId]: {
+            ...details,
+            blacklisted_at: result.blacklisted_at,
+            previewed_count: result.previewed_count ?? details.previewed_count,
+        },
+    };
 }
 
 function cancelActiveRequest() {
@@ -283,6 +324,12 @@ async function fetchVisibleDetails(): Promise<void> {
                 source: item.source,
                 artists: item.artists,
                 albums: item.albums,
+                cover_url: item.cover_url,
+                duration_seconds: item.duration_seconds,
+                reaction: item.reaction,
+                blacklisted_at: item.blacklisted_at,
+                previewed_count: item.previewed_count,
+                seen_count: item.seen_count,
             };
         }
 
@@ -296,6 +343,12 @@ async function fetchVisibleDetails(): Promise<void> {
                 source: null,
                 artists: [],
                 albums: [],
+                cover_url: null,
+                duration_seconds: null,
+                reaction: null,
+                blacklisted_at: null,
+                previewed_count: 0,
+                seen_count: 0,
             };
         }
 
@@ -351,22 +404,9 @@ onUnmounted(() => {
 <template>
     <PageLayout flush>
         <div class="relative flex h-full min-h-0 w-full flex-col overflow-hidden" data-test="audio-page">
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                data-test="audio-filter-cta"
-                class="absolute right-4 top-4 z-10 shrink-0"
-                @click="isFilterSheetOpen = true"
-            >
-                Filter: {{ activeFilterLabel }}
-            </Button>
             <Sheet v-model:open="isFilterSheetOpen">
                 <SheetContent side="right" class="w-full sm:max-w-sm">
-                    <SheetHeader>
-                        <SheetTitle>Audio Filter</SheetTitle>
-                    </SheetHeader>
-                    <div class="mt-6 space-y-4 px-6" data-test="audio-filter-sheet-body">
+                    <div class="space-y-4 px-6 pt-12" data-test="audio-filter-sheet-body">
                         <p class="text-xs font-semibold uppercase tracking-wide text-twilight-indigo-200">Source</p>
                         <div class="inline-flex rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-1">
                             <Button
@@ -439,9 +479,39 @@ onUnmounted(() => {
             </div>
             <div
                 v-else
-                class="flex min-h-0 flex-1 flex-col border border-twilight-indigo-500 bg-prussian-blue-700"
-                data-test="audio-list-shell"
+                class="flex min-h-0 flex-1"
+                data-test="audio-library-surface"
             >
+                <AudioPlaylistPanel v-if="isPlaylistPanelOpen" />
+                <div
+                    class="flex min-h-0 flex-1 flex-col border border-twilight-indigo-500 bg-prussian-blue-700"
+                    data-test="audio-list-shell"
+                >
+                <div
+                    class="flex h-10 shrink-0 items-center justify-between border-b border-twilight-indigo-500/70 px-3 md:px-4"
+                    data-test="audio-list-header"
+                >
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-test="audio-playlists-cta"
+                        class="h-7 shrink-0 px-2 text-xs"
+                        @click="isPlaylistPanelOpen = !isPlaylistPanelOpen"
+                    >
+                        Playlists
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-test="audio-filter-cta"
+                        class="h-7 shrink-0 px-2 text-xs"
+                        @click="isFilterSheetOpen = true"
+                    >
+                        Filter: {{ activeFilterLabel }}
+                    </Button>
+                </div>
                 <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>
                 <div v-else-if="filteredAudioIds.length === 0" class="p-4 text-twilight-indigo-100">
                     No audio files match this filter.
@@ -449,41 +519,36 @@ onUnmounted(() => {
                 <VirtualList
                     v-else
                     :items="filteredAudioIds"
-                    :item-height="64"
+                    :item-height="72"
                     :overscan="4"
                     container-class="min-h-0 flex-1 overflow-y-auto"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"
                 >
-                    <template #default="{ items }">
-                        <ul class="divide-y divide-twilight-indigo-500">
-                            <li
-                                v-for="audioId in items"
+                    <template #default="{ items, startIndex }">
+                        <ul class="divide-y divide-twilight-indigo-500/70">
+                            <AudioTrackRow
+                                v-for="(audioId, index) in items"
                                 :key="audioId"
-                                class="h-16 px-4 text-twilight-indigo-100 flex flex-col justify-center gap-1"
-                            >
-                                <p class="font-mono text-xs text-blue-slate-300">#{{ audioId }}</p>
-                                <template v-if="hasDetails(audioId)">
-                                    <div class="flex min-w-0 items-center gap-2">
-                                        <p class="truncate text-sm">{{ detailTitle(audioId) }}</p>
-                                        <span
-                                            v-if="isSpotifyTrack(audioId)"
-                                            class="inline-flex shrink-0 items-center rounded border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100"
-                                            :title="sourceTooltip(audioId)"
-                                        >
-                                            Spotify
-                                        </span>
-                                    </div>
-                                    <p class="truncate text-xs text-blue-slate-300">{{ detailSubtitle(audioId) }}</p>
-                                </template>
-                                <template v-else>
-                                    <Skeleton class="h-4 w-2/3 bg-prussian-blue-500/60" />
-                                    <Skeleton class="h-3 w-1/2 bg-prussian-blue-500/60" />
-                                </template>
-                            </li>
+                                :audio-id="audioId"
+                                :display-index="startIndex + index + 1"
+                                :is-loaded="hasDetails(audioId)"
+                                :title="detailTitle(audioId)"
+                                :artists="detailArtists(audioId)"
+                                :album="detailAlbum(audioId)"
+                                :cover-url="detailCoverUrl(audioId)"
+                                :reaction="detailReaction(audioId)"
+                                :blacklisted-at="detailBlacklistedAt(audioId)"
+                                :previewed-count="detailPreviewedCount(audioId)"
+                                :seen-count="detailSeenCount(audioId)"
+                                :duration="detailDuration(audioId)"
+                                @reaction="handleAudioReaction"
+                                @blacklist="handleAudioBlacklist"
+                            />
                         </ul>
                     </template>
                 </VirtualList>
+                </div>
             </div>
         </div>
     </PageLayout>

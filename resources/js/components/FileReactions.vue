@@ -14,6 +14,9 @@ interface Props {
     totalItems?: number;
     variant?: 'default' | 'small';
     mode?: 'default' | 'reaction-only';
+    showBlacklist?: boolean;
+    surface?: 'default' | 'none';
+    iconSize?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -26,6 +29,9 @@ const props = withDefaults(defineProps<Props>(), {
     totalItems: undefined,
     variant: 'default',
     mode: 'default',
+    showBlacklist: false,
+    surface: 'default',
+    iconSize: 18,
 });
 
 const emit = defineEmits<{
@@ -72,11 +78,16 @@ function handleBlacklistClick(): void {
 // Computed properties for variant checks
 const isSmall = computed(() => props.variant === 'small');
 const isReactionOnly = computed(() => props.mode === 'reaction-only');
+const shouldShowBlacklist = computed(() => !isReactionOnly.value || props.showBlacklist);
+const hasDefaultSurface = computed(() => props.surface === 'default');
 
 // Computed properties for styling classes
 const containerClasses = computed(() => [
-    'flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg',
-    isSmall.value ? 'gap-2 px-2 py-1' : 'gap-4 px-4 py-2'
+    'flex items-center justify-center',
+    hasDefaultSurface.value ? 'rounded-lg bg-black/60 backdrop-blur-sm' : '',
+    isSmall.value
+        ? (hasDefaultSurface.value ? 'gap-2 px-2 py-1' : 'gap-3')
+        : (hasDefaultSurface.value ? 'gap-4 px-4 py-2' : 'gap-4')
 ]);
 
 const separatorHeight = computed(() => isSmall.value ? 'h-4' : 'h-6');
@@ -96,7 +107,7 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
 </script>
 
 <template>
-    <div @click.stop :class="containerClasses">
+    <div data-test="file-reactions" @click.stop :class="containerClasses">
         <!-- Reaction Icons -->
         <div class="flex items-center gap-2">
             <!-- Favorite -->
@@ -105,7 +116,7 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
                 isSmall ? 'p-1' : 'p-2',
                 favorite ? 'bg-red-500 text-white' : 'text-white hover:text-red-400'
             ]" aria-label="Favorite">
-                <Heart :size="18" />
+                <Heart :size="iconSize" />
             </button>
 
             <!-- Like -->
@@ -114,12 +125,12 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
                 isSmall ? 'p-1' : 'p-2',
                 like ? 'bg-smart-blue-500 text-white' : 'text-white hover:text-smart-blue-400'
             ]" aria-label="Like">
-                <ThumbsUp :size="18" />
+                <ThumbsUp :size="iconSize" />
             </button>
 
             <!-- Blacklist -->
             <button
-                v-if="!isReactionOnly"
+                v-if="shouldShowBlacklist"
                 @click="handleBlacklistClick"
                 :disabled="blacklisted"
                 :aria-pressed="blacklisted"
@@ -130,7 +141,7 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
                 ]"
                 aria-label="Blacklist"
             >
-                <Ban :size="18" />
+                <Ban :size="iconSize" />
             </button>
 
             <!-- Funny -->
@@ -139,7 +150,7 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
                 isSmall ? 'p-1' : 'p-2',
                 funny ? 'bg-yellow-500 text-white' : 'text-white hover:text-yellow-400'
             ]" aria-label="Funny">
-                <Smile :size="18" />
+                <Smile :size="iconSize" />
             </button>
         </div>
 

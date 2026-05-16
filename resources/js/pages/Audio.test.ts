@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import Audio from './Audio.vue';
 import PageLayout from '../components/PageLayout.vue';
 import VirtualList from '../components/VirtualList.vue';
+import type { ReactionType } from '@/types/reaction';
 
 type AudioIdsResponse = {
     ids: number[];
@@ -27,8 +28,16 @@ type AudioDetailsResponse = {
         source: string | null;
         artists: string[];
         albums: string[];
+        cover_url: string | null;
+        duration_seconds: number | null;
+        reaction: { type: ReactionType } | null;
+        blacklisted_at: string | null;
+        previewed_count: number;
+        seen_count: number;
     }>;
 };
+
+type AudioDetailsItem = AudioDetailsResponse['items'][number];
 
 function createDeferred<T>() {
     let resolve: ((value: T | PromiseLike<T>) => void) | null = null;
@@ -50,6 +59,22 @@ const mockAxios = {
     get: vi.fn(),
     post: vi.fn(),
 };
+
+function audioDetail(overrides: Partial<AudioDetailsItem> & Pick<AudioDetailsItem, 'id'>): AudioDetailsItem {
+    return {
+        title: `Track ${overrides.id}`,
+        source: null,
+        artists: [],
+        albums: [],
+        cover_url: null,
+        duration_seconds: null,
+        reaction: null,
+        blacklisted_at: null,
+        previewed_count: 0,
+        seen_count: 0,
+        ...overrides,
+    };
+}
 
 beforeEach(() => {
     vi.useFakeTimers();
@@ -109,9 +134,9 @@ describe('Audio', () => {
         mockAxios.post.mockResolvedValue({
             data: {
                 items: [
-                    { id: 101, title: 'Track 101', source: 'Spotify', artists: ['Artist A'], albums: ['Album A'] },
-                    { id: 202, title: 'Track 202', source: 'YouTube', artists: ['Artist B'], albums: ['Album B'] },
-                    { id: 303, title: 'Track 303', source: null, artists: ['Artist C'], albums: ['Album C'] },
+                    audioDetail({ id: 101, title: 'Track 101', source: 'Spotify', artists: ['Artist A'], albums: ['Album A'] }),
+                    audioDetail({ id: 202, title: 'Track 202', source: 'YouTube', artists: ['Artist B'], albums: ['Album B'] }),
+                    audioDetail({ id: 303, title: 'Track 303', source: null, artists: ['Artist C'], albums: ['Album C'] }),
                 ],
             } satisfies AudioDetailsResponse,
         });
@@ -204,7 +229,6 @@ describe('Audio', () => {
             signal: expect.any(AbortSignal),
         }));
         expect(wrapper.text()).toContain('Track 101');
-        expect(wrapper.text()).toContain('Spotify');
         expect(wrapper.text()).not.toContain('Not Spotify');
         expect(wrapper.text()).toContain('Artist A');
         expect(wrapper.text()).toContain('Album A');
@@ -234,7 +258,7 @@ describe('Audio', () => {
         mockAxios.post.mockResolvedValue({
             data: {
                 items: [
-                    { id: 1, title: 'Track 1', source: 'Spotify', artists: ['Artist 1'], albums: ['Album 1'] },
+                    audioDetail({ id: 1, title: 'Track 1', source: 'Spotify', artists: ['Artist 1'], albums: ['Album 1'] }),
                 ],
             } satisfies AudioDetailsResponse,
         });
@@ -255,7 +279,174 @@ describe('Audio', () => {
             'flex-1',
             'flex-col',
         ]));
+        expect(wrapper.get('[data-test="audio-list-header"]').classes()).toEqual(expect.arrayContaining([
+            'h-10',
+            'justify-between',
+            'border-b',
+        ]));
+        expect(wrapper.get('[data-test="audio-list-header"]').text()).toContain('Playlists');
+        expect(wrapper.get('[data-test="audio-list-header"]').text()).toContain('Filter: All');
         expect(wrapper.findComponent(VirtualList).props('containerClass')).toBe('min-h-0 flex-1 overflow-y-auto');
+        expect(wrapper.findComponent(VirtualList).props('itemHeight')).toBe(72);
+    });
+
+    it('opens a non-overlay playlist panel beside the audio list', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                ids: [1],
+                sources: {
+                    1: 'Spotify',
+                },
+                cursor: {
+                    after_id: 0,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 1,
+                },
+                pagination: {
+                    per_page: 100,
+                    total: 1,
+                    total_pages: 1,
+                },
+            } satisfies AudioIdsResponse,
+        });
+
+        mockAxios.post.mockResolvedValue({
+            data: {
+                items: [
+                    audioDetail({ id: 1, title: 'Track 1', source: 'Spotify', artists: ['Artist 1'], albums: ['Album 1'] }),
+                ],
+            } satisfies AudioDetailsResponse,
+        });
+
+        const wrapper = mount(Audio);
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
+
+        await wrapper.get('[data-test="audio-playlists-cta"]').trigger('click');
+
+        expect(wrapper.get('[data-test="audio-library-surface"]').classes()).toContain('flex');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').classes()).toEqual(expect.arrayContaining([
+            'w-72',
+            'shrink-0',
+            'md:flex',
+        ]));
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).not.toContain('PLAYLISTS');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Spotify favorites');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Source: Spotify / Reaction: favorite');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Banned from feed');
+        expect(wrapper.get('[data-test="audio-add-playlist-cta"]').text()).toBe('Add playlist');
+    });
+
+    it('renders desktop rows with Spotify-style columns and routes reactions', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                ids: [7],
+                sources: {
+                    7: 'Spotify',
+                },
+                cursor: {
+                    after_id: 0,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 7,
+                },
+                pagination: {
+                    per_page: 100,
+                    total: 1,
+                    total_pages: 1,
+                },
+            } satisfies AudioIdsResponse,
+        });
+
+        mockAxios.post.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/details') {
+                return {
+                    data: {
+                        items: [
+                            audioDetail({
+                                id: 7,
+                                title: 'Seed Track',
+                                source: 'Spotify',
+                                artists: ['Artist A', 'Artist B'],
+                                albums: ['Album A'],
+                                cover_url: '/api/files/7/poster',
+                                duration_seconds: 185,
+                                reaction: { type: 'love' },
+                            }),
+                        ],
+                    } satisfies AudioDetailsResponse,
+                };
+            }
+
+            if (url === '/api/files/7/reaction') {
+                return {
+                    data: {
+                        reaction: { type: 'like' },
+                    },
+                };
+            }
+
+            if (url === '/api/files/blacklist/batch') {
+                return {
+                    data: {
+                        results: [
+                            {
+                                id: 7,
+                                blacklisted_at: '2026-05-16T10:00:00+04:00',
+                                previewed_count: 99999,
+                            },
+                        ],
+                    },
+                };
+            }
+
+            throw new Error(`Unexpected post URL: ${url}`);
+        });
+
+        const wrapper = mount(Audio);
+        await flushPromises();
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        const row = wrapper.get('li');
+        expect(row.classes()).toContain('grid');
+        expect(row.classes()).toContain('grid-cols-[2.5rem_minmax(0,1fr)_3rem]');
+        expect(row.classes()).toContain('md:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_minmax(10rem,auto)_5rem]');
+        expect(row.classes()).toContain('gap-2');
+        expect(row.classes()).toContain('md:gap-4');
+        expect(row.text()).toContain('1');
+        expect(row.text()).toContain('Seed Track');
+        expect(row.text()).toContain('Artist A, Artist B');
+        expect(row.text()).toContain('Album A');
+        expect(row.text()).toContain('3:05');
+        expect(row.find('img').attributes('src')).toBe('/api/files/7/poster');
+        expect(row.get('[data-test="audio-track-title-cell"]').classes()).toContain('min-w-0');
+        expect(row.get('[data-test="audio-track-album"]').classes()).toContain('hidden');
+        expect(row.get('[data-test="audio-track-album"]').classes()).toContain('md:block');
+        expect(row.get('[data-test="audio-track-duration"]').classes()).toContain('tabular-nums');
+        expect(row.get('[aria-label="Favorite"]').exists()).toBe(true);
+        expect(row.get('[aria-label="Blacklist"]').exists()).toBe(true);
+        expect(row.get('[data-test="file-reactions"]').classes()).toContain('gap-3');
+        expect(row.get('[data-test="file-reactions"]').classes()).not.toContain('bg-black/60');
+        expect(row.get('[aria-label="Blacklist"] svg').attributes('width')).toBe('23');
+
+        await row.get('[aria-label="Like"]').trigger('click');
+        await flushPromises();
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/7/reaction', {
+            type: 'like',
+        });
+
+        await row.get('[aria-label="Blacklist"]').trigger('click');
+        await flushPromises();
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/blacklist/batch', {
+            file_ids: [7],
+        });
+        expect(row.get('[aria-label="Blacklist"]').attributes('disabled')).toBeDefined();
     });
 
     it('debounces scroll and fetches unseen visible item details only', async () => {
@@ -282,11 +473,13 @@ describe('Audio', () => {
         mockAxios.post.mockImplementation(async (_url: string, payload: { ids: number[] }) => ({
             data: {
                 items: payload.ids.map((id) => ({
-                    id,
-                    title: `Track ${id}`,
-                    source: id % 2 === 0 ? 'Spotify' : 'Local',
-                    artists: [`Artist ${id}`],
-                    albums: [`Album ${id}`],
+                    ...audioDetail({
+                        id,
+                        title: `Track ${id}`,
+                        source: id % 2 === 0 ? 'Spotify' : 'Local',
+                        artists: [`Artist ${id}`],
+                        albums: [`Album ${id}`],
+                    }),
                 })),
             } satisfies AudioDetailsResponse,
         }));

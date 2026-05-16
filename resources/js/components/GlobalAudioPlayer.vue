@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+    Ban,
     Heart,
     ListMusic,
     MoreVertical,
@@ -10,20 +11,22 @@ import {
     SkipBack,
     SkipForward,
     Smile,
-    ThumbsDown,
     ThumbsUp,
     Volume2,
 } from 'lucide-vue-next';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const controlButtonClass = [
     'player-control-button inline-flex size-12 items-center justify-center rounded-full 2xl:size-14',
-    'cursor-default text-blue-slate-300 transition-colors hover:bg-smart-blue-700 hover:text-white',
+    'text-blue-slate-300 transition-colors',
+    'enabled:cursor-pointer enabled:hover:bg-smart-blue-700 enabled:hover:text-white',
+    'disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50',
     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-500',
 ].join(' ');
 
 const reactionButtonClass = [
     'inline-flex items-center justify-center rounded p-1.5 text-white transition-colors',
-    'disabled:cursor-default disabled:opacity-100',
+    'enabled:cursor-pointer disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50',
 ].join(' ');
 </script>
 
@@ -42,53 +45,51 @@ const reactionButtonClass = [
                     <Music class="size-6 max-h-full max-w-full text-smart-blue-100 md:size-10 2xl:size-12" />
                 </div>
                 <div class="min-w-0 self-center text-center md:text-left lg:py-3" data-test="global-audio-player-details">
-                    <p
-                        class="truncate text-sm font-semibold text-regal-navy-100 md:max-lg:pl-[18px] 2xl:pl-[18px]"
+                    <Skeleton
+                        class="h-4 w-40 bg-prussian-blue-500/60 max-md:mx-auto"
                         data-test="global-audio-player-title"
-                    >
-                        No audio selected
-                    </p>
-                    <p
-                        class="truncate text-xs text-blue-slate-300 md:max-lg:pl-[18px] 2xl:pl-[18px]"
+                        aria-hidden="true"
+                    />
+                    <Skeleton
+                        class="mt-2 h-3 w-28 bg-prussian-blue-500/60 max-md:mx-auto"
                         data-test="global-audio-player-subtitle"
-                    >
-                        Atlas player
-                    </p>
+                        aria-hidden="true"
+                    />
                     <div
-                        class="mt-2 flex w-fit items-center justify-center gap-2 rounded-lg bg-black/60 px-2 py-1 backdrop-blur-sm max-lg:mx-auto max-lg:gap-2.5 max-lg:px-3 max-lg:py-1.5 2xl:mt-3 2xl:gap-2.5 2xl:px-3 2xl:py-1.5"
+                        class="mt-2 flex w-fit items-center justify-center gap-3 max-lg:mx-auto md:gap-2.5 2xl:mt-3 2xl:gap-3"
                         data-test="global-audio-player-reactions"
                     >
                         <button
                             type="button"
-                            :class="[reactionButtonClass, 'hover:text-red-400']"
+                            :class="[reactionButtonClass, 'enabled:hover:text-red-400']"
                             disabled
                             aria-label="Favorite"
                         >
-                            <Heart class="size-7" />
+                            <Heart class="size-6 md:size-8" />
                         </button>
                         <button
                             type="button"
-                            :class="[reactionButtonClass, 'hover:text-smart-blue-400']"
+                            :class="[reactionButtonClass, 'enabled:hover:text-smart-blue-400']"
                             disabled
                             aria-label="Like"
                         >
-                            <ThumbsUp class="size-7" />
+                            <ThumbsUp class="size-6 md:size-8" />
                         </button>
                         <button
                             type="button"
-                            :class="[reactionButtonClass, 'hover:text-gray-400']"
+                            :class="[reactionButtonClass, 'enabled:hover:text-danger-300']"
                             disabled
-                            aria-label="Dislike"
+                            aria-label="Blacklist"
                         >
-                            <ThumbsDown class="size-7" />
+                            <Ban class="size-6 md:size-8" />
                         </button>
                         <button
                             type="button"
-                            :class="[reactionButtonClass, 'hover:text-yellow-400']"
+                            :class="[reactionButtonClass, 'enabled:hover:text-yellow-400']"
                             disabled
                             aria-label="Funny"
                         >
-                            <Smile class="size-7" />
+                            <Smile class="size-6 md:size-8" />
                         </button>
                     </div>
                 </div>
@@ -111,31 +112,32 @@ const reactionButtonClass = [
                 </div>
 
                 <div class="mt-3 flex items-center justify-center gap-3 md:mt-4 md:gap-5 2xl:mt-4 2xl:gap-6" data-test="global-audio-player-controls">
-                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Shuffle">
+                    <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Shuffle">
                         <Shuffle class="size-6 2xl:size-7" />
                     </button>
-                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Previous">
+                    <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Previous">
                         <SkipBack class="size-7 2xl:size-8" />
                     </button>
                     <button
                         type="button"
-                        class="inline-flex size-14 cursor-default items-center justify-center rounded-full bg-smart-blue-600 text-white shadow-lg shadow-smart-blue-900/30 transition hover:scale-105 hover:bg-smart-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-300 2xl:size-16"
+                        class="inline-flex size-14 items-center justify-center rounded-full bg-smart-blue-600 text-white shadow-lg shadow-smart-blue-900/30 transition enabled:cursor-pointer enabled:hover:scale-105 enabled:hover:bg-smart-blue-500 disabled:cursor-not-allowed disabled:bg-smart-blue-900/60 disabled:text-blue-slate-400 disabled:opacity-60 disabled:shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-300 2xl:size-16"
+                        disabled
                         aria-disabled="true"
                         aria-label="Play"
                     >
                         <Play class="ml-0.5 size-7 fill-current 2xl:size-8" />
                     </button>
-                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Next">
+                    <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Next">
                         <SkipForward class="size-7 2xl:size-8" />
                     </button>
-                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Repeat">
+                    <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Repeat">
                         <Repeat class="size-6 2xl:size-7" />
                     </button>
                 </div>
             </div>
 
             <div class="hidden min-w-0 items-center justify-end gap-2 lg:flex lg:py-3 lg:pr-4 2xl:gap-3">
-                <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Queue">
+                <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Queue">
                     <ListMusic class="size-4 2xl:size-6" />
                 </button>
                 <div class="flex w-24 items-center gap-2 2xl:w-36 2xl:gap-3">
@@ -151,7 +153,7 @@ const reactionButtonClass = [
                         <div class="h-full w-2/3 rounded-full bg-blue-slate-300"></div>
                     </div>
                 </div>
-                <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="More options">
+                <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="More options">
                     <MoreVertical class="size-4 2xl:size-6" />
                 </button>
             </div>

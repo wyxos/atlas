@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\File;
+use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -69,13 +70,22 @@ test('authenticated user can fetch audio details batch for ids', function () {
         'title' => null,
         'filename' => 'fallback-track.mp3',
         'source' => 'Spotify',
+        'poster_path' => 'imports/ab/cd/poster.jpg',
+        'previewed_count' => 12,
+        'seen_count' => 4,
     ]);
     $audio->metadata()->create([
         'payload' => [
             'title' => 'Song Title',
             'artist' => ['Artist A', 'Artist B'],
             'album' => 'Album Name',
+            'duration_seconds' => 215,
         ],
+    ]);
+    Reaction::query()->create([
+        'file_id' => $audio->id,
+        'user_id' => $user->id,
+        'type' => 'like',
     ]);
 
     $response = $this->actingAs($user)->postJson('/api/audio/details', [
@@ -91,6 +101,12 @@ test('authenticated user can fetch audio details batch for ids', function () {
                 'source' => 'Spotify',
                 'artists' => ['Artist A', 'Artist B'],
                 'albums' => ['Album Name'],
+                'cover_url' => "/api/files/{$audio->id}/poster",
+                'duration_seconds' => 215,
+                'reaction' => ['type' => 'like'],
+                'blacklisted_at' => null,
+                'previewed_count' => 12,
+                'seen_count' => 4,
             ],
         ],
     ]);
