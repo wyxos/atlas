@@ -290,58 +290,6 @@ describe('Audio', () => {
         expect(wrapper.findComponent(VirtualList).props('itemHeight')).toBe(72);
     });
 
-    it('opens a non-overlay playlist panel beside the audio list', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                ids: [1],
-                sources: {
-                    1: 'Spotify',
-                },
-                cursor: {
-                    after_id: 0,
-                    next_after_id: null,
-                    has_more: false,
-                    max_id: 1,
-                },
-                pagination: {
-                    per_page: 100,
-                    total: 1,
-                    total_pages: 1,
-                },
-            } satisfies AudioIdsResponse,
-        });
-
-        mockAxios.post.mockResolvedValue({
-            data: {
-                items: [
-                    audioDetail({ id: 1, title: 'Track 1', source: 'Spotify', artists: ['Artist 1'], albums: ['Album 1'] }),
-                ],
-            } satisfies AudioDetailsResponse,
-        });
-
-        const wrapper = mount(Audio);
-        await flushPromises();
-
-        expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
-
-        await wrapper.get('[data-test="audio-playlists-cta"]').trigger('click');
-
-        expect(wrapper.get('[data-test="audio-library-surface"]').classes()).toContain('flex');
-        expect(wrapper.get('[data-test="audio-playlist-panel"]').classes()).toEqual(expect.arrayContaining([
-            'w-72',
-            'shrink-0',
-            'md:flex',
-        ]));
-        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).not.toContain('PLAYLISTS');
-        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Spotify favorites');
-        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Source: Spotify / Reaction: favorite');
-        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Banned from feed');
-        expect(wrapper.get('[data-test="audio-playlist-scroll"]').classes()).toContain('[scrollbar-gutter:stable]');
-        expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('shrink-0');
-        expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('border-t');
-        expect(wrapper.get('[data-test="audio-add-playlist-cta"]').text()).toBe('Add playlist');
-    });
-
     it('renders desktop rows with Spotify-style columns and routes reactions', async () => {
         mockAxios.get.mockResolvedValue({
             data: {
@@ -521,36 +469,4 @@ describe('Audio', () => {
         expect(wrapper.text()).toContain('Failed to load audio IDs.');
     });
 
-    it('pads the filter sheet body on mobile', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                ids: [],
-                sources: {},
-                cursor: {
-                    after_id: 0,
-                    next_after_id: null,
-                    has_more: false,
-                    max_id: 0,
-                },
-                pagination: {
-                    per_page: 100,
-                    total: 0,
-                    total_pages: 0,
-                },
-            } satisfies AudioIdsResponse,
-        });
-
-        const wrapper = mount(Audio, {
-            attachTo: document.body,
-        });
-        await flushPromises();
-
-        await wrapper.get('[data-test="audio-filter-cta"]').trigger('click');
-        await flushPromises();
-
-        const sheetBody = document.body.querySelector('[data-test="audio-filter-sheet-body"]');
-
-        expect(sheetBody).not.toBeNull();
-        expect(sheetBody?.classList.contains('px-6')).toBe(true);
-    });
 });

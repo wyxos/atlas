@@ -1,12 +1,19 @@
 <script setup lang="ts">
-const staticPlaylists = [
-    { name: 'Spotify favorites', count: 124, description: 'Source: Spotify / Reaction: favorite' },
-    { name: 'Spotify likes', count: 86, description: 'Source: Spotify / Reaction: like' },
-    { name: 'Funny audio', count: 31, description: 'Reaction: funny / Any source' },
-    { name: 'Banned from feed', count: 19, description: 'Reaction: ban / Out of feed' },
-    { name: 'Local liked', count: 18, description: 'Source: local / Reaction: like' },
-    { name: 'Unreacted Spotify', count: 54, description: 'Source: Spotify / No reaction' },
-];
+import { computed } from 'vue';
+import type { AudioPlaylist, AudioPlaylistSection } from '@/types/audio';
+
+const props = defineProps<{
+    sections: AudioPlaylistSection[];
+    activeSlug: string;
+    isLoading: boolean;
+    error: string | null;
+}>();
+
+const emit = defineEmits<{
+    select: [playlist: AudioPlaylist];
+}>();
+
+const visibleSections = computed(() => props.sections.filter((section) => section.playlists.length > 0));
 </script>
 
 <template>
@@ -18,20 +25,44 @@ const staticPlaylists = [
             class="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
             data-test="audio-playlist-scroll"
         >
-            <button
-                v-for="playlist in staticPlaylists"
-                :key="playlist.name"
-                type="button"
-                class="group flex w-full items-center justify-between gap-3 border-b border-twilight-indigo-500/45 px-4 py-3 text-left transition-colors hover:bg-prussian-blue-600/80"
-            >
-                <span class="min-w-0">
-                    <span class="block truncate text-sm font-medium text-regal-navy-100">{{ playlist.name }}</span>
-                    <span class="block truncate text-xs text-blue-slate-300">{{ playlist.description }}</span>
-                </span>
-                <span class="shrink-0 text-xs tabular-nums text-blue-slate-300 group-hover:text-regal-navy-100">
-                    {{ playlist.count }}
-                </span>
-            </button>
+            <div v-if="props.isLoading" class="px-4 py-3 text-xs text-blue-slate-300">
+                Loading playlists...
+            </div>
+            <div v-else-if="props.error" class="px-4 py-3 text-xs text-danger-200">
+                {{ props.error }}
+            </div>
+            <template v-else>
+                <section
+                    v-for="section in visibleSections"
+                    :key="section.key"
+                    data-test="audio-playlist-section"
+                >
+                    <p
+                        class="border-b border-twilight-indigo-500/45 px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-wide text-blue-slate-400"
+                        data-test="audio-playlist-section-label"
+                    >
+                        {{ section.label }}
+                    </p>
+                    <button
+                        v-for="playlist in section.playlists"
+                        :key="playlist.id"
+                        type="button"
+                        :aria-pressed="playlist.slug === props.activeSlug"
+                        class="group flex w-full items-center justify-between gap-3 border-b border-twilight-indigo-500/45 px-4 py-3 text-left transition-colors hover:bg-prussian-blue-600/80"
+                        :class="playlist.slug === props.activeSlug ? 'bg-prussian-blue-600/80' : ''"
+                        data-test="audio-playlist-option"
+                        @click="emit('select', playlist)"
+                    >
+                        <span class="min-w-0">
+                            <span class="block truncate text-sm font-medium text-regal-navy-100">{{ playlist.name }}</span>
+                            <span class="block truncate text-xs text-blue-slate-300">{{ playlist.description }}</span>
+                        </span>
+                        <span class="shrink-0 text-xs tabular-nums text-blue-slate-300 group-hover:text-regal-navy-100">
+                            {{ playlist.count }}
+                        </span>
+                    </button>
+                </section>
+            </template>
         </div>
         <button
             type="button"

@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
+import AudioFilterSheet from '../components/AudioFilterSheet.vue';
+import AudioListShell from '../components/AudioListShell.vue';
+import AudioLoadProgressPanel from '../components/AudioLoadProgressPanel.vue';
 import AudioPlaylistPanel from '../components/AudioPlaylistPanel.vue';
-import AudioTrackRow from '../components/AudioTrackRow.vue';
-import VirtualList from '../components/VirtualList.vue';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import type { AudioDetail, AudioDetailsResponse, AudioIdsResponse, AudioSourceFilter } from '@/types/audio';
+import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
+import type {
+    AudioDetail,
+    AudioDetailsResponse,
+    AudioIdsResponse,
+    AudioPlaylist,
+    AudioPlaylistSection,
+    AudioPlaylistsResponse,
+    AudioSourceFilter,
+} from '@/types/audio';
 import type { ReactionType } from '@/types/reaction';
 
 const PER_PAGE = 100;
@@ -23,9 +31,28 @@ const error = ref<string | null>(null);
 const isFilterSheetOpen = ref(false);
 const isPlaylistPanelOpen = ref(false);
 const activeFilter = ref<AudioSourceFilter>('all');
+const activePlaylist = ref<AudioPlaylist | null>(null);
+const playlistSections = ref<AudioPlaylistSection[]>([]);
+const arePlaylistsLoading = ref(false);
+const playlistsLoaded = ref(false);
+const playlistsError = ref<string | null>(null);
 const showProgressPanel = ref(true);
 const visibleIds = ref<number[]>([]);
 const detailsById = ref<Record<number, AudioDetail>>({});
+
+const {
+    detailAlbum,
+    detailArtists,
+    detailBlacklistedAt,
+    detailCoverUrl,
+    detailDuration,
+    detailPreviewedCount,
+    detailReaction,
+    detailSeenCount,
+    detailSource,
+    detailTitle,
+    hasDetails,
+} = useAudioDetailAccessors(detailsById, sourceById);
 
 const progressPercent = computed(() => {
     if (totalPages.value === 0) {
@@ -41,7 +68,7 @@ const filteredAudioIds = computed(() => {
     }
 
     return audioIds.value.filter((id) => {
-        const source = sourceForAudioId(id);
+        const source = detailSource(id);
         if (!source) {
             return false;
         }
@@ -66,17 +93,21 @@ const activeFilterLabel = computed(() => {
     return 'All';
 });
 
+const activePlaylistSlug = computed(() => activePlaylist.value?.slug ?? 'all');
+
 let isDisposed = false;
 let activeRequestToken = 0;
+let activeIdsRequestToken = 0;
 let idleTimeout: ReturnType<typeof setTimeout> | null = null;
 let detailsAbortController: AbortController | null = null;
 let progressHideTimeout: ReturnType<typeof setTimeout> | null = null;
 
-async function fetchChunk(afterId: number, maxId: number | null): Promise<AudioIdsResponse> {
+async function fetchChunk(afterId: number, maxId: number | null, playlistSlug: string): Promise<AudioIdsResponse> {
     const params = {
         after_id: afterId,
         per_page: PER_PAGE,
         ...(maxId !== null ? { max_id: maxId } : {}),
+        ...(playlistSlug !== 'all' ? { playlist: playlistSlug } : {}),
     };
     const { data } = await window.axios.get<AudioIdsResponse>('/api/audio/ids', {
         params,
@@ -86,6 +117,9 @@ async function fetchChunk(afterId: number, maxId: number | null): Promise<AudioI
 }
 
 async function loadAllAudioIds(): Promise<void> {
+    const requestToken = ++activeIdsRequestToken;
+    const playlistSlug = activePlaylistSlug.value;
+
     isLoading.value = true;
     error.value = null;
     audioIds.value = [];
@@ -103,8 +137,8 @@ async function loadAllAudioIds(): Promise<void> {
         let hasMore = true;
 
         while (hasMore) {
-            const nextChunk = await fetchChunk(afterId, maxId);
-            if (isDisposed) {
+            const nextChunk = await fetchChunk(afterId, maxId, playlistSlug);
+            if (isDisposed || requestToken !== activeIdsRequestToken) {
                 return;
             }
 
@@ -137,74 +171,35 @@ async function loadAllAudioIds(): Promise<void> {
     }
 }
 
-function detailTitle(audioId: number): string {
-    const title = detailsById.value[audioId]?.title;
-
-    return title && title.trim() !== '' ? title : `Audio #${audioId}`;
-}
-
-function hasDetails(audioId: number): boolean {
-    return detailsById.value[audioId] !== undefined;
-}
-
-function detailArtists(audioId: number): string {
-    const details = detailsById.value[audioId];
-    if (!details) {
-        return 'Loading metadata...';
+async function loadPlaylists(): Promise<void> {
+    if (arePlaylistsLoading.value || playlistsLoaded.value) {
+        return;
     }
 
-    return details.artists.length > 0 ? details.artists.join(', ') : 'Unknown artist';
+    arePlaylistsLoading.value = true;
+    playlistsError.value = null;
+
+    try {
+        const { data } = await window.axios.get<AudioPlaylistsResponse>('/api/audio/playlists');
+        playlistSections.value = Array.isArray(data.sections) ? data.sections : [];
+        playlistsLoaded.value = true;
+    } catch (playlistError) {
+        console.error('Failed to load audio playlists:', playlistError);
+        playlistsError.value = 'Failed to load playlists.';
+    } finally {
+        arePlaylistsLoading.value = false;
+    }
 }
 
-function detailAlbum(audioId: number): string {
-    const details = detailsById.value[audioId];
-    if (!details) {
-        return 'Loading metadata...';
+function handlePlaylistSelect(playlist: AudioPlaylist): void {
+    if (activePlaylist.value?.slug === playlist.slug) {
+        return;
     }
 
-    return details.albums.length > 0 ? details.albums[0] ?? 'Unknown album' : 'Unknown album';
-}
-
-function detailSource(audioId: number): string | null {
-    const source = detailsById.value[audioId]?.source?.trim();
-
-    return source && source !== '' ? source : sourceById.value[audioId] ?? null;
-}
-
-function sourceForAudioId(audioId: number): string | null {
-    return detailSource(audioId);
-}
-
-function detailCoverUrl(audioId: number): string | null {
-    return detailsById.value[audioId]?.cover_url ?? null;
-}
-
-function detailReaction(audioId: number): { type: ReactionType } | null {
-    return detailsById.value[audioId]?.reaction ?? null;
-}
-
-function detailBlacklistedAt(audioId: number): string | null {
-    return detailsById.value[audioId]?.blacklisted_at ?? null;
-}
-
-function detailPreviewedCount(audioId: number): number {
-    return detailsById.value[audioId]?.previewed_count ?? 0;
-}
-
-function detailSeenCount(audioId: number): number {
-    return detailsById.value[audioId]?.seen_count ?? 0;
-}
-
-function detailDuration(audioId: number): string {
-    const seconds = detailsById.value[audioId]?.duration_seconds;
-    if (!seconds || seconds <= 0) {
-        return '--:--';
-    }
-
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.round(seconds % 60);
-
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    activePlaylist.value = playlist;
+    activeFilter.value = 'all';
+    cancelActiveRequest();
+    void loadAllAudioIds();
 }
 
 async function handleAudioReaction(audioId: number, type: ReactionType): Promise<void> {
@@ -389,6 +384,12 @@ watch([isLoading, progressPercent], ([loading, percent]) => {
     }, PROGRESS_HIDE_DELAY_MS);
 }, { immediate: true });
 
+watch(isPlaylistPanelOpen, (isOpen) => {
+    if (isOpen) {
+        void loadPlaylists();
+    }
+});
+
 onUnmounted(() => {
     isDisposed = true;
     if (idleTimeout) {
@@ -404,45 +405,12 @@ onUnmounted(() => {
 <template>
     <PageLayout flush>
         <div class="relative flex h-full min-h-0 w-full flex-col overflow-hidden" data-test="audio-page">
-            <Sheet v-model:open="isFilterSheetOpen">
-                <SheetContent side="right" class="w-full sm:max-w-sm">
-                    <div class="space-y-4 px-6 pt-12" data-test="audio-filter-sheet-body">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-twilight-indigo-200">Source</p>
-                        <div class="inline-flex rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-1">
-                            <Button
-                                type="button"
-                                size="sm"
-                                :variant="activeFilter === 'all' ? 'default' : 'ghost'"
-                                data-test="audio-filter-all"
-                                @click="activeFilter = 'all'"
-                            >
-                                All
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                :variant="activeFilter === 'spotify' ? 'default' : 'ghost'"
-                                data-test="audio-filter-spotify"
-                                @click="activeFilter = 'spotify'"
-                            >
-                                Spotify
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                :variant="activeFilter === 'local' ? 'default' : 'ghost'"
-                                data-test="audio-filter-local"
-                                @click="activeFilter = 'local'"
-                            >
-                                Local
-                            </Button>
-                        </div>
-                        <p class="text-xs text-blue-slate-300">
-                            Showing {{ filteredAudioIds.length }} of {{ audioIds.length }}
-                        </p>
-                    </div>
-                </SheetContent>
-            </Sheet>
+            <AudioFilterSheet
+                v-model:open="isFilterSheetOpen"
+                v-model:active-filter="activeFilter"
+                :visible-count="filteredAudioIds.length"
+                :total-count="audioIds.length"
+            />
 
             <Transition
                 enter-active-class="transition-all duration-250 ease-out"
@@ -452,26 +420,15 @@ onUnmounted(() => {
                 leave-from-class="translate-y-0 opacity-100 max-h-32"
                 leave-to-class="-translate-y-3 opacity-0 max-h-0"
             >
-                <div
+                <AudioLoadProgressPanel
                     v-if="showProgressPanel"
-                    class="mb-4 overflow-hidden rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-4"
-                    data-test="audio-progress-panel"
-                >
-                    <div class="mb-2 flex items-center justify-between text-sm text-twilight-indigo-100">
-                        <span>Pages: {{ loadedPages }} / {{ totalPages }}</span>
-                        <span>{{ progressPercent }}%</span>
-                    </div>
-                    <div class="h-2 w-full rounded-full bg-twilight-indigo-600">
-                        <div
-                            class="h-2 rounded-full bg-smart-blue-400 transition-[width] duration-200"
-                            :style="{ width: `${progressPercent}%` }"
-                        />
-                    </div>
-                    <div class="mt-2 text-xs text-blue-slate-300">
-                        IDs loaded: {{ audioIds.length }} / {{ totalAudioFiles }}
-                        <span v-if="isLoading" class="ml-2">Loading...</span>
-                    </div>
-                </div>
+                    :loaded-pages="loadedPages"
+                    :total-pages="totalPages"
+                    :progress-percent="progressPercent"
+                    :loaded-ids="audioIds.length"
+                    :total-audio-files="totalAudioFiles"
+                    :is-loading="isLoading"
+                />
             </Transition>
 
             <div v-if="error" class="rounded-lg border border-danger-500 bg-prussian-blue-700 p-4 text-danger-200">
@@ -482,73 +439,35 @@ onUnmounted(() => {
                 class="flex min-h-0 flex-1"
                 data-test="audio-library-surface"
             >
-                <AudioPlaylistPanel v-if="isPlaylistPanelOpen" />
-                <div
-                    class="flex min-h-0 flex-1 flex-col border border-twilight-indigo-500 bg-prussian-blue-700"
-                    data-test="audio-list-shell"
-                >
-                <div
-                    class="flex h-10 shrink-0 items-center justify-between border-b border-twilight-indigo-500/70 px-3 md:px-4"
-                    data-test="audio-list-header"
-                >
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-test="audio-playlists-cta"
-                        class="h-7 shrink-0 px-2 text-xs"
-                        @click="isPlaylistPanelOpen = !isPlaylistPanelOpen"
-                    >
-                        Playlists
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-test="audio-filter-cta"
-                        class="h-7 shrink-0 px-2 text-xs"
-                        @click="isFilterSheetOpen = true"
-                    >
-                        Filter: {{ activeFilterLabel }}
-                    </Button>
-                </div>
-                <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>
-                <div v-else-if="filteredAudioIds.length === 0" class="p-4 text-twilight-indigo-100">
-                    No audio files match this filter.
-                </div>
-                <VirtualList
-                    v-else
-                    :items="filteredAudioIds"
-                    :item-height="72"
-                    :overscan="4"
-                    container-class="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+                <AudioPlaylistPanel
+                    v-if="isPlaylistPanelOpen"
+                    :sections="playlistSections"
+                    :active-slug="activePlaylistSlug"
+                    :is-loading="arePlaylistsLoading"
+                    :error="playlistsError"
+                    @select="handlePlaylistSelect"
+                />
+                <AudioListShell
+                    :active-filter-label="activeFilterLabel"
+                    :audio-ids="filteredAudioIds"
+                    :is-loading="isLoading"
+                    :has-details="hasDetails"
+                    :detail-title="detailTitle"
+                    :detail-artists="detailArtists"
+                    :detail-album="detailAlbum"
+                    :detail-cover-url="detailCoverUrl"
+                    :detail-reaction="detailReaction"
+                    :detail-blacklisted-at="detailBlacklistedAt"
+                    :detail-previewed-count="detailPreviewedCount"
+                    :detail-seen-count="detailSeenCount"
+                    :detail-duration="detailDuration"
+                    @toggle-playlists="isPlaylistPanelOpen = !isPlaylistPanelOpen"
+                    @open-filter="isFilterSheetOpen = true"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"
-                >
-                    <template #default="{ items, startIndex }">
-                        <ul class="divide-y divide-twilight-indigo-500/70">
-                            <AudioTrackRow
-                                v-for="(audioId, index) in items"
-                                :key="audioId"
-                                :audio-id="audioId"
-                                :display-index="startIndex + index + 1"
-                                :is-loaded="hasDetails(audioId)"
-                                :title="detailTitle(audioId)"
-                                :artists="detailArtists(audioId)"
-                                :album="detailAlbum(audioId)"
-                                :cover-url="detailCoverUrl(audioId)"
-                                :reaction="detailReaction(audioId)"
-                                :blacklisted-at="detailBlacklistedAt(audioId)"
-                                :previewed-count="detailPreviewedCount(audioId)"
-                                :seen-count="detailSeenCount(audioId)"
-                                :duration="detailDuration(audioId)"
-                                @reaction="handleAudioReaction"
-                                @blacklist="handleAudioBlacklist"
-                            />
-                        </ul>
-                    </template>
-                </VirtualList>
-                </div>
+                    @reaction="handleAudioReaction"
+                    @blacklist="handleAudioBlacklist"
+                />
             </div>
         </div>
     </PageLayout>

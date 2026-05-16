@@ -3,11 +3,15 @@
 namespace App\Services;
 
 use App\Models\File;
+use App\Services\Playlists\AudioPlaylistQueryService;
 use App\Support\FileApiPath;
-use Illuminate\Support\Facades\DB;
 
 class AudioIdListingService
 {
+    public function __construct(
+        private readonly AudioPlaylistQueryService $playlistQuery,
+    ) {}
+
     /**
      * Fetch audio file IDs with cursor metadata.
      *
@@ -15,19 +19,26 @@ class AudioIdListingService
      * Do not switch this to Eloquent. Keep this query-builder only and ID-only,
      * similar to LocalService, because the files dataset is large.
      */
-    public function fetch(int $afterId, int $perPage, ?int $maxId = null): array
-    {
+    public function fetch(
+        int $afterId,
+        int $perPage,
+        ?int $maxId = null,
+        ?string $playlistSlug = null,
+        ?int $userId = null,
+    ): array {
         $afterId = max(0, $afterId);
         $perPage = min(1000, max(1, $perPage));
+        $baseQuery = $this->playlistQuery->baseAudioQuery();
+        if ($playlistSlug !== null && $userId !== null) {
+            $this->playlistQuery->applySlug($baseQuery, $userId, $playlistSlug);
+        }
+
         $maxId = $maxId === null
-            ? (int) DB::table('files')
-                ->where('mime_type', 'like', 'audio/%')
-                ->max('id')
+            ? (int) (clone $baseQuery)->max('id')
             : max(0, $maxId);
 
-        $rows = DB::table('files')
+        $rows = (clone $baseQuery)
             ->select(['id', 'source'])
-            ->where('mime_type', 'like', 'audio/%')
             ->where('id', '>', $afterId)
             ->where('id', '<=', $maxId)
             ->orderBy('id')
@@ -51,8 +62,7 @@ class AudioIdListingService
             ? $ids[array_key_last($ids)]
             : null;
         $total = $afterId === 0
-            ? (int) DB::table('files')
-                ->where('mime_type', 'like', 'audio/%')
+            ? (int) (clone $baseQuery)
                 ->where('id', '<=', $maxId)
                 ->count()
             : null;

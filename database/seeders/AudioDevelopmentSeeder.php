@@ -189,9 +189,8 @@ class AudioDevelopmentSeeder extends Seeder
     private function sourceFor(int $number): string
     {
         return match ($number % 10) {
-            0, 1, 2 => 'local',
+            0, 1, 2, 6, 7 => 'local',
             3, 4, 5 => 'spotify',
-            6, 7 => 'NAS',
             8 => 'Bandcamp',
             default => 'Podcast',
         };

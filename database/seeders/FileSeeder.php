@@ -79,7 +79,7 @@ class FileSeeder extends Seeder
             'heights' => [1080, 900, 720, 768, 600],
         ],
         [
-            'source' => 'NAS',
+            'source' => 'local',
             'url_template' => 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-{id}.mp3',
             'filename_template' => 'sample-audio-{id}.mp3',
             'ext' => 'mp3',

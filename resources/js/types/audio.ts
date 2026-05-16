@@ -35,3 +35,26 @@ export type AudioDetailsResponse = {
 export type AudioDetail = Omit<AudioDetailsResponse['items'][number], 'id'>;
 
 export type AudioSourceFilter = 'all' | 'spotify' | 'local';
+
+export type AudioPlaylist = {
+    id: number;
+    slug: string;
+    name: string;
+    description: string | null;
+    kind: 'system' | 'smart' | 'manual';
+    membership_mode: 'rules' | 'manual';
+    source_key: string | null;
+    is_editable: boolean;
+    is_deletable: boolean;
+    count: number;
+};
+
+export type AudioPlaylistSection = {
+    key: 'system' | 'smart' | 'manual';
+    label: string;
+    playlists: AudioPlaylist[];
+};
+
+export type AudioPlaylistsResponse = {
+    sections: AudioPlaylistSection[];
+};

@@ -16,7 +16,7 @@ class FileFactory extends Factory
      */
     public function definition(): array
     {
-        $sources = ['local', 'NAS', 'YouTube', 'Booru'];
+        $sources = ['local', 'YouTube', 'Booru'];
         $mimeTypes = [
             'image/jpeg',
             'image/png',

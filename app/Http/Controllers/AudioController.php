@@ -21,8 +21,18 @@ class AudioController extends Controller
         $maxId = $request->query('max_id');
         $maxId = is_numeric($maxId) ? max(0, (int) $maxId) : null;
         $perPage = min(1000, max(1, $request->integer('per_page', 100)));
+        $playlistSlug = $request->query('playlist');
+        $playlistSlug = is_string($playlistSlug) && trim($playlistSlug) !== ''
+            ? trim($playlistSlug)
+            : null;
 
-        return response()->json($listing->fetch($afterId, $perPage, $maxId));
+        return response()->json($listing->fetch(
+            $afterId,
+            $perPage,
+            $maxId,
+            $playlistSlug,
+            Auth::id(),
+        ));
     }
 
     /**

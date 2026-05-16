@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Playlist;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -20,6 +21,7 @@ test('app:setup creates an administrator', function () {
     expect($user->name)->toBe('Admin User');
     expect($user->is_admin)->toBeTrue();
     expect($user->email_verified_at)->not->toBeNull();
+    expect(Playlist::query()->where('user_id', $user->id)->where('slug', 'all')->exists())->toBeTrue();
 });
 
 test('app:setup rejects weak passwords', function () {

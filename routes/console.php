@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\Playlists\SystemPlaylistSyncService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
@@ -132,6 +133,8 @@ Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-passw
     $user->forceFill([
         'email_verified_at' => now(),
     ])->save();
+
+    app(SystemPlaylistSyncService::class)->syncForUser($user);
 
     $this->info('Administrator created successfully.');
 
