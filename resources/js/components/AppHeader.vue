@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 interface Props {
     userName: string;
     appName?: string;
+    menuOpen?: boolean;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
     appName: 'Atlas',
+    menuOpen: false,
 });
 
 const emit = defineEmits<{
@@ -26,6 +28,7 @@ function handleToggleMenu(): void {
         <div class="relative flex h-16 items-center justify-center px-4">
             <!-- Mobile Menu Toggle (Only visible on mobile) -->
             <Button
+                v-if="!props.menuOpen"
                 variant="ghost"
                 size="icon"
                 @click="handleToggleMenu"

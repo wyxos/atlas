@@ -13,9 +13,11 @@ import {
     Image,
     Download,
     Activity,
+    X,
 } from 'lucide-vue-next';
 import AppHeader from '../components/AppHeader.vue';
 import AtlasIcon from '../components/AtlasIcon.vue';
+import GlobalAudioPlayer from '../components/GlobalAudioPlayer.vue';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -161,28 +163,40 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex min-h-screen bg-gradient-to-b from-prussian-blue-900 via-prussian-blue-800 to-prussian-blue-700">
+    <div class="flex h-screen overflow-hidden bg-gradient-to-b from-prussian-blue-900 via-prussian-blue-800 to-prussian-blue-700">
         <!-- Side Menu -->
         <aside :class="[
-            'absolute lg:static z-40 h-screen bg-prussian-blue-800 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
+            'fixed inset-y-0 left-0 lg:static z-40 h-screen w-full lg:w-24 bg-prussian-blue-800 border-r border-twilight-indigo-500 transition-transform duration-300 ease-in-out',
             'flex flex-col',
-            isMenuOpen ? 'w-24 translate-x-0' : 'w-24 -translate-x-full lg:translate-x-0'
+            isMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         ]">
             <!-- Atlas Icon / Logo -->
-            <div class="flex h-20 flex-col items-center justify-center gap-1 px-2">
-                <AtlasIcon class="h-10 w-10" />
-                <span class="text-[10px] font-medium text-twilight-indigo-300 tracking-wide">v{{ appVersion }}</span>
+            <div class="flex h-16 items-center justify-between gap-3 px-4 lg:h-20 lg:flex-col lg:justify-center lg:gap-1 lg:px-2">
+                <div class="flex items-center gap-3 lg:flex-col lg:gap-1">
+                    <AtlasIcon class="h-8 w-8 lg:h-10 lg:w-10" />
+                    <span class="text-xs font-medium tracking-wide text-twilight-indigo-300 lg:text-[10px]">v{{ appVersion }}</span>
+                </div>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close menu"
+                    class="text-smart-blue-100 lg:hidden"
+                    @click="closeMenu"
+                >
+                    <X class="size-5" />
+                </Button>
             </div>
 
             <!-- Menu Items -->
             <nav class="flex-1 overflow-y-auto py-4">
-                <div class="space-y-2 px-2">
+                <div class="space-y-1 px-4 lg:space-y-2 lg:px-2">
                     <router-link v-for="item in menuItems" :key="item.name" :to="item.path" @click="handleMenuItemClick"
                         active-class="!bg-smart-blue-600 !text-white"
                         exact-active-class="!bg-smart-blue-600 !text-white"
-                        class="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg bg-transparent px-1.5 py-2 text-center text-twilight-indigo-100 transition-colors hover:bg-smart-blue-700/50 hover:text-white">
-                        <component :is="item.icon" class="size-8 flex-shrink-0" />
-                        <span class="w-full text-[11px] font-medium leading-tight">
+                        class="flex min-h-12 flex-row items-center justify-start gap-3 rounded-lg bg-transparent px-4 py-3 text-left text-twilight-indigo-100 transition-colors hover:bg-smart-blue-700/50 hover:text-white lg:min-h-16 lg:flex-col lg:justify-center lg:gap-1 lg:px-1.5 lg:py-2 lg:text-center">
+                        <component :is="item.icon" class="size-5 shrink-0 lg:size-8" />
+                        <span class="text-sm font-medium leading-tight lg:w-full lg:text-[11px]">
                             {{ item.label }}
                         </span>
                     </router-link>
@@ -190,10 +204,10 @@ onUnmounted(() => {
                         v-if="isAdmin"
                         href="/horizon"
                         @click="handleMenuItemClick"
-                        class="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg bg-transparent px-1.5 py-2 text-center text-twilight-indigo-100 transition-colors hover:bg-smart-blue-700/50 hover:text-white"
+                        class="flex min-h-12 flex-row items-center justify-start gap-3 rounded-lg bg-transparent px-4 py-3 text-left text-twilight-indigo-100 transition-colors hover:bg-smart-blue-700/50 hover:text-white lg:min-h-16 lg:flex-col lg:justify-center lg:gap-1 lg:px-1.5 lg:py-2 lg:text-center"
                     >
-                        <Activity class="size-8 flex-shrink-0" />
-                        <span class="w-full text-[11px] font-medium leading-tight">
+                        <Activity class="size-5 shrink-0 lg:size-8" />
+                        <span class="text-sm font-medium leading-tight lg:w-full lg:text-[11px]">
                             Horizon
                         </span>
                     </a>
@@ -235,11 +249,12 @@ onUnmounted(() => {
         </aside>
 
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col min-w-0 lg:max-h-screen">
-            <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" @toggle-menu="toggleMenu" />
-            <main class="flex-1 overflow-auto lg:overflow-y-auto">
+        <div class="flex min-w-0 flex-1 flex-col">
+            <AppHeader :user-name="userName" :app-name="appName" :menu-open="isMenuOpen" @logout="handleLogout" @toggle-menu="toggleMenu" />
+            <main class="min-h-0 flex-1 overflow-auto lg:overflow-y-auto">
                 <slot></slot>
             </main>
+            <GlobalAudioPlayer />
         </div>
 
         <!-- Overlay for mobile -->

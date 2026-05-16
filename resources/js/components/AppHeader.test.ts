@@ -53,5 +53,19 @@ describe('AppHeader', () => {
         expect(wrapper.emitted('toggle-menu')).toBeTruthy();
         expect(wrapper.emitted('toggle-menu')).toHaveLength(1);
     });
-});
 
+    it('hides the menu toggle button while the mobile menu is open', async () => {
+        const router = await createTestRouter();
+        const wrapper = mount(AppHeader, {
+            props: {
+                userName: 'Test User',
+                menuOpen: true,
+            },
+            global: {
+                plugins: [router],
+            },
+        });
+
+        expect(wrapper.find('[aria-label="Toggle menu"]').exists()).toBe(false);
+    });
+});
