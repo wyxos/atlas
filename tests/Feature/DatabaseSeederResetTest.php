@@ -2,13 +2,14 @@
 
 use App\Models\File;
 use App\Models\Tab;
+use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
-test('seeder resets app state when atlas storage has content', function () {
+test('seeder preserves app state and storage when atlas storage has content', function () {
     Storage::fake('atlas');
     Storage::fake('local');
 
@@ -18,12 +19,15 @@ test('seeder resets app state when atlas storage has content', function () {
     Storage::disk('atlas')->put('downloads/sample.txt', 'payload');
     Storage::disk('local')->put('private/sample.txt', 'payload');
 
+    $existingUserCount = User::count();
+
     (new DatabaseSeeder)->run();
 
-    expect(File::count())->toBe(0);
-    expect(Tab::count())->toBe(0);
-    expect(Storage::disk('atlas')->allFiles())->toBe([]);
-    expect(Storage::disk('local')->allFiles())->toBe([]);
+    expect(File::count())->toBe(2);
+    expect(Tab::count())->toBe(2);
+    expect(User::count())->toBe($existingUserCount + 26);
+    expect(Storage::disk('atlas')->allFiles())->toBe(['downloads/sample.txt']);
+    expect(Storage::disk('local')->allFiles())->toBe(['private/sample.txt']);
 });
 
 test('seeder does not reset app state in production', function () {
