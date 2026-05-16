@@ -521,7 +521,7 @@ onUnmounted(() => {
                     :items="filteredAudioIds"
                     :item-height="72"
                     :overscan="4"
-                    container-class="min-h-0 flex-1 overflow-y-auto"
+                    container-class="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"
                 >

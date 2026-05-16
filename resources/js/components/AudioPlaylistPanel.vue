@@ -14,7 +14,10 @@ const staticPlaylists = [
         class="hidden w-72 shrink-0 border-y border-l border-twilight-indigo-500 bg-prussian-blue-800 md:flex md:flex-col"
         data-test="audio-playlist-panel"
     >
-        <div class="min-h-0 flex-1 overflow-y-auto">
+        <div
+            class="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+            data-test="audio-playlist-scroll"
+        >
             <button
                 v-for="playlist in staticPlaylists"
                 :key="playlist.name"
@@ -29,13 +32,13 @@ const staticPlaylists = [
                     {{ playlist.count }}
                 </span>
             </button>
-            <button
-                type="button"
-                class="flex w-full items-center justify-center border-b border-twilight-indigo-500/45 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-smart-blue-200 transition-colors hover:bg-prussian-blue-600/80 hover:text-white"
-                data-test="audio-add-playlist-cta"
-            >
-                Add playlist
-            </button>
         </div>
+        <button
+            type="button"
+            class="flex w-full shrink-0 items-center justify-center border-t border-twilight-indigo-500/70 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-smart-blue-200 transition-colors hover:bg-prussian-blue-600/80 hover:text-white"
+            data-test="audio-add-playlist-cta"
+        >
+            Add playlist
+        </button>
     </aside>
 </template>

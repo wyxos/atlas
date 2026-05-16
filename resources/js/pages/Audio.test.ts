@@ -286,7 +286,7 @@ describe('Audio', () => {
         ]));
         expect(wrapper.get('[data-test="audio-list-header"]').text()).toContain('Playlists');
         expect(wrapper.get('[data-test="audio-list-header"]').text()).toContain('Filter: All');
-        expect(wrapper.findComponent(VirtualList).props('containerClass')).toBe('min-h-0 flex-1 overflow-y-auto');
+        expect(wrapper.findComponent(VirtualList).props('containerClass')).toBe('min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]');
         expect(wrapper.findComponent(VirtualList).props('itemHeight')).toBe(72);
     });
 
@@ -336,6 +336,9 @@ describe('Audio', () => {
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Spotify favorites');
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Source: Spotify / Reaction: favorite');
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Banned from feed');
+        expect(wrapper.get('[data-test="audio-playlist-scroll"]').classes()).toContain('[scrollbar-gutter:stable]');
+        expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('shrink-0');
+        expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('border-t');
         expect(wrapper.get('[data-test="audio-add-playlist-cta"]').text()).toBe('Add playlist');
     });
 
