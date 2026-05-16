@@ -349,25 +349,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <PageLayout>
-        <div class="w-full">
-            <div class="mb-6 flex items-start justify-between gap-4">
-                <div>
-                    <h4 class="text-2xl font-semibold text-regal-navy-100 mb-2">Audio</h4>
-                    <p class="text-blue-slate-300">All audio file IDs</p>
-                </div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    data-test="audio-filter-cta"
-                    class="shrink-0"
-                    @click="isFilterSheetOpen = true"
-                >
-                    Filter: {{ activeFilterLabel }}
-                </Button>
-            </div>
-
+    <PageLayout flush>
+        <div class="relative flex h-full min-h-0 w-full flex-col overflow-hidden" data-test="audio-page">
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-test="audio-filter-cta"
+                class="absolute right-4 top-4 z-10 shrink-0"
+                @click="isFilterSheetOpen = true"
+            >
+                Filter: {{ activeFilterLabel }}
+            </Button>
             <Sheet v-model:open="isFilterSheetOpen">
                 <SheetContent side="right" class="w-full sm:max-w-sm">
                     <SheetHeader>
@@ -444,7 +437,11 @@ onUnmounted(() => {
             <div v-if="error" class="rounded-lg border border-danger-500 bg-prussian-blue-700 p-4 text-danger-200">
                 {{ error }}
             </div>
-            <div v-else class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700">
+            <div
+                v-else
+                class="flex min-h-0 flex-1 flex-col border border-twilight-indigo-500 bg-prussian-blue-700"
+                data-test="audio-list-shell"
+            >
                 <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>
                 <div v-else-if="filteredAudioIds.length === 0" class="p-4 text-twilight-indigo-100">
                     No audio files match this filter.
@@ -454,7 +451,7 @@ onUnmounted(() => {
                     :items="filteredAudioIds"
                     :item-height="64"
                     :overscan="4"
-                    container-class="max-h-[70vh] overflow-y-auto"
+                    container-class="min-h-0 flex-1 overflow-y-auto"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"
                 >

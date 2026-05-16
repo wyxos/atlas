@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import Audio from './Audio.vue';
+import PageLayout from '../components/PageLayout.vue';
 import VirtualList from '../components/VirtualList.vue';
 
 type AudioIdsResponse = {
@@ -207,6 +208,54 @@ describe('Audio', () => {
         expect(wrapper.text()).not.toContain('Not Spotify');
         expect(wrapper.text()).toContain('Artist A');
         expect(wrapper.text()).toContain('Album A');
+    });
+
+    it('uses a flush full-height list layout without the redundant page heading', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                ids: [1],
+                sources: {
+                    1: 'Spotify',
+                },
+                cursor: {
+                    after_id: 0,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 1,
+                },
+                pagination: {
+                    per_page: 100,
+                    total: 1,
+                    total_pages: 1,
+                },
+            } satisfies AudioIdsResponse,
+        });
+
+        mockAxios.post.mockResolvedValue({
+            data: {
+                items: [
+                    { id: 1, title: 'Track 1', source: 'Spotify', artists: ['Artist 1'], albums: ['Album 1'] },
+                ],
+            } satisfies AudioDetailsResponse,
+        });
+
+        const wrapper = mount(Audio);
+        await flushPromises();
+
+        expect(wrapper.findComponent(PageLayout).props('flush')).toBe(true);
+        expect(wrapper.find('h4').exists()).toBe(false);
+        expect(wrapper.get('[data-test="audio-page"]').classes()).toEqual(expect.arrayContaining([
+            'h-full',
+            'min-h-0',
+            'overflow-hidden',
+        ]));
+        expect(wrapper.get('[data-test="audio-list-shell"]').classes()).toEqual(expect.arrayContaining([
+            'flex',
+            'min-h-0',
+            'flex-1',
+            'flex-col',
+        ]));
+        expect(wrapper.findComponent(VirtualList).props('containerClass')).toBe('min-h-0 flex-1 overflow-y-auto');
     });
 
     it('debounces scroll and fetches unseen visible item details only', async () => {

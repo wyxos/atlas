@@ -19,14 +19,16 @@ test('seeder preserves app state and storage when atlas storage has content', fu
     Storage::disk('atlas')->put('downloads/sample.txt', 'payload');
     Storage::disk('local')->put('private/sample.txt', 'payload');
 
+    $existingFileCount = File::count();
     $existingUserCount = User::count();
 
     (new DatabaseSeeder)->run();
 
-    expect(File::count())->toBe(2);
+    expect(File::count())->toBe($existingFileCount + 1000);
     expect(Tab::count())->toBe(2);
     expect(User::count())->toBe($existingUserCount + 26);
-    expect(Storage::disk('atlas')->allFiles())->toBe(['downloads/sample.txt']);
+    expect(Storage::disk('atlas')->exists('downloads/sample.txt'))->toBeTrue();
+    expect(Storage::disk('atlas')->allFiles())->toHaveCount(3);
     expect(Storage::disk('local')->allFiles())->toBe(['private/sample.txt']);
 });
 

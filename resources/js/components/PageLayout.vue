@@ -8,15 +8,16 @@ withDefaults(defineProps<{
 
 <template>
     <div
+        data-test="page-layout"
         :class="[
-            'h-[calc(100vh-4rem)] md:h-[calc(100vh-4rem)] md:flex md:flex-col',
-            flush ? '' : 'md:p-8',
+            'h-full min-h-0 md:flex md:flex-col',
         ]"
     >
         <div
+            data-test="page-layout-content"
             :class="[
-                'h-full md:flex-1 md:flex md:flex-col md:min-h-0 md:overflow-auto',
-                flush ? '' : 'p-4 md:p-8 bg-prussian-blue-600 rounded-lg',
+                'h-full min-h-0 md:flex md:flex-1 md:flex-col md:overflow-auto',
+                flush ? '' : 'bg-prussian-blue-600',
             ]"
         >
             <slot />

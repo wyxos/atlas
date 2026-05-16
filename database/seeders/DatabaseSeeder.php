@@ -20,16 +20,21 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        // Demo user (admin)
-        User::create([
-            'name' => 'Demo User',
-            'email' => 'demo@atlas.test',
-            'password' => Hash::make('password'),
-            'email_verified_at' => now(),
-            'is_admin' => true,
-        ]);
+        User::query()->updateOrCreate(
+            ['email' => 'demo@atlas.test'],
+            [
+                'name' => 'Demo User',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+                'is_admin' => true,
+            ],
+        );
 
         // Seed additional users using factory
         User::factory()->count(25)->create();
+
+        $this->call([
+            AudioDevelopmentSeeder::class,
+        ]);
     }
 }
