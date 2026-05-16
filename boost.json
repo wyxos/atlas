@@ -1,9 +1,9 @@
 {
     "agents": [
-        "cursor"
+        "codex"
     ],
     "editors": [
-        "cursor"
+        "codex"
     ],
     "guidelines": [],
     "herd_mcp": true

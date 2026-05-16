@@ -16,9 +16,9 @@ import {
 } from 'lucide-vue-next';
 
 const controlButtonClass = [
-    'inline-flex size-12 items-center justify-center rounded-full 2xl:size-14',
-    'text-blue-slate-300 transition-colors hover:text-smart-blue-100',
-    'disabled:cursor-default disabled:opacity-60 disabled:hover:text-blue-slate-300',
+    'player-control-button inline-flex size-12 items-center justify-center rounded-full 2xl:size-14',
+    'cursor-default text-blue-slate-300 transition-colors hover:bg-smart-blue-700 hover:text-white',
+    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-500',
 ].join(' ');
 
 const reactionButtonClass = [
@@ -33,23 +33,23 @@ const reactionButtonClass = [
         data-test="global-audio-player"
         aria-label="Global audio player"
     >
-        <div class="grid gap-3 lg:min-h-24 lg:grid-cols-[minmax(280px,1fr)_minmax(420px,2fr)_minmax(220px,1fr)] lg:items-stretch 2xl:min-h-32">
-            <div class="flex h-full min-w-0 items-stretch gap-3" data-test="global-audio-player-track">
+        <div class="grid gap-3 md:min-h-24 lg:grid-cols-[minmax(280px,1fr)_minmax(420px,2fr)_minmax(220px,1fr)] lg:items-stretch 2xl:min-h-32">
+            <div class="flex h-full min-w-0 items-stretch justify-center gap-3 md:justify-start" data-test="global-audio-player-track">
                 <div
-                    class="flex size-12 aspect-square shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500 lg:h-full lg:w-auto"
+                    class="hidden size-12 aspect-square shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500 md:flex md:h-full md:w-auto"
                     data-test="global-audio-player-cover"
                 >
-                    <Music class="size-6 max-h-full max-w-full text-smart-blue-100 lg:size-10 2xl:size-12" />
+                    <Music class="size-6 max-h-full max-w-full text-smart-blue-100 md:size-10 2xl:size-12" />
                 </div>
-                <div class="min-w-0 self-center lg:py-3">
+                <div class="min-w-0 self-center text-center md:text-left lg:py-3" data-test="global-audio-player-details">
                     <p
-                        class="truncate text-sm font-semibold text-regal-navy-100 2xl:pl-[18px]"
+                        class="truncate text-sm font-semibold text-regal-navy-100 md:max-lg:pl-[18px] 2xl:pl-[18px]"
                         data-test="global-audio-player-title"
                     >
                         No audio selected
                     </p>
                     <p
-                        class="truncate text-xs text-blue-slate-300 2xl:pl-[18px]"
+                        class="truncate text-xs text-blue-slate-300 md:max-lg:pl-[18px] 2xl:pl-[18px]"
                         data-test="global-audio-player-subtitle"
                     >
                         Atlas player
@@ -94,11 +94,11 @@ const reactionButtonClass = [
                 </div>
             </div>
 
-            <div class="min-w-0 self-center lg:py-3">
+            <div class="min-w-0 self-center md:max-lg:mt-3 lg:py-3" data-test="global-audio-player-playback">
                 <div class="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-2 text-xs text-blue-slate-300 2xl:grid-cols-[3.75rem_minmax(0,1fr)_3.75rem] 2xl:text-sm">
                     <span class="text-right tabular-nums">0:00</span>
                     <div
-                        class="h-1 overflow-hidden rounded-full bg-twilight-indigo-500 2xl:h-1.5"
+                        class="h-2 overflow-hidden rounded-full bg-twilight-indigo-500 2xl:h-3"
                         role="progressbar"
                         aria-label="Playback progress"
                         aria-valuemin="0"
@@ -110,32 +110,32 @@ const reactionButtonClass = [
                     <span class="tabular-nums">0:00</span>
                 </div>
 
-                <div class="mt-2 flex items-center justify-center gap-2 2xl:mt-3 2xl:gap-3">
-                    <button type="button" :class="controlButtonClass" disabled aria-label="Shuffle">
+                <div class="mt-3 flex items-center justify-center gap-3 md:mt-4 md:gap-5 2xl:mt-4 2xl:gap-6" data-test="global-audio-player-controls">
+                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Shuffle">
                         <Shuffle class="size-6 2xl:size-7" />
                     </button>
-                    <button type="button" :class="controlButtonClass" disabled aria-label="Previous">
+                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Previous">
                         <SkipBack class="size-7 2xl:size-8" />
                     </button>
                     <button
                         type="button"
-                        class="inline-flex size-14 items-center justify-center rounded-full bg-smart-blue-600 text-white shadow-lg shadow-smart-blue-900/30 transition-transform disabled:cursor-default 2xl:size-16"
-                        disabled
+                        class="inline-flex size-14 cursor-default items-center justify-center rounded-full bg-smart-blue-600 text-white shadow-lg shadow-smart-blue-900/30 transition hover:scale-105 hover:bg-smart-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-300 2xl:size-16"
+                        aria-disabled="true"
                         aria-label="Play"
                     >
                         <Play class="ml-0.5 size-7 fill-current 2xl:size-8" />
                     </button>
-                    <button type="button" :class="controlButtonClass" disabled aria-label="Next">
+                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Next">
                         <SkipForward class="size-7 2xl:size-8" />
                     </button>
-                    <button type="button" :class="controlButtonClass" disabled aria-label="Repeat">
+                    <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Repeat">
                         <Repeat class="size-6 2xl:size-7" />
                     </button>
                 </div>
             </div>
 
             <div class="hidden min-w-0 items-center justify-end gap-2 lg:flex lg:py-3 lg:pr-4 2xl:gap-3">
-                <button type="button" :class="controlButtonClass" disabled aria-label="Queue">
+                <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="Queue">
                     <ListMusic class="size-4 2xl:size-6" />
                 </button>
                 <div class="flex w-24 items-center gap-2 2xl:w-36 2xl:gap-3">
@@ -151,7 +151,7 @@ const reactionButtonClass = [
                         <div class="h-full w-2/3 rounded-full bg-blue-slate-300"></div>
                     </div>
                 </div>
-                <button type="button" :class="controlButtonClass" disabled aria-label="More options">
+                <button type="button" :class="controlButtonClass" aria-disabled="true" aria-label="More options">
                     <MoreVertical class="size-4 2xl:size-6" />
                 </button>
             </div>

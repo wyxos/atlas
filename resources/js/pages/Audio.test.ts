@@ -61,6 +61,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.useRealTimers();
+    document.body.innerHTML = '';
 });
 
 describe('Audio', () => {
@@ -273,5 +274,38 @@ describe('Audio', () => {
         await flushPromises();
 
         expect(wrapper.text()).toContain('Failed to load audio IDs.');
+    });
+
+    it('pads the filter sheet body on mobile', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                ids: [],
+                sources: {},
+                cursor: {
+                    after_id: 0,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 0,
+                },
+                pagination: {
+                    per_page: 100,
+                    total: 0,
+                    total_pages: 0,
+                },
+            } satisfies AudioIdsResponse,
+        });
+
+        const wrapper = mount(Audio, {
+            attachTo: document.body,
+        });
+        await flushPromises();
+
+        await wrapper.get('[data-test="audio-filter-cta"]').trigger('click');
+        await flushPromises();
+
+        const sheetBody = document.body.querySelector('[data-test="audio-filter-sheet-body"]');
+
+        expect(sheetBody).not.toBeNull();
+        expect(sheetBody?.classList.contains('px-6')).toBe(true);
     });
 });

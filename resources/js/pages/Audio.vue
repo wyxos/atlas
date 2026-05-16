@@ -373,7 +373,7 @@ onUnmounted(() => {
                     <SheetHeader>
                         <SheetTitle>Audio Filter</SheetTitle>
                     </SheetHeader>
-                    <div class="mt-6 space-y-4">
+                    <div class="mt-6 space-y-4 px-6" data-test="audio-filter-sheet-body">
                         <p class="text-xs font-semibold uppercase tracking-wide text-twilight-indigo-200">Source</p>
                         <div class="inline-flex rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-1">
                             <Button
