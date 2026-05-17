@@ -1,11 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import GlobalAudioPlayer from './GlobalAudioPlayer.vue';
-import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
+import { useGlobalAudioPlayer, type AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
+
+function testTrack(id: number, overrides: Partial<AudioPlayerTrack> = {}): AudioPlayerTrack {
+    return {
+        id,
+        title: `Track ${id}`,
+        artists: '',
+        album: '',
+        coverUrl: null,
+        duration: `0:${id.toString().padStart(2, '0')}`,
+        durationSeconds: id,
+        reaction: null,
+        blacklistedAt: null,
+        previewedCount: 0,
+        seenCount: 0,
+        playbackUrl: `/api/files/${id}/serve`,
+        ...overrides,
+    };
+}
 
 describe('GlobalAudioPlayer', () => {
     afterEach(() => {
         useGlobalAudioPlayer().clear();
+        delete (window as unknown as { axios?: unknown }).axios;
         vi.restoreAllMocks();
     });
 
@@ -256,6 +275,7 @@ describe('GlobalAudioPlayer', () => {
         await wrapper.get('[aria-label="Queue"]').trigger('click');
 
         expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('2 tracks');
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).not.toContain('Queue');
         expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('Atlas Seed Track 0041');
         expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('Atlas Seed Track 0042');
         expect(wrapper.findAll('[data-test="audio-queue-track"]')).toHaveLength(2);
@@ -266,73 +286,166 @@ describe('GlobalAudioPlayer', () => {
         expect(player.isPlaying.value).toBe(true);
     });
 
-    it('shuffles the copied queue while keeping the current track first', async () => {
+    it('closes the queue sheet from the outside click backdrop', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([testTrack(41), testTrack(42)], 41);
+        const wrapper = mount(GlobalAudioPlayer);
+
+        await wrapper.get('[aria-label="Queue"]').trigger('click');
+
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="audio-queue-backdrop"]').exists()).toBe(true);
+
+        await wrapper.get('[data-test="audio-queue-backdrop"]').trigger('click');
+
+        expect(wrapper.find('[data-test="audio-queue-sheet"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="audio-queue-backdrop"]').exists()).toBe(false);
+    });
+
+    it('loads queue details as virtual queue rows become visible', async () => {
+        const post = vi.fn().mockResolvedValue({
+            data: {
+                items: [
+                    {
+                        id: 742,
+                        title: 'Atlas Seed Track 0742',
+                        source: 'Spotify',
+                        artists: ['Mira Vale'],
+                        albums: ['Late Indexes'],
+                        cover_url: '/api/files/742/poster',
+                        duration_seconds: 154,
+                        reaction: null,
+                        blacklisted_at: null,
+                        previewed_count: 2,
+                        seen_count: 1,
+                    },
+                ],
+            },
+        });
+        Object.assign(window, {
+            axios: { post },
+        });
+        const player = useGlobalAudioPlayer();
+        player.queueTracks([
+            {
+                id: 742,
+                title: 'Audio #742',
+                artists: 'Loading metadata...',
+                album: 'Unknown album',
+                coverUrl: null,
+                duration: '--:--',
+                durationSeconds: null,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/742/serve',
+            },
+        ], 742);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        await wrapper.get('[aria-label="Queue"]').trigger('click');
+        await flushPromises();
+
+        expect(post).toHaveBeenCalledWith('/api/audio/details', {
+            ids: [742],
+        });
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('Atlas Seed Track 0742');
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('Mira Vale');
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('2:34');
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).not.toContain('Loading metadata...');
+        expect(player.queue.value[0]).toMatchObject({
+            id: 742,
+            title: 'Atlas Seed Track 0742',
+            artists: 'Mira Vale',
+            album: 'Late Indexes',
+            duration: '2:34',
+            durationSeconds: 154,
+            previewedCount: 2,
+            seenCount: 1,
+        });
+    });
+
+    it('preloads queue details for the next playback track', async () => {
+        const post = vi.fn().mockResolvedValue({
+            data: {
+                items: [
+                    {
+                        id: 742,
+                        title: 'Atlas Seed Track 0742',
+                        source: 'Spotify',
+                        artists: ['Mira Vale'],
+                        albums: ['Late Indexes'],
+                        cover_url: '/api/files/742/poster',
+                        duration_seconds: 154,
+                        reaction: null,
+                        blacklisted_at: null,
+                        previewed_count: 2,
+                        seen_count: 1,
+                    },
+                ],
+            },
+        });
+        Object.assign(window, {
+            axios: { post },
+        });
         const player = useGlobalAudioPlayer();
         player.queueAndPlay([
-            {
-                id: 1,
-                title: 'Track 1',
-                artists: '',
-                album: '',
-                coverUrl: null,
-                duration: '0:01',
-                durationSeconds: 1,
-                reaction: null,
-                blacklistedAt: null,
-                previewedCount: 0,
-                seenCount: 0,
-                playbackUrl: '/api/files/1/serve',
-            },
-            {
-                id: 2,
-                title: 'Track 2',
-                artists: '',
-                album: '',
-                coverUrl: null,
-                duration: '0:02',
-                durationSeconds: 2,
-                reaction: null,
-                blacklistedAt: null,
-                previewedCount: 0,
-                seenCount: 0,
-                playbackUrl: '/api/files/2/serve',
-            },
-            {
-                id: 3,
-                title: 'Track 3',
-                artists: '',
-                album: '',
-                coverUrl: null,
-                duration: '0:03',
-                durationSeconds: 3,
-                reaction: null,
-                blacklistedAt: null,
-                previewedCount: 0,
-                seenCount: 0,
-                playbackUrl: '/api/files/3/serve',
-            },
-            {
-                id: 4,
-                title: 'Track 4',
-                artists: '',
-                album: '',
-                coverUrl: null,
-                duration: '0:04',
-                durationSeconds: 4,
-                reaction: null,
-                blacklistedAt: null,
-                previewedCount: 0,
-                seenCount: 0,
-                playbackUrl: '/api/files/4/serve',
-            },
-        ], 1);
+            testTrack(41, {
+                title: 'Atlas Seed Track 0041',
+                artists: 'Signal Park',
+                duration: '1:31',
+                durationSeconds: 91,
+            }),
+            testTrack(742, {
+                title: 'Audio #742',
+                artists: 'Loading metadata...',
+                album: 'Unknown album',
+                duration: '--:--',
+                durationSeconds: null,
+            }),
+        ], 41);
+
+        const wrapper = mount(GlobalAudioPlayer);
+        await flushPromises();
+
+        expect(post).toHaveBeenCalledWith('/api/audio/details', {
+            ids: [742],
+        });
+        expect(player.queue.value[1]).toMatchObject({
+            id: 742,
+            title: 'Atlas Seed Track 0742',
+            artists: 'Mira Vale',
+            album: 'Late Indexes',
+            duration: '2:34',
+        });
+
+        await wrapper.get('[aria-label="Next"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.get('[data-test="global-audio-player-title"]').text()).toBe('Atlas Seed Track 0742');
+        expect(wrapper.get('[data-test="global-audio-player-subtitle"]').text()).toBe('Mira Vale');
+        expect(wrapper.get('[data-test="global-audio-player"]').text()).not.toContain('Loading metadata...');
+    });
+
+    it('shuffles the copied queue while keeping the current track first', async () => {
+        const player = useGlobalAudioPlayer();
+        const copiedPlaylist = [testTrack(1), testTrack(2), testTrack(3), testTrack(4)];
+        player.queueAndPlay(copiedPlaylist, 1);
         vi.spyOn(Math, 'random').mockReturnValue(0);
 
         const wrapper = mount(GlobalAudioPlayer);
 
         await wrapper.get('[aria-label="Shuffle queue"]').trigger('click');
 
-        expect(player.queue.value.map((track) => track.id)).toEqual([1, 3, 4, 2]);
+        const shuffledOrder = player.queue.value.map((track) => track.id);
+        expect(shuffledOrder).toEqual([1, 3, 4, 2]);
+
+        player.queueTracks(copiedPlaylist, 3);
+
+        expect(player.queue.value.map((track) => track.id)).toEqual(shuffledOrder);
+        expect(player.currentTrackId.value).toBe(1);
     });
 
     it('cycles repeat modes from off to all to one', async () => {

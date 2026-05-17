@@ -49,18 +49,19 @@ function queueAndPlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { pl
 
 function queueTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, trackId?: number): void {
     const nextQueue = tracks.map(withPlaybackUrl);
-    queue.value = nextQueue;
 
     if (nextQueue.length === 0) {
+        queue.value = [];
         currentTrackId.value = null;
         isPlaying.value = false;
         return;
     }
 
-    if (currentTrackId.value !== null && nextQueue.some((track) => track.id === currentTrackId.value)) {
+    if (currentTrackId.value !== null && queue.value.length > 0 && nextQueue.some((track) => track.id === currentTrackId.value)) {
         return;
     }
 
+    queue.value = nextQueue;
     currentTrackId.value = nextQueue.find((track) => track.id === trackId)?.id ?? nextQueue[0]?.id ?? null;
 }
 

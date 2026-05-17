@@ -19,6 +19,7 @@ import {
 import AudioQueueSheet from './AudioQueueSheet.vue';
 import AudioVolumeControl from './AudioVolumeControl.vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAudioQueueDetails } from '@/composables/useAudioQueueDetails';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
 import type { ReactionType } from '@/types/reaction';
 
@@ -27,6 +28,7 @@ const audioRef = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(0);
 const mediaDuration = ref(0);
 const isQueueSheetOpen = ref(false);
+const { handleQueueVisibleItemsChange } = useAudioQueueDetails(audioPlayer);
 
 const currentTrack = audioPlayer.currentTrack;
 const currentTrackId = audioPlayer.currentTrackId;
@@ -219,11 +221,36 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
         isQueueSheetOpen.value = false;
     }
 });
+
 </script>
 
 <template>
+    <div
+        v-if="isQueueSheetOpen"
+        class="fixed inset-0 z-[70] cursor-default"
+        data-test="audio-queue-backdrop"
+        aria-hidden="true"
+        @click="isQueueSheetOpen = false"
+    />
+    <Transition
+        enter-active-class="transition duration-500 ease-in-out"
+        enter-from-class="translate-x-full opacity-0"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-active-class="transition duration-300 ease-in-out"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-to-class="translate-x-full opacity-0"
+    >
+        <AudioQueueSheet
+            v-if="isQueueSheetOpen"
+            :tracks="audioPlayer.queue.value"
+            :current-track-id="currentTrackId"
+            @close="isQueueSheetOpen = false"
+            @play="audioPlayer.playQueueTrack"
+            @visible-items-change="handleQueueVisibleItemsChange"
+        />
+    </Transition>
     <section
-        class="shrink-0 border-t border-twilight-indigo-500 bg-prussian-blue-900 px-4 py-3 text-twilight-indigo-100 shadow-lg lg:px-0 lg:py-0"
+        class="relative z-[75] shrink-0 border-t border-twilight-indigo-500 bg-prussian-blue-900 px-4 py-3 text-twilight-indigo-100 shadow-lg lg:px-0 lg:py-0"
         data-test="global-audio-player"
         aria-label="Global audio player"
     >
@@ -238,22 +265,6 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
             @timeupdate="handleTimeUpdate"
             @ended="handleEnded"
         ></audio>
-        <Transition
-            enter-active-class="transition duration-500 ease-in-out"
-            enter-from-class="translate-x-full opacity-0"
-            enter-to-class="translate-x-0 opacity-100"
-            leave-active-class="transition duration-300 ease-in-out"
-            leave-from-class="translate-x-0 opacity-100"
-            leave-to-class="translate-x-full opacity-0"
-        >
-            <AudioQueueSheet
-                v-if="isQueueSheetOpen"
-                :tracks="audioPlayer.queue.value"
-                :current-track-id="currentTrackId"
-                @close="isQueueSheetOpen = false"
-                @play="audioPlayer.playQueueTrack"
-            />
-        </Transition>
         <div class="grid gap-3 md:min-h-24 lg:grid-cols-[minmax(280px,1fr)_minmax(420px,2fr)_minmax(220px,1fr)] lg:items-stretch 2xl:min-h-32">
             <div class="flex h-full min-w-0 items-stretch justify-center gap-3 md:justify-start" data-test="global-audio-player-track">
                 <div

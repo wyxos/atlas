@@ -38,7 +38,7 @@ const emit = defineEmits<{
 
 <template>
     <div
-        class="flex min-h-0 flex-1 flex-col border border-twilight-indigo-500 bg-prussian-blue-700"
+        class="flex min-h-0 min-w-0 flex-1 flex-col border border-twilight-indigo-500 bg-prussian-blue-700"
         data-test="audio-list-shell"
     >
         <AudioListHeader

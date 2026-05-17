@@ -11,7 +11,12 @@ defineProps<{
 const emit = defineEmits<{
     close: [];
     play: [trackId: number];
+    visibleItemsChange: [items: AudioPlayerTrack[]];
 }>();
+
+function handleVisibleItemsChange(items: unknown[]): void {
+    emit('visibleItemsChange', items as AudioPlayerTrack[]);
+}
 </script>
 
 <template>
@@ -23,8 +28,7 @@ const emit = defineEmits<{
     >
         <header class="flex h-14 shrink-0 items-center justify-between border-b border-twilight-indigo-500/70 px-4">
             <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-regal-navy-100">Queue</p>
-                <p class="text-xs text-blue-slate-300">
+                <p class="truncate text-sm font-semibold text-regal-navy-100">
                     {{ tracks.length === 1 ? '1 track' : `${tracks.length} tracks` }}
                 </p>
             </div>
@@ -48,6 +52,7 @@ const emit = defineEmits<{
             :item-height="64"
             :overscan="4"
             container-class="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+            @visible-items-change="handleVisibleItemsChange"
         >
             <template #default="{ items, startIndex }">
                 <ol class="divide-y divide-twilight-indigo-500/50">

@@ -138,11 +138,21 @@ describe('Audio playlists', () => {
         await flushPromises();
 
         expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
+        expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
+            'w-0',
+            'duration-300',
+            'transition-[width]',
+        ]));
 
         await wrapper.get('[data-test="audio-playlists-cta"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.get('[data-test="audio-library-surface"]').classes()).toContain('flex');
+        expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
+            'w-72',
+            'duration-500',
+            'transition-[width]',
+        ]));
         expect(wrapper.get('[data-test="audio-playlist-panel"]').classes()).toEqual(expect.arrayContaining([
             'w-72',
             'shrink-0',
