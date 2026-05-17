@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import Audio from './Audio.vue';
 import PageLayout from '../components/PageLayout.vue';
 import VirtualList from '../components/VirtualList.vue';
+import { useGlobalAudioPlayer } from '../composables/useGlobalAudioPlayer';
 import type { ReactionType } from '@/types/reaction';
 
 type AudioIdsResponse = {
@@ -86,6 +87,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    useGlobalAudioPlayer().clear();
     vi.useRealTimers();
     document.body.innerHTML = '';
 });
@@ -383,6 +385,8 @@ describe('Audio', () => {
         expect(row.get('[data-test="file-reactions"]').classes()).toContain('gap-3');
         expect(row.get('[data-test="file-reactions"]').classes()).not.toContain('bg-black/60');
         expect(row.get('[aria-label="Blacklist"] svg').attributes('width')).toBe('23');
+        expect(row.get('[data-test="audio-track-cover"]').exists()).toBe(true);
+        expect(row.get('[aria-label="Play track"]').exists()).toBe(true);
 
         await row.get('[aria-label="Like"]').trigger('click');
         await flushPromises();
@@ -398,6 +402,78 @@ describe('Audio', () => {
             file_ids: [7],
         });
         expect(row.get('[aria-label="Blacklist"]').attributes('disabled')).toBeDefined();
+    });
+
+    it('selects a row on single click and queues the playlist from a double click', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                ids: [5, 6],
+                sources: {
+                    5: 'Spotify',
+                    6: 'Spotify',
+                },
+                cursor: {
+                    after_id: 0,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 6,
+                },
+                pagination: {
+                    per_page: 100,
+                    total: 2,
+                    total_pages: 1,
+                },
+            } satisfies AudioIdsResponse,
+        });
+
+        mockAxios.post.mockResolvedValue({
+            data: {
+                items: [
+                    audioDetail({
+                        id: 5,
+                        title: 'Target Track',
+                        source: 'Spotify',
+                        artists: ['Archive Drift'],
+                        albums: ['The Seeded Collection'],
+                        duration_seconds: 95,
+                    }),
+                    audioDetail({
+                        id: 6,
+                        title: 'Next Track',
+                        source: 'Spotify',
+                        artists: ['Studio Orchard'],
+                        albums: ['Late Indexes'],
+                        duration_seconds: 96,
+                    }),
+                ],
+            } satisfies AudioDetailsResponse,
+        });
+
+        const wrapper = mount(Audio);
+        await flushPromises();
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        const firstRow = wrapper.get('[data-test="audio-track-row"]');
+        await firstRow.trigger('click');
+
+        expect(firstRow.attributes('aria-selected')).toBe('true');
+        expect(firstRow.classes()).toContain('bg-prussian-blue-600/55');
+
+        await firstRow.trigger('dblclick');
+        await flushPromises();
+
+        const player = useGlobalAudioPlayer();
+        expect(player.currentTrackId.value).toBe(5);
+        expect(player.isPlaying.value).toBe(true);
+        expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
+        expect(player.currentTrack.value?.title).toBe('Target Track');
+        expect(firstRow.attributes('data-current-track')).toBe('true');
+        expect(firstRow.find('[data-test="audio-track-playing-bars"]').exists()).toBe(true);
+        expect(firstRow.get('[data-test="audio-track-playing-bars"]').classes()).toContain('items-end');
+        expect(firstRow.findAll('.audio-visual-bar')).toHaveLength(8);
+        expect(firstRow.get('[aria-label="Pause track"]').exists()).toBe(true);
     });
 
     it('debounces scroll and fetches unseen visible item details only', async () => {

@@ -18,6 +18,9 @@ defineProps<{
     detailPreviewedCount: (audioId: number) => number;
     detailSeenCount: (audioId: number) => number;
     detailDuration: (audioId: number) => string;
+    selectedAudioId: number | null;
+    currentTrackId: number | null;
+    isPlaying: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -25,6 +28,9 @@ const emit = defineEmits<{
     openFilter: [];
     scroll: [];
     visibleItemsChange: [items: unknown[]];
+    select: [audioId: number];
+    play: [audioId: number];
+    pause: [audioId: number];
     reaction: [audioId: number, type: ReactionType];
     blacklist: [audioId: number];
 }>();
@@ -70,6 +76,12 @@ const emit = defineEmits<{
                         :previewed-count="detailPreviewedCount(audioId)"
                         :seen-count="detailSeenCount(audioId)"
                         :duration="detailDuration(audioId)"
+                        :is-selected="selectedAudioId === audioId"
+                        :is-current-track="currentTrackId === audioId"
+                        :is-playing="isPlaying && currentTrackId === audioId"
+                        @select="emit('select', audioId)"
+                        @play="emit('play', audioId)"
+                        @pause="emit('pause', audioId)"
                         @reaction="(audioId, type) => emit('reaction', audioId, type)"
                         @blacklist="(audioId) => emit('blacklist', audioId)"
                     />

@@ -7,6 +7,7 @@ type ActionHandler = ((...args: unknown[]) => Promise<unknown>) & {
 declare module '@/actions/App/Http/Controllers/FilesController' {
     export const index: ActionHandler;
     export const show: ActionHandler;
+    export const serve: ActionHandler;
     export const destroy: ActionHandler;
     export const deleteAll: ActionHandler;
     export const incrementPreview: ActionHandler;

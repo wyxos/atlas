@@ -6,6 +6,7 @@ import AudioListShell from '../components/AudioListShell.vue';
 import AudioLoadProgressPanel from '../components/AudioLoadProgressPanel.vue';
 import AudioPlaylistPanel from '../components/AudioPlaylistPanel.vue';
 import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
+import { useGlobalAudioPlayer, type AudioPlayerTrack } from '../composables/useGlobalAudioPlayer';
 import type {
     AudioDetail,
     AudioDetailsResponse,
@@ -39,6 +40,10 @@ const playlistsError = ref<string | null>(null);
 const showProgressPanel = ref(true);
 const visibleIds = ref<number[]>([]);
 const detailsById = ref<Record<number, AudioDetail>>({});
+const selectedAudioId = ref<number | null>(null);
+const audioPlayer = useGlobalAudioPlayer();
+const playerCurrentTrackId = audioPlayer.currentTrackId;
+const playerIsPlaying = audioPlayer.isPlaying;
 
 const {
     detailAlbum,
@@ -200,6 +205,44 @@ function handlePlaylistSelect(playlist: AudioPlaylist): void {
     activeFilter.value = 'all';
     cancelActiveRequest();
     void loadAllAudioIds();
+}
+
+function audioPlayerTrack(audioId: number): AudioPlayerTrack {
+    const details = detailsById.value[audioId];
+
+    return {
+        id: audioId,
+        title: detailTitle(audioId),
+        artists: detailArtists(audioId),
+        album: detailAlbum(audioId),
+        coverUrl: detailCoverUrl(audioId),
+        duration: detailDuration(audioId),
+        durationSeconds: details?.duration_seconds ?? null,
+        reaction: detailReaction(audioId),
+        blacklistedAt: detailBlacklistedAt(audioId),
+        previewedCount: detailPreviewedCount(audioId),
+        seenCount: detailSeenCount(audioId),
+        playbackUrl: `/api/files/${audioId}/serve`,
+    };
+}
+
+function audioPlayerQueue(): AudioPlayerTrack[] {
+    return filteredAudioIds.value.map(audioPlayerTrack);
+}
+
+function handleAudioSelect(audioId: number): void {
+    selectedAudioId.value = audioId;
+}
+
+function handleAudioPlay(audioId: number): void {
+    selectedAudioId.value = audioId;
+    audioPlayer.queueAndPlay(audioPlayerQueue(), audioId);
+}
+
+function handleAudioPause(audioId: number): void {
+    if (playerCurrentTrackId.value === audioId) {
+        audioPlayer.pause();
+    }
 }
 
 async function handleAudioReaction(audioId: number, type: ReactionType): Promise<void> {
@@ -390,6 +433,10 @@ watch(isPlaylistPanelOpen, (isOpen) => {
     }
 });
 
+watch(detailsById, () => {
+    audioPlayer.updateQueuedTracks(audioPlayerQueue());
+});
+
 onUnmounted(() => {
     isDisposed = true;
     if (idleTimeout) {
@@ -461,10 +508,16 @@ onUnmounted(() => {
                     :detail-previewed-count="detailPreviewedCount"
                     :detail-seen-count="detailSeenCount"
                     :detail-duration="detailDuration"
+                    :selected-audio-id="selectedAudioId"
+                    :current-track-id="playerCurrentTrackId"
+                    :is-playing="playerIsPlaying"
                     @toggle-playlists="isPlaylistPanelOpen = !isPlaylistPanelOpen"
                     @open-filter="isFilterSheetOpen = true"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"
+                    @select="handleAudioSelect"
+                    @play="handleAudioPlay"
+                    @pause="handleAudioPause"
                     @reaction="handleAudioReaction"
                     @blacklist="handleAudioBlacklist"
                 />

@@ -107,7 +107,7 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
 </script>
 
 <template>
-    <div data-test="file-reactions" @click.stop :class="containerClasses">
+    <div data-test="file-reactions" @click.stop @dblclick.stop :class="containerClasses">
         <!-- Reaction Icons -->
         <div class="flex items-center gap-2">
             <!-- Favorite -->

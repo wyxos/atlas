@@ -1,15 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import GlobalAudioPlayer from './GlobalAudioPlayer.vue';
+import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
 
 describe('GlobalAudioPlayer', () => {
+    afterEach(() => {
+        useGlobalAudioPlayer().clear();
+    });
+
     it('renders a custom static player surface without native audio controls', () => {
         const wrapper = mount(GlobalAudioPlayer);
         const playerText = wrapper.get('[data-test="global-audio-player"]').text();
         const playButton = wrapper.get('[aria-label="Play"]');
         const shuffleButton = wrapper.get('[aria-label="Shuffle"]');
 
-        expect(wrapper.find('audio').exists()).toBe(false);
+        expect(wrapper.find('audio').exists()).toBe(true);
+        expect(wrapper.get('audio').attributes('controls')).toBeUndefined();
+        expect(wrapper.get('audio').classes()).toContain('hidden');
         expect(playerText).not.toContain('No audio selected');
         expect(playerText).not.toContain('Atlas player');
         expect(playButton.classes()).toContain('size-14');
@@ -34,6 +41,8 @@ describe('GlobalAudioPlayer', () => {
         expect(wrapper.get('[aria-label="Playback progress"]').classes()).toContain('h-2');
         expect(wrapper.get('[aria-label="Playback progress"]').classes()).toContain('2xl:h-3');
         expect(wrapper.get('[aria-label="Playback progress"]').classes()).not.toContain('top-0');
+        expect(wrapper.get('[aria-label="Playback progress"]').attributes('type')).toBe('range');
+        expect(wrapper.get('[aria-label="Playback progress"]').attributes('disabled')).toBeDefined();
         expect(wrapper.get('[aria-label="Volume"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="global-audio-player-track"]').classes()).toContain('h-full');
         expect(wrapper.get('[data-test="global-audio-player-track"]').classes()).toContain('justify-center');
@@ -100,5 +109,81 @@ describe('GlobalAudioPlayer', () => {
         expect(reactions.get('[aria-label="Funny"]').find('svg').classes()).toContain('size-6');
         expect(reactions.get('[aria-label="Funny"]').find('svg').classes()).toContain('md:size-8');
         expect(wrapper.get('[data-test="global-audio-player-track"]').find('[data-test="global-audio-player-reactions"]').exists()).toBe(true);
+    });
+
+    it('renders the queued track and enables playback controls', () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            {
+                id: 41,
+                title: 'Atlas Seed Track 0041',
+                artists: 'Signal Park',
+                album: 'Playback Notes',
+                coverUrl: '/api/files/41/poster',
+                duration: '1:31',
+                durationSeconds: 91,
+                reaction: { type: 'like' },
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/41/serve',
+            },
+            {
+                id: 42,
+                title: 'Atlas Seed Track 0042',
+                artists: 'The Quiet Machines',
+                album: 'Blue Room Sessions',
+                coverUrl: null,
+                duration: '1:32',
+                durationSeconds: 92,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/42/serve',
+            },
+        ], 41);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        expect(wrapper.text()).toContain('Atlas Seed Track 0041');
+        expect(wrapper.text()).toContain('Signal Park');
+        expect(wrapper.get('audio').attributes('src')).toBe('/api/files/41/serve');
+        expect(wrapper.get('[aria-label="Pause"]').attributes('disabled')).toBeUndefined();
+        expect(wrapper.get('[aria-label="Next"]').attributes('disabled')).toBeUndefined();
+        expect(wrapper.get('[aria-label="Previous"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[aria-label="Like"]').classes()).toContain('bg-smart-blue-500');
+        expect(wrapper.get('[aria-label="Like"]').attributes('disabled')).toBeUndefined();
+        expect(wrapper.get('[aria-label="Playback progress"]').attributes('aria-valuemax')).toBe('91');
+        expect(wrapper.get('[aria-label="Playback progress"]').attributes('disabled')).toBeUndefined();
+    });
+
+    it('seeks the hidden audio element from the custom progress bar', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            {
+                id: 41,
+                title: 'Atlas Seed Track 0041',
+                artists: 'Signal Park',
+                album: 'Playback Notes',
+                coverUrl: null,
+                duration: '1:31',
+                durationSeconds: 91,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/41/serve',
+            },
+        ], 41);
+
+        const wrapper = mount(GlobalAudioPlayer);
+        const seekInput = wrapper.get('[aria-label="Playback progress"]');
+
+        await seekInput.setValue('45');
+
+        expect((wrapper.get('audio').element as HTMLAudioElement).currentTime).toBe(45);
+        expect((seekInput.element as HTMLInputElement).value).toBe('45');
+        expect(wrapper.text()).toContain('0:45');
     });
 });
