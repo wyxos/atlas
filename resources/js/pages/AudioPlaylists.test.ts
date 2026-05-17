@@ -40,9 +40,9 @@ const playlistSections: AudioPlaylistSection[] = [
         playlists: [
             {
                 id: 3,
-                slug: 'smart-unreacted-spotify',
-                name: 'Unreacted Spotify',
-                description: 'Source: Spotify / No reaction',
+                slug: 'smart-review-queue',
+                name: 'Review queue',
+                description: 'Hand-picked tracks to review',
                 kind: 'smart',
                 membership_mode: 'rules',
                 source_key: null,
@@ -156,7 +156,7 @@ describe('Audio playlists', () => {
         ]);
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('All audio');
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Spotify');
-        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Unreacted Spotify');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Review queue');
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Late night');
         expect(wrapper.get('[data-test="audio-playlist-scroll"]').classes()).toContain('[scrollbar-gutter:stable]');
         expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('shrink-0');

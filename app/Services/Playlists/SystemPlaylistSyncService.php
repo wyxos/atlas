@@ -45,10 +45,16 @@ class SystemPlaylistSyncService
             $playlist->wasRecentlyCreated ? $created++ : $updated++;
         }
 
+        $definitionSlugs = array_column($definitions, 'slug');
+
         $deleted = Playlist::query()
             ->where('user_id', $user->id)
             ->where('is_system', true)
-            ->whereNotIn('slug', array_column($definitions, 'slug'))
+            ->where(function ($query) use ($definitionSlugs): void {
+                $query
+                    ->whereNull('slug')
+                    ->orWhereNotIn('slug', $definitionSlugs);
+            })
             ->delete();
 
         return [

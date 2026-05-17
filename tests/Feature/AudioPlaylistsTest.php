@@ -44,6 +44,18 @@ test('audio playlists endpoint syncs system playlists and dynamic sources', func
         'is_editable' => false,
         'is_deletable' => false,
     ]);
+    Playlist::query()->create([
+        'user_id' => $user->id,
+        'slug' => null,
+        'name' => 'Not Found',
+        'kind' => 'system',
+        'membership_mode' => 'rules',
+        'membership_rules' => ['operator' => 'missing'],
+        'is_system' => true,
+        'is_smart' => true,
+        'is_editable' => false,
+        'is_deletable' => false,
+    ]);
 
     $response = $this->actingAs($user)->getJson('/api/audio/playlists');
 
@@ -57,9 +69,11 @@ test('audio playlists endpoint syncs system playlists and dynamic sources', func
         ->and($playlists->get('favorites')['count'])->toBe(1)
         ->and($playlists->get('banned')['name'])->toBe('Banned')
         ->and($playlists->has('out-of-feed'))->toBeFalse()
+        ->and($playlists->contains(fn (array $playlist): bool => $playlist['name'] === 'Not Found'))->toBeFalse()
         ->and($playlists->has('source-nas'))->toBeFalse()
         ->and($playlists->has('source-local'))->toBeFalse()
         ->and(Playlist::query()->where('user_id', $user->id)->where('slug', 'out-of-feed')->exists())->toBeFalse()
+        ->and(Playlist::query()->where('user_id', $user->id)->where('name', 'Not Found')->whereNull('slug')->exists())->toBeFalse()
         ->and($playlists->get('imports')['count'])->toBe(2)
         ->and($playlists->get('online-sources')['count'])->toBe(1)
         ->and($playlists->get('source-spotify')['count'])->toBe(1)
