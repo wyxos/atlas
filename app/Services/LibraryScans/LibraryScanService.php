@@ -48,7 +48,7 @@ class LibraryScanService
         return $run;
     }
 
-    public function startImportedFileReparse(): LibraryScanRun
+    public function startImportedFileReparse(?string $parserFilter = null): LibraryScanRun
     {
         $activeRun = LibraryScanRun::query()
             ->whereIn('status', LibraryScanRunStatus::active())
@@ -59,10 +59,13 @@ class LibraryScanService
             return $activeRun;
         }
 
+        $parserFilter = in_array($parserFilter, ['audio'], true) ? $parserFilter : null;
+
         $run = LibraryScanRun::query()->create([
             'mode' => LibraryScanRunMode::REPARSE,
+            'parser_filter' => $parserFilter,
             'status' => LibraryScanRunStatus::PENDING,
-            'phase' => 'reparse_pending',
+            'phase' => $parserFilter === 'audio' ? 'audio_reparse_pending' : 'reparse_pending',
         ]);
 
         $this->broadcastRun($run);
@@ -165,11 +168,12 @@ class LibraryScanService
     public function restart(LibraryScanRun $run): LibraryScanRun
     {
         $mode = $run->mode;
+        $parserFilter = $run->parser_filter;
 
         $this->cancel($run);
 
         return $mode === LibraryScanRunMode::REPARSE
-            ? $this->startImportedFileReparse()
+            ? $this->startImportedFileReparse($parserFilter)
             : $this->start();
     }
 

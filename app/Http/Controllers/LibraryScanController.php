@@ -43,6 +43,15 @@ class LibraryScanController extends Controller
         ], 202);
     }
 
+    public function reparseImportedAudio(LibraryScanService $scans): JsonResponse
+    {
+        $run = $scans->startImportedFileReparse('audio');
+
+        return response()->json([
+            'run' => LibraryScanPayload::run($run),
+        ], 202);
+    }
+
     public function show(Request $request, LibraryScanRun $libraryScanRun): JsonResponse
     {
         $limit = min(200, max(1, $request->integer('limit', 100)));

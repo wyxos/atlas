@@ -79,7 +79,7 @@ class ReparseImportedFilesRun implements ShouldQueue
 
     private function queueImportedFiles(LibraryScanRun $run, LibraryScanService $scans): void
     {
-        AtlasFile::query()
+        $query = AtlasFile::query()
             ->select(['id', 'path', 'filename', 'hash', 'mime_type', 'size'])
             ->whereNotNull('imported_at')
             ->whereNotNull('path')
@@ -88,7 +88,13 @@ class ReparseImportedFilesRun implements ShouldQueue
                     ->from('library_scan_items')
                     ->whereColumn('library_scan_items.file_id', 'files.id')
                     ->where('library_scan_items.library_scan_run_id', $run->id);
-            })
+            });
+
+        if ($run->parser_filter === 'audio') {
+            $query->where('mime_type', 'like', 'audio/%');
+        }
+
+        $query
             ->chunkById(self::BATCH_SIZE, function ($files) use ($run, $scans): bool {
                 $run->refresh();
                 if ($run->status === LibraryScanRunStatus::PAUSED || $run->status === LibraryScanRunStatus::CANCELED) {

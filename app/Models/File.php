@@ -157,6 +157,16 @@ class File extends Model
         return $this->belongsToMany(Container::class);
     }
 
+    public function artists(): BelongsToMany
+    {
+        return $this->belongsToMany(Artist::class);
+    }
+
+    public function albums(): BelongsToMany
+    {
+        return $this->belongsToMany(Album::class);
+    }
+
     /**
      * Get all reactions for this file.
      */

@@ -15,6 +15,7 @@ type EchoMock = {
 type ScanRunOverrides = Partial<{
     id: number;
     mode: string;
+    parser_filter: string | null;
     status: string;
     phase: string | null;
     files_found: number;
@@ -30,6 +31,7 @@ function makeRun(overrides: ScanRunOverrides = {}) {
     return {
         id: 12,
         mode: 'scan',
+        parser_filter: null,
         status: 'processing',
         phase: 'video',
         files_found: 4,
@@ -203,5 +205,26 @@ describe('LibraryScanSettings', () => {
         expect(axios.post).toHaveBeenCalledWith('/api/settings/library-scans/reparse-imported');
         expect(wrapper.text()).toContain('Imported file parser re-run queued.');
         expect(wrapper.text()).toContain('Parser re-run');
+    });
+
+    it('starts imported audio metadata reruns from settings', async () => {
+        const run = makeRun({
+            id: 19,
+            mode: 'reparse',
+            parser_filter: 'audio',
+            status: 'pending',
+            phase: 'audio_reparse_pending',
+        });
+        const axios = installAxiosMock(run, []);
+        installEchoMock();
+
+        const wrapper = await mountScanSettings();
+
+        await wrapper.findAll('button').find((button) => button.text() === 'Re-run Audio Metadata')?.trigger('click');
+        await flushPromises();
+
+        expect(axios.post).toHaveBeenCalledWith('/api/settings/library-scans/reparse-imported/audio');
+        expect(wrapper.text()).toContain('Imported audio metadata re-run queued.');
+        expect(wrapper.text()).toContain('Audio parser re-run');
     });
 });

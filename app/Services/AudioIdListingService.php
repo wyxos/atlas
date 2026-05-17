@@ -140,6 +140,9 @@ class AudioIdListingService
             ->with([
                 'metadata:file_id,payload',
                 'containers:id,type,source_id',
+                'artists:id,name',
+                'albums:id,name',
+                'albums.defaultCover:id,album_id,path,mime_type',
                 'reactions' => fn ($query) => $query
                     ->select(['id', 'file_id', 'user_id', 'type'])
                     ->where('user_id', $userId ?? 0),
@@ -187,8 +190,23 @@ class AudioIdListingService
                 ->values()
                 ->all();
 
-            $artists = array_values(array_unique([...$artists, ...$containerArtists]));
-            $albums = array_values(array_unique([...$albums, ...$containerAlbums]));
+            $relationshipArtists = $file->artists
+                ->map(fn ($artist): string => trim((string) $artist->name))
+                ->filter(fn (string $name): bool => $name !== '')
+                ->values()
+                ->all();
+            $relationshipAlbums = $file->albums
+                ->map(fn ($album): string => trim((string) $album->name))
+                ->filter(fn (string $name): bool => $name !== '')
+                ->values()
+                ->all();
+
+            $artists = $relationshipArtists !== []
+                ? array_values(array_unique($relationshipArtists))
+                : array_values(array_unique([...$artists, ...$containerArtists]));
+            $albums = $relationshipAlbums !== []
+                ? array_values(array_unique($relationshipAlbums))
+                : array_values(array_unique([...$albums, ...$containerAlbums]));
 
             $title = trim((string) (data_get($payload, 'title') ?? $file->title ?? $file->filename ?? ''));
             $source = trim((string) ($file->source ?? ''));
@@ -246,6 +264,15 @@ class AudioIdListingService
 
     private function coverUrl(File $file): ?string
     {
+        $albumCover = $file->albums
+            ->map(fn ($album) => $album->defaultCover)
+            ->filter()
+            ->first();
+
+        if ($albumCover) {
+            return FileApiPath::albumCover((int) $albumCover->id);
+        }
+
         if (is_string($file->poster_path) && trim($file->poster_path) !== '') {
             return FileApiPath::poster((int) $file->id);
         }

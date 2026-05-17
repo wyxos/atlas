@@ -8,6 +8,7 @@ const LIBRARY_SCAN_ITEMS_PAGE_SIZE = 100;
 type LibraryScanRun = {
     id: number;
     mode: string;
+    parser_filter: string | null;
     status: string;
     phase: string | null;
     files_found: number;
@@ -87,7 +88,9 @@ const libraryScanCanPause = computed(() => ['pending', 'scanning', 'processing']
 const libraryScanCanResume = computed(() => activeLibraryScan.value?.status === 'paused');
 const libraryScanCanCancel = computed(() => ['pending', 'scanning', 'processing', 'paused'].includes(activeLibraryScan.value?.status ?? ''));
 const activeLibraryScanModeLabel = computed(() => (
-    activeLibraryScan.value?.mode === 'reparse' ? 'Parser re-run' : 'Library scan'
+    activeLibraryScan.value?.mode === 'reparse'
+        ? activeLibraryScan.value.parser_filter === 'audio' ? 'Audio parser re-run' : 'Parser re-run'
+        : 'Library scan'
 ));
 const isViewingLatestLibraryScanItems = computed(() => !selectedLibraryScanItemsPagination.value.previous_cursor);
 const libraryScanProgress = computed(() => {
@@ -199,22 +202,24 @@ async function handleStartLibraryScan(): Promise<void> {
     }
 }
 
-async function handleReparseImportedFiles(): Promise<void> {
+async function handleReparseImportedFiles(parserFilter: 'all' | 'audio'): Promise<void> {
+    const isAudio = parserFilter === 'audio';
+
     isLibraryScanActionBusy.value = true;
     try {
         const { data } = await window.axios.post<{ run: LibraryScanRun }>(
-            '/api/settings/library-scans/reparse-imported',
+            isAudio ? '/api/settings/library-scans/reparse-imported/audio' : '/api/settings/library-scans/reparse-imported',
         );
         upsertLibraryScanRun(data.run);
         await fetchLibraryScanDetails(data.run.id);
         setLibraryScanNotice(
-            data.run.mode === 'reparse'
-                ? 'Imported file parser re-run queued.'
+            (isAudio ? data.run.parser_filter === 'audio' : data.run.mode === 'reparse')
+                ? isAudio ? 'Imported audio metadata re-run queued.' : 'Imported file parser re-run queued.'
                 : 'A library scan is already active.',
-            data.run.mode === 'reparse' ? 'success' : 'neutral',
+            (isAudio ? data.run.parser_filter === 'audio' : data.run.mode === 'reparse') ? 'success' : 'neutral',
         );
     } catch {
-        setLibraryScanNotice('Failed to re-run imported file parser.', 'error');
+        setLibraryScanNotice(isAudio ? 'Failed to re-run imported audio metadata.' : 'Failed to re-run imported file parser.', 'error');
     } finally {
         isLibraryScanActionBusy.value = false;
     }
@@ -328,7 +333,16 @@ onBeforeUnmount(() => {
                     size="sm"
                     variant="secondary"
                     :loading="isLibraryScanActionBusy"
-                    @click="handleReparseImportedFiles"
+                    @click="handleReparseImportedFiles('audio')"
+                >
+                    Re-run Audio Metadata
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    :loading="isLibraryScanActionBusy"
+                    @click="handleReparseImportedFiles('all')"
                 >
                     Re-run Parsers
                 </Button>

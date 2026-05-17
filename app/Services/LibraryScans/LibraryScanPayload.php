@@ -16,6 +16,7 @@ class LibraryScanPayload
         return [
             'id' => $run->id,
             'mode' => $run->mode ?: LibraryScanRunMode::SCAN,
+            'parser_filter' => $run->parser_filter,
             'status' => $run->status,
             'phase' => $run->phase,
             'files_found' => (int) $run->files_found,

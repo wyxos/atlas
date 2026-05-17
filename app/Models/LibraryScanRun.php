@@ -12,6 +12,7 @@ class LibraryScanRun extends Model
 
     protected $fillable = [
         'mode',
+        'parser_filter',
         'status',
         'phase',
         'files_found',

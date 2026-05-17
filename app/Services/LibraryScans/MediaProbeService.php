@@ -97,12 +97,14 @@ class MediaProbeService
             ], static fn (mixed $value): bool => $value !== null && $value !== []),
             'streams' => array_values(array_map(function (array $stream): array {
                 return array_filter([
+                    'index' => is_numeric($stream['index'] ?? null) ? (int) $stream['index'] : null,
                     'codec_type' => is_string($stream['codec_type'] ?? null) ? $stream['codec_type'] : null,
                     'codec_name' => is_string($stream['codec_name'] ?? null) ? $stream['codec_name'] : null,
                     'width' => is_numeric($stream['width'] ?? null) ? (int) $stream['width'] : null,
                     'height' => is_numeric($stream['height'] ?? null) ? (int) $stream['height'] : null,
                     'duration' => $this->numericString($stream['duration'] ?? null),
                     'bit_rate' => $this->numericString($stream['bit_rate'] ?? null),
+                    'disposition' => is_array($stream['disposition'] ?? null) ? $stream['disposition'] : null,
                     'tags' => is_array($stream['tags'] ?? null) ? $stream['tags'] : null,
                 ], static fn (mixed $value): bool => $value !== null && $value !== []);
             }, array_filter($streams, 'is_array'))),

@@ -5,6 +5,7 @@ namespace App\Services\LibraryScans;
 use App\Enums\LibraryScanMediaTask;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Services\Audio\AudioMetadataIngestionService;
 use App\Support\AtlasPathResolver;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
@@ -14,6 +15,7 @@ class LibraryScanFileParser
     public function __construct(
         private readonly MediaProbeService $probe,
         private readonly BrowserVideoSupport $browserVideoSupport,
+        private readonly AudioMetadataIngestionService $audioMetadata,
     ) {}
 
     /**
@@ -42,6 +44,12 @@ class LibraryScanFileParser
         }
 
         $this->mergeMetadata($file, $metadata);
+
+        if ($parser === 'audio') {
+            $file->refresh()->load('metadata');
+            $payload = $file->metadata?->payload;
+            $this->audioMetadata->ingest($file, is_array($payload) ? $payload : $metadata, $absolutePath);
+        }
 
         return [
             'updates' => [],

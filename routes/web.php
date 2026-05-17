@@ -77,6 +77,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.library-scans.store');
     Route::post('/api/settings/library-scans/reparse-imported', [\App\Http\Controllers\LibraryScanController::class, 'reparseImported'])
         ->name('api.settings.library-scans.reparse-imported');
+    Route::post('/api/settings/library-scans/reparse-imported/audio', [\App\Http\Controllers\LibraryScanController::class, 'reparseImportedAudio'])
+        ->name('api.settings.library-scans.reparse-imported.audio');
     Route::get('/api/settings/moderation-feed-removal-runs', [\App\Http\Controllers\ModerationFeedRemovalRunController::class, 'index'])
         ->name('api.settings.moderation-feed-removal-runs.index');
     Route::post('/api/settings/moderation-feed-removal-runs/preview', [\App\Http\Controllers\ModerationFeedRemovalRunController::class, 'preview'])
@@ -105,6 +107,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/audio/playlists', [\App\Http\Controllers\AudioPlaylistController::class, 'index'])->name('api.audio.playlists.index');
     Route::get('/api/audio/ids', [\App\Http\Controllers\AudioController::class, 'ids'])->name('api.audio.ids');
     Route::post('/api/audio/details', [\App\Http\Controllers\AudioController::class, 'details'])->name('api.audio.details');
+    Route::get('/api/audio/album-covers/{albumCover}', [\App\Http\Controllers\AlbumCoverController::class, 'show'])->name('api.audio.album-covers.show');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::get('/api/files/{file}/downloaded', [\App\Http\Controllers\FilesController::class, 'serveDownloaded'])->name('api.files.downloaded');

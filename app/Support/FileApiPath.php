@@ -19,6 +19,11 @@ final class FileApiPath
         return "/api/files/{$fileId}/poster";
     }
 
+    public static function albumCover(int $albumCoverId): string
+    {
+        return "/api/audio/album-covers/{$albumCoverId}";
+    }
+
     public static function serve(int $fileId): string
     {
         return "/api/files/{$fileId}/serve";

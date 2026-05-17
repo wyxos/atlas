@@ -15,6 +15,7 @@ class LibraryScanRunFactory extends Factory
     {
         return [
             'mode' => LibraryScanRunMode::SCAN,
+            'parser_filter' => null,
             'status' => LibraryScanRunStatus::PENDING,
             'phase' => 'pending',
             'files_found' => 0,
