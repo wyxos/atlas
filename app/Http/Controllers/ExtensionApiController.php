@@ -3,12 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\DownloadTransfer;
-use App\Models\File;
 use App\Models\Reaction;
-use App\Models\Tab;
-use App\Models\User;
-use App\Services\BrowsePersister;
-use App\Services\CivitAiImages;
+use App\Services\Extension\ExtensionApiPayloadSupport;
+use App\Services\Extension\ExtensionCivitAiBrowseTabService;
 use App\Services\Extension\ExtensionContainerMetadataService;
 use App\Services\Extension\ExtensionDownloadRuntimeContext;
 use App\Services\Extension\ExtensionListingMetadataOverridesNormalizer;
@@ -20,8 +17,6 @@ use App\Services\FileReactionService;
 use App\Services\Library\LibraryIndexSyncDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class ExtensionApiController extends Controller
 {
@@ -34,11 +29,11 @@ class ExtensionApiController extends Controller
             ], 401);
         }
 
-        $extensionChannel = $this->extensionChannelHash($apiKey);
+        $extensionChannel = app(ExtensionApiPayloadSupport::class)->channelHash($apiKey);
 
         return response()->json([
             'ok' => true,
-            'reverb' => $this->reverbPayload($extensionChannel),
+            'reverb' => app(ExtensionApiPayloadSupport::class)->reverbPayload($extensionChannel),
         ]);
     }
 
@@ -55,7 +50,7 @@ class ExtensionApiController extends Controller
         }
 
         $channelName = trim((string) $request->input('channel_name', ''));
-        $expectedChannel = 'private-extension-downloads.'.$this->extensionChannelHash($apiKey);
+        $expectedChannel = 'private-extension-downloads.'.app(ExtensionApiPayloadSupport::class)->channelHash($apiKey);
         if ($channelName === '' || ! hash_equals($expectedChannel, $channelName)) {
             return response()->json([
                 'message' => 'Invalid Reverb channel authorization request.',
@@ -204,7 +199,7 @@ class ExtensionApiController extends Controller
             'user_agent' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
+        $extensionChannel = app(ExtensionApiPayloadSupport::class)->channelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
         $urlDerivedListingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
             $validated['referrer_url_hash_aware'] ?? null,
             $validated['referrer_url'] ?? null,
@@ -226,11 +221,11 @@ class ExtensionApiController extends Controller
             $downloadRuntimeContext->fromValidated($validated, $request),
             $listingMetadataOverrides,
         );
-        $this->attachDerivedContainers([$payload], $listingMetadataOverrides);
+        app(ExtensionApiPayloadSupport::class)->attachDerivedContainers([$payload], $listingMetadataOverrides);
 
         return response()->json([
             ...$payload,
-            'reverb' => $this->reverbPayload($extensionChannel),
+            'reverb' => app(ExtensionApiPayloadSupport::class)->reverbPayload($extensionChannel),
         ]);
     }
 
@@ -283,7 +278,7 @@ class ExtensionApiController extends Controller
             'user_agent' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $extensionChannel = $this->extensionChannelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
+        $extensionChannel = app(ExtensionApiPayloadSupport::class)->channelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
         $runtimeContext = $downloadRuntimeContext->fromValidated($validated, $request);
         $firstItem = $validated['items'][0] ?? [];
         $urlDerivedListingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
@@ -343,7 +338,7 @@ class ExtensionApiController extends Controller
             ]);
         }
 
-        $this->attachActiveTransfers(
+        app(ExtensionApiPayloadSupport::class)->attachActiveTransfers(
             $batchItems,
             $reactionProcessor->activeTransfersByFileId($fileIds),
         );
@@ -355,12 +350,12 @@ class ExtensionApiController extends Controller
             }
         }
 
-        $this->attachDerivedContainers($batchItems, $listingMetadataOverrides);
+        app(ExtensionApiPayloadSupport::class)->attachDerivedContainers($batchItems, $listingMetadataOverrides);
         $libraryIndexSyncDispatcher->filesAndReactions($fileIds);
 
         return response()->json([
             ...$primaryPayload,
-            'reverb' => $this->reverbPayload($extensionChannel),
+            'reverb' => app(ExtensionApiPayloadSupport::class)->reverbPayload($extensionChannel),
             'batch' => [
                 'count' => count($batchItems),
                 'primary_candidate_id' => $primaryCandidateId,
@@ -441,33 +436,9 @@ class ExtensionApiController extends Controller
             'nsfw' => ['sometimes', 'boolean'],
         ]);
 
-        $modelId = (int) $validated['model_id'];
-        $modelVersionId = isset($validated['model_version_id']) ? (int) $validated['model_version_id'] : null;
-        $nsfw = (bool) ($validated['nsfw'] ?? false);
-        $params = array_filter([
-            'feed' => 'online',
-            'service' => CivitAiImages::key(),
-            'page' => 1,
-            'limit' => 20,
-            'modelId' => $modelId,
-            'modelVersionId' => $modelVersionId,
-            'nsfw' => $nsfw ? true : null,
-        ], static fn (mixed $value): bool => $value !== null);
-
-        $tab = $this->createExtensionBrowseTab(
-            $user,
-            $this->buildCivitAiModelBrowseTabLabel($modelId, $modelVersionId),
-            $params,
+        return response()->json(
+            app(ExtensionCivitAiBrowseTabService::class)->openModelTab($user, $validated)
         );
-
-        return response()->json([
-            'tab' => [
-                'id' => $tab->id,
-                'label' => $tab->label,
-                'params' => $tab->params ?? [],
-            ],
-            'browse_url' => url('/browse'),
-        ]);
     }
 
     public function openCivitAiUserBrowseTab(
@@ -486,34 +457,9 @@ class ExtensionApiController extends Controller
             'nsfw' => ['sometimes', 'boolean'],
         ]);
 
-        $username = trim((string) $validated['username']);
-        if ($username === '') {
-            throw ValidationException::withMessages([
-                'username' => 'The username field is required.',
-            ]);
-        }
-
-        $tab = $this->createExtensionBrowseTab(
-            $user,
-            "CivitAI Images: User $username - 1",
-            [
-                'feed' => 'online',
-                'service' => CivitAiImages::key(),
-                'page' => 1,
-                'limit' => 20,
-                'username' => $username,
-                ...(($validated['nsfw'] ?? false) ? ['nsfw' => true] : []),
-            ],
+        return response()->json(
+            app(ExtensionCivitAiBrowseTabService::class)->openUserTab($user, $validated)
         );
-
-        return response()->json([
-            'tab' => [
-                'id' => $tab->id,
-                'label' => $tab->label,
-                'params' => $tab->params ?? [],
-            ],
-            'browse_url' => url('/browse'),
-        ]);
     }
 
     private function resolveExtensionUser(Request $request, ExtensionApiKeyService $extensionApiKey): ?\App\Models\User
@@ -524,129 +470,5 @@ class ExtensionApiController extends Controller
         }
 
         return $extensionApiKey->resolveUserForApiKey($apiKey);
-    }
-
-    /**
-     * @param  array<string, mixed>  $params
-     */
-    private function createExtensionBrowseTab(User $user, string $label, array $params): Tab
-    {
-        return DB::transaction(function () use ($user, $label, $params) {
-            $userId = (int) $user->id;
-            $nextPosition = (Tab::forUser($userId)->max('position') ?? -1) + 1;
-
-            Tab::forUser($userId)->update(['is_active' => false]);
-
-            return Tab::query()->create([
-                'user_id' => $userId,
-                'label' => $label,
-                'custom_label' => null,
-                'params' => $params,
-                'position' => $nextPosition,
-                'is_active' => true,
-            ]);
-        });
-    }
-
-    private function buildCivitAiModelBrowseTabLabel(int $modelId, ?int $modelVersionId): string
-    {
-        if ($modelVersionId !== null && $modelVersionId > 0) {
-            return "CivitAI Images: Model {$modelId} @ {$modelVersionId} - 1";
-        }
-
-        return "CivitAI Images: Model {$modelId} - 1";
-    }
-
-    private function attachDerivedContainers(array $payloads, array $listingMetadataOverrides): void
-    {
-        if ($listingMetadataOverrides === []) {
-            return;
-        }
-
-        $fileIds = [];
-        foreach ($payloads as $payload) {
-            $fileId = data_get($payload, 'file.id');
-            if (is_numeric($fileId)) {
-                $fileIds[] = (int) $fileId;
-            }
-        }
-
-        if ($fileIds === []) {
-            return;
-        }
-
-        app(BrowsePersister::class)->attachContainersForFiles(
-            File::query()
-                ->whereIn('id', array_values(array_unique($fileIds)))
-                ->get()
-        );
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $payloads
-     * @param  array<int, DownloadTransfer>  $activeTransfersByFileId
-     */
-    private function attachActiveTransfers(array &$payloads, array $activeTransfersByFileId): void
-    {
-        foreach ($payloads as &$payload) {
-            $fileId = data_get($payload, 'file.id');
-            if (! is_numeric($fileId)) {
-                continue;
-            }
-
-            $download = is_array($payload['download'] ?? null) ? $payload['download'] : [];
-            $activeTransfer = $activeTransfersByFileId[(int) $fileId] ?? null;
-            $payload['download'] = [
-                'requested' => $download['requested'] ?? false,
-                'transfer_id' => $activeTransfer?->id,
-                'status' => $activeTransfer?->status,
-                'progress_percent' => $activeTransfer?->last_broadcast_percent,
-                'downloaded_at' => $download['downloaded_at'] ?? null,
-            ];
-        }
-        unset($payload);
-    }
-
-    private function extensionChannelHash(string $apiKey): string
-    {
-        return hash('sha256', $apiKey);
-    }
-
-    /**
-     * @return array{enabled: bool, key: string, host: string, port: int, scheme: string, channel: string}
-     */
-    private function reverbPayload(string $extensionChannel): array
-    {
-        $reverb = config('broadcasting.connections.reverb');
-        $key = trim((string) data_get($reverb, 'key', ''));
-        $rawHost = trim((string) data_get($reverb, 'options.host', ''));
-        $host = '';
-        $hostPort = null;
-        if ($rawHost !== '') {
-            $hostCandidate = str_contains($rawHost, '://') ? $rawHost : 'https://'.$rawHost;
-            $parsedHost = parse_url($hostCandidate, PHP_URL_HOST);
-            $parsedPort = parse_url($hostCandidate, PHP_URL_PORT);
-            $host = is_string($parsedHost) ? trim($parsedHost) : '';
-            $hostPort = is_int($parsedPort) ? $parsedPort : null;
-        }
-        if ($host === '') {
-            $appHost = parse_url((string) config('app.url', ''), PHP_URL_HOST);
-            $host = is_string($appHost) ? $appHost : '';
-        }
-        $configuredPort = (int) data_get($reverb, 'options.port', 443);
-        $port = $hostPort ?? $configuredPort;
-        $scheme = strtolower((string) data_get($reverb, 'options.scheme', 'https'));
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            $scheme = 'https';
-        }
-
-        return [
-            'enabled' => $key !== '' && $host !== '',
-            'key' => $key,
-            'host' => $host,
-            'port' => $port > 0 ? $port : 443,
-            'scheme' => $scheme,
-            'channel' => 'private-extension-downloads.'.$extensionChannel,
-        ];
     }
 }

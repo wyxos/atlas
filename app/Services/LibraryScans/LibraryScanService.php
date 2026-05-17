@@ -8,10 +8,7 @@ use App\Enums\LibraryScanRunMode;
 use App\Enums\LibraryScanRunStatus;
 use App\Events\LibraryScanItemUpdated;
 use App\Events\LibraryScanRunUpdated;
-use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
-use App\Jobs\LibraryScans\GenerateLibraryScanPreviewAssets;
 use App\Jobs\LibraryScans\ImportLibraryScanItem;
-use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
 use App\Jobs\LibraryScans\ReparseImportedFilesRun;
 use App\Jobs\LibraryScans\ScanLibraryRun;
@@ -24,6 +21,10 @@ use Illuminate\Support\Facades\DB;
 
 class LibraryScanService
 {
+    public function __construct(
+        private readonly LibraryScanMediaTaskService $mediaTasks,
+    ) {}
+
     public function start(): LibraryScanRun
     {
         $activeRun = LibraryScanRun::query()
@@ -199,86 +200,17 @@ class LibraryScanService
      */
     public function queueMediaTasks(LibraryScanItem $item, array $tasks, bool $regeneratePreviewAssets = false): int
     {
-        $queuedTasks = [];
-
-        foreach (array_unique($tasks) as $type) {
-            /** @var LibraryScanMediaTaskModel $task */
-            $task = LibraryScanMediaTaskModel::query()->updateOrCreate(
-                [
-                    'library_scan_item_id' => $item->id,
-                    'type' => $type,
-                ],
-                [
-                    'file_id' => $item->file_id,
-                    'status' => MediaTask::STATUS_PENDING,
-                    'phase' => MediaTask::PHASE_QUEUED,
-                    'progress' => 0,
-                    'result' => null,
-                    'error_code' => null,
-                    'error_message' => null,
-                    'error_context' => null,
-                ],
-            );
-
-            $queuedTasks[] = $task;
-        }
-
-        if ($queuedTasks !== [] && ! $item->isTerminal()) {
-            $item->update([
-                'status' => LibraryScanItemStatus::PROCESSING,
-                'phase' => MediaTask::PHASE_MEDIA_QUEUED,
-                'progress' => 50,
-            ]);
-            $this->broadcastItem($item->fresh(['mediaTasks']));
-        } elseif ($queuedTasks !== []) {
-            $this->broadcastItem($item->fresh(['mediaTasks']));
-        }
-
-        foreach ($queuedTasks as $task) {
-            $this->dispatchMediaTask($task, $regeneratePreviewAssets);
-        }
-
-        return count($queuedTasks);
+        return $this->mediaTasks->queueMediaTasks($item, $tasks, $regeneratePreviewAssets, $this);
     }
 
     public function deferMediaTask(?LibraryScanMediaTaskModel $task): void
     {
-        if (! $task || in_array($task->status, MediaTask::terminal(), true)) {
-            return;
-        }
-
-        $task->update([
-            'status' => MediaTask::STATUS_PENDING,
-            'phase' => MediaTask::PHASE_PAUSED,
-            'progress' => 0,
-        ]);
-
-        $item = $task->item()->with(['run', 'mediaTasks'])->first();
-        if ($item) {
-            $this->broadcastItem($item->fresh(['mediaTasks']));
-        }
+        $this->mediaTasks->deferMediaTask($task, $this);
     }
 
     public function markMediaTaskProcessing(?LibraryScanMediaTaskModel $task, string $phase, int $progress = 0): void
     {
-        if (! $task || in_array($task->status, MediaTask::terminal(), true)) {
-            return;
-        }
-
-        $task->update([
-            'status' => MediaTask::STATUS_PROCESSING,
-            'phase' => $phase,
-            'progress' => max(0, min(99, $progress)),
-        ]);
-
-        $item = $task->item()->with(['run', 'mediaTasks'])->first();
-        if ($item) {
-            if ($item->status === LibraryScanItemStatus::COMPLETED) {
-                $this->broadcastItem($item->fresh(['mediaTasks']));
-            } else {
-                $this->refreshItemMediaProgress($item);
-            }
-        }
+        $this->mediaTasks->markMediaTaskProcessing($task, $phase, $progress, $this);
     }
 
     /**
@@ -286,24 +218,7 @@ class LibraryScanService
      */
     public function markMediaTaskCompleted(?LibraryScanMediaTaskModel $task, array $result = []): void
     {
-        if (! $task || in_array($task->status, MediaTask::terminal(), true)) {
-            return;
-        }
-
-        $task->update([
-            'status' => MediaTask::STATUS_COMPLETED,
-            'phase' => MediaTask::PHASE_COMPLETED,
-            'progress' => 100,
-            'result' => $result,
-            'error_code' => null,
-            'error_message' => null,
-            'error_context' => null,
-        ]);
-
-        $item = $task->item()->with(['run', 'file', 'mediaTasks'])->first();
-        if ($item) {
-            $this->completeItemIfMediaTasksDone($item);
-        }
+        $this->mediaTasks->markMediaTaskCompleted($task, $result, $this);
     }
 
     /**
@@ -315,105 +230,17 @@ class LibraryScanService
         string $message,
         array $context = [],
     ): void {
-        if (! $task || in_array($task->status, MediaTask::terminal(), true)) {
-            return;
-        }
-
-        $task->update([
-            'status' => MediaTask::STATUS_FAILED,
-            'phase' => MediaTask::PHASE_FAILED,
-            'progress' => 100,
-            'error_code' => $code,
-            'error_message' => $message,
-            'error_context' => $context,
-        ]);
-
-        $item = $task->item()->with(['run', 'file', 'mediaTasks'])->first();
-        if ($item) {
-            $this->completeItemIfMediaTasksDone($item);
-        }
+        $this->mediaTasks->markMediaTaskFailed($task, $code, $message, $context, $this);
     }
 
     public function markMediaTaskCanceled(?LibraryScanMediaTaskModel $task): void
     {
-        if (! $task || in_array($task->status, MediaTask::terminal(), true)) {
-            return;
-        }
-
-        $task->update([
-            'status' => MediaTask::STATUS_CANCELED,
-            'phase' => MediaTask::PHASE_CANCELED,
-            'progress' => 100,
-        ]);
-
-        $item = $task->item()->with(['run', 'file', 'mediaTasks'])->first();
-        if ($item) {
-            $this->completeItemIfMediaTasksDone($item);
-        }
+        $this->mediaTasks->markMediaTaskCanceled($task, $this);
     }
 
     public function completeItemIfMediaTasksDone(LibraryScanItem $item): void
     {
-        if ($item->isTerminal()) {
-            if ($item->status === LibraryScanItemStatus::COMPLETED && $item->file_id) {
-                app(LibraryIndexSyncDispatcher::class)->files([(int) $item->file_id]);
-            }
-            $this->broadcastItem($item->fresh(['mediaTasks']));
-
-            return;
-        }
-
-        $item->loadMissing(['run', 'file', 'mediaTasks']);
-        if ($item->mediaTasks->isEmpty()) {
-            return;
-        }
-
-        $remaining = $item->mediaTasks
-            ->whereNotIn('status', MediaTask::terminal());
-
-        if ($remaining->isNotEmpty()) {
-            $this->refreshItemMediaProgress($item);
-
-            return;
-        }
-
-        $failed = $item->mediaTasks->firstWhere('status', MediaTask::STATUS_FAILED);
-        if ($failed) {
-            $item->update([
-                'status' => LibraryScanItemStatus::FAILED,
-                'phase' => LibraryScanItemStatus::FAILED,
-                'progress' => 100,
-                'error_code' => $failed->error_code ?: 'media_task_failed',
-                'error_message' => $failed->error_message ?: 'Media task failed.',
-                'error_context' => [
-                    'media_task_id' => $failed->id,
-                    'media_task_type' => $failed->type,
-                    ...($failed->error_context ?? []),
-                ],
-            ]);
-        } elseif ($item->mediaTasks->every(fn (LibraryScanMediaTaskModel $task): bool => $task->status === MediaTask::STATUS_CANCELED)) {
-            $item->update([
-                'status' => LibraryScanItemStatus::CANCELED,
-                'phase' => MediaTask::PHASE_CANCELED,
-                'progress' => 100,
-            ]);
-        } else {
-            if ($item->file_id) {
-                app(LibraryIndexSyncDispatcher::class)->files([(int) $item->file_id]);
-            }
-
-            $item->update([
-                'status' => LibraryScanItemStatus::COMPLETED,
-                'phase' => LibraryScanItemStatus::COMPLETED,
-                'progress' => 100,
-                'error_code' => null,
-                'error_message' => null,
-                'error_context' => null,
-            ]);
-        }
-
-        $this->broadcastItem($item->fresh(['mediaTasks']));
-        $this->completeIfDone($item->run);
+        $this->mediaTasks->completeItemIfMediaTasksDone($item, $this);
     }
 
     public function completeIfDone(?LibraryScanRun $run): void
@@ -469,23 +296,7 @@ class LibraryScanService
 
     public function dispatchPausedMediaTasksForRun(LibraryScanRun $run): void
     {
-        $regeneratePreviewAssets = $run->mode === LibraryScanRunMode::REPARSE;
-
-        LibraryScanMediaTaskModel::query()
-            ->where('status', MediaTask::STATUS_PENDING)
-            ->where('phase', MediaTask::PHASE_PAUSED)
-            ->whereHas('item', fn ($query) => $query->where('library_scan_run_id', $run->id))
-            ->orderBy('id')
-            ->chunkById(500, function ($tasks) use ($regeneratePreviewAssets): void {
-                foreach ($tasks as $task) {
-                    $task->update([
-                        'phase' => MediaTask::PHASE_QUEUED,
-                        'updated_at' => now(),
-                    ]);
-
-                    $this->dispatchMediaTask($task, $regeneratePreviewAssets);
-                }
-            });
+        $this->mediaTasks->dispatchPausedMediaTasksForRun($run, $this);
     }
 
     public function queueParserForImportedScanItem(
@@ -635,55 +446,6 @@ class LibraryScanService
         } catch (\Throwable) {
             // Broadcasting must not affect scan work.
         }
-    }
-
-    private function refreshItemMediaProgress(LibraryScanItem $item): void
-    {
-        if ($item->isTerminal()) {
-            return;
-        }
-
-        $item->loadMissing('mediaTasks');
-        if ($item->mediaTasks->isEmpty()) {
-            return;
-        }
-
-        $averageProgress = (int) round($item->mediaTasks->avg(fn (LibraryScanMediaTaskModel $task): int => (int) $task->progress));
-        $item->update([
-            'status' => LibraryScanItemStatus::PROCESSING,
-            'phase' => $item->mediaTasks->contains('status', MediaTask::STATUS_PROCESSING)
-                ? MediaTask::PHASE_MEDIA_PROCESSING
-                : MediaTask::PHASE_MEDIA_QUEUED,
-            'progress' => min(99, max(50, 50 + (int) round($averageProgress / 2))),
-        ]);
-
-        $this->broadcastItem($item->fresh(['mediaTasks']));
-    }
-
-    private function dispatchMediaTask(LibraryScanMediaTaskModel $task, bool $regeneratePreviewAssets): void
-    {
-        if ($task->type === MediaTask::TASK_PREVIEW_ASSETS) {
-            GenerateLibraryScanPreviewAssets::dispatch(
-                $task->id,
-                regeneratePreviewAssets: $regeneratePreviewAssets,
-            );
-
-            return;
-        }
-
-        if ($task->type === MediaTask::TASK_AUDIO_NORMALIZATION) {
-            NormalizeLibraryScanAudio::dispatch($task->id);
-
-            return;
-        }
-
-        if ($task->type === MediaTask::TASK_VIDEO_STREAMABLE) {
-            CreateLibraryScanStreamableVideo::dispatch($task->id);
-
-            return;
-        }
-
-        $this->markMediaTaskFailed($task, 'unknown_media_task', "Unknown media task [$task->type].");
     }
 
     private function scanHasPendingImports(LibraryScanRun $run): bool

@@ -23,6 +23,10 @@ class SpotifyOAuthService
 
     private const STATE_TTL_SECONDS = 900;
 
+    public function __construct(
+        private readonly SpotifyOAuthConfig $config,
+    ) {}
+
     public function statusForUser(User $user): array
     {
         $token = $this->tokenForUser($user);
@@ -30,8 +34,8 @@ class SpotifyOAuthService
         $base = [
             'key' => 'spotify',
             'label' => 'Spotify',
-            'configured' => $this->isConfigured(),
-            'missing_configuration' => $this->missingConfiguration(),
+            'configured' => $this->config->isConfigured(),
+            'missing_configuration' => $this->config->missingConfiguration(),
             'connected' => $token !== null,
             'session_valid' => false,
             'needs_reconnect' => false,
@@ -81,7 +85,7 @@ class SpotifyOAuthService
 
     public function beginAuthorization(Request $request): string
     {
-        if (! $this->isConfigured()) {
+        if (! $this->config->isConfigured()) {
             throw new SpotifyOAuthException('Spotify OAuth is not configured on this server.');
         }
 
@@ -98,16 +102,16 @@ class SpotifyOAuthService
 
         $query = http_build_query([
             'response_type' => 'code',
-            'client_id' => $this->clientId(),
-            'redirect_uri' => $this->redirectUri(),
-            'scope' => implode(' ', $this->configuredScopes()),
+            'client_id' => $this->config->clientId(),
+            'redirect_uri' => $this->config->redirectUri(),
+            'scope' => implode(' ', $this->config->configuredScopes()),
             'state' => $state,
             'code_challenge_method' => 'S256',
             'code_challenge' => $codeChallenge,
             'show_dialog' => 'false',
         ], '', '&', PHP_QUERY_RFC3986);
 
-        return rtrim($this->authorizeUrl(), '?').'?'.$query;
+        return rtrim($this->config->authorizeUrl(), '?').'?'.$query;
     }
 
     public function consumeAuthorizationState(Request $request, string $state): ?string
@@ -139,17 +143,17 @@ class SpotifyOAuthService
 
     public function connectWithAuthorizationCode(User $user, string $authorizationCode, string $codeVerifier): SpotifyToken
     {
-        if (! $this->isConfigured()) {
+        if (! $this->config->isConfigured()) {
             throw new SpotifyOAuthException('Spotify OAuth is not configured on this server.');
         }
 
         $response = $this->tokenHttpClient()
-            ->post($this->tokenUrl(), array_filter([
+            ->post($this->config->tokenUrl(), array_filter([
                 'grant_type' => 'authorization_code',
                 'code' => $authorizationCode,
-                'redirect_uri' => $this->redirectUri(),
-                'client_id' => $this->clientId(),
-                'client_secret' => $this->clientSecret() ?: null,
+                'redirect_uri' => $this->config->redirectUri(),
+                'client_id' => $this->config->clientId(),
+                'client_secret' => $this->config->clientSecret() ?: null,
                 'code_verifier' => $codeVerifier,
             ], static fn ($value): bool => $value !== null && $value !== ''));
 
@@ -211,11 +215,11 @@ class SpotifyOAuthService
         }
 
         $response = $this->tokenHttpClient()
-            ->post($this->tokenUrl(), array_filter([
+            ->post($this->config->tokenUrl(), array_filter([
                 'grant_type' => 'refresh_token',
                 'refresh_token' => $refreshToken,
-                'client_id' => $this->clientId(),
-                'client_secret' => $this->clientSecret() ?: null,
+                'client_id' => $this->config->clientId(),
+                'client_secret' => $this->config->clientSecret() ?: null,
             ], static fn ($value): bool => $value !== null && $value !== ''));
 
         if (! $response->successful()) {
@@ -252,7 +256,7 @@ class SpotifyOAuthService
 
         $scope = trim((string) Arr::get($payload, 'scope', ''));
         if ($scope === '') {
-            $scope = trim((string) ($existing?->scope ?? implode(' ', $this->configuredScopes())));
+            $scope = trim((string) ($existing?->scope ?? implode(' ', $this->config->configuredScopes())));
         }
 
         $expiresIn = max(0, (int) Arr::get($payload, 'expires_in', 0));
@@ -362,7 +366,7 @@ class SpotifyOAuthService
         $response = Http::acceptJson()
             ->withToken($accessToken)
             ->timeout(15)
-            ->get(rtrim($this->apiBaseUrl(), '/').'/me');
+            ->get(rtrim($this->config->apiBaseUrl(), '/').'/me');
 
         if (! $response->successful()) {
             throw new SpotifyOAuthException(
@@ -435,79 +439,6 @@ class SpotifyOAuthService
         return Http::asForm()
             ->acceptJson()
             ->timeout(15);
-    }
-
-    private function isConfigured(): bool
-    {
-        return $this->clientId() !== '' && $this->redirectUri() !== '';
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function missingConfiguration(): array
-    {
-        $missing = [];
-        if ($this->clientId() === '') {
-            $missing[] = 'SPOTIFY_CLIENT_ID';
-        }
-
-        if ($this->redirectUri() === '') {
-            $missing[] = 'SPOTIFY_REDIRECT_URI';
-        }
-
-        return $missing;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function configuredScopes(): array
-    {
-        $rawScopes = config('services.spotify.scopes', '');
-        if (is_array($rawScopes)) {
-            return array_values(array_filter(array_map(
-                static fn ($scope): string => trim((string) $scope),
-                $rawScopes
-            ), static fn (string $scope): bool => $scope !== ''));
-        }
-
-        $value = trim((string) $rawScopes);
-        if ($value === '') {
-            return [];
-        }
-
-        return $this->normalizeScopes($value);
-    }
-
-    private function clientId(): string
-    {
-        return trim((string) config('services.spotify.client_id', ''));
-    }
-
-    private function clientSecret(): string
-    {
-        return trim((string) config('services.spotify.client_secret', ''));
-    }
-
-    private function redirectUri(): string
-    {
-        return trim((string) config('services.spotify.redirect_uri', ''));
-    }
-
-    private function authorizeUrl(): string
-    {
-        return trim((string) config('services.spotify.authorize_url', 'https://accounts.spotify.com/authorize'));
-    }
-
-    private function tokenUrl(): string
-    {
-        return trim((string) config('services.spotify.token_url', 'https://accounts.spotify.com/api/token'));
-    }
-
-    private function apiBaseUrl(): string
-    {
-        return trim((string) config('services.spotify.api_base_url', 'https://api.spotify.com/v1'));
     }
 
     private function decryptedTokenValueOrEmpty(SpotifyToken $token, string $attribute): string

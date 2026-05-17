@@ -39,7 +39,20 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function configureLibraryScanStorage(): string
 {
-    // ..
+    $root = storage_path('framework/testing/library-scan-'.Illuminate\Support\Str::random(10));
+
+    if (is_dir($root)) {
+        Illuminate\Support\Facades\File::deleteDirectory($root);
+    }
+
+    config()->set('atlas.root', $root);
+    config()->set('filesystems.disks.atlas.root', $root.DIRECTORY_SEPARATOR.'.app');
+    Illuminate\Support\Facades\Storage::forgetDisk(['atlas']);
+
+    Illuminate\Support\Facades\File::ensureDirectoryExists($root);
+    Illuminate\Support\Facades\File::ensureDirectoryExists($root.DIRECTORY_SEPARATOR.'.app');
+
+    return $root;
 }

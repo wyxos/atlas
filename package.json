@@ -22,7 +22,7 @@
         "test:coverage": "vitest run --coverage -c vitest.config.js --passWithNoTests",
         "e2e": "playwright test",
         "e2e:ui": "playwright test --ui",
-        "backend:lint": "php vendor/bin/pint --dirty --test",
+        "backend:lint": "php vendor/bin/pint --dirty --test && php scripts/php-max-lines.php --max=500",
         "backend:lint:fix": "php vendor/bin/pint --dirty",
         "backend:test": "php artisan test --compact",
         "generate-favicons": "tsx scripts/generate-favicons.ts",
