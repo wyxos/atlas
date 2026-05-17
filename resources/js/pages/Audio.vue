@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import PageLayout from '../components/PageLayout.vue';
 import AudioFilterSheet from '../components/AudioFilterSheet.vue';
 import AudioListShell from '../components/AudioListShell.vue';
@@ -32,7 +33,6 @@ const error = ref<string | null>(null);
 const isFilterSheetOpen = ref(false);
 const isPlaylistPanelOpen = ref(false);
 const activeFilter = ref<AudioSourceFilter>('all');
-const activePlaylist = ref<AudioPlaylist | null>(null);
 const playlistSections = ref<AudioPlaylistSection[]>([]);
 const arePlaylistsLoading = ref(false);
 const playlistsLoaded = ref(false);
@@ -44,6 +44,8 @@ const selectedAudioId = ref<number | null>(null);
 const audioPlayer = useGlobalAudioPlayer();
 const playerCurrentTrackId = audioPlayer.currentTrackId;
 const playerIsPlaying = audioPlayer.isPlaying;
+const route = useRoute();
+const router = useRouter();
 
 const {
     detailAlbum,
@@ -98,7 +100,15 @@ const activeFilterLabel = computed(() => {
     return 'All';
 });
 
-const activePlaylistSlug = computed(() => activePlaylist.value?.slug ?? 'all');
+const activePlaylistSlug = computed(() => {
+    const routeSlug = route.params.playlistSlug;
+
+    if (typeof routeSlug !== 'string' || routeSlug.trim() === '') {
+        return 'all';
+    }
+
+    return routeSlug;
+});
 
 let isDisposed = false;
 let activeRequestToken = 0;
@@ -197,14 +207,17 @@ async function loadPlaylists(): Promise<void> {
 }
 
 function handlePlaylistSelect(playlist: AudioPlaylist): void {
-    if (activePlaylist.value?.slug === playlist.slug) {
+    if (activePlaylistSlug.value === playlist.slug) {
         return;
     }
 
-    activePlaylist.value = playlist;
     activeFilter.value = 'all';
-    cancelActiveRequest();
-    void loadAllAudioIds();
+    void router.push({
+        name: 'audio',
+        params: {
+            playlistSlug: playlist.slug,
+        },
+    });
 }
 
 function audioPlayerTrack(audioId: number): AudioPlayerTrack {
@@ -232,6 +245,7 @@ function audioPlayerQueue(): AudioPlayerTrack[] {
 
 function handleAudioSelect(audioId: number): void {
     selectedAudioId.value = audioId;
+    audioPlayer.queueTracks(audioPlayerQueue(), audioId);
 }
 
 function handleAudioPlay(audioId: number): void {
@@ -433,6 +447,12 @@ watch(isPlaylistPanelOpen, (isOpen) => {
     }
 });
 
+watch(activePlaylistSlug, () => {
+    activeFilter.value = 'all';
+    cancelActiveRequest();
+    void loadAllAudioIds();
+});
+
 watch(detailsById, () => {
     audioPlayer.updateQueuedTracks(audioPlayerQueue());
 });
@@ -486,14 +506,23 @@ onUnmounted(() => {
                 class="flex min-h-0 flex-1"
                 data-test="audio-library-surface"
             >
-                <AudioPlaylistPanel
-                    v-if="isPlaylistPanelOpen"
-                    :sections="playlistSections"
-                    :active-slug="activePlaylistSlug"
-                    :is-loading="arePlaylistsLoading"
-                    :error="playlistsError"
-                    @select="handlePlaylistSelect"
-                />
+                <Transition
+                    enter-active-class="transition duration-500 ease-in-out"
+                    enter-from-class="-translate-x-full opacity-0"
+                    enter-to-class="translate-x-0 opacity-100"
+                    leave-active-class="transition duration-300 ease-in-out"
+                    leave-from-class="translate-x-0 opacity-100"
+                    leave-to-class="-translate-x-full opacity-0"
+                >
+                    <AudioPlaylistPanel
+                        v-if="isPlaylistPanelOpen"
+                        :sections="playlistSections"
+                        :active-slug="activePlaylistSlug"
+                        :is-loading="arePlaylistsLoading"
+                        :error="playlistsError"
+                        @select="handlePlaylistSelect"
+                    />
+                </Transition>
                 <AudioListShell
                     :active-filter-label="activeFilterLabel"
                     :audio-ids="filteredAudioIds"

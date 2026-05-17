@@ -9,13 +9,15 @@ import {
     Pause,
     Play,
     Repeat,
+    Repeat1,
     Shuffle,
     SkipBack,
     SkipForward,
     Smile,
     ThumbsUp,
-    Volume2,
 } from 'lucide-vue-next';
+import AudioQueueSheet from './AudioQueueSheet.vue';
+import AudioVolumeControl from './AudioVolumeControl.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
 import type { ReactionType } from '@/types/reaction';
@@ -24,6 +26,7 @@ const audioPlayer = useGlobalAudioPlayer();
 const audioRef = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(0);
 const mediaDuration = ref(0);
+const isQueueSheetOpen = ref(false);
 
 const currentTrack = audioPlayer.currentTrack;
 const currentTrackId = audioPlayer.currentTrackId;
@@ -59,6 +62,17 @@ const progressWidth = computed(() => {
     }
 
     return `${Math.min(100, Math.max(0, (currentTime.value / durationSeconds.value) * 100))}%`;
+});
+const repeatButtonLabel = computed(() => {
+    if (audioPlayer.repeatMode.value === 'one') {
+        return 'Repeat one';
+    }
+
+    if (audioPlayer.repeatMode.value === 'all') {
+        return 'Repeat all';
+    }
+
+    return 'Repeat off';
 });
 
 const controlButtonClass = [
@@ -117,7 +131,21 @@ function handleSeek(event: Event): void {
 }
 
 function handleEnded(): void {
+    const endedTrackId = currentTrackId.value;
+
+    if (audioPlayer.repeatMode.value === 'one') {
+        restartHiddenAudio();
+        audioPlayer.restartCurrentTrack();
+        void attemptPlay();
+        return;
+    }
+
     audioPlayer.playNext();
+
+    if (audioPlayer.isPlaying.value && audioPlayer.currentTrackId.value === endedTrackId) {
+        restartHiddenAudio();
+        void attemptPlay();
+    }
 }
 
 function handlePlaybackClick(): void {
@@ -160,6 +188,14 @@ async function handleBlacklist(): Promise<void> {
     });
 }
 
+function restartHiddenAudio(): void {
+    currentTime.value = 0;
+
+    if (audioRef.value) {
+        audioRef.value.currentTime = 0;
+    }
+}
+
 watch(currentTrackId, () => {
     currentTime.value = 0;
     mediaDuration.value = currentTrack.value?.durationSeconds ?? 0;
@@ -176,6 +212,12 @@ watch(isPlaying, (playing) => {
     }
 
     audioRef.value?.pause();
+});
+
+watch(audioPlayer.hasQueue, (hasQueue) => {
+    if (!hasQueue) {
+        isQueueSheetOpen.value = false;
+    }
 });
 </script>
 
@@ -196,10 +238,26 @@ watch(isPlaying, (playing) => {
             @timeupdate="handleTimeUpdate"
             @ended="handleEnded"
         ></audio>
+        <Transition
+            enter-active-class="transition duration-500 ease-in-out"
+            enter-from-class="translate-x-full opacity-0"
+            enter-to-class="translate-x-0 opacity-100"
+            leave-active-class="transition duration-300 ease-in-out"
+            leave-from-class="translate-x-0 opacity-100"
+            leave-to-class="translate-x-full opacity-0"
+        >
+            <AudioQueueSheet
+                v-if="isQueueSheetOpen"
+                :tracks="audioPlayer.queue.value"
+                :current-track-id="currentTrackId"
+                @close="isQueueSheetOpen = false"
+                @play="audioPlayer.playQueueTrack"
+            />
+        </Transition>
         <div class="grid gap-3 md:min-h-24 lg:grid-cols-[minmax(280px,1fr)_minmax(420px,2fr)_minmax(220px,1fr)] lg:items-stretch 2xl:min-h-32">
             <div class="flex h-full min-w-0 items-stretch justify-center gap-3 md:justify-start" data-test="global-audio-player-track">
                 <div
-                    class="hidden size-12 aspect-square shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500 md:flex md:h-full md:w-auto"
+                    class="hidden size-12 shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500 md:flex md:size-24 2xl:size-32"
                     data-test="global-audio-player-cover"
                 >
                     <img
@@ -307,7 +365,14 @@ watch(isPlaying, (playing) => {
                 </div>
 
                 <div class="mt-3 flex items-center justify-center gap-3 md:mt-4 md:gap-5 2xl:mt-4 2xl:gap-6" data-test="global-audio-player-controls">
-                    <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Shuffle">
+                    <button
+                        type="button"
+                        :class="controlButtonClass"
+                        :disabled="audioPlayer.queueLength.value <= 1"
+                        :aria-disabled="audioPlayer.queueLength.value <= 1"
+                        aria-label="Shuffle queue"
+                        @click="audioPlayer.shuffleQueue"
+                    >
                         <Shuffle class="size-6 2xl:size-7" />
                     </button>
                     <button
@@ -341,29 +406,35 @@ watch(isPlaying, (playing) => {
                     >
                         <SkipForward class="size-7 2xl:size-8" />
                     </button>
-                    <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Repeat">
-                        <Repeat class="size-6 2xl:size-7" />
+                    <button
+                        type="button"
+                        :class="[controlButtonClass, audioPlayer.repeatMode.value !== 'none' ? 'bg-smart-blue-800 text-smart-blue-100' : '']"
+                        :disabled="!hasTrack"
+                        :aria-disabled="!hasTrack"
+                        :aria-label="repeatButtonLabel"
+                        :aria-pressed="audioPlayer.repeatMode.value !== 'none'"
+                        @click="audioPlayer.cycleRepeatMode"
+                    >
+                        <Repeat1 v-if="audioPlayer.repeatMode.value === 'one'" class="size-6 2xl:size-7" />
+                        <Repeat v-else class="size-6 2xl:size-7" />
                     </button>
                 </div>
             </div>
 
             <div class="hidden min-w-0 items-center justify-end gap-2 lg:flex lg:py-3 lg:pr-4 2xl:gap-3">
-                <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="Queue">
+                <button
+                    type="button"
+                    :class="[controlButtonClass, isQueueSheetOpen ? 'bg-smart-blue-800 text-smart-blue-100' : '']"
+                    :disabled="!audioPlayer.hasQueue.value"
+                    :aria-disabled="!audioPlayer.hasQueue.value"
+                    :aria-expanded="isQueueSheetOpen"
+                    aria-controls="audio-queue-sheet"
+                    aria-label="Queue"
+                    @click="isQueueSheetOpen = !isQueueSheetOpen"
+                >
                     <ListMusic class="size-4 2xl:size-6" />
                 </button>
-                <div class="flex w-24 items-center gap-2 2xl:w-36 2xl:gap-3">
-                    <Volume2 class="size-4 shrink-0 text-blue-slate-300 2xl:size-6" />
-                    <div
-                        class="h-1.5 flex-1 overflow-hidden rounded-full bg-twilight-indigo-500 2xl:h-2.5"
-                        role="progressbar"
-                        aria-label="Volume"
-                        aria-valuemin="0"
-                        aria-valuemax="100"
-                        aria-valuenow="70"
-                    >
-                        <div class="h-full w-2/3 rounded-full bg-blue-slate-300"></div>
-                    </div>
-                </div>
+                <AudioVolumeControl :audio-ref="audioRef" />
                 <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="More options">
                     <MoreVertical class="size-4 2xl:size-6" />
                 </button>

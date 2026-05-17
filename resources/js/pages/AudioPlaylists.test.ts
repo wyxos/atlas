@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
-import Audio from './Audio.vue';
+import { flushPromises } from '@vue/test-utils';
+import { mountAudioPage } from './audioTestUtils';
 import type { AudioIdsResponse, AudioPlaylistSection } from '@/types/audio';
 
 const playlistSections: AudioPlaylistSection[] = [
@@ -134,7 +134,7 @@ describe('Audio playlists', () => {
     it('opens a non-overlay playlist panel beside the audio list', async () => {
         mockAudioEndpoints();
 
-        const wrapper = mount(Audio);
+        const { wrapper } = await mountAudioPage();
         await flushPromises();
 
         expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
@@ -158,6 +158,9 @@ describe('Audio playlists', () => {
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Spotify');
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Review queue');
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).toContain('Late night');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).not.toContain('Every audio file');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).not.toContain('Source: Spotify');
+        expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).not.toContain('Manual playlist');
         expect(wrapper.get('[data-test="audio-playlist-scroll"]').classes()).toContain('[scrollbar-gutter:stable]');
         expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('shrink-0');
         expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('border-t');
@@ -168,7 +171,7 @@ describe('Audio playlists', () => {
     it('reloads audio ids when a playlist is selected', async () => {
         mockAudioEndpoints();
 
-        const wrapper = mount(Audio);
+        const { router, wrapper } = await mountAudioPage();
         await flushPromises();
 
         await wrapper.get('[data-test="audio-playlists-cta"]').trigger('click');
@@ -182,6 +185,7 @@ describe('Audio playlists', () => {
         await spotifyOption?.trigger('click');
         await flushPromises();
 
+        expect(router.currentRoute.value.fullPath).toBe('/playlists/source-spotify');
         expect(mockAxios.get).toHaveBeenLastCalledWith('/api/audio/ids', {
             params: {
                 after_id: 0,

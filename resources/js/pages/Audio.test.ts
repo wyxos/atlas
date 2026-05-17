@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
-import Audio from './Audio.vue';
+import { flushPromises } from '@vue/test-utils';
+import { mountAudio } from './audioTestUtils';
 import PageLayout from '../components/PageLayout.vue';
 import VirtualList from '../components/VirtualList.vue';
 import { useGlobalAudioPlayer } from '../composables/useGlobalAudioPlayer';
@@ -143,7 +143,7 @@ describe('Audio', () => {
             } satisfies AudioDetailsResponse,
         });
 
-        const wrapper = mount(Audio);
+        const wrapper = await mountAudio();
         await flushPromises();
 
         expect(mockAxios.get).toHaveBeenNthCalledWith(1, '/api/audio/ids', {
@@ -265,7 +265,7 @@ describe('Audio', () => {
             } satisfies AudioDetailsResponse,
         });
 
-        const wrapper = mount(Audio);
+        const wrapper = await mountAudio();
         await flushPromises();
 
         expect(wrapper.findComponent(PageLayout).props('flush')).toBe(true);
@@ -358,7 +358,7 @@ describe('Audio', () => {
             throw new Error(`Unexpected post URL: ${url}`);
         });
 
-        const wrapper = mount(Audio);
+        const wrapper = await mountAudio();
         await flushPromises();
 
         vi.advanceTimersByTime(180);
@@ -404,7 +404,7 @@ describe('Audio', () => {
         expect(row.get('[aria-label="Blacklist"]').attributes('disabled')).toBeDefined();
     });
 
-    it('selects a row on single click and queues the playlist from a double click', async () => {
+    it('selects a row, stores a copied queue, and plays it from a double click', async () => {
         mockAxios.get.mockResolvedValue({
             data: {
                 ids: [5, 6],
@@ -449,7 +449,7 @@ describe('Audio', () => {
             } satisfies AudioDetailsResponse,
         });
 
-        const wrapper = mount(Audio);
+        const wrapper = await mountAudio();
         await flushPromises();
 
         vi.advanceTimersByTime(180);
@@ -459,12 +459,15 @@ describe('Audio', () => {
         await firstRow.trigger('click');
 
         expect(firstRow.attributes('aria-selected')).toBe('true');
-        expect(firstRow.classes()).toContain('bg-prussian-blue-600/55');
+        expect(firstRow.classes()).toContain('bg-smart-blue-900/45');
+        const player = useGlobalAudioPlayer();
+        expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
+        expect(player.currentTrackId.value).toBe(5);
+        expect(player.isPlaying.value).toBe(false);
 
         await firstRow.trigger('dblclick');
         await flushPromises();
 
-        const player = useGlobalAudioPlayer();
         expect(player.currentTrackId.value).toBe(5);
         expect(player.isPlaying.value).toBe(true);
         expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
@@ -511,7 +514,7 @@ describe('Audio', () => {
             } satisfies AudioDetailsResponse,
         }));
 
-        const wrapper = mount(Audio);
+        const wrapper = await mountAudio();
         await flushPromises();
 
         vi.advanceTimersByTime(180);
@@ -539,7 +542,7 @@ describe('Audio', () => {
     it('shows an error when loading ids fails', async () => {
         mockAxios.get.mockRejectedValue(new Error('Network failure'));
 
-        const wrapper = mount(Audio);
+        const wrapper = await mountAudio();
         await flushPromises();
 
         expect(wrapper.text()).toContain('Failed to load audio IDs.');

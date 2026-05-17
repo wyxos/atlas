@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import GlobalAudioPlayer from './GlobalAudioPlayer.vue';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
@@ -6,13 +6,14 @@ import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
 describe('GlobalAudioPlayer', () => {
     afterEach(() => {
         useGlobalAudioPlayer().clear();
+        vi.restoreAllMocks();
     });
 
     it('renders a custom static player surface without native audio controls', () => {
         const wrapper = mount(GlobalAudioPlayer);
         const playerText = wrapper.get('[data-test="global-audio-player"]').text();
         const playButton = wrapper.get('[aria-label="Play"]');
-        const shuffleButton = wrapper.get('[aria-label="Shuffle"]');
+        const shuffleButton = wrapper.get('[aria-label="Shuffle queue"]');
 
         expect(wrapper.find('audio').exists()).toBe(true);
         expect(wrapper.get('audio').attributes('controls')).toBeUndefined();
@@ -49,12 +50,12 @@ describe('GlobalAudioPlayer', () => {
         expect(wrapper.get('[data-test="global-audio-player-track"]').classes()).toContain('md:justify-start');
         expect(wrapper.get('[data-test="global-audio-player-details"]').classes()).toContain('text-center');
         expect(wrapper.get('[data-test="global-audio-player-details"]').classes()).toContain('md:text-left');
-        expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('aspect-square');
+        expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('size-12');
         expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('hidden');
         expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('md:flex');
         expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).not.toContain('rounded-lg');
-        expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('md:h-full');
-        expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('md:w-auto');
+        expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('md:size-24');
+        expect(wrapper.get('[data-test="global-audio-player-cover"]').classes()).toContain('2xl:size-32');
         expect(wrapper.get('[data-test="global-audio-player-playback"]').classes()).toContain('md:max-lg:mt-3');
         expect(wrapper.get('[data-test="global-audio-player-controls"]').classes()).toContain('md:gap-5');
         expect(wrapper.get('[data-test="global-audio-player-controls"]').classes()).toContain('2xl:gap-6');
@@ -152,6 +153,8 @@ describe('GlobalAudioPlayer', () => {
         expect(wrapper.get('[aria-label="Pause"]').attributes('disabled')).toBeUndefined();
         expect(wrapper.get('[aria-label="Next"]').attributes('disabled')).toBeUndefined();
         expect(wrapper.get('[aria-label="Previous"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[aria-label="Shuffle queue"]').attributes('disabled')).toBeUndefined();
+        expect(wrapper.get('[aria-label="Queue"]').attributes('disabled')).toBeUndefined();
         expect(wrapper.get('[aria-label="Like"]').classes()).toContain('bg-smart-blue-500');
         expect(wrapper.get('[aria-label="Like"]').attributes('disabled')).toBeUndefined();
         expect(wrapper.get('[aria-label="Playback progress"]').attributes('aria-valuemax')).toBe('91');
@@ -185,5 +188,184 @@ describe('GlobalAudioPlayer', () => {
         expect((wrapper.get('audio').element as HTMLAudioElement).currentTime).toBe(45);
         expect((seekInput.element as HTMLInputElement).value).toBe('45');
         expect(wrapper.text()).toContain('0:45');
+    });
+
+    it('controls volume and restores the previous amount after mute', async () => {
+        const wrapper = mount(GlobalAudioPlayer);
+        await wrapper.vm.$nextTick();
+
+        const audio = wrapper.get('audio').element as HTMLAudioElement;
+        const volumeInput = wrapper.get('[aria-label="Volume"]');
+
+        expect((volumeInput.element as HTMLInputElement).value).toBe('70');
+        expect(audio.volume).toBe(0.7);
+
+        await volumeInput.setValue('35');
+
+        expect(audio.volume).toBe(0.35);
+        expect(audio.muted).toBe(false);
+        expect(wrapper.get('[aria-label="Mute volume"]').exists()).toBe(true);
+
+        await wrapper.get('[aria-label="Mute volume"]').trigger('click');
+
+        expect(audio.muted).toBe(true);
+        expect((volumeInput.element as HTMLInputElement).value).toBe('0');
+
+        await wrapper.get('[aria-label="Restore volume"]').trigger('click');
+
+        expect(audio.muted).toBe(false);
+        expect(audio.volume).toBe(0.35);
+        expect((volumeInput.element as HTMLInputElement).value).toBe('35');
+    });
+
+    it('opens a virtualized copied queue and plays selected queue tracks', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            {
+                id: 41,
+                title: 'Atlas Seed Track 0041',
+                artists: 'Signal Park',
+                album: 'Playback Notes',
+                coverUrl: '/api/files/41/poster',
+                duration: '1:31',
+                durationSeconds: 91,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/41/serve',
+            },
+            {
+                id: 42,
+                title: 'Atlas Seed Track 0042',
+                artists: 'The Quiet Machines',
+                album: 'Blue Room Sessions',
+                coverUrl: null,
+                duration: '1:32',
+                durationSeconds: 92,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/42/serve',
+            },
+        ], 41);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        await wrapper.get('[aria-label="Queue"]').trigger('click');
+
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('2 tracks');
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('Atlas Seed Track 0041');
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('Atlas Seed Track 0042');
+        expect(wrapper.findAll('[data-test="audio-queue-track"]')).toHaveLength(2);
+
+        await wrapper.findAll('[data-test="audio-queue-track"]')[1]?.trigger('click');
+
+        expect(player.currentTrackId.value).toBe(42);
+        expect(player.isPlaying.value).toBe(true);
+    });
+
+    it('shuffles the copied queue while keeping the current track first', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            {
+                id: 1,
+                title: 'Track 1',
+                artists: '',
+                album: '',
+                coverUrl: null,
+                duration: '0:01',
+                durationSeconds: 1,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/1/serve',
+            },
+            {
+                id: 2,
+                title: 'Track 2',
+                artists: '',
+                album: '',
+                coverUrl: null,
+                duration: '0:02',
+                durationSeconds: 2,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/2/serve',
+            },
+            {
+                id: 3,
+                title: 'Track 3',
+                artists: '',
+                album: '',
+                coverUrl: null,
+                duration: '0:03',
+                durationSeconds: 3,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/3/serve',
+            },
+            {
+                id: 4,
+                title: 'Track 4',
+                artists: '',
+                album: '',
+                coverUrl: null,
+                duration: '0:04',
+                durationSeconds: 4,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/4/serve',
+            },
+        ], 1);
+        vi.spyOn(Math, 'random').mockReturnValue(0);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        await wrapper.get('[aria-label="Shuffle queue"]').trigger('click');
+
+        expect(player.queue.value.map((track) => track.id)).toEqual([1, 3, 4, 2]);
+    });
+
+    it('cycles repeat modes from off to all to one', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            {
+                id: 41,
+                title: 'Atlas Seed Track 0041',
+                artists: 'Signal Park',
+                album: 'Playback Notes',
+                coverUrl: null,
+                duration: '1:31',
+                durationSeconds: 91,
+                reaction: null,
+                blacklistedAt: null,
+                previewedCount: 0,
+                seenCount: 0,
+                playbackUrl: '/api/files/41/serve',
+            },
+        ], 41);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        await wrapper.get('[aria-label="Repeat off"]').trigger('click');
+        expect(player.repeatMode.value).toBe('all');
+        expect(wrapper.get('[aria-label="Repeat all"]').attributes('aria-pressed')).toBe('true');
+
+        await wrapper.get('[aria-label="Repeat all"]').trigger('click');
+        expect(player.repeatMode.value).toBe('one');
+        expect(wrapper.get('[aria-label="Repeat one"]').attributes('aria-pressed')).toBe('true');
+
+        await wrapper.get('[aria-label="Repeat one"]').trigger('click');
+        expect(player.repeatMode.value).toBe('none');
+        expect(wrapper.get('[aria-label="Repeat off"]').attributes('aria-pressed')).toBe('false');
     });
 });

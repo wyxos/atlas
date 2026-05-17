@@ -8,7 +8,8 @@ async function createTestRouter(initialPath = '/dashboard') {
         history: createMemoryHistory(),
         routes: [
             { path: '/dashboard', component: { template: '<div>Dashboard</div>' } },
-            { path: '/audio', component: { template: '<div>Audio</div>' } },
+            { path: '/audio', redirect: '/playlists/all' },
+            { path: '/playlists/:playlistSlug', component: { template: '<div>Audio</div>' } },
         ],
     });
     await router.push(initialPath);
@@ -52,7 +53,7 @@ describe('DashboardLayout', () => {
 
     it('renders the static global audio player in the app shell', async () => {
         setViewportWidth(430);
-        const router = await createTestRouter('/audio');
+        const router = await createTestRouter('/playlists/all');
         const wrapper = mount(DashboardLayout, {
             slots: {
                 default: '<div>Audio page</div>',

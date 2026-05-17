@@ -119,6 +119,11 @@ if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
     Element.prototype.scrollTo = vi.fn();
 }
 
+if (typeof HTMLMediaElement !== 'undefined') {
+    HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
+    HTMLMediaElement.prototype.pause = vi.fn();
+}
+
 // Suppress Vue Router warnings in tests
 beforeEach(() => {
     const originalWarn = console.warn;

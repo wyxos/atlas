@@ -4,6 +4,7 @@ import Section from '../components/ui/Section.vue';
 </script>
 
 <template>
+        <!-- Codex UI note: before Atlas UI work, use this Guidelines source as the project reference. Side panels that toggle like sheets, including the audio playlist panel, should match sheet motion: ease-in-out, 500ms enter, 300ms leave, and side slide/fade from the panel edge. -->
         <PageHeader title="UI/UX Guidelines" subtitle="Design system and component showcase for Atlas" />
 
         <div class="mt-8 space-y-12">

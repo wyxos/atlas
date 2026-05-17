@@ -78,7 +78,7 @@ class SystemPlaylistCatalog
             ],
             [
                 'slug' => 'online-sources',
-                'name' => 'From online',
+                'name' => 'Online sources',
                 'description' => 'Files from online sources',
                 'membership_rules' => ['operator' => 'online'],
                 'source_key' => null,

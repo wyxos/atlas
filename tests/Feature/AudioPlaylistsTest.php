@@ -77,6 +77,7 @@ test('audio playlists endpoint syncs system playlists and dynamic sources', func
         ->and(Playlist::query()->where('user_id', $user->id)->where('slug', 'out-of-feed')->exists())->toBeFalse()
         ->and(Playlist::query()->where('user_id', $user->id)->where('name', 'Not Found')->whereNull('slug')->exists())->toBeFalse()
         ->and($playlists->get('imports')['count'])->toBe(2)
+        ->and($playlists->get('online-sources')['name'])->toBe('Online sources')
         ->and($playlists->get('online-sources')['count'])->toBe(1)
         ->and($playlists->get('source-spotify')['count'])->toBe(1)
         ->and($playlists->get('source-bandcamp')['name'])->toBe('Bandcamp')

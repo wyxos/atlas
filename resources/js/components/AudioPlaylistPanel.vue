@@ -55,7 +55,6 @@ const visibleSections = computed(() => props.sections.filter((section) => sectio
                     >
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-regal-navy-100">{{ playlist.name }}</span>
-                            <span class="block truncate text-xs text-blue-slate-300">{{ playlist.description }}</span>
                         </span>
                         <span class="shrink-0 text-xs tabular-nums text-blue-slate-300 group-hover:text-regal-navy-100">
                             {{ playlist.count }}
