@@ -8,6 +8,8 @@ use App\Support\FileApiPath;
 
 class AudioIdListingService
 {
+    private const string AUDIO_ID_PAGE_INDEX = 'files_mime_type_id_index';
+
     public function __construct(
         private readonly AudioPlaylistQueryService $playlistQuery,
     ) {}
@@ -38,6 +40,7 @@ class AudioIdListingService
             : max(0, $maxId);
 
         $rows = (clone $baseQuery)
+            ->forceIndex(self::AUDIO_ID_PAGE_INDEX)
             ->select(['id', 'source'])
             ->where('id', '>', $afterId)
             ->where('id', '<=', $maxId)

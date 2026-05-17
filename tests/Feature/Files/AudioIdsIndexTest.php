@@ -4,11 +4,17 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
 test('authenticated user can fetch cursor-paginated audio ids only', function () {
     $user = User::factory()->create();
+    $queries = [];
+
+    DB::listen(static function ($query) use (&$queries): void {
+        $queries[] = strtolower($query->sql);
+    });
 
     $audioOne = File::factory()->create(['mime_type' => 'audio/mpeg']);
     File::factory()->create(['mime_type' => 'image/jpeg']);
@@ -34,6 +40,7 @@ test('authenticated user can fetch cursor-paginated audio ids only', function ()
     ]);
     $response->assertJsonPath('sources.'.$audioOne->id, $audioOne->source);
     $response->assertJsonPath('sources.'.$audioTwo->id, $audioTwo->source);
+    expect($queries)->toContainAudioIdPageIndexHint();
 
     $cursor = $response->json('cursor');
 
@@ -54,6 +61,15 @@ test('authenticated user can fetch cursor-paginated audio ids only', function ()
         ],
     ]);
     $nextChunk->assertJsonPath('sources.'.$audioThree->id, $audioThree->source);
+});
+
+expect()->extend('toContainAudioIdPageIndexHint', function () {
+    $containsIndexHint = collect($this->value)->contains(
+        static fn (string $sql): bool => str_contains($sql, 'indexed by files_mime_type_id_index')
+            || str_contains($sql, 'force index (files_mime_type_id_index)')
+    );
+
+    expect($containsIndexHint)->toBeTrue();
 });
 
 test('guest cannot fetch audio ids', function () {

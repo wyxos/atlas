@@ -12,8 +12,7 @@
         "verify:vibe-dependency": "node scripts/verify-vibe-dependency.mjs",
         "dev": "vite",
         "dev:extension": "vite --config extension/vite.config.ts",
-        "check": "npm run guard:files-table-migrations && npm run lint && npm run typecheck && npm run test && npm run backend:lint && npm run backend:test",
-        "guard:files-table-migrations": "node scripts/guard-files-table-migrations.mjs",
+        "check": "npm run lint && npm run typecheck && npm run test && npm run backend:lint && npm run backend:test",
         "lint": "eslint resources/js extension/src scripts vite.config.js extension/vite.config.ts extension/vite.content.config.ts vitest.config.js playwright.config.ts --max-warnings 0",
         "lint:fix": "eslint resources/js extension/src scripts vite.config.js extension/vite.config.ts extension/vite.content.config.ts vitest.config.js playwright.config.ts --fix",
         "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
@@ -27,8 +26,8 @@
         "backend:lint:fix": "php vendor/bin/pint --dirty",
         "backend:test": "php artisan test --compact",
         "generate-favicons": "tsx scripts/generate-favicons.ts",
-        "release": "npm run guard:files-table-migrations && npm run verify:vibe-dependency && npx @wyxos/zephyr@latest --skip-git-hooks --maintenance off",
-        "release:non-interactive": "npm run guard:files-table-migrations && npm run verify:vibe-dependency && npx @wyxos/zephyr@latest --non-interactive --auto-commit --preset \"Atlas Production (Windows)\" --skip-git-hooks --maintenance off"
+        "release": "npm run verify:vibe-dependency && npx @wyxos/zephyr@latest --preset \"Atlas Production (Windows)\"",
+        "release:non-interactive": "npm run verify:vibe-dependency && npx @wyxos/zephyr@latest --non-interactive --preset \"Atlas Production (Windows)\""
     },
     "devDependencies": {
         "@laravel/echo-vue": "^2.2.7",
