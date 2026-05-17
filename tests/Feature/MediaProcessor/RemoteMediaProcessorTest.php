@@ -170,6 +170,48 @@ it('accepts a signed completion callback and stores preview paths', function () 
         ->and($file->fresh()?->poster_path)->toBe("downloads/bb/bb/preview/{$hash}.jpg");
 });
 
+it('reconciles in-flight tasks before sampling stale queued backlog', function () {
+    configureRemoteMediaProcessor();
+    Http::fake([
+        'processor.test/tasks/*' => Http::response([
+            'status' => 'processing',
+            'phase' => 'processing',
+            'progress' => 33,
+        ], 200),
+    ]);
+
+    $staleSince = now()->subMinutes(10);
+    $processingTasks = collect([
+        createMediaProcessorTask(MediaProcessorTaskStatus::PROCESSING, $staleSince->copy()->addSecond()),
+        createMediaProcessorTask(MediaProcessorTaskStatus::PROCESSING, $staleSince->copy()->addSeconds(2)),
+        createMediaProcessorTask(MediaProcessorTaskStatus::PROCESSING, $staleSince->copy()->addSeconds(3)),
+    ]);
+    $firstQueued = createMediaProcessorTask(MediaProcessorTaskStatus::QUEUED, $staleSince->copy()->addSeconds(4));
+    $secondQueued = createMediaProcessorTask(MediaProcessorTaskStatus::QUEUED, $staleSince->copy()->addSeconds(5));
+
+    $this->artisan('atlas:reconcile-media-processor-tasks --limit=4 --pending-limit=1')
+        ->expectsOutput('Polled 4 stale media processor task(s); 0 failed.')
+        ->assertExitCode(0);
+
+    Http::assertSentCount(4);
+    expect($processingTasks->every(fn (MediaProcessorTask $task): bool => $task->fresh()?->progress === 33))->toBeTrue()
+        ->and($firstQueued->fresh()?->status)->toBe(MediaProcessorTaskStatus::PROCESSING)
+        ->and($secondQueued->fresh()?->status)->toBe(MediaProcessorTaskStatus::QUEUED);
+});
+
+it('reports stale in-flight and pending counts separately during media processor reconciliation dry runs', function () {
+    configureRemoteMediaProcessor();
+
+    createMediaProcessorTask(MediaProcessorTaskStatus::PROCESSING, now()->subMinutes(10));
+    createMediaProcessorTask(MediaProcessorTaskStatus::QUEUED, now()->subMinutes(10));
+    createMediaProcessorTask(MediaProcessorTaskStatus::SUBMITTING, now()->subMinutes(10));
+
+    $this->artisan('atlas:reconcile-media-processor-tasks --dry-run')
+        ->expectsOutput('Stale in-flight media processor tasks: 1')
+        ->expectsOutput('Stale pending media processor tasks: 2')
+        ->assertExitCode(0);
+});
+
 it('queues library scan audio normalization remotely without reading local media content', function () {
     configureRemoteMediaProcessor();
     Http::fake([
@@ -274,6 +316,25 @@ function configureRemoteMediaProcessor(): void
     config()->set('media_processor.instance', 'local');
     config()->set('media_processor.storage_profile', 'atlas-local');
     config()->set('media_processor.websocket_required', true);
+}
+
+function createMediaProcessorTask(string $status, mixed $lastEventAt): MediaProcessorTask
+{
+    $id = (string) Str::uuid();
+
+    return MediaProcessorTask::query()->create([
+        'id' => $id,
+        'operation' => MediaProcessorOperation::IMAGE_PREVIEW,
+        'status' => $status,
+        'phase' => $status,
+        'progress' => $status === MediaProcessorTaskStatus::PROCESSING ? 50 : 1,
+        'storage_profile' => 'atlas-local',
+        'input_path' => "downloads/{$id}.png",
+        'output_paths' => [
+            'preview_path' => "downloads/preview/{$id}.png",
+        ],
+        'last_event_at' => $lastEventAt,
+    ]);
 }
 
 /**

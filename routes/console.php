@@ -146,7 +146,7 @@ Schedule::command('horizon:snapshot')->everyFiveMinutes();
 Schedule::command('horizon:clear-metrics')->hourly();
 Schedule::command('horizon:clear')->daily();
 Schedule::command('metrics:sync')->hourly();
-Schedule::command('atlas:reconcile-media-processor-tasks')->everyFiveMinutes();
+Schedule::command('atlas:reconcile-media-processor-tasks')->everyFiveMinutes()->withoutOverlapping(15);
 
 Artisan::command('mail:test {to : Recipient email address}', function () {
     $to = (string) $this->argument('to');
