@@ -53,6 +53,14 @@ class SystemPlaylistCatalog
                 'sort_order' => 40,
             ],
             [
+                'slug' => 'unreacted',
+                'name' => 'Unreacted',
+                'description' => 'No reaction yet',
+                'membership_rules' => ['operator' => 'unreacted'],
+                'source_key' => null,
+                'sort_order' => 45,
+            ],
+            [
                 'slug' => 'banned',
                 'name' => 'Banned',
                 'description' => 'Files marked as banned',

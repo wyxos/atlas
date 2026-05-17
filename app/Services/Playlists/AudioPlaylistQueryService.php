@@ -106,6 +106,7 @@ class AudioPlaylistQueryService
                 ->whereRaw('LOWER(TRIM(source)) NOT IN (?, ?)', ['local', 'nas']),
             'reaction' => $this->applyReactionRule($query, $userId, (string) ($rules['type'] ?? '')),
             'source' => $this->applySourceRule($query, (string) ($rules['source_key'] ?? '')),
+            'unreacted' => $this->applyUnreactedRule($query, $userId),
             default => $query,
         };
     }
@@ -141,6 +142,17 @@ class AudioPlaylistQueryService
                 ->whereColumn('reactions.file_id', 'files.id')
                 ->where('reactions.user_id', $userId)
                 ->where('reactions.type', $type);
+        });
+    }
+
+    private function applyUnreactedRule(Builder $query, int $userId): Builder
+    {
+        return $query->whereNotExists(function (Builder $subQuery) use ($userId): void {
+            $subQuery
+                ->selectRaw('1')
+                ->from('reactions')
+                ->whereColumn('reactions.file_id', 'files.id')
+                ->where('reactions.user_id', $userId);
         });
     }
 

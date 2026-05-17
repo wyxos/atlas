@@ -68,6 +68,8 @@ test('audio playlists endpoint syncs system playlists and dynamic sources', func
     expect($playlists->get('all')['count'])->toBe(3)
         ->and($playlists->get('favorites')['count'])->toBe(1)
         ->and($playlists->get('banned')['name'])->toBe('Banned')
+        ->and($playlists->get('unreacted')['name'])->toBe('Unreacted')
+        ->and($playlists->get('unreacted')['count'])->toBe(2)
         ->and($playlists->has('out-of-feed'))->toBeFalse()
         ->and($playlists->contains(fn (array $playlist): bool => $playlist['name'] === 'Not Found'))->toBeFalse()
         ->and($playlists->has('source-nas'))->toBeFalse()
@@ -90,7 +92,7 @@ test('audio ids can be filtered by system playlist slug', function () {
         'source' => 'local',
         'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
     ]);
-    File::factory()->create(['mime_type' => 'audio/mpeg', 'source' => 'Bandcamp']);
+    $unreacted = File::factory()->create(['mime_type' => 'audio/mpeg', 'source' => 'Bandcamp']);
 
     Reaction::query()->create([
         'file_id' => $favorite->id,
@@ -114,6 +116,11 @@ test('audio ids can be filtered by system playlist slug', function () {
         ->getJson('/api/audio/ids?playlist=banned&after_id=0&per_page=10')
         ->assertSuccessful()
         ->assertJsonPath('ids', [$removed->id]);
+
+    $this->actingAs($user)
+        ->getJson('/api/audio/ids?playlist=unreacted&after_id=0&per_page=10')
+        ->assertSuccessful()
+        ->assertJsonPath('ids', [$removed->id, $unreacted->id]);
 
     $this->actingAs($user)
         ->getJson('/api/audio/ids?playlist=source-spotify&after_id=0&per_page=10')
