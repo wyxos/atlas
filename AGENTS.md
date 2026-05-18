@@ -67,11 +67,11 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - Only recent browser logs will be useful - ignore old logs.
 
 ## Searching Documentation (Critically Important)
-- Boost comes with a powerful `search-docs` tool you should use before any other approaches when dealing with Laravel or Laravel ecosystem packages. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
+- Boost comes with a powerful `search-docs` tool for Laravel and Laravel ecosystem packages. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
 - The `search-docs` tool is perfect for all Laravel-related packages, including Laravel, Inertia, Livewire, Filament, Tailwind, Pest, Nova, Nightwatch, etc.
-- You must use this tool to search for Laravel ecosystem documentation before falling back to other approaches.
-- Search the documentation before making code changes to ensure we are taking the correct approach.
-- Use multiple, broad, simple, topic-based queries to start. For example: `['rate limiting', 'routing rate limiting', 'routing']`.
+- Use `search-docs` before code changes when the implementation depends on Laravel, Pest, Tailwind, Wayfinder, or other ecosystem behavior that is unfamiliar, version-sensitive, or not already established in this repo.
+- For small edits that follow an existing local pattern, inspect the repo first and skip `search-docs` unless framework behavior is uncertain.
+- Use focused, simple, topic-based queries and a low token limit by default; raise the limit only when the first result set is insufficient. For example: `['rate limiting', 'routing rate limiting']`.
 - Do not add package names to queries; package information is already shared. For example, use `test resource table`, not `filament 4 test resource table`.
 
 ### Available Search Syntax
@@ -177,7 +177,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ## Laravel 12
 
-- Use the `search-docs` tool to get version-specific documentation.
+- Use the `search-docs` tool to get version-specific documentation when the Laravel 12 behavior is uncertain or version-sensitive.
 - Since Laravel 11, Laravel has a new streamlined file structure which this project uses.
 
 ### Laravel 12 Structure

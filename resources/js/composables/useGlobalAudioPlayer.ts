@@ -97,6 +97,17 @@ function orderTracksByIds(tracks: AudioPlayerTrack[], orderedIds: number[]): Aud
     ];
 }
 
+function shuffledTracks(tracks: AudioPlayerTrack[]): AudioPlayerTrack[] {
+    const shuffled = [...tracks];
+
+    for (let index = shuffled.length - 1; index > 0; index--) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+
+    return shuffled;
+}
+
 function readAudioPlayerState(): PersistedAudioPlayerState | null {
     if (typeof window === 'undefined' || !('sessionStorage' in window)) {
         return null;
@@ -120,7 +131,7 @@ function readAudioPlayerState(): PersistedAudioPlayerState | null {
         return {
             version: 1,
             currentTrackId: restoredTrackId,
-            isShuffleEnabled: Boolean(state.isShuffleEnabled && restoredUnshuffledQueueIds.length > 0 && restoredQueue.length > 1),
+            isShuffleEnabled: Boolean(state.isShuffleEnabled && restoredUnshuffledQueueIds.length > 0 && restoredQueue.length > 0),
             isPlaying: Boolean(state.isPlaying && restoredTrackId !== null),
             playbackPositionSeconds: typeof state.playbackPositionSeconds === 'number' && Number.isFinite(state.playbackPositionSeconds)
                 ? Math.max(0, state.playbackPositionSeconds)
@@ -201,6 +212,22 @@ function queueAndPlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { pl
     setQueueLabel(options);
     playbackPositionSeconds.value = 0;
     currentTrackId.value = trackId;
+    isPlaying.value = true;
+}
+
+function queueAndShufflePlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, options?: AudioQueueOptions): void {
+    const nextQueue = tracks.map(withPlaybackUrl);
+
+    if (nextQueue.length === 0) {
+        return;
+    }
+
+    unshuffledQueueIds.value = trackIds(nextQueue);
+    queue.value = nextQueue.length > 1 ? shuffledTracks(nextQueue) : nextQueue;
+    isShuffleEnabled.value = true;
+    setQueueLabel(options);
+    playbackPositionSeconds.value = 0;
+    currentTrackId.value = queue.value[0]?.id ?? null;
     isPlaying.value = true;
 }
 
@@ -315,7 +342,7 @@ function playNext(): void {
 }
 
 function shuffleQueue(): void {
-    if (queue.value.length <= 1) {
+    if (queue.value.length === 0) {
         unshuffledQueueIds.value = trackIds(queue.value);
         isShuffleEnabled.value = false;
         return;
@@ -334,12 +361,8 @@ function shuffleQueue(): void {
         ? queue.value.filter((track) => track.id !== activeTrack.id)
         : [...queue.value];
 
-    for (let index = tracksToShuffle.length - 1; index > 0; index--) {
-        const swapIndex = Math.floor(Math.random() * (index + 1));
-        [tracksToShuffle[index], tracksToShuffle[swapIndex]] = [tracksToShuffle[swapIndex], tracksToShuffle[index]];
-    }
-
-    queue.value = activeTrack ? [activeTrack, ...tracksToShuffle] : tracksToShuffle;
+    const shuffled = shuffledTracks(tracksToShuffle);
+    queue.value = activeTrack ? [activeTrack, ...shuffled] : shuffled;
     isShuffleEnabled.value = true;
 }
 
@@ -404,6 +427,7 @@ export function useGlobalAudioPlayer() {
         queueLabel,
         queueLength,
         queueAndPlay,
+        queueAndShufflePlay,
         queueTracks,
         repeatMode,
         resume,

@@ -7,6 +7,7 @@ import type { ReactionType } from '@/types/reaction';
 defineProps<{
     activeFilterLabel: string;
     audioIds: number[];
+    canShufflePlay: boolean;
     isLoading: boolean;
     hasDetails: (audioId: number) => boolean;
     detailTitle: (audioId: number) => string;
@@ -25,6 +26,7 @@ defineProps<{
 
 const emit = defineEmits<{
     togglePlaylists: [];
+    shufflePlay: [];
     openFilter: [];
     scroll: [];
     visibleItemsChange: [items: unknown[]];
@@ -43,7 +45,9 @@ const emit = defineEmits<{
     >
         <AudioListHeader
             :active-filter-label="activeFilterLabel"
+            :can-shuffle-play="canShufflePlay"
             @toggle-playlists="emit('togglePlaylists')"
+            @shuffle-play="emit('shufflePlay')"
             @open-filter="emit('openFilter')"
         />
         <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>

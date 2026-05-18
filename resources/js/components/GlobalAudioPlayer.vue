@@ -401,8 +401,8 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
                     <button
                         type="button"
                         :class="[controlButtonClass, audioPlayer.isShuffleEnabled.value ? 'bg-smart-blue-800 text-smart-blue-100' : '']"
-                        :disabled="audioPlayer.queueLength.value <= 1"
-                        :aria-disabled="audioPlayer.queueLength.value <= 1"
+                        :disabled="audioPlayer.queueLength.value === 0"
+                        :aria-disabled="audioPlayer.queueLength.value === 0"
                         :aria-pressed="audioPlayer.isShuffleEnabled.value"
                         aria-label="Shuffle queue"
                         @click="audioPlayer.shuffleQueue"

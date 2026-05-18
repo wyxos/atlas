@@ -286,8 +286,11 @@ describe('Audio', () => {
             'justify-between',
             'border-b',
         ]));
-        expect(wrapper.get('[data-test="audio-list-header"]').text()).toContain('Playlists');
-        expect(wrapper.get('[data-test="audio-list-header"]').text()).toContain('Filter: All');
+        expect(wrapper.get('[data-test="audio-list-header"]').text()).not.toContain('Playlists');
+        expect(wrapper.get('[data-test="audio-list-header"]').text()).not.toContain('Filter: All');
+        expect(wrapper.get('[data-test="audio-playlists-cta"]').attributes('aria-label')).toBe('Toggle playlists');
+        expect(wrapper.get('[data-test="audio-shuffle-play-cta"]').attributes('aria-label')).toBe('Shuffle play playlist');
+        expect(wrapper.get('[data-test="audio-filter-cta"]').attributes('aria-label')).toBe('Filter: All');
         expect(wrapper.findComponent(VirtualList).props('containerClass')).toBe('min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]');
         expect(wrapper.findComponent(VirtualList).props('itemHeight')).toBe(72);
     });

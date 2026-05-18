@@ -110,6 +110,61 @@ describe('useGlobalAudioPlayer', () => {
         expect(restoredPlayer.currentTrackId.value).toBe(1);
     });
 
+    it('starts playback from a newly shuffled queue and preserves the original order for toggling off', async () => {
+        vi.resetModules();
+        window.sessionStorage.removeItem(AUDIO_PLAYER_STATE_STORAGE_KEY);
+
+        const { useGlobalAudioPlayer } = await import('./useGlobalAudioPlayer');
+        const player = useGlobalAudioPlayer();
+
+        vi.spyOn(Math, 'random').mockReturnValue(0);
+
+        player.queueAndShufflePlay([testTrack(5), testTrack(6), testTrack(7)], { queueLabel: 'Favorites' });
+
+        expect(player.queue.value.map((track) => track.id)).toEqual([6, 7, 5]);
+        expect(player.currentTrackId.value).toBe(6);
+        expect(player.isPlaying.value).toBe(true);
+        expect(player.isShuffleEnabled.value).toBe(true);
+        expect(player.queueLabel.value).toBe('Favorites');
+        expect(JSON.parse(window.sessionStorage.getItem(AUDIO_PLAYER_STATE_STORAGE_KEY) ?? '{}')).toMatchObject({
+            currentTrackId: 6,
+            isShuffleEnabled: true,
+            isPlaying: true,
+            queueLabel: 'Favorites',
+            unshuffledQueueIds: [5, 6, 7],
+        });
+
+        player.shuffleQueue();
+
+        expect(player.queue.value.map((track) => track.id)).toEqual([5, 6, 7]);
+        expect(player.currentTrackId.value).toBe(6);
+        expect(player.isShuffleEnabled.value).toBe(false);
+    });
+
+    it('keeps shuffle mode active for a one-track queue', async () => {
+        vi.resetModules();
+        window.sessionStorage.removeItem(AUDIO_PLAYER_STATE_STORAGE_KEY);
+
+        const { useGlobalAudioPlayer } = await import('./useGlobalAudioPlayer');
+        const player = useGlobalAudioPlayer();
+
+        player.queueAndShufflePlay([testTrack(9)], { queueLabel: 'Favorites' });
+
+        expect(player.queue.value.map((track) => track.id)).toEqual([9]);
+        expect(player.currentTrackId.value).toBe(9);
+        expect(player.isShuffleEnabled.value).toBe(true);
+
+        vi.resetModules();
+
+        const { useGlobalAudioPlayer: useRestoredGlobalAudioPlayer } = await import('./useGlobalAudioPlayer');
+        const restoredPlayer = useRestoredGlobalAudioPlayer();
+
+        expect(restoredPlayer.isShuffleEnabled.value).toBe(true);
+        restoredPlayer.shuffleQueue();
+        expect(restoredPlayer.isShuffleEnabled.value).toBe(false);
+        expect(restoredPlayer.queue.value.map((track) => track.id)).toEqual([9]);
+    });
+
     it('removes persisted player state when the queue is cleared', async () => {
         vi.resetModules();
 

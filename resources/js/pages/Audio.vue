@@ -537,6 +537,7 @@ onUnmounted(() => {
                 <AudioListShell
                     :active-filter-label="activeFilterLabel"
                     :audio-ids="filteredAudioIds"
+                    :can-shuffle-play="filteredAudioIds.length > 0 && !isLoading"
                     :is-loading="isLoading"
                     :has-details="hasDetails"
                     :detail-title="detailTitle"
@@ -552,6 +553,7 @@ onUnmounted(() => {
                     :current-track-id="playerCurrentTrackId"
                     :is-playing="playerIsPlaying"
                     @toggle-playlists="isPlaylistPanelOpen = !isPlaylistPanelOpen"
+                    @shuffle-play="audioPlayer.queueAndShufflePlay(audioPlayerQueue(), { queueLabel: activePlaylistLabel })"
                     @open-filter="isFilterSheetOpen = true"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"
