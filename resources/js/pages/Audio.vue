@@ -223,6 +223,13 @@ function handlePlaylistSelect(playlist: AudioPlaylist): void {
 function audioPlayerTrack(audioId: number): AudioPlayerTrack {
     const details = detailsById.value[audioId];
 
+    if (details === undefined) {
+        const existingTrack = audioPlayer.queue.value.find((track) => track.id === audioId);
+        if (existingTrack) {
+            return existingTrack;
+        }
+    }
+
     return {
         id: audioId,
         title: detailTitle(audioId),

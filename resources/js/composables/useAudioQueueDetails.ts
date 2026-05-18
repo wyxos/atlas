@@ -89,6 +89,12 @@ export function useAudioQueueDetails(audioPlayer: GlobalAudioPlayer) {
                 ids,
             });
             const detailsById = new Map(data.items.map((item) => [item.id, item]));
+            const missingIds = ids.filter((id) => !detailsById.has(id));
+            if (missingIds.length > 0) {
+                const retryableIds = new Set(missingIds);
+                loadedQueueDetailIds.value = new Set([...loadedQueueDetailIds.value].filter((id) => !retryableIds.has(id)));
+            }
+
             const hydratedTracks = audioPlayer.queue.value
                 .filter((track) => detailsById.has(track.id))
                 .map((track) => hydratedQueueTrack(detailsById.get(track.id)!, track));
