@@ -1,15 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { ChevronDown } from 'lucide-vue-next';
+import { computed, nextTick, ref, watch } from 'vue';
+import { Check, ChevronsUpDown, Search } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
     formatLocalSourceSelectionLabel,
     isLocalSourceSelected,
@@ -39,55 +32,123 @@ const emit = defineEmits<{
     'update:modelValue': [value: string[]];
 }>();
 
+const open = ref(false);
+const searchInput = ref<HTMLInputElement | null>(null);
+const searchQuery = ref('');
+
 const sourceOptions = computed(() => normalizeLocalSourceOptions(props.options));
 const selectionLabel = computed(() => formatLocalSourceSelectionLabel(
     props.modelValue,
     sourceOptions.value,
     props.placeholder,
 ));
+const popoverAlign = computed(() => props.align === 'end' ? 'end' : 'start');
+const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase());
+const filteredSourceOptions = computed(() => {
+    if (normalizedSearchQuery.value === '') {
+        return sourceOptions.value;
+    }
 
-function updateSource(value: string, checked: boolean): void {
+    return sourceOptions.value.filter((option) => {
+        const label = option.label.toLowerCase();
+        const value = option.value.toLowerCase();
+
+        return label.includes(normalizedSearchQuery.value) || value.includes(normalizedSearchQuery.value);
+    });
+});
+
+watch(open, async (isOpen) => {
+    if (!isOpen) {
+        searchQuery.value = '';
+
+        return;
+    }
+
+    await nextTick();
+    searchInput.value?.focus();
+});
+
+function updateSearch(event: Event): void {
+    searchQuery.value = (event.target as HTMLInputElement | null)?.value ?? '';
+}
+
+function updateSource(value: string): void {
+    const checked = !isLocalSourceSelected(props.modelValue, value);
+
     emit('update:modelValue', toggleLocalSourceSelection(props.modelValue, value, checked));
 }
 </script>
 
 <template>
-    <DropdownMenu>
-        <DropdownMenuTrigger as-child>
+    <Popover v-model="open">
+        <PopoverTrigger as-child>
             <Button
                 type="button"
                 variant="outline"
+                role="combobox"
+                :aria-expanded="open"
+                aria-label="Select library sources"
                 :disabled="disabled"
                 :class="['justify-between', triggerClass]"
                 data-test="source-select-trigger"
             >
                 <span class="min-w-0 truncate text-left">{{ selectionLabel }}</span>
-                <ChevronDown :size="14" class="shrink-0 opacity-70" />
+                <ChevronsUpDown :size="14" class="shrink-0 opacity-70" />
             </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-            :align="align"
+        </PopoverTrigger>
+        <PopoverContent
+            :align="popoverAlign"
             :class="[
-                'w-64 border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100',
+                'w-72 border-twilight-indigo-500 bg-prussian-blue-600 p-0 text-twilight-indigo-100',
                 contentClass,
             ]"
         >
-            <DropdownMenuLabel class="text-smart-blue-100">
-                Sources
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator class="bg-twilight-indigo-500" />
-            <DropdownMenuCheckboxItem
-                v-for="option in sourceOptions"
-                :key="option.value"
-                :model-value="isLocalSourceSelected(modelValue, option.value)"
-                :disabled="disabled"
-                class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
-                data-test="source-select-item"
-                @select.prevent
-                @update:model-value="(checked) => updateSource(option.value, checked)"
+            <div class="flex items-center gap-2 border-b border-twilight-indigo-500/70 px-3 py-2">
+                <Search :size="14" class="shrink-0 text-twilight-indigo-300" />
+                <input
+                    ref="searchInput"
+                    :value="searchQuery"
+                    type="search"
+                    class="h-8 min-w-0 flex-1 bg-transparent text-sm text-twilight-indigo-100 outline-none placeholder:text-twilight-indigo-400"
+                    placeholder="Search sources..."
+                    data-test="source-select-search"
+                    @input="updateSearch"
+                    @keydown.stop
+                >
+            </div>
+            <div
+                class="max-h-72 overflow-y-auto p-1"
+                role="listbox"
+                aria-multiselectable="true"
             >
-                <span class="truncate">{{ option.label }}</span>
-            </DropdownMenuCheckboxItem>
-        </DropdownMenuContent>
-    </DropdownMenu>
+                <button
+                    v-for="option in filteredSourceOptions"
+                    :key="option.value"
+                    type="button"
+                    role="option"
+                    :aria-selected="isLocalSourceSelected(modelValue, option.value)"
+                    :disabled="disabled"
+                    class="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm text-twilight-indigo-100 hover:bg-smart-blue-700/50 focus:bg-smart-blue-700/50 focus:outline-none disabled:pointer-events-none disabled:opacity-50"
+                    data-test="source-select-item"
+                    @click="updateSource(option.value)"
+                >
+                    <Check
+                        :size="14"
+                        :class="[
+                            'shrink-0 text-smart-blue-200',
+                            isLocalSourceSelected(modelValue, option.value) ? 'opacity-100' : 'opacity-0',
+                        ]"
+                    />
+                    <span class="min-w-0 truncate">{{ option.label }}</span>
+                </button>
+                <p
+                    v-if="filteredSourceOptions.length === 0"
+                    class="px-3 py-6 text-center text-sm text-twilight-indigo-300"
+                    data-test="source-select-empty"
+                >
+                    No sources found.
+                </p>
+            </div>
+        </PopoverContent>
+    </Popover>
 </template>

@@ -2,6 +2,7 @@
 
 use App\Models\File;
 use App\Models\User;
+use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -180,6 +181,24 @@ test('browse services endpoint includes database sources in library source optio
     File::factory()->create(['source' => 'Bandcamp']);
     File::factory()->create(['source' => 'Spotify']);
     File::factory()->create(['source' => 'local']);
+    File::factory()->create([
+        'source' => 'FeedRemovedOnly',
+        'blacklisted_at' => now(),
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+    ]);
+    File::factory()->create([
+        'source' => 'PreviewThresholdOnly',
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+    ]);
+    File::factory()->create([
+        'source' => 'MissingOnly',
+        'not_found' => true,
+    ]);
+    File::factory()->create([
+        'source' => 'BlacklistedStillInFeed',
+        'blacklisted_at' => now(),
+        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT - 1,
+    ]);
 
     $response = $this->actingAs($user)->getJson('/api/browse/services');
 
@@ -192,6 +211,10 @@ test('browse services endpoint includes database sources in library source optio
         ->and($sourceField['options'])->toContain(['label' => 'Spotify', 'value' => 'Spotify'])
         ->and($sourceField['options'])->toContain(['label' => 'Bandcamp', 'value' => 'Bandcamp'])
         ->and($sourceField['options'])->toContain(['label' => 'Library', 'value' => 'local'])
+        ->and($sourceField['options'])->toContain(['label' => 'BlacklistedStillInFeed', 'value' => 'BlacklistedStillInFeed'])
+        ->and($sourceField['options'])->not->toContain(['label' => 'FeedRemovedOnly', 'value' => 'FeedRemovedOnly'])
+        ->and($sourceField['options'])->not->toContain(['label' => 'PreviewThresholdOnly', 'value' => 'PreviewThresholdOnly'])
+        ->and($sourceField['options'])->not->toContain(['label' => 'MissingOnly', 'value' => 'MissingOnly'])
         ->and($sourceField['options'])->not->toContain(['label' => 'Local', 'value' => 'Local']);
 
     $sourcesResponse = $this->actingAs($user)->getJson('/api/browse/sources');

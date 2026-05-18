@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Browser;
 use App\Exceptions\LibraryUnavailableException;
 use App\Models\File;
+use App\Services\FilePreviewService;
 use App\Services\LocalService;
 use App\Support\ServiceFilterSchema;
 use Illuminate\Http\JsonResponse;
@@ -270,7 +271,10 @@ class BrowseController extends Controller
     {
         return File::query()
             ->select('source')
+            ->whereNotNull('source')
             ->where('source', '<>', '')
+            ->where('not_found', false)
+            ->where('previewed_count', '<', FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
             ->distinct()
             ->pluck('source')
             ->filter(fn (mixed $source): bool => is_string($source) && trim($source) !== '')
