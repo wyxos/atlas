@@ -100,6 +100,9 @@ class AudioPlaylistQueryService
         return match ((string) ($rules['operator'] ?? 'all')) {
             'blacklisted' => $this->applyBlacklistedRule($query),
             'imported' => $this->applyImportedRule($query),
+            'missing_album' => $this->applyMissingAlbumRule($query),
+            'missing_album_cover' => $this->applyMissingAlbumCoverRule($query),
+            'missing_artist' => $this->applyMissingArtistRule($query),
             'online' => $query
                 ->whereNull('imported_at')
                 ->whereNotNull('source')
@@ -118,6 +121,51 @@ class AudioPlaylistQueryService
                 ->whereNotNull('imported_at')
                 ->orWhereRaw('LOWER(TRIM(source)) IN (?, ?)', ['local', 'nas']);
         });
+    }
+
+    private function applyMissingArtistRule(Builder $query): Builder
+    {
+        $this->applyImportedRule($query);
+
+        return $query->whereNotExists(function (Builder $subQuery): void {
+            $subQuery
+                ->selectRaw('1')
+                ->from('artist_file')
+                ->whereColumn('artist_file.file_id', 'files.id');
+        });
+    }
+
+    private function applyMissingAlbumRule(Builder $query): Builder
+    {
+        $this->applyImportedRule($query);
+
+        return $query->whereNotExists(function (Builder $subQuery): void {
+            $subQuery
+                ->selectRaw('1')
+                ->from('album_file')
+                ->whereColumn('album_file.file_id', 'files.id');
+        });
+    }
+
+    private function applyMissingAlbumCoverRule(Builder $query): Builder
+    {
+        $this->applyImportedRule($query);
+
+        return $query
+            ->whereExists(function (Builder $subQuery): void {
+                $subQuery
+                    ->selectRaw('1')
+                    ->from('album_file')
+                    ->whereColumn('album_file.file_id', 'files.id');
+            })
+            ->whereNotExists(function (Builder $subQuery): void {
+                $subQuery
+                    ->selectRaw('1')
+                    ->from('album_file')
+                    ->join('album_covers', 'album_covers.album_id', '=', 'album_file.album_id')
+                    ->whereColumn('album_file.file_id', 'files.id')
+                    ->where('album_covers.is_default', true);
+            });
     }
 
     private function applyBlacklistedRule(Builder $query): Builder

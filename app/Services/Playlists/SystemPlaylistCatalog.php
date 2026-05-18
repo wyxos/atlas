@@ -84,6 +84,30 @@ class SystemPlaylistCatalog
                 'source_key' => null,
                 'sort_order' => 70,
             ],
+            [
+                'slug' => 'no-artist',
+                'name' => 'No artist',
+                'description' => 'Imported audio without artist relationships',
+                'membership_rules' => ['operator' => 'missing_artist'],
+                'source_key' => null,
+                'sort_order' => 80,
+            ],
+            [
+                'slug' => 'no-album',
+                'name' => 'No album',
+                'description' => 'Imported audio without album relationships',
+                'membership_rules' => ['operator' => 'missing_album'],
+                'source_key' => null,
+                'sort_order' => 90,
+            ],
+            [
+                'slug' => 'no-album-cover',
+                'name' => 'No album cover',
+                'description' => 'Imported audio linked to albums without default covers',
+                'membership_rules' => ['operator' => 'missing_album_cover'],
+                'source_key' => null,
+                'sort_order' => 95,
+            ],
         ];
 
         foreach ($this->normalizeSourceKeys($sourceKeys) as $index => $sourceKey) {

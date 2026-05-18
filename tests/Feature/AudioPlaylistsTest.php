@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Album;
+use App\Models\AlbumCover;
+use App\Models\Artist;
 use App\Models\File;
 use App\Models\Playlist;
 use App\Models\Reaction;
@@ -79,9 +82,84 @@ test('audio playlists endpoint syncs system playlists and dynamic sources', func
         ->and($playlists->get('imports')['count'])->toBe(2)
         ->and($playlists->get('online-sources')['name'])->toBe('Online sources')
         ->and($playlists->get('online-sources')['count'])->toBe(1)
+        ->and($playlists->get('no-artist')['name'])->toBe('No artist')
+        ->and($playlists->get('no-artist')['count'])->toBe(2)
+        ->and($playlists->get('no-album')['name'])->toBe('No album')
+        ->and($playlists->get('no-album')['count'])->toBe(2)
+        ->and($playlists->get('no-album-cover')['name'])->toBe('No album cover')
+        ->and($playlists->get('no-album-cover')['count'])->toBe(0)
         ->and($playlists->get('source-spotify')['count'])->toBe(1)
         ->and($playlists->get('source-bandcamp')['name'])->toBe('Bandcamp')
         ->and($playlists->get('source-bandcamp')['is_deletable'])->toBeFalse();
+});
+
+test('audio catalog cleanup playlists expose imported relationship gaps', function () {
+    $user = User::factory()->create();
+    $artist = Artist::factory()->create();
+    $coveredAlbum = Album::factory()->create();
+    $uncoveredAlbum = Album::factory()->create();
+
+    $complete = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'source' => 'local',
+        'imported_at' => now(),
+    ]);
+    $missingArtist = File::factory()->create([
+        'mime_type' => 'audio/ogg',
+        'source' => 'local',
+        'imported_at' => now(),
+    ]);
+    $missingAlbum = File::factory()->create([
+        'mime_type' => 'audio/wav',
+        'source' => 'local',
+        'imported_at' => now(),
+    ]);
+    $missingCover = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'source' => 'local',
+        'imported_at' => now(),
+    ]);
+    File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'source' => 'Spotify',
+        'imported_at' => null,
+    ]);
+
+    $complete->artists()->attach($artist);
+    $complete->albums()->attach($coveredAlbum);
+    $missingArtist->albums()->attach($coveredAlbum);
+    $missingAlbum->artists()->attach($artist);
+    $missingCover->artists()->attach($artist);
+    $missingCover->albums()->attach($uncoveredAlbum);
+
+    AlbumCover::factory()->create([
+        'album_id' => $coveredAlbum->id,
+        'file_id' => $complete->id,
+        'is_default' => true,
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/audio/playlists');
+
+    $response->assertSuccessful();
+    $playlists = collect($response->json('sections.0.playlists'))->keyBy('slug');
+    expect($playlists->get('no-artist')['count'])->toBe(1)
+        ->and($playlists->get('no-album')['count'])->toBe(1)
+        ->and($playlists->get('no-album-cover')['count'])->toBe(1);
+
+    $this->actingAs($user)
+        ->getJson('/api/audio/ids?playlist=no-artist&after_id=0&per_page=10')
+        ->assertSuccessful()
+        ->assertJsonPath('ids', [$missingArtist->id]);
+
+    $this->actingAs($user)
+        ->getJson('/api/audio/ids?playlist=no-album&after_id=0&per_page=10')
+        ->assertSuccessful()
+        ->assertJsonPath('ids', [$missingAlbum->id]);
+
+    $this->actingAs($user)
+        ->getJson('/api/audio/ids?playlist=no-album-cover&after_id=0&per_page=10')
+        ->assertSuccessful()
+        ->assertJsonPath('ids', [$missingCover->id]);
 });
 
 test('audio ids can be filtered by system playlist slug', function () {
