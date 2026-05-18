@@ -18,7 +18,7 @@ const visibleSections = computed(() => props.sections.filter((section) => sectio
 
 <template>
     <aside
-        class="hidden w-72 shrink-0 border-y border-l border-twilight-indigo-500 bg-prussian-blue-800 md:flex md:flex-col"
+        class="hidden h-full min-h-0 w-72 shrink-0 overflow-hidden border-y border-l border-twilight-indigo-500 bg-prussian-blue-800 md:flex md:flex-col"
         data-test="audio-playlist-panel"
     >
         <div

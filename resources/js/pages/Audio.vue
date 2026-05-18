@@ -7,6 +7,7 @@ import AudioListShell from '../components/AudioListShell.vue';
 import AudioLoadProgressPanel from '../components/AudioLoadProgressPanel.vue';
 import AudioPlaylistPanel from '../components/AudioPlaylistPanel.vue';
 import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
+import { useAudioPlaylistPanelOpenState } from '../composables/useAudioPlaylistPanelOpenState';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '../composables/useGlobalAudioPlayer';
 import type {
     AudioDetail,
@@ -31,7 +32,7 @@ const totalAudioFiles = ref(0);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const isFilterSheetOpen = ref(false);
-const isPlaylistPanelOpen = ref(false);
+const { isPlaylistPanelOpen } = useAudioPlaylistPanelOpenState();
 const activeFilter = ref<AudioSourceFilter>('all');
 const playlistSections = ref<AudioPlaylistSection[]>([]);
 const arePlaylistsLoading = ref(false);
@@ -88,16 +89,13 @@ const filteredAudioIds = computed(() => {
     });
 });
 
-const activeFilterLabel = computed(() => {
-    if (activeFilter.value === 'spotify') {
-        return 'Spotify';
-    }
+const activeFilterLabel = computed(() => ({ all: 'All', local: 'Local', spotify: 'Spotify' })[activeFilter.value]);
 
-    if (activeFilter.value === 'local') {
-        return 'Local';
-    }
+const activePlaylistLabel = computed(() => {
+    const slug = activePlaylistSlug.value.replace(/^source-/, '');
+    const fallbackLabel = slug === 'all' ? 'All audio' : slug.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-    return 'All';
+    return playlistSections.value.flatMap((section) => section.playlists).find((playlist) => playlist.slug === activePlaylistSlug.value)?.name ?? fallbackLabel;
 });
 
 const activePlaylistSlug = computed(() => {
@@ -252,12 +250,12 @@ function audioPlayerQueue(): AudioPlayerTrack[] {
 
 function handleAudioSelect(audioId: number): void {
     selectedAudioId.value = audioId;
-    audioPlayer.queueTracks(audioPlayerQueue(), audioId);
+    audioPlayer.queueTracks(audioPlayerQueue(), audioId, { queueLabel: activePlaylistLabel.value });
 }
 
 function handleAudioPlay(audioId: number): void {
     selectedAudioId.value = audioId;
-    audioPlayer.queueAndPlay(audioPlayerQueue(), audioId);
+    audioPlayer.queueAndPlay(audioPlayerQueue(), audioId, { queueLabel: activePlaylistLabel.value });
 }
 
 function handleAudioPause(audioId: number): void {
@@ -452,7 +450,7 @@ watch(isPlaylistPanelOpen, (isOpen) => {
     if (isOpen) {
         void loadPlaylists();
     }
-});
+}, { immediate: true });
 
 watch(activePlaylistSlug, () => {
     activeFilter.value = 'all';

@@ -462,6 +462,7 @@ describe('Audio', () => {
         expect(firstRow.classes()).toContain('bg-smart-blue-900/45');
         const player = useGlobalAudioPlayer();
         expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
+        expect(player.queueLabel.value).toBe('All audio');
         expect(player.currentTrackId.value).toBe(5);
         expect(player.isPlaying.value).toBe(false);
 

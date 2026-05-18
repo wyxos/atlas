@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { mountAudioPage } from './audioTestUtils';
+import { AUDIO_PLAYLIST_PANEL_OPEN_STORAGE_KEY } from '@/composables/useAudioPlaylistPanelOpenState';
 import type { AudioIdsResponse, AudioPlaylistSection } from '@/types/audio';
 
 const playlistSections: AudioPlaylistSection[] = [
@@ -123,6 +124,7 @@ beforeEach(() => {
     Object.assign(global.window, {
         axios: mockAxios,
     });
+    window.sessionStorage.removeItem(AUDIO_PLAYLIST_PANEL_OPEN_STORAGE_KEY);
 });
 
 afterEach(() => {
@@ -147,6 +149,7 @@ describe('Audio playlists', () => {
         await wrapper.get('[data-test="audio-playlists-cta"]').trigger('click');
         await flushPromises();
 
+        expect(window.sessionStorage.getItem(AUDIO_PLAYLIST_PANEL_OPEN_STORAGE_KEY)).toBe('1');
         expect(wrapper.get('[data-test="audio-library-surface"]').classes()).toContain('flex');
         expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
             'w-72',
@@ -154,8 +157,11 @@ describe('Audio playlists', () => {
             'transition-[width]',
         ]));
         expect(wrapper.get('[data-test="audio-playlist-panel"]').classes()).toEqual(expect.arrayContaining([
+            'h-full',
+            'min-h-0',
             'w-72',
             'shrink-0',
+            'overflow-hidden',
             'md:flex',
         ]));
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).not.toContain('PLAYLISTS');
@@ -176,6 +182,44 @@ describe('Audio playlists', () => {
         expect(wrapper.get('[data-test="audio-add-playlist-cta"]').classes()).toContain('border-t');
         expect(wrapper.get('[data-test="audio-add-playlist-cta"]').text()).toBe('Add playlist');
         expect(mockAxios.get).toHaveBeenCalledWith('/api/audio/playlists');
+    });
+
+    it('restores and persists the playlist panel session state', async () => {
+        mockAudioEndpoints();
+        window.sessionStorage.setItem(AUDIO_PLAYLIST_PANEL_OPEN_STORAGE_KEY, '1');
+
+        const { wrapper } = await mountAudioPage();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
+            'w-72',
+            'duration-500',
+        ]));
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/audio/playlists');
+
+        await wrapper.get('[data-test="audio-playlists-cta"]').trigger('click');
+        await flushPromises();
+
+        expect(window.sessionStorage.getItem(AUDIO_PLAYLIST_PANEL_OPEN_STORAGE_KEY)).toBe('0');
+        expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
+        expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
+            'w-0',
+            'duration-300',
+        ]));
+
+        wrapper.unmount();
+        vi.clearAllMocks();
+
+        const { wrapper: closedWrapper } = await mountAudioPage();
+        await flushPromises();
+
+        expect(closedWrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
+        expect(closedWrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
+            'w-0',
+            'duration-300',
+        ]));
+        expect(mockAxios.get).not.toHaveBeenCalledWith('/api/audio/playlists');
     });
 
     it('reloads audio ids when a playlist is selected', async () => {

@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { serve } from '@/actions/App/Http/Controllers/FilesController';
 import type { ReactionType } from '@/types/reaction';
 
@@ -17,12 +17,166 @@ export type AudioPlayerTrack = {
     playbackUrl: string;
 };
 
+type AudioQueueOptions = {
+    queueLabel?: string | null;
+};
+
 export type AudioRepeatMode = 'none' | 'all' | 'one';
 
-const queue = ref<AudioPlayerTrack[]>([]);
-const currentTrackId = ref<number | null>(null);
-const isPlaying = ref(false);
-const repeatMode = ref<AudioRepeatMode>('none');
+type PersistedAudioPlayerState = {
+    version: 1;
+    currentTrackId: number | null;
+    isShuffleEnabled: boolean;
+    isPlaying: boolean;
+    playbackPositionSeconds: number;
+    queue: AudioPlayerTrack[];
+    queueLabel: string | null;
+    repeatMode: AudioRepeatMode;
+    unshuffledQueueIds: number[];
+};
+
+export const AUDIO_PLAYER_STATE_STORAGE_KEY = 'atlas:audioPlayerState';
+
+function isAudioRepeatMode(value: unknown): value is AudioRepeatMode {
+    return value === 'none' || value === 'all' || value === 'one';
+}
+
+function isStoredTrack(value: unknown): value is AudioPlayerTrack {
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
+
+    const track = value as Partial<AudioPlayerTrack>;
+
+    return typeof track.id === 'number'
+        && Number.isFinite(track.id)
+        && typeof track.title === 'string'
+        && typeof track.artists === 'string'
+        && typeof track.album === 'string'
+        && typeof track.duration === 'string';
+}
+
+function withPlaybackUrl(track: Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }): AudioPlayerTrack {
+    return {
+        ...track,
+        playbackUrl: track.playbackUrl ?? serve.url(track.id),
+    };
+}
+
+function trackIds(tracks: AudioPlayerTrack[]): number[] {
+    return tracks.map((track) => track.id);
+}
+
+function storedTrackIds(value: unknown): number[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    const seenIds = new Set<number>();
+
+    return value.filter((id): id is number => {
+        if (typeof id !== 'number' || !Number.isFinite(id) || seenIds.has(id)) {
+            return false;
+        }
+
+        seenIds.add(id);
+        return true;
+    });
+}
+
+function orderTracksByIds(tracks: AudioPlayerTrack[], orderedIds: number[]): AudioPlayerTrack[] {
+    const tracksById = new Map(tracks.map((track) => [track.id, track]));
+    const orderedTracks = orderedIds
+        .map((id) => tracksById.get(id))
+        .filter((track): track is AudioPlayerTrack => track !== undefined);
+    const orderedTrackIds = new Set(orderedTracks.map((track) => track.id));
+
+    return [
+        ...orderedTracks,
+        ...tracks.filter((track) => !orderedTrackIds.has(track.id)),
+    ];
+}
+
+function readAudioPlayerState(): PersistedAudioPlayerState | null {
+    if (typeof window === 'undefined' || !('sessionStorage' in window)) {
+        return null;
+    }
+
+    try {
+        const raw = window.sessionStorage.getItem(AUDIO_PLAYER_STATE_STORAGE_KEY);
+        const state = raw ? JSON.parse(raw) as Partial<PersistedAudioPlayerState> : null;
+
+        if (state?.version !== 1 || !Array.isArray(state.queue)) {
+            return null;
+        }
+
+        const restoredQueue = state.queue.filter(isStoredTrack).map(withPlaybackUrl);
+        const restoredUnshuffledQueueIds = storedTrackIds(state.unshuffledQueueIds);
+        const restoredTrackIds = new Set(restoredQueue.map((track) => track.id));
+        const restoredTrackId = typeof state.currentTrackId === 'number' && restoredTrackIds.has(state.currentTrackId)
+            ? state.currentTrackId
+            : restoredQueue[0]?.id ?? null;
+
+        return {
+            version: 1,
+            currentTrackId: restoredTrackId,
+            isShuffleEnabled: Boolean(state.isShuffleEnabled && restoredUnshuffledQueueIds.length > 0 && restoredQueue.length > 1),
+            isPlaying: Boolean(state.isPlaying && restoredTrackId !== null),
+            playbackPositionSeconds: typeof state.playbackPositionSeconds === 'number' && Number.isFinite(state.playbackPositionSeconds)
+                ? Math.max(0, state.playbackPositionSeconds)
+                : 0,
+            queue: restoredQueue,
+            queueLabel: typeof state.queueLabel === 'string' ? state.queueLabel : null,
+            repeatMode: isAudioRepeatMode(state.repeatMode) ? state.repeatMode : 'none',
+            unshuffledQueueIds: restoredUnshuffledQueueIds.length > 0 ? restoredUnshuffledQueueIds : trackIds(restoredQueue),
+        };
+    } catch {
+        return null;
+    }
+}
+
+const storedState = readAudioPlayerState();
+
+const queue = ref<AudioPlayerTrack[]>(storedState?.queue ?? []);
+const queueLabel = ref<string | null>(storedState?.queueLabel ?? null);
+const currentTrackId = ref<number | null>(storedState?.currentTrackId ?? null);
+const isShuffleEnabled = ref(storedState?.isShuffleEnabled ?? false);
+const isPlaying = ref(storedState?.isPlaying ?? false);
+const playbackPositionSeconds = ref(storedState?.playbackPositionSeconds ?? 0);
+const repeatMode = ref<AudioRepeatMode>(storedState?.repeatMode ?? 'none');
+const unshuffledQueueIds = ref<number[]>(storedState?.unshuffledQueueIds ?? trackIds(queue.value));
+
+function writeAudioPlayerState(): void {
+    if (typeof window === 'undefined' || !('sessionStorage' in window)) {
+        return;
+    }
+
+    try {
+        if (queue.value.length === 0) {
+            window.sessionStorage.removeItem(AUDIO_PLAYER_STATE_STORAGE_KEY);
+            return;
+        }
+
+        window.sessionStorage.setItem(AUDIO_PLAYER_STATE_STORAGE_KEY, JSON.stringify({
+            version: 1,
+            currentTrackId: currentTrackId.value,
+            isShuffleEnabled: isShuffleEnabled.value,
+            isPlaying: isPlaying.value,
+            playbackPositionSeconds: playbackPositionSeconds.value,
+            queue: queue.value,
+            queueLabel: queueLabel.value,
+            repeatMode: repeatMode.value,
+            unshuffledQueueIds: unshuffledQueueIds.value,
+        } satisfies PersistedAudioPlayerState));
+    } catch {
+        // Ignore storage errors (private mode, quota, etc.).
+    }
+}
+
+watch([queue, queueLabel, currentTrackId, isShuffleEnabled, isPlaying, playbackPositionSeconds, repeatMode, unshuffledQueueIds], writeAudioPlayerState, {
+    deep: true,
+    flush: 'sync',
+});
 
 const currentTrack = computed(() => queue.value.find((track) => track.id === currentTrackId.value) ?? null);
 const currentTrackIndex = computed(() => queue.value.findIndex((track) => track.id === currentTrackId.value));
@@ -34,25 +188,32 @@ const canPlayNext = computed(() => currentTrackIndex.value >= 0 && (
     || (repeatMode.value === 'all' && queue.value.length > 1)
 ));
 
-function withPlaybackUrl(track: Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }): AudioPlayerTrack {
-    return {
-        ...track,
-        playbackUrl: track.playbackUrl ?? serve.url(track.id),
-    };
+function setQueueLabel(options?: AudioQueueOptions): void {
+    queueLabel.value = options?.queueLabel?.trim() || null;
 }
 
-function queueAndPlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, trackId: number): void {
-    queue.value = tracks.map(withPlaybackUrl);
+function queueAndPlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, trackId: number, options?: AudioQueueOptions): void {
+    const nextQueue = tracks.map(withPlaybackUrl);
+
+    queue.value = nextQueue;
+    unshuffledQueueIds.value = trackIds(nextQueue);
+    isShuffleEnabled.value = false;
+    setQueueLabel(options);
+    playbackPositionSeconds.value = 0;
     currentTrackId.value = trackId;
     isPlaying.value = true;
 }
 
-function queueTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, trackId?: number): void {
+function queueTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, trackId?: number, options?: AudioQueueOptions): void {
     const nextQueue = tracks.map(withPlaybackUrl);
 
     if (nextQueue.length === 0) {
         queue.value = [];
+        queueLabel.value = null;
+        unshuffledQueueIds.value = [];
+        isShuffleEnabled.value = false;
         currentTrackId.value = null;
+        playbackPositionSeconds.value = 0;
         isPlaying.value = false;
         return;
     }
@@ -62,6 +223,10 @@ function queueTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { pla
     }
 
     queue.value = nextQueue;
+    unshuffledQueueIds.value = trackIds(nextQueue);
+    isShuffleEnabled.value = false;
+    setQueueLabel(options);
+    playbackPositionSeconds.value = 0;
     currentTrackId.value = nextQueue.find((track) => track.id === trackId)?.id ?? nextQueue[0]?.id ?? null;
 }
 
@@ -106,18 +271,21 @@ function playQueueTrack(trackId: number): void {
         return;
     }
 
+    playbackPositionSeconds.value = 0;
     currentTrackId.value = trackId;
     isPlaying.value = true;
 }
 
 function playPrevious(): void {
     if (currentTrackIndex.value > 0) {
+        playbackPositionSeconds.value = 0;
         currentTrackId.value = queue.value[currentTrackIndex.value - 1]?.id ?? currentTrackId.value;
         isPlaying.value = true;
         return;
     }
 
     if (repeatMode.value === 'all' && queue.value.length > 1) {
+        playbackPositionSeconds.value = 0;
         currentTrackId.value = queue.value[queue.value.length - 1]?.id ?? currentTrackId.value;
         isPlaying.value = true;
         return;
@@ -130,12 +298,14 @@ function playPrevious(): void {
 
 function playNext(): void {
     if (currentTrackIndex.value >= 0 && currentTrackIndex.value < queue.value.length - 1) {
+        playbackPositionSeconds.value = 0;
         currentTrackId.value = queue.value[currentTrackIndex.value + 1]?.id ?? currentTrackId.value;
         isPlaying.value = true;
         return;
     }
 
     if (repeatMode.value === 'all' && queue.value.length > 0) {
+        playbackPositionSeconds.value = 0;
         currentTrackId.value = queue.value[0]?.id ?? currentTrackId.value;
         isPlaying.value = true;
         return;
@@ -146,8 +316,18 @@ function playNext(): void {
 
 function shuffleQueue(): void {
     if (queue.value.length <= 1) {
+        unshuffledQueueIds.value = trackIds(queue.value);
+        isShuffleEnabled.value = false;
         return;
     }
+
+    if (isShuffleEnabled.value) {
+        queue.value = orderTracksByIds(queue.value, unshuffledQueueIds.value);
+        isShuffleEnabled.value = false;
+        return;
+    }
+
+    unshuffledQueueIds.value = trackIds(queue.value);
 
     const activeTrack = currentTrack.value;
     const tracksToShuffle = activeTrack
@@ -160,6 +340,7 @@ function shuffleQueue(): void {
     }
 
     queue.value = activeTrack ? [activeTrack, ...tracksToShuffle] : tracksToShuffle;
+    isShuffleEnabled.value = true;
 }
 
 function cycleRepeatMode(): void {
@@ -180,14 +361,27 @@ function restartCurrentTrack(): void {
         return;
     }
 
+    playbackPositionSeconds.value = 0;
     isPlaying.value = true;
 }
 
 function clear(): void {
     queue.value = [];
+    queueLabel.value = null;
+    unshuffledQueueIds.value = [];
+    isShuffleEnabled.value = false;
     currentTrackId.value = null;
+    playbackPositionSeconds.value = 0;
     isPlaying.value = false;
     repeatMode.value = 'none';
+}
+
+function updatePlaybackPosition(seconds: number): void {
+    if (!Number.isFinite(seconds)) {
+        return;
+    }
+
+    playbackPositionSeconds.value = Math.max(0, Math.round(seconds * 10) / 10);
 }
 
 export function useGlobalAudioPlayer() {
@@ -199,12 +393,15 @@ export function useGlobalAudioPlayer() {
         currentTrack,
         currentTrackId,
         hasQueue,
+        isShuffleEnabled,
         isPlaying,
         pause,
+        playbackPositionSeconds,
         playNext,
         playPrevious,
         playQueueTrack,
         queue,
+        queueLabel,
         queueLength,
         queueAndPlay,
         queueTracks,
@@ -215,6 +412,7 @@ export function useGlobalAudioPlayer() {
         shuffleQueue,
         togglePlayback,
         updateCurrentTrack,
+        updatePlaybackPosition,
         updateQueuedTracks,
     };
 }

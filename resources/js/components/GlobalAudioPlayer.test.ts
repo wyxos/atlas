@@ -58,6 +58,7 @@ describe('GlobalAudioPlayer', () => {
         expect(shuffleButton.classes()).not.toContain('hover:text-white');
         expect(shuffleButton.attributes('disabled')).toBeDefined();
         expect(shuffleButton.attributes('aria-disabled')).toBe('true');
+        expect(shuffleButton.attributes('aria-pressed')).toBe('false');
         expect(wrapper.get('[aria-label="Playback progress"]').classes()).toContain('h-2');
         expect(wrapper.get('[aria-label="Playback progress"]').classes()).toContain('2xl:h-3');
         expect(wrapper.get('[aria-label="Playback progress"]').classes()).not.toContain('top-0');
@@ -162,7 +163,7 @@ describe('GlobalAudioPlayer', () => {
                 seenCount: 0,
                 playbackUrl: '/api/files/42/serve',
             },
-        ], 41);
+        ], 41, { queueLabel: 'All audio' });
 
         const wrapper = mount(GlobalAudioPlayer);
 
@@ -197,7 +198,7 @@ describe('GlobalAudioPlayer', () => {
                 seenCount: 0,
                 playbackUrl: '/api/files/41/serve',
             },
-        ], 41);
+        ], 41, { queueLabel: 'All audio' });
 
         const wrapper = mount(GlobalAudioPlayer);
         const seekInput = wrapper.get('[aria-label="Playback progress"]');
@@ -268,12 +269,14 @@ describe('GlobalAudioPlayer', () => {
                 seenCount: 0,
                 playbackUrl: '/api/files/42/serve',
             },
-        ], 41);
+        ], 41, { queueLabel: 'All audio' });
 
         const wrapper = mount(GlobalAudioPlayer);
 
         await wrapper.get('[aria-label="Queue"]').trigger('click');
 
+        expect(wrapper.get('[data-test="audio-queue-title"]').text()).toBe('All audio');
+        expect(wrapper.get('[data-test="audio-queue-count"]').text()).toBe('2 tracks');
         expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('2 tracks');
         expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).not.toContain('Queue');
         expect(wrapper.get('[data-test="audio-queue-sheet"]').text()).toContain('Atlas Seed Track 0041');
@@ -429,23 +432,38 @@ describe('GlobalAudioPlayer', () => {
         expect(wrapper.get('[data-test="global-audio-player"]').text()).not.toContain('Loading metadata...');
     });
 
-    it('shuffles the copied queue while keeping the current track first', async () => {
+    it('toggles shuffle state and restores the copied queue order', async () => {
         const player = useGlobalAudioPlayer();
         const copiedPlaylist = [testTrack(1), testTrack(2), testTrack(3), testTrack(4)];
         player.queueAndPlay(copiedPlaylist, 1);
         vi.spyOn(Math, 'random').mockReturnValue(0);
 
         const wrapper = mount(GlobalAudioPlayer);
+        const shuffleButton = wrapper.get('[aria-label="Shuffle queue"]');
 
-        await wrapper.get('[aria-label="Shuffle queue"]').trigger('click');
+        expect(shuffleButton.attributes('aria-pressed')).toBe('false');
+
+        await shuffleButton.trigger('click');
 
         const shuffledOrder = player.queue.value.map((track) => track.id);
         expect(shuffledOrder).toEqual([1, 3, 4, 2]);
+        expect(player.isShuffleEnabled.value).toBe(true);
+        expect(wrapper.get('[aria-label="Shuffle queue"]').attributes('aria-pressed')).toBe('true');
+        expect(wrapper.get('[aria-label="Shuffle queue"]').classes()).toContain('bg-smart-blue-800');
+        expect(wrapper.get('[aria-label="Shuffle queue"]').classes()).toContain('text-smart-blue-100');
 
         player.queueTracks(copiedPlaylist, 3);
 
         expect(player.queue.value.map((track) => track.id)).toEqual(shuffledOrder);
         expect(player.currentTrackId.value).toBe(1);
+
+        await wrapper.get('[aria-label="Shuffle queue"]').trigger('click');
+
+        expect(player.isShuffleEnabled.value).toBe(false);
+        expect(player.queue.value.map((track) => track.id)).toEqual([1, 2, 3, 4]);
+        expect(wrapper.get('[aria-label="Shuffle queue"]').attributes('aria-pressed')).toBe('false');
+        expect(wrapper.get('[aria-label="Shuffle queue"]').classes()).not.toContain('bg-smart-blue-800');
+        expect(wrapper.get('[aria-label="Shuffle queue"]').classes()).not.toContain('text-smart-blue-100');
     });
 
     it('cycles repeat modes from off to all to one', async () => {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Music, X } from 'lucide-vue-next';
 import VirtualList from './VirtualList.vue';
 import type { AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
 
-defineProps<{
+const props = defineProps<{
     tracks: AudioPlayerTrack[];
     currentTrackId: number | null;
+    queueLabel: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -17,6 +19,8 @@ const emit = defineEmits<{
 function handleVisibleItemsChange(items: unknown[]): void {
     emit('visibleItemsChange', items as AudioPlayerTrack[]);
 }
+
+const trackCountLabel = computed(() => props.tracks.length === 1 ? '1 track' : `${props.tracks.length} tracks`);
 </script>
 
 <template>
@@ -28,8 +32,11 @@ function handleVisibleItemsChange(items: unknown[]): void {
     >
         <header class="flex h-14 shrink-0 items-center justify-between border-b border-twilight-indigo-500/70 px-4">
             <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-regal-navy-100">
-                    {{ tracks.length === 1 ? '1 track' : `${tracks.length} tracks` }}
+                <p class="truncate text-sm font-semibold text-regal-navy-100" data-test="audio-queue-title">
+                    {{ queueLabel || trackCountLabel }}
+                </p>
+                <p v-if="queueLabel" class="mt-0.5 truncate text-xs text-blue-slate-300" data-test="audio-queue-count">
+                    {{ trackCountLabel }}
                 </p>
             </div>
             <button

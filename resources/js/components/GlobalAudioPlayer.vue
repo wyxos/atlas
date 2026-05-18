@@ -25,7 +25,7 @@ import type { ReactionType } from '@/types/reaction';
 
 const audioPlayer = useGlobalAudioPlayer();
 const audioRef = ref<HTMLAudioElement | null>(null);
-const currentTime = ref(0);
+const currentTime = ref(audioPlayer.playbackPositionSeconds.value);
 const mediaDuration = ref(0);
 const isQueueSheetOpen = ref(false);
 const { handleQueueVisibleItemsChange } = useAudioQueueDetails(audioPlayer);
@@ -105,18 +105,36 @@ async function attemptPlay(): Promise<void> {
         return;
     }
 
+    if (currentTime.value > 0) {
+        audioRef.value.currentTime = currentTime.value;
+    }
+
     const playResult = audioRef.value.play();
-    void (playResult as Promise<void> | undefined)?.catch(() => {});
+    void (playResult as Promise<void> | undefined)?.catch(() => {
+        audioPlayer.pause();
+    });
+}
+
+function syncPlaybackPositionFromPlayer(): void {
+    const storedPosition = audioPlayer.playbackPositionSeconds.value;
+    const targetPosition = durationSeconds.value > 0 ? Math.min(durationSeconds.value, storedPosition) : storedPosition;
+    currentTime.value = targetPosition;
+
+    if (audioRef.value) {
+        audioRef.value.currentTime = targetPosition;
+    }
 }
 
 function handleLoadedMetadata(): void {
     mediaDuration.value = audioRef.value?.duration && Number.isFinite(audioRef.value.duration)
         ? audioRef.value.duration
         : currentTrack.value?.durationSeconds ?? 0;
+    syncPlaybackPositionFromPlayer();
 }
 
 function handleTimeUpdate(): void {
     currentTime.value = audioRef.value?.currentTime ?? 0;
+    audioPlayer.updatePlaybackPosition(currentTime.value);
 }
 
 function handleSeek(event: Event): void {
@@ -130,6 +148,8 @@ function handleSeek(event: Event): void {
     if (audioRef.value) {
         audioRef.value.currentTime = targetTime;
     }
+
+    audioPlayer.updatePlaybackPosition(targetTime);
 }
 
 function handleEnded(): void {
@@ -192,6 +212,7 @@ async function handleBlacklist(): Promise<void> {
 
 function restartHiddenAudio(): void {
     currentTime.value = 0;
+    audioPlayer.updatePlaybackPosition(0);
 
     if (audioRef.value) {
         audioRef.value.currentTime = 0;
@@ -199,13 +220,13 @@ function restartHiddenAudio(): void {
 }
 
 watch(currentTrackId, () => {
-    currentTime.value = 0;
     mediaDuration.value = currentTrack.value?.durationSeconds ?? 0;
+    syncPlaybackPositionFromPlayer();
 
     if (isPlaying.value) {
         void attemptPlay();
     }
-});
+}, { immediate: true });
 
 watch(isPlaying, (playing) => {
     if (playing) {
@@ -244,6 +265,7 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
             v-if="isQueueSheetOpen"
             :tracks="audioPlayer.queue.value"
             :current-track-id="currentTrackId"
+            :queue-label="audioPlayer.queueLabel.value"
             @close="isQueueSheetOpen = false"
             @play="audioPlayer.playQueueTrack"
             @visible-items-change="handleQueueVisibleItemsChange"
@@ -378,9 +400,10 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
                 <div class="mt-3 flex items-center justify-center gap-3 md:mt-4 md:gap-5 2xl:mt-4 2xl:gap-6" data-test="global-audio-player-controls">
                     <button
                         type="button"
-                        :class="controlButtonClass"
+                        :class="[controlButtonClass, audioPlayer.isShuffleEnabled.value ? 'bg-smart-blue-800 text-smart-blue-100' : '']"
                         :disabled="audioPlayer.queueLength.value <= 1"
                         :aria-disabled="audioPlayer.queueLength.value <= 1"
+                        :aria-pressed="audioPlayer.isShuffleEnabled.value"
                         aria-label="Shuffle queue"
                         @click="audioPlayer.shuffleQueue"
                     >
