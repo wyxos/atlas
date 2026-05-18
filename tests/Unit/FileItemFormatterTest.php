@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Album;
+use App\Models\AlbumCover;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
@@ -30,9 +32,35 @@ function formatterFile(array $attributes = []): File
     $file->id = (int) $attributes['id'];
 
     $file->setRelation('containers', new EloquentCollection);
+    $file->setRelation('albums', new EloquentCollection);
     $file->setRelation('metadata', null);
 
     return $file;
+}
+
+function formatterAlbumWithDefaultCover(int $coverId): Album
+{
+    $album = new Album;
+    $album->forceFill([
+        'id' => 1,
+        'name' => 'Album',
+        'normalized_name' => 'album',
+    ]);
+    $album->id = 1;
+
+    $cover = new AlbumCover;
+    $cover->forceFill([
+        'id' => $coverId,
+        'album_id' => $album->id,
+        'path' => 'imports/aa/bb/covers/cover.jpg',
+        'mime_type' => 'image/jpeg',
+        'is_default' => true,
+    ]);
+    $cover->id = $coverId;
+
+    $album->setRelation('defaultCover', $cover);
+
+    return $album;
 }
 
 function formatterContainer(array $attributes = []): Container
@@ -92,7 +120,30 @@ it('treats application/mp4 as video for remote items', function () {
     expect($item['original'])->toBe('https://image.civitai.com/example/video.mp4');
 });
 
-it('uses an icon preview for downloaded audio files but keeps the original URL', function () {
+it('uses an album cover preview for downloaded audio files when available', function () {
+    $file = formatterFile([
+        'id' => 103,
+        'mime_type' => 'audio/mpeg',
+        'ext' => 'mp3',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/test.mp3',
+    ]);
+    $file->setRelation('albums', new EloquentCollection([
+        formatterAlbumWithDefaultCover(501),
+    ]));
+
+    $items = FileItemFormatter::format([$file], 1);
+    $item = $items[0];
+
+    expect($item['media_kind'])->toBe('audio');
+    expect($item['type'])->toBe('image'); // Vibe loader expects image/video only
+    expect($item['src'])->toBe(FileApiPath::albumCover(501));
+    expect($item['preview'])->toBe(FileApiPath::albumCover(501));
+    expect($item['thumbnail'])->toBe(FileApiPath::albumCover(501));
+    expect($item['original'])->toBe(FileApiPath::downloaded($file->id));
+});
+
+it('falls back to an icon preview for downloaded audio files without covers', function () {
     $file = formatterFile([
         'id' => 103,
         'mime_type' => 'audio/mpeg',

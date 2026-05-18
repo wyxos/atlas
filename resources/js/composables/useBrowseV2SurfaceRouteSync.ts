@@ -35,7 +35,9 @@ function resolveFileMediaKind(file: File): FeedItem['media_kind'] {
 }
 
 export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
-    const previewUrl = file.preview_file_url
+    const mediaKind = resolveFileMediaKind(file);
+    const previewUrl = (mediaKind === 'audio' ? file.cover_url : null)
+        ?? file.preview_file_url
         ?? file.preview_url
         ?? file.poster_url
         ?? file.file_url
@@ -46,7 +48,6 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         ?? file.disk_url
         ?? file.url
         ?? previewUrl;
-    const mediaKind = resolveFileMediaKind(file);
 
     return {
         id: file.id,

@@ -157,7 +157,7 @@ export function mapFeedItemToVibeItem(item: FeedItem): AtlasVibeViewerItem {
             ? 'other'
             : (item.type === 'video' || item.media_kind === 'video' ? 'video' : 'image');
     const previewMediaType = type === 'video' ? 'video' : 'image';
-    const previewAsset = previewUrl && type !== 'audio' ? ({
+    const previewAsset = previewUrl ? ({
         url: previewUrl,
         width: item.width,
         height: item.height,

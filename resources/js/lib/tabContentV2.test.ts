@@ -225,8 +225,8 @@ describe('tabContentV2 resolve', () => {
     it('marks audio and video previews with explicit renderable media types', () => {
         const audioItem = mapFeedItemToVibeItem({
             ...createFeedItem(10),
-            preview: '/api/files/10/icon',
-            src: '/api/files/10/icon',
+            preview: '/api/audio/album-covers/10',
+            src: '/api/audio/album-covers/10',
             original: '/api/files/10/downloaded',
             originalUrl: '/api/files/10/downloaded',
             media_kind: 'audio',
@@ -245,7 +245,10 @@ describe('tabContentV2 resolve', () => {
         });
 
         expect(audioItem.type).toBe('audio');
-        expect(audioItem.preview).toBeUndefined();
+        expect(audioItem.preview).toMatchObject({
+            url: '/api/audio/album-covers/10',
+            mediaType: 'image',
+        });
         expect(audioItem.healthCheck).toMatchObject({
             kind: 'playback',
             url: '/api/files/10/downloaded',

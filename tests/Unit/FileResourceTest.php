@@ -1,8 +1,12 @@
 <?php
 
 use App\Http\Resources\FileResource;
+use App\Models\Album;
+use App\Models\AlbumCover;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Support\FileApiPath;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -42,6 +46,31 @@ function resourceFile(array $attributes = [], ?FileMetadata $metadata = null): F
     }
 
     return $file;
+}
+
+function resourceAlbumWithDefaultCover(int $coverId): Album
+{
+    $album = new Album;
+    $album->forceFill([
+        'id' => 1,
+        'name' => 'Album',
+        'normalized_name' => 'album',
+    ]);
+    $album->id = 1;
+
+    $cover = new AlbumCover;
+    $cover->forceFill([
+        'id' => $coverId,
+        'album_id' => $album->id,
+        'path' => 'imports/aa/bb/covers/cover.jpg',
+        'mime_type' => 'image/jpeg',
+        'is_default' => true,
+    ]);
+    $cover->id = $coverId;
+
+    $album->setRelation('defaultCover', $cover);
+
+    return $album;
 }
 
 it('includes absolute preview path when preview path is set', function () {
@@ -85,6 +114,22 @@ it('prefers downloaded and preview file routes for downloaded files', function (
         ->and($data['preview_file_url'])->toBe("/api/files/{$file->id}/preview")
         ->and($data['file_url'])->toBe("/api/files/{$file->id}/downloaded")
         ->and($data['preview_url'])->toBe("/api/files/{$file->id}/preview");
+});
+
+it('includes an audio cover url when an album cover relation is loaded', function () {
+    $file = resourceFile([
+        'id' => 202,
+        'mime_type' => 'audio/mpeg',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/example.mp3',
+    ]);
+    $file->setRelation('albums', new EloquentCollection([
+        resourceAlbumWithDefaultCover(701),
+    ]));
+
+    $data = FileResource::make($file)->toArray(Request::create('https://atlas.test/files'));
+
+    expect($data['cover_url'])->toBe(FileApiPath::albumCover(701));
 });
 
 it('resolves imported local file absolute path from atlas storage', function () {

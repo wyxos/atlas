@@ -6,6 +6,7 @@ use App\Jobs\GenerateFilePreviewAssets;
 use App\Models\File;
 use App\Support\AtlasPathResolver;
 use App\Support\AtlasStorage;
+use App\Support\FileMimeType;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -19,7 +20,7 @@ class FileStorageResponseService
     {
         $userId = Auth::id();
 
-        $file->load([
+        $relations = [
             'metadata',
             'autoBlacklistModerationAction',
             'containers' => function ($query) use ($userId) {
@@ -51,7 +52,13 @@ class FileStorageResponseService
                     },
                 ]);
             },
-        ]);
+        ];
+
+        if (FileMimeType::isAudio($file->mime_type)) {
+            $relations[] = 'albums.defaultCover';
+        }
+
+        $file->load($relations);
     }
 
     public function hydrateDiskMetadata(File $file): void

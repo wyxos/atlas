@@ -37,6 +37,7 @@ export interface File {
     absolute_path: string | null;
     absolute_preview_path: string | null;
     preview_url: string | null;
+    cover_url: string | null;
     disk_url: string | null;
     preview_file_url: string | null;
     poster_url: string | null;

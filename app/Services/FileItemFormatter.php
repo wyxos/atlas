@@ -9,6 +9,7 @@ use App\Support\FileApiPath;
 use App\Support\FileMimeType;
 use Illuminate\Container\Container as IoCContainer;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 
 class FileItemFormatter
 {
@@ -42,6 +43,43 @@ class FileItemFormatter
         return $path.$query;
     }
 
+    private static function hasLoadedAlbumCoverRelation(File $file): bool
+    {
+        if (! $file->relationLoaded('albums')) {
+            return false;
+        }
+
+        return $file->albums->every(
+            static fn ($album): bool => $album->relationLoaded('defaultCover')
+        );
+    }
+
+    private static function audioCoverUrl(File $file): ?string
+    {
+        if ($file->relationLoaded('albums')) {
+            $albumCover = $file->albums
+                ->map(static fn ($album) => $album->defaultCover)
+                ->filter()
+                ->first();
+
+            if ($albumCover) {
+                return FileApiPath::albumCover((int) $albumCover->id);
+            }
+        }
+
+        if (is_string($file->poster_path) && trim($file->poster_path) !== '') {
+            return FileApiPath::poster((int) $file->id);
+        }
+
+        if (is_string($file->preview_path) && trim($file->preview_path) !== '') {
+            return FileApiPath::preview((int) $file->id);
+        }
+
+        $previewUrl = trim((string) ($file->preview_url ?? ''));
+
+        return $previewUrl !== '' ? $previewUrl : null;
+    }
+
     /**
      * Format files into items structure for frontend.
      */
@@ -56,9 +94,21 @@ class FileItemFormatter
             if ($persistedFiles->isNotEmpty()) {
                 $persistedFiles->load('containers');
             }
-        } elseif (is_array($files) && ! empty($files)) {
+
+            $audioFilesMissingCovers = $files->filter(
+                fn (File $file): bool => $file->exists
+                    && FileMimeType::isAudio($file->mime_type)
+                    && ! self::hasLoadedAlbumCoverRelation($file)
+            );
+
+            if ($audioFilesMissingCovers->isNotEmpty()) {
+                $audioFilesMissingCovers->load('albums.defaultCover');
+            }
+        } elseif ($files instanceof SupportCollection || (is_array($files) && ! empty($files))) {
+            $fileList = $files instanceof SupportCollection ? $files->all() : $files;
+
             $filesNeedingContainers = array_values(array_filter(
-                $files,
+                $fileList,
                 fn (File $file): bool => $file->exists && ! $file->relationLoaded('containers')
             ));
 
@@ -74,6 +124,28 @@ class FileItemFormatter
                 foreach ($filesNeedingContainers as $file) {
                     if (isset($filesWithContainers[$file->id])) {
                         $file->setRelation('containers', $filesWithContainers[$file->id]->containers);
+                    }
+                }
+            }
+
+            $audioFilesMissingCovers = array_values(array_filter(
+                $fileList,
+                fn (File $file): bool => $file->exists
+                    && FileMimeType::isAudio($file->mime_type)
+                    && ! self::hasLoadedAlbumCoverRelation($file)
+            ));
+
+            if ($audioFilesMissingCovers !== []) {
+                $fileIds = array_map(fn (File $file) => $file->id, $audioFilesMissingCovers);
+                $filesWithAlbums = File::query()
+                    ->whereIn('id', $fileIds)
+                    ->with('albums.defaultCover')
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($audioFilesMissingCovers as $file) {
+                    if (isset($filesWithAlbums[$file->id])) {
+                        $file->setRelation('albums', $filesWithAlbums[$file->id]->albums);
                     }
                 }
             }
@@ -157,12 +229,13 @@ class FileItemFormatter
             $isAudio = FileMimeType::isAudio($file->mime_type);
 
             // Vibe currently only knows how to load "image" and "video" items.
-            // For audio/other files, use an icon SVG as the preview image, but keep the real
-            // file URL in `original` for the viewer/actions.
+            // For audio/other files, keep the real file URL in `original` for the viewer/actions.
             $mediaKind = $isVideo ? 'video' : ($isImage ? 'image' : ($isAudio ? 'audio' : 'file'));
             $vibeType = $isVideo ? 'video' : 'image';
 
-            if ($mediaKind !== 'image' && $mediaKind !== 'video') {
+            if ($mediaKind === 'audio') {
+                $thumbnailUrl = self::audioCoverUrl($file) ?? FileApiPath::icon($file->id);
+            } elseif ($mediaKind !== 'image' && $mediaKind !== 'video') {
                 $thumbnailUrl = FileApiPath::icon($file->id);
             }
 

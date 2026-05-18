@@ -23,6 +23,7 @@ function createFile(overrides: Partial<File> = {}): File {
         absolute_path: null,
         absolute_preview_path: null,
         preview_url: 'https://example.test/preview.mp4',
+        cover_url: null,
         disk_url: null,
         preview_file_url: 'https://example.test/preview.mp4',
         poster_url: null,
@@ -59,5 +60,22 @@ describe('mapBrowseV2FileToFeedItem', () => {
         expect(item.type).toBe('video');
         expect(item.preview).toBe('https://example.test/preview.mp4');
         expect(item.original).toBe('https://example.test/original.mp4');
+    });
+
+    it('uses audio cover URLs as standalone browse previews', () => {
+        const item = mapBrowseV2FileToFeedItem(createFile({
+            filename: 'audio-file',
+            ext: 'mp3',
+            mime_type: 'audio/mpeg',
+            file_url: '/api/files/111/downloaded',
+            preview_url: null,
+            preview_file_url: null,
+            cover_url: '/api/audio/album-covers/501',
+        }));
+
+        expect(item.media_kind).toBe('audio');
+        expect(item.type).toBe('image');
+        expect(item.preview).toBe('/api/audio/album-covers/501');
+        expect(item.original).toBe('/api/files/111/downloaded');
     });
 });

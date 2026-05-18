@@ -2,13 +2,45 @@
 
 namespace App\Http\Resources;
 
+use App\Models\File;
 use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
+use App\Support\FileMimeType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class FileResource extends JsonResource
 {
+    private static function audioCoverUrl(File $file): ?string
+    {
+        if (! FileMimeType::isAudio($file->mime_type)) {
+            return null;
+        }
+
+        if ($file->relationLoaded('albums')) {
+            $albumCover = $file->albums
+                ->map(static fn ($album) => $album->defaultCover)
+                ->filter()
+                ->first();
+
+            if ($albumCover) {
+                return FileApiPath::albumCover((int) $albumCover->id);
+            }
+        }
+
+        if (is_string($file->poster_path) && trim($file->poster_path) !== '') {
+            return FileApiPath::poster((int) $file->id);
+        }
+
+        if (is_string($file->preview_path) && trim($file->preview_path) !== '') {
+            return FileApiPath::preview((int) $file->id);
+        }
+
+        $previewUrl = trim((string) ($file->preview_url ?? ''));
+
+        return $previewUrl !== '' ? $previewUrl : null;
+    }
+
     private static function toRelativeInternalApiUrl(?string $url, ?Request $request = null): ?string
     {
         if (! is_string($url) || $url === '') {
@@ -96,12 +128,14 @@ class FileResource extends JsonResource
 
         // For downloaded files with generated previews, prefer the internal preview route.
         $previewUrl = $previewFileUrl ?: $this->preview_url;
+        $coverUrl = self::audioCoverUrl($this->resource);
 
         $fileUrl = self::toRelativeInternalApiUrl($fileUrl, $request);
         $diskUrl = self::toRelativeInternalApiUrl($diskUrl, $request);
         $previewUrl = self::toRelativeInternalApiUrl($previewUrl, $request);
         $previewFileUrl = self::toRelativeInternalApiUrl($previewFileUrl, $request);
         $posterUrl = self::toRelativeInternalApiUrl($posterUrl, $request);
+        $coverUrl = self::toRelativeInternalApiUrl($coverUrl, $request);
 
         $blacklistRule = null;
         if ($this->blacklisted_at !== null) {
@@ -173,6 +207,7 @@ class FileResource extends JsonResource
             'absolute_path' => $absolutePath,
             'absolute_preview_path' => $absolutePreviewPath,
             'preview_url' => $previewUrl,
+            'cover_url' => $coverUrl,
             'disk_url' => $diskUrl,
             'preview_file_url' => $previewFileUrl,
             'poster_url' => $posterUrl,

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Album;
+use App\Models\AlbumCover;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\ModerationRule;
@@ -61,6 +63,43 @@ test('items are formatted correctly', function () {
     expect($item)->toHaveKey('key');
     expect($item)->toHaveKey('index');
     expect($item['key'])->toBe("{$item['page']}-{$item['id']}");
+});
+
+test('audio items use album covers as browse previews', function () {
+    $user = User::factory()->create();
+    $audio = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'ext' => 'mp3',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/test-track.mp3',
+        'preview_url' => null,
+        'preview_path' => null,
+        'poster_path' => null,
+    ]);
+    $album = Album::factory()->create();
+    $audio->albums()->attach($album->id);
+    $cover = AlbumCover::factory()->create([
+        'album_id' => $album->id,
+        'file_id' => $audio->id,
+        'path' => 'imports/aa/bb/covers/test-cover.jpg',
+        'path_hash' => hash('sha256', 'imports/aa/bb/covers/test-cover.jpg'),
+        'is_default' => true,
+    ]);
+
+    $tab = Tab::factory()->for($user)->withFiles([$audio->id])->create();
+
+    $response = $this->actingAs($user)->getJson(route('api.tabs.show', ['tab' => $tab->id]));
+
+    $response->assertSuccessful();
+
+    $item = $response->json('tab.items.0');
+    $coverUrl = "/api/audio/album-covers/{$cover->id}";
+
+    expect($item['media_kind'])->toBe('audio');
+    expect($item['src'])->toBe($coverUrl);
+    expect($item['preview'])->toBe($coverUrl);
+    expect($item['thumbnail'])->toBe($coverUrl);
+    expect($item['original'])->toBe("/api/files/{$audio->id}/downloaded");
 });
 
 test('items use correct page number from params', function () {
