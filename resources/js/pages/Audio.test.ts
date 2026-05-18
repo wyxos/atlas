@@ -293,6 +293,15 @@ describe('Audio', () => {
         expect(wrapper.get('[data-test="audio-filter-cta"]').attributes('aria-label')).toBe('Filter: All');
         expect(wrapper.findComponent(VirtualList).props('containerClass')).toBe('min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]');
         expect(wrapper.findComponent(VirtualList).props('itemHeight')).toBe(72);
+
+        await wrapper.get('[data-test="audio-filter-cta"]').trigger('click');
+        await flushPromises();
+
+        const libraryFilter = document.body.querySelector('[data-test="audio-filter-local"]') as HTMLButtonElement | null;
+        libraryFilter?.click();
+        await flushPromises();
+
+        expect(wrapper.get('[data-test="audio-filter-cta"]').attributes('aria-label')).toBe('Filter: Library');
     });
 
     it('renders desktop rows with Spotify-style columns and routes reactions', async () => {

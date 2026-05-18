@@ -215,6 +215,14 @@ describe('Files', () => {
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
+        vm.listing.openPanel();
+        await wrapper.vm.$nextTick();
+        const sourceSelect = document.body.querySelector('select');
+        const sourceOptions = Array.from(sourceSelect?.querySelectorAll('option') ?? [])
+            .map((option) => option.textContent?.trim() ?? '');
+        expect(sourceOptions).toContain('Library');
+        expect(sourceOptions).not.toContain('Local');
+
         const resetPromise = vm.listing.resetFilters();
         expect(vm.listing.isResetting).toBe(true);
         await resetPromise;

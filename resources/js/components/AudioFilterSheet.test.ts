@@ -23,5 +23,7 @@ describe('AudioFilterSheet', () => {
 
         expect(sheetBody).not.toBeNull();
         expect(sheetBody?.classList.contains('px-6')).toBe(true);
+        expect(sheetBody?.textContent).toContain('Library');
+        expect(sheetBody?.textContent).not.toContain('Local');
     });
 });

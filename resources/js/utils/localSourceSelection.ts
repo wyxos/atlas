@@ -21,6 +21,18 @@ function stringifySourceValue(value: unknown): string | null {
     return null;
 }
 
+function localSourceOptionLabel(value: string, label?: string): string {
+    if (value === 'all') {
+        return 'All';
+    }
+
+    if (value.toLowerCase() === 'local') {
+        return 'Library';
+    }
+
+    return label?.trim() || value;
+}
+
 export function normalizeLocalSourceSelection(value: unknown): string[] {
     const rawValues = Array.isArray(value) ? value : [value];
     const sources = rawValues
@@ -37,7 +49,7 @@ export function normalizeLocalSourceSelection(value: unknown): string[] {
 
 export function createLocalSourceOptions(sources: readonly string[]): LocalSourceOption[] {
     return normalizeLocalSourceOptions(sources.map((source) => ({
-        label: source === 'all' ? 'All' : source,
+        label: localSourceOptionLabel(source),
         value: source,
     })));
 }
@@ -55,7 +67,7 @@ export function normalizeLocalSourceOptions(options: readonly ServiceFilterOptio
 
         seen.add(value);
         normalized.push({
-            label: option.label || (value === 'all' ? 'All' : value),
+            label: localSourceOptionLabel(value, option.label),
             value,
         });
     }

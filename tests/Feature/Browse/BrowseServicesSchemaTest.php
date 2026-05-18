@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -170,4 +171,31 @@ test('browse services endpoint disables caching', function () {
     expect($cacheControl)->toContain('no-cache');
     expect($cacheControl)->toContain('must-revalidate');
     expect($cacheControl)->toContain('max-age=0');
+});
+
+test('browse services endpoint includes database sources in library source options', function () {
+    $user = User::factory()->create();
+
+    File::factory()->create(['source' => 'Spotify']);
+    File::factory()->create(['source' => 'Bandcamp']);
+    File::factory()->create(['source' => 'Spotify']);
+    File::factory()->create(['source' => 'local']);
+
+    $response = $this->actingAs($user)->getJson('/api/browse/services');
+
+    $response->assertOk();
+
+    $sourceField = collect($response->json('local.schema.fields'))->firstWhere('uiKey', 'source');
+
+    expect($sourceField)->not->toBeNull()
+        ->and($sourceField['options'])->toContain(['label' => 'All', 'value' => 'all'])
+        ->and($sourceField['options'])->toContain(['label' => 'Spotify', 'value' => 'Spotify'])
+        ->and($sourceField['options'])->toContain(['label' => 'Bandcamp', 'value' => 'Bandcamp'])
+        ->and($sourceField['options'])->toContain(['label' => 'Library', 'value' => 'local'])
+        ->and($sourceField['options'])->not->toContain(['label' => 'Local', 'value' => 'Local']);
+
+    $sourcesResponse = $this->actingAs($user)->getJson('/api/browse/sources');
+
+    $sourcesResponse->assertOk();
+    expect($sourcesResponse->json('sources'))->toContain('Spotify');
 });

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+    createLocalSourceOptions,
     formatLocalSourceSelectionLabel,
     isLocalSourceSelected,
     normalizeLocalSourceSelection,
+    normalizeLocalSourceOptions,
     toggleLocalSourceSelection,
 } from './localSourceSelection';
 
@@ -34,5 +36,16 @@ describe('localSourceSelection', () => {
         expect(isLocalSourceSelected(['all'], 'all')).toBe(true);
         expect(formatLocalSourceSelectionLabel(['CivitAI', 'Wallhaven'], options)).toBe('2 sources');
         expect(formatLocalSourceSelectionLabel(['CivitAI'], options)).toBe('CivitAI');
+    });
+
+    it('labels local source values as library in source dropdowns', () => {
+        expect(createLocalSourceOptions(['all', 'local', 'Spotify'])).toEqual([
+            { label: 'All', value: 'all' },
+            { label: 'Library', value: 'local' },
+            { label: 'Spotify', value: 'Spotify' },
+        ]);
+        expect(normalizeLocalSourceOptions([{ label: 'Local', value: 'local' }])).toEqual([
+            { label: 'Library', value: 'local' },
+        ]);
     });
 });

@@ -295,7 +295,7 @@ onMounted(async () => {
                             Source
                         </template>
                         <option value="all">All</option>
-                        <option value="local">Local</option>
+                        <option value="local">Library</option>
                         <option value="NAS">NAS</option>
                         <option value="YouTube">YouTube</option>
                         <option value="Booru">Booru</option>

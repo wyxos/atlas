@@ -89,7 +89,7 @@ const filteredAudioIds = computed(() => {
     });
 });
 
-const activeFilterLabel = computed(() => ({ all: 'All', local: 'Local', spotify: 'Spotify' })[activeFilter.value]);
+const activeFilterLabel = computed(() => ({ all: 'All', local: 'Library', spotify: 'Spotify' })[activeFilter.value]);
 
 const activePlaylistLabel = computed(() => {
     const slug = activePlaylistSlug.value.replace(/^source-/, '');

@@ -153,7 +153,7 @@ class SystemPlaylistCatalog
     {
         return match ($sourceKey) {
             'civitai' => 'CivitAI',
-            'local' => 'Local files',
+            'local' => 'Library files',
             'spotify' => 'Spotify',
             'wallhaven' => 'Wallhaven',
             'youtube' => 'YouTube',

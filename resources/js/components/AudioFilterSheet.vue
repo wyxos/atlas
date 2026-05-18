@@ -55,7 +55,7 @@ const isOpen = computed({
                         data-test="audio-filter-local"
                         @click="emit('update:activeFilter', 'local')"
                     >
-                        Local
+                        Library
                     </Button>
                 </div>
                 <p class="text-xs text-blue-slate-300">

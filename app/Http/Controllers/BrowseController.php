@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Browser;
 use App\Exceptions\LibraryUnavailableException;
+use App\Models\File;
 use App\Services\LocalService;
 use App\Support\ServiceFilterSchema;
 use Illuminate\Http\JsonResponse;
@@ -80,7 +81,7 @@ class BrowseController extends Controller
         ], [20, 40, 60, 80, 100, 200, 250]);
         $sourcesWithAll = $this->sourcesWithAll();
         $sourceOptions = array_map(fn (string $source) => [
-            'label' => $source === 'all' ? 'All' : $source,
+            'label' => $this->sourceLabel($source),
             'value' => $source,
         ], $sourcesWithAll);
 
@@ -118,7 +119,7 @@ class BrowseController extends Controller
                         ]),
                         $localSchema->limitField([
                             'type' => 'number',
-                            'description' => 'The number of local results per page (1-250).',
+                            'description' => 'The number of library results per page (1-250).',
                             'min' => 1,
                             'max' => 250,
                             'options' => $localLimitOptions,
@@ -174,7 +175,7 @@ class BrowseController extends Controller
                         ]),
                         $localSchema->field('not_found', [
                             'type' => 'radio',
-                            'description' => 'Whether the local file has been marked missing.',
+                            'description' => 'Whether the library file has been marked missing.',
                             'options' => [
                                 ['label' => 'Any', 'value' => 'any'],
                                 ['label' => 'Yes', 'value' => 'yes'],
@@ -204,7 +205,7 @@ class BrowseController extends Controller
                         ]),
                         $localSchema->field('sort', [
                             'type' => 'select',
-                            'description' => 'Sort local results.',
+                            'description' => 'Sort library results.',
                             'options' => [
                                 ['label' => 'Stored At', 'value' => 'stored_at'],
                                 ['label' => 'Stored At (Oldest)', 'value' => 'stored_at_asc'],
@@ -251,6 +252,38 @@ class BrowseController extends Controller
      */
     private function sourcesWithAll(): array
     {
+        $sources = [
+            ...$this->databaseSources(),
+            ...$this->serviceSources(),
+        ];
+
+        $sources = array_values(array_unique($sources));
+        sort($sources, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return array_merge(['all'], $sources);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function databaseSources(): array
+    {
+        return File::query()
+            ->select('source')
+            ->where('source', '<>', '')
+            ->distinct()
+            ->pluck('source')
+            ->filter(fn (mixed $source): bool => is_string($source) && trim($source) !== '')
+            ->map(fn (string $source): string => trim($source))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function serviceSources(): array
+    {
         $browser = new \App\Browser;
         $reflection = new \ReflectionClass($browser);
         $method = $reflection->getMethod('getAvailableServices');
@@ -259,15 +292,25 @@ class BrowseController extends Controller
 
         $sources = [];
         foreach ($services as $serviceClass) {
+            if (is_a($serviceClass, LocalService::class, true)) {
+                continue;
+            }
+
             $source = $serviceClass::source();
             if ($source !== '') {
                 $sources[] = $source;
             }
         }
 
-        $sources = array_values(array_unique($sources));
-        sort($sources);
+        return $sources;
+    }
 
-        return array_merge(['all'], $sources);
+    private function sourceLabel(string $source): string
+    {
+        return match (strtolower($source)) {
+            'all' => 'All',
+            'local' => 'Library',
+            default => $source,
+        };
     }
 }
