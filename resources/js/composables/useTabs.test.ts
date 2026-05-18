@@ -83,6 +83,26 @@ describe('useTabs', () => {
         expect(activeTabId.value).toBe(1);
     });
 
+    it('loads legacy local service tabs as local feed tabs', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: [
+                {
+                    id: 12,
+                    label: 'Legacy Library',
+                    params: { service: 'local', source: 'all' },
+                    position: 0,
+                    is_active: true,
+                    updated_at: '2024-01-01T00:00:00Z',
+                },
+            ],
+        });
+
+        const { tabs, loadTabs } = useTabs();
+        await loadTabs();
+
+        expect(tabs.value[0].feed).toBe('local');
+    });
+
     it('creates and activates a new tab without an external switch callback', async () => {
         mockAxios.post.mockResolvedValueOnce({
             data: {

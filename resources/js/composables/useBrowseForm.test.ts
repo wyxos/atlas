@@ -172,6 +172,34 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.serviceFilters.local_preset).toBe('reacted_random');
     });
 
+    it('hydrates legacy local service tabs as local library tabs', () => {
+        const form = createBrowseForm();
+        form.reset();
+
+        const tab: TabData = {
+            id: 6,
+            label: 'Legacy local tab',
+            position: 0,
+            isActive: true,
+            params: {
+                service: 'local',
+                source: 'all',
+                page: 7,
+                limit: 100,
+                local_preset: 'reacted_random',
+            } as any,
+        };
+
+        form.syncFromTab(tab);
+
+        expect(form.data.feed).toBe('local');
+        expect(form.data.service).toBe('local');
+        expect(form.data.source).toBe('all');
+        expect(form.data.page).toBe(7);
+        expect(form.data.limit).toBe('100');
+        expect(form.data.serviceFilters.local_preset).toBe('reacted_random');
+    });
+
     it('restores multiple local source selections from tab params', () => {
         const form = createBrowseForm();
         form.reset();

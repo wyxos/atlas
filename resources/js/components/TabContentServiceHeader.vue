@@ -40,6 +40,7 @@ const props = withDefaults(defineProps<Props>(), {
 const globalStartPanel = useBrowseGlobalStartPanel();
 const queuedReactionCount = queueManager.collection.getAllComputed();
 const localSourceOptions = computed(() => createLocalSourceOptions(props.availableSources));
+const feedLabel = computed(() => props.form.data.feed === 'local' ? 'Library' : 'Online');
 </script>
 
 <template>
@@ -51,7 +52,7 @@ const localSourceOptions = computed(() => createLocalSourceOptions(props.availab
                     @update:model-value="(value) => updateFeed(value as 'online' | 'local')"
                     :disabled="masonry?.isLoading">
                     <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
-                        <SelectValue placeholder="Online" />
+                        <span class="truncate">{{ feedLabel }}</span>
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="online" data-test="source-type-online">Online</SelectItem>

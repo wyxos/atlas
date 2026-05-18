@@ -75,7 +75,7 @@ function handleInteractOutside(event: Event): void {
     <DialogContent
       data-slot="sheet-content"
       :class="cn(
-        'bg-prussian-blue-600 data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
+        'bg-prussian-blue-600 data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-[90] flex flex-col gap-4 shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
         side === 'right'
           && 'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l-2 border-twilight-indigo-500 sm:max-w-lg',
         side === 'left'

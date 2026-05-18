@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import { useToast } from '@/components/ui/toast/use-toast';
 import StatusToast from '@/components/toasts/StatusToast.vue';
+import { resolveBrowseFeed } from '@/utils/browseFeed';
 import {
     destroyBatch as tabsDestroyBatch,
     index as tabsIndex,
@@ -204,7 +205,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             params,
             position: tab.position ?? 0,
             isActive: tab.is_active ?? false,
-            feed: (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local',
+            feed: resolveBrowseFeed(params),
             updatedAt: tab.updated_at ?? null,
         };
     }
@@ -333,7 +334,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             params: normalizedParams ?? {},
             position: maxPosition + 1,
             isActive: false,
-            feed: normalizedParams?.feed === 'local' ? 'local' : 'online',
+            feed: resolveBrowseFeed(normalizedParams),
             updatedAt: null,
         };
 

@@ -1,5 +1,6 @@
 import { computed, hasInjectionContext, inject, reactive, ref, type InjectionKey } from 'vue';
 import { normalizeLocalSourceSelection, type LocalSourceSelection } from '@/utils/localSourceSelection';
+import { resolveBrowseFeed } from '@/utils/browseFeed';
 import type { TabData } from './useTabs';
 
 export interface BrowseFormData {
@@ -69,7 +70,7 @@ function createFormInstance() {
 
         data.tab_id = tab.id;
         data.service = parseString(params.service, defaultData.service);
-        data.feed = params.feed === 'local' ? 'local' : 'online';
+        data.feed = resolveBrowseFeed(params);
         data.source = parseSource(params.source, 'all');
 
         const limitValue = params.limit;

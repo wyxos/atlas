@@ -98,6 +98,16 @@ describe('TabContentServiceHeader', () => {
         expect(wrapper.get('[data-test="apply-service-button"]').exists()).toBe(true);
     });
 
+    it('renders the selected local feed as Library', () => {
+        const props = createProps();
+        props.form.data.feed = 'local';
+
+        const wrapper = mountHeader(props);
+
+        expect(wrapper.get('[data-test="source-type-select-trigger"]').text()).toContain('Library');
+        expect(wrapper.get('[data-test="source-type-select-trigger"]').text()).not.toContain('local');
+    });
+
     it('routes header navigation and apply buttons through the wired handlers', async () => {
         const props = createProps();
         props.masonry = {
