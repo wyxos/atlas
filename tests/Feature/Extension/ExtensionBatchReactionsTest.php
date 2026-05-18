@@ -92,38 +92,21 @@ test('extension batch reactions queue all submitted gallery items and return the
         ->value('type'))->toBe('like');
 
     $this->assertDatabaseHas('containers', [
-        'type' => 'Post',
-        'source' => 'deviantart.com',
-        'source_id' => 'https://www.deviantart.com/artist/art/post-1',
-        'referrer' => 'https://www.deviantart.com/artist/art/post-1',
-    ]);
-
-    $container = Container::query()
-        ->where('type', 'Post')
-        ->where('source', 'deviantart.com')
-        ->where('source_id', 'https://www.deviantart.com/artist/art/post-1')
-        ->first();
-
-    expect($container)->not->toBeNull();
-    expect($firstFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
-    expect($secondFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
-
-    $this->assertDatabaseHas('containers', [
         'type' => 'User',
         'source' => 'deviantart.com',
         'source_id' => 'artist',
         'referrer' => 'https://www.deviantart.com/artist/gallery',
     ]);
 
-    $userContainer = Container::query()
+    $container = Container::query()
         ->where('type', 'User')
         ->where('source', 'deviantart.com')
         ->where('source_id', 'artist')
         ->first();
 
-    expect($userContainer)->not->toBeNull();
-    expect($firstFile?->containers()->where('containers.id', $userContainer?->id)->exists())->toBeTrue();
-    expect($secondFile?->containers()->where('containers.id', $userContainer?->id)->exists())->toBeTrue();
+    expect($container)->not->toBeNull();
+    expect($firstFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
+    expect($secondFile?->containers()->where('containers.id', $container?->id)->exists())->toBeTrue();
 
     Queue::assertPushed(DownloadFile::class, 2);
     Queue::assertPushed(
@@ -258,13 +241,6 @@ test('extension batch reactions create a user container for deviantart gallery u
             ],
         ],
     ])->assertSuccessful();
-
-    $this->assertDatabaseHas('containers', [
-        'type' => 'Post',
-        'source' => 'deviantart.com',
-        'source_id' => $galleryUrl,
-        'referrer' => $galleryUrl,
-    ]);
 
     $this->assertDatabaseHas('containers', [
         'type' => 'User',

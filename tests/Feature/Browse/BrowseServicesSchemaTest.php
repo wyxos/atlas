@@ -125,6 +125,31 @@ test('browse services endpoint returns civitai schema with expected field mappin
         ['label' => 'Video', 'value' => 'video'],
     ]);
 
+    $deviantArt = collect($services)->firstWhere('key', 'deviantart-images');
+    expect($deviantArt)->not->toBeNull();
+    expect($deviantArt['source'])->toBe('deviantart.com');
+    expect($deviantArt['defaults']['q'])->toBe('');
+
+    $deviantArtFields = $deviantArt['schema']['fields'] ?? null;
+    expect($deviantArtFields)->toBeArray();
+    expect(array_column($deviantArtFields, 'uiKey'))->toBe([
+        'page',
+        'limit',
+        'q',
+        'tag',
+        'username',
+        'folderId',
+        'nsfw',
+    ]);
+
+    $deviantArtPage = collect($deviantArtFields)->firstWhere('uiKey', 'page');
+    expect($deviantArtPage['serviceKey'])->toBe('offset');
+    expect($deviantArtPage['type'])->toBe('hidden');
+
+    $deviantArtNsfw = collect($deviantArtFields)->firstWhere('uiKey', 'nsfw');
+    expect($deviantArtNsfw['serviceKey'])->toBe('mature_content');
+    expect($deviantArtNsfw['label'])->toBe('Mature Content');
+
     $wallhaven = collect($services)->firstWhere('key', 'wallhaven');
     expect($wallhaven)->not->toBeNull();
 

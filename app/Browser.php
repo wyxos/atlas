@@ -7,6 +7,7 @@ use App\Models\File;
 use App\Services\BrowseModerationService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
+use App\Services\DeviantArtImages;
 use App\Services\FileItemFormatter;
 use App\Services\LocalService;
 use App\Services\Wallhaven;
@@ -323,6 +324,7 @@ class Browser
     {
         return [
             CivitAiImages::key() => CivitAiImages::class,
+            DeviantArtImages::key() => DeviantArtImages::class,
             Wallhaven::key() => Wallhaven::class,
             LocalService::key() => LocalService::class,
         ];

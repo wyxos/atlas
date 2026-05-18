@@ -44,6 +44,18 @@ return [
         'user_agent' => env('WALLHAVEN_USER_AGENT', 'Atlas/1.0 (+https://wallhaven.cc)'),
     ],
 
+    'deviantart' => [
+        'client_id' => env('DEVIANTART_CLIENT_ID'),
+        'client_secret' => env('DEVIANTART_CLIENT_SECRET'),
+        'redirect_uri' => env('DEVIANTART_REDIRECT_URI', rtrim((string) env('APP_URL', ''), '/').'/auth/deviantart/callback'),
+        'scopes' => env('DEVIANTART_SCOPES', 'basic browse user'),
+        'default_query' => env('DEVIANTART_DEFAULT_QUERY', ''),
+        'user_agent' => env('DEVIANTART_USER_AGENT', 'Atlas/1.0 (+https://www.deviantart.com)'),
+        'authorize_url' => env('DEVIANTART_AUTHORIZE_URL', 'https://www.deviantart.com/oauth2/authorize'),
+        'token_url' => env('DEVIANTART_TOKEN_URL', 'https://www.deviantart.com/oauth2/token'),
+        'api_base_url' => env('DEVIANTART_API_BASE_URL', 'https://www.deviantart.com/api/v1/oauth2'),
+    ],
+
     'spotify' => [
         'client_id' => env('SPOTIFY_CLIENT_ID'),
         'client_secret' => env('SPOTIFY_CLIENT_SECRET'),

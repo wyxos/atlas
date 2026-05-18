@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Services\CivitAiImages;
+use App\Services\DeviantArtImages;
 
 class ContainerBrowseTabPayload
 {
@@ -34,6 +35,7 @@ class ContainerBrowseTabPayload
 
         $params = match ($service['key']) {
             CivitAiImages::key() => self::applyCivitAiFilters($params, $container),
+            DeviantArtImages::key() => self::applyDeviantArtFilters($params, $container),
             default => null,
         };
 
@@ -70,10 +72,24 @@ class ContainerBrowseTabPayload
             ];
         }
 
+        if ($source === DeviantArtImages::source()) {
+            return [
+                'key' => DeviantArtImages::key(),
+                'label' => DeviantArtImages::label(),
+            ];
+        }
+
         if ($currentFeed === 'online' && $currentService === CivitAiImages::key()) {
             return [
                 'key' => CivitAiImages::key(),
                 'label' => CivitAiImages::label(),
+            ];
+        }
+
+        if ($currentFeed === 'online' && $currentService === DeviantArtImages::key()) {
+            return [
+                'key' => DeviantArtImages::key(),
+                'label' => DeviantArtImages::label(),
             ];
         }
 
@@ -177,6 +193,28 @@ class ContainerBrowseTabPayload
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed>  $container
+     * @return array<string, mixed>|null
+     */
+    private static function applyDeviantArtFilters(array $params, array $container): ?array
+    {
+        $containerType = self::normalizeString($container['type'] ?? null);
+        $sourceId = self::normalizeString($container['source_id'] ?? null);
+
+        if ($containerType !== 'User' || $sourceId === null) {
+            return null;
+        }
+
+        $params['username'] = $sourceId;
+        $params['tag'] = '';
+        $params['q'] = '';
+        $params['folderId'] = '';
+
+        return $params;
     }
 
     /**

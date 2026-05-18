@@ -15,13 +15,8 @@ class HttpRateLimiter
     /**
      * Make an HTTP request with rate limiting and retry logic for 429 errors and connection timeouts.
      */
-    public static function requestWithRetry(
-        callable $clientFactory,
-        string $url,
-        array $options = [],
-        int $maxRetries = 3,
-        int $baseDelaySeconds = 1
-    ): Response {
+    public static function requestWithRetry(callable $clientFactory, string $url, array $options = [], int $maxRetries = 3, int $baseDelaySeconds = 1): Response
+    {
         $attempt = 0;
         $lastException = null;
 
@@ -36,6 +31,10 @@ class HttpRateLimiter
 
                 // Handle 429 rate limit error
                 if ($response->status() === 429) {
+                    if ($attempt >= $maxRetries) {
+                        return $response;
+                    }
+
                     $retryAfter = self::getRetryAfter($response, $baseDelaySeconds, $attempt);
 
                     // Wait before retrying
@@ -114,7 +113,7 @@ class HttpRateLimiter
     /**
      * Throttle requests to a specific domain using cache-based rate limiting.
      */
-    public static function throttleDomain(string $domain, int $maxRequests = 10, int $windowSeconds = 60): void
+    public static function throttleDomain(string $domain, int $maxRequests = 10, int $windowSeconds = 60, ?int $maxWaitSeconds = null): bool
     {
         $key = "http_rate_limit:{$domain}";
         $requests = Cache::get($key, []);
@@ -129,6 +128,16 @@ class HttpRateLimiter
             $waitTime = $windowSeconds - ($now - $oldestRequest);
 
             if ($waitTime > 0) {
+                if ($maxWaitSeconds !== null && $waitTime > $maxWaitSeconds) {
+                    Log::warning('HTTP rate limit wait skipped', [
+                        'domain' => $domain,
+                        'wait_time' => $waitTime,
+                        'max_wait_seconds' => $maxWaitSeconds,
+                    ]);
+
+                    return false;
+                }
+
                 sleep($waitTime);
 
                 // Re-fetch after waiting
@@ -140,6 +149,8 @@ class HttpRateLimiter
         // Record this request
         $requests[] = $now;
         Cache::put($key, $requests, $windowSeconds);
+
+        return true;
     }
 
     /**

@@ -373,6 +373,30 @@ test('corrects stale mime type when downloaded file content disagrees', function
     expect($file->path)->toEndWith('.png');
 });
 
+test('prefers downloaded file extension over stale listing extension', function () {
+    $pngContent = hex2bin('89504E470D0A1A0A0000000D49484452');
+
+    $file = File::factory()->create([
+        'url' => 'https://fc.example.test/listing.jpg',
+        'filename' => 'deviantart-listing.jpg',
+        'ext' => 'jpg',
+        'mime_type' => 'image/jpeg',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $tmpPath = 'downloads/.tmp/transfer-1/original.tmp';
+    Storage::disk('atlas')->put($tmpPath, $pngContent);
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/png');
+
+    $file->refresh();
+
+    expect($file->path)->toEndWith('.png')
+        ->and($file->mime_type)->toBe('image/png')
+        ->and($file->ext)->toBe('png');
+});
+
 test('generates preview for image files (finalizer)', function () {
     // Create a simple 1x1 pixel JPEG image for testing
     // This is a minimal but valid JPEG that GD can process

@@ -266,6 +266,17 @@ describe('useTabContentContainerInteractions', () => {
         });
     });
 
+    it('allows DeviantArt user containers to open the blacklist dialog', () => {
+        const interactions = createSubject([]);
+
+        expect(interactions.isBlacklistable({
+            id: 10,
+            type: 'User',
+            source: 'deviantart.com',
+            source_id: 'artist',
+        })).toBe(true);
+    });
+
     it('keeps the same sheet open when clicking the same pill again', () => {
         vi.useFakeTimers();
         const interactions = createSubject([

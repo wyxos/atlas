@@ -54,10 +54,10 @@ class FileDownloadFinalizer
 
         $absolutePath = $disk->path($downloadedPath);
 
-        $extension = $file->ext
-            ?? $this->getExtensionFromFile($absolutePath, $contentTypeHeader)
-            ?? $this->getExtensionFromUrl((string) $file->url)
-            ?? 'bin';
+        $extension = $this->resolveFinalExtension(
+            $file,
+            $this->getExtensionFromFile($absolutePath, $contentTypeHeader),
+        );
 
         $storedFilename = $this->resolveStoredFilename($file, $extension);
         $hashForSegmentation = $this->appStorage->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
@@ -94,7 +94,7 @@ class FileDownloadFinalizer
         ) {
             $updates['mime_type'] = $resolvedMimeType;
         }
-        if (! $file->ext || $file->ext === 'bin') {
+        if (! $file->ext || $file->ext === 'bin' || strtolower((string) $file->ext) !== strtolower($extension)) {
             $updates['ext'] = $extension;
         }
 
@@ -153,6 +153,56 @@ class FileDownloadFinalizer
         }
 
         return $this->appStorage->storedFilename($baseFilename, $extension);
+    }
+
+    private function resolveFinalExtension(File $file, ?string $detectedExtension): string
+    {
+        $detectedExtension = $this->normalizeExtension($detectedExtension);
+        $filenameExtension = $this->normalizeExtension(pathinfo((string) $file->filename, PATHINFO_EXTENSION) ?: null);
+        $fileExtension = $this->normalizeExtension($file->ext);
+        $urlExtension = $this->normalizeExtension($this->getExtensionFromUrl((string) $file->url));
+
+        if ($detectedExtension) {
+            return $this->equivalentPreferredExtension($detectedExtension, $filenameExtension)
+                ?? $this->equivalentPreferredExtension($detectedExtension, $fileExtension)
+                ?? $this->equivalentPreferredExtension($detectedExtension, $urlExtension)
+                ?? $detectedExtension;
+        }
+
+        return $fileExtension ?? $urlExtension ?? 'bin';
+    }
+
+    private function equivalentPreferredExtension(string $detectedExtension, ?string $candidateExtension): ?string
+    {
+        if (! $candidateExtension || $candidateExtension === 'bin') {
+            return null;
+        }
+
+        return $this->extensionsAreEquivalent($detectedExtension, $candidateExtension)
+            ? $candidateExtension
+            : null;
+    }
+
+    private function extensionsAreEquivalent(string $firstExtension, string $secondExtension): bool
+    {
+        if ($firstExtension === $secondExtension) {
+            return true;
+        }
+
+        return in_array($firstExtension, ['jpg', 'jpeg'], true)
+            && in_array($secondExtension, ['jpg', 'jpeg'], true);
+    }
+
+    private function normalizeExtension(?string $extension): ?string
+    {
+        if (! is_string($extension)) {
+            return null;
+        }
+
+        $extension = strtolower(trim($extension, ". \t\n\r\0\x0B"));
+        $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?? '';
+
+        return $extension !== '' ? $extension : null;
     }
 
     private function getExtensionFromUrl(string $url): ?string

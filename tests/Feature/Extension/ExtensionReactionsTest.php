@@ -363,7 +363,7 @@ test('extension reactions payload forwards cookies and user agent to queued down
         'user_agent' => 'AtlasExtensionBodyUA/1.2.3',
     ])->assertSuccessful();
 
-    Queue::assertPushed(DownloadFile::class, function (DownloadFile $job): bool {
+    Queue::assertPushed(DownloadFile::class, function (DownloadFile $job) use ($user): bool {
         return $job->runtimeContext === [
             'cookies' => [[
                 'name' => 'auth_token',
@@ -376,6 +376,7 @@ test('extension reactions payload forwards cookies and user agent to queued down
                 'expires_at' => null,
             ]],
             'user_agent' => 'AtlasExtensionBodyUA/1.2.3',
+            'user_id' => $user->id,
         ];
     });
 });

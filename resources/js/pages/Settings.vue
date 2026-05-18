@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import PageLayout from '../components/PageLayout.vue';
 import LibraryScanSettings from '@/components/settings/LibraryScanSettings.vue';
 import ModerationFeedRemovalBackfillSettings from '@/components/settings/ModerationFeedRemovalBackfillSettings.vue';
+import OAuthServiceCard from '@/components/settings/OAuthServiceCard.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -26,18 +27,12 @@ const servicesNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
 const isServicesLoading = ref(false);
 const isSpotifyRefreshing = ref(false);
 const isSpotifyDisconnecting = ref(false);
+const isDeviantArtRefreshing = ref(false);
+const isDeviantArtDisconnecting = ref(false);
 const browserExtensionDownloadUrl = '/settings/browser-extension/download';
 
-type SpotifyServiceAccount = {
-    id: string | null;
-    display_name: string | null;
-    email: string | null;
-    product: string | null;
-    country: string | null;
-};
-
-type SpotifyServiceStatus = {
-    key: 'spotify';
+type OAuthServiceStatus<TAccount> = {
+    key: string;
     label: string;
     configured: boolean;
     missing_configuration: string[];
@@ -48,13 +43,31 @@ type SpotifyServiceStatus = {
     scopes: string[];
     expires_at: string | null;
     expires_in_seconds: number | null;
-    account: SpotifyServiceAccount | null;
+    account: TAccount | null;
     last_error: string | null;
     connect_url: string;
 };
 
+type SpotifyServiceAccount = {
+    id: string | null;
+    display_name: string | null;
+    email: string | null;
+    product: string | null;
+    country: string | null;
+};
+
+type DeviantArtServiceAccount = {
+    userid: string | null;
+    username: string | null;
+    usericon: string | null;
+};
+
+type SpotifyServiceStatus = OAuthServiceStatus<SpotifyServiceAccount> & { key: 'spotify' };
+type DeviantArtServiceStatus = OAuthServiceStatus<DeviantArtServiceAccount> & { key: 'deviantart' };
+
 type SettingsServicesResponse = {
     spotify: SpotifyServiceStatus;
+    deviantart: DeviantArtServiceStatus;
     extension: {
         api_key_configured: boolean;
         default_domain: string;
@@ -62,6 +75,7 @@ type SettingsServicesResponse = {
 };
 
 const spotifyService = ref<SpotifyServiceStatus | null>(null);
+const deviantArtService = ref<DeviantArtServiceStatus | null>(null);
 const extensionApiKeyConfigured = ref(false);
 const extensionDefaultDomain = ref('https://atlas.test');
 const generatedExtensionApiKey = ref('');
@@ -70,9 +84,8 @@ const extensionNotice = ref('');
 const extensionNoticeTone = ref<'success' | 'error' | 'neutral'>('neutral');
 const isExtensionApiKeyGenerating = ref(false);
 const spotifyIsConnected = computed(() => spotifyService.value?.connected === true);
-const spotifyNeedsReconnect = computed(() => spotifyService.value?.needs_reconnect === true);
-const spotifyIsConfigured = computed(() => spotifyService.value?.configured === true);
-const spotifyHasValidSession = computed(() => spotifyService.value?.session_valid === true);
+const deviantArtIsConnected = computed(() => deviantArtService.value?.connected === true);
+const connectedServiceCount = computed(() => [spotifyIsConnected.value, deviantArtIsConnected.value].filter(Boolean).length);
 const spotifyAccountName = computed(() => {
     const displayName = spotifyService.value?.account?.display_name?.trim() ?? '';
     if (displayName !== '') {
@@ -81,23 +94,13 @@ const spotifyAccountName = computed(() => {
 
     return spotifyService.value?.account?.id ?? 'Connected account';
 });
-const spotifyScopeSummary = computed(() => {
-    const scopes = spotifyService.value?.scopes ?? [];
-
-    return scopes.length > 0 ? scopes.join(', ') : 'No scopes granted yet.';
-});
-const spotifyExpirySummary = computed(() => {
-    const expiresAt = spotifyService.value?.expires_at ?? null;
-    if (!expiresAt) {
-        return 'No active session expiry set.';
+const deviantArtAccountName = computed(() => {
+    const username = deviantArtService.value?.account?.username?.trim() ?? '';
+    if (username !== '') {
+        return username;
     }
 
-    const date = new Date(expiresAt);
-    if (Number.isNaN(date.getTime())) {
-        return 'Unable to parse session expiry.';
-    }
-
-    return date.toLocaleString();
+    return deviantArtService.value?.account?.userid ?? 'Connected account';
 });
 
 function setServicesNotice(message: string, tone: 'success' | 'error' | 'neutral' = 'neutral'): void {
@@ -110,34 +113,58 @@ function setExtensionNotice(message: string, tone: 'success' | 'error' | 'neutra
     extensionNoticeTone.value = tone;
 }
 
-function consumeSpotifyNoticeFromUrl(): void {
+function consumeServiceNoticesFromUrl(): void {
     const params = new URLSearchParams(window.location.search);
-    const notice = params.get('spotify_notice');
-    const reason = (params.get('spotify_reason') ?? '').trim();
+    let consumed = false;
 
-    if (!notice) {
+    consumed = consumeServiceNotice(params, 'spotify', 'Spotify connected successfully.', {
+        not_configured: 'Spotify is not configured on the server yet.',
+        invalid_state: 'Spotify login state expired or was invalid. Please try again.',
+        missing_code_or_state: 'Spotify callback was incomplete. Please retry connection.',
+        token_exchange_failed: 'Failed to finalize Spotify connection.',
+        access_denied: 'Spotify authorization was cancelled.',
+    }) || consumed;
+
+    consumed = consumeServiceNotice(params, 'deviantart', 'DeviantArt connected successfully.', {
+        not_configured: 'DeviantArt is not configured on the server yet.',
+        invalid_state: 'DeviantArt login state expired or was invalid. Please try again.',
+        missing_code_or_state: 'DeviantArt callback was incomplete. Please retry connection.',
+        token_exchange_failed: 'Failed to finalize DeviantArt connection.',
+        access_denied: 'DeviantArt authorization was cancelled.',
+    }) || consumed;
+
+    if (!consumed) {
         return;
     }
 
-    if (notice === 'connected') {
-        setServicesNotice('Spotify connected successfully.', 'success');
-    } else if (notice === 'error') {
-        const reasonMessages: Record<string, string> = {
-            not_configured: 'Spotify is not configured on the server yet.',
-            invalid_state: 'Spotify login state expired or was invalid. Please try again.',
-            missing_code_or_state: 'Spotify callback was incomplete. Please retry connection.',
-            token_exchange_failed: 'Failed to finalize Spotify connection.',
-            access_denied: 'Spotify authorization was cancelled.',
-        };
-        const mapped = reasonMessages[reason] ?? reason;
-        setServicesNotice(mapped !== '' ? mapped : 'Spotify connection failed.', 'error');
-    }
-
-    params.delete('spotify_notice');
-    params.delete('spotify_reason');
     const queryString = params.toString();
     const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}${window.location.hash}`;
     window.history.replaceState({}, '', nextUrl);
+}
+
+function consumeServiceNotice(
+    params: URLSearchParams,
+    provider: string,
+    connectedMessage: string,
+    reasonMessages: Record<string, string>,
+): boolean {
+    const notice = params.get(`${provider}_notice`);
+    const reason = (params.get(`${provider}_reason`) ?? '').trim();
+    if (!notice) {
+        return false;
+    }
+
+    if (notice === 'connected') {
+        setServicesNotice(connectedMessage, 'success');
+    } else if (notice === 'error') {
+        const mapped = reasonMessages[reason] ?? reason;
+        setServicesNotice(mapped !== '' ? mapped : 'Service connection failed.', 'error');
+    }
+
+    params.delete(`${provider}_notice`);
+    params.delete(`${provider}_reason`);
+
+    return true;
 }
 
 async function fetchServices(): Promise<void> {
@@ -145,6 +172,7 @@ async function fetchServices(): Promise<void> {
     try {
         const { data } = await window.axios.get<SettingsServicesResponse>('/api/settings/services');
         spotifyService.value = data.spotify;
+        deviantArtService.value = data.deviantart;
         extensionApiKeyConfigured.value = data.extension.api_key_configured === true;
         extensionDefaultDomain.value = data.extension.default_domain || 'https://atlas.test';
     } catch (error) {
@@ -187,6 +215,11 @@ function handleConnectSpotify(): void {
     window.location.assign(connectUrl);
 }
 
+function handleConnectDeviantArt(): void {
+    const connectUrl = deviantArtService.value?.connect_url || '/auth/deviantart/redirect';
+    window.location.assign(connectUrl);
+}
+
 async function handleRefreshSpotify(): Promise<void> {
     isSpotifyRefreshing.value = true;
     try {
@@ -201,6 +234,23 @@ async function handleRefreshSpotify(): Promise<void> {
         await fetchServices();
     } finally {
         isSpotifyRefreshing.value = false;
+    }
+}
+
+async function handleRefreshDeviantArt(): Promise<void> {
+    isDeviantArtRefreshing.value = true;
+    try {
+        const { data } = await window.axios.post<{ deviantart: DeviantArtServiceStatus; message: string }>(
+            '/api/settings/services/deviantart/refresh',
+        );
+        deviantArtService.value = data.deviantart;
+        setServicesNotice(data.message || 'DeviantArt session refreshed.', 'success');
+    } catch (error: unknown) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setServicesNotice(responseMessage || 'Failed to refresh DeviantArt session.', 'error');
+        await fetchServices();
+    } finally {
+        isDeviantArtRefreshing.value = false;
     }
 }
 
@@ -222,6 +272,27 @@ async function handleDisconnectSpotify(): Promise<void> {
         await fetchServices();
     } finally {
         isSpotifyDisconnecting.value = false;
+    }
+}
+
+async function handleDisconnectDeviantArt(): Promise<void> {
+    if (!window.confirm('Disconnect DeviantArt from this account?')) {
+        return;
+    }
+
+    isDeviantArtDisconnecting.value = true;
+    try {
+        const { data } = await window.axios.delete<{ deviantart: DeviantArtServiceStatus; message: string }>(
+            '/api/settings/services/deviantart',
+        );
+        deviantArtService.value = data.deviantart;
+        setServicesNotice(data.message || 'DeviantArt disconnected.', 'success');
+    } catch (error: unknown) {
+        const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setServicesNotice(responseMessage || 'Failed to disconnect DeviantArt.', 'error');
+        await fetchServices();
+    } finally {
+        isDeviantArtDisconnecting.value = false;
     }
 }
 
@@ -248,7 +319,7 @@ async function handleResetApp(): Promise<void> {
 }
 
 onMounted(() => {
-    consumeSpotifyNoticeFromUrl();
+    consumeServiceNoticesFromUrl();
     void fetchServices();
 });
 </script>
@@ -268,106 +339,36 @@ onMounted(() => {
                             </p>
                         </div>
                         <div class="text-xs px-3 py-1 rounded-full border border-twilight-indigo-500 text-twilight-indigo-100 bg-prussian-blue-600/70">
-                            {{ spotifyIsConnected ? '1 connected' : 'No connected services' }}
+                            {{ connectedServiceCount > 0 ? `${connectedServiceCount} connected` : 'No connected services' }}
                         </div>
                     </div>
 
-                    <div class="border border-twilight-indigo-500/60 rounded-lg p-4 bg-prussian-blue-600/60 space-y-4">
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                                <h6 class="text-base font-semibold text-regal-navy-100">Spotify</h6>
-                                <p class="text-sm text-twilight-indigo-200">
-                                    OAuth for playlists, playback state, and Web Playback SDK features.
-                                </p>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span
-                                    class="text-xs px-2 py-1 rounded-full border"
-                                    :class="spotifyIsConnected && spotifyHasValidSession
-                                        ? 'border-smart-blue-400 text-smart-blue-200 bg-smart-blue-500/10'
-                                        : spotifyNeedsReconnect
-                                            ? 'border-danger-400 text-danger-200 bg-danger-500/10'
-                                            : 'border-twilight-indigo-500 text-twilight-indigo-200 bg-prussian-blue-700/60'"
-                                >
-                                    {{
-                                        spotifyIsConnected && spotifyHasValidSession
-                                            ? 'Connected'
-                                            : spotifyNeedsReconnect
-                                                ? 'Reconnect required'
-                                                : 'Disconnected'
-                                    }}
-                                </span>
+                    <div class="space-y-4">
+                        <OAuthServiceCard
+                            :service="spotifyService"
+                            description="OAuth for playlists, playback state, and Web Playback SDK features."
+                            :account-name="spotifyAccountName"
+                            :is-loading="isServicesLoading"
+                            :is-refreshing="isSpotifyRefreshing"
+                            :is-disconnecting="isSpotifyDisconnecting"
+                            loading-label="Loading Spotify status..."
+                            @connect="handleConnectSpotify"
+                            @refresh="handleRefreshSpotify"
+                            @disconnect="handleDisconnectSpotify"
+                        />
 
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    :disabled="isServicesLoading || isSpotifyRefreshing || isSpotifyDisconnecting || !spotifyIsConfigured"
-                                    @click="handleConnectSpotify"
-                                >
-                                    {{ spotifyIsConnected ? 'Reconnect' : 'Connect' }}
-                                </Button>
-
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    :loading="isSpotifyRefreshing"
-                                    :disabled="!spotifyIsConnected || isSpotifyDisconnecting"
-                                    @click="handleRefreshSpotify"
-                                >
-                                    Refresh Session
-                                </Button>
-
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    :loading="isSpotifyDisconnecting"
-                                    :disabled="!spotifyIsConnected || isSpotifyRefreshing"
-                                    @click="handleDisconnectSpotify"
-                                >
-                                    Disconnect
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div v-if="isServicesLoading" class="text-sm text-twilight-indigo-200">
-                            Loading Spotify status...
-                        </div>
-
-                        <template v-else>
-                            <div class="grid gap-3 text-sm text-twilight-indigo-100 md:grid-cols-2">
-                                <p>
-                                    <span class="text-twilight-indigo-300">Configured:</span>
-                                    {{ spotifyIsConfigured ? 'Yes' : 'No' }}
-                                </p>
-                                <p>
-                                    <span class="text-twilight-indigo-300">Session valid:</span>
-                                    {{ spotifyHasValidSession ? 'Yes' : 'No' }}
-                                </p>
-                                <p>
-                                    <span class="text-twilight-indigo-300">Account:</span>
-                                    {{ spotifyIsConnected ? spotifyAccountName : 'Not connected' }}
-                                </p>
-                                <p>
-                                    <span class="text-twilight-indigo-300">Session expires:</span>
-                                    {{ spotifyExpirySummary }}
-                                </p>
-                            </div>
-
-                            <p class="text-xs text-twilight-indigo-300">
-                                <span class="text-twilight-indigo-200">Granted scopes:</span> {{ spotifyScopeSummary }}
-                            </p>
-
-                            <p
-                                v-if="spotifyService?.missing_configuration?.length"
-                                class="text-xs text-danger-200"
-                            >
-                                Missing server configuration: {{ spotifyService.missing_configuration.join(', ') }}
-                            </p>
-
-                            <p v-if="spotifyService?.last_error" class="text-xs text-danger-200">
-                                {{ spotifyService.last_error }}
-                            </p>
-                        </template>
+                        <OAuthServiceCard
+                            :service="deviantArtService"
+                            description="OAuth for authenticated browse access and mature-content visibility."
+                            :account-name="deviantArtAccountName"
+                            :is-loading="isServicesLoading"
+                            :is-refreshing="isDeviantArtRefreshing"
+                            :is-disconnecting="isDeviantArtDisconnecting"
+                            loading-label="Loading DeviantArt status..."
+                            @connect="handleConnectDeviantArt"
+                            @refresh="handleRefreshDeviantArt"
+                            @disconnect="handleDisconnectDeviantArt"
+                        />
                     </div>
 
                     <p

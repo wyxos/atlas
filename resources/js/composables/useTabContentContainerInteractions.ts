@@ -91,7 +91,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     }
 
     function isBlacklistable(container: { type: string; source?: string }): boolean {
-        if (container.source === 'CivitAI') {
+        if (container.source === 'CivitAI' || container.source === 'deviantart.com') {
             return container.type === 'User';
         }
 

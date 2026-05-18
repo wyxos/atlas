@@ -20,6 +20,7 @@ class FileReactionService
      *     forceDownload?: bool,
      *     detachFromTabsOnNoop?: bool,
      *     downloadRuntimeContext?: array{
+     *         user_id?: int,
      *         cookies?: list<array{
      *             name: string,
      *             value: string,
@@ -44,7 +45,10 @@ class FileReactionService
         $queueDownload = $options['queueDownload'] ?? true;
         $forceDownload = $options['forceDownload'] ?? false;
         $detachFromTabsOnNoop = $options['detachFromTabsOnNoop'] ?? false;
-        $downloadRuntimeContext = $options['downloadRuntimeContext'] ?? [];
+        $downloadRuntimeContext = $this->normalizeDownloadRuntimeContext(
+            $user,
+            $options['downloadRuntimeContext'] ?? [],
+        );
         $queueLibrarySync = $options['queueLibrarySync'] ?? true;
         $existingReaction = Reaction::query()
             ->where('user_id', $user->id)
@@ -154,6 +158,8 @@ class FileReactionService
         array $downloadRuntimeContext = [],
         bool $queueLibrarySync = true,
     ): Reaction {
+        $downloadRuntimeContext = $this->normalizeDownloadRuntimeContext($user, $downloadRuntimeContext);
+
         $metrics = app(MetricsService::class);
         $oldType = $existingReaction?->type;
         $wasBlacklisted = $file->blacklisted_at !== null;
@@ -206,6 +212,7 @@ class FileReactionService
 
     /**
      * @param  array{
+     *     user_id?: int,
      *     cookies?: list<array{
      *         name: string,
      *         value: string,
@@ -224,6 +231,15 @@ class FileReactionService
         DownloadFile::dispatch($fileId, $forceDownload, $downloadRuntimeContext)
             ->onConnection($this->asyncQueueConnection())
             ->onQueue('downloads');
+    }
+
+    private function normalizeDownloadRuntimeContext(User $user, array $downloadRuntimeContext): array
+    {
+        if (! isset($downloadRuntimeContext['user_id'])) {
+            $downloadRuntimeContext['user_id'] = (int) $user->id;
+        }
+
+        return $downloadRuntimeContext;
     }
 
     private function asyncQueueConnection(): string

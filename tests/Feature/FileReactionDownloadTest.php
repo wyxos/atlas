@@ -20,8 +20,9 @@ test('dispatches download job when user reacts with like', function () {
 
     $response->assertSuccessful();
 
-    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
-        return $job->fileId === $file->id;
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file, $admin) {
+        return $job->fileId === $file->id
+            && ($job->runtimeContext['user_id'] ?? null) === $admin->id;
     });
 });
 
@@ -37,8 +38,9 @@ test('dispatches download job when user reacts with love', function () {
 
     $response->assertSuccessful();
 
-    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
-        return $job->fileId === $file->id;
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file, $admin) {
+        return $job->fileId === $file->id
+            && ($job->runtimeContext['user_id'] ?? null) === $admin->id;
     });
 });
 
@@ -54,8 +56,9 @@ test('dispatches download job when user reacts with funny', function () {
 
     $response->assertSuccessful();
 
-    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
-        return $job->fileId === $file->id;
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file, $admin) {
+        return $job->fileId === $file->id
+            && ($job->runtimeContext['user_id'] ?? null) === $admin->id;
     });
 });
 
@@ -100,7 +103,8 @@ test('dispatches download job when reapplying the same positive reaction', funct
     expect($file->fresh()->reactions()->where('user_id', $admin->id)->count())->toBe(1);
     expect($file->fresh()->reactions()->where('user_id', $admin->id)->value('type'))->toBe('like');
 
-    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
-        return $job->fileId === $file->id;
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file, $admin) {
+        return $job->fileId === $file->id
+            && ($job->runtimeContext['user_id'] ?? null) === $admin->id;
     });
 });

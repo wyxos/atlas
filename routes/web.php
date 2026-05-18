@@ -59,6 +59,10 @@ Route::middleware('auth')->group(function () {
         ->name('auth.spotify.redirect');
     Route::get('/auth/spotify/callback', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyCallback'])
         ->name('auth.spotify.callback');
+    Route::get('/auth/deviantart/redirect', [\App\Http\Controllers\SettingsServicesController::class, 'deviantArtRedirect'])
+        ->name('auth.deviantart.redirect');
+    Route::get('/auth/deviantart/callback', [\App\Http\Controllers\SettingsServicesController::class, 'deviantArtCallback'])
+        ->name('auth.deviantart.callback');
 
     // API routes (must come before SPA catch-all)
     Route::get('/api/settings/services', [\App\Http\Controllers\SettingsServicesController::class, 'index'])
@@ -71,6 +75,10 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.services.spotify.refresh');
     Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])
         ->name('api.settings.services.spotify.disconnect');
+    Route::post('/api/settings/services/deviantart/refresh', [\App\Http\Controllers\SettingsServicesController::class, 'deviantArtRefresh'])
+        ->name('api.settings.services.deviantart.refresh');
+    Route::delete('/api/settings/services/deviantart', [\App\Http\Controllers\SettingsServicesController::class, 'deviantArtDisconnect'])
+        ->name('api.settings.services.deviantart.disconnect');
     Route::get('/api/settings/library-scans', [\App\Http\Controllers\LibraryScanController::class, 'index'])
         ->name('api.settings.library-scans.index');
     Route::post('/api/settings/library-scans', [\App\Http\Controllers\LibraryScanController::class, 'store'])

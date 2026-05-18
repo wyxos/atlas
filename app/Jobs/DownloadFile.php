@@ -9,6 +9,7 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\DownloadUrlResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -33,6 +34,7 @@ class DownloadFile implements ShouldQueue
      *         host_only: bool,
      *         expires_at: int|null
      *     }>,
+     *     user_id?: int,
      *     user_agent?: string
      * }  $runtimeContext
      */
@@ -41,9 +43,10 @@ class DownloadFile implements ShouldQueue
         $this->onQueue('downloads');
     }
 
-    public function handle(?DownloadTransferRuntimeStore $runtimeStore = null): void
+    public function handle(?DownloadTransferRuntimeStore $runtimeStore = null, ?DownloadUrlResolver $downloadUrlResolver = null): void
     {
         $runtimeStore ??= app(DownloadTransferRuntimeStore::class);
+        $downloadUrlResolver ??= app(DownloadUrlResolver::class);
 
         $file = File::find($this->fileId);
 
@@ -58,8 +61,6 @@ class DownloadFile implements ShouldQueue
                 return;
             }
         }
-
-        $domain = $this->extractDomain((string) $file->url) ?? 'unknown';
 
         $activeStatuses = [
             DownloadTransferStatus::PENDING,
@@ -76,13 +77,20 @@ class DownloadFile implements ShouldQueue
             ->latest('id')
             ->first();
 
-        if (! $existing) {
+        if ($existing) {
+            $this->maybeRefreshRuntimeContext($runtimeStore, $existing);
+            PumpDomainDownloads::dispatch((string) $existing->domain);
+        } else {
+            $resolvedDownload = $downloadUrlResolver->resolve($file, $this->runtimeContext);
+            $downloadUrl = $resolvedDownload->url;
+            $domain = $this->extractDomain($downloadUrl) ?? 'unknown';
+
             $transfer = DownloadTransfer::query()->create([
                 'file_id' => $file->id,
-                'url' => (string) $file->url,
+                'url' => $downloadUrl,
                 'domain' => $domain,
                 'status' => DownloadTransferStatus::PENDING,
-                'bytes_total' => null,
+                'bytes_total' => $resolvedDownload->filesize !== null && $resolvedDownload->filesize > 0 ? $resolvedDownload->filesize : null,
                 'bytes_downloaded' => 0,
                 'last_broadcast_percent' => 0,
             ]);
@@ -95,11 +103,8 @@ class DownloadFile implements ShouldQueue
             }
 
             $this->storeRuntimeContext($runtimeStore, $transfer->id);
-        } else {
-            $this->maybeRefreshRuntimeContext($runtimeStore, $existing);
+            PumpDomainDownloads::dispatch($domain);
         }
-
-        PumpDomainDownloads::dispatch($domain);
     }
 
     private function storeRuntimeContext(DownloadTransferRuntimeStore $runtimeStore, int $transferId): void
