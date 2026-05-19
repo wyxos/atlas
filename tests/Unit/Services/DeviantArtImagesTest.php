@@ -102,6 +102,37 @@ it('derives DeviantArt user containers from deviation URLs when author metadata 
         ]]);
 });
 
+it('normalizes mixed-case DeviantArt usernames for container keys', function () {
+    $service = new DeviantArtImages;
+
+    $result = $service->transform([
+        'results' => [[
+            'deviationid' => '67B1C91B-808F-364E-4074-3DDECC03423A',
+            'url' => 'https://www.deviantart.com/animeaivideos/art/Anime-Image-1329880490',
+            'author' => [
+                'username' => 'AnimeAIVideos',
+            ],
+            'content' => [
+                'src' => 'https://fc.example.test/content.jpg',
+                'height' => 900,
+                'width' => 1200,
+            ],
+        ]],
+    ]);
+
+    $file = $result['files'][0]['file'];
+    $listingMetadata = json_decode($file['listing_metadata'], true);
+
+    expect($listingMetadata['author']['username'])->toBe('AnimeAIVideos')
+        ->and($listingMetadata['user_container_source_id'])->toBe('animeaivideos')
+        ->and($listingMetadata['user_container_referrer_url'])->toBe('https://www.deviantart.com/animeaivideos/gallery')
+        ->and($service->containers($listingMetadata))->toMatchArray([[
+            'type' => 'User',
+            'source_id' => 'animeaivideos',
+            'referrer' => 'https://www.deviantart.com/animeaivideos/gallery',
+        ]]);
+});
+
 it('prefers the largest video when a deviation has videos', function () {
     $service = new DeviantArtImages;
 

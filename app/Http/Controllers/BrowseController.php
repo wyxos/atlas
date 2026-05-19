@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Browser;
 use App\Exceptions\LibraryUnavailableException;
-use App\Models\File;
-use App\Services\FilePreviewService;
+use App\Services\FileSourceRegistry;
 use App\Services\LocalService;
 use App\Support\ServiceFilterSchema;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +15,8 @@ class BrowseController extends Controller
         'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
         'Pragma' => 'no-cache',
     ];
+
+    public function __construct(private readonly FileSourceRegistry $fileSourceRegistry) {}
 
     /**
      * Get a page of browse items from the selected service (CivitAI, Wallhaven, etc.).
@@ -269,18 +270,7 @@ class BrowseController extends Controller
      */
     private function databaseSources(): array
     {
-        return File::query()
-            ->select('source')
-            ->whereNotNull('source')
-            ->where('source', '<>', '')
-            ->where('not_found', false)
-            ->where('previewed_count', '<', FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
-            ->distinct()
-            ->pluck('source')
-            ->filter(fn (mixed $source): bool => is_string($source) && trim($source) !== '')
-            ->map(fn (string $source): string => trim($source))
-            ->values()
-            ->all();
+        return $this->fileSourceRegistry->activeSources();
     }
 
     /**

@@ -158,7 +158,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             : getVisibleSiblingItems(selectedSheetContainerId.value)
     ));
     const highlightedItemIds = computed(() => {
-        if (!isDrawerOpen.value || relatedItems.value.length <= 1) {
+        if (!isDrawerOpen.value) {
             return new Set<number>();
         }
 
@@ -187,7 +187,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             return;
         }
 
-        if (selectedContainer.value && relatedItems.value.length > 1) {
+        if (selectedContainer.value) {
             isDrawerOpen.value = true;
             return;
         }
@@ -197,12 +197,6 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
 
     function openDrawer(container: ContainerTarget, reason: Exclude<DrawerOpenReason, null>): void {
         cancelPendingHoverOpen();
-
-        const siblings = getVisibleSiblingItems(container.id);
-        if (siblings.length <= 1) {
-            closeDrawer();
-            return;
-        }
 
         selectedContainerId.value = container.id;
         isDrawerOpen.value = true;
@@ -221,7 +215,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
             return;
         }
 
-        if (selectedSheetContainer.value && sheetItems.value.length > 1) {
+        if (selectedSheetContainer.value) {
             isSheetOpen.value = true;
             return;
         }
@@ -231,11 +225,6 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
 
     function openSheetFromClick(container: ContainerTarget): void {
         cancelPendingHoverOpen();
-
-        if (getVisibleSiblingItems(container.id).length <= 1) {
-            closeSheet();
-            return;
-        }
 
         closeDrawer();
         selectedSheetContainerId.value = container.id;
@@ -297,7 +286,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     }
 
     watch([selectedContainer, relatedItems], ([container, items]) => {
-        if (isDrawerOpen.value && (!container || items.length <= 1)) {
+        if (isDrawerOpen.value && (!container || items.length === 0)) {
             closeDrawer();
         }
     });

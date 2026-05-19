@@ -87,6 +87,25 @@ describe('useTabContentContainerInteractions', () => {
         vi.useRealTimers();
     });
 
+    it('opens the drawer when the hovered container has one loaded item', () => {
+        vi.useFakeTimers();
+        const interactions = createSubject([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 20, type: 'album' }]),
+        ]);
+
+        interactions.pillHandlers.onMouseEnter(10);
+        vi.advanceTimersByTime(700);
+        vi.runOnlyPendingTimers();
+
+        expect(interactions.drawer.state.isOpen.value).toBe(true);
+        expect(interactions.drawer.derived.container.value?.id).toBe(10);
+        expect(interactions.drawer.derived.items.value.map((item) => item.id)).toEqual([1]);
+        expect([...interactions.drawer.derived.highlightedItemIds.value]).toEqual([1]);
+
+        vi.useRealTimers();
+    });
+
     it('clears drawer highlighted item ids when the drawer closes', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
@@ -226,7 +245,7 @@ describe('useTabContentContainerInteractions', () => {
         vi.useRealTimers();
     });
 
-    it('does not open the sheet when the container has only one loaded item', () => {
+    it('opens the sheet when the container has only one loaded item', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -240,9 +259,9 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.drawer.state.isOpen.value).toBe(false);
         expect(interactions.drawer.derived.container.value).toBeNull();
         expect(interactions.drawer.derived.items.value).toEqual([]);
-        expect(interactions.sheet.state.isOpen.value).toBe(false);
-        expect(interactions.sheet.derived.container.value).toBeNull();
-        expect(interactions.sheet.derived.items.value).toEqual([]);
+        expect(interactions.sheet.state.isOpen.value).toBe(true);
+        expect(interactions.sheet.derived.container.value?.id).toBe(10);
+        expect(interactions.sheet.derived.items.value.map((item) => item.id)).toEqual([1]);
 
         vi.useRealTimers();
     });

@@ -172,3 +172,30 @@ test('backfill deviantart containers queues the next chunk when more matching fi
 
     expect($first->fresh()?->containers()->exists())->toBeTrue();
 });
+
+test('backfill deviantart containers normalizes existing mixed-case usernames before attaching', function () {
+    $existingContainer = Container::query()->create([
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => 'animeaivideos',
+        'referrer' => 'https://www.deviantart.com/animeaivideos/gallery',
+    ]);
+    $file = File::factory()->create([
+        'source' => 'deviantart.com',
+        'url' => 'https://www.deviantart.com/animeaivideos/art/Anime-Image-1329880490',
+        'listing_metadata' => [
+            'user_container_source' => 'deviantart.com',
+            'user_container_source_id' => 'AnimeAIVideos',
+            'user_container_referrer_url' => 'https://www.deviantart.com/AnimeAIVideos/gallery',
+        ],
+    ]);
+
+    $job = new BackfillDeviantArtContainers(afterId: 0, chunk: 20, queueName: 'processing');
+    app()->call([$job, 'handle']);
+
+    $file->refresh();
+
+    expect(data_get($file->listing_metadata, 'user_container_source_id'))->toBe('animeaivideos')
+        ->and($file->containers()->where('containers.id', $existingContainer->id)->exists())->toBeTrue();
+    $this->assertDatabaseCount('containers', 1);
+});

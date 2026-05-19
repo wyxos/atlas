@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\File;
+use App\Observers\FileSourceObserver;
 use Illuminate\Support\ServiceProvider;
 use Typesense\Client;
 
@@ -22,6 +24,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        File::observe(FileSourceObserver::class);
     }
 }

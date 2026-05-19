@@ -71,12 +71,12 @@ class DeviantArtMediaResolver
             : null;
 
         if ($username !== null && self::isValidDeviantArtUsernameSegment($username)) {
-            return $username;
+            return self::normalizeUsernameSegment($username);
         }
 
         $sourceId = $row['user_container_source_id'] ?? null;
         if (is_string($sourceId) && self::isValidDeviantArtUsernameSegment($sourceId)) {
-            return trim($sourceId);
+            return self::normalizeUsernameSegment($sourceId);
         }
 
         $url = $row['url'] ?? $row['referrer_url'] ?? null;
@@ -95,12 +95,12 @@ class DeviantArtMediaResolver
             return null;
         }
 
-        return trim($candidate);
+        return self::normalizeUsernameSegment($candidate);
     }
 
     public static function artistGalleryUrl(string $username): string
     {
-        return 'https://www.deviantart.com/'.$username.'/gallery';
+        return 'https://www.deviantart.com/'.self::normalizeUsernameSegment($username).'/gallery';
     }
 
     public static function metadataPayload(array $row, array $media): array
@@ -227,5 +227,10 @@ class DeviantArtMediaResolver
         }
 
         return preg_match('/^[a-z0-9_-]+$/i', $value) === 1;
+    }
+
+    private static function normalizeUsernameSegment(string $value): string
+    {
+        return strtolower(trim($value));
     }
 }
