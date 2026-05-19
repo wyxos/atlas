@@ -28,3 +28,16 @@ export function normalizeComparableUrls(values: unknown): string[] {
 
     return Array.from(new Set(normalized));
 }
+
+export function isHttpTabUrl(value: unknown): boolean {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}

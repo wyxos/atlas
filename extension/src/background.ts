@@ -14,6 +14,7 @@ import {
     handleOpenCivitAiModelTabRuntimeMessage,
     handleOpenCivitAiUsernameTabRuntimeMessage,
 } from './background-civitai-browse-tabs';
+import { isHttpTabUrl } from './background-url-utils';
 import { normalizeComparableOpenTabUrl } from './open-tab-url';
 import { resolveTabDomainGroupKey, summarizeTabCounts } from './tab-counts';
 type TabPresenceChangedMessage = {
@@ -40,6 +41,7 @@ type BrowserTab = {
 };
 const openComparableUrlByTabId = new Map<number, string>();
 const openComparableUrlCountByUrl = new Map<string, number>();
+const lastTabCountSnapshotByTabId = new Map<number, TabCountChangedMessage>();
 let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
 const DISCARD_INACTIVE_TABS_BATCH_SIZE = 8;
 const DISCARD_INACTIVE_TABS_BATCH_PAUSE_MS = 50;
@@ -91,6 +93,23 @@ function getComparableOpenTabUrls(): string[] {
     return Array.from(openComparableUrlByTabId.values());
 }
 
+function isMissingReceiverError(errorMessage: string): boolean {
+    const normalized = errorMessage.trim().toLowerCase();
+    return normalized.includes('receiving end does not exist')
+        || normalized.includes('no tab with id');
+}
+
+function hasUnchangedTabCountSnapshot(tabId: number, message: TabCountChangedMessage): boolean {
+    const previous = lastTabCountSnapshotByTabId.get(tabId);
+    return previous !== undefined
+        && previous.count === message.count
+        && previous.similarDomainCount === message.similarDomainCount;
+}
+
+function rememberTabCountSnapshot(tabId: number, message: TabCountChangedMessage): void {
+    lastTabCountSnapshotByTabId.set(tabId, message);
+}
+
 function broadcastTabPresenceChanged(urls: string[]): void {
     if (urls.length === 0) {
         return;
@@ -100,7 +119,7 @@ function broadcastTabPresenceChanged(urls: string[]): void {
     const counts = getComparableOpenTabCounts(dedupedUrls);
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
         tabs.forEach((tab) => {
-            if (typeof tab.id !== 'number') {
+            if (typeof tab.id !== 'number' || !isHttpTabUrl(tab.url)) {
                 return;
             }
 
@@ -124,7 +143,7 @@ function broadcastTabCountChanged(): void {
         const tabRows: Array<{ tabId: number; similarDomainKey: string | null }> = [];
 
         for (const tab of safeTabs) {
-            if (typeof tab.id !== 'number') {
+            if (typeof tab.id !== 'number' || !isHttpTabUrl(tab.url)) {
                 continue;
             }
 
@@ -147,8 +166,15 @@ function broadcastTabCountChanged(): void {
                     ? null
                     : (domainCounts.get(row.similarDomainKey) ?? 0),
             };
+            if (hasUnchangedTabCountSnapshot(row.tabId, message)) {
+                continue;
+            }
+
             chrome.tabs.sendMessage(row.tabId, message, () => {
-                void chrome.runtime.lastError;
+                const errorMessage = chrome.runtime.lastError?.message ?? '';
+                if (errorMessage === '' || !isMissingReceiverError(errorMessage)) {
+                    rememberTabCountSnapshot(row.tabId, message);
+                }
             });
         }
     });
@@ -261,8 +287,8 @@ chrome.runtime.onMessage.addListener((
     const payload = message as { type?: unknown; url?: unknown; urls?: unknown };
     if (handleGetUrlCookiesRuntimeMessage(message, sendResponse)
         || handleSubmitReactionRuntimeMessage(message, sender, sendResponse)
-        || handleQueuedBadgeCheckRuntimeMessage(message, sendResponse)
-        || handleQueuedReferrerCheckRuntimeMessage(message, sendResponse)
+        || handleQueuedBadgeCheckRuntimeMessage(message, sender, sendResponse)
+        || handleQueuedReferrerCheckRuntimeMessage(message, sender, sendResponse)
         || handleAtlasApiRequestRuntimeMessage(message, sendResponse)
         || handleOpenCivitAiModelTabRuntimeMessage(message, sender, sendResponse)
         || handleOpenCivitAiUsernameTabRuntimeMessage(message, sender, sendResponse)) {
@@ -371,6 +397,7 @@ chrome.tabs.onCreated.addListener((tab: BrowserTab) => {
 
 chrome.tabs.onRemoved.addListener((tabId: number) => {
     removeDownloadProgressSubscriber(tabId);
+    lastTabCountSnapshotByTabId.delete(tabId);
     const changedUrls = updateTrackedComparableTabUrl(tabId, null);
     broadcastTabPresenceChanged(changedUrls);
     broadcastTabCountChanged();

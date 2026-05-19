@@ -18,6 +18,8 @@ import { normalizeComparableUrls } from './background-url-utils';
 type RuntimeMessageSender = {
     tab?: {
         id?: number;
+        active?: boolean;
+        discarded?: boolean;
     };
 };
 
@@ -45,6 +47,7 @@ type QueueBadgeCheckPayload = {
     atlasDomain: string;
     apiToken: string;
     normalizedMediaUrl: string;
+    pageVisibility?: unknown;
 };
 
 type QueueReferrerCheckPayload = {
@@ -52,6 +55,15 @@ type QueueReferrerCheckPayload = {
     atlasDomain: string;
     apiToken: string;
     normalizedReferrerUrl: string;
+    pageVisibility?: unknown;
+};
+
+const ATLAS_CHECK_PRIORITY_NORMAL = 1;
+const ATLAS_CHECK_PRIORITY_ACTIVE = 2;
+
+type QueueRuntimeOptions = {
+    cacheOnly: boolean;
+    priority: number;
 };
 
 function parseJsonResponse(response: Response): Promise<unknown> {
@@ -81,6 +93,20 @@ function isAllowedAtlasApiEndpoint(
     }
 
     return method === 'GET' && endpoint === `${atlasDomain}/api/extension/ping`;
+}
+
+function resolveQueueRuntimeOptions(payload: { pageVisibility?: unknown }, sender: RuntimeMessageSender): QueueRuntimeOptions {
+    const visibility = typeof payload.pageVisibility === 'string' ? payload.pageVisibility : null;
+    const isHiddenPage = visibility === 'hidden';
+    const isActiveTab = sender.tab?.active === true;
+    const isDiscardedTab = sender.tab?.discarded === true;
+
+    return {
+        cacheOnly: isHiddenPage || isDiscardedTab,
+        priority: isActiveTab || visibility === 'visible'
+            ? ATLAS_CHECK_PRIORITY_ACTIVE
+            : ATLAS_CHECK_PRIORITY_NORMAL,
+    };
 }
 
 export function handleGetUrlCookiesRuntimeMessage(
@@ -219,6 +245,7 @@ export function handleSubmitReactionRuntimeMessage(
 
 export function handleQueuedBadgeCheckRuntimeMessage(
     message: unknown,
+    sender: RuntimeMessageSender,
     sendResponse: RuntimeSendResponse,
 ): boolean {
     if (!message || typeof message !== 'object') {
@@ -241,10 +268,13 @@ export function handleQueuedBadgeCheckRuntimeMessage(
         return false;
     }
 
+    const queueOptions = resolveQueueRuntimeOptions(queuePayload, sender);
     void enqueueGlobalBadgeCheck({
         atlasDomain,
         apiToken,
         normalizedMediaUrl,
+        cacheOnly: queueOptions.cacheOnly,
+        priority: queueOptions.priority,
     })
         .then((response) => {
             sendResponse(response);
@@ -258,6 +288,7 @@ export function handleQueuedBadgeCheckRuntimeMessage(
 
 export function handleQueuedReferrerCheckRuntimeMessage(
     message: unknown,
+    sender: RuntimeMessageSender,
     sendResponse: RuntimeSendResponse,
 ): boolean {
     if (!message || typeof message !== 'object') {
@@ -280,10 +311,13 @@ export function handleQueuedReferrerCheckRuntimeMessage(
         return false;
     }
 
+    const queueOptions = resolveQueueRuntimeOptions(queuePayload, sender);
     void enqueueGlobalReferrerCheck({
         atlasDomain,
         apiToken,
         normalizedReferrerUrl,
+        cacheOnly: queueOptions.cacheOnly,
+        priority: queueOptions.priority,
     })
         .then((response) => {
             sendResponse(response);

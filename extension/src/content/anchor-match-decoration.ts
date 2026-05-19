@@ -1,7 +1,7 @@
 import type { MediaElement } from './media-utils';
 
 type ReactionType = 'love' | 'like' | 'funny' | null;
-type AnchorDecorationKind = 'checking' | 'reaction' | 'opened';
+type AnchorDecorationKind = 'checking' | 'reaction' | 'opened' | 'same-page';
 
 const BADGE_ATTR = 'data-atlas-anchor-reaction-badge';
 const badgeByMedia = new WeakMap<MediaElement, HTMLDivElement>();
@@ -27,6 +27,10 @@ function iconMarkup(reaction: ReactionType, kind: AnchorDecorationKind): string 
 
     if (kind === 'opened') {
         return '<path d="M14 3h7v7"></path><path d="M10 14 21 3"></path><path d="M21 14v7h-7"></path><path d="M3 10 14 21"></path>';
+    }
+
+    if (kind === 'same-page') {
+        return '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path>';
     }
 
     if (reaction === 'love') {
@@ -121,4 +125,13 @@ export function applyAnchorOpenedDecoration(media: MediaElement): void {
     media.style.opacity = '0.25';
 
     ensureBadge(media, null, color, 'opened');
+}
+
+export function applyAnchorSamePageDecoration(media: MediaElement): void {
+    const color = '#f97316';
+    media.style.outline = `4px solid ${color}`;
+    media.style.outlineOffset = '-4px';
+    media.style.opacity = '0.25';
+
+    ensureBadge(media, null, color, 'same-page');
 }

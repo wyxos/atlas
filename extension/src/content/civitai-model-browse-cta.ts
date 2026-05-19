@@ -9,6 +9,7 @@ const CTA_PENDING_TEXT = 'Opening...';
 const CTA_SUCCESS_TEXT = 'Opened';
 const CTA_FAILURE_TEXT = 'Failed';
 const CTA_SELECTOR = '[data-atlas-civitai-model-browse-cta]';
+const noop = (): void => {};
 
 type CivitAiModelReference = {
     modelId: number;
@@ -296,9 +297,9 @@ function syncMutationTarget(mutation: MutationRecord): void {
     }
 }
 
-export function installCivitAiModelBrowseCtas(): void {
+export function installCivitAiModelBrowseCtas(): () => void {
     if (isInstalled || !isCivitAiHostname()) {
-        return;
+        return noop;
     }
 
     isInstalled = true;
@@ -332,4 +333,9 @@ export function installCivitAiModelBrowseCtas(): void {
         characterData: true,
         subtree: true,
     });
+
+    return () => {
+        observer.disconnect();
+        isInstalled = false;
+    };
 }

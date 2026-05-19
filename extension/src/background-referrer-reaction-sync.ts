@@ -1,4 +1,5 @@
 import { primeGlobalReferrerCheckCache } from './background-referrer-check-cache';
+import { isHttpTabUrl } from './background-url-utils';
 
 export type KnownReactionType = 'love' | 'like' | 'funny';
 
@@ -14,6 +15,7 @@ export type ReferrerReactionSyncMessage = {
 
 type BrowserTab = {
     id?: number;
+    url?: string;
 };
 
 function stringOrNull(value: unknown): string | null {
@@ -93,7 +95,7 @@ export function broadcastReferrerReactionSync(
 
     chrome.tabs.query({}, (tabs: BrowserTab[]) => {
         tabs.forEach((tab: BrowserTab) => {
-            if (typeof tab.id !== 'number' || tab.id === excludeTabId) {
+            if (typeof tab.id !== 'number' || tab.id === excludeTabId || !isHttpTabUrl(tab.url)) {
                 return;
             }
 

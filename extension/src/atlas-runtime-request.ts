@@ -24,6 +24,14 @@ type RuntimeQueuedReferrerCheckOptions = {
     normalizedReferrerUrl: string;
 };
 
+function resolvePageVisibility(): string | null {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+
+    return document.visibilityState;
+}
+
 function numberOrZero(value: unknown): number {
     if (typeof value === 'number' && Number.isFinite(value)) {
         return value;
@@ -94,6 +102,7 @@ export async function requestQueuedBadgeCheckViaRuntime(
         atlasDomain: options.atlasDomain,
         apiToken: options.apiToken,
         normalizedMediaUrl: options.normalizedMediaUrl,
+        pageVisibility: resolvePageVisibility(),
     });
 }
 
@@ -105,5 +114,6 @@ export async function requestQueuedReferrerCheckViaRuntime(
         atlasDomain: options.atlasDomain,
         apiToken: options.apiToken,
         normalizedReferrerUrl: options.normalizedReferrerUrl,
+        pageVisibility: resolvePageVisibility(),
     });
 }

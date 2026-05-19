@@ -15,8 +15,12 @@ const mockAnchorRuntime = {
     handleTabPresenceChanged: vi.fn(),
     registerFromDocument: vi.fn(),
     registerFromNode: vi.fn(),
+    registerVisibleFromDocument: vi.fn(),
+    resume: vi.fn(),
+    suspend: vi.fn(),
 };
 const mockSubscribeToDownloadProgress = vi.fn();
+const mockUnsubscribeDownloadProgress = vi.fn();
 const mockDownloadEventSheetPush = vi.fn();
 const mockDuplicateAnchorTabGuard = {
     destroy: vi.fn(),
@@ -24,9 +28,14 @@ const mockDuplicateAnchorTabGuard = {
     refreshSnapshot: vi.fn(),
 };
 const mockInstallCivitAiModelBrowseCtas = vi.fn();
+const mockCleanupCivitAiModelBrowseCtas = vi.fn();
 const mockInstallCivitAiUserBrowseLinks = vi.fn();
+const mockCleanupCivitAiUserBrowseLinks = vi.fn();
 const mockClearDeviantArtBackgroundImageStyle = vi.fn();
 const mockMutationObserverObserve = vi.fn();
+const mockMutationObserverDisconnect = vi.fn();
+const mockRequestAnimationFrame = vi.fn();
+const mockCancelAnimationFrame = vi.fn();
 
 let mutationObserverCallback: MutationCallback | null = null;
 let progressListener: ((event: Record<string, unknown>) => void) | null = null;
@@ -116,6 +125,13 @@ function flushPromises(): Promise<void> {
     });
 }
 
+function setDocumentVisibility(value: DocumentVisibilityState): void {
+    Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value,
+    });
+}
+
 describe('content-main', () => {
     beforeEach(() => {
         vi.resetModules();
@@ -131,18 +147,28 @@ describe('content-main', () => {
             configurable: true,
             value: 'complete',
         });
+        Object.defineProperty(document, 'visibilityState', {
+            configurable: true,
+            value: 'visible',
+        });
 
         class MockMutationObserver {
             constructor(callback: MutationCallback) {
                 mutationObserverCallback = callback;
             }
 
-            disconnect(): void {}
+            disconnect = mockMutationObserverDisconnect;
 
             observe = mockMutationObserverObserve;
         }
 
         vi.stubGlobal('MutationObserver', MockMutationObserver as unknown as typeof MutationObserver);
+        mockRequestAnimationFrame.mockImplementation((callback: FrameRequestCallback) => {
+            callback(0);
+            return 1;
+        });
+        vi.stubGlobal('requestAnimationFrame', mockRequestAnimationFrame);
+        vi.stubGlobal('cancelAnimationFrame', mockCancelAnimationFrame);
         vi.stubGlobal('chrome', {
             runtime: {
                 onMessage: {
@@ -162,7 +188,10 @@ describe('content-main', () => {
 
         mockSubscribeToDownloadProgress.mockImplementation((listener: (event: Record<string, unknown>) => void) => {
             progressListener = listener;
+            return mockUnsubscribeDownloadProgress;
         });
+        mockInstallCivitAiModelBrowseCtas.mockReturnValue(mockCleanupCivitAiModelBrowseCtas);
+        mockInstallCivitAiUserBrowseLinks.mockReturnValue(mockCleanupCivitAiUserBrowseLinks);
         mockResolveMediaResolution.mockReturnValue({
             width: 320,
             height: 240,
@@ -278,5 +307,80 @@ describe('content-main', () => {
         await flushPromises();
 
         expect(mockGetStoredOptions).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not start page work while hidden and resumes with a bounded visible scan', async () => {
+        setDocumentVisibility('hidden');
+        mockGetStoredOptions.mockResolvedValue({
+            siteCustomizations: [],
+        });
+        mockResolveSiteCustomizationForHostname.mockReturnValue(null);
+
+        await import('./content-main');
+        await flushPromises();
+
+        expect(mockAnchorRuntime.suspend).toHaveBeenCalledTimes(1);
+        expect(mockGetStoredOptions).not.toHaveBeenCalled();
+        expect(mockSubscribeToDownloadProgress).not.toHaveBeenCalled();
+        expect(mockMutationObserverObserve).not.toHaveBeenCalled();
+
+        setDocumentVisibility('visible');
+        document.dispatchEvent(new Event('visibilitychange'));
+        await flushPromises();
+        await flushPromises();
+
+        expect(mockAnchorRuntime.resume).toHaveBeenCalledTimes(1);
+        expect(mockGetStoredOptions).toHaveBeenCalledTimes(1);
+        expect(mockAnchorRuntime.registerVisibleFromDocument).toHaveBeenCalledWith(100);
+        expect(mockAnchorRuntime.registerFromDocument).not.toHaveBeenCalled();
+
+        mockAnchorRuntime.registerVisibleFromDocument.mockClear();
+        window.dispatchEvent(new Event('scroll'));
+
+        expect(mockAnchorRuntime.registerVisibleFromDocument).toHaveBeenCalledWith(100);
+    });
+
+    it('disconnects active page observers and ignores events when the tab becomes hidden', async () => {
+        mockGetStoredOptions.mockResolvedValue({
+            siteCustomizations: [],
+        });
+        mockResolveSiteCustomizationForHostname.mockReturnValue(null);
+
+        await import('./content-main');
+        await flushPromises();
+        await flushPromises();
+
+        expect(mockSubscribeToDownloadProgress).toHaveBeenCalledTimes(1);
+        expect(progressListener).toBeTypeOf('function');
+
+        const mutationObserverDisconnectsBeforeHide = mockMutationObserverDisconnect.mock.calls.length;
+        const unsubscribeCallsBeforeHide = mockUnsubscribeDownloadProgress.mock.calls.length;
+        const modelCleanupCallsBeforeHide = mockCleanupCivitAiModelBrowseCtas.mock.calls.length;
+        const userCleanupCallsBeforeHide = mockCleanupCivitAiUserBrowseLinks.mock.calls.length;
+        const duplicateGuardDestroyCallsBeforeHide = mockDuplicateAnchorTabGuard.destroy.mock.calls.length;
+        const anchorSuspendCallsBeforeHide = mockAnchorRuntime.suspend.mock.calls.length;
+
+        setDocumentVisibility('hidden');
+        document.dispatchEvent(new Event('visibilitychange'));
+
+        expect(mockMutationObserverDisconnect.mock.calls.length).toBeGreaterThan(mutationObserverDisconnectsBeforeHide);
+        expect(mockUnsubscribeDownloadProgress.mock.calls.length).toBeGreaterThan(unsubscribeCallsBeforeHide);
+        expect(mockCleanupCivitAiModelBrowseCtas.mock.calls.length).toBeGreaterThan(modelCleanupCallsBeforeHide);
+        expect(mockCleanupCivitAiUserBrowseLinks.mock.calls.length).toBeGreaterThan(userCleanupCallsBeforeHide);
+        expect(mockDuplicateAnchorTabGuard.destroy.mock.calls.length).toBeGreaterThan(duplicateGuardDestroyCallsBeforeHide);
+        expect(mockAnchorRuntime.suspend.mock.calls.length).toBeGreaterThan(anchorSuspendCallsBeforeHide);
+
+        progressListener?.({
+            event: 'DownloadTransferQueued',
+            transferId: 55,
+        });
+        runtimeMessageListener?.({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'pending',
+            urls: ['https://example.com/post'],
+        });
+
+        expect(mockDownloadEventSheetPush).not.toHaveBeenCalled();
+        expect(mockAnchorRuntime.handleReferrerReactionSync).not.toHaveBeenCalled();
     });
 });

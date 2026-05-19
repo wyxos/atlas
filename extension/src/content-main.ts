@@ -25,6 +25,11 @@ import { installCivitAiUserBrowseLinks } from './content/civitai-user-browse-lin
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
 const MIN_WIDGET_MEDIA_WIDTH = 200;
+const VISIBLE_RESUME_SCAN_LIMIT = 100;
+
+type LoadRulesAndProcessOptions = {
+    fullScan?: boolean;
+};
 
 let currentSiteCustomization: SiteCustomization | null = null;
 let currentRules: UrlMatchRule[] = [];
@@ -40,6 +45,32 @@ const anchorMediaRuntime = createAnchorMediaRuntime({
     getPageHostname: () => currentPageHostname,
 });
 let duplicateAnchorTabGuard: ReturnType<typeof createDuplicateAnchorTabGuard> | null = null;
+let mainMutationObserver: MutationObserver | null = null;
+let unsubscribeDownloadProgress: (() => void) | null = null;
+let isPageWorkActive = false;
+let pageEnhancementsInstalled = false;
+let pageEnhancementCleanups: Array<() => void> = [];
+let viewportListenersInstalled = false;
+let interactionFallbackListenersInstalled = false;
+let mediaDimensionListenersInstalled = false;
+let visiblePageWorkFrame: number | null = null;
+
+function isPageVisible(): boolean {
+    return document.visibilityState !== 'hidden';
+}
+
+function isVisibleInViewport(element: Element): boolean {
+    const rect = element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+    return rect.bottom > 0
+        && rect.right > 0
+        && rect.top < viewportHeight
+        && rect.left < viewportWidth
+        && rect.width > 0
+        && rect.height > 0;
+}
 
 function mediaMatchesRules(element: MediaElement): boolean {
     if (!isCurrentSiteEnabled) {
@@ -111,6 +142,49 @@ function processAllCurrentMedia(): void {
     }
 }
 
+function processVisibleCurrentMedia(limit = VISIBLE_RESUME_SCAN_LIMIT): void {
+    let processedCount = 0;
+    for (const mediaElement of document.querySelectorAll('img,video')) {
+        if (processedCount >= limit) {
+            return;
+        }
+
+        if (!isMediaElement(mediaElement) || !isVisibleInViewport(mediaElement)) {
+            continue;
+        }
+
+        processMedia(mediaElement);
+        processedCount += 1;
+    }
+}
+
+function processVisiblePageWork(): void {
+    processVisibleCurrentMedia();
+    anchorMediaRuntime.registerVisibleFromDocument(VISIBLE_RESUME_SCAN_LIMIT);
+}
+
+function scheduleVisiblePageWork(): void {
+    if (!isPageWorkActive || visiblePageWorkFrame !== null) {
+        return;
+    }
+
+    visiblePageWorkFrame = window.requestAnimationFrame(() => {
+        visiblePageWorkFrame = null;
+        if (isPageWorkActive) {
+            processVisiblePageWork();
+        }
+    });
+}
+
+function cancelVisiblePageWork(): void {
+    if (visiblePageWorkFrame === null) {
+        return;
+    }
+
+    window.cancelAnimationFrame(visiblePageWorkFrame);
+    visiblePageWorkFrame = null;
+}
+
 function resolveMediaCandidateFromInteraction(event: MouseEvent): MediaElement | null {
     const target = event.target;
     if (target instanceof Element) {
@@ -147,7 +221,15 @@ function tryApplyMediaWidgetFromInteraction(event: MouseEvent): void {
 }
 
 function installMutationObserver(): void {
+    if (mainMutationObserver !== null) {
+        return;
+    }
+
     const observer = new MutationObserver((mutations) => {
+        if (!isPageWorkActive) {
+            return;
+        }
+
         for (const mutation of mutations) {
             if (mutation.type === 'childList') {
                 for (const addedNode of mutation.addedNodes) {
@@ -174,6 +256,7 @@ function installMutationObserver(): void {
         }
     });
 
+    mainMutationObserver = observer;
     observer.observe(document.documentElement, {
         childList: true,
         subtree: true,
@@ -182,13 +265,20 @@ function installMutationObserver(): void {
     });
 }
 
+function disconnectMutationObserver(): void {
+    mainMutationObserver?.disconnect();
+    mainMutationObserver = null;
+}
+
 function installStorageListener(): void {
     if (!chrome.storage?.onChanged) {
         return;
     }
 
     chrome.storage.onChanged.addListener(() => {
-        void loadRulesAndProcess();
+        if (isPageWorkActive) {
+            void loadRulesAndProcess();
+        }
     });
 }
 
@@ -203,54 +293,159 @@ function installRuntimeMessageListener(): void {
         }
 
         if ((message as { type?: unknown }).type === 'ATLAS_TAB_PRESENCE_CHANGED') {
+            if (!isPageWorkActive) {
+                return;
+            }
+
             anchorMediaRuntime.handleTabPresenceChanged((message as { urls?: unknown }).urls);
             duplicateAnchorTabGuard?.handleTabPresenceChanged(message);
             return;
         }
 
         if ((message as { type?: unknown }).type === 'ATLAS_REFERRER_REACTION_SYNC') {
+            if (!isPageWorkActive) {
+                return;
+            }
+
             anchorMediaRuntime.handleReferrerReactionSync(message);
         }
     });
 }
 
-function installDownloadProgressListener(): void {
-    subscribeToDownloadProgress((event) => {
+function connectDownloadProgressListener(): void {
+    if (unsubscribeDownloadProgress !== null) {
+        return;
+    }
+
+    unsubscribeDownloadProgress = subscribeToDownloadProgress((event) => {
+        if (!isPageWorkActive) {
+            return;
+        }
+
         downloadEventSheet.push(event);
         anchorMediaRuntime.handleDownloadProgressEvent(event);
     });
 }
 
-function installViewportListeners(): void {
-    window.addEventListener('scroll', scheduleReposition, { passive: true });
-    window.addEventListener('resize', scheduleReposition, { passive: true });
+function disconnectDownloadProgressListener(): void {
+    unsubscribeDownloadProgress?.();
+    unsubscribeDownloadProgress = null;
 }
 
+const handleViewportUpdate = (): void => {
+    if (!isPageWorkActive) {
+        return;
+    }
+
+    scheduleReposition();
+    scheduleVisiblePageWork();
+};
+
+function installViewportListeners(): void {
+    if (viewportListenersInstalled) {
+        return;
+    }
+
+    window.addEventListener('scroll', handleViewportUpdate, { passive: true });
+    window.addEventListener('resize', handleViewportUpdate, { passive: true });
+    viewportListenersInstalled = true;
+}
+
+function removeViewportListeners(): void {
+    if (!viewportListenersInstalled) {
+        return;
+    }
+
+    window.removeEventListener('scroll', handleViewportUpdate);
+    window.removeEventListener('resize', handleViewportUpdate);
+    viewportListenersInstalled = false;
+}
+
+const handleInteraction = (event: MouseEvent): void => {
+    if (!isPageWorkActive) {
+        return;
+    }
+
+    tryApplyMediaWidgetFromInteraction(event);
+};
+
 function installInteractionFallbackListeners(): void {
-    const handleInteraction = (event: MouseEvent): void => {
-        tryApplyMediaWidgetFromInteraction(event);
-    };
+    if (interactionFallbackListenersInstalled) {
+        return;
+    }
 
     document.addEventListener('mouseover', handleInteraction, { passive: true });
     document.addEventListener('mouseup', handleInteraction, { passive: true });
+    interactionFallbackListenersInstalled = true;
 }
 
-function installMediaDimensionListeners(): void {
-    const handleMediaDimensionResolved = (event: Event): void => {
-        const target = event.target;
-        if (!(target instanceof Element) || !isMediaElement(target)) {
-            return;
-        }
+function removeInteractionFallbackListeners(): void {
+    if (!interactionFallbackListenersInstalled) {
+        return;
+    }
 
-        processMedia(target);
-        scheduleReposition();
-    };
+    document.removeEventListener('mouseover', handleInteraction);
+    document.removeEventListener('mouseup', handleInteraction);
+    interactionFallbackListenersInstalled = false;
+}
+
+const handleMediaDimensionResolved = (event: Event): void => {
+    if (!isPageWorkActive) {
+        return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof Element) || !isMediaElement(target)) {
+        return;
+    }
+
+    processMedia(target);
+    scheduleReposition();
+};
+
+function installMediaDimensionListeners(): void {
+    if (mediaDimensionListenersInstalled) {
+        return;
+    }
 
     document.addEventListener('load', handleMediaDimensionResolved, true);
     document.addEventListener('loadedmetadata', handleMediaDimensionResolved, true);
+    mediaDimensionListenersInstalled = true;
 }
 
-async function loadRulesAndProcess(): Promise<void> {
+function removeMediaDimensionListeners(): void {
+    if (!mediaDimensionListenersInstalled) {
+        return;
+    }
+
+    document.removeEventListener('load', handleMediaDimensionResolved, true);
+    document.removeEventListener('loadedmetadata', handleMediaDimensionResolved, true);
+    mediaDimensionListenersInstalled = false;
+}
+
+function installPageEnhancements(): void {
+    if (pageEnhancementsInstalled) {
+        return;
+    }
+
+    pageEnhancementsInstalled = true;
+    clearDeviantArtBackgroundImageStyle();
+    const cleanups = [
+        installCivitAiModelBrowseCtas(),
+        installCivitAiUserBrowseLinks(),
+    ].filter((cleanup): cleanup is () => void => typeof cleanup === 'function');
+    pageEnhancementCleanups.push(...cleanups);
+}
+
+function cleanupPageEnhancements(): void {
+    pageEnhancementCleanups.forEach((cleanup) => {
+        cleanup();
+    });
+    pageEnhancementCleanups = [];
+    pageEnhancementsInstalled = false;
+}
+
+async function loadRulesAndProcess(options: LoadRulesAndProcessOptions = {}): Promise<void> {
     try {
         const stored = await getStoredOptions();
         currentPageHostname = window.location.hostname;
@@ -267,23 +462,77 @@ async function loadRulesAndProcess(): Promise<void> {
     }
 
     setActivePageSiteCustomization(currentSiteCustomization);
-    processAllCurrentMedia();
-    anchorMediaRuntime.registerFromDocument();
+    if (!isPageWorkActive) {
+        return;
+    }
+
+    if (options.fullScan ?? true) {
+        processAllCurrentMedia();
+        anchorMediaRuntime.registerFromDocument();
+        return;
+    }
+
+    processVisiblePageWork();
 }
 
-function bootstrap(): void {
-    duplicateAnchorTabGuard = createDuplicateAnchorTabGuard();
-    clearDeviantArtBackgroundImageStyle();
-    installCivitAiModelBrowseCtas();
-    installCivitAiUserBrowseLinks();
+function startPageWork(options: { fullScan?: boolean } = {}): void {
+    if (isPageWorkActive) {
+        return;
+    }
+
+    isPageWorkActive = true;
+    duplicateAnchorTabGuard ??= createDuplicateAnchorTabGuard();
+    installPageEnhancements();
     installMutationObserver();
-    installStorageListener();
-    installRuntimeMessageListener();
-    installDownloadProgressListener();
+    connectDownloadProgressListener();
     installViewportListeners();
     installInteractionFallbackListeners();
     installMediaDimensionListeners();
-    void loadRulesAndProcess();
+    anchorMediaRuntime.resume();
+    void loadRulesAndProcess({ fullScan: options.fullScan ?? true });
+}
+
+function stopPageWork(): void {
+    if (!isPageWorkActive) {
+        return;
+    }
+
+    isPageWorkActive = false;
+    disconnectMutationObserver();
+    disconnectDownloadProgressListener();
+    removeViewportListeners();
+    removeInteractionFallbackListeners();
+    removeMediaDimensionListeners();
+    cancelVisiblePageWork();
+    cleanupPageEnhancements();
+    duplicateAnchorTabGuard?.destroy();
+    duplicateAnchorTabGuard = null;
+    anchorMediaRuntime.suspend();
+}
+
+function handleVisibilityChange(): void {
+    if (isPageVisible()) {
+        startPageWork({ fullScan: false });
+        return;
+    }
+
+    stopPageWork();
+}
+
+function installVisibilityListener(): void {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+}
+
+function bootstrap(): void {
+    installStorageListener();
+    installRuntimeMessageListener();
+    installVisibilityListener();
+
+    if (isPageVisible()) {
+        startPageWork({ fullScan: true });
+    } else {
+        anchorMediaRuntime.suspend();
+    }
 }
 
 if (document.readyState === 'loading') {

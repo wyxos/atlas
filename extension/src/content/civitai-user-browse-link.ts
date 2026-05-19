@@ -7,6 +7,7 @@ const USER_OPEN_TITLE = 'Open this CivitAI user in Atlas';
 const USER_PENDING_TITLE = 'Opening this CivitAI user in Atlas...';
 const USER_SUCCESS_TITLE = 'Opened this CivitAI user in Atlas';
 const USER_FAILURE_TITLE = 'Failed to open this CivitAI user in Atlas';
+const noop = (): void => {};
 
 type CivitAiUsernameReference = {
     username: string;
@@ -244,9 +245,9 @@ function syncMutationTarget(mutation: MutationRecord): void {
     }
 }
 
-export function installCivitAiUserBrowseLinks(): void {
+export function installCivitAiUserBrowseLinks(): () => void {
     if (isInstalled || !isCivitAiHostname()) {
-        return;
+        return noop;
     }
 
     isInstalled = true;
@@ -278,4 +279,9 @@ export function installCivitAiUserBrowseLinks(): void {
         characterData: true,
         subtree: true,
     });
+
+    return () => {
+        observer.disconnect();
+        isInstalled = false;
+    };
 }

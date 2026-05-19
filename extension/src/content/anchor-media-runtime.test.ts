@@ -53,6 +53,10 @@ describe('anchor-media-runtime', () => {
         vi.resetModules();
         vi.clearAllMocks();
         document.body.innerHTML = '';
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://current.example.com/current') as unknown as Location,
+        });
 
         mockUrlMatchesAnyRule.mockReturnValue(true);
         mockIsUrlOpenInAnotherTab.mockResolvedValue(false);
@@ -178,6 +182,79 @@ describe('anchor-media-runtime', () => {
 
         expect(mockGetCachedReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', ['tag', 'tags']);
         expect(mockEnqueueReferrerCheck).toHaveBeenCalledWith('https://domain.com/?id=123', ['tag', 'tags']);
+    });
+
+    it('marks anchor media that links to the exact current page without queuing a referrer check', async () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://www.deviantart.com/fr34ky5/art/Lois-Lane-1281274875') as unknown as Location,
+        });
+
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'www.deviantart.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = window.location.href;
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.registerFromDocument();
+        await flushPromises();
+
+        expect(mockGetCachedReferrerCheck).not.toHaveBeenCalled();
+        expect(mockEnqueueReferrerCheck).not.toHaveBeenCalled();
+        expect(mockIsUrlOpenInAnotherTab).not.toHaveBeenCalled();
+        expect(image.getAttribute('data-atlas-anchor-same-page')).toBe('1');
+        expect(image.getAttribute('data-atlas-anchor-checking')).toBeNull();
+        expect(image.getAttribute('data-atlas-anchor-media-red-border')).toBe('1');
+        expect(image.getAttribute('data-atlas-anchor-media-match')).toBe('0');
+        expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')?.getAttribute('data-atlas-anchor-badge-kind')).toBe('same-page');
+    });
+
+    it('does not mark same-page when only cleaned referrer urls match', async () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL('https://example.com/post?tag=current') as unknown as Location,
+        });
+        mockEnqueueReferrerCheck.mockResolvedValue({
+            exists: false,
+            reaction: null,
+            reactedAt: null,
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
+
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => ['tag'],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post?tag=anchor';
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.registerFromDocument();
+        await flushPromises();
+
+        expect(image.getAttribute('data-atlas-anchor-same-page')).toBeNull();
+        expect(mockEnqueueReferrerCheck).toHaveBeenCalledWith('https://example.com/post', ['tag']);
     });
 
     it('marks changed anchors as already open elsewhere when tab presence changes', async () => {
