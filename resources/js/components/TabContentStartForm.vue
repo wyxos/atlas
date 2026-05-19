@@ -2,15 +2,16 @@
 import { computed, watch } from 'vue';
 import { Play } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from '@/components/ui/switch';
 import Input from '@/components/ui/input/Input.vue';
+import SearchableDropdown from '@/components/ui/SearchableDropdown.vue';
 import LocalSourceDropdown from '@/components/tab-filter/LocalSourceDropdown.vue';
 import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
 import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { LocalSourceSelection } from '@/utils/localSourceSelection';
+import { localPresetDropdownGroups, serviceDropdownOptions, serviceStatusMessage } from '@/utils/browseDropdownOptions';
 import {
     LOCAL_TAB_FILTER_PRESET_GROUPS,
     LOCAL_TAB_FILTER_PRESETS,
@@ -37,6 +38,8 @@ const form = useBrowseForm();
 
 const inputClass = 'text-twilight-indigo-100 placeholder:text-twilight-indigo-300';
 const onlineServices = computed(() => props.availableServices.filter((entry) => entry.key !== 'local'));
+const serviceOptions = computed(() => serviceDropdownOptions(onlineServices.value));
+const presetGroups = computed(() => localPresetDropdownGroups(LOCAL_TAB_FILTER_PRESET_GROUPS));
 const selectedServiceDef = computed(() => {
     if (form.data.feed !== 'online' || !form.data.service) {
         return null;
@@ -76,13 +79,7 @@ const selectedLocalPreset = computed<string>({
         delete form.data.serviceFilters.local_preset;
     },
 });
-const selectedLocalPresetLabel = computed(() => {
-    if (!selectedLocalPreset.value) {
-        return null;
-    }
-
-    return LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === selectedLocalPreset.value)?.label ?? selectedLocalPreset.value;
-});
+const selectedServiceStatusMessage = computed(() => serviceStatusMessage(selectedServiceDef.value));
 const localPageInput = computed<number>({
     get() {
         const raw = form.data.page;
@@ -195,43 +192,31 @@ watch(
 
                 <div v-if="form.data.feed === 'online'" class="form-field">
                     <label class="form-label">Service</label>
-                    <Select :model-value="form.data.service" @update:model-value="(value) => updateService(value as string)" :disabled="isLoading">
-                        <SelectTrigger class="w-full" data-test="service-select-trigger">
-                            <SelectValue placeholder="Select a service..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="service in onlineServices"
-                                :key="service.key" :value="service.key" data-test="service-select-item">
-                                {{ service.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <SearchableDropdown
+                        :model-value="form.data.service"
+                        :options="serviceOptions"
+                        :disabled="isLoading"
+                        placeholder="Select a service..."
+                        search-placeholder="Search services..."
+                        data-test="service-select-trigger"
+                        @update:model-value="(value) => updateService(String(value))"
+                    />
+                    <p v-if="selectedServiceStatusMessage" class="mt-2 inline-flex rounded-full border border-danger-400/40 bg-danger-500/15 px-2 py-0.5 text-[11px] font-medium text-danger-100">
+                        {{ selectedServiceStatusMessage }}
+                    </p>
                 </div>
 
                 <template v-if="form.data.feed === 'local' && activeSchema">
                     <div class="form-field">
                         <label class="form-label">Preset</label>
-                        <Select
+                        <SearchableDropdown
                             :model-value="selectedLocalPreset"
+                            :groups="presetGroups"
                             :disabled="isLoading"
+                            placeholder="Select a preset…"
+                            search-placeholder="Search presets..."
                             @update:model-value="(value) => applyLocalPreset(String(value))"
-                        >
-                            <SelectTrigger class="w-full">
-                                <span class="truncate">
-                                    {{ selectedLocalPresetLabel || 'Select a preset…' }}
-                                </span>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <template v-for="group in LOCAL_TAB_FILTER_PRESET_GROUPS" :key="group.label">
-                                    <div class="px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-twilight-indigo-400/80">
-                                        {{ group.label }}
-                                    </div>
-                                    <SelectItem v-for="preset in group.presets" :key="preset.value" :value="preset.value">
-                                        {{ preset.label }}
-                                    </SelectItem>
-                                </template>
-                            </SelectContent>
-                        </Select>
+                        />
                     </div>
 
                     <TabFilterLimitField :model-value="form.data.limit" :options="limitOptions" @update:model-value="updateLimit" />

@@ -6,6 +6,7 @@ use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Services\Library\LibraryIndexSyncDispatcher;
+use App\Support\StableFileIdentity;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -59,6 +60,7 @@ class BrowsePersister
         if (empty($preparedItems)) {
             return [];
         }
+        $preparedItems = StableFileIdentity::mergeExistingUrls($preparedItems);
 
         $urls = collect($preparedItems)
             ->pluck('url')
@@ -80,7 +82,7 @@ class BrowsePersister
         }
 
         $fileRows = collect($preparedItems)->pluck('file')->all();
-        $upsertUpdateColumns = ['url', 'url_hash', 'referrer_url', 'referrer_url_hash', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at'];
+        $upsertUpdateColumns = ['source_id', 'url', 'url_hash', 'referrer_url', 'referrer_url_hash', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at'];
 
         File::upsert(
             $fileRows,

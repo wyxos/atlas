@@ -53,6 +53,11 @@ abstract class BaseService
         return $originalUrl;
     }
 
+    public function browseStatusForUser(?Authenticatable $user): ?array
+    {
+        return null;
+    }
+
     /**
      * Persist transformed rows using the shared BrowsePersister helper.
      */

@@ -3,16 +3,20 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Services\DeviantArt\DeviantArtOAuthConfig;
 use App\Services\DeviantArt\DeviantArtOAuthService;
 use App\Support\DeviantArtApiClient;
 use App\Support\DeviantArtImagesFilterSchema;
 use App\Support\DeviantArtMediaResolver;
+use App\Support\DeviantArtPageUrl;
 use App\Support\FileMimeType;
 use App\Support\FileTypeDetector;
 use Carbon\Carbon;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class DeviantArtImages extends BaseService
 {
@@ -103,6 +107,59 @@ class DeviantArtImages extends BaseService
         ];
     }
 
+    public function browseStatusForUser(?Authenticatable $user): ?array
+    {
+        $config = app(DeviantArtOAuthConfig::class);
+
+        if (! $config->isConfigured()) {
+            return [
+                'state' => 'error',
+                'label' => 'Error',
+                'message' => 'DeviantArt OAuth is not configured.',
+            ];
+        }
+
+        if (! $user instanceof User) {
+            return [
+                'state' => 'disconnected',
+                'label' => 'Disconnected',
+                'message' => 'Sign in to connect DeviantArt.',
+            ];
+        }
+
+        $token = $user->deviantArtToken()->latest('id')->first();
+
+        if (! $token) {
+            return [
+                'state' => 'disconnected',
+                'label' => 'Disconnected',
+                'message' => 'Connect DeviantArt in Settings.',
+            ];
+        }
+
+        try {
+            if ($token->isExpired() && trim((string) $token->refresh_token) === '') {
+                return [
+                    'state' => 'disconnected',
+                    'label' => 'Reconnect',
+                    'message' => 'Reconnect DeviantArt in Settings.',
+                ];
+            }
+        } catch (Throwable) {
+            return [
+                'state' => 'error',
+                'label' => 'Error',
+                'message' => 'Stored DeviantArt credentials are invalid. Reconnect in Settings.',
+            ];
+        }
+
+        return [
+            'state' => 'ready',
+            'label' => null,
+            'message' => null,
+        ];
+    }
+
     public function filterSchema(): array
     {
         return DeviantArtImagesFilterSchema::make();
@@ -170,7 +227,12 @@ class DeviantArtImages extends BaseService
             return null;
         }
 
-        $referrer = isset($row['url']) && is_string($row['url']) ? $row['url'] : null;
+        $rawReferrer = isset($row['url']) && is_string($row['url']) ? $row['url'] : null;
+        $referrer = DeviantArtPageUrl::normalize($rawReferrer) ?? $rawReferrer;
+        if ($referrer !== null) {
+            $row['url'] = $referrer;
+        }
+
         $id = isset($row['deviationid']) ? (string) $row['deviationid'] : sha1((string) ($referrer ?? $media['url']));
         $typeProbe = $media['filename'] !== null && $media['filename'] !== '' ? $media['filename'] : $media['url'];
 

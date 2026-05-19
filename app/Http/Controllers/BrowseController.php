@@ -43,6 +43,7 @@ class BrowseController extends Controller
                 'toBlacklist' => [],
                 'moderatedOut' => [],
             ],
+            'error' => $payload['error'] ?? null,
         ], headers: self::NO_STORE_HEADERS);
     }
 
@@ -67,13 +68,20 @@ class BrowseController extends Controller
                 continue;
             }
 
-            $servicesMeta[] = [
+            $serviceMeta = [
                 'key' => $serviceInstance::key(),
                 'label' => $serviceInstance::label(),
                 'source' => $serviceInstance::source(),
                 'defaults' => $serviceInstance->defaultParams(),
                 'schema' => $serviceInstance->filterSchema(),
             ];
+
+            $status = $serviceInstance->browseStatusForUser(auth()->user());
+            if (is_array($status)) {
+                $serviceMeta['status'] = $status;
+            }
+
+            $servicesMeta[] = $serviceMeta;
         }
 
         $localSchema = ServiceFilterSchema::make();
@@ -145,7 +153,7 @@ class BrowseController extends Controller
                             'default' => ['all'],
                         ]),
                         $localSchema->field('reaction_mode', [
-                            'type' => 'select',
+                            'type' => 'radio',
                             'description' => 'How to filter by your reactions.',
                             'options' => [
                                 ['label' => 'Any (ignore reactions)', 'value' => 'any'],

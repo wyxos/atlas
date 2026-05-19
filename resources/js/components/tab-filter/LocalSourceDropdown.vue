@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { Check, ChevronsUpDown, Search } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import {
     formatLocalSourceSelectionLabel,
     isLocalSourceSelected,
@@ -82,24 +83,23 @@ function updateSource(value: string): void {
 <template>
     <Popover v-model="open">
         <PopoverTrigger as-child>
-            <Button
+            <button
                 type="button"
-                variant="outline"
                 role="combobox"
                 :aria-expanded="open"
                 aria-label="Select library sources"
                 :disabled="disabled"
-                :class="['justify-between', triggerClass]"
+                :class="cn(buttonVariants({ variant: 'outline' }), 'justify-between px-3 text-left', triggerClass)"
                 data-test="source-select-trigger"
             >
                 <span class="min-w-0 truncate text-left">{{ selectionLabel }}</span>
                 <ChevronsUpDown :size="14" class="shrink-0 opacity-70" />
-            </Button>
+            </button>
         </PopoverTrigger>
         <PopoverContent
             :align="popoverAlign"
             :class="[
-                'w-72 border-twilight-indigo-500 bg-prussian-blue-600 p-0 text-twilight-indigo-100',
+                'w-[var(--popover-trigger-width)] min-w-[var(--popover-trigger-width)] border-twilight-indigo-500 bg-prussian-blue-600 p-0 text-twilight-indigo-100',
                 contentClass,
             ]"
         >

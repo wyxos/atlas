@@ -2,9 +2,9 @@
 import { computed, toRef } from 'vue';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SlidersHorizontal } from 'lucide-vue-next';
 import Input from '@/components/ui/input/Input.vue';
+import SearchableDropdown from '@/components/ui/SearchableDropdown.vue';
 import LocalSourceDropdown from '@/components/tab-filter/LocalSourceDropdown.vue';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
@@ -12,6 +12,7 @@ import type { LocalSourceSelection } from '@/utils/localSourceSelection';
 import TabFilterFieldControl from '@/components/tab-filter/TabFilterFieldControl.vue';
 import TabFilterLimitField from '@/components/tab-filter/TabFilterLimitField.vue';
 import { useTabFilterState } from '@/composables/useTabFilterState';
+import { localPresetDropdownGroups, serviceDropdownOptions, serviceStatusMessage } from '@/utils/browseDropdownOptions';
 import { getTabFilterLimitOptions, shouldShowTabFilterDescriptionBelow, type TabFilterFieldUpdate } from '@/utils/tabFilter';
 
 interface Props {
@@ -52,10 +53,12 @@ const visibleServiceFields = filter.derived.visibleServiceFields;
 const localSourceField = filter.derived.localSourceField;
 const localPresetGroups = filter.derived.localPresetGroups;
 const selectedLocalPreset = filter.derived.selectedLocalPreset;
-const selectedLocalPresetLabel = filter.derived.selectedLocalPresetLabel;
 const localPageInput = filter.models.localPageInput;
 const limitOptions = computed(() => getTabFilterLimitOptions(form.data.feed, activeSchema.value));
 const onlineServices = computed(() => props.availableServices.filter((service) => service.key !== 'local'));
+const serviceOptions = computed(() => serviceDropdownOptions(onlineServices.value));
+const presetGroups = computed(() => localPresetDropdownGroups(localPresetGroups.value));
+const selectedServiceStatusMessage = computed(() => serviceStatusMessage(selectedServiceDef.value));
 
 function updateLimit(value: string): void {
     form.data.limit = value;
@@ -91,41 +94,28 @@ function handleFieldUpdate(field: TabFilterFieldUpdate): void {
             <div class="flex-1 space-y-6 overflow-y-auto p-6">
                 <div v-if="isOnlineFeed" class="form-field">
                     <label class="form-label">Service</label>
-                    <Select :model-value="form.data.service" @update:model-value="(value) => filter.actions.updateService(String(value))">
-                        <SelectTrigger class="w-full">
-                            <SelectValue placeholder="Select a service..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="service in onlineServices" :key="service.key" :value="service.key">
-                                {{ service.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <SearchableDropdown
+                        :model-value="form.data.service"
+                        :options="serviceOptions"
+                        placeholder="Select a service..."
+                        search-placeholder="Search services..."
+                        @update:model-value="(value) => filter.actions.updateService(String(value))"
+                    />
+                    <p v-if="selectedServiceStatusMessage" class="mt-2 inline-flex rounded-full border border-danger-400/40 bg-danger-500/15 px-2 py-0.5 text-[11px] font-medium text-danger-100">
+                        {{ selectedServiceStatusMessage }}
+                    </p>
                 </div>
 
                 <template v-if="isLocalFeed && activeSchema">
                     <div class="form-field">
                         <label class="form-label">Preset</label>
-                        <Select
+                        <SearchableDropdown
                             :model-value="selectedLocalPreset"
+                            :groups="presetGroups"
+                            placeholder="Select a preset…"
+                            search-placeholder="Search presets..."
                             @update:model-value="(value) => filter.actions.applyLocalPreset(String(value))"
-                        >
-                            <SelectTrigger class="w-full">
-                                <span class="truncate">
-                                    {{ selectedLocalPresetLabel || 'Select a preset…' }}
-                                </span>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <template v-for="group in localPresetGroups" :key="group.label">
-                                    <div class="px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-twilight-indigo-400/80">
-                                        {{ group.label }}
-                                    </div>
-                                    <SelectItem v-for="preset in group.presets" :key="preset.value" :value="preset.value">
-                                        {{ preset.label }}
-                                    </SelectItem>
-                                </template>
-                            </SelectContent>
-                        </Select>
+                        />
                         <p class="form-help">
                             Presets set sensible defaults. You can tweak fields below after applying.
                         </p>

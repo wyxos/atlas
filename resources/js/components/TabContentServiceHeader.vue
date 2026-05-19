@@ -4,13 +4,14 @@ import { ChevronDown, ChevronsUp, PanelRightOpen, Play } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { queueManager } from '@/composables/useQueue';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import SearchableDropdown from '@/components/ui/SearchableDropdown.vue';
 import TabFilter from './TabFilter.vue';
 import LocalSourceDropdown from '@/components/tab-filter/LocalSourceDropdown.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
+import { serviceDropdownOptions } from '@/utils/browseDropdownOptions';
 import { createLocalSourceOptions, type LocalSourceSelection } from '@/utils/localSourceSelection';
 
 interface Props {
@@ -40,7 +41,11 @@ const props = withDefaults(defineProps<Props>(), {
 const globalStartPanel = useBrowseGlobalStartPanel();
 const queuedReactionCount = queueManager.collection.getAllComputed();
 const localSourceOptions = computed(() => createLocalSourceOptions(props.availableSources));
-const feedLabel = computed(() => props.form.data.feed === 'local' ? 'Library' : 'Online');
+const feedOptions = [
+    { label: 'Online', value: 'online' },
+    { label: 'Library', value: 'local' },
+];
+const onlineServiceOptions = computed(() => serviceDropdownOptions(props.availableServices.filter((entry) => entry.key !== 'local')));
 </script>
 
 <template>
@@ -48,33 +53,28 @@ const feedLabel = computed(() => props.form.data.feed === 'local' ? 'Library' : 
         data-test="service-selection-header">
         <div class="flex items-center gap-3">
             <div>
-                <Select :model-value="form.data.feed"
-                    @update:model-value="(value) => updateFeed(value as 'online' | 'local')"
-                    :disabled="masonry?.isLoading">
-                    <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
-                        <span class="truncate">{{ feedLabel }}</span>
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
-                        <SelectItem value="local" data-test="source-type-local">Library</SelectItem>
-                    </SelectContent>
-                </Select>
+                <SearchableDropdown
+                    :model-value="form.data.feed"
+                    :options="feedOptions"
+                    trigger-class="w-[120px]"
+                    search-placeholder="Search sources..."
+                    data-test="source-type-select-trigger"
+                    @update:model-value="(value) => updateFeed(String(value) as 'online' | 'local')"
+                    :disabled="masonry?.isLoading"
+                />
             </div>
 
             <div v-if="form.data.feed === 'online'" class="flex-1">
-                <Select :model-value="form.data.service"
-                    @update:model-value="(value) => updateService(value as string)"
-                    :disabled="masonry?.isLoading">
-                    <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
-                        <SelectValue placeholder="Select a service..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem v-for="service in availableServices.filter((entry) => entry.key !== 'local')"
-                            :key="service.key" :value="service.key" data-test="service-select-item">
-                            {{ service.label }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+                <SearchableDropdown
+                    :model-value="form.data.service"
+                    :options="onlineServiceOptions"
+                    trigger-class="w-[200px]"
+                    placeholder="Select a service..."
+                    search-placeholder="Search services..."
+                    data-test="service-select-trigger"
+                    @update:model-value="(value) => updateService(String(value))"
+                    :disabled="masonry?.isLoading"
+                />
             </div>
 
             <div v-if="form.data.feed === 'local'" class="flex-1">

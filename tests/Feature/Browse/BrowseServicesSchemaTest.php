@@ -9,6 +9,11 @@ uses(RefreshDatabase::class);
 
 test('browse services endpoint returns civitai schema with expected field mappings', function () {
     $user = User::factory()->create();
+    config([
+        'services.deviantart.client_id' => 'client-id',
+        'services.deviantart.client_secret' => 'client-secret',
+        'services.deviantart.redirect_uri' => 'https://atlas.test/auth/deviantart/callback',
+    ]);
 
     $response = $this->actingAs($user)->getJson('/api/browse/services');
 
@@ -81,6 +86,9 @@ test('browse services endpoint returns civitai schema with expected field mappin
         ->toContain(['label' => 'Updated At (Newest)', 'value' => 'updated_at'])
         ->toContain(['label' => 'Updated At (Oldest)', 'value' => 'updated_at_asc']);
 
+    $localReactionMode = collect($localFields)->firstWhere('uiKey', 'reaction_mode');
+    expect($localReactionMode['type'])->toBe('radio');
+
     $civit = collect($services)->firstWhere('key', 'civit-ai-images');
     expect($civit)->not->toBeNull();
 
@@ -129,6 +137,11 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($deviantArt)->not->toBeNull();
     expect($deviantArt['source'])->toBe('deviantart.com');
     expect($deviantArt['defaults']['q'])->toBe('');
+    expect($deviantArt['status'])->toMatchArray([
+        'state' => 'disconnected',
+        'label' => 'Disconnected',
+        'message' => 'Connect DeviantArt in Settings.',
+    ]);
 
     $deviantArtFields = $deviantArt['schema']['fields'] ?? null;
     expect($deviantArtFields)->toBeArray();

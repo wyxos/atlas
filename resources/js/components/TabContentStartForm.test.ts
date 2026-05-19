@@ -97,6 +97,7 @@ function mountStartForm(
                 SelectItem: simpleStub,
                 SelectTrigger: simpleStub,
                 SelectValue: simpleStub,
+                SearchableDropdown: simpleStub,
                 Switch: simpleStub,
                 TabFilterFieldControl: fieldStub,
                 TabFilterLimitField: limitStub,
@@ -126,5 +127,24 @@ describe('TabContentStartForm', () => {
         expect(wrapper.get('[data-test="new-tab-setup-sheet"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="start-limit-field"]').text()).toContain('Limit');
         expect(wrapper.get('[data-test="start-filter-field"]').text()).toContain('Sort');
+    });
+
+    it('shows the selected service status message under the service dropdown', () => {
+        const form = createForm({ service: 'deviantart-images' });
+        const wrapper = mountStartForm({
+            availableServices: [
+                {
+                    key: 'deviantart-images',
+                    label: 'DeviantArt Images',
+                    status: {
+                        state: 'disconnected',
+                        label: 'Disconnected',
+                        message: 'Connect DeviantArt in Settings.',
+                    },
+                },
+            ],
+        }, form);
+
+        expect(wrapper.text()).toContain('Connect DeviantArt in Settings.');
     });
 });

@@ -4,6 +4,7 @@ use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\DeviantArtImages;
 use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -95,6 +96,48 @@ test('extension reactions endpoint creates file applies reaction and queues down
 
     Queue::assertPushed(DownloadFile::class, function (DownloadFile $job) use ($file): bool {
         return $job->fileId === $file?->id;
+    });
+});
+
+test('extension reactions reuse DeviantArt files by normalized referrer when media URL changes', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $existing = File::factory()->create([
+        'source' => DeviantArtImages::SOURCE,
+        'source_id' => '52BAFA97-9DB9-0E5F-FF2D-C39083F89817',
+        'url' => 'https://fc.example.test/listing-media.jpg',
+        'referrer_url' => 'https://www.deviantart.com/artist/art/Astana-Hotel-487117484',
+        'preview_url' => 'https://th.example.test/listing-preview.jpg',
+        'downloaded' => false,
+        'downloaded_at' => null,
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'type' => 'like',
+        'url' => 'https://images.example.test/browser-media.jpg',
+        'referrer_url_hash_aware' => 'https://www.deviantart.com/artist/art/Astana-Hotel-487117484?utm_source=extension#image-2',
+        'page_url' => 'https://www.deviantart.com/artist/art/Astana-Hotel-487117484?utm_source=extension',
+        'tag_name' => 'img',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.id', $existing->id);
+    $response->assertJsonPath('file.referrer_url', 'https://www.deviantart.com/artist/art/Astana-Hotel-487117484');
+
+    expect(File::query()->count())->toBe(1);
+
+    $existing->refresh();
+
+    expect($existing->url)->toBe('https://images.example.test/browser-media.jpg')
+        ->and($existing->referrer_url)->toBe('https://www.deviantart.com/artist/art/Astana-Hotel-487117484');
+
+    Queue::assertPushed(DownloadFile::class, function (DownloadFile $job) use ($existing): bool {
+        return $job->fileId === $existing->id;
     });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { defineComponent, nextTick } from 'vue';
+import { defineComponent, h, nextTick } from 'vue';
 import TabFilter from './TabFilter.vue';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
 import type { TabData } from '@/composables/useTabs';
@@ -9,6 +9,26 @@ import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT } from '@/lib/feedModeration';
 
 const Stub = defineComponent({
     template: '<div><slot /></div>',
+});
+
+const SearchableDropdownStub = defineComponent({
+    name: 'SearchableDropdownStub',
+    props: {
+        modelValue: { default: '' },
+        options: { type: Array, default: () => [] },
+        groups: { type: Array, default: () => [] },
+        placeholder: { type: String, default: '' },
+    },
+    setup(props) {
+        return () => h('div', [
+            ...((props.options as Array<{ label?: string }>).map((option) => option.label ?? '')),
+            ...((props.groups as Array<{ label?: string; options?: Array<{ label?: string }> }>).flatMap((group) => [
+                group.label ?? '',
+                ...(group.options ?? []).map((option) => option.label ?? ''),
+            ])),
+            props.placeholder,
+        ].filter(Boolean).join(' '));
+    },
 });
 
 describe('TabFilter', () => {
@@ -177,6 +197,7 @@ describe('TabFilter', () => {
                     SelectItem: Stub,
                     SelectTrigger: Stub,
                     SelectValue: Stub,
+                    SearchableDropdown: SearchableDropdownStub,
                     RadioGroup: Stub,
                     RadioGroupItem: Stub,
                     Switch: Stub,
@@ -255,6 +276,7 @@ describe('TabFilter', () => {
                     SelectItem: Stub,
                     SelectTrigger: Stub,
                     SelectValue: Stub,
+                    SearchableDropdown: SearchableDropdownStub,
                     RadioGroup: Stub,
                     RadioGroupItem: Stub,
                     Switch: Stub,
@@ -326,6 +348,7 @@ describe('TabFilter', () => {
                     SelectItem: Stub,
                     SelectTrigger: Stub,
                     SelectValue: Stub,
+                    SearchableDropdown: SearchableDropdownStub,
                     RadioGroup: Stub,
                     RadioGroupItem: Stub,
                     Switch: Stub,

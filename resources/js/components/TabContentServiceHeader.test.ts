@@ -20,6 +20,23 @@ const buttonStub = defineComponent({
 
 const simpleStub = { template: '<div><slot /></div>' };
 
+const searchableDropdownStub = defineComponent({
+    name: 'SearchableDropdownStub',
+    props: {
+        modelValue: { default: '' },
+        options: { type: Array, default: () => [] },
+        placeholder: { type: String, default: '' },
+    },
+    setup(props, { attrs }) {
+        return () => {
+            const option = (props.options as Array<{ label?: string; value?: unknown }>)
+                .find((entry) => entry.value === props.modelValue);
+
+            return h('button', attrs, option?.label ?? props.placeholder);
+        };
+    },
+});
+
 function createProps() {
     return {
         form: {
@@ -71,6 +88,7 @@ function mountHeader(props = createProps()) {
                 SelectItem: simpleStub,
                 SelectTrigger: simpleStub,
                 SelectValue: simpleStub,
+                SearchableDropdown: searchableDropdownStub,
                 TabFilter: simpleStub,
             },
         },

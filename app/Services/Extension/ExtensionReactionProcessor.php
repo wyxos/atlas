@@ -5,11 +5,14 @@ namespace App\Services\Extension;
 use App\Models\File;
 use App\Models\User;
 use App\Services\CivitAiImages;
+use App\Services\DeviantArtImages;
 use App\Services\FileBlacklistService;
 use App\Services\FilePreviewService;
 use App\Services\FileReactionService;
 use App\Support\CivitAiMediaUrl;
+use App\Support\DeviantArtPageUrl;
 use App\Support\FileTypeDetector;
+use App\Support\StableFileIdentity;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -248,7 +251,9 @@ class ExtensionReactionProcessor
         if ($file->url !== $canonicalUrl && ! $duplicateCanonicalUrlExists) {
             $updates['url'] = $canonicalUrl;
         }
-        if ($referrerUrl !== null && $file->referrer_url !== $referrerUrl) {
+        if ($referrerUrl !== null
+            && $file->referrer_url !== $referrerUrl
+            && ! $this->referrerUrlsAreEquivalent($source, $file->referrer_url, $referrerUrl)) {
             $updates['referrer_url'] = $referrerUrl;
         }
         if ($file->preview_url === null && $previewUrl !== null) {
@@ -330,32 +335,32 @@ class ExtensionReactionProcessor
             return $file;
         }
 
-        if ($source !== CivitAiImages::SOURCE) {
-            return null;
+        return StableFileIdentity::findExistingFile(
+            $source,
+            $sourceId,
+            $this->identityReferrerUrl($source, $referrerUrl),
+        );
+    }
+
+    private function identityReferrerUrl(string $source, ?string $referrerUrl): ?string
+    {
+        if ($source === DeviantArtImages::SOURCE) {
+            return DeviantArtPageUrl::normalize($referrerUrl) ?? $referrerUrl;
         }
 
-        if ($referrerUrl !== null) {
-            $file = File::query()
-                ->where('source', CivitAiImages::SOURCE)
-                ->where('referrer_url_hash', hash('sha256', $referrerUrl))
-                ->orderByDesc('downloaded')
-                ->latest('updated_at')
-                ->first();
-            if ($file) {
-                return $file;
-            }
+        return $referrerUrl;
+    }
+
+    private function referrerUrlsAreEquivalent(string $source, ?string $currentReferrerUrl, string $nextReferrerUrl): bool
+    {
+        if ($source !== DeviantArtImages::SOURCE) {
+            return false;
         }
 
-        if ($sourceId === null) {
-            return null;
-        }
+        $current = DeviantArtPageUrl::normalize($currentReferrerUrl);
+        $next = DeviantArtPageUrl::normalize($nextReferrerUrl);
 
-        return File::query()
-            ->where('source', CivitAiImages::SOURCE)
-            ->where('source_id', $sourceId)
-            ->orderByDesc('downloaded')
-            ->latest('updated_at')
-            ->first();
+        return $current !== null && $current === $next;
     }
 
     /**

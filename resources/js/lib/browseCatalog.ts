@@ -7,6 +7,13 @@ export type ServiceOption = {
     source?: string;
     defaults?: Record<string, unknown>;
     schema?: ServiceFilterSchema;
+    status?: ServiceStatus;
+};
+
+export type ServiceStatus = {
+    state: 'ready' | 'disconnected' | 'error';
+    label?: string | null;
+    message?: string | null;
 };
 
 export type ServiceFilterFieldType =

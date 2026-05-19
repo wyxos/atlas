@@ -1,31 +1,33 @@
 <script setup lang="ts">
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { computed } from 'vue';
+import SearchableDropdown from '@/components/ui/SearchableDropdown.vue';
 
 interface Props {
     modelValue: string;
     options: readonly string[];
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
     'update:modelValue': [value: string];
 }>();
+
+const dropdownOptions = computed(() => props.options.map((option) => ({
+    label: option,
+    value: option,
+})));
 </script>
 
 <template>
     <div class="form-field">
         <label class="form-label">Limit</label>
 
-        <Select :model-value="modelValue" @update:model-value="(value) => emit('update:modelValue', String(value))">
-            <SelectTrigger class="w-full">
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem v-for="option in options" :key="option" :value="option">
-                    {{ option }}
-                </SelectItem>
-            </SelectContent>
-        </Select>
+        <SearchableDropdown
+            :model-value="modelValue"
+            :options="dropdownOptions"
+            search-placeholder="Search limits..."
+            @update:model-value="(value) => emit('update:modelValue', String(value))"
+        />
     </div>
 </template>

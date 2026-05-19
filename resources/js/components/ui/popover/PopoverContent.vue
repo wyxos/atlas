@@ -35,7 +35,14 @@ const isOpen = computed(() => {
 
 const contentRef = ref<HTMLElement | null>(null);
 const triggerRef = inject<{ value: HTMLElement | null } | undefined>('popoverTriggerRef', undefined);
-const popoverStyle = ref<{ top?: string; left?: string; right?: string }>({});
+type PopoverStyle = {
+    top?: string;
+    left?: string;
+    right?: string;
+    '--popover-trigger-width'?: string;
+};
+
+const popoverStyle = ref<PopoverStyle>({});
 const mouseDownHandlerRef = ref<((e: MouseEvent) => void) | null>(null);
 const touchEndHandlerRef = ref<((e: TouchEvent) => void) | null>(null);
 
@@ -115,6 +122,7 @@ function updatePosition(): void {
 
     popoverStyle.value = {
         top: `${top}px`,
+        '--popover-trigger-width': `${triggerRect.width}px`,
         ...(left !== undefined ? { left: `${left}px` } : {}),
         ...(right !== undefined ? { right: `${right}px` } : {}),
     };

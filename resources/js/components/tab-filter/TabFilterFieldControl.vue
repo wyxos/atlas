@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import Checkbox from '@/components/ui/Checkbox.vue';
 import Input from '@/components/ui/input/Input.vue';
-import type { ServiceFilterField } from '@/composables/useBrowseService';
+import SearchableDropdown from '@/components/ui/SearchableDropdown.vue';
+import type { ServiceFilterField } from '@/lib/browseCatalog';
 import { coerceBoolean } from '@/utils/coerceBoolean';
 import {
     getTabFilterCheckboxGroupSelection,
@@ -78,24 +78,15 @@ function updateCheckboxGroupValue(value: string, checked: boolean): void {
             {{ field.description || field.label }}
         </Checkbox>
 
-        <Select
+        <SearchableDropdown
             v-else-if="field.type === 'select'"
             :model-value="(resolvedValue ?? null) as any"
+            :options="field.options ?? []"
+            :disabled="disabled"
+            :placeholder="placeholder || 'Select…'"
+            :search-placeholder="`Search ${field.label.toLowerCase()}...`"
             @update:model-value="(value) => emit('update:modelValue', value)"
-        >
-            <SelectTrigger class="w-full">
-                <SelectValue :placeholder="placeholder || 'Select…'" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem
-                    v-for="option in field.options ?? []"
-                    :key="String(option.value)"
-                    :value="option.value as any"
-                >
-                    {{ option.label }}
-                </SelectItem>
-            </SelectContent>
-        </Select>
+        />
 
         <Input
             v-else-if="field.type === 'number'"
