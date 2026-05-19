@@ -5,6 +5,32 @@ const mockResolveSiteCustomizationForHostname = vi.fn();
 const mockCreateCustomizationMatchRules = vi.fn();
 const mockSetActivePageSiteCustomization = vi.fn();
 const mockResolveMediaResolution = vi.fn();
+const mockCollectOpenShadowRootsFromNode = vi.fn((node: Node): ShadowRoot[] => {
+    if (
+        !(node instanceof Element)
+        && !(node instanceof Document)
+        && !(node instanceof DocumentFragment)
+    ) {
+        return [];
+    }
+
+    const roots: ShadowRoot[] = [];
+    const collect = (element: Element): void => {
+        if (element.shadowRoot !== null) {
+            roots.push(element.shadowRoot);
+        }
+    };
+
+    if (node instanceof Element) {
+        collect(node);
+    }
+
+    for (const element of node.querySelectorAll('*')) {
+        collect(element);
+    }
+
+    return roots;
+});
 const mockMediaMatchesRulesForPage = vi.fn();
 const mockOverlayApply = vi.fn();
 const mockOverlayRemove = vi.fn();
@@ -56,19 +82,35 @@ vi.mock('./page-customization-state', () => ({
 }));
 
 vi.mock('./content/media-utils', () => ({
+    collectOpenShadowRootsFromNode: mockCollectOpenShadowRootsFromNode,
     collectMediaFromNode: (node: Node) => {
         const media: Array<HTMLImageElement | HTMLVideoElement> = [];
+        const seen = new WeakSet<HTMLImageElement | HTMLVideoElement>();
 
-        if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
-            media.push(node);
-        }
+        const collectFromRoot = (root: Element | Document | DocumentFragment): void => {
+            if ((root instanceof HTMLImageElement || root instanceof HTMLVideoElement) && !seen.has(root)) {
+                seen.add(root);
+                media.push(root);
+            }
 
-        if (node instanceof Element) {
-            for (const element of node.querySelectorAll('img,video')) {
-                if (element instanceof HTMLImageElement || element instanceof HTMLVideoElement) {
+            for (const element of root.querySelectorAll('img,video')) {
+                if ((element instanceof HTMLImageElement || element instanceof HTMLVideoElement) && !seen.has(element)) {
+                    seen.add(element);
                     media.push(element);
                 }
             }
+
+            for (const shadowRoot of mockCollectOpenShadowRootsFromNode(root)) {
+                collectFromRoot(shadowRoot);
+            }
+        };
+
+        if (
+            node instanceof Element
+            || node instanceof Document
+            || node instanceof DocumentFragment
+        ) {
+            collectFromRoot(node);
         }
 
         return media;
@@ -223,6 +265,13 @@ describe('content-main', () => {
         standaloneImage.src = 'https://cdn.example.com/standalone.jpg';
         document.body.appendChild(standaloneImage);
 
+        const shadowHost = document.createElement('shreddit-player');
+        const shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+        const shadowVideo = document.createElement('video');
+        shadowVideo.src = 'https://v.redd.it/example/CMAF_720.mp4';
+        shadowRoot.appendChild(shadowVideo);
+        document.body.appendChild(shadowHost);
+
         const linkedAnchor = document.createElement('a');
         linkedAnchor.href = 'https://example.com/post';
         const linkedImage = document.createElement('img');
@@ -236,6 +285,7 @@ describe('content-main', () => {
 
         expect(mockSetActivePageSiteCustomization).toHaveBeenCalledWith(customization);
         expect(mockOverlayApply).toHaveBeenCalledWith(standaloneImage);
+        expect(mockOverlayApply).toHaveBeenCalledWith(shadowVideo);
         expect(mockOverlayRemove).toHaveBeenCalledWith(linkedImage);
         expect(mockAnchorRuntime.registerFromDocument).toHaveBeenCalledTimes(1);
         expect(mockClearDeviantArtBackgroundImageStyle).toHaveBeenCalledTimes(1);
@@ -244,7 +294,7 @@ describe('content-main', () => {
         expect(runtimeMessageListener).toBeTypeOf('function');
         expect(storageChangeListener).toBeTypeOf('function');
         expect(progressListener).toBeTypeOf('function');
-        expect(mockMutationObserverObserve).toHaveBeenCalledTimes(1);
+        expect(mockMutationObserverObserve).toHaveBeenCalledTimes(2);
 
         runtimeMessageListener?.({
             type: 'ATLAS_TAB_PRESENCE_CHANGED',

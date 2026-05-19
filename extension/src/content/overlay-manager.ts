@@ -142,27 +142,16 @@ export class OverlayManager {
 
     private syncBadgePlacement(media: MediaElement, badge: HTMLDivElement): void {
         const parent = media.parentElement;
-        if (!parent) {
+        const mediaRect = media.getBoundingClientRect();
+        if (parent === null) {
+            this.pinBadgeToViewport(mediaRect, badge);
             return;
         }
 
         const parentRect = parent.getBoundingClientRect();
-        const mediaRect = media.getBoundingClientRect();
         const parentIsCollapsed = parentRect.width < 2 || parentRect.height < 2;
         if (parentIsCollapsed) {
-            if (badge.parentElement !== document.body) {
-                document.body.appendChild(badge);
-            }
-
-            const centerX = mediaRect.left + (mediaRect.width / 2);
-            const bottomOffset = Math.max(0, window.innerHeight - mediaRect.bottom + 58);
-
-            badge.style.position = 'fixed';
-            badge.style.left = `${centerX}px`;
-            badge.style.bottom = `${bottomOffset}px`;
-            badge.style.transform = 'translateX(-50%)';
-            badge.style.display = 'block';
-
+            this.pinBadgeToViewport(mediaRect, badge);
             return;
         }
 
@@ -178,6 +167,21 @@ export class OverlayManager {
         if (badge.parentElement !== parent || badge.previousElementSibling !== media) {
             media.insertAdjacentElement('afterend', badge);
         }
+        badge.style.display = 'block';
+    }
+
+    private pinBadgeToViewport(mediaRect: DOMRect, badge: HTMLDivElement): void {
+        if (badge.parentElement !== document.body) {
+            document.body.appendChild(badge);
+        }
+
+        const centerX = mediaRect.left + (mediaRect.width / 2);
+        const bottomOffset = Math.max(0, window.innerHeight - mediaRect.bottom + 58);
+
+        badge.style.position = 'fixed';
+        badge.style.left = `${centerX}px`;
+        badge.style.bottom = `${bottomOffset}px`;
+        badge.style.transform = 'translateX(-50%)';
         badge.style.display = 'block';
     }
 

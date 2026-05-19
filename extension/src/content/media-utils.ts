@@ -348,20 +348,71 @@ export function hasRelatedPostThumbnailsBelowMedia(
 }
 
 export function collectMediaFromNode(node: Node): MediaElement[] {
-    if (!(node instanceof Element)) {
+    if (
+        !(node instanceof Element)
+        && !(node instanceof Document)
+        && !(node instanceof DocumentFragment)
+    ) {
         return [];
     }
 
     const media: MediaElement[] = [];
-    if (isMediaElement(node)) {
-        media.push(node);
-    }
-
-    for (const element of node.querySelectorAll('img,video')) {
-        if (isMediaElement(element)) {
-            media.push(element);
+    const seen = new WeakSet<MediaElement>();
+    const collectFromRoot = (root: Element | Document | DocumentFragment): void => {
+        if (root instanceof Element && isMediaElement(root) && !seen.has(root)) {
+            seen.add(root);
+            media.push(root);
         }
-    }
+
+        for (const element of root.querySelectorAll('img,video')) {
+            if (isMediaElement(element) && !seen.has(element)) {
+                seen.add(element);
+                media.push(element);
+            }
+        }
+
+        for (const shadowRoot of collectOpenShadowRootsFromNode(root)) {
+            collectFromRoot(shadowRoot);
+        }
+    };
+
+    collectFromRoot(node);
 
     return media;
+}
+
+export function collectOpenShadowRootsFromNode(node: Node): ShadowRoot[] {
+    if (
+        !(node instanceof Element)
+        && !(node instanceof Document)
+        && !(node instanceof DocumentFragment)
+    ) {
+        return [];
+    }
+
+    const roots: ShadowRoot[] = [];
+    const seen = new WeakSet<ShadowRoot>();
+    const maybeCollect = (element: Element): void => {
+        const shadowRoot = element.shadowRoot;
+        if (shadowRoot === null || seen.has(shadowRoot)) {
+            return;
+        }
+
+        seen.add(shadowRoot);
+        roots.push(shadowRoot);
+
+        for (const nested of shadowRoot.querySelectorAll('*')) {
+            maybeCollect(nested);
+        }
+    };
+
+    if (node instanceof Element) {
+        maybeCollect(node);
+    }
+
+    for (const element of node.querySelectorAll('*')) {
+        maybeCollect(element);
+    }
+
+    return roots;
 }

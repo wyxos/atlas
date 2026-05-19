@@ -7,6 +7,7 @@ import {
 } from './site-customizations';
 import { setActivePageSiteCustomization } from './page-customization-state';
 import {
+    collectOpenShadowRootsFromNode,
     collectMediaFromNode,
     isMediaElement,
     resolveMediaResolution,
@@ -46,6 +47,7 @@ const anchorMediaRuntime = createAnchorMediaRuntime({
 });
 let duplicateAnchorTabGuard: ReturnType<typeof createDuplicateAnchorTabGuard> | null = null;
 let mainMutationObserver: MutationObserver | null = null;
+const shadowRootMutationObservers = new Map<ShadowRoot, MutationObserver>();
 let unsubscribeDownloadProgress: (() => void) | null = null;
 let isPageWorkActive = false;
 let pageEnhancementsInstalled = false;
@@ -134,22 +136,46 @@ function processSourceMutation(sourceElement: HTMLSourceElement): void {
     }
 }
 
-function processAllCurrentMedia(): void {
-    for (const mediaElement of document.querySelectorAll('img,video')) {
-        if (isMediaElement(mediaElement)) {
-            processMedia(mediaElement);
+function collectKnownMediaElements(): MediaElement[] {
+    const media: MediaElement[] = [];
+    const seen = new WeakSet<MediaElement>();
+    const addMedia = (element: Element): void => {
+        if (!isMediaElement(element) || seen.has(element)) {
+            return;
         }
+
+        seen.add(element);
+        media.push(element);
+    };
+
+    for (const mediaElement of document.querySelectorAll('img,video')) {
+        addMedia(mediaElement);
+    }
+
+    for (const shadowRoot of shadowRootMutationObservers.keys()) {
+        for (const mediaElement of collectMediaFromNode(shadowRoot)) {
+            addMedia(mediaElement);
+        }
+    }
+
+    return media;
+}
+
+function processAllCurrentMedia(): void {
+    observeOpenShadowRootsFromNode(document);
+    for (const mediaElement of collectKnownMediaElements()) {
+        processMedia(mediaElement);
     }
 }
 
 function processVisibleCurrentMedia(limit = VISIBLE_RESUME_SCAN_LIMIT): void {
     let processedCount = 0;
-    for (const mediaElement of document.querySelectorAll('img,video')) {
+    for (const mediaElement of collectKnownMediaElements()) {
         if (processedCount >= limit) {
             return;
         }
 
-        if (!isMediaElement(mediaElement) || !isVisibleInViewport(mediaElement)) {
+        if (!isVisibleInViewport(mediaElement)) {
             continue;
         }
 
@@ -220,41 +246,63 @@ function tryApplyMediaWidgetFromInteraction(event: MouseEvent): void {
     overlayManager.apply(mediaCandidate);
 }
 
+function handlePageMutations(mutations: MutationRecord[]): void {
+    if (!isPageWorkActive) {
+        return;
+    }
+
+    for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+            for (const addedNode of mutation.addedNodes) {
+                clearDeviantArtBackgroundImageStyle(addedNode);
+                observeOpenShadowRootsFromNode(addedNode);
+                processNodeAndDescendants(addedNode);
+                anchorMediaRuntime.registerFromNode(addedNode);
+            }
+            scheduleReposition();
+        }
+
+        if (mutation.type === 'attributes' && mutation.target instanceof Element && isMediaElement(mutation.target)) {
+            processMedia(mutation.target);
+            anchorMediaRuntime.registerFromNode(mutation.target);
+            scheduleReposition();
+        }
+
+        if (mutation.type === 'attributes' && mutation.target instanceof HTMLAnchorElement) {
+            anchorMediaRuntime.registerFromNode(mutation.target);
+        }
+
+        if (mutation.type === 'attributes' && mutation.target instanceof HTMLSourceElement) {
+            processSourceMutation(mutation.target);
+        }
+    }
+}
+
+function observeOpenShadowRootsFromNode(node: Node): void {
+    for (const shadowRoot of collectOpenShadowRootsFromNode(node)) {
+        if (shadowRootMutationObservers.has(shadowRoot)) {
+            continue;
+        }
+
+        const observer = new MutationObserver(handlePageMutations);
+        shadowRootMutationObservers.set(shadowRoot, observer);
+        observer.observe(shadowRoot, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: [...OBSERVED_ATTRS, 'href'],
+        });
+        processNodeAndDescendants(shadowRoot);
+        anchorMediaRuntime.registerFromNode(shadowRoot);
+    }
+}
+
 function installMutationObserver(): void {
     if (mainMutationObserver !== null) {
         return;
     }
 
-    const observer = new MutationObserver((mutations) => {
-        if (!isPageWorkActive) {
-            return;
-        }
-
-        for (const mutation of mutations) {
-            if (mutation.type === 'childList') {
-                for (const addedNode of mutation.addedNodes) {
-                    clearDeviantArtBackgroundImageStyle(addedNode);
-                    processNodeAndDescendants(addedNode);
-                    anchorMediaRuntime.registerFromNode(addedNode);
-                }
-                scheduleReposition();
-            }
-
-            if (mutation.type === 'attributes' && mutation.target instanceof Element && isMediaElement(mutation.target)) {
-                processMedia(mutation.target);
-                anchorMediaRuntime.registerFromNode(mutation.target);
-                scheduleReposition();
-            }
-
-            if (mutation.type === 'attributes' && mutation.target instanceof HTMLAnchorElement) {
-                anchorMediaRuntime.registerFromNode(mutation.target);
-            }
-
-            if (mutation.type === 'attributes' && mutation.target instanceof HTMLSourceElement) {
-                processSourceMutation(mutation.target);
-            }
-        }
-    });
+    const observer = new MutationObserver(handlePageMutations);
 
     mainMutationObserver = observer;
     observer.observe(document.documentElement, {
@@ -263,11 +311,16 @@ function installMutationObserver(): void {
         attributes: true,
         attributeFilter: [...OBSERVED_ATTRS, 'href'],
     });
+    observeOpenShadowRootsFromNode(document);
 }
 
 function disconnectMutationObserver(): void {
     mainMutationObserver?.disconnect();
     mainMutationObserver = null;
+    for (const observer of shadowRootMutationObservers.values()) {
+        observer.disconnect();
+    }
+    shadowRootMutationObservers.clear();
 }
 
 function installStorageListener(): void {

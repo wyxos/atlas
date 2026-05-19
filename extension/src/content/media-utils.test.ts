@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    collectMediaFromNode,
+    collectOpenShadowRootsFromNode,
     hasRelatedPostThumbnailsBelowMedia,
     normalizeHashAwareUrl,
     normalizeUrl,
@@ -114,6 +116,22 @@ describe('normalizeHashAwareUrl', () => {
 describe('normalizeUrl', () => {
     it('removes hash fragments for hash-insensitive checks', () => {
         expect(normalizeUrl('https://example.com/page?tab=1#section')).toBe('https://example.com/page?tab=1');
+    });
+});
+
+describe('collectMediaFromNode', () => {
+    it('collects media inside open shadow roots', () => {
+        document.body.innerHTML = '';
+        const host = document.createElement('shreddit-player');
+        const shadowRoot = host.attachShadow({ mode: 'open' });
+        const video = document.createElement('video');
+        video.src = 'https://v.redd.it/example/CMAF_720.mp4';
+        shadowRoot.appendChild(video);
+        document.body.appendChild(host);
+
+        expect(collectOpenShadowRootsFromNode(document)).toContain(shadowRoot);
+        expect(collectMediaFromNode(document)).toContain(video);
+        expect(collectMediaFromNode(host)).toContain(video);
     });
 });
 

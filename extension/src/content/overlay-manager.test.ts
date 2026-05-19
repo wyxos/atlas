@@ -215,4 +215,30 @@ describe('OverlayManager', () => {
         manager.remove(image);
         expect(unmountByMedia.get(image)).toHaveBeenCalledTimes(1);
     });
+
+    it('pins the badge to the viewport when media is a shadow-root child', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const host = document.createElement('shreddit-player');
+        const shadowRoot = host.attachShadow({ mode: 'open' });
+        const video = document.createElement('video');
+        shadowRoot.appendChild(video);
+        document.body.appendChild(host);
+
+        Object.defineProperty(video, 'getBoundingClientRect', {
+            configurable: true,
+            value: () => createRect(120, 140, 320, 180),
+        });
+
+        manager.apply(video);
+
+        const badge = document.querySelector('[data-atlas-media-red-badge="1"]');
+        expect(badge).toBeInstanceOf(HTMLDivElement);
+        expect(badge?.parentElement).toBe(document.body);
+        expect((badge as HTMLDivElement).style.position).toBe('fixed');
+        expect((badge as HTMLDivElement).style.display).toBe('block');
+
+        manager.remove(video);
+        expect(unmountByMedia.get(video)).toHaveBeenCalledTimes(1);
+    });
 });
