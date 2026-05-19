@@ -29,12 +29,14 @@ function getBrowseContainerLabel(formData: BrowseFormData): string | null {
         return null;
     }
 
-    if (formData.service === 'civit-ai-images') {
+    if (formData.service === 'civit-ai-images' || formData.service === 'deviantart-images') {
         const username = normalizeContainerValue(formData.serviceFilters?.username);
         if (username) {
             return `User ${username}`;
         }
+    }
 
+    if (formData.service === 'civit-ai-images') {
         const postId = normalizeContainerValue(formData.serviceFilters?.postId);
         if (postId) {
             return `Post ${postId}`;

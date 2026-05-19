@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
 import Tab from '../components/Tab.vue';
@@ -29,6 +30,8 @@ const dropTargetTabId = ref<number | null>(null);
 const dropIndicator = ref<DropIndicator | null>(null);
 const tabMasonryLoadingStates = ref<Map<number, boolean>>(new Map());
 const tabDataLoadingStates = ref<Map<number, boolean>>(new Map());
+const route = useRoute() as ReturnType<typeof useRoute> | undefined;
+const router = useRouter() as ReturnType<typeof useRouter> | undefined;
 
 provideBrowseGlobalStartPanel();
 
@@ -46,6 +49,10 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
     if (previousActiveTabId !== null && previousActiveTabId !== tabId) {
         activeTabContentRef.value?.cancelFill?.();
         activeTabContentRef.value?.stopAutoScroll?.();
+
+        if (route?.name === 'browse-file') {
+            await router?.replace('/browse');
+        }
     }
 
     activeTabId.value = tabId;

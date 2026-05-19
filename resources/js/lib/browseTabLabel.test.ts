@@ -34,6 +34,19 @@ describe('browseTabLabel', () => {
         })).toBe('CivitAI Images: User atlasUser - CURSOR_1');
     });
 
+    it('keeps DeviantArt username filters in generated tab labels', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                service: 'deviantart-images',
+                serviceFilters: {
+                    username: 'avavivid',
+                },
+            }),
+            pageToken: 1,
+            availableServices: [{ key: 'deviantart-images', label: 'DeviantArt Images' }],
+        })).toBe('DeviantArt Images: User avavivid - 1');
+    });
+
     it('builds a label for Library state with preset label context', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({
