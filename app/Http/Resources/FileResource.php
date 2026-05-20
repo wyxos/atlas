@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\File;
+use App\Services\SourceMedia\SourceMediaRefreshService;
 use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
@@ -66,6 +67,13 @@ class FileResource extends JsonResource
         $query = isset($parts['query']) && $parts['query'] !== '' ? '?'.$parts['query'] : '';
 
         return $path.$query;
+    }
+
+    private static function capabilities(File $file): array
+    {
+        return [
+            'refresh_source_media' => app(SourceMediaRefreshService::class)->supports($file),
+        ];
     }
 
     /**
@@ -233,6 +241,7 @@ class FileResource extends JsonResource
             'detail_metadata' => $this->detail_metadata,
             'metadata' => $this->metadata ? ['payload' => $this->metadata->payload] : null,
             'containers' => $containers,
+            'capabilities' => self::capabilities($this->resource),
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
         ];

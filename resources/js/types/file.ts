@@ -31,6 +31,10 @@ export interface FileMetadata {
     payload: FileMetadataRecord | null;
 }
 
+export interface FileCapabilities {
+    refresh_source_media: boolean;
+}
+
 export interface File {
     id: number;
     source: string;
@@ -77,6 +81,7 @@ export interface File {
     listing_metadata: FileMetadataRecord | null;
     detail_metadata: FileMetadataRecord | null;
     containers?: FileContainer[];
+    capabilities: FileCapabilities;
     created_at: string;
     updated_at: string;
 }

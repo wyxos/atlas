@@ -80,6 +80,34 @@ export function useFileViewerData(params: {
         }
     }
 
+    function setFileData(file: File): void {
+        fileData.value = file;
+        lastFetchedFileId.value = file.id;
+
+        const item = params.items.value.find((candidate) => candidate.id === file.id);
+        if (!item) {
+            return;
+        }
+
+        const refreshedUrl = file.file_url ?? file.url ?? item.url ?? item.src;
+        const refreshedPreview = file.preview_url ?? file.file_url ?? file.url ?? item.preview ?? item.src;
+
+        item.url = file.url;
+        item.original = refreshedUrl;
+        item.originalUrl = refreshedUrl;
+        item.src = refreshedPreview;
+        item.preview = refreshedPreview;
+        item.thumbnail = refreshedPreview;
+        item.previewed_count = file.previewed_count;
+        item.seen_count = file.seen_count;
+        item.auto_blacklisted = file.auto_blacklisted;
+        item.auto_blacklist_rule = file.auto_blacklist_rule ?? null;
+        item.blacklisted_at = file.blacklisted_at;
+        item.blacklist_rule = file.blacklist_rule ?? null;
+        item.downloaded = file.downloaded;
+        item.notFound = file.not_found;
+    }
+
     // Keep the sheet data in sync with navigation. The overlay sets fillComplete=false during transitions,
     // so we must also react to fillComplete toggling back to true for the newly-selected item.
     watch(
@@ -118,6 +146,7 @@ export function useFileViewerData(params: {
         fileData,
         isLoadingFileData,
         fetchFileData,
+        setFileData,
         handleItemSeen,
     };
 }

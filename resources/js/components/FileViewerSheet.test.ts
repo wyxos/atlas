@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
 import FileViewerSheet from './FileViewerSheet.vue';
 import type { File } from '@/types/file';
@@ -8,6 +8,21 @@ import { copyToClipboard } from '@/utils/clipboard';
 vi.mock('@/utils/clipboard', () => ({
     copyToClipboard: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
+    refreshSourceMedia: {
+        url: (id: number) => `/api/files/${id}/refresh-source-media`,
+    },
+}));
+
+const mockAxios = {
+    post: vi.fn(),
+};
+
+Object.defineProperty(window, 'axios', {
+    value: mockAxios,
+    writable: true,
+});
 
 function makeFile(overrides: Partial<File> = {}): File {
     return {
@@ -30,6 +45,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         absolute_path: 'D:\\storage\\app\\downloads\\aa\\bb\\test.jpg',
         absolute_preview_path: 'D:\\storage\\app\\thumbnails\\aa\\bb\\test.preview.jpg',
         preview_url: null,
+        cover_url: null,
         disk_url: null,
         preview_file_url: null,
         poster_url: null,
@@ -53,6 +69,9 @@ function makeFile(overrides: Partial<File> = {}): File {
         detail_metadata: null,
         metadata: null,
         containers: [],
+        capabilities: {
+            refresh_source_media: false,
+        },
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
         ...overrides,
@@ -86,6 +105,10 @@ function makePreview(overrides: Partial<VibeFullscreenPreviewItem> = {}): VibeFu
 }
 
 describe('FileViewerSheet', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('copies absolute paths when clicking relative paths', async () => {
         Object.defineProperty(navigator, 'platform', { value: 'Win32', configurable: true });
 
@@ -243,6 +266,62 @@ describe('FileViewerSheet', () => {
         expect(text).toContain('Stored Metadata Payload');
         expect(text).toContain('Is Mature');
     });
+
+    it('refreshes source media and emits the updated file', async () => {
+        const fileData = makeFile({
+            source: 'deviantart.com',
+            capabilities: {
+                refresh_source_media: true,
+            },
+        });
+        const refreshedFile = makeFile({
+            id: fileData.id,
+            source: 'deviantart.com',
+            url: 'https://images.example.test/fresh-original.png',
+            preview_url: 'https://images.example.test/fresh-preview.jpg',
+            capabilities: {
+                refresh_source_media: true,
+            },
+        });
+
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                message: 'Source media refreshed.',
+                changed: true,
+                file: refreshedFile,
+            },
+        });
+
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: fileData.id,
+                isLoading: false,
+                fileData,
+            },
+        });
+
+        await wrapper.get('[data-test="refresh-source-media"]').trigger('click');
+        await flushPromises();
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/refresh-source-media');
+        expect(wrapper.emitted('source-media-refreshed')).toEqual([[refreshedFile]]);
+        expect(wrapper.get('[data-test="source-media-refresh-message"]').text()).toBe('Source media refreshed.');
+    });
+
+    it('does not render the source media refresh action without capability', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile(),
+            },
+        });
+
+        expect(wrapper.find('[data-test="refresh-source-media"]').exists()).toBe(false);
+    });
+
 
     it('renders fullscreen next previews fixed at the bottom of the embedded sheet', async () => {
         const wrapper = mount(FileViewerSheet, {

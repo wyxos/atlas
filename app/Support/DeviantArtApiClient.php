@@ -32,6 +32,11 @@ class DeviantArtApiClient
         return $this->requestJson($this->downloadUrl($deviationId), [], $token);
     }
 
+    public function deviationPayload(string $deviationId, string $token): array
+    {
+        return $this->requestJson($this->deviationUrl($deviationId), [], $token);
+    }
+
     private function request(string $url, array $query, string $token): Response
     {
         if (! HttpRateLimiter::throttleDomain('deviantart.com', 80, 60, maxWaitSeconds: 1)) {
@@ -63,6 +68,11 @@ class DeviantArtApiClient
     private function downloadUrl(string $deviationId): string
     {
         return $this->apiBaseUrl().'/deviation/download/'.rawurlencode($deviationId);
+    }
+
+    private function deviationUrl(string $deviationId): string
+    {
+        return $this->apiBaseUrl().'/deviation/'.rawurlencode($deviationId);
     }
 
     private function headers(): array

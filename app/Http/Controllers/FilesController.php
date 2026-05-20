@@ -11,6 +11,7 @@ use App\Services\FilePreviewService;
 use App\Services\FileStorageResponseService;
 use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\MetricsService;
+use App\Services\SourceMedia\SourceMediaRefreshService;
 use App\Support\AtlasStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +19,10 @@ use Illuminate\Support\Facades\Storage;
 
 class FilesController extends Controller
 {
-    public function __construct(private readonly FileStorageResponseService $fileStorageResponses) {}
+    public function __construct(
+        private readonly FileStorageResponseService $fileStorageResponses,
+        private readonly SourceMediaRefreshService $sourceMediaRefreshes,
+    ) {}
 
     /**
      * Display a listing of the files.
@@ -40,6 +44,32 @@ class FilesController extends Controller
 
         return response()->json([
             'file' => new \App\Http\Resources\FileResource($file),
+        ]);
+    }
+
+    public function refreshSourceMedia(File $file): JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user instanceof \App\Models\User, 403);
+
+        $result = $this->sourceMediaRefreshes->refresh($file, $user);
+        if (! $result->supported) {
+            return response()->json([
+                'message' => $result->message,
+                'supported' => false,
+                'changed' => false,
+            ], 422);
+        }
+
+        $refreshedFile = $result->file ?? $file;
+        $this->fileStorageResponses->loadViewerRelations($refreshedFile);
+        $this->fileStorageResponses->hydrateDiskMetadata($refreshedFile);
+
+        return response()->json([
+            'message' => $result->message,
+            'supported' => true,
+            'changed' => $result->changed,
+            'file' => new \App\Http\Resources\FileResource($refreshedFile),
         ]);
     }
 

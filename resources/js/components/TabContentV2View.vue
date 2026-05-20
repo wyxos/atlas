@@ -13,6 +13,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import type { FeedItem, TabData } from '@/composables/useTabs';
 import type { ServiceOption } from '@/lib/browseCatalog';
 import type { BrowseFeedHandle } from '@/types/browse';
+import type { File } from '@/types/file';
 import type { ReactionType } from '@/types/reaction';
 import type { LocalSourceSelection } from '@/utils/localSourceSelection';
 import { shouldCloseContainerSheetForEscape, shouldExitFullscreenForMediaBarEscape } from '@/lib/vibeMediaBarEscape';
@@ -36,8 +37,9 @@ type FileSheetState = {
 };
 
 type FileViewerDataShape = {
-    fileData: { value: unknown };
+    fileData: { value: File | null };
     isLoadingFileData: { value: boolean };
+    setFileData: (file: File) => void;
 };
 
 type DownloadedReactionPromptShape = {
@@ -405,6 +407,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                             :total-items="total"
                             @close="closeFileSheet"
                             @select-preview="props.updateActiveIndex"
+                            @source-media-refreshed="fileViewerData.setFileData"
                         />
                     </template>
                 </VibeLayout>

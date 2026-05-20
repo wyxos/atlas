@@ -81,5 +81,45 @@ describe('useFileViewerData', () => {
         expect(fileData.value?.id).toBe(2);
         expect(isLoadingFileData.value).toBe(false);
     });
-});
 
+    it('updates active sheet data and matching feed item after source media refresh', () => {
+        const items = ref([{
+            id: 1,
+            src: 'https://images.example.test/old-preview.jpg',
+            preview: 'https://images.example.test/old-preview.jpg',
+            original: 'https://images.example.test/old-original.jpg',
+            url: 'https://images.example.test/old-original.jpg',
+        }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: false });
+
+        const { fileData, setFileData } = useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+        });
+
+        setFileData({
+            id: 1,
+            url: 'https://images.example.test/fresh-original.png',
+            file_url: 'https://images.example.test/fresh-original.png',
+            preview_url: 'https://images.example.test/fresh-preview.jpg',
+            previewed_count: 3,
+            seen_count: 4,
+            auto_blacklisted: false,
+            blacklisted_at: null,
+            downloaded: false,
+            not_found: false,
+        } as any);
+
+        expect(fileData.value?.id).toBe(1);
+        expect(items.value[0].src).toBe('https://images.example.test/fresh-preview.jpg');
+        expect(items.value[0].preview).toBe('https://images.example.test/fresh-preview.jpg');
+        expect(items.value[0].original).toBe('https://images.example.test/fresh-original.png');
+        expect(items.value[0].originalUrl).toBe('https://images.example.test/fresh-original.png');
+        expect(items.value[0].previewed_count).toBe(3);
+        expect(items.value[0].seen_count).toBe(4);
+    });
+});

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { Copy, Loader2, PanelRightClose, RefreshCw } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
-import type { FileMetadataRecord } from '@/types/file';
+import { refreshSourceMedia } from '@/actions/App/Http/Controllers/FilesController';
+import type { File, FileMetadataRecord } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
 import FullscreenSheetPreviewStrip from './FullscreenSheetPreviewStrip.vue';
 import FileViewerMetadataTree from './FileViewerMetadataTree.vue';
@@ -11,7 +12,7 @@ interface Props {
     embedded?: boolean;
     isOpen: boolean;
     fileId: number | null;
-    fileData: import('@/types/file').File | null;
+    fileData: File | null;
     isLoading: boolean;
     nextPreviews?: VibeFullscreenPreviewItem[];
     totalItems?: number;
@@ -22,7 +23,23 @@ const props = withDefaults(defineProps<Props>(), {
     totalItems: 0,
 });
 
+const emit = defineEmits<{
+    close: [];
+    'select-preview': [index: number];
+    'source-media-refreshed': [file: File];
+}>();
+
+type RefreshSourceMediaResponse = {
+    message: string;
+    changed: boolean;
+    file: File;
+};
+
+const isRefreshingSourceMedia = ref(false);
+const sourceMediaRefreshMessage = ref<string | null>(null);
+const sourceMediaRefreshError = ref<string | null>(null);
 const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
+const canRefreshSourceMedia = computed(() => Boolean(props.fileData?.capabilities?.refresh_source_media));
 const metadataSections = computed(() => {
     if (!props.fileData) {
         return [];
@@ -85,10 +102,29 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
     }
 }
 
-const emit = defineEmits<{
-    close: [];
-    'select-preview': [index: number];
-}>();
+async function handleRefreshSourceMedia(): Promise<void> {
+    if (!props.fileData || !canRefreshSourceMedia.value || isRefreshingSourceMedia.value) {
+        return;
+    }
+
+    isRefreshingSourceMedia.value = true;
+    sourceMediaRefreshMessage.value = null;
+    sourceMediaRefreshError.value = null;
+
+    try {
+        const { data } = await window.axios.post<RefreshSourceMediaResponse>(
+            refreshSourceMedia.url(props.fileData.id),
+        );
+
+        emit('source-media-refreshed', data.file);
+        sourceMediaRefreshMessage.value = data.message;
+    } catch (error) {
+        const response = error as { response?: { data?: { message?: string } } };
+        sourceMediaRefreshError.value = response.response?.data?.message ?? 'Unable to refresh source media.';
+    } finally {
+        isRefreshingSourceMedia.value = false;
+    }
+}
 </script>
 
 <template>
@@ -122,7 +158,27 @@ const emit = defineEmits<{
                 <div v-else-if="fileData" class="space-y-4 text-sm text-twilight-indigo-200">
                     <div>
                         <div class="font-semibold text-white mb-1">Source</div>
-                        <div>{{ fileData.source || 'N/A' }}</div>
+                        <div class="flex min-w-0 items-center gap-2">
+                            <div class="min-w-0 flex-1 wrap-break-word">{{ fileData.source || 'N/A' }}</div>
+                            <button
+                                v-if="canRefreshSourceMedia"
+                                type="button"
+                                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-twilight-indigo-500/50 text-white/80 transition hover:border-smart-blue-400/70 hover:bg-prussian-blue-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                title="Refresh source media"
+                                aria-label="Refresh source media"
+                                data-test="refresh-source-media"
+                                :disabled="isRefreshingSourceMedia"
+                                @click="handleRefreshSourceMedia"
+                            >
+                                <RefreshCw :size="14" :class="{ 'animate-spin': isRefreshingSourceMedia }" />
+                            </button>
+                        </div>
+                        <div v-if="sourceMediaRefreshMessage" class="mt-2 text-xs text-green-300" data-test="source-media-refresh-message">
+                            {{ sourceMediaRefreshMessage }}
+                        </div>
+                        <div v-if="sourceMediaRefreshError" class="mt-2 text-xs text-red-300" data-test="source-media-refresh-error">
+                            {{ sourceMediaRefreshError }}
+                        </div>
                     </div>
                     <div v-if="fileData.filename">
                         <div class="font-semibold text-white mb-1">Filename</div>
