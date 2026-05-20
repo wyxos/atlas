@@ -51,6 +51,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         not_found: false,
         listing_metadata: null,
         detail_metadata: null,
+        metadata: null,
         containers: [],
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
@@ -178,6 +179,69 @@ describe('FileViewerSheet', () => {
         expect(root.classes()).toContain('w-full');
         expect(root.classes()).not.toContain('w-80');
         expect(root.classes()).not.toContain('max-w-80');
+        expect(root.classes()).not.toContain('w-[30rem]');
+        expect(root.classes()).not.toContain('max-w-[30rem]');
+    });
+
+    it('renders the standalone sheet at the wider overlay width', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile(),
+            },
+        });
+
+        const root = wrapper.get('div');
+
+        expect(root.classes()).toContain('w-[30rem]');
+        expect(root.classes()).toContain('max-w-[30rem]');
+    });
+
+    it('renders saved provider metadata as structured sections', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile({
+                    listing_metadata: {
+                        premium_folder_data: {
+                            type: 'watchers',
+                            has_access: false,
+                        },
+                        _atlas_media: {
+                            mode: 'content',
+                        },
+                    },
+                    detail_metadata: {
+                        download_mode: 'content',
+                    },
+                    metadata: {
+                        payload: {
+                            is_mature: false,
+                            stats: {
+                                comments: 0,
+                            },
+                        },
+                    },
+                }),
+            },
+        });
+
+        const text = wrapper.get('[data-test="file-provider-metadata"]').text();
+
+        expect(text).toContain('Provider Metadata');
+        expect(text).toContain('Listing Metadata');
+        expect(text).toContain('Premium Folder Data');
+        expect(text).toContain('Has Access');
+        expect(text).toContain('No');
+        expect(text).toContain('Atlas Media');
+        expect(text).toContain('Detail Metadata');
+        expect(text).toContain('Download Mode');
+        expect(text).toContain('Stored Metadata Payload');
+        expect(text).toContain('Is Mature');
     });
 
     it('renders fullscreen next previews fixed at the bottom of the embedded sheet', async () => {

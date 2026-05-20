@@ -2,8 +2,10 @@
 import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
 import { computed } from 'vue';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
+import type { FileMetadataRecord } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
 import FullscreenSheetPreviewStrip from './FullscreenSheetPreviewStrip.vue';
+import FileViewerMetadataTree from './FileViewerMetadataTree.vue';
 
 interface Props {
     embedded?: boolean;
@@ -21,6 +23,34 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
+const metadataSections = computed(() => {
+    if (!props.fileData) {
+        return [];
+    }
+
+    return [
+        {
+            id: 'listing',
+            title: 'Listing Metadata',
+            data: props.fileData.listing_metadata,
+        },
+        {
+            id: 'detail',
+            title: 'Detail Metadata',
+            data: props.fileData.detail_metadata,
+        },
+        {
+            id: 'payload',
+            title: 'Stored Metadata Payload',
+            data: props.fileData.metadata?.payload ?? null,
+        },
+    ].filter((section): section is { id: string; title: string; data: FileMetadataRecord } => hasMetadata(section.data));
+});
+const hasMetadataSections = computed(() => metadataSections.value.length > 0);
+
+function hasMetadata(value: FileMetadataRecord | null | undefined): value is FileMetadataRecord {
+    return Boolean(value) && Object.keys(value).length > 0;
+}
 
 function normalizePathForOs(path: string): string {
     const platform = typeof navigator !== 'undefined' ? navigator.platform : '';
@@ -64,9 +94,9 @@ const emit = defineEmits<{
 <template>
     <div
         class="relative flex h-full min-h-0 flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden pointer-events-auto"
-        :class="embedded ? 'w-full max-w-none' : (isOpen ? 'w-80 max-w-80' : 'w-0 max-w-0')"
+        :class="embedded ? 'w-full max-w-none' : (isOpen ? 'w-[30rem] max-w-[30rem]' : 'w-0 max-w-0')"
     >
-        <div class="flex h-full min-h-0 flex-col" :class="embedded ? 'w-full min-w-0 max-w-none' : 'w-80 min-w-80 max-w-80'">
+        <div class="flex h-full min-h-0 flex-col" :class="embedded ? 'w-full min-w-0 max-w-none' : 'w-[30rem] min-w-[30rem] max-w-[30rem]'">
             <div
                 class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap"
                 :class="isOpen ? '' : 'opacity-0 pointer-events-none'"
@@ -336,6 +366,24 @@ const emit = defineEmits<{
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    <div v-if="hasMetadataSections" class="space-y-3" data-test="file-provider-metadata">
+                        <div>
+                            <div class="font-semibold text-white mb-1">Provider Metadata</div>
+                            <div class="text-xs text-twilight-indigo-300">
+                                Saved provider fields from this file record.
+                            </div>
+                        </div>
+                        <div
+                            v-for="section in metadataSections"
+                            :key="section.id"
+                            class="rounded-lg border border-twilight-indigo-500/45 bg-prussian-blue-900/45 p-3"
+                        >
+                            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-white">
+                                {{ section.title }}
+                            </div>
+                            <FileViewerMetadataTree :value="section.data" />
                         </div>
                     </div>
                     <div v-if="fileData.created_at">

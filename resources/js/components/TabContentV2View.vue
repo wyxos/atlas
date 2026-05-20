@@ -282,6 +282,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                     :key="viewerKey"
                     :ref="handleVibeRef"
                     class="h-full min-h-0 w-full"
+                    :class="{ 'atlas-file-viewer-wide-aside': fileSheetState.isOpen }"
                     v-bind="vibeLayoutBindings"
                     @update:active-index="props.updateActiveIndex"
                     @update:surface-mode="props.updateSurfaceMode"
@@ -468,3 +469,15 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
         />
     </div>
 </template>
+
+<style scoped>
+.atlas-file-viewer-wide-aside:deep(.grid:has(> [data-testid="vibe-stage"])) {
+    grid-template-columns: minmax(0, 1fr) 33rem !important;
+}
+
+@media (max-width: 1279px) {
+    .atlas-file-viewer-wide-aside:deep(.grid:has(> [data-testid="vibe-stage"])) {
+        grid-template-columns: minmax(0, 1fr) 0rem !important;
+    }
+}
+</style>

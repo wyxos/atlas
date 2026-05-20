@@ -17,6 +17,20 @@ export interface FileContainer {
     file_stats: ContainerBlacklistFileStats;
 }
 
+export type FileMetadataValue =
+    | string
+    | number
+    | boolean
+    | null
+    | FileMetadataValue[]
+    | { [key: string]: FileMetadataValue };
+
+export type FileMetadataRecord = Record<string, FileMetadataValue>;
+
+export interface FileMetadata {
+    payload: FileMetadataRecord | null;
+}
+
 export interface File {
     id: number;
     source: string;
@@ -59,8 +73,9 @@ export interface File {
     imported_at: string | null;
     download_progress: number;
     not_found: boolean;
-    listing_metadata: Record<string, unknown> | null;
-    detail_metadata: Record<string, unknown> | null;
+    metadata?: FileMetadata | null;
+    listing_metadata: FileMetadataRecord | null;
+    detail_metadata: FileMetadataRecord | null;
     containers?: FileContainer[];
     created_at: string;
     updated_at: string;
