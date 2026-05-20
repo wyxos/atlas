@@ -256,7 +256,7 @@ const fileViewerData = useFileViewerData({
     overlay: fullscreenOverlayState,
     sheet: fileSheetState,
 });
-const syncedFileViewerData = createSyncedFileViewerData({ activeIndex, fallbackItems: sessionItems, fileViewerData, getCurrentItems: getCurrentVibeFeedItems, hydratedInitialState, masonryRenderKey, startPageToken: browseState.startPageToken, vibeStatus });
+const syncedFileViewerData = createSyncedFileViewerData({ fileViewerData, getCurrentVibeItems: () => vibeRef.value?.getItems() ?? [] });
 const currentVisibleItem = computed(() => {
     if (sessionItems.value.length === 0) {
         return null;
