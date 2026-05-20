@@ -14,6 +14,9 @@ vi.mock('@/components/toasts/StatusToast.vue', () => ({
 }));
 
 vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
+    refreshSourceMedia: {
+        url: (id: number) => `/api/files/${id}/refresh-source-media`,
+    },
     watchSourceAndRefreshMedia: {
         url: (id: number) => `/api/files/${id}/source-watch-refresh`,
     },
@@ -131,6 +134,51 @@ describe('useSourceWatchRefresh', () => {
         await actions.watchAndRefresh(makeItem(), 'exampleartist');
 
         expect(mockAxios.post).toHaveBeenCalledWith('/api/files/42/source-watch-refresh');
+        expect(setFileData).toHaveBeenCalledWith(refreshedFile);
+        expect(toastSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                props: expect.objectContaining({
+                    title: 'Source media refreshed',
+                    variant: 'success',
+                }),
+            }),
+            expect.objectContaining({ id: 'source-watch-refresh-42' }),
+        );
+    });
+
+    it('posts source media refresh and applies returned file data', async () => {
+        const setFileData = vi.fn();
+        const refreshedFile = makeFile({
+            url: 'https://images.example.test/after-refresh.png',
+            preview_url: 'https://images.example.test/after-refresh-preview.jpg',
+            source_access: {
+                provider: 'deviantart',
+                access_type: 'watchers',
+                has_access: false,
+                requires_watch: true,
+                can_unwatch: false,
+            },
+        });
+        const actions = useSourceWatchRefresh({ setFileData });
+
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                changed: true,
+                message: 'Source media refreshed.',
+                file: refreshedFile,
+            },
+        });
+
+        await actions.refreshSourceMedia(makeItem({
+            source_access: null,
+            capabilities: {
+                refresh_source_media: true,
+                watch_source_and_refresh: true,
+                unwatch_source_account: true,
+            },
+        }));
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/42/refresh-source-media');
         expect(setFileData).toHaveBeenCalledWith(refreshedFile);
         expect(toastSpy).toHaveBeenCalledWith(
             expect.objectContaining({

@@ -82,9 +82,11 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
             },
         } as any,
         sourceWatchRefresh: {
+            canRefreshSourceMedia: vi.fn().mockReturnValue(false),
             canWatchAndRefresh: vi.fn().mockReturnValue(false),
             canUnwatchSourceAccount: vi.fn().mockReturnValue(false),
             isWatchingAndRefreshing: vi.fn().mockReturnValue(false),
+            refreshSourceMedia: vi.fn(),
             watchAndRefresh: vi.fn(),
             unwatchSourceAccount: vi.fn(),
         },
@@ -196,6 +198,34 @@ it('renders hover actions without preview-side dependencies', () => {
         await wrapper.get('[data-test="source-watch-refresh-trigger"]').trigger('click');
 
         expect(props.sourceWatchRefresh.watchAndRefresh).toHaveBeenCalledWith(props.item, 'exampleartist');
+    });
+
+    it('shows source media refresh action before watch access metadata is known', async () => {
+        const props = createProps({ hovered: true });
+        props.itemInteractions.preload.isItemPreloaded.mockReturnValue(false);
+        props.item.source = 'deviantart.com';
+        props.item.source_access = null;
+        props.item.capabilities = {
+            refresh_source_media: true,
+            watch_source_and_refresh: true,
+            unwatch_source_account: true,
+        };
+        props.sourceWatchRefresh.canRefreshSourceMedia.mockReturnValue(true);
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        await wrapper.get('[data-test="source-media-refresh-trigger"]').trigger('click');
+
+        expect(props.sourceWatchRefresh.refreshSourceMedia).toHaveBeenCalledWith(props.item);
     });
 
     it('shows source watch refresh action even when the locked asset did not preload', () => {

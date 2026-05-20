@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Info, Loader2, Trash2, UserMinus, UserPlus } from 'lucide-vue-next';
+import { Info, Loader2, RefreshCw, Trash2, UserMinus, UserPlus } from 'lucide-vue-next';
 import type { VibeViewerItem } from '@wyxos/vibe';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { SourceWatchRefreshActions } from '@/composables/useSourceWatchRefresh';
@@ -41,6 +41,8 @@ const deviantArtUserContainer = computed(() => itemContainers.value.find((contai
 const deviantArtUsername = computed(() => deviantArtUserContainer.value?.source_id?.trim() ?? null);
 const isPreloaded = computed(() => props.itemInteractions.preload.isItemPreloaded(props.item.id));
 const showContainers = computed(() => props.hovered && isPreloaded.value && itemContainers.value.length > 0);
+const showSourceMediaRefreshButton = computed(() => props.hovered
+    && props.sourceWatchRefresh.canRefreshSourceMedia(props.item));
 const showSourceWatchRefreshButton = computed(() => props.hovered
     && props.sourceWatchRefresh.canWatchAndRefresh(props.item, deviantArtUsername.value));
 const showSourceUnwatchButton = computed(() => props.hovered
@@ -94,9 +96,26 @@ const showReactions = computed(() => (
         </div>
 
         <div
-            v-if="showSourceWatchRefreshButton || showSourceUnwatchButton || showPromptButton || showDeleteButton"
+            v-if="showSourceMediaRefreshButton || showSourceWatchRefreshButton || showSourceUnwatchButton || showPromptButton || showDeleteButton"
             class="pointer-events-auto absolute right-2 top-2 flex items-center gap-2"
         >
+            <Button
+                v-if="showSourceMediaRefreshButton"
+                variant="ghost"
+                size="sm"
+                class="h-7 w-7 bg-black/55 p-0 text-white hover:bg-black/75 disabled:cursor-wait disabled:opacity-80"
+                aria-label="Refresh source media"
+                data-test="source-media-refresh-trigger"
+                :disabled="isSourceWatchRefreshPending"
+                @click.stop="sourceWatchRefresh.refreshSourceMedia(item)"
+            >
+                <Loader2
+                    v-if="isSourceWatchRefreshPending"
+                    :size="14"
+                    class="animate-spin"
+                />
+                <RefreshCw v-else :size="14" />
+            </Button>
             <Button
                 v-if="showSourceWatchRefreshButton"
                 variant="ghost"

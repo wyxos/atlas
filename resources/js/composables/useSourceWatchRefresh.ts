@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { unwatchSourceAccount, watchSourceAndRefreshMedia } from '@/actions/App/Http/Controllers/FilesController';
+import { refreshSourceMedia, unwatchSourceAccount, watchSourceAndRefreshMedia } from '@/actions/App/Http/Controllers/FilesController';
 import StatusToast from '@/components/toasts/StatusToast.vue';
 import { useToast } from '@/components/ui/toast/use-toast';
 import type { FeedItem } from '@/composables/useTabs';
@@ -9,6 +9,12 @@ type SourceWatchRefreshResponse = {
     message?: string;
     supported: boolean;
     watched: boolean;
+    changed: boolean;
+    file?: File;
+};
+
+type SourceMediaRefreshResponse = {
+    message?: string;
     changed: boolean;
     file?: File;
 };
@@ -26,9 +32,11 @@ type WatchAccessState = {
 };
 
 export type SourceWatchRefreshActions = {
+    canRefreshSourceMedia: (item: FeedItem) => boolean;
     canWatchAndRefresh: (item: FeedItem, username: string | null) => boolean;
     canUnwatchSourceAccount: (item: FeedItem, username: string | null) => boolean;
     isWatchingAndRefreshing: (item: FeedItem) => boolean;
+    refreshSourceMedia: (item: FeedItem) => Promise<void>;
     watchAndRefresh: (item: FeedItem, username: string) => Promise<void>;
     unwatchSourceAccount: (item: FeedItem, username: string) => Promise<void>;
 };
@@ -123,6 +131,10 @@ export function useSourceWatchRefresh(options: {
         };
     }
 
+    function canRefreshSourceMedia(item: FeedItem): boolean {
+        return item.capabilities?.refresh_source_media === true;
+    }
+
     function canWatchAndRefresh(item: FeedItem, username: string | null): boolean {
         const usernameValue = normalizedUsername(username);
         if (usernameValue === '') {
@@ -156,6 +168,39 @@ export function useSourceWatchRefresh(options: {
 
     function isWatchingAndRefreshing(item: FeedItem): boolean {
         return pendingFileIds.value.has(item.id);
+    }
+
+    async function refreshSourceMediaAction(item: FeedItem): Promise<void> {
+        if (!canRefreshSourceMedia(item) || isWatchingAndRefreshing(item)) {
+            return;
+        }
+
+        setPending(item.id, true);
+
+        try {
+            const { data } = await window.axios.post<SourceMediaRefreshResponse>(
+                refreshSourceMedia.url(item.id),
+            );
+
+            if (data.file) {
+                options.setFileData(data.file);
+            }
+
+            showStatusToast(
+                item,
+                data.changed ? 'Source media refreshed' : 'Source media checked',
+                data.message ?? 'Source media refreshed.',
+                'success',
+            );
+        } catch (error) {
+            const response = (error as { response?: { data?: { message?: string } } }).response;
+            const message = response?.data?.message
+                ?? 'Unable to refresh source media.';
+
+            showStatusToast(item, 'Source action failed', message, 'error');
+        } finally {
+            setPending(item.id, false);
+        }
     }
 
     async function watchAndRefresh(item: FeedItem, username: string): Promise<void> {
@@ -236,9 +281,11 @@ export function useSourceWatchRefresh(options: {
     }
 
     return {
+        canRefreshSourceMedia,
         canWatchAndRefresh,
         canUnwatchSourceAccount,
         isWatchingAndRefreshing,
+        refreshSourceMedia: refreshSourceMediaAction,
         watchAndRefresh,
         unwatchSourceAccount: unwatchSourceAccountAction,
     };
