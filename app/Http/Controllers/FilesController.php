@@ -12,6 +12,7 @@ use App\Services\FileStorageResponseService;
 use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\MetricsService;
 use App\Services\SourceMedia\SourceMediaRefreshService;
+use App\Services\SourceMedia\SourceWatchRefreshService;
 use App\Support\AtlasStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -22,6 +23,7 @@ class FilesController extends Controller
     public function __construct(
         private readonly FileStorageResponseService $fileStorageResponses,
         private readonly SourceMediaRefreshService $sourceMediaRefreshes,
+        private readonly SourceWatchRefreshService $sourceWatchRefreshes,
     ) {}
 
     /**
@@ -71,6 +73,34 @@ class FilesController extends Controller
             'changed' => $result->changed,
             'file' => new \App\Http\Resources\FileResource($refreshedFile),
         ]);
+    }
+
+    public function watchSourceAndRefreshMedia(File $file): JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user instanceof \App\Models\User, 403);
+
+        $result = $this->sourceWatchRefreshes->watchAndRefresh($file, $user);
+        if (! $result->supported) {
+            return response()->json([
+                'message' => $result->message,
+                'supported' => false,
+                'watched' => false,
+                'changed' => false,
+            ], 422);
+        }
+
+        $refreshedFile = $result->file ?? $file;
+        $this->fileStorageResponses->loadViewerRelations($refreshedFile);
+        $this->fileStorageResponses->hydrateDiskMetadata($refreshedFile);
+
+        return response()->json([
+            'message' => $result->message,
+            'supported' => true,
+            'watched' => $result->watched,
+            'changed' => $result->changed,
+            'file' => new \App\Http\Resources\FileResource($refreshedFile),
+        ], $result->watched ? 200 : 422);
     }
 
     /**

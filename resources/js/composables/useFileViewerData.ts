@@ -106,6 +106,13 @@ export function useFileViewerData(params: {
         item.blacklist_rule = file.blacklist_rule ?? null;
         item.downloaded = file.downloaded;
         item.notFound = file.not_found;
+        item.source = file.source;
+        item.source_id = file.source_id;
+        item.referrer_url = file.referrer_url;
+        item.listing_metadata = file.listing_metadata;
+        item.detail_metadata = file.detail_metadata;
+        item.containers = file.containers ?? item.containers;
+        item.capabilities = file.capabilities;
     }
 
     // Keep the sheet data in sync with navigation. The overlay sets fillComplete=false during transitions,

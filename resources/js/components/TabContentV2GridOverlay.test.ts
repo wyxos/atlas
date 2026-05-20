@@ -11,6 +11,14 @@ const testStub = defineComponent({
     },
 });
 
+const buttonStub = defineComponent({
+    name: 'ButtonStub',
+    inheritAttrs: false,
+    setup(_, { attrs, slots }) {
+        return () => h('button', attrs, slots.default?.());
+    },
+});
+
 function createFeedItem(): FeedItem {
     return {
         id: 42,
@@ -73,6 +81,11 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
                 open: vi.fn(),
             },
         } as any,
+        sourceWatchRefresh: {
+            canWatchAndRefresh: vi.fn().mockReturnValue(false),
+            isWatchingAndRefreshing: vi.fn().mockReturnValue(false),
+            watchAndRefresh: vi.fn(),
+        },
         onReaction: vi.fn(),
     };
 }
@@ -152,5 +165,34 @@ it('renders hover actions without preview-side dependencies', () => {
         await wrapper.get('[data-testid="blacklist-trigger"]').trigger('click');
 
         expect(props.itemInteractions.reactions.onFileBlacklist).toHaveBeenCalledWith(props.item);
+    });
+
+    it('shows source watch refresh action for DeviantArt items with a user container', async () => {
+        const props = createProps({ hovered: true });
+        props.item.source = 'deviantart.com';
+        props.containers.badges.getContainersForItem.mockReturnValue([
+            {
+                id: 9,
+                type: 'User',
+                source: 'deviantart.com',
+                source_id: 'exampleartist',
+            },
+        ]);
+        props.sourceWatchRefresh.canWatchAndRefresh.mockImplementation((_item: FeedItem, username: string | null) => username === 'exampleartist');
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        await wrapper.get('[data-test="source-watch-refresh-trigger"]').trigger('click');
+
+        expect(props.sourceWatchRefresh.watchAndRefresh).toHaveBeenCalledWith(props.item, 'exampleartist');
     });
 });

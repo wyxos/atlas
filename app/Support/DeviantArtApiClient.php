@@ -37,6 +37,26 @@ class DeviantArtApiClient
         return $this->requestJson($this->deviationUrl($deviationId), [], $token);
     }
 
+    public function watchUser(string $username, string $token): bool
+    {
+        $response = $this->postForm($this->watchUrl($username), [
+            'watch[friend]' => '1',
+            'watch[deviations]' => '1',
+            'watch[journals]' => '0',
+            'watch[forum_threads]' => '0',
+            'watch[critiques]' => '0',
+            'watch[scraps]' => '0',
+            'watch[activity]' => '1',
+            'watch[collections]' => '0',
+        ], $token);
+
+        $payload = $response->json();
+
+        return $response->successful()
+            && is_array($payload)
+            && ($payload['success'] ?? false) === true;
+    }
+
     private function request(string $url, array $query, string $token): Response
     {
         if (! HttpRateLimiter::throttleDomain('deviantart.com', 80, 60, maxWaitSeconds: 1)) {
@@ -65,6 +85,33 @@ class DeviantArtApiClient
         return $response;
     }
 
+    private function postForm(string $url, array $form, string $token): Response
+    {
+        if (! HttpRateLimiter::throttleDomain('deviantart.com', 80, 60, maxWaitSeconds: 1)) {
+            throw new RuntimeException('DeviantArt API rate limit is active. Try again shortly.');
+        }
+
+        $response = Http::asForm()
+            ->withToken($token)
+            ->withHeaders($this->headers())
+            ->acceptJson()
+            ->connectTimeout(4)
+            ->timeout(8)
+            ->post($url, $form);
+
+        if ($response->failed()) {
+            Log::warning('DeviantArt API request failed', [
+                'status' => $response->status(),
+                'retry_after' => $response->header('Retry-After'),
+                'url' => $url,
+                'error' => $response->json('error'),
+                'error_description' => $response->json('error_description'),
+            ]);
+        }
+
+        return $response;
+    }
+
     private function downloadUrl(string $deviationId): string
     {
         return $this->apiBaseUrl().'/deviation/download/'.rawurlencode($deviationId);
@@ -73,6 +120,11 @@ class DeviantArtApiClient
     private function deviationUrl(string $deviationId): string
     {
         return $this->apiBaseUrl().'/deviation/'.rawurlencode($deviationId);
+    }
+
+    private function watchUrl(string $username): string
+    {
+        return $this->apiBaseUrl().'/user/friends/watch/'.rawurlencode($username);
     }
 
     private function headers(): array

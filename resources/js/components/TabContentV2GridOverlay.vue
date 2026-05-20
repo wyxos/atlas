@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Info, Trash2 } from 'lucide-vue-next';
+import { Info, Loader2, Trash2, UserPlus } from 'lucide-vue-next';
 import type { VibeViewerItem } from '@wyxos/vibe';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
+import type { SourceWatchRefreshActions } from '@/composables/useSourceWatchRefresh';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
 import type { TabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
@@ -24,14 +25,26 @@ interface Props {
     itemInteractions: TabContentItemInteractions;
     promptDialog: TabContentPromptDialog;
     localFileDeletion: LocalFileDeletion;
+    sourceWatchRefresh: SourceWatchRefreshActions;
     onReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
 }
 
 const props = defineProps<Props>();
 
 const itemContainers = computed(() => props.containers.badges.getContainersForItem(props.item));
+const deviantArtUserContainer = computed(() => itemContainers.value.find((container) => (
+    String(container.source ?? '').toLowerCase() === 'deviantart.com'
+    && String(container.type ?? '').toLowerCase() === 'user'
+    && typeof container.source_id === 'string'
+    && container.source_id.trim() !== ''
+)) ?? null);
+const deviantArtUsername = computed(() => deviantArtUserContainer.value?.source_id?.trim() ?? null);
 const isPreloaded = computed(() => props.itemInteractions.preload.isItemPreloaded(props.item.id));
 const showContainers = computed(() => props.hovered && isPreloaded.value && itemContainers.value.length > 0);
+const showSourceWatchRefreshButton = computed(() => props.hovered
+    && isPreloaded.value
+    && props.sourceWatchRefresh.canWatchAndRefresh(props.item, deviantArtUsername.value));
+const isSourceWatchRefreshPending = computed(() => props.sourceWatchRefresh.isWatchingAndRefreshing(props.item));
 const showPromptButton = computed(() => props.hovered && isPreloaded.value);
 const showDeleteButton = computed(() => props.hovered
     && isPreloaded.value
@@ -80,9 +93,30 @@ const showReactions = computed(() => (
         </div>
 
         <div
-            v-if="showPromptButton || showDeleteButton"
+            v-if="showSourceWatchRefreshButton || showPromptButton || showDeleteButton"
             class="pointer-events-auto absolute right-2 top-2 flex items-center gap-2"
         >
+            <Button
+                v-if="showSourceWatchRefreshButton"
+                variant="ghost"
+                size="sm"
+                class="h-7 w-7 bg-smart-blue-700/80 p-0 text-white hover:bg-smart-blue-600 disabled:cursor-wait disabled:opacity-80"
+                aria-label="Watch source account and refresh media"
+                data-test="source-watch-refresh-trigger"
+                :disabled="isSourceWatchRefreshPending"
+                @click.stop="() => {
+                    if (deviantArtUsername) {
+                        sourceWatchRefresh.watchAndRefresh(item, deviantArtUsername);
+                    }
+                }"
+            >
+                <Loader2
+                    v-if="isSourceWatchRefreshPending"
+                    :size="14"
+                    class="animate-spin"
+                />
+                <UserPlus v-else :size="14" />
+            </Button>
             <Button
                 v-if="showPromptButton"
                 variant="ghost"

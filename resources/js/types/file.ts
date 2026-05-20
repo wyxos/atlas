@@ -33,6 +33,7 @@ export interface FileMetadata {
 
 export interface FileCapabilities {
     refresh_source_media: boolean;
+    watch_source_and_refresh: boolean;
 }
 
 export interface File {

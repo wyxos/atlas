@@ -48,7 +48,7 @@ return [
         'client_id' => env('DEVIANTART_CLIENT_ID'),
         'client_secret' => env('DEVIANTART_CLIENT_SECRET'),
         'redirect_uri' => env('DEVIANTART_REDIRECT_URI', rtrim((string) env('APP_URL', ''), '/').'/auth/deviantart/callback'),
-        'scopes' => env('DEVIANTART_SCOPES', 'basic browse user'),
+        'scopes' => env('DEVIANTART_SCOPES', 'basic browse user user.manage'),
         'default_query' => env('DEVIANTART_DEFAULT_QUERY', ''),
         'user_agent' => env('DEVIANTART_USER_AGENT', 'Atlas/1.0 (+https://www.deviantart.com)'),
         'authorize_url' => env('DEVIANTART_AUTHORIZE_URL', 'https://www.deviantart.com/oauth2/authorize'),

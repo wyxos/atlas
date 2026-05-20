@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\File;
 use App\Services\SourceMedia\SourceMediaRefreshService;
+use App\Services\SourceMedia\SourceWatchRefreshService;
 use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
@@ -73,6 +74,7 @@ class FileResource extends JsonResource
     {
         return [
             'refresh_source_media' => app(SourceMediaRefreshService::class)->supports($file),
+            'watch_source_and_refresh' => app(SourceWatchRefreshService::class)->supports($file),
         ];
     }
 

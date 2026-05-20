@@ -118,6 +118,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/audio/album-covers/{albumCover}', [\App\Http\Controllers\AlbumCoverController::class, 'show'])->name('api.audio.album-covers.show');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::post('/api/files/{file}/refresh-source-media', [\App\Http\Controllers\FilesController::class, 'refreshSourceMedia'])->name('api.files.refresh-source-media');
+    Route::post('/api/files/{file}/source-watch-refresh', [\App\Http\Controllers\FilesController::class, 'watchSourceAndRefreshMedia'])->name('api.files.source-watch-refresh');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::get('/api/files/{file}/downloaded', [\App\Http\Controllers\FilesController::class, 'serveDownloaded'])->name('api.files.downloaded');
     Route::get('/api/files/{file}/preview', [\App\Http\Controllers\FilesController::class, 'servePreview'])->name('api.files.preview');

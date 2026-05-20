@@ -71,6 +71,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         containers: [],
         capabilities: {
             refresh_source_media: false,
+            watch_source_and_refresh: false,
         },
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
@@ -272,6 +273,7 @@ describe('FileViewerSheet', () => {
             source: 'deviantart.com',
             capabilities: {
                 refresh_source_media: true,
+                watch_source_and_refresh: false,
             },
         });
         const refreshedFile = makeFile({
@@ -281,6 +283,7 @@ describe('FileViewerSheet', () => {
             preview_url: 'https://images.example.test/fresh-preview.jpg',
             capabilities: {
                 refresh_source_media: true,
+                watch_source_and_refresh: false,
             },
         });
 

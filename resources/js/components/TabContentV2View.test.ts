@@ -178,6 +178,7 @@ function createProps() {
         fileViewerData: {
             fileData: ref(null),
             isLoadingFileData: ref(false),
+            setFileData: vi.fn(),
         },
         form: {
             data: {

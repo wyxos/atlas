@@ -77,7 +77,10 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         source: file.source,
         source_id: file.source_id,
         referrer_url: file.referrer_url,
+        listing_metadata: file.listing_metadata,
+        detail_metadata: file.detail_metadata,
         containers: file.containers ?? [],
+        capabilities: file.capabilities,
         notFound: file.not_found,
     };
 }

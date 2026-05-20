@@ -10,6 +10,7 @@ import {
     store as tabsStore,
     update as tabsUpdate,
 } from '@/actions/App/Http/Controllers/TabController';
+import type { FileCapabilities, FileContainer, FileMetadataRecord } from '@/types/file';
 
 const NO_CACHE_REQUEST_CONFIG = {
     headers: {
@@ -43,6 +44,13 @@ export type FeedItem = {
     blacklisted_at?: string | null;
     blacklist_rule?: { id: number; name: string } | null;
     downloaded?: boolean;
+    source?: string | null;
+    source_id?: string | null;
+    referrer_url?: string | null;
+    listing_metadata?: FileMetadataRecord | null;
+    detail_metadata?: FileMetadataRecord | null;
+    containers?: FileContainer[];
+    capabilities?: FileCapabilities;
     [key: string]: unknown;
 };
 

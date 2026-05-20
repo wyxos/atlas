@@ -6,6 +6,7 @@ import { PanelRightOpen } from 'lucide-vue-next';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
+import { useSourceWatchRefresh } from '@/composables/useSourceWatchRefresh';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
 import type { TabContentPromptDialog as TabContentPromptDialogHandle } from '@/composables/useTabContentPromptDialog';
@@ -118,6 +119,9 @@ const props = defineProps<{
 
 const globalStartPanel = useBrowseGlobalStartPanel();
 const showGlobalStartPanel = computed(() => Boolean(globalStartPanel?.isOpen.value) && !props.shouldShowForm);
+const sourceWatchRefresh = useSourceWatchRefresh({
+    setFileData: props.fileViewerData.setFileData,
+});
 
 function closeGlobalStartPanel(): void {
     globalStartPanel?.close();
@@ -306,6 +310,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                             :item-interactions="itemInteractions"
                             :prompt-dialog="promptDialog"
                             :local-file-deletion="localFileDeletion"
+                            :source-watch-refresh="sourceWatchRefresh"
                             :on-reaction="handleReaction"
                         />
                     </template>
