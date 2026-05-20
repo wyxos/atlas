@@ -38,17 +38,16 @@ export function useMasonryReactionHandler(
     const toast = useToast();
     const reactionCallback = createReactionCallback();
 
-    function shouldPromptDownloadedReaction(item: FeedItem, type: ReactionType): boolean {
+    function shouldPromptDownloadedReaction(item: FeedItem): boolean {
         return options.isLocal.value
             && options.promptDownloadedReaction !== undefined
             && item.downloaded === true
             && hasDownloadSource(item)
-            && typeof item.reaction?.type === 'string'
-            && item.reaction.type !== type;
+            && typeof item.reaction?.type === 'string';
     }
 
-    async function resolveForceDownload(item: FeedItem, type: ReactionType): Promise<boolean | null> {
-        if (!shouldPromptDownloadedReaction(item, type)) {
+    async function resolveForceDownload(item: FeedItem): Promise<boolean | null> {
+        if (!shouldPromptDownloadedReaction(item)) {
             return false;
         }
 
@@ -162,7 +161,7 @@ export function useMasonryReactionHandler(
             return;
         }
 
-        const forceDownload = await resolveForceDownload(item, type);
+        const forceDownload = await resolveForceDownload(item);
 
         if (forceDownload === null) {
             return;

@@ -173,6 +173,41 @@ describe('useMasonryReactionHandler', () => {
         );
     });
 
+    it('prompts before queueing the same positive reaction for an already-downloaded local file', async () => {
+        const item = createItem({
+            downloaded: true,
+            reaction: { type: 'love' },
+            url: 'https://example.com/original.jpg',
+        });
+        const items = ref([item]);
+        const promptDownloadedReaction = vi.fn().mockResolvedValue('redownload');
+
+        const { handleMasonryReaction } = useMasonryReactionHandler({
+            items,
+            masonry: ref(null),
+            tab: ref({ id: 5 } as any),
+            isLocal: ref(true),
+            isPositiveOnlyLocalView: () => false,
+            onReaction: vi.fn(),
+            promptDownloadedReaction,
+        });
+
+        await handleMasonryReaction(item, 'love');
+
+        expect(promptDownloadedReaction).toHaveBeenCalledTimes(1);
+        expect(mockQueueReaction).toHaveBeenCalledWith(
+            1,
+            'love',
+            'https://example.com/preview.jpg',
+            expect.any(Function),
+            items,
+            expect.objectContaining({
+                forceDownload: true,
+                updateLocalState: false,
+            }),
+        );
+    });
+
     it('saves positive-to-positive reactions immediately in positive-only local views', async () => {
         const item = createItem({
             reaction: { type: 'like' },
