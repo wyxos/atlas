@@ -44,6 +44,21 @@ describe('FileReactions', () => {
         expect(wrapper.find('[aria-label="Preview count removed from feed"]').exists()).toBe(true);
     });
 
+    it('does not mark the blacklist button active for a terminal preview count alone', () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                previewedCount: 99999,
+                blacklistedAt: null,
+            },
+        });
+
+        const blacklistButton = wrapper.find('button[aria-label="Blacklist"]');
+
+        expect(blacklistButton.attributes('aria-pressed')).toBe('false');
+        expect(blacklistButton.attributes('disabled')).toBeUndefined();
+    });
+
     it('shows only index (not total) in small variant', () => {
         const wrapper = mount(FileReactions, {
             props: {

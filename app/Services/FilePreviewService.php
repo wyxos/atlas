@@ -94,6 +94,7 @@ class FilePreviewService
             if (
                 $reactionType === null
                 && ! $this->isLocalSource($file)
+                && ! $this->isPreviewAutoBlacklistExempt($file)
                 && (int) $file->previewed_count >= self::AUTO_BLACKLIST_PREVIEW_COUNT
             ) {
                 $filesToAutoBlacklist[] = $file;
@@ -163,5 +164,14 @@ class FilePreviewService
     private function isLocalSource(File $file): bool
     {
         return strtolower(trim((string) $file->source)) === 'local';
+    }
+
+    private function isPreviewAutoBlacklistExempt(File $file): bool
+    {
+        if ((string) $file->source !== DeviantArtImages::SOURCE) {
+            return false;
+        }
+
+        return data_get($file->listing_metadata, 'premium_folder_data') !== null;
     }
 }

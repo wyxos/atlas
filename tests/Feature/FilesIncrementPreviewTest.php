@@ -85,6 +85,34 @@ test('does not auto blacklist local unreacted item on second preview', function 
         ->and($file->blacklisted_at)->toBeNull();
 });
 
+test('does not auto blacklist deviantart premium folder item on second preview', function () {
+    $admin = User::factory()->admin()->create();
+    $file = previewTestFile([
+        'previewed_count' => 1,
+        'source' => 'deviantart.com',
+        'listing_metadata' => [
+            'premium_folder_data' => [
+                'has_access' => false,
+            ],
+        ],
+    ]);
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/preview");
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'previewed_count' => 2,
+            'reaction' => null,
+            'auto_blacklisted' => false,
+            'blacklisted_at' => null,
+        ]);
+
+    $file->refresh();
+    expect($file->previewed_count)->toBe(2)
+        ->and($file->auto_blacklisted)->toBeFalse()
+        ->and($file->blacklisted_at)->toBeNull();
+});
+
 test('preserves positive reaction on next preview', function () {
     $admin = User::factory()->admin()->create();
     $file = previewTestFile(['previewed_count' => 1]);
