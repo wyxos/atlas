@@ -18,6 +18,11 @@ final class SourceWatchRefreshService
         return $this->resolverFor($file) !== null;
     }
 
+    public function supportsUnwatch(File $file): bool
+    {
+        return $this->resolverFor($file) !== null;
+    }
+
     public function watchAndRefresh(File $file, User $user): SourceWatchRefreshResult
     {
         $resolver = $this->resolverFor($file);
@@ -74,6 +79,41 @@ final class SourceWatchRefreshService
                 ? 'Source account watched and media refreshed.'
                 : 'Source account watched. Source media is already current.',
             file: $refresh->file ?? $file->fresh() ?? $file,
+        );
+    }
+
+    public function unwatch(File $file, User $user): SourceUnwatchResult
+    {
+        $resolver = $this->resolverFor($file);
+        if (! $resolver) {
+            return new SourceUnwatchResult(
+                supported: false,
+                unwatched: false,
+                message: 'This file source does not support source account watching.',
+                file: $file,
+            );
+        }
+
+        try {
+            $unwatched = $resolver->unwatch($file, $user);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return new SourceUnwatchResult(
+                supported: true,
+                unwatched: false,
+                message: 'Unable to unwatch the source account. Reconnect the provider in Settings if this keeps failing.',
+                file: $file->fresh() ?? $file,
+            );
+        }
+
+        return new SourceUnwatchResult(
+            supported: true,
+            unwatched: $unwatched,
+            message: $unwatched
+                ? 'Source account unwatched.'
+                : 'Unable to unwatch the source account. It may not currently be watched.',
+            file: $file->fresh() ?? $file,
         );
     }
 

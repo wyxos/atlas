@@ -10,7 +10,7 @@ import {
     store as tabsStore,
     update as tabsUpdate,
 } from '@/actions/App/Http/Controllers/TabController';
-import type { FileCapabilities, FileContainer, FileMetadataRecord } from '@/types/file';
+import type { FileCapabilities, FileContainer, FileMetadataRecord, FileSourceAccess } from '@/types/file';
 
 const NO_CACHE_REQUEST_CONFIG = {
     headers: {
@@ -50,6 +50,7 @@ export type FeedItem = {
     listing_metadata?: FileMetadataRecord | null;
     detail_metadata?: FileMetadataRecord | null;
     containers?: FileContainer[];
+    source_access?: FileSourceAccess | null;
     capabilities?: FileCapabilities;
     [key: string]: unknown;
 };

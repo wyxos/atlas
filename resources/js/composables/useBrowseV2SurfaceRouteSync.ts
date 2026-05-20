@@ -80,6 +80,7 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         listing_metadata: file.listing_metadata,
         detail_metadata: file.detail_metadata,
         containers: file.containers ?? [],
+        source_access: file.source_access ?? null,
         capabilities: file.capabilities,
         notFound: file.not_found,
     };

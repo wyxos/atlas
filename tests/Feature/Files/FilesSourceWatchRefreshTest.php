@@ -98,6 +98,9 @@ test('user can watch DeviantArt source account and refresh source media for a fi
     $response->assertJsonPath('file.preview_url', 'https://images.example.test/fresh-preview.jpg');
     $response->assertJsonPath('file.capabilities.refresh_source_media', true);
     $response->assertJsonPath('file.capabilities.watch_source_and_refresh', true);
+    $response->assertJsonPath('file.capabilities.unwatch_source_account', true);
+    $response->assertJsonPath('file.source_access.requires_watch', false);
+    $response->assertJsonPath('file.source_access.can_unwatch', true);
 
     $file->refresh();
     expect($file->url)->toBe('https://images.example.test/fresh-original.png')
@@ -136,4 +139,56 @@ test('source watch refresh rejects unsupported sources', function () {
     $response->assertJsonPath('changed', false);
 
     Http::assertNothingSent();
+});
+
+test('user can unwatch DeviantArt source account for a watcher-gated file', function () {
+    $user = User::factory()->create();
+    DeviantArtToken::query()->create([
+        'user_id' => $user->id,
+        'access_token' => 'connected-access-token',
+        'refresh_token' => 'connected-refresh-token',
+        'scope' => 'basic browse user user.manage',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    Http::fake([
+        'https://www.deviantart.com/api/v1/oauth2/user/friends/unwatch/exampleartist' => Http::response([
+            'success' => true,
+        ]),
+    ]);
+
+    $file = File::factory()->create([
+        'source' => 'deviantart.com',
+        'source_id' => 'C2DC7BF1-82D3-4778-4BE4-23D1DA198CE0',
+        'referrer_url' => 'https://www.deviantart.com/exampleartist/art/Example-1329880490',
+        'listing_metadata' => [
+            'premium_folder_data' => [
+                'has_access' => true,
+                'type' => 'watchers',
+            ],
+        ],
+    ]);
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => 'exampleartist',
+        'referrer' => 'https://www.deviantart.com/exampleartist/gallery',
+    ]);
+    $file->containers()->attach($container);
+
+    $response = $this->actingAs($user)->postJson("/api/files/{$file->id}/source-unwatch");
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('supported', true);
+    $response->assertJsonPath('unwatched', true);
+    $response->assertJsonPath('file.listing_metadata.premium_folder_data.has_access', false);
+    $response->assertJsonPath('file.source_access.requires_watch', true);
+    $response->assertJsonPath('file.source_access.can_unwatch', false);
+
+    $file->refresh();
+    expect($file->listing_metadata['premium_folder_data']['has_access'])->toBeFalse();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+        && $request->url() === 'https://www.deviantart.com/api/v1/oauth2/user/friends/unwatch/exampleartist'
+        && $request->header('Authorization')[0] === 'Bearer connected-access-token');
 });

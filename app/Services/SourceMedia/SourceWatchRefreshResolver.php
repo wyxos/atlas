@@ -10,4 +10,6 @@ interface SourceWatchRefreshResolver
     public function supports(File $file): bool;
 
     public function watch(File $file, User $user): bool;
+
+    public function unwatch(File $file, User $user): bool;
 }

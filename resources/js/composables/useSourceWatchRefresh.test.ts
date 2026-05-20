@@ -17,6 +17,9 @@ vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
     watchSourceAndRefreshMedia: {
         url: (id: number) => `/api/files/${id}/source-watch-refresh`,
     },
+    unwatchSourceAccount: {
+        url: (id: number) => `/api/files/${id}/source-unwatch`,
+    },
 }));
 
 const mockAxios = {
@@ -38,6 +41,13 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
         index: 0,
         src: 'https://example.com/image-42.jpg',
         source: 'deviantart.com',
+        source_access: {
+            provider: 'deviantart',
+            access_type: 'watchers',
+            has_access: false,
+            requires_watch: true,
+            can_unwatch: false,
+        },
         ...overrides,
     };
 }
@@ -90,6 +100,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         capabilities: {
             refresh_source_media: true,
             watch_source_and_refresh: true,
+            unwatch_source_account: true,
         },
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
@@ -132,19 +143,109 @@ describe('useSourceWatchRefresh', () => {
         );
     });
 
-    it('does not run for unsupported sources or disabled capabilities', async () => {
+    it('only offers watch refresh when watcher access is missing', () => {
         const actions = useSourceWatchRefresh({ setFileData: vi.fn() });
 
-        expect(actions.canWatchAndRefresh(makeItem({ source: 'civitai.com' }), 'exampleartist')).toBe(false);
+        expect(actions.canWatchAndRefresh(makeItem(), 'exampleartist')).toBe(true);
+        expect(actions.canWatchAndRefresh(makeItem({
+            source_access: {
+                provider: 'deviantart',
+                access_type: 'watchers',
+                has_access: true,
+                requires_watch: false,
+                can_unwatch: true,
+            },
+        }), 'exampleartist')).toBe(false);
+        expect(actions.canWatchAndRefresh(makeItem({
+            listing_metadata: {
+                premium_folder_data: {
+                    type: 'watchers',
+                    has_access: false,
+                },
+            },
+            source_access: {
+                provider: 'deviantart',
+                access_type: 'watchers',
+                has_access: true,
+                requires_watch: false,
+                can_unwatch: true,
+            },
+        }), 'exampleartist')).toBe(true);
+    });
+
+    it('does not run when capabilities are disabled', async () => {
+        const actions = useSourceWatchRefresh({ setFileData: vi.fn() });
+
         expect(actions.canWatchAndRefresh(makeItem({
             capabilities: {
                 refresh_source_media: true,
                 watch_source_and_refresh: false,
+                unwatch_source_account: true,
             },
         }), 'exampleartist')).toBe(false);
 
-        await actions.watchAndRefresh(makeItem({ source: 'civitai.com' }), 'exampleartist');
+        await actions.watchAndRefresh(makeItem({
+            capabilities: {
+                refresh_source_media: true,
+                watch_source_and_refresh: false,
+                unwatch_source_account: true,
+            },
+        }), 'exampleartist');
 
         expect(mockAxios.post).not.toHaveBeenCalled();
+    });
+
+    it('unwatches source accounts when watcher access is present', async () => {
+        const setFileData = vi.fn();
+        const refreshedFile = makeFile({
+            listing_metadata: {
+                premium_folder_data: {
+                    type: 'watchers',
+                    has_access: false,
+                },
+            },
+            source_access: {
+                provider: 'deviantart',
+                access_type: 'watchers',
+                has_access: false,
+                requires_watch: true,
+                can_unwatch: false,
+            },
+        });
+        const actions = useSourceWatchRefresh({ setFileData });
+        const item = makeItem({
+            source_access: {
+                provider: 'deviantart',
+                access_type: 'watchers',
+                has_access: true,
+                requires_watch: false,
+                can_unwatch: true,
+            },
+        });
+
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                supported: true,
+                unwatched: true,
+                message: 'Source account unwatched.',
+                file: refreshedFile,
+            },
+        });
+
+        expect(actions.canUnwatchSourceAccount(item, 'exampleartist')).toBe(true);
+
+        await actions.unwatchSourceAccount(item, 'exampleartist');
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/42/source-unwatch');
+        expect(setFileData).toHaveBeenCalledWith(refreshedFile);
+        expect(toastSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                props: expect.objectContaining({
+                    title: 'Source account unwatched',
+                    variant: 'success',
+                }),
+            }),
+            expect.objectContaining({ id: 'source-watch-refresh-42' }),
+        );
     });
 });

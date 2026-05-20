@@ -57,6 +57,16 @@ class DeviantArtApiClient
             && ($payload['success'] ?? false) === true;
     }
 
+    public function unwatchUser(string $username, string $token): bool
+    {
+        $response = $this->request($this->unwatchUrl($username), [], $token);
+        $payload = $response->json();
+
+        return $response->successful()
+            && is_array($payload)
+            && ($payload['success'] ?? false) === true;
+    }
+
     private function request(string $url, array $query, string $token): Response
     {
         if (! HttpRateLimiter::throttleDomain('deviantart.com', 80, 60, maxWaitSeconds: 1)) {
@@ -125,6 +135,11 @@ class DeviantArtApiClient
     private function watchUrl(string $username): string
     {
         return $this->apiBaseUrl().'/user/friends/watch/'.rawurlencode($username);
+    }
+
+    private function unwatchUrl(string $username): string
+    {
+        return $this->apiBaseUrl().'/user/friends/unwatch/'.rawurlencode($username);
     }
 
     private function headers(): array

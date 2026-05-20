@@ -4,9 +4,12 @@ namespace App\Services;
 
 use App\Models\Container;
 use App\Models\File;
+use App\Services\SourceMedia\SourceMediaRefreshService;
+use App\Services\SourceMedia\SourceWatchRefreshService;
 use App\Support\ContainerBrowseTabPayload;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
+use App\Support\SourceAccessState;
 use Illuminate\Container\Container as IoCContainer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
@@ -153,6 +156,8 @@ class FileItemFormatter
 
         $items = [];
         $index = 0;
+        $sourceMediaRefreshes = app(SourceMediaRefreshService::class);
+        $sourceWatchRefreshes = app(SourceWatchRefreshService::class);
 
         foreach ($files as $file) {
             // Only extract essential metadata properties needed for masonry display
@@ -255,6 +260,9 @@ class FileItemFormatter
                 'originalUrl' => $originalUrl, // Needed for FileViewer to show original images
                 'thumbnail' => $thumbnailUrl,
                 'url' => $file->url,
+                'source' => $file->source,
+                'source_id' => $file->source_id,
+                'referrer_url' => $file->referrer_url,
                 'type' => $vibeType,
                 'media_kind' => $mediaKind,
                 'mime_type' => $file->mime_type,
@@ -274,6 +282,12 @@ class FileItemFormatter
                 'metadata' => $prompt ? ['prompt' => $prompt] : null,
                 // listing_metadata removed - loaded on-demand in FileDetailsCard when needed
                 'containers' => $containers, // Needed for container badges and reactions
+                'source_access' => SourceAccessState::forFile($file),
+                'capabilities' => [
+                    'refresh_source_media' => $sourceMediaRefreshes->supports($file),
+                    'watch_source_and_refresh' => $sourceWatchRefreshes->supports($file),
+                    'unwatch_source_account' => $sourceWatchRefreshes->supportsUnwatch($file),
+                ],
             ];
 
             $items[] = $item;

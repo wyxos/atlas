@@ -112,6 +112,7 @@ export function useFileViewerData(params: {
         item.listing_metadata = file.listing_metadata;
         item.detail_metadata = file.detail_metadata;
         item.containers = file.containers ?? item.containers;
+        item.source_access = file.source_access ?? null;
         item.capabilities = file.capabilities;
     }
 

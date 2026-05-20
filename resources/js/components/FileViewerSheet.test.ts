@@ -72,6 +72,7 @@ function makeFile(overrides: Partial<File> = {}): File {
         capabilities: {
             refresh_source_media: false,
             watch_source_and_refresh: false,
+            unwatch_source_account: false,
         },
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
@@ -274,6 +275,7 @@ describe('FileViewerSheet', () => {
             capabilities: {
                 refresh_source_media: true,
                 watch_source_and_refresh: false,
+                unwatch_source_account: false,
             },
         });
         const refreshedFile = makeFile({
@@ -284,6 +286,7 @@ describe('FileViewerSheet', () => {
             capabilities: {
                 refresh_source_media: true,
                 watch_source_and_refresh: false,
+                unwatch_source_account: false,
             },
         });
 

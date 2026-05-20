@@ -119,6 +119,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::post('/api/files/{file}/refresh-source-media', [\App\Http\Controllers\FilesController::class, 'refreshSourceMedia'])->name('api.files.refresh-source-media');
     Route::post('/api/files/{file}/source-watch-refresh', [\App\Http\Controllers\FilesController::class, 'watchSourceAndRefreshMedia'])->name('api.files.source-watch-refresh');
+    Route::post('/api/files/{file}/source-unwatch', [\App\Http\Controllers\FilesController::class, 'unwatchSourceAccount'])->name('api.files.source-unwatch');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::get('/api/files/{file}/downloaded', [\App\Http\Controllers\FilesController::class, 'serveDownloaded'])->name('api.files.downloaded');
     Route::get('/api/files/{file}/preview', [\App\Http\Controllers\FilesController::class, 'servePreview'])->name('api.files.preview');

@@ -8,6 +8,7 @@ use App\Services\SourceMedia\SourceWatchRefreshService;
 use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
+use App\Support\SourceAccessState;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -75,6 +76,7 @@ class FileResource extends JsonResource
         return [
             'refresh_source_media' => app(SourceMediaRefreshService::class)->supports($file),
             'watch_source_and_refresh' => app(SourceWatchRefreshService::class)->supports($file),
+            'unwatch_source_account' => app(SourceWatchRefreshService::class)->supportsUnwatch($file),
         ];
     }
 
@@ -243,6 +245,7 @@ class FileResource extends JsonResource
             'detail_metadata' => $this->detail_metadata,
             'metadata' => $this->metadata ? ['payload' => $this->metadata->payload] : null,
             'containers' => $containers,
+            'source_access' => SourceAccessState::forFile($this->resource),
             'capabilities' => self::capabilities($this->resource),
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),

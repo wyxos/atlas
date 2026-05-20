@@ -83,8 +83,10 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
         } as any,
         sourceWatchRefresh: {
             canWatchAndRefresh: vi.fn().mockReturnValue(false),
+            canUnwatchSourceAccount: vi.fn().mockReturnValue(false),
             isWatchingAndRefreshing: vi.fn().mockReturnValue(false),
             watchAndRefresh: vi.fn(),
+            unwatchSourceAccount: vi.fn(),
         },
         onReaction: vi.fn(),
     };
@@ -194,5 +196,33 @@ it('renders hover actions without preview-side dependencies', () => {
         await wrapper.get('[data-test="source-watch-refresh-trigger"]').trigger('click');
 
         expect(props.sourceWatchRefresh.watchAndRefresh).toHaveBeenCalledWith(props.item, 'exampleartist');
+    });
+
+    it('shows and wires source unwatch action for watched DeviantArt access items', async () => {
+        const props = createProps({ hovered: true });
+        props.containers.badges.getContainersForItem.mockReturnValue([
+            {
+                id: 9,
+                type: 'User',
+                source: 'deviantart.com',
+                source_id: 'exampleartist',
+            },
+        ]);
+        props.sourceWatchRefresh.canUnwatchSourceAccount.mockImplementation((_item: FeedItem, username: string | null) => username === 'exampleartist');
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        await wrapper.get('[data-test="source-unwatch-trigger"]').trigger('click');
+
+        expect(props.sourceWatchRefresh.unwatchSourceAccount).toHaveBeenCalledWith(props.item, 'exampleartist');
     });
 });

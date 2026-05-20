@@ -34,6 +34,15 @@ export interface FileMetadata {
 export interface FileCapabilities {
     refresh_source_media: boolean;
     watch_source_and_refresh: boolean;
+    unwatch_source_account: boolean;
+}
+
+export interface FileSourceAccess {
+    provider: string;
+    access_type: string | null;
+    has_access: boolean | null;
+    requires_watch: boolean;
+    can_unwatch: boolean;
 }
 
 export interface File {
@@ -82,6 +91,7 @@ export interface File {
     listing_metadata: FileMetadataRecord | null;
     detail_metadata: FileMetadataRecord | null;
     containers?: FileContainer[];
+    source_access?: FileSourceAccess | null;
     capabilities: FileCapabilities;
     created_at: string;
     updated_at: string;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Info, Loader2, Trash2, UserPlus } from 'lucide-vue-next';
+import { Info, Loader2, Trash2, UserMinus, UserPlus } from 'lucide-vue-next';
 import type { VibeViewerItem } from '@wyxos/vibe';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { SourceWatchRefreshActions } from '@/composables/useSourceWatchRefresh';
@@ -44,6 +44,9 @@ const showContainers = computed(() => props.hovered && isPreloaded.value && item
 const showSourceWatchRefreshButton = computed(() => props.hovered
     && isPreloaded.value
     && props.sourceWatchRefresh.canWatchAndRefresh(props.item, deviantArtUsername.value));
+const showSourceUnwatchButton = computed(() => props.hovered
+    && isPreloaded.value
+    && props.sourceWatchRefresh.canUnwatchSourceAccount(props.item, deviantArtUsername.value));
 const isSourceWatchRefreshPending = computed(() => props.sourceWatchRefresh.isWatchingAndRefreshing(props.item));
 const showPromptButton = computed(() => props.hovered && isPreloaded.value);
 const showDeleteButton = computed(() => props.hovered
@@ -93,7 +96,7 @@ const showReactions = computed(() => (
         </div>
 
         <div
-            v-if="showSourceWatchRefreshButton || showPromptButton || showDeleteButton"
+            v-if="showSourceWatchRefreshButton || showSourceUnwatchButton || showPromptButton || showDeleteButton"
             class="pointer-events-auto absolute right-2 top-2 flex items-center gap-2"
         >
             <Button
@@ -116,6 +119,27 @@ const showReactions = computed(() => (
                     class="animate-spin"
                 />
                 <UserPlus v-else :size="14" />
+            </Button>
+            <Button
+                v-if="showSourceUnwatchButton"
+                variant="ghost"
+                size="sm"
+                class="h-7 w-7 bg-zinc-700/80 p-0 text-white hover:bg-zinc-600 disabled:cursor-wait disabled:opacity-80"
+                aria-label="Unwatch source account"
+                data-test="source-unwatch-trigger"
+                :disabled="isSourceWatchRefreshPending"
+                @click.stop="() => {
+                    if (deviantArtUsername) {
+                        sourceWatchRefresh.unwatchSourceAccount(item, deviantArtUsername);
+                    }
+                }"
+            >
+                <Loader2
+                    v-if="isSourceWatchRefreshPending"
+                    :size="14"
+                    class="animate-spin"
+                />
+                <UserMinus v-else :size="14" />
             </Button>
             <Button
                 v-if="showPromptButton"

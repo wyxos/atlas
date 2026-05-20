@@ -9,6 +9,7 @@ declare module '@/actions/App/Http/Controllers/FilesController' {
     export const show: ActionHandler;
     export const refreshSourceMedia: ActionHandler;
     export const watchSourceAndRefreshMedia: ActionHandler;
+    export const unwatchSourceAccount: ActionHandler;
     export const serve: ActionHandler;
     export const destroy: ActionHandler;
     export const deleteAll: ActionHandler;

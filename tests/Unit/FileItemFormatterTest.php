@@ -234,3 +234,44 @@ it('extracts prompt text from nested metadata payloads', function () {
         'prompt' => 'nested prompt',
     ]);
 });
+
+it('includes minimal source access state for DeviantArt watcher-gated library items', function () {
+    $file = formatterFile([
+        'id' => 107,
+        'source' => 'deviantart.com',
+        'source_id' => 'B80091C0-EC22-C82D-1E54-FB6FC80E5924',
+        'referrer_url' => 'https://www.deviantart.com/exampleartist/art/example-123',
+        'mime_type' => 'image/jpeg',
+        'url' => 'https://images.example.test/blurred.jpg',
+        'preview_url' => 'https://images.example.test/blurred-preview.jpg',
+        'listing_metadata' => [
+            'premium_folder_data' => [
+                'type' => 'watchers',
+                'has_access' => false,
+            ],
+        ],
+    ]);
+
+    $items = FileItemFormatter::format([$file], 1, [
+        'feed' => 'local',
+        'source' => 'deviantart.com',
+    ]);
+
+    expect($items[0])
+        ->toHaveKey('source', 'deviantart.com')
+        ->toHaveKey('source_id', 'B80091C0-EC22-C82D-1E54-FB6FC80E5924')
+        ->toHaveKey('referrer_url', 'https://www.deviantart.com/exampleartist/art/example-123')
+        ->not->toHaveKey('listing_metadata')
+        ->and($items[0]['source_access'])->toBe([
+            'provider' => 'deviantart',
+            'access_type' => 'watchers',
+            'has_access' => false,
+            'requires_watch' => true,
+            'can_unwatch' => false,
+        ])
+        ->and($items[0]['capabilities'])->toMatchArray([
+            'refresh_source_media' => true,
+            'watch_source_and_refresh' => true,
+            'unwatch_source_account' => true,
+        ]);
+});

@@ -103,6 +103,32 @@ class FilesController extends Controller
         ], $result->watched ? 200 : 422);
     }
 
+    public function unwatchSourceAccount(File $file): JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user instanceof \App\Models\User, 403);
+
+        $result = $this->sourceWatchRefreshes->unwatch($file, $user);
+        if (! $result->supported) {
+            return response()->json([
+                'message' => $result->message,
+                'supported' => false,
+                'unwatched' => false,
+            ], 422);
+        }
+
+        $refreshedFile = $result->file ?? $file;
+        $this->fileStorageResponses->loadViewerRelations($refreshedFile);
+        $this->fileStorageResponses->hydrateDiskMetadata($refreshedFile);
+
+        return response()->json([
+            'message' => $result->message,
+            'supported' => true,
+            'unwatched' => $result->unwatched,
+            'file' => new \App\Http\Resources\FileResource($refreshedFile),
+        ], $result->unwatched ? 200 : 422);
+    }
+
     /**
      * Serve the file content.
      */
