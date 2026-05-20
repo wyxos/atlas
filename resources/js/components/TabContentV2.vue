@@ -23,6 +23,7 @@ import { loadBrowseV2StandaloneFileItem } from '@/lib/browseV2StandaloneItem';
 import { buildBrowseTabLabel } from '@/lib/browseTabLabel';
 import { extractRestoredBrowseSession } from '@/lib/tabContentBrowseBootstrap';
 import { createRemovedItemIdSet, createTabContentV2EmptyStatus, createTabContentV2Resolve, mapFeedItemToVibeItem, normalizeCursor, resolveOverlayMediaType, type OverlayMediaType } from '@/lib/tabContentV2';
+import { createSyncedFileViewerData } from '@/lib/tabContentV2FileSync';
 import { createBrowseV2MouseShortcutHandlers } from '@/lib/tabContentV2MouseShortcuts';
 import { getFeedItemFromVibeItem, getFeedItemsFromVibeHandle, getFeedItemFromVibeOccurrenceTarget, type AtlasVibeHandle } from '@/lib/tabContentV2VibeItems';
 import type { FeedItem, TabData } from '@/composables/useTabs';
@@ -255,6 +256,7 @@ const fileViewerData = useFileViewerData({
     overlay: fullscreenOverlayState,
     sheet: fileSheetState,
 });
+const syncedFileViewerData = createSyncedFileViewerData({ activeIndex, fallbackItems: sessionItems, fileViewerData, getCurrentItems: getCurrentVibeFeedItems, hydratedInitialState, masonryRenderKey, startPageToken: browseState.startPageToken, vibeStatus });
 const currentVisibleItem = computed(() => {
     if (sessionItems.value.length === 0) {
         return null;
@@ -528,7 +530,7 @@ watch(
         :handle-reaction="handleReaction"
         :file-sheet-state="fileSheetState"
         :current-visible-item="currentVisibleItem"
-        :file-viewer-data="fileViewerData"
+        :file-viewer-data="syncedFileViewerData"
         :open-file-sheet="openFileSheet"
         :close-file-sheet="closeFileSheet"
         :downloaded-reaction-prompt="downloadedReactionPrompt"

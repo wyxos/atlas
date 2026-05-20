@@ -42,10 +42,8 @@ const deviantArtUsername = computed(() => deviantArtUserContainer.value?.source_
 const isPreloaded = computed(() => props.itemInteractions.preload.isItemPreloaded(props.item.id));
 const showContainers = computed(() => props.hovered && isPreloaded.value && itemContainers.value.length > 0);
 const showSourceWatchRefreshButton = computed(() => props.hovered
-    && isPreloaded.value
     && props.sourceWatchRefresh.canWatchAndRefresh(props.item, deviantArtUsername.value));
 const showSourceUnwatchButton = computed(() => props.hovered
-    && isPreloaded.value
     && props.sourceWatchRefresh.canUnwatchSourceAccount(props.item, deviantArtUsername.value));
 const isSourceWatchRefreshPending = computed(() => props.sourceWatchRefresh.isWatchingAndRefreshing(props.item));
 const showPromptButton = computed(() => props.hovered && isPreloaded.value);

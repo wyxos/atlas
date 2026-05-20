@@ -198,6 +198,33 @@ it('renders hover actions without preview-side dependencies', () => {
         expect(props.sourceWatchRefresh.watchAndRefresh).toHaveBeenCalledWith(props.item, 'exampleartist');
     });
 
+    it('shows source watch refresh action even when the locked asset did not preload', () => {
+        const props = createProps({ hovered: true });
+        props.itemInteractions.preload.isItemPreloaded.mockReturnValue(false);
+        props.containers.badges.getContainersForItem.mockReturnValue([
+            {
+                id: 9,
+                type: 'User',
+                source: 'deviantart.com',
+                source_id: 'exampleartist',
+            },
+        ]);
+        props.sourceWatchRefresh.canWatchAndRefresh.mockImplementation((_item: FeedItem, username: string | null) => username === 'exampleartist');
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        expect(wrapper.find('[data-test="source-watch-refresh-trigger"]').exists()).toBe(true);
+    });
+
     it('shows and wires source unwatch action for watched DeviantArt access items', async () => {
         const props = createProps({ hovered: true });
         props.containers.badges.getContainersForItem.mockReturnValue([
