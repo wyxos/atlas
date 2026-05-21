@@ -151,6 +151,50 @@ describe('tabContentV2 resolve', () => {
         expect(result.items).toHaveLength(1);
     });
 
+    it('does not show a toast when an online service returns an empty error payload', async () => {
+        const totalAvailable = ref<number | null>(381);
+        const toast = {
+            error: vi.fn(),
+        };
+
+        window.axios.get = vi.fn().mockResolvedValue({
+            data: {
+                items: [],
+                nextPage: null,
+                previousPage: null,
+                total: null,
+                error: {
+                    message: 'Unable to connect to service',
+                },
+            },
+        }) as typeof window.axios.get;
+
+        const resolve = createTabContentV2Resolve({
+            form: {
+                getData: () => ({
+                    feed: 'online',
+                    limit: 20,
+                    page: 1,
+                    service: 'civit-ai-images',
+                    serviceFilters: {},
+                    source: 'all',
+                    tab_id: 44,
+                }),
+            } as any,
+            startPageToken: ref(1),
+            totalAvailable,
+            toast,
+        });
+
+        const result = await resolve({ cursor: 1, pageSize: 20 });
+
+        expect(result.items).toEqual([]);
+        expect(result.nextPage).toBeNull();
+        expect(result.total).toBeNull();
+        expect(totalAvailable.value).toBeNull();
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
     it('throws browse request failures instead of converting them into empty final pages', async () => {
         const totalAvailable = ref<number | null>(381);
         const toast = {

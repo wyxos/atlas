@@ -132,21 +132,6 @@ function showBrowseErrorToast(
     toast.error(message);
 }
 
-function browseServiceErrorMessage(data: unknown): string | null {
-    if (!data || typeof data !== 'object' || !('error' in data)) {
-        return null;
-    }
-
-    const error = (data as { error?: unknown }).error;
-    if (!error || typeof error !== 'object' || !('message' in error)) {
-        return null;
-    }
-
-    const message = (error as { message?: unknown }).message;
-
-    return typeof message === 'string' && message.trim() !== '' ? message.trim() : null;
-}
-
 export function resolveOverlayMediaType(item: FeedItem): OverlayMediaType {
     if (item.media_kind === 'audio') {
         return 'audio';
@@ -225,13 +210,6 @@ export function createTabContentV2Resolve(args: TabContentV2ResolveArgs) {
             const { data } = await window.axios.get(browseIndex.url({ query }), {
                 signal: params.signal,
             });
-
-            const serviceErrorMessage = browseServiceErrorMessage(data);
-            if (serviceErrorMessage) {
-                const trimmed = serviceErrorMessage.length > 280 ? `${serviceErrorMessage.slice(0, 280)}…` : serviceErrorMessage;
-
-                throw new Error(trimmed);
-            }
 
             const total = normalizeTotal(data.total);
 
