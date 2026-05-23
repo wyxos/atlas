@@ -9,8 +9,16 @@ export function useTabContentPromptDialog(items: ShallowRef<FeedItem[]>) {
         void data.openPromptDialog(item);
     }
 
+    function select(item: FeedItem): void {
+        void data.selectPromptItem(item);
+    }
+
     function close(): void {
         data.closePromptDialog();
+    }
+
+    function clear(): void {
+        data.clearPromptSelection();
     }
 
     function setOpen(value: boolean): void {
@@ -39,7 +47,9 @@ export function useTabContentPromptDialog(items: ShallowRef<FeedItem[]>) {
     return {
         data,
         open,
+        select,
         close,
+        clear,
         setOpen,
         copy,
         openTestPage,

@@ -4,11 +4,14 @@ namespace App\Jobs;
 
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferCreated;
+use App\Events\DownloadTransferProgressUpdated;
 use App\Jobs\Downloads\PumpDomainDownloads;
+use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\Downloads\DownloadUrlResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -84,6 +87,23 @@ class DownloadFile implements ShouldQueue
             $resolvedDownload = $downloadUrlResolver->resolve($file, $this->runtimeContext);
             $downloadUrl = $resolvedDownload->url;
             $domain = $this->extractDomain($downloadUrl) ?? 'unknown';
+            $failedTransfer = $this->matchingFailedTransfer($file, $downloadUrl);
+
+            if ($failedTransfer) {
+                $transfer = $this->resetFailedTransferForRetry(
+                    $failedTransfer,
+                    $file,
+                    $downloadUrl,
+                    $domain,
+                    $resolvedDownload->filesize,
+                );
+
+                $this->maybeRefreshRuntimeContext($runtimeStore, $transfer);
+                $this->broadcastTransferProgress($transfer);
+                PumpDomainDownloads::dispatch($domain);
+
+                return;
+            }
 
             $transfer = DownloadTransfer::query()->create([
                 'file_id' => $file->id,
@@ -104,6 +124,87 @@ class DownloadFile implements ShouldQueue
 
             $this->storeRuntimeContext($runtimeStore, $transfer->id);
             PumpDomainDownloads::dispatch($domain);
+        }
+    }
+
+    private function matchingFailedTransfer(File $file, string $downloadUrl): ?DownloadTransfer
+    {
+        return DownloadTransfer::query()
+            ->where('file_id', $file->id)
+            ->where('status', DownloadTransferStatus::FAILED)
+            ->where('url', $downloadUrl)
+            ->latest('id')
+            ->first();
+    }
+
+    private function resetFailedTransferForRetry(
+        DownloadTransfer $transfer,
+        File $file,
+        string $downloadUrl,
+        string $domain,
+        ?int $filesize,
+    ): DownloadTransfer {
+        $transfer->setRelation('file', $file);
+        $this->cleanupTransferParts($transfer);
+
+        $updates = [
+            'url' => $downloadUrl,
+            'domain' => $domain,
+            'status' => DownloadTransferStatus::PENDING,
+            'bytes_total' => $filesize !== null && $filesize > 0 ? $filesize : null,
+            'bytes_downloaded' => 0,
+            'last_broadcast_percent' => 0,
+            'batch_id' => null,
+            'queued_at' => null,
+            'started_at' => null,
+            'finished_at' => null,
+            'failed_at' => null,
+            'error' => null,
+        ];
+
+        if ($this->isYtDlpTransfer($transfer)) {
+            $updates['attempt'] = ((int) ($transfer->attempt ?? 0)) + 1;
+        }
+
+        $transfer->update($updates);
+
+        $file->forceFill([
+            'download_progress' => 0,
+        ])->save();
+
+        $transfer->refresh();
+        $transfer->setRelation('file', $file);
+
+        return $transfer;
+    }
+
+    private function cleanupTransferParts(DownloadTransfer $transfer): void
+    {
+        DownloadChunk::query()
+            ->where('download_transfer_id', $transfer->id)
+            ->delete();
+
+        $disk = Storage::disk(config('downloads.disk'));
+        $tmpDir = app(DownloadTransferTempDirectory::class)->forTransfer($transfer);
+
+        if ($disk->exists($tmpDir)) {
+            $disk->deleteDirectory($tmpDir);
+        }
+    }
+
+    private function isYtDlpTransfer(DownloadTransfer $transfer): bool
+    {
+        return data_get($transfer->file?->listing_metadata, 'download_via') === 'yt-dlp';
+    }
+
+    private function broadcastTransferProgress(DownloadTransfer $transfer): void
+    {
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+            ));
+        } catch (\Throwable) {
+            // Broadcast errors shouldn't fail downloads.
         }
     }
 

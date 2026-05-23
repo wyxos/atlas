@@ -1,10 +1,12 @@
 import type { FeedItem } from '@/composables/useTabs';
+import type { LoadedItemsBulkAction } from '@/lib/tabContentLoadedItemsBulkActions';
 import type { ReactionType } from '@/types/reaction';
 
 type BrowseV2MouseShortcutOptions = {
     getCurrentItem: () => FeedItem | null;
     getItemFromTarget: (target: EventTarget | null) => FeedItem | null;
     getSurfaceMode: () => 'fullscreen' | 'list';
+    onBatchAction?: (action: LoadedItemsBulkAction) => void | Promise<number>;
     onReaction: (item: FeedItem, type: ReactionType) => void | Promise<void>;
     onBlacklist: (item: FeedItem) => void | Promise<void>;
 };
@@ -51,6 +53,16 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
         }
     }
 
+    function performBatchShortcut(event: MouseEvent, action: LoadedItemsBulkAction): void {
+        if (!options.onBatchAction) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        void options.onBatchAction(action);
+    }
+
     function handleClickCapture(event: MouseEvent): void {
         if (!event.altKey || event.button !== 0 || isShortcutSuppressedTarget(event.target)) {
             return;
@@ -58,6 +70,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
 
         const item = getShortcutItemFromTarget(event.target);
         if (!item) {
+            performBatchShortcut(event, 'love');
             return;
         }
 
@@ -73,6 +86,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
 
         const item = getShortcutItemFromTarget(event.target);
         if (!item) {
+            performBatchShortcut(event, 'blacklist');
             return;
         }
 
@@ -88,6 +102,9 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
 
         const item = getShortcutItemFromTarget(event.target);
         if (!item) {
+            if (event.altKey) {
+                performBatchShortcut(event, 'like');
+            }
             return;
         }
 

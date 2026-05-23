@@ -207,6 +207,44 @@ describe('Browse actions', () => {
         expect(tabContentCancelFillMock.mock.invocationCallOrder[0]).toBeLessThan(setActiveTabMock.mock.invocationCallOrder[0]);
     });
 
+    it('smoothly scrolls the newly active tab into view when switching tabs', async () => {
+        const wrapper = mount(BrowseV2, { attachTo: document.body });
+        const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            if (this.getAttribute('data-test') === 'tab-panel-tabs-scroll') {
+                return createRect(50, 200);
+            }
+
+            if (this.getAttribute('data-browse-tab-id') === '2') {
+                return createRect(270);
+            }
+
+            return createRect(0);
+        });
+
+        try {
+            await flushPromises();
+
+            const scrollContainer = wrapper.get('[data-test="tab-panel-tabs-scroll"]').element as HTMLElement;
+            const scrollToMock = vi.fn();
+            scrollContainer.scrollTop = 10;
+            scrollContainer.style.paddingTop = '8px';
+            Object.defineProperty(scrollContainer, 'clientHeight', { value: 200, configurable: true });
+            Object.defineProperty(scrollContainer, 'scrollHeight', { value: 500, configurable: true });
+            scrollContainer.scrollTo = scrollToMock;
+
+            await wrapper.get('[data-test="browse-tab-2"]').trigger('click');
+            await flushPromises();
+
+            expect(scrollToMock).toHaveBeenCalledWith({
+                top: 70,
+                behavior: 'smooth',
+            });
+        } finally {
+            rectSpy.mockRestore();
+            wrapper.unmount();
+        }
+    });
+
     it('smoothly scrolls a newly opened tab into view', async () => {
         const mockedTabsModule = await import('@/composables/useTabs') as MockedTabsModule;
         const createdTab = {
@@ -233,7 +271,7 @@ describe('Browse actions', () => {
             }
 
             if (this.getAttribute('data-browse-tab-id') === '3') {
-                return createRect(240);
+                return createRect(340);
             }
 
             return createRect(0);
@@ -246,6 +284,8 @@ describe('Browse actions', () => {
             const scrollToMock = vi.fn();
             scrollContainer.scrollTop = 40;
             scrollContainer.style.paddingTop = '16px';
+            Object.defineProperty(scrollContainer, 'clientHeight', { value: 200, configurable: true });
+            Object.defineProperty(scrollContainer, 'scrollHeight', { value: 500, configurable: true });
             scrollContainer.scrollTo = scrollToMock;
 
             await wrapper.get('[data-test="create-tab-button"]').trigger('click');
@@ -253,7 +293,7 @@ describe('Browse actions', () => {
 
             expect(createTabMock).toHaveBeenCalledTimes(1);
             expect(scrollToMock).toHaveBeenCalledWith({
-                top: 164,
+                top: 120,
                 behavior: 'smooth',
             });
         } finally {
@@ -287,7 +327,7 @@ describe('Browse actions', () => {
             }
 
             if (this.getAttribute('data-browse-tab-id') === '2') {
-                return createRect(180);
+                return createRect(270);
             }
 
             return createRect(0);
@@ -300,6 +340,8 @@ describe('Browse actions', () => {
             const scrollToMock = vi.fn();
             scrollContainer.scrollTop = 10;
             scrollContainer.style.paddingTop = '8px';
+            Object.defineProperty(scrollContainer, 'clientHeight', { value: 200, configurable: true });
+            Object.defineProperty(scrollContainer, 'scrollHeight', { value: 500, configurable: true });
             scrollContainer.scrollTo = scrollToMock;
 
             wrapper.findAllComponents({ name: 'Tab' })[0].vm.$emit('close');
@@ -309,7 +351,7 @@ describe('Browse actions', () => {
                 preferredTabId: null,
             });
             expect(scrollToMock).toHaveBeenCalledWith({
-                top: 132,
+                top: 70,
                 behavior: 'smooth',
             });
         } finally {

@@ -28,7 +28,6 @@ import LocalFileDeleteDialog from './LocalFileDeleteDialog.vue';
 import Pill from './ui/Pill.vue';
 import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
 import TabContentContainerSheet from './TabContentContainerSheet.vue';
-import TabContentPromptDialog from './TabContentPromptDialog.vue';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentStartForm from './TabContentStartForm.vue';
 import TabContentV2GridOverlay from './TabContentV2GridOverlay.vue';
@@ -94,6 +93,7 @@ const props = defineProps<{
     masonryRenderKey: number;
     mouseShortcuts: MouseShortcutHandlers;
     openFileSheet: () => void;
+    openFileSheetForItem: (item: FeedItem, index: number) => void;
     promptDialog: TabContentPromptDialogHandle;
     resolve: (params: { cursor: string | null; pageSize: number; signal?: AbortSignal }) => Promise<VibeResolveResult>;
     setAutoScrollSpeed?: (value: number) => void;
@@ -122,6 +122,18 @@ const showGlobalStartPanel = computed(() => Boolean(globalStartPanel?.isOpen.val
 const sourceWatchRefresh = useSourceWatchRefresh({
     setFileData: props.fileViewerData.setFileData,
 });
+const sheetPromptItemId = computed(() => props.promptDialog.data.promptDialogItemId.value);
+const isSheetPromptLoading = computed(() => {
+    const itemId = sheetPromptItemId.value;
+    const promptLoading = props.promptDialog.data.promptDataLoading.value as unknown;
+
+    if (promptLoading instanceof Map) {
+        return itemId !== null && promptLoading.get(itemId) === true;
+    }
+
+    return Boolean(promptLoading);
+});
+const showSheetPrompt = computed(() => sheetPromptItemId.value !== null);
 
 function closeGlobalStartPanel(): void {
     globalStartPanel?.close();
@@ -287,7 +299,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                 <VibeLayout
                     :key="viewerKey"
                     :ref="handleVibeRef"
-                    class="h-full min-h-0 w-full"
+                    class="h-full min-h-0 min-w-0 flex-1"
                     :class="{ 'atlas-file-viewer-wide-aside': fileSheetState.isOpen }"
                     v-bind="vibeLayoutBindings"
                     @update:active-index="props.updateActiveIndex"
@@ -308,8 +320,8 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                             :vibe-item="item as VibeViewerItem"
                             :containers="containerInteractions"
                             :item-interactions="itemInteractions"
-                            :prompt-dialog="promptDialog"
                             :local-file-deletion="localFileDeletion"
+                            :open-file-sheet="openFileSheetForItem"
                             :source-watch-refresh="sourceWatchRefresh"
                             :on-reaction="handleReaction"
                         />
@@ -323,7 +335,6 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                                 :auto-scroll-max="autoScrollMax"
                                 :auto-scroll-min="autoScrollMin"
                                 :auto-scroll-speed="autoScrollSpeed"
-                                :bulk-actions-disabled="Boolean(headerMasonry?.isLoading) || vibeStatus.itemCount === 0"
                                 :cancel-fill="cancelFill"
                                 :can-toggle-page-loading-lock="Boolean(headerMasonry?.lockPageLoading && headerMasonry?.unlockPageLoading)"
                                 :fill-actions-disabled="fillActionsDisabled"
@@ -333,7 +344,6 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                                 :fill-until-count="fillUntilCount"
                                 :fill-until-end="fillUntilEnd"
                                 :page-loading-locked="Boolean(headerMasonry?.pageLoadingLocked)"
-                                :perform-loaded-items-bulk-action="itemInteractions.performLoadedItemsBulkAction"
                                 :set-auto-scroll-speed="setAutoScrollSpeed"
                                 :set-fill-call-count="setFillCallCount"
                                 :toggle-auto-scroll="toggleAutoScroll"
@@ -408,14 +418,28 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                             :file-id="currentVisibleItem?.id ?? null"
                             :file-data="fileViewerData.fileData.value"
                             :is-loading="fileViewerData.isLoadingFileData.value"
+                            :is-prompt-loading="isSheetPromptLoading"
                             :next-previews="nextPreviews"
+                            :prompt="promptDialog.data.currentPromptData.value"
+                            :show-prompt="showSheetPrompt"
                             :total-items="total"
                             @close="closeFileSheet"
                             @select-preview="props.updateActiveIndex"
-                            @source-media-refreshed="fileViewerData.setFileData"
                         />
                     </template>
                 </VibeLayout>
+
+                <FileViewerSheet
+                    v-if="fileSheetState.isOpen && surfaceMode === 'list'"
+                    :is-open="fileSheetState.isOpen"
+                    :file-id="currentVisibleItem?.id ?? null"
+                    :file-data="fileViewerData.fileData.value"
+                    :is-loading="fileViewerData.isLoadingFileData.value"
+                    :is-prompt-loading="isSheetPromptLoading"
+                    :prompt="promptDialog.data.currentPromptData.value"
+                    :show-prompt="showSheetPrompt"
+                    @close="closeFileSheet"
+                />
 
                 <TabContentContainerDrawer
                     :open="containerInteractions.drawer.state.isOpen.value"
@@ -446,17 +470,6 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                 <BrowseGlobalStartPanel :open="showGlobalStartPanel" @close="closeGlobalStartPanel" />
             </SheetContent>
         </Sheet>
-
-        <TabContentPromptDialog
-            :open="promptDialog.data.promptDialogOpen.value"
-            :item-id="promptDialog.data.promptDialogItemId.value"
-            :loading="promptDialog.data.promptDataLoading.value"
-            :prompt="promptDialog.data.currentPromptData.value"
-            :update-open="promptDialog.setOpen"
-            :copy-prompt="promptDialog.copy"
-            :test-prompt="promptDialog.openTestPage"
-            :close-prompt="promptDialog.close"
-        />
 
         <DownloadedReactionDialog
             :open="downloadedReactionPrompt.data.open.value"

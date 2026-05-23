@@ -103,6 +103,14 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
         }
     }
 
+    async function selectPromptItem(item: FeedItem): Promise<void> {
+        promptDialogItemId.value = item.id;
+
+        if (!getPromptData(item) && !promptDataLoading.value.get(item.id)) {
+            await loadPromptData(item);
+        }
+    }
+
     // Close prompt dialog
     function closePromptDialog(): void {
         promptDialogOpen.value = false;
@@ -110,6 +118,11 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
         setTimeout(() => {
             promptDialogItemId.value = null;
         }, 200);
+    }
+
+    function clearPromptSelection(): void {
+        promptDialogOpen.value = false;
+        promptDialogItemId.value = null;
     }
 
     // Copy prompt to clipboard
@@ -131,7 +144,9 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
         currentPromptItem,
         currentPromptData,
         openPromptDialog,
+        selectPromptItem,
         closePromptDialog,
+        clearPromptSelection,
         copyPromptToClipboard,
     };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
 import FileViewerSheet from './FileViewerSheet.vue';
 import type { File } from '@/types/file';
@@ -8,21 +8,6 @@ import { copyToClipboard } from '@/utils/clipboard';
 vi.mock('@/utils/clipboard', () => ({
     copyToClipboard: vi.fn().mockResolvedValue(undefined),
 }));
-
-vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
-    refreshSourceMedia: {
-        url: (id: number) => `/api/files/${id}/refresh-source-media`,
-    },
-}));
-
-const mockAxios = {
-    post: vi.fn(),
-};
-
-Object.defineProperty(window, 'axios', {
-    value: mockAxios,
-    writable: true,
-});
 
 function makeFile(overrides: Partial<File> = {}): File {
     return {
@@ -269,65 +254,60 @@ describe('FileViewerSheet', () => {
         expect(text).toContain('Is Mature');
     });
 
-    it('refreshes source media and emits the updated file', async () => {
-        const fileData = makeFile({
-            source: 'deviantart.com',
-            capabilities: {
-                refresh_source_media: true,
-                watch_source_and_refresh: false,
-                unwatch_source_account: false,
-            },
-        });
-        const refreshedFile = makeFile({
-            id: fileData.id,
-            source: 'deviantart.com',
-            url: 'https://images.example.test/fresh-original.png',
-            preview_url: 'https://images.example.test/fresh-preview.jpg',
-            capabilities: {
-                refresh_source_media: true,
-                watch_source_and_refresh: false,
-                unwatch_source_account: false,
-            },
-        });
-
-        mockAxios.post.mockResolvedValueOnce({
-            data: {
-                message: 'Source media refreshed.',
-                changed: true,
-                file: refreshedFile,
-            },
-        });
-
+    it('does not render the source media refresh action in the sheet', () => {
         const wrapper = mount(FileViewerSheet, {
             props: {
                 isOpen: true,
-                fileId: fileData.id,
+                fileId: 1,
                 isLoading: false,
-                fileData,
+                fileData: makeFile({
+                    source: 'deviantart.com',
+                    capabilities: {
+                        refresh_source_media: true,
+                        watch_source_and_refresh: true,
+                        unwatch_source_account: true,
+                    },
+                }),
             },
         });
 
-        await wrapper.get('[data-test="refresh-source-media"]').trigger('click');
-        await flushPromises();
-
-        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/refresh-source-media');
-        expect(wrapper.emitted('source-media-refreshed')).toEqual([[refreshedFile]]);
-        expect(wrapper.get('[data-test="source-media-refresh-message"]').text()).toBe('Source media refreshed.');
+        expect(wrapper.find('[data-test="refresh-source-media"]').exists()).toBe(false);
+        expect(wrapper.emitted('source-media-refreshed')).toBeUndefined();
     });
 
-    it('does not render the source media refresh action without capability', () => {
+    it('renders the selected item prompt in the sheet', async () => {
         const wrapper = mount(FileViewerSheet, {
             props: {
                 isOpen: true,
                 fileId: 1,
                 isLoading: false,
                 fileData: makeFile(),
+                prompt: 'high detail test prompt',
+                showPrompt: true,
             },
         });
 
-        expect(wrapper.find('[data-test="refresh-source-media"]').exists()).toBe(false);
+        expect(wrapper.get('[data-test="file-prompt"]').text()).toContain('high detail test prompt');
+
+        await wrapper.get('[data-test="copy-prompt"]').trigger('click');
+
+        expect(copyToClipboard).toHaveBeenCalledWith('high detail test prompt', 'Prompt', { showToast: false });
     });
 
+    it('shows prompt loading state in the sheet', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile(),
+                isPromptLoading: true,
+                showPrompt: true,
+            },
+        });
+
+        expect(wrapper.get('[data-test="file-prompt"]').text()).toContain('Loading prompt...');
+    });
 
     it('renders fullscreen next previews fixed at the bottom of the embedded sheet', async () => {
         const wrapper = mount(FileViewerSheet, {

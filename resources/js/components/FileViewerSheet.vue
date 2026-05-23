@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { Copy, Loader2, PanelRightClose, RefreshCw } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
+import { computed } from 'vue';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
-import { refreshSourceMedia } from '@/actions/App/Http/Controllers/FilesController';
 import type { File, FileMetadataRecord } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
 import FullscreenSheetPreviewStrip from './FullscreenSheetPreviewStrip.vue';
@@ -14,32 +13,28 @@ interface Props {
     fileId: number | null;
     fileData: File | null;
     isLoading: boolean;
+    isPromptLoading?: boolean;
     nextPreviews?: VibeFullscreenPreviewItem[];
+    prompt?: string | null;
+    showPrompt?: boolean;
     totalItems?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
+    isPromptLoading: false,
     nextPreviews: () => [],
+    prompt: null,
+    showPrompt: false,
     totalItems: 0,
 });
 
 const emit = defineEmits<{
     close: [];
     'select-preview': [index: number];
-    'source-media-refreshed': [file: File];
 }>();
 
-type RefreshSourceMediaResponse = {
-    message: string;
-    changed: boolean;
-    file: File;
-};
-
-const isRefreshingSourceMedia = ref(false);
-const sourceMediaRefreshMessage = ref<string | null>(null);
-const sourceMediaRefreshError = ref<string | null>(null);
 const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
-const canRefreshSourceMedia = computed(() => Boolean(props.fileData?.capabilities?.refresh_source_media));
+const shouldShowPrompt = computed(() => props.showPrompt || props.isPromptLoading || Boolean(props.prompt));
 const metadataSections = computed(() => {
     if (!props.fileData) {
         return [];
@@ -102,29 +97,6 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
     }
 }
 
-async function handleRefreshSourceMedia(): Promise<void> {
-    if (!props.fileData || !canRefreshSourceMedia.value || isRefreshingSourceMedia.value) {
-        return;
-    }
-
-    isRefreshingSourceMedia.value = true;
-    sourceMediaRefreshMessage.value = null;
-    sourceMediaRefreshError.value = null;
-
-    try {
-        const { data } = await window.axios.post<RefreshSourceMediaResponse>(
-            refreshSourceMedia.url(props.fileData.id),
-        );
-
-        emit('source-media-refreshed', data.file);
-        sourceMediaRefreshMessage.value = data.message;
-    } catch (error) {
-        const response = error as { response?: { data?: { message?: string } } };
-        sourceMediaRefreshError.value = response.response?.data?.message ?? 'Unable to refresh source media.';
-    } finally {
-        isRefreshingSourceMedia.value = false;
-    }
-}
 </script>
 
 <template>
@@ -160,24 +132,6 @@ async function handleRefreshSourceMedia(): Promise<void> {
                         <div class="font-semibold text-white mb-1">Source</div>
                         <div class="flex min-w-0 items-center gap-2">
                             <div class="min-w-0 flex-1 wrap-break-word">{{ fileData.source || 'N/A' }}</div>
-                            <button
-                                v-if="canRefreshSourceMedia"
-                                type="button"
-                                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-twilight-indigo-500/50 text-white/80 transition hover:border-smart-blue-400/70 hover:bg-prussian-blue-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                title="Refresh source media"
-                                aria-label="Refresh source media"
-                                data-test="refresh-source-media"
-                                :disabled="isRefreshingSourceMedia"
-                                @click="handleRefreshSourceMedia"
-                            >
-                                <RefreshCw :size="14" :class="{ 'animate-spin': isRefreshingSourceMedia }" />
-                            </button>
-                        </div>
-                        <div v-if="sourceMediaRefreshMessage" class="mt-2 text-xs text-green-300" data-test="source-media-refresh-message">
-                            {{ sourceMediaRefreshMessage }}
-                        </div>
-                        <div v-if="sourceMediaRefreshError" class="mt-2 text-xs text-red-300" data-test="source-media-refresh-error">
-                            {{ sourceMediaRefreshError }}
                         </div>
                     </div>
                     <div v-if="fileData.filename">
@@ -215,6 +169,31 @@ async function handleRefreshSourceMedia(): Promise<void> {
                     <div v-if="fileData.description">
                         <div class="font-semibold text-white mb-1">Description</div>
                         <div class="wrap-break-word">{{ fileData.description }}</div>
+                    </div>
+                    <div v-if="shouldShowPrompt" class="space-y-2" data-test="file-prompt">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="font-semibold text-white">Prompt</div>
+                            <button
+                                v-if="prompt"
+                                type="button"
+                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white"
+                                aria-label="Copy prompt"
+                                data-test="copy-prompt"
+                                @click="handleCopyText(prompt, 'Prompt')"
+                            >
+                                <Copy :size="16" />
+                            </button>
+                        </div>
+                        <div v-if="isPromptLoading" class="flex items-center gap-2 text-sm text-twilight-indigo-100">
+                            <Loader2 :size="16" class="animate-spin" />
+                            <span>Loading prompt...</span>
+                        </div>
+                        <div v-else-if="prompt" class="max-h-[28rem] overflow-y-auto whitespace-pre-wrap wrap-break-word rounded border border-twilight-indigo-500/45 bg-prussian-blue-900/45 p-3 text-sm text-twilight-indigo-100">
+                            {{ prompt }}
+                        </div>
+                        <div v-else class="text-sm text-twilight-indigo-300">
+                            No prompt data available
+                        </div>
                     </div>
                     <div v-if="fileData.url">
                         <div class="font-semibold text-white mb-1">URL</div>

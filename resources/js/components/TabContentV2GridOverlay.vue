@@ -6,7 +6,6 @@ import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { SourceWatchRefreshActions } from '@/composables/useSourceWatchRefresh';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
-import type { TabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
 import type { FeedItem } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
 import { Button } from '@/components/ui/button';
@@ -23,8 +22,8 @@ interface Props {
     vibeItem: VibeViewerItem;
     containers: TabContentContainerInteractions;
     itemInteractions: TabContentItemInteractions;
-    promptDialog: TabContentPromptDialog;
     localFileDeletion: LocalFileDeletion;
+    openFileSheet: (item: FeedItem, index: number) => void;
     sourceWatchRefresh: SourceWatchRefreshActions;
     onReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
 }
@@ -164,7 +163,7 @@ const showReactions = computed(() => (
                 size="sm"
                 class="h-7 w-7 bg-black/50 p-0 text-white hover:bg-black/70"
                 aria-label="Show prompt"
-                @click.stop="promptDialog.open(item)"
+                @click.stop="openFileSheet(item, index)"
             >
                 <Info :size="14" />
             </Button>

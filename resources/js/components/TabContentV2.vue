@@ -366,8 +366,9 @@ function handleAssetLoads(loads: VibeAssetLoadEvent[]): void { const batch = loa
 function handleAssetErrors(errors: VibeAssetErrorEvent[]): void { itemInteractions.preload.onBatchFailures(errors.map((error) => ({ item: error.item.feedItem as FeedItem, error }))); }
 async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> { const feedItem = getFeedItemFromVibeItem(item); if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type); }
 
-function openFileSheet(): void { fileViewerSheet.setSheetOpen(true); }
-function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); }
+function openFileSheet(): void { promptDialog.clear(); fileViewerSheet.setSheetOpen(true); }
+function openFileSheetForItem(item: FeedItem, index: number): void { activeIndex.value = index; promptDialog.select(item); fileViewerSheet.setSheetOpen(true); }
+function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); promptDialog.clear(); }
 
 async function loadStandaloneFileItem(fileId: number): Promise<FeedItem | null> {
     try {
@@ -403,6 +404,7 @@ const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
     onBlacklist: async (item) => {
         await itemInteractions.reactions.onFileBlacklist(item);
     },
+    onBatchAction: async (action) => (isVibeLoading.value || vibeStatus.value.itemCount === 0 ? 0 : itemInteractions.performLoadedItemsBulkAction(action)),
 });
 
 async function applyFilters(): Promise<void> { stopActiveVibeAutomation(); hydratedInitialState.value = undefined; await browseActions.applyFilters(); }
@@ -531,7 +533,7 @@ watch(
         :file-sheet-state="fileSheetState"
         :current-visible-item="currentVisibleItem"
         :file-viewer-data="syncedFileViewerData"
-        :open-file-sheet="openFileSheet"
+        :open-file-sheet="openFileSheet" :open-file-sheet-for-item="openFileSheetForItem"
         :close-file-sheet="closeFileSheet"
         :downloaded-reaction-prompt="downloadedReactionPrompt"
         :handle-container-blacklist-change="containerBlacklists.handleContainerBlacklistChange"

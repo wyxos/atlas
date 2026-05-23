@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
@@ -144,6 +144,16 @@ function getScrollPaddingTop(element: HTMLElement): number {
     return Number.isNaN(paddingTop) ? 0 : paddingTop;
 }
 
+function getScrollPaddingBottom(element: HTMLElement): number {
+    const paddingBottom = Number.parseFloat(window.getComputedStyle(element).paddingBottom);
+
+    return Number.isNaN(paddingBottom) ? 0 : paddingBottom;
+}
+
+function hasVerticalOverflow(element: HTMLElement): boolean {
+    return element.scrollHeight > element.clientHeight + 1;
+}
+
 async function scrollTabIntoView(tabId: number | null): Promise<void> {
     if (tabId === null) {
         return;
@@ -158,14 +168,25 @@ async function scrollTabIntoView(tabId: number | null): Promise<void> {
         return;
     }
 
+    if (!hasVerticalOverflow(scrollContainer)) {
+        return;
+    }
+
+    const scrollContainerRect = scrollContainer.getBoundingClientRect();
+    const tabRect = tabElement.getBoundingClientRect();
+    const visibleTop = scrollContainerRect.top + getScrollPaddingTop(scrollContainer);
+    const visibleBottom = scrollContainerRect.bottom - getScrollPaddingBottom(scrollContainer);
+
+    if (tabRect.top >= visibleTop && tabRect.bottom <= visibleBottom) {
+        return;
+    }
+
+    const nextTop = tabRect.top < visibleTop
+        ? scrollContainer.scrollTop + tabRect.top - visibleTop
+        : scrollContainer.scrollTop + tabRect.bottom - visibleBottom;
+
     scrollContainer.scrollTo({
-        top: Math.max(
-            0,
-            scrollContainer.scrollTop
-                + tabElement.getBoundingClientRect().top
-                - scrollContainer.getBoundingClientRect().top
-                - getScrollPaddingTop(scrollContainer),
-        ),
+        top: Math.max(0, nextTop),
         behavior: 'smooth',
     });
 }
@@ -355,9 +376,21 @@ async function loadTabs(): Promise<void> {
     }
 }
 
+watch(activeTabId, (tabId) => {
+    void scrollTabIntoView(tabId);
+});
+
+watch(
+    () => tabs.value.length,
+    () => {
+        void scrollTabIntoView(activeTabId.value);
+    },
+);
+
 onMounted(async () => {
     window.addEventListener('keydown', handleUndoShortcut);
     await loadTabs();
+    await scrollTabIntoView(activeTabId.value);
 });
 
 onUnmounted(() => {

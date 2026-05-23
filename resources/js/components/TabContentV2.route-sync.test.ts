@@ -207,9 +207,11 @@ vi.mock('@/composables/useTabContentPromptDialog', () => ({
             promptDialogItemId: ref(null),
             promptDialogOpen: ref(false),
         },
+        clear: vi.fn(),
         close: vi.fn(),
         copy: vi.fn(),
         openTestPage: vi.fn(),
+        select: vi.fn(),
         setOpen: vi.fn(),
     }),
 }));

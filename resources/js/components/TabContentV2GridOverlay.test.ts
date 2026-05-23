@@ -72,15 +72,13 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
                 onFileBlacklist: vi.fn(),
             },
         } as any,
-        promptDialog: {
-            open: vi.fn(),
-        } as any,
         localFileDeletion: {
             actions: {
                 canDelete: vi.fn().mockReturnValue(false),
                 open: vi.fn(),
             },
         } as any,
+        openFileSheet: vi.fn(),
         sourceWatchRefresh: {
             canRefreshSourceMedia: vi.fn().mockReturnValue(false),
             canWatchAndRefresh: vi.fn().mockReturnValue(false),
@@ -95,7 +93,7 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
 }
 
 describe('TabContentV2GridOverlay', () => {
-it('renders hover actions without preview-side dependencies', () => {
+    it('renders hover actions without preview-side dependencies', () => {
         const props = createProps({ hovered: true });
 
         const wrapper = mount(TabContentV2GridOverlay, {
@@ -110,6 +108,25 @@ it('renders hover actions without preview-side dependencies', () => {
         });
 
         expect(wrapper.exists()).toBe(true);
+    });
+
+    it('opens the file sheet from the prompt action', async () => {
+        const props = createProps({ hovered: true });
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        await wrapper.get('button[aria-label="Show prompt"]').trigger('click');
+
+        expect(props.openFileSheet).toHaveBeenCalledWith(props.item, props.index);
     });
 
     it('marks non-sibling cards as dimmed while a container drawer is open', () => {

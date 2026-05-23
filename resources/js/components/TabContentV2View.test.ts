@@ -42,11 +42,9 @@ const browseV2StatusBarStub = defineComponent({
     props: {
         status: { type: Object, required: true },
         totalAvailable: { default: null },
-        bulkActionsDisabled: { type: Boolean, default: true },
         cancelFill: { type: Function, default: null },
         canTogglePageLoadingLock: { type: Boolean, default: false },
         pageLoadingLocked: { type: Boolean, default: false },
-        performLoadedItemsBulkAction: { type: Function, default: null },
         togglePageLoadingLock: { type: Function, default: null },
     },
     setup(props) {
@@ -224,6 +222,7 @@ function createProps() {
             handleMouseDownCapture: vi.fn(),
         },
         openFileSheet: vi.fn(),
+        openFileSheetForItem: vi.fn(),
         promptDialog: {
             data: {
                 promptDialogOpen: ref(false),
@@ -231,7 +230,9 @@ function createProps() {
                 promptDataLoading: ref(false),
                 currentPromptData: ref(null),
             },
+            clear: vi.fn(),
             setOpen: vi.fn(),
+            select: vi.fn(),
             copy: vi.fn(),
             openTestPage: vi.fn(),
             close: vi.fn(),
@@ -432,7 +433,7 @@ describe('TabContentV2View', () => {
         expect(browseV2StatusBarSpy.mock.calls[0][0].totalAvailable).toBe(312);
     });
 
-    it('passes status bar action handlers and lock state through to the footer overlay', () => {
+    it('passes status bar lock state through to the footer overlay', () => {
         const props = createProps();
         const lockPageLoading = vi.fn();
         const unlockPageLoading = vi.fn();
@@ -457,11 +458,10 @@ describe('TabContentV2View', () => {
 
         const statusBarProps = browseV2StatusBarSpy.mock.calls[0][0];
 
-        expect(statusBarProps.bulkActionsDisabled).toBe(false);
         expect(statusBarProps.cancelFill).toBe(props.cancelFill);
         expect(statusBarProps.canTogglePageLoadingLock).toBe(true);
         expect(statusBarProps.pageLoadingLocked).toBe(false);
-        expect(statusBarProps.performLoadedItemsBulkAction).toBe(props.itemInteractions.performLoadedItemsBulkAction);
+        expect('performLoadedItemsBulkAction' in statusBarProps).toBe(false);
 
         statusBarProps.togglePageLoadingLock();
         expect(lockPageLoading).toHaveBeenCalledTimes(1);

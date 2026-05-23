@@ -164,4 +164,39 @@ describe('tabContentV2MouseShortcuts', () => {
 
         expect(onReaction).toHaveBeenCalledWith(item, 'like');
     });
+
+    it('runs batch reactions when alt-clicking grid gaps', () => {
+        const onBatchAction = vi.fn();
+        const onReaction = vi.fn();
+        const onBlacklist = vi.fn();
+        const handlers = createBrowseV2MouseShortcutHandlers({
+            getCurrentItem: () => null,
+            getItemFromTarget: () => null,
+            getSurfaceMode: () => 'list',
+            onBatchAction,
+            onBlacklist,
+            onReaction,
+        });
+
+        document.body.innerHTML = '<div id="grid-gap"></div>';
+        const target = document.getElementById('grid-gap');
+
+        const leftClick = new MouseEvent('click', { altKey: true, button: 0 });
+        Object.defineProperty(leftClick, 'target', { value: target, configurable: true });
+        handlers.handleClickCapture(leftClick);
+
+        const middleMouseDown = new MouseEvent('mousedown', { altKey: true, button: 1 });
+        Object.defineProperty(middleMouseDown, 'target', { value: target, configurable: true });
+        handlers.handleMouseDownCapture(middleMouseDown);
+
+        const contextMenu = new MouseEvent('contextmenu', { altKey: true, button: 2 });
+        Object.defineProperty(contextMenu, 'target', { value: target, configurable: true });
+        handlers.handleContextMenuCapture(contextMenu);
+
+        expect(onBatchAction).toHaveBeenNthCalledWith(1, 'love');
+        expect(onBatchAction).toHaveBeenNthCalledWith(2, 'like');
+        expect(onBatchAction).toHaveBeenNthCalledWith(3, 'blacklist');
+        expect(onReaction).not.toHaveBeenCalled();
+        expect(onBlacklist).not.toHaveBeenCalled();
+    });
 });

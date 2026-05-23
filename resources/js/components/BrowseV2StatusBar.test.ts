@@ -464,21 +464,19 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.find('[data-testid="browse-v2-available-total-pill"]').exists()).toBe(false);
     });
 
-    it('renders the moved bulk actions as icon-only status bar buttons', () => {
+    it('does not render batch reaction buttons in the status bar', () => {
         const wrapper = mount(BrowseV2StatusBar, {
             props: {
                 status: createStatus(),
-                bulkActionsDisabled: false,
                 canTogglePageLoadingLock: true,
-                performLoadedItemsBulkAction: vi.fn(),
                 togglePageLoadingLock: vi.fn(),
             },
         });
 
         expect(wrapper.get('[data-test="page-loading-lock-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-like-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-love-button"]').exists()).toBe(true);
-        expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="loaded-items-like-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-love-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-blacklist-button"]').exists()).toBe(false);
         expect(wrapper.text()).not.toContain('Like all');
         expect(wrapper.text()).not.toContain('Lock paging');
     });
@@ -519,41 +517,30 @@ describe('BrowseV2StatusBar', () => {
         expect(lockButton.find('[data-testid="lock-keyhole-open-icon"]').exists()).toBe(false);
     });
 
-    it('routes bulk actions and the page-loading lock through the provided handlers', async () => {
-        const performLoadedItemsBulkAction = vi.fn(async () => 0);
+    it('routes the page-loading lock through the provided handler', async () => {
         const togglePageLoadingLock = vi.fn();
         const wrapper = mount(BrowseV2StatusBar, {
             props: {
                 status: createStatus(),
-                bulkActionsDisabled: false,
                 canTogglePageLoadingLock: true,
-                performLoadedItemsBulkAction,
                 togglePageLoadingLock,
             },
         });
 
-        await wrapper.get('[data-test="loaded-items-like-button"]').trigger('click');
-        await wrapper.get('[data-test="loaded-items-love-button"]').trigger('click');
-        await wrapper.get('[data-test="loaded-items-blacklist-button"]').trigger('click');
         await wrapper.get('[data-test="page-loading-lock-button"]').trigger('click');
 
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(1, 'like');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(2, 'love');
-        expect(performLoadedItemsBulkAction).toHaveBeenNthCalledWith(3, 'blacklist');
         expect(togglePageLoadingLock).toHaveBeenCalledTimes(1);
     });
 
-    it('disables the action rail when handlers are unavailable', () => {
+    it('hides the action rail when no action handlers are available', () => {
         const wrapper = mount(BrowseV2StatusBar, {
             props: {
                 status: createStatus(),
-                bulkActionsDisabled: true,
                 canTogglePageLoadingLock: false,
-                performLoadedItemsBulkAction: vi.fn(),
             },
         });
 
-        expect(wrapper.get('[data-test="page-loading-lock-button"]').attributes('disabled')).toBeDefined();
-        expect(wrapper.get('[data-test="loaded-items-blacklist-button"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.find('[data-test="page-loading-lock-button"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="loaded-items-blacklist-button"]').exists()).toBe(false);
     });
 });

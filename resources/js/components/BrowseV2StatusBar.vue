@@ -1,43 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Ban, ChevronsDown, Heart, ListPlus, Loader2, LockKeyhole, LockKeyholeOpen, Pause, Play, ThumbsUp, X } from 'lucide-vue-next'
+import { ChevronsDown, ListPlus, Loader2, LockKeyhole, LockKeyholeOpen, Pause, Play, X } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
-import type { LoadedItemsBulkAction } from '@/composables/useTabContentItemInteractions'
 import BrowseV2NumberField from './BrowseV2NumberField.vue'
 import Pill from './ui/Pill.vue'
-
-const bulkActionButtons: Array<{
-  action: LoadedItemsBulkAction
-  color?: 'danger'
-  dataTest: string
-  icon: typeof Heart
-  label: string
-  title: string
-}> = [
-  {
-    action: 'like',
-    dataTest: 'loaded-items-like-button',
-    icon: ThumbsUp,
-    label: 'Like all',
-    title: 'Run the ALT + middle click reaction on all loaded items',
-  },
-  {
-    action: 'love',
-    dataTest: 'loaded-items-love-button',
-    icon: Heart,
-    label: 'Love all',
-    title: 'Run the ALT + left click reaction on all loaded items',
-  },
-  {
-    action: 'blacklist',
-    color: 'danger',
-    dataTest: 'loaded-items-blacklist-button',
-    icon: Ban,
-    label: 'Blacklist all',
-    title: 'Blacklist every loaded item and remove it from the grid',
-  },
-]
 
 type VibeStatusLike = {
   currentCursor: string | null
@@ -72,7 +39,6 @@ interface Props {
   autoScrollMax?: number
   autoScrollMin?: number
   autoScrollSpeed?: number
-  bulkActionsDisabled?: boolean
   cancelFill?: (() => void) | null
   canTogglePageLoadingLock?: boolean
   fillActionsDisabled?: boolean
@@ -82,7 +48,6 @@ interface Props {
   fillUntilCount?: (() => void) | null
   fillUntilEnd?: (() => void) | null
   pageLoadingLocked?: boolean
-  performLoadedItemsBulkAction?: ((action: LoadedItemsBulkAction) => void | Promise<number>) | null
   setAutoScrollSpeed?: ((value: number) => void) | null
   setFillCallCount?: ((value: number) => void) | null
   toggleAutoScroll?: (() => void) | null
@@ -95,7 +60,6 @@ const props = withDefaults(defineProps<Props>(), {
   autoScrollMax: 300,
   autoScrollMin: 20,
   autoScrollSpeed: 50,
-  bulkActionsDisabled: true,
   cancelFill: null,
   canTogglePageLoadingLock: false,
   fillActionsDisabled: false,
@@ -105,7 +69,6 @@ const props = withDefaults(defineProps<Props>(), {
   fillUntilCount: null,
   fillUntilEnd: null,
   pageLoadingLocked: false,
-  performLoadedItemsBulkAction: null,
   setAutoScrollSpeed: null,
   setFillCallCount: null,
   toggleAutoScroll: null,
@@ -128,7 +91,6 @@ const showActionRail = computed(() => (
   canCancelFill.value
   || showAutoScrollControls.value
   || showFillControls.value
-  || props.performLoadedItemsBulkAction !== null
   || props.canTogglePageLoadingLock
 ))
 const nextBoundaryProgressPercent = computed(() => Math.round(clampProgress(props.status.nextBoundaryLoadProgress) * 100))
@@ -233,14 +195,6 @@ const fillControlsDisabled = computed(() => (
   || props.status.pageLoadingLocked === true
   || isPending.value
 ))
-
-function handleLoadedItemsBulkAction(action: LoadedItemsBulkAction): void {
-  if (!props.performLoadedItemsBulkAction) {
-    return
-  }
-
-  void props.performLoadedItemsBulkAction(action)
-}
 
 function handleTogglePageLoadingLock(): void {
   if (!props.togglePageLoadingLock) {
@@ -464,21 +418,6 @@ function clampProgress(value: unknown): number {
           <component :is="props.pageLoadingLocked ? LockKeyhole : LockKeyholeOpen" :size="14" />
         </Button>
 
-        <Button
-          v-for="action in bulkActionButtons"
-          :key="action.dataTest"
-          size="icon-sm"
-          variant="ghost"
-          class="rounded border-0 bg-transparent text-white hover:bg-transparent hover:text-smart-blue-300"
-          :class="action.color === 'danger' ? 'hover:text-danger-300' : ''"
-          :aria-label="action.label"
-          :data-test="action.dataTest"
-          :disabled="props.bulkActionsDisabled || !props.performLoadedItemsBulkAction"
-          :title="action.title"
-          @click="handleLoadedItemsBulkAction(action.action)"
-        >
-          <component :is="action.icon" :size="14" />
-        </Button>
       </div>
     </div>
   </div>
