@@ -70,6 +70,10 @@ test('audio playlists endpoint syncs system playlists and dynamic sources', func
     $playlists = collect($response->json('sections.0.playlists'))->keyBy('slug');
     expect($playlists->get('all')['count'])->toBe(3)
         ->and($playlists->get('favorites')['count'])->toBe(1)
+        ->and($playlists->get('favorites-and-likes')['name'])->toBe('Favorites & Likes')
+        ->and($playlists->get('favorites-and-likes')['count'])->toBe(1)
+        ->and($playlists->get('reacted')['name'])->toBe('Reacted')
+        ->and($playlists->get('reacted')['count'])->toBe(1)
         ->and($playlists->get('banned')['name'])->toBe('Banned')
         ->and($playlists->get('unreacted')['name'])->toBe('Unreacted')
         ->and($playlists->get('unreacted')['count'])->toBe(2)
@@ -166,6 +170,7 @@ test('audio ids can be filtered by system playlist slug', function () {
     $user = User::factory()->create();
     $favorite = File::factory()->create(['mime_type' => 'audio/mpeg', 'source' => 'Spotify']);
     $liked = File::factory()->create(['mime_type' => 'audio/ogg', 'source' => 'Spotify']);
+    $funny = File::factory()->create(['mime_type' => 'audio/flac', 'source' => 'Bandcamp']);
     $removed = File::factory()->create([
         'mime_type' => 'audio/wav',
         'source' => 'local',
@@ -183,6 +188,11 @@ test('audio ids can be filtered by system playlist slug', function () {
         'user_id' => $user->id,
         'type' => 'like',
     ]);
+    Reaction::query()->create([
+        'file_id' => $funny->id,
+        'user_id' => $user->id,
+        'type' => 'funny',
+    ]);
 
     $this->actingAs($user)->getJson('/api/audio/playlists')->assertSuccessful();
 
@@ -190,6 +200,16 @@ test('audio ids can be filtered by system playlist slug', function () {
         ->getJson('/api/audio/ids?playlist=favorites&after_id=0&per_page=10')
         ->assertSuccessful()
         ->assertJsonPath('ids', [$favorite->id]);
+
+    $this->actingAs($user)
+        ->getJson('/api/audio/ids?playlist=favorites-and-likes&after_id=0&per_page=10')
+        ->assertSuccessful()
+        ->assertJsonPath('ids', [$favorite->id, $liked->id]);
+
+    $this->actingAs($user)
+        ->getJson('/api/audio/ids?playlist=reacted&after_id=0&per_page=10')
+        ->assertSuccessful()
+        ->assertJsonPath('ids', [$favorite->id, $liked->id, $funny->id]);
 
     $this->actingAs($user)
         ->getJson('/api/audio/ids?playlist=banned&after_id=0&per_page=10')

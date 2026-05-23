@@ -108,6 +108,7 @@ class AudioPlaylistQueryService
                 ->whereNotNull('source')
                 ->whereRaw('LOWER(TRIM(source)) NOT IN (?, ?)', ['local', 'nas']),
             'reaction' => $this->applyReactionRule($query, $userId, (string) ($rules['type'] ?? '')),
+            'reaction_any' => $this->applyReactionAnyRule($query, $userId, $rules['types'] ?? []),
             'source' => $this->applySourceRule($query, (string) ($rules['source_key'] ?? '')),
             'unreacted' => $this->applyUnreactedRule($query, $userId),
             default => $query,
@@ -190,6 +191,31 @@ class AudioPlaylistQueryService
                 ->whereColumn('reactions.file_id', 'files.id')
                 ->where('reactions.user_id', $userId)
                 ->where('reactions.type', $type);
+        });
+    }
+
+    private function applyReactionAnyRule(Builder $query, int $userId, mixed $types): Builder
+    {
+        if (! is_array($types)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $types = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $type): string => is_string($type) ? trim($type) : '', $types),
+            static fn (string $type): bool => in_array($type, ['love', 'like', 'funny'], true),
+        )));
+
+        if ($types === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereExists(function (Builder $subQuery) use ($types, $userId): void {
+            $subQuery
+                ->selectRaw('1')
+                ->from('reactions')
+                ->whereColumn('reactions.file_id', 'files.id')
+                ->where('reactions.user_id', $userId)
+                ->whereIn('reactions.type', $types);
         });
     }
 

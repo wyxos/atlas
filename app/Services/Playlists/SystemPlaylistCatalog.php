@@ -45,6 +45,14 @@ class SystemPlaylistCatalog
                 'sort_order' => 30,
             ],
             [
+                'slug' => 'favorites-and-likes',
+                'name' => 'Favorites & Likes',
+                'description' => 'Files marked as favorites or liked',
+                'membership_rules' => ['operator' => 'reaction_any', 'types' => ['love', 'like']],
+                'source_key' => null,
+                'sort_order' => 35,
+            ],
+            [
                 'slug' => 'funny',
                 'name' => 'Funny',
                 'description' => 'Files marked as funny',
@@ -53,12 +61,20 @@ class SystemPlaylistCatalog
                 'sort_order' => 40,
             ],
             [
+                'slug' => 'reacted',
+                'name' => 'Reacted',
+                'description' => 'Files marked as favorites, liked, or funny',
+                'membership_rules' => ['operator' => 'reaction_any', 'types' => ['love', 'like', 'funny']],
+                'source_key' => null,
+                'sort_order' => 45,
+            ],
+            [
                 'slug' => 'unreacted',
                 'name' => 'Unreacted',
                 'description' => 'No reaction yet',
                 'membership_rules' => ['operator' => 'unreacted'],
                 'source_key' => null,
-                'sort_order' => 45,
+                'sort_order' => 50,
             ],
             [
                 'slug' => 'banned',
@@ -66,7 +82,7 @@ class SystemPlaylistCatalog
                 'description' => 'Files marked as banned',
                 'membership_rules' => ['operator' => 'blacklisted'],
                 'source_key' => null,
-                'sort_order' => 50,
+                'sort_order' => 60,
             ],
             [
                 'slug' => 'imports',
@@ -74,7 +90,7 @@ class SystemPlaylistCatalog
                 'description' => 'Files saved in Atlas',
                 'membership_rules' => ['operator' => 'imported'],
                 'source_key' => null,
-                'sort_order' => 60,
+                'sort_order' => 70,
             ],
             [
                 'slug' => 'online-sources',
@@ -82,7 +98,7 @@ class SystemPlaylistCatalog
                 'description' => 'Files from online sources',
                 'membership_rules' => ['operator' => 'online'],
                 'source_key' => null,
-                'sort_order' => 70,
+                'sort_order' => 80,
             ],
             [
                 'slug' => 'no-artist',
@@ -90,7 +106,7 @@ class SystemPlaylistCatalog
                 'description' => 'Imported audio without artist relationships',
                 'membership_rules' => ['operator' => 'missing_artist'],
                 'source_key' => null,
-                'sort_order' => 80,
+                'sort_order' => 90,
             ],
             [
                 'slug' => 'no-album',
@@ -98,7 +114,7 @@ class SystemPlaylistCatalog
                 'description' => 'Imported audio without album relationships',
                 'membership_rules' => ['operator' => 'missing_album'],
                 'source_key' => null,
-                'sort_order' => 90,
+                'sort_order' => 100,
             ],
             [
                 'slug' => 'no-album-cover',
@@ -106,7 +122,7 @@ class SystemPlaylistCatalog
                 'description' => 'Imported audio linked to albums without default covers',
                 'membership_rules' => ['operator' => 'missing_album_cover'],
                 'source_key' => null,
-                'sort_order' => 95,
+                'sort_order' => 105,
             ],
         ];
 
@@ -117,7 +133,7 @@ class SystemPlaylistCatalog
                 'description' => 'Source: '.$this->sourceLabel($sourceKey),
                 'membership_rules' => ['operator' => 'source', 'source_key' => $sourceKey],
                 'source_key' => $sourceKey,
-                'sort_order' => 100 + $index,
+                'sort_order' => 110 + $index,
             ];
         }
 
