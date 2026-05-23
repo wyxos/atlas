@@ -36,6 +36,8 @@ type FileSheetState = {
     isOpen: boolean;
 };
 
+type FileSheetPresentation = 'inline' | 'overlay';
+
 type FileViewerDataShape = {
     fileData: { value: File | null };
     isLoadingFileData: { value: boolean };
@@ -95,6 +97,7 @@ const props = defineProps<{
     openFileSheet: () => void;
     openFileSheetForItem: (item: FeedItem, index: number) => void;
     promptDialog: TabContentPromptDialogHandle;
+    fileSheetPresentation: FileSheetPresentation;
     resolve: (params: { cursor: string | null; pageSize: number; signal?: AbortSignal }) => Promise<VibeResolveResult>;
     setAutoScrollSpeed?: (value: number) => void;
     setFillCallCount?: (value: number) => void;
@@ -134,6 +137,8 @@ const isSheetPromptLoading = computed(() => {
     return Boolean(promptLoading);
 });
 const showSheetPrompt = computed(() => sheetPromptItemId.value !== null);
+const isFileSheetOverlay = computed(() => props.fileSheetPresentation === 'overlay' && props.surfaceMode === 'list');
+const shouldReserveFileSheetSpace = computed(() => props.fileSheetState.isOpen && !isFileSheetOverlay.value);
 
 function closeGlobalStartPanel(): void {
     globalStartPanel?.close();
@@ -300,7 +305,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                     :key="viewerKey"
                     :ref="handleVibeRef"
                     class="h-full min-h-0 min-w-0 flex-1"
-                    :class="{ 'atlas-file-viewer-wide-aside': fileSheetState.isOpen }"
+                    :class="{ 'atlas-file-viewer-wide-aside': shouldReserveFileSheetSpace }"
                     v-bind="vibeLayoutBindings"
                     @update:active-index="props.updateActiveIndex"
                     @update:surface-mode="props.updateSurfaceMode"
@@ -429,17 +434,36 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                     </template>
                 </VibeLayout>
 
-                <FileViewerSheet
-                    v-if="fileSheetState.isOpen && surfaceMode === 'list'"
-                    :is-open="fileSheetState.isOpen"
-                    :file-id="currentVisibleItem?.id ?? null"
-                    :file-data="fileViewerData.fileData.value"
-                    :is-loading="fileViewerData.isLoadingFileData.value"
-                    :is-prompt-loading="isSheetPromptLoading"
-                    :prompt="promptDialog.data.currentPromptData.value"
-                    :show-prompt="showSheetPrompt"
-                    @close="closeFileSheet"
-                />
+                <template v-if="fileSheetState.isOpen && surfaceMode === 'list'">
+                    <div
+                        v-if="isFileSheetOverlay"
+                        class="pointer-events-none absolute inset-y-0 right-0 z-20 flex max-w-full justify-end"
+                        data-test="file-viewer-sheet-overlay"
+                    >
+                        <FileViewerSheet
+                            :is-open="fileSheetState.isOpen"
+                            :file-id="currentVisibleItem?.id ?? null"
+                            :file-data="fileViewerData.fileData.value"
+                            :is-loading="fileViewerData.isLoadingFileData.value"
+                            :is-prompt-loading="isSheetPromptLoading"
+                            :prompt="promptDialog.data.currentPromptData.value"
+                            :show-prompt="showSheetPrompt"
+                            @close="closeFileSheet"
+                        />
+                    </div>
+                    <FileViewerSheet
+                        v-else
+                        data-test="file-viewer-sheet-inline"
+                        :is-open="fileSheetState.isOpen"
+                        :file-id="currentVisibleItem?.id ?? null"
+                        :file-data="fileViewerData.fileData.value"
+                        :is-loading="fileViewerData.isLoadingFileData.value"
+                        :is-prompt-loading="isSheetPromptLoading"
+                        :prompt="promptDialog.data.currentPromptData.value"
+                        :show-prompt="showSheetPrompt"
+                        @close="closeFileSheet"
+                    />
+                </template>
 
                 <TabContentContainerDrawer
                     :open="containerInteractions.drawer.state.isOpen.value"

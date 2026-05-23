@@ -230,6 +230,7 @@ const fullscreenOverlayState = reactive({
 });
 const fileViewerSheet = useFileViewerSheetState({ overlay: fullscreenOverlayState });
 const fileSheetState = fileViewerSheet.sheetState;
+const fileSheetPresentation = ref<'inline' | 'overlay'>('inline');
 const vibeInitialCursor = computed(() => (standaloneItem.value ? null : normalizeCursor(browseState.startPageToken.value)));
 const vibeInitialState = computed<VibeInitialState | undefined>(() => {
     if (standaloneItem.value) {
@@ -290,11 +291,7 @@ function handleVibeItemsChange(vibeItems: VibeViewerItem[]): void {
         .filter((item): item is FeedItem => item !== null);
 }
 
-function resetLocalFeedState(): void {
-    items.value = [];
-    removedItemIds.value = new Set();
-    fileViewerSheet.setSheetOpen(false, { persist: false });
-}
+function resetLocalFeedState(): void { items.value = []; removedItemIds.value = new Set(); fileSheetPresentation.value = 'inline'; fileViewerSheet.setSheetOpen(false, { persist: false }); }
 
 function applyRestoredSession(): void {
     isSessionReady.value = false;
@@ -366,9 +363,9 @@ function handleAssetLoads(loads: VibeAssetLoadEvent[]): void { const batch = loa
 function handleAssetErrors(errors: VibeAssetErrorEvent[]): void { itemInteractions.preload.onBatchFailures(errors.map((error) => ({ item: error.item.feedItem as FeedItem, error }))); }
 async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> { const feedItem = getFeedItemFromVibeItem(item); if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type); }
 
-function openFileSheet(): void { promptDialog.clear(); fileViewerSheet.setSheetOpen(true); }
-function openFileSheetForItem(item: FeedItem, index: number): void { activeIndex.value = index; promptDialog.select(item); fileViewerSheet.setSheetOpen(true); }
-function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); promptDialog.clear(); }
+function openFileSheet(): void { fileSheetPresentation.value = 'inline'; promptDialog.clear(); fileViewerSheet.setSheetOpen(true); }
+function openFileSheetForItem(item: FeedItem, index: number): void { activeIndex.value = index; fileSheetPresentation.value = 'overlay'; promptDialog.select(item); fileViewerSheet.setSheetOpen(true); }
+function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); fileSheetPresentation.value = 'inline'; promptDialog.clear(); }
 
 async function loadStandaloneFileItem(fileId: number): Promise<FeedItem | null> {
     try {
@@ -531,6 +528,7 @@ watch(
         :local-file-deletion="localFileDeletion"
         :handle-reaction="handleReaction"
         :file-sheet-state="fileSheetState"
+        :file-sheet-presentation="fileSheetPresentation"
         :current-visible-item="currentVisibleItem"
         :file-viewer-data="syncedFileViewerData"
         :open-file-sheet="openFileSheet" :open-file-sheet-for-item="openFileSheetForItem"

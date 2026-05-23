@@ -133,6 +133,7 @@ function createProps() {
         currentVisibleItem: null,
         downloadedReactionPrompt: { data: { open: ref(false) }, chooseReact: vi.fn(), chooseRedownload: vi.fn(), close: vi.fn(), setOpen: vi.fn() },
         fileSheetState: { isOpen: false },
+        fileSheetPresentation: 'inline' as 'inline' | 'overlay',
         fileViewerData: { fileData: ref(null), isLoadingFileData: ref(false), setFileData: vi.fn() },
         form: { data: { limit: 20, feed: 'online', source: null }, reset: vi.fn() },
         goToFirstPage: vi.fn(),

@@ -101,6 +101,7 @@ vi.mock('@wyxos/vibe', () => ({
             });
 
             return () => h('div', {
+                class: attrs.class,
                 'data-testid': 'vibe-layout',
                 'data-slot-names': Object.keys(slots).join(','),
             }, [
@@ -173,6 +174,7 @@ function createProps() {
             setOpen: vi.fn(),
         },
         fileSheetState: { isOpen: false },
+        fileSheetPresentation: 'inline' as 'inline' | 'overlay',
         fileViewerData: {
             fileData: ref(null),
             isLoadingFileData: ref(false),
@@ -469,6 +471,40 @@ describe('TabContentV2View', () => {
         props.headerMasonry.pageLoadingLocked = true;
         statusBarProps.togglePageLoadingLock();
         expect(unlockPageLoading).toHaveBeenCalledTimes(1);
+    });
+
+    it('overlays the list-mode file sheet without reserving grid space for grid item info actions', () => {
+        const props = createProps();
+        props.fileSheetPresentation = 'overlay';
+        props.fileSheetState.isOpen = true;
+        props.surfaceMode = 'list';
+
+        const wrapper = mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: defaultStubs,
+            },
+        });
+
+        expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="vibe-layout"]').classes()).not.toContain('atlas-file-viewer-wide-aside');
+    });
+
+    it('keeps the inline list-mode file sheet path reserving grid space', () => {
+        const props = createProps();
+        props.fileSheetState.isOpen = true;
+        props.surfaceMode = 'list';
+
+        const wrapper = mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: defaultStubs,
+            },
+        });
+
+        expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="vibe-layout"]').classes()).toContain('atlas-file-viewer-wide-aside');
     });
 
 });
