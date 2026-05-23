@@ -11,6 +11,7 @@
         @endif
 
         @include('partials.favicons')
+        @include('partials.google-analytics')
     </head>
     <body class="app-gradient text-twilight-indigo-100 min-h-screen">
         <main class="mx-auto flex min-h-screen w-full max-w-4xl flex-col items-center justify-center gap-8 px-6 py-12 text-center">

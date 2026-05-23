@@ -231,6 +231,12 @@ describe('background-atlas-check-queue', () => {
 
     it('flushes short badge batches on the debounce timer and long batches immediately at the threshold', async () => {
         vi.useFakeTimers();
+        vi.stubGlobal('crypto', {
+            ...crypto,
+            subtle: {
+                digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
+            },
+        });
         const fetchMock = vi.fn().mockImplementation((_endpoint: string, init?: RequestInit) => {
             const body = JSON.parse(String(init?.body ?? '{}')) as {
                 items?: Array<{ request_id?: string }>;

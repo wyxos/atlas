@@ -66,4 +66,9 @@ return [
         'api_base_url' => env('SPOTIFY_API_BASE_URL', 'https://api.spotify.com/v1'),
     ],
 
+    'google_analytics' => [
+        'enabled' => env('GOOGLE_ANALYTICS_ENABLED', env('APP_ENV') === 'production'),
+        'measurement_id' => env('GOOGLE_ANALYTICS_MEASUREMENT_ID'),
+    ],
+
 ];

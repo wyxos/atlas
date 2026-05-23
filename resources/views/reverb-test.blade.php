@@ -12,6 +12,7 @@
         @endif
 
         @include('partials.favicons')
+        @include('partials.google-analytics')
     </head>
     <body class="app-gradient text-twilight-indigo-100 min-h-screen">
         <div id="app"></div>
