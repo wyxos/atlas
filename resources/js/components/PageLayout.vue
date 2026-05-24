@@ -17,7 +17,7 @@ withDefaults(defineProps<{
             data-test="page-layout-content"
             :class="[
                 'h-full min-h-0 md:flex md:flex-1 md:flex-col md:overflow-auto',
-                flush ? '' : 'bg-prussian-blue-600',
+                flush ? '' : 'bg-transparent',
             ]"
         >
             <slot />

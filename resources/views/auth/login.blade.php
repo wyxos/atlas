@@ -14,11 +14,11 @@
         @include('partials.favicons')
         @include('partials.google-analytics')
     </head>
-    <body class="bg-prussian-blue-600 text-twilight-indigo-100 min-h-screen">
+    <body class="app-gradient min-h-screen text-twilight-indigo-100">
         <div id="app"></div>
         <main class="flex min-h-screen items-center justify-center p-6">
             <div class="w-full max-w-md">
-                <div class="bg-prussian-blue-600 rounded-lg shadow-2xl p-8 lg:p-12">
+                <div class="rounded-lg bg-prussian-blue-800/70 p-8 shadow-2xl lg:p-12">
                     <div class="text-center mb-8">
                         <div class="flex justify-center mb-6">
                             <x-atlas-icon class="w-24 h-24" />

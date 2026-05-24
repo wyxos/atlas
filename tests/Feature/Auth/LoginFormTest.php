@@ -26,3 +26,11 @@ test('login form returns correct view', function () {
 
     $response->assertViewIs('auth.login');
 });
+
+test('login form uses the public gradient background', function () {
+    $response = $this->get('/login');
+
+    $response
+        ->assertOk()
+        ->assertSee('<body class="app-gradient min-h-screen text-twilight-indigo-100">', false);
+});

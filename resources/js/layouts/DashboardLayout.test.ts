@@ -65,6 +65,7 @@ describe('DashboardLayout', () => {
 
         expect(wrapper.classes()).toContain('h-screen');
         expect(wrapper.classes()).toContain('overflow-hidden');
+        expect(wrapper.classes()).toContain('app-gradient');
         expect(wrapper.find('[data-test="global-audio-player"]').exists()).toBe(true);
     });
 });

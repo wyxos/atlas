@@ -5,11 +5,13 @@ import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import App from './App.vue';
+import HomeScreenshotCarousel from './components/HomeScreenshotCarousel.vue';
 import routes from './routes';
 import './bootstrap';
 import './icons';
 import { configureEcho, echo } from '@laravel/echo-vue';
 import type Echo from 'laravel-echo';
+import type { HomeScreenshotSlide } from './types/homeScreenshot';
 import { registerStaleAssetReload } from './utils/staleAssetReload';
 
 declare global {
@@ -58,4 +60,17 @@ if (appElement?.dataset.vueRoot === 'spa') {
     });
 
     app.mount('#app');
+}
+
+const homeScreenshotCarouselElement = document.getElementById('atlas-home-screenshot-carousel');
+if (homeScreenshotCarouselElement) {
+    let slides: HomeScreenshotSlide[] = [];
+
+    try {
+        slides = JSON.parse(homeScreenshotCarouselElement.dataset.slides ?? '[]') as HomeScreenshotSlide[];
+    } catch {
+        slides = [];
+    }
+
+    createApp(HomeScreenshotCarousel, { slides }).mount(homeScreenshotCarouselElement);
 }

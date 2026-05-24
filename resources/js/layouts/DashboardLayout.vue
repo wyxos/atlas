@@ -163,7 +163,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex h-screen overflow-hidden bg-gradient-to-b from-prussian-blue-900 via-prussian-blue-800 to-prussian-blue-700">
+    <div class="app-gradient flex h-screen overflow-hidden">
         <!-- Side Menu -->
         <aside :class="[
             'fixed inset-y-0 left-0 lg:static z-40 h-screen w-full lg:w-24 bg-prussian-blue-800 border-r border-twilight-indigo-500 transition-transform duration-300 ease-in-out',
