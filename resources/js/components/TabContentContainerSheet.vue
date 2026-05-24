@@ -225,22 +225,20 @@ const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
                             </div>
                         </div>
                     </template>
-                    <template #fullscreen-overlay="{ item, index, total }">
-                        <div class="pointer-events-none absolute inset-0 z-[5]">
-                            <div class="pointer-events-auto absolute bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)] left-1/2 -translate-x-1/2">
-                                <FileReactions
-                                    :file-id="((item as VibeViewerItem).feedItem as FeedItem).id"
-                                    :reaction="(((item as VibeViewerItem).feedItem as FeedItem).reaction ?? null)"
-                                    :blacklisted-at="(((item as VibeViewerItem).feedItem as FeedItem).blacklisted_at ?? null)"
-                                    :previewed-count="(((item as VibeViewerItem).feedItem as FeedItem).previewed_count ?? 0)"
-                                    :viewed-count="(((item as VibeViewerItem).feedItem as FeedItem).seen_count ?? 0)"
-                                    :current-index="index"
-                                    :total-items="total"
-                                    variant="default"
-                                    @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
-                                    @blacklist="() => handleBlacklist(item as VibeViewerItem)"
-                                />
-                            </div>
+                    <template #fullscreen-footer="{ item, index, total }">
+                        <div class="flex justify-center">
+                            <FileReactions
+                                :file-id="((item as VibeViewerItem).feedItem as FeedItem).id"
+                                :reaction="(((item as VibeViewerItem).feedItem as FeedItem).reaction ?? null)"
+                                :blacklisted-at="(((item as VibeViewerItem).feedItem as FeedItem).blacklisted_at ?? null)"
+                                :previewed-count="(((item as VibeViewerItem).feedItem as FeedItem).previewed_count ?? 0)"
+                                :viewed-count="(((item as VibeViewerItem).feedItem as FeedItem).seen_count ?? 0)"
+                                :current-index="index"
+                                :total-items="total"
+                                variant="default"
+                                @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
+                                @blacklist="() => handleBlacklist(item as VibeViewerItem)"
+                            />
                         </div>
                     </template>
                 </VibeLayout>

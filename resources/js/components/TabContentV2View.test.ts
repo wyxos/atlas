@@ -133,7 +133,15 @@ vi.mock('@wyxos/vibe', () => ({
                     item: testState.gridOverlayItem,
                     openFullscreen: vi.fn(),
                 }),
-                slots['fullscreen-overlay']?.({
+                slots['fullscreen-header-actions']?.({
+                    hasNextPage: true,
+                    index: props.activeIndex,
+                    item: testState.fullscreenOverlayItem,
+                    loading: false,
+                    paginationDetail: null,
+                    total: 20,
+                }),
+                slots['fullscreen-footer']?.({
                     hasNextPage: true,
                     index: props.activeIndex,
                     item: testState.fullscreenOverlayItem,
@@ -328,6 +336,9 @@ describe('TabContentV2View', () => {
         });
 
         expect(wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names')).toContain('grid-footer');
+        expect(wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names')).toContain('fullscreen-aside');
+        expect(wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names')).toContain('fullscreen-footer');
+        expect(wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names')).toContain('fullscreen-header-actions');
         expect(vibeLayoutSpy).toHaveBeenCalled();
         expect(vibeLayoutSpy.mock.calls[0][0].props.activeIndex).toBe(1);
         expect(vibeLayoutSpy.mock.calls[0][0].props.emptyStateMode).toBe('hidden');
@@ -489,9 +500,10 @@ describe('TabContentV2View', () => {
         expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="vibe-layout"]').classes()).not.toContain('atlas-file-viewer-wide-aside');
+        expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({});
     });
 
-    it('keeps the inline list-mode file sheet path reserving grid space', () => {
+    it('keeps the inline list-mode file sheet in the sibling path', () => {
         const props = createProps();
         props.fileSheetState.isOpen = true;
         props.surfaceMode = 'list';
@@ -504,7 +516,9 @@ describe('TabContentV2View', () => {
         });
 
         expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(true);
         expect(wrapper.get('[data-testid="vibe-layout"]').classes()).toContain('atlas-file-viewer-wide-aside');
+        expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({ '--vibe-fullscreen-aside-width': '33rem' });
     });
 
 });

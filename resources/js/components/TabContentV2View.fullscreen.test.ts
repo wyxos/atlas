@@ -23,11 +23,23 @@ vi.mock('@wyxos/vibe', () => ({
         props: { activeIndex: { type: Number, default: 0 } },
         setup(props, { slots }) {
             return () => h('div', { 'data-testid': 'vibe-layout' }, [
-                slots['fullscreen-overlay']?.({
+                h('div', { 'data-testid': 'mock-vibe-header' }, slots['fullscreen-header-actions']?.({
                     index: props.activeIndex,
                     item: testState.item,
                     total: 20,
-                }),
+                })),
+                h('div', { 'data-testid': 'mock-vibe-footer' }, slots['fullscreen-footer']?.({
+                    index: props.activeIndex,
+                    item: testState.item,
+                    nextPreviews: [],
+                    total: 20,
+                })),
+                h('div', { 'data-testid': 'mock-vibe-aside' }, slots['fullscreen-aside']?.({
+                    index: props.activeIndex,
+                    item: testState.item,
+                    nextPreviews: [{ index: 2, item: testState.item, asset: { kind: 'image', label: 'Next', url: '/next.jpg', width: 100, height: 100 } }],
+                    total: 20,
+                })),
             ]);
         },
     }),
@@ -173,7 +185,7 @@ function createProps() {
     };
 }
 
-describe('TabContentV2View fullscreen overlay', () => {
+describe('TabContentV2View fullscreen chrome', () => {
     beforeEach(() => {
         testState.item = {
             fileId: 11,
@@ -183,7 +195,7 @@ describe('TabContentV2View fullscreen overlay', () => {
         };
     });
 
-    it('offsets fullscreen reactions above the media bar for audio and video items', () => {
+    it('renders fullscreen reactions in the Vibe footer for audio and video items', () => {
         for (const type of ['audio', 'video'] as const) {
             testState.item = {
                 fileId: type === 'audio' ? 44711 : 2853735,
@@ -194,8 +206,11 @@ describe('TabContentV2View fullscreen overlay', () => {
 
             const wrapper = mount(TabContentV2View, { props: createProps(), global: { stubs: defaultStubs } });
 
-            expect(wrapper.get('[data-testid="browse-fullscreen-reactions"]').attributes('class')).toContain('bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)]');
-            expect(wrapper.get('[data-testid="browse-fullscreen-reactions"]').attributes('class')).toContain('max-[720px]:bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)]');
+            const footer = wrapper.get('[data-testid="mock-vibe-footer"]');
+            const reactions = wrapper.get('[data-testid="browse-fullscreen-reactions"]');
+
+            expect(footer.element.contains(reactions.element)).toBe(true);
+            expect(reactions.attributes('class')).not.toContain('bottom-');
 
             wrapper.unmount();
         }
@@ -250,10 +265,9 @@ describe('TabContentV2View fullscreen overlay', () => {
         const pillRow = wrapper.get('[data-testid="browse-fullscreen-container-pills"]');
         const trigger = wrapper.get('[data-container-pill-trigger]');
 
-        expect(pillRow.attributes('class')).toContain('left-1/2');
-        expect(pillRow.attributes('class')).toContain('-translate-x-1/2');
+        expect(wrapper.get('[data-testid="mock-vibe-header"]').element.contains(pillRow.element)).toBe(true);
         expect(pillRow.attributes('class')).toContain('flex-row');
-        expect(pillRow.attributes('class')).toContain('justify-center');
+        expect(pillRow.attributes('class')).toContain('justify-end');
         expect(wrapper.get('[data-testid="fullscreen-container-pill"]').text()).toBe('User:5');
 
         await trigger.trigger('mouseenter');
@@ -271,5 +285,50 @@ describe('TabContentV2View fullscreen overlay', () => {
         expect(props.containerInteractions.pillHandlers.onMouseDown).toHaveBeenCalledWith(expect.any(MouseEvent));
         expect(props.containerInteractions.pillHandlers.onAuxClick).toHaveBeenCalledWith(container.id, expect.any(MouseEvent));
         expect(props.containerInteractions.pillHandlers.onDismiss).toHaveBeenCalledWith(container);
+    });
+
+    it('renders the file sheet in the fullscreen aside slot', () => {
+        const props = createProps();
+        const sheetSpy = vi.fn();
+        props.fileSheetState.isOpen = true;
+        props.currentVisibleItem = { id: 11 } as never;
+
+        const fileViewerSheetStub = defineComponent({
+            name: 'FileViewerSheetStub',
+            props: {
+                embedded: { type: Boolean, default: false },
+                fileId: { type: Number, default: null },
+                nextPreviews: { type: Array, default: () => [] },
+                totalItems: { type: Number, default: 0 },
+            },
+            setup(stubProps) {
+                sheetSpy(stubProps);
+
+                return () => h('div', { 'data-testid': 'file-viewer-sheet-stub' });
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, { props, global: { stubs: { ...defaultStubs, FileViewerSheet: fileViewerSheetStub } } });
+        const aside = wrapper.get('[data-testid="mock-vibe-aside"]');
+        const sheet = wrapper.get('[data-testid="file-viewer-sheet-stub"]');
+
+        expect(aside.element.contains(sheet.element)).toBe(true);
+        expect(wrapper.get('[data-testid="mock-vibe-header"]').element.contains(sheet.element)).toBe(false);
+        expect(wrapper.get('[data-testid="mock-vibe-footer"]').element.contains(sheet.element)).toBe(false);
+        expect(sheetSpy).toHaveBeenCalledWith(expect.objectContaining({
+            embedded: true,
+            fileId: 11,
+            totalItems: 20,
+        }));
+        expect(sheetSpy.mock.calls[0][0].nextPreviews).toHaveLength(1);
+    });
+
+    it('wires the fullscreen file sheet toggle', async () => {
+        const props = createProps();
+        const wrapper = mount(TabContentV2View, { props, global: { stubs: defaultStubs } });
+
+        await wrapper.get('[aria-label="Show file sheet"]').trigger('click');
+
+        expect(props.openFileSheet).toHaveBeenCalledTimes(1);
     });
 });

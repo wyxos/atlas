@@ -306,6 +306,22 @@ describe('tabContentV2 resolve', () => {
         expect(videoItem.healthCheck).toBeUndefined();
     });
 
+    it('uses the backend title as the Vibe title before falling back to filename', () => {
+        const titledItem = mapFeedItemToVibeItem({
+            ...createFeedItem(13),
+            filename: 'atlas-file.png',
+            title: 'Source title',
+        });
+        const filenameItem = mapFeedItemToVibeItem({
+            ...createFeedItem(14),
+            filename: 'atlas-fallback.png',
+            title: '   ',
+        });
+
+        expect(titledItem.title).toBe('Source title');
+        expect(filenameItem.title).toBe('atlas-fallback.png');
+    });
+
     it('adds playback health checks for generic file tiles that render with icon previews', () => {
         const fileItem = mapFeedItemToVibeItem({
             ...createFeedItem(12),

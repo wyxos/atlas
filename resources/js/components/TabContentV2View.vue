@@ -198,14 +198,6 @@ function togglePageLoadingLock(): void {
     props.headerMasonry.lockPageLoading();
 }
 
-function getFullscreenReactionPositionClasses(item: VibeViewerItem): string {
-    if (item.type === 'audio' || item.type === 'video') {
-        return 'bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] max-[720px]:bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)]';
-    }
-
-    return 'bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)]';
-}
-
 function handleFullscreenMediaBarEscape(event: KeyboardEvent): void {
     if (!shouldExitFullscreenForMediaBarEscape(event, props.surfaceMode)) {
         return;
@@ -306,6 +298,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                     :ref="handleVibeRef"
                     class="h-full min-h-0 min-w-0 flex-1"
                     :class="{ 'atlas-file-viewer-wide-aside': shouldReserveFileSheetSpace }"
+                    :style="shouldReserveFileSheetSpace ? { '--vibe-fullscreen-aside-width': '33rem' } : undefined"
                     v-bind="vibeLayoutBindings"
                     @update:active-index="props.updateActiveIndex"
                     @update:surface-mode="props.updateSurfaceMode"
@@ -356,11 +349,11 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                             />
                         </div>
                     </template>
-                    <template #fullscreen-overlay="{ item, index, total }">
-                        <div class="pointer-events-none absolute inset-0 z-[5]">
+                    <template #fullscreen-header-actions="{ item }">
+                        <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
                             <div
                                 v-if="getContainerPillTargets(item as VibeViewerItem).length > 0"
-                                class="pointer-events-auto absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] flex max-w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-row flex-wrap justify-center gap-1 max-[720px]:top-[calc(env(safe-area-inset-top,0px)+4.25rem)]"
+                                class="flex max-w-[min(34rem,45vw)] flex-row flex-wrap justify-end gap-1"
                                 data-testid="browse-fullscreen-container-pills"
                             >
                                 <div
@@ -385,35 +378,36 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                                     />
                                 </div>
                             </div>
-                            <div
-                                data-testid="browse-fullscreen-reactions"
-                                class="pointer-events-auto absolute left-1/2 -translate-x-1/2"
-                                :class="getFullscreenReactionPositionClasses(item as VibeViewerItem)"
+                            <button
+                                type="button"
+                                class="inline-flex h-8 w-8 items-center justify-center border border-twilight-indigo-500 bg-prussian-blue-900/55 text-twilight-indigo-100 transition hover:border-smart-blue-400 hover:bg-prussian-blue-800 hover:text-white"
+                                :aria-label="fileSheetState.isOpen ? 'Hide file sheet' : 'Show file sheet'"
+                                @click="fileSheetState.isOpen ? closeFileSheet() : openFileSheet()"
                             >
-                                <FileReactions
-                                    :file-id="(item as Record<string, unknown>).fileId as number"
-                                    :reaction="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.reaction ?? null"
-                                    :blacklisted-at="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.blacklisted_at ?? null"
-                                    :previewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.previewed_count ?? 0"
-                                    :viewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.seen_count ?? 0"
-                                    :current-index="index"
-                                    :total-items="total"
-                                    variant="default"
-                                    @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
-                                    @blacklist="() => handleBlacklist(item as VibeViewerItem)"
-                                />
-                            </div>
+                                <PanelRightOpen :size="16" />
+                            </button>
                         </div>
                     </template>
-                    <template #fullscreen-header-actions>
-                        <button
-                            type="button"
-                            class="inline-flex h-11 w-11 items-center justify-center border border-white/12 bg-black/50 text-[#f7f1ea]/82 backdrop-blur-[18px] transition hover:border-white/24 hover:bg-black/65"
-                            :aria-label="fileSheetState.isOpen ? 'Hide file sheet' : 'Show file sheet'"
-                            @click="fileSheetState.isOpen ? closeFileSheet() : openFileSheet()"
+                    <template #fullscreen-footer="{ item, index, total }">
+                        <div
+                            data-testid="browse-fullscreen-reactions"
+                            class="flex justify-center"
                         >
-                            <PanelRightOpen :size="16" />
-                        </button>
+                            <FileReactions
+                                :file-id="(item as Record<string, unknown>).fileId as number"
+                                :reaction="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.reaction ?? null"
+                                :blacklisted-at="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.blacklisted_at ?? null"
+                                :previewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.previewed_count ?? 0"
+                                :viewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.seen_count ?? 0"
+                                :current-index="index"
+                                :total-items="total"
+                                :icon-size="16"
+                                surface="none"
+                                variant="small"
+                                @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
+                                @blacklist="() => handleBlacklist(item as VibeViewerItem)"
+                            />
+                        </div>
                     </template>
                     <template #fullscreen-aside="{ nextPreviews, total }">
                         <FileViewerSheet
@@ -514,15 +508,3 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
         />
     </div>
 </template>
-
-<style scoped>
-.atlas-file-viewer-wide-aside:deep(.grid:has(> [data-testid="vibe-stage"])) {
-    grid-template-columns: minmax(0, 1fr) 33rem !important;
-}
-
-@media (max-width: 1279px) {
-    .atlas-file-viewer-wide-aside:deep(.grid:has(> [data-testid="vibe-stage"])) {
-        grid-template-columns: minmax(0, 1fr) 0rem !important;
-    }
-}
-</style>

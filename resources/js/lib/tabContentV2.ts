@@ -112,6 +112,10 @@ function normalizeTotal(value: unknown): number | null {
 }
 
 function normalizeUrl(value: unknown): string | null {
+    return normalizeText(value);
+}
+
+function normalizeText(value: unknown): string | null {
     if (typeof value !== 'string') {
         return null;
     }
@@ -173,7 +177,7 @@ export function mapFeedItemToVibeItem(item: FeedItem): AtlasVibeViewerItem {
     return {
         id: String(item.id),
         type,
-        title: typeof item.title === 'string' ? item.title : undefined,
+        title: normalizeText(item.title) ?? normalizeText(item.filename) ?? undefined,
         url: fullUrl,
         preview: previewAsset,
         healthCheck,
