@@ -95,6 +95,7 @@ const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
 const SPOTIFY_DEVICE_READY_TIMEOUT_MS = 5000;
 const SPOTIFY_DEVICE_READY_POLL_MS = 250;
 const SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS = 3500;
+const SPOTIFY_AUTHENTICATION_ERROR_STATUSES = new Set([401, 403, 409]);
 
 let sdkLoadPromise: Promise<void> | null = null;
 
@@ -105,8 +106,19 @@ class SpotifyPlaybackSupersededError extends Error {
     }
 }
 
+class SpotifyPlaybackAuthenticationError extends Error {
+    constructor(message: string, public readonly status: number | null = null) {
+        super(message);
+        this.name = 'SpotifyPlaybackAuthenticationError';
+    }
+}
+
 export function isSpotifyPlaybackSuperseded(error: unknown): boolean {
     return error instanceof SpotifyPlaybackSupersededError;
+}
+
+export function isSpotifyPlaybackAuthenticationError(error: unknown): error is SpotifyPlaybackAuthenticationError {
+    return error instanceof SpotifyPlaybackAuthenticationError;
 }
 
 function assertSpotifyPlaybackCurrent(options?: SpotifyPlayOptions): void {
@@ -195,7 +207,13 @@ async function fetchAccessToken(): Promise<string> {
 
     const payload = await response.json().catch(() => ({})) as SpotifyAccessTokenResponse;
     if (!response.ok) {
-        throw new Error(payload.message ?? 'Unable to load Spotify playback token.');
+        const message = payload.message ?? 'Unable to load Spotify playback token.';
+
+        if (SPOTIFY_AUTHENTICATION_ERROR_STATUSES.has(response.status)) {
+            throw new SpotifyPlaybackAuthenticationError(message, response.status);
+        }
+
+        throw new Error(message);
     }
 
     const token = payload.access_token?.trim();
@@ -216,7 +234,7 @@ async function spotifyApiRequest(path: string, token: string, init: RequestInit)
     });
 
     if (!response.ok && response.status !== 204) {
-        throw new Error(await spotifyApiErrorMessage(response));
+        throw await spotifyApiError(response);
     }
 }
 
@@ -229,7 +247,7 @@ async function spotifyApiJsonRequest<T>(path: string, token: string): Promise<T>
     });
 
     if (!response.ok) {
-        throw new Error(await spotifyApiErrorMessage(response));
+        throw await spotifyApiError(response);
     }
 
     return await response.json() as T;
@@ -248,7 +266,7 @@ async function spotifyApiOptionalJsonRequest<T>(path: string, token: string): Pr
     }
 
     if (!response.ok) {
-        throw new Error(await spotifyApiErrorMessage(response));
+        throw await spotifyApiError(response);
     }
 
     return await response.json() as T;
@@ -261,6 +279,14 @@ async function spotifyApiErrorMessage(response: Response): Promise<string> {
     return message && message !== ''
         ? message
         : `Spotify playback request failed with HTTP ${response.status}.`;
+}
+
+async function spotifyApiError(response: Response): Promise<Error> {
+    const message = await spotifyApiErrorMessage(response);
+
+    return SPOTIFY_AUTHENTICATION_ERROR_STATUSES.has(response.status)
+        ? new SpotifyPlaybackAuthenticationError(message, response.status)
+        : new Error(message);
 }
 
 async function delay(milliseconds: number, options?: SpotifyPlayOptions): Promise<void> {
@@ -417,9 +443,14 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
                 options.onError?.(message);
                 reject(new Error(message));
             };
+            const rejectWithAuthenticationError = ({ message }: SpotifySdkError): void => {
+                const authenticationMessage = message || 'Spotify authentication failed. Reconnect Spotify and try again.';
+                options.onError?.(authenticationMessage);
+                reject(new SpotifyPlaybackAuthenticationError(authenticationMessage));
+            };
 
             player.addListener('initialization_error', rejectWithSdkError);
-            player.addListener('authentication_error', rejectWithSdkError);
+            player.addListener('authentication_error', rejectWithAuthenticationError);
             player.addListener('account_error', rejectWithSdkError);
             player.addListener('playback_error', ({ message }) => {
                 options.onError?.(message);

@@ -4,6 +4,7 @@ import { useAudioPlaybackEngines } from './useAudioPlaybackEngines';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
 
 const spotifyPlaybackMocks = vi.hoisted(() => ({
+    authenticationError: new Error('Spotify is not connected for this account.'),
     currentState: vi.fn().mockResolvedValue(null),
     destroy: vi.fn(),
     options: null as {
@@ -25,6 +26,7 @@ vi.mock('@/services/spotifyPlayback', () => ({
 
         return spotifyPlaybackMocks;
     }),
+    isSpotifyPlaybackAuthenticationError: vi.fn((error) => error === spotifyPlaybackMocks.authenticationError),
     isSpotifyPlaybackSuperseded: vi.fn(() => false),
 }));
 
@@ -173,6 +175,38 @@ describe('useAudioPlaybackEngines', () => {
 
             expect(currentTime.value).toBeGreaterThan(0);
             expect(player.playbackPositionSeconds.value).toBeGreaterThan(0);
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
+    it('reports Spotify authentication failures and reverts playback state', async () => {
+        const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const notifySpotifyAuthenticationError = vi.fn();
+        spotifyPlaybackMocks.play.mockRejectedValueOnce(spotifyPlaybackMocks.authenticationError);
+
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(91, { source: 'spotify', spotifyUri }),
+        ], 91);
+
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(
+            player,
+            ref(null),
+            currentTime,
+            mediaDuration,
+            durationSeconds,
+            { onSpotifyAuthenticationError: notifySpotifyAuthenticationError },
+        );
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+
+            expect(notifySpotifyAuthenticationError).toHaveBeenCalledWith('Spotify is not connected for this account.');
+            expect(player.isPlaying.value).toBe(false);
         } finally {
             playbackEngines.teardown();
         }

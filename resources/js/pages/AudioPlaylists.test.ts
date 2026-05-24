@@ -133,7 +133,7 @@ afterEach(() => {
 });
 
 describe('Audio playlists', () => {
-    it('opens a non-overlay playlist panel beside the audio list', async () => {
+    it('opens an overlapping mobile playlist panel with desktop inline sizing', async () => {
         mockAudioEndpoints();
 
         const { wrapper } = await mountAudioPage();
@@ -141,9 +141,11 @@ describe('Audio playlists', () => {
 
         expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
         expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
-            'w-0',
+            '-translate-x-full',
+            'pointer-events-none',
             'duration-300',
-            'transition-[width]',
+            'md:w-0',
+            'transition-[transform,opacity,width]',
         ]));
 
         await wrapper.get('[data-test="audio-playlists-cta"]').trigger('click');
@@ -151,18 +153,27 @@ describe('Audio playlists', () => {
 
         expect(window.sessionStorage.getItem(AUDIO_PLAYLIST_PANEL_OPEN_STORAGE_KEY)).toBe('1');
         expect(wrapper.get('[data-test="audio-library-surface"]').classes()).toContain('flex');
+        expect(wrapper.get('[data-test="audio-library-surface"]').classes()).toContain('overflow-hidden');
+        expect(wrapper.get('[data-test="audio-playlist-backdrop"]').classes()).toEqual(expect.arrayContaining([
+            'absolute',
+            'inset-0',
+            'md:hidden',
+        ]));
         expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
-            'w-72',
+            'absolute',
+            'translate-x-0',
+            'md:relative',
+            'md:w-72',
             'duration-500',
-            'transition-[width]',
+            'transition-[transform,opacity,width]',
         ]));
         expect(wrapper.get('[data-test="audio-playlist-panel"]').classes()).toEqual(expect.arrayContaining([
             'h-full',
             'min-h-0',
-            'w-72',
+            'w-full',
             'shrink-0',
             'overflow-hidden',
-            'md:flex',
+            'flex',
         ]));
         expect(wrapper.get('[data-test="audio-playlist-panel"]').text()).not.toContain('PLAYLISTS');
         expect(wrapper.findAll('[data-test="audio-playlist-section-label"]').map((label) => label.text())).toEqual([
@@ -193,7 +204,8 @@ describe('Audio playlists', () => {
 
         expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
-            'w-72',
+            'translate-x-0',
+            'md:w-72',
             'duration-500',
         ]));
         expect(mockAxios.get).toHaveBeenCalledWith('/api/audio/playlists');
@@ -204,7 +216,8 @@ describe('Audio playlists', () => {
         expect(window.sessionStorage.getItem(AUDIO_PLAYLIST_PANEL_OPEN_STORAGE_KEY)).toBe('0');
         expect(wrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
         expect(wrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
-            'w-0',
+            '-translate-x-full',
+            'md:w-0',
             'duration-300',
         ]));
 
@@ -216,7 +229,8 @@ describe('Audio playlists', () => {
 
         expect(closedWrapper.find('[data-test="audio-playlist-panel"]').exists()).toBe(false);
         expect(closedWrapper.get('[data-test="audio-playlist-panel-frame"]').classes()).toEqual(expect.arrayContaining([
-            'w-0',
+            '-translate-x-full',
+            'md:w-0',
             'duration-300',
         ]));
         expect(mockAxios.get).not.toHaveBeenCalledWith('/api/audio/playlists');

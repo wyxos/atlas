@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Music, Pause, Play } from 'lucide-vue-next';
 import FileReactions from './FileReactions.vue';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +13,7 @@ const props = defineProps<{
     artists: string;
     album: string;
     coverUrl: string | null;
+    source: string | null;
     reaction: { type: ReactionType } | null;
     blacklistedAt: string | null;
     previewedCount: number;
@@ -58,14 +60,26 @@ function handleCoverPlaybackClick(): void {
 
     emit('play');
 }
+
+const sourceBadgeLabel = computed(() => {
+    const source = props.source?.trim();
+
+    if (!source || source.toLowerCase() === 'local') {
+        return null;
+    }
+
+    return source;
+});
 </script>
 
 <template>
     <li
-        class="grid h-[72px] grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-center gap-2 px-3 text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/80 md:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_minmax(10rem,auto)_5rem] md:gap-4 md:px-4"
+        class="grid h-[72px] grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-center gap-2 px-3 text-twilight-indigo-100 transition-colors md:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_minmax(10rem,auto)_5rem] md:gap-4 md:px-4"
         :class="[
-            props.isCurrentTrack ? 'bg-smart-blue-900/45 ring-1 ring-inset ring-smart-blue-500/60' : '',
+            props.isPlaying ? 'bg-smart-blue-700/85 ring-2 ring-inset ring-smart-blue-200/90 hover:bg-smart-blue-700/90' : '',
+            props.isCurrentTrack && !props.isPlaying ? 'bg-smart-blue-800/75 ring-2 ring-inset ring-smart-blue-300/80 hover:bg-smart-blue-800/85' : '',
             props.isSelected && !props.isCurrentTrack ? 'bg-prussian-blue-600/55' : '',
+            !props.isCurrentTrack ? 'hover:bg-prussian-blue-600/80' : '',
         ]"
         data-test="audio-track-row"
         :data-audio-id="props.audioId"
@@ -122,12 +136,21 @@ function handleCoverPlaybackClick(): void {
                     </button>
                 </div>
                 <div class="min-w-0">
-                    <p
-                        class="truncate text-sm font-medium"
-                        :class="props.isCurrentTrack ? 'text-smart-blue-100' : 'text-regal-navy-100'"
-                    >
-                        {{ props.title }}
-                    </p>
+                    <div class="flex min-w-0 items-center gap-2">
+                        <p
+                            class="min-w-0 truncate text-sm font-medium"
+                            :class="props.isCurrentTrack ? 'text-smart-blue-100' : 'text-regal-navy-100'"
+                        >
+                            {{ props.title }}
+                        </p>
+                        <span
+                            v-if="sourceBadgeLabel"
+                            class="shrink-0 rounded border border-smart-blue-400/60 bg-smart-blue-950/85 px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none text-smart-blue-100 uppercase"
+                            data-test="audio-track-source-badge"
+                        >
+                            {{ sourceBadgeLabel }}
+                        </span>
+                    </div>
                     <p class="truncate text-xs text-blue-slate-300">{{ props.artists }}</p>
                 </div>
             </div>

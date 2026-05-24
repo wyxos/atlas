@@ -5,7 +5,7 @@ import PageLayout from '../components/PageLayout.vue';
 import AudioFilterSheet from '../components/AudioFilterSheet.vue';
 import AudioListShell from '../components/AudioListShell.vue';
 import AudioLoadProgressPanel from '../components/AudioLoadProgressPanel.vue';
-import AudioPlaylistPanel from '../components/AudioPlaylistPanel.vue';
+import AudioPlaylistPanelFrame from '../components/AudioPlaylistPanelFrame.vue';
 import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
 import { audioDetailFromResponseItem, emptyAudioDetail } from '../composables/useAudioDetailMapping';
 import { useAudioPlaylistPanelOpenState } from '../composables/useAudioPlaylistPanelOpenState';
@@ -512,32 +512,18 @@ onUnmounted(() => {
             </div>
             <div
                 v-else
-                class="flex min-h-0 flex-1"
+                class="relative flex min-h-0 flex-1 overflow-hidden"
                 data-test="audio-library-surface"
             >
-                <div
-                    class="hidden min-h-0 shrink-0 overflow-hidden transition-[width] ease-in-out md:block"
-                    :class="isPlaylistPanelOpen ? 'w-72 duration-500' : 'w-0 duration-300'"
-                    data-test="audio-playlist-panel-frame"
-                >
-                    <Transition
-                        enter-active-class="transition duration-500 ease-in-out"
-                        enter-from-class="-translate-x-full opacity-0"
-                        enter-to-class="translate-x-0 opacity-100"
-                        leave-active-class="transition duration-300 ease-in-out"
-                        leave-from-class="translate-x-0 opacity-100"
-                        leave-to-class="-translate-x-full opacity-0"
-                    >
-                        <AudioPlaylistPanel
-                            v-if="isPlaylistPanelOpen"
-                            :sections="playlistSections"
-                            :active-slug="activePlaylistSlug"
-                            :is-loading="arePlaylistsLoading"
-                            :error="playlistsError"
-                            @select="handlePlaylistSelect"
-                        />
-                    </Transition>
-                </div>
+                <AudioPlaylistPanelFrame
+                    :is-open="isPlaylistPanelOpen"
+                    :sections="playlistSections"
+                    :active-slug="activePlaylistSlug"
+                    :is-loading="arePlaylistsLoading"
+                    :error="playlistsError"
+                    @close="isPlaylistPanelOpen = false"
+                    @select="handlePlaylistSelect"
+                />
                 <AudioListShell
                     ref="audioListShellRef"
                     :active-filter-label="activeFilterLabel"
@@ -549,6 +535,7 @@ onUnmounted(() => {
                     :detail-artists="detailArtists"
                     :detail-album="detailAlbum"
                     :detail-cover-url="detailCoverUrl"
+                    :detail-source="detailSource"
                     :detail-reaction="detailReaction"
                     :detail-blacklisted-at="detailBlacklistedAt"
                     :detail-previewed-count="detailPreviewedCount"

@@ -15,6 +15,7 @@ const props = defineProps<{
     detailArtists: (audioId: number) => string;
     detailAlbum: (audioId: number) => string;
     detailCoverUrl: (audioId: number) => string | null;
+    detailSource: (audioId: number) => string | null;
     detailReaction: (audioId: number) => { type: ReactionType } | null;
     detailBlacklistedAt: (audioId: number) => string | null;
     detailPreviewedCount: (audioId: number) => number;
@@ -94,6 +95,7 @@ defineExpose({
                         :artists="detailArtists(audioId)"
                         :album="detailAlbum(audioId)"
                         :cover-url="detailCoverUrl(audioId)"
+                        :source="detailSource(audioId)"
                         :reaction="detailReaction(audioId)"
                         :blacklisted-at="detailBlacklistedAt(audioId)"
                         :previewed-count="detailPreviewedCount(audioId)"

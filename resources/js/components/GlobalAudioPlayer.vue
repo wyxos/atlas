@@ -19,6 +19,7 @@ import {
 import AudioQueueSheet from './AudioQueueSheet.vue';
 import AudioVolumeControl from './AudioVolumeControl.vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast/use-toast';
 import { useAudioPlaybackEngines } from '@/composables/useAudioPlaybackEngines';
 import { useAudioQueueDetails } from '@/composables/useAudioQueueDetails';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
@@ -29,6 +30,7 @@ const audioRef = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(audioPlayer.playbackPositionSeconds.value);
 const mediaDuration = ref(0);
 const isQueueSheetOpen = ref(false);
+const toast = useToast();
 const { handleQueueVisibleItemsChange } = useAudioQueueDetails(audioPlayer);
 
 const currentTrack = audioPlayer.currentTrack;
@@ -86,7 +88,9 @@ const {
     nativeAudioSource,
     startCurrentPlayback,
     teardown,
-} = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds);
+} = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds, {
+    onSpotifyAuthenticationError: notifySpotifyAuthenticationError,
+});
 
 const controlButtonClass = [
     'player-control-button inline-flex size-12 items-center justify-center rounded-full 2xl:size-14',
@@ -100,6 +104,14 @@ const reactionButtonClass = [
     'inline-flex items-center justify-center rounded p-1.5 transition-colors',
     'enabled:cursor-pointer disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50',
 ].join(' ');
+
+function notifySpotifyAuthenticationError(message: string): void {
+    toast.error(message || 'Spotify is not connected for this account.', {
+        id: 'spotify-playback-authentication-error',
+        description: 'Connect or refresh Spotify in Settings, then try playback again.',
+        duration: 8000,
+    });
+}
 
 function formatSeconds(value: number): string {
     const seconds = Math.max(0, Math.floor(value));

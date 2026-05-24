@@ -2,6 +2,7 @@ import { computed, nextTick, type ComputedRef, type Ref } from 'vue';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
 import {
     createSpotifyPlaybackController,
+    isSpotifyPlaybackAuthenticationError,
     isSpotifyPlaybackSuperseded,
     type SpotifyPlaybackController,
     type SpotifyPlaybackSnapshot,
@@ -19,6 +20,7 @@ const SPOTIFY_START_STALE_GUARD_SECONDS = 6;
 
 type PlaybackEngine = 'local' | 'spotify';
 type GlobalAudioPlayer = ReturnType<typeof useGlobalAudioPlayer>;
+type AudioPlaybackEngineOptions = { onSpotifyAuthenticationError?: (message: string) => void };
 type SpotifyPendingStart = {
     correctedStalePosition: boolean;
     observedFreshPlaybackAt: number | null;
@@ -38,10 +40,13 @@ export function useAudioPlaybackEngines(
     currentTime: Ref<number>,
     mediaDuration: Ref<number>,
     durationSeconds: ComputedRef<number>,
+    options: AudioPlaybackEngineOptions = {},
 ) {
-    const nativeAudioSource = computed(() => audioPlayer.currentTrack.value && !isSpotifyAudioTrack(audioPlayer.currentTrack.value)
-        ? audioPlayer.currentTrack.value.playbackUrl
-        : undefined);
+    const nativeAudioSource = computed(() => {
+        const track = audioPlayer.currentTrack.value;
+
+        return track && !isSpotifyAudioTrack(track) ? track.playbackUrl : undefined;
+    });
 
     let activeEngine: PlaybackEngine | null = null;
     let playbackToken = 0;
@@ -228,11 +233,8 @@ export function useAudioPlaybackEngines(
     }
 
     function isSpotifyPollStartAdvanced(snapshot: SpotifyPlaybackSnapshot): boolean {
-        if (!spotifyPendingStart) {
-            return false;
-        }
-
-        return snapshot.positionMs / 1000 >= spotifyPendingStart.positionSeconds + SPOTIFY_POLL_START_ADVANCE_SECONDS;
+        return Boolean(spotifyPendingStart
+            && snapshot.positionMs / 1000 >= spotifyPendingStart.positionSeconds + SPOTIFY_POLL_START_ADVANCE_SECONDS);
     }
 
     function shouldIgnoreSpotifyStartSnapshot(snapshot: SpotifyPlaybackSnapshot): boolean {
@@ -275,11 +277,7 @@ export function useAudioPlaybackEngines(
     }
 
     function remainingSpotifySeconds(snapshot: SpotifyPlaybackSnapshot): number | null {
-        if (snapshot.durationMs <= 0) {
-            return null;
-        }
-
-        return Math.max(0, (snapshot.durationMs - snapshot.positionMs) / 1000);
+        return snapshot.durationMs <= 0 ? null : Math.max(0, (snapshot.durationMs - snapshot.positionMs) / 1000);
     }
 
     function isSpotifySnapshotNearEnd(snapshot: SpotifyPlaybackSnapshot, seconds: number): boolean {
@@ -301,11 +299,7 @@ export function useAudioPlaybackEngines(
             return spotifyWasNearEnd;
         }
 
-        if (hasSpotifyPositionReset(snapshot)) {
-            return true;
-        }
-
-        return snapshot.paused && isSpotifySnapshotNearEnd(snapshot, SPOTIFY_ENDED_TOLERANCE_SECONDS);
+        return hasSpotifyPositionReset(snapshot) || (snapshot.paused && isSpotifySnapshotNearEnd(snapshot, SPOTIFY_ENDED_TOLERANCE_SECONDS));
     }
 
     function finishSpotifyPlaybackIfEnded(snapshot: SpotifyPlaybackSnapshot | null): boolean {
@@ -512,6 +506,12 @@ export function useAudioPlaybackEngines(
                 }
             } catch (error) {
                 if (!isCurrentSpotifyStart() || isSpotifyPlaybackSuperseded(error)) {
+                    return;
+                }
+
+                if (isSpotifyPlaybackAuthenticationError(error)) {
+                    options.onSpotifyAuthenticationError?.(error.message);
+                    audioPlayer.pause();
                     return;
                 }
 

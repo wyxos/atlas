@@ -388,7 +388,6 @@ describe('Audio', () => {
         expect(row.text()).toContain('Album A');
         expect(row.text()).toContain('3:05');
         expect(row.find('img').attributes('src')).toBe('/api/files/7/poster');
-        expect(row.get('[data-test="audio-track-title-cell"]').classes()).toContain('min-w-0');
         expect(row.get('[data-test="audio-track-album"]').classes()).toContain('hidden');
         expect(row.get('[data-test="audio-track-album"]').classes()).toContain('md:block');
         expect(row.get('[data-test="audio-track-duration"]').classes()).toContain('tabular-nums');
@@ -471,7 +470,7 @@ describe('Audio', () => {
         await firstRow.trigger('click');
 
         expect(firstRow.attributes('aria-selected')).toBe('true');
-        expect(firstRow.classes()).toContain('bg-smart-blue-900/45');
+        expect(firstRow.classes()).toContain('bg-smart-blue-800/75');
         const player = useGlobalAudioPlayer();
         expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
         expect(player.queueLabel.value).toBe('All audio');
@@ -486,6 +485,7 @@ describe('Audio', () => {
         expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
         expect(player.currentTrack.value?.title).toBe('Target Track');
         expect(firstRow.attributes('data-current-track')).toBe('true');
+        expect(firstRow.classes()).toContain('bg-smart-blue-700/85');
         expect(firstRow.find('[data-test="audio-track-playing-bars"]').exists()).toBe(true);
         expect(firstRow.get('[data-test="audio-track-playing-bars"]').classes()).toContain('items-end');
         expect(firstRow.findAll('.audio-visual-bar')).toHaveLength(8);
