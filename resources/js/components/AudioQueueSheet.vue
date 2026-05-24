@@ -8,6 +8,7 @@ import type { AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
 const props = defineProps<{
     tracks: AudioPlayerTrack[];
     currentTrackId: number | null;
+    isPlaying: boolean;
     queueLabel: string | null;
 }>();
 
@@ -25,6 +26,20 @@ function handleVisibleItemsChange(items: unknown[]): void {
 
 function isTrackLoading(track: AudioPlayerTrack): boolean {
     return track.artists === 'Loading metadata...';
+}
+
+function queueTrackButtonClass(track: AudioPlayerTrack): string[] {
+    const isCurrentTrack = track.id === props.currentTrackId;
+
+    return [
+        isCurrentTrack && props.isPlaying
+            ? 'bg-smart-blue-600/95 text-smart-blue-100 shadow-[inset_4px_0_0_rgb(219_238_255/0.95)] ring-2 ring-inset ring-smart-blue-100/90 hover:bg-smart-blue-600 focus-visible:bg-smart-blue-600'
+            : '',
+        isCurrentTrack && !props.isPlaying
+            ? 'bg-smart-blue-700/90 text-smart-blue-100 shadow-[inset_4px_0_0_rgb(123_190_255/0.95)] ring-2 ring-inset ring-smart-blue-100/75 hover:bg-smart-blue-700 focus-visible:bg-smart-blue-700'
+            : '',
+        !isCurrentTrack ? 'hover:bg-prussian-blue-600/80 focus-visible:bg-prussian-blue-600/80' : '',
+    ];
 }
 
 function scrollToCurrentTrack(): void {
@@ -92,8 +107,8 @@ watch(() => props.currentTrackId, scrollToCurrentTrack);
                     >
                         <button
                             type="button"
-                            class="grid h-16 w-full grid-cols-[2rem_2.5rem_minmax(0,1fr)_3rem] items-center gap-3 px-4 text-left transition hover:bg-prussian-blue-600/80 focus-visible:bg-prussian-blue-600/80 focus-visible:outline-none"
-                            :class="track.id === currentTrackId ? 'bg-smart-blue-900/45 text-smart-blue-100' : ''"
+                            class="grid h-16 w-full grid-cols-[2rem_2.5rem_minmax(0,1fr)_3rem] items-center gap-3 px-4 text-left transition focus-visible:outline-none"
+                            :class="queueTrackButtonClass(track)"
                             :aria-current="track.id === currentTrackId ? 'true' : undefined"
                             data-test="audio-queue-track"
                             @click="emit('play', track.id)"

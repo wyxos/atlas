@@ -263,6 +263,7 @@ onBeforeUnmount(teardown);
             v-if="isQueueSheetOpen"
             :tracks="audioPlayer.queue.value"
             :current-track-id="currentTrackId"
+            :is-playing="isPlaying"
             :queue-label="audioPlayer.queueLabel.value"
             @close="audioPlayer.closeQueueSheet"
             @play="audioPlayer.playQueueTrack"

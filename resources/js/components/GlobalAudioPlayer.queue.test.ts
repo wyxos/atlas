@@ -154,4 +154,31 @@ describe('GlobalAudioPlayer queue', () => {
         expect(queueSheet.text()).toContain('Visible Track 91');
         expect(queueSheet.find('[aria-current="true"]').text()).toContain('Visible Track 91');
     });
+
+    it('uses the strong active track treatment in the queue sheet', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(41, { title: 'Previous Track' }),
+            testTrack(42, { title: 'Playing Track' }),
+        ], 42);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        await wrapper.get('[aria-label="Queue"]').trigger('click');
+        await flushPromises();
+
+        const playingTrack = wrapper.get('[data-test="audio-queue-track"][aria-current="true"]');
+        expect(playingTrack.classes()).toContain('bg-smart-blue-600/95');
+        expect(playingTrack.classes()).toContain('ring-2');
+        expect(playingTrack.classes()).toContain('ring-smart-blue-100/90');
+        expect(playingTrack.classes()).toContain('shadow-[inset_4px_0_0_rgb(219_238_255/0.95)]');
+
+        player.pause();
+        await flushPromises();
+
+        const pausedTrack = wrapper.get('[data-test="audio-queue-track"][aria-current="true"]');
+        expect(pausedTrack.classes()).toContain('bg-smart-blue-700/90');
+        expect(pausedTrack.classes()).toContain('ring-smart-blue-100/75');
+        expect(pausedTrack.classes()).toContain('shadow-[inset_4px_0_0_rgb(123_190_255/0.95)]');
+    });
 });
