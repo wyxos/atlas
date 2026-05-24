@@ -181,6 +181,48 @@ describe('useAudioPlaybackEngines', () => {
         }
     });
 
+    it('corrects confirmed Spotify progress back to authoritative snapshots', async () => {
+        vi.useFakeTimers();
+
+        const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        spotifyPlaybackMocks.currentState.mockResolvedValue(null);
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(91, { source: 'spotify', spotifyUri }),
+        ], 91);
+
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(player, ref(null), currentTime, mediaDuration, durationSeconds);
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+
+            spotifyPlaybackMocks.options?.onStateChange?.({
+                durationMs: 180000,
+                paused: false,
+                positionMs: 0,
+                trackUri: spotifyUri,
+            });
+            await vi.advanceTimersByTimeAsync(4000);
+
+            expect(currentTime.value).toBeGreaterThanOrEqual(3.9);
+
+            spotifyPlaybackMocks.options?.onStateChange?.({
+                durationMs: 180000,
+                paused: false,
+                positionMs: 1000,
+                trackUri: spotifyUri,
+            });
+
+            expect(currentTime.value).toBe(1);
+            expect(player.playbackPositionSeconds.value).toBe(1);
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
     it('reports Spotify authentication failures and reverts playback state', async () => {
         const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
         const notifySpotifyAuthenticationError = vi.fn();

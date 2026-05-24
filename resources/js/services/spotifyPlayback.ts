@@ -96,7 +96,7 @@ const SPOTIFY_SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
 const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
 const SPOTIFY_DEVICE_READY_TIMEOUT_MS = 5000;
 const SPOTIFY_DEVICE_READY_POLL_MS = 250;
-const SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS = 3500;
+const SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS = 1500;
 const SPOTIFY_AUTHENTICATION_ERROR_STATUSES = new Set([401, 403, 409]);
 
 let sdkLoadPromise: Promise<void> | null = null;

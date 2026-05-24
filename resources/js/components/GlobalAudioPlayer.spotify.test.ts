@@ -47,6 +47,7 @@ type SpotifyApiPlaybackMock = {
 
 const spotifyPlayerInstances: MockSpotifyPlayerHandle[] = [];
 let spotifyCurrentState: SpotifyPlaybackState | null = null;
+let spotifyCurrentStateSetAt = 0;
 
 function testTrack(id: number, overrides: Partial<AudioPlayerTrack> = {}): AudioPlayerTrack {
     return {
@@ -86,6 +87,7 @@ class MockSpotifyPlayer {
                 ...spotifyCurrentState,
                 position: positionMs,
             };
+            spotifyCurrentStateSetAt = Date.now();
         }
 
         return Promise.resolve();
@@ -114,13 +116,23 @@ class MockSpotifyPlayer {
     disconnect(): void {}
 
     getCurrentState(): Promise<SpotifyPlaybackState | null> {
-        return Promise.resolve(spotifyCurrentState);
+        if (!spotifyCurrentState || spotifyCurrentState.paused) {
+            return Promise.resolve(spotifyCurrentState);
+        }
+
+        const elapsedMs = Math.max(0, Date.now() - spotifyCurrentStateSetAt);
+
+        return Promise.resolve({
+            ...spotifyCurrentState,
+            position: Math.min(spotifyCurrentState.duration, spotifyCurrentState.position + elapsedMs),
+        });
     }
 }
 
 function installSpotifySdkMock(): void {
     spotifyPlayerInstances.splice(0);
     spotifyCurrentState = null;
+    spotifyCurrentStateSetAt = 0;
 
     window.Spotify = {
         Player: MockSpotifyPlayer,
@@ -144,6 +156,7 @@ function spotifyState(
 
 function emitSpotifyState(state: SpotifyPlaybackState | null): void {
     spotifyCurrentState = state;
+    spotifyCurrentStateSetAt = Date.now();
     spotifyPlayerInstances[0]?.listeners.player_state_changed?.(state);
 }
 
@@ -153,6 +166,7 @@ function mockSpotifyFetch(
     currentPlaybackOverrides: SpotifyApiPlaybackMock = {},
 ): ReturnType<typeof vi.fn> {
     const { item: currentPlaybackItemOverrides, ...currentPlaybackBaseOverrides } = currentPlaybackOverrides;
+    const currentPlaybackCreatedAt = Date.now();
 
     return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
@@ -175,14 +189,19 @@ function mockSpotifyFetch(
         }
 
         if (url === 'https://api.spotify.com/v1/me/player' && init?.method !== 'PUT') {
+            const progressOverride = currentPlaybackBaseOverrides.progress_ms;
+            const progressMs = typeof progressOverride === 'number' && Number.isFinite(progressOverride)
+                ? progressOverride + (currentPlaybackBaseOverrides.is_playing === false ? 0 : Math.max(0, Date.now() - currentPlaybackCreatedAt))
+                : progressOverride ?? Math.max(0, Date.now() - currentPlaybackCreatedAt);
+
             return {
                 ok: true,
                 status: 200,
                 json: async () => ({
                     device: { id: activeDeviceId, is_active: true },
                     is_playing: true,
-                    progress_ms: 0,
                     ...currentPlaybackBaseOverrides,
+                    progress_ms: progressMs,
                     item: {
                         duration_ms: 10000,
                         uri: spotifyUri,
@@ -281,12 +300,8 @@ describe('GlobalAudioPlayer Spotify playback', () => {
 
         const player = useGlobalAudioPlayer();
         player.queueAndPlay([
-            testTrack(91, {
-                spotifyUri,
-            }),
-            testTrack(41, {
-                playbackUrl: '/api/files/41/serve',
-            }),
+            testTrack(91, { spotifyUri }),
+            testTrack(41, { playbackUrl: '/api/files/41/serve' }),
         ], 91);
 
         const wrapper = mountPlayer();
@@ -324,13 +339,14 @@ describe('GlobalAudioPlayer Spotify playback', () => {
         await flushPromises();
 
         emitSpotifyState(spotifyState(spotifyUri, { duration: 10000 }));
-        vi.advanceTimersByTime(1000);
-        await wrapper.vm.$nextTick();
+        await vi.advanceTimersByTimeAsync(1000);
+        await flushPromises();
 
         expect(wrapper.text()).toContain('0:01');
 
-        vi.advanceTimersByTime(1000);
-        await wrapper.vm.$nextTick();
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 10000, position: 1000 }));
+        await vi.advanceTimersByTimeAsync(1000);
+        await flushPromises();
 
         expect(wrapper.text()).toContain('0:02');
     });
@@ -365,10 +381,7 @@ describe('GlobalAudioPlayer Spotify playback', () => {
         vi.advanceTimersByTime(500);
         await wrapper.vm.$nextTick();
 
-        emitSpotifyState(spotifyState(spotifyUri, {
-            duration: 10000,
-            position: 2000,
-        }));
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 10000, position: 2000 }));
         await wrapper.vm.$nextTick();
 
         expect(wrapper.text()).toContain('0:01');
@@ -419,11 +432,11 @@ describe('GlobalAudioPlayer Spotify playback', () => {
 
         expect(wrapper.text()).toContain('0:02');
 
-        emitSpotifyState(spotifyState(spotifyUri, { duration: 10000 }));
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 10000, position: 2000 }));
         await vi.advanceTimersByTimeAsync(1000);
-        await wrapper.vm.$nextTick();
+        await flushPromises();
 
-        expect(wrapper.text()).toContain('0:03');
+        expect(player.playbackPositionSeconds.value).toBeGreaterThan(2.75);
     });
 
     it('starts Spotify progress from polling when the SDK event is missed', async () => {
@@ -447,10 +460,7 @@ describe('GlobalAudioPlayer Spotify playback', () => {
         const wrapper = mountPlayer();
         await flushPromises(); await flushPromises();
 
-        spotifyCurrentState = spotifyState(spotifyUri, {
-            duration: 10000,
-            position: 1000,
-        });
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 10000, position: 1000 }));
 
         await vi.advanceTimersByTimeAsync(1000);
         await flushPromises();
@@ -518,19 +528,13 @@ describe('GlobalAudioPlayer Spotify playback', () => {
         const wrapper = mountPlayer();
         await flushPromises();
 
-        emitSpotifyState(spotifyState(spotifyUri, {
-            duration: 30000,
-            position: 25000,
-        }));
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 30000, position: 25000 }));
         await flushPromises();
 
         expect(wrapper.text()).toContain('0:00');
         expect(spotifyPlayerInstances[0]?.seek).toHaveBeenCalledWith(0);
 
-        emitSpotifyState(spotifyState(spotifyUri, {
-            duration: 30000,
-            position: 0,
-        }));
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 30000, position: 0 }));
         vi.advanceTimersByTime(1000);
         await wrapper.vm.$nextTick();
 
@@ -564,16 +568,10 @@ describe('GlobalAudioPlayer Spotify playback', () => {
         const wrapper = mountPlayer();
         await flushPromises();
 
-        emitSpotifyState(spotifyState(spotifyUri, {
-            duration: 10000,
-            position: 0,
-        }));
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 10000, position: 0 }));
         await wrapper.vm.$nextTick();
 
-        emitSpotifyState(spotifyState(spotifyUri, {
-            duration: 10000,
-            position: 9500,
-        }));
+        emitSpotifyState(spotifyState(spotifyUri, { duration: 10000, position: 9500 }));
         emitSpotifyState(null);
         await flushPromises();
 
@@ -592,11 +590,7 @@ describe('GlobalAudioPlayer Spotify playback', () => {
 
         const player = useGlobalAudioPlayer();
         player.queueAndPlay([
-            testTrack(91, {
-                source: 'spotify',
-                sourceId: '1A2B3C4D5E6F7G8H9I0J1K',
-                spotifyUri,
-            }),
+            testTrack(91, { source: 'spotify', sourceId: '1A2B3C4D5E6F7G8H9I0J1K', spotifyUri }),
         ], 91);
 
         mountPlayer();

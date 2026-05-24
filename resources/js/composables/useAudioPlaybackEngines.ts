@@ -13,7 +13,7 @@ const SPOTIFY_PROGRESS_TICK_INTERVAL_MS = 250;
 const SPOTIFY_ENDED_TOLERANCE_SECONDS = 1.25;
 const SPOTIFY_NEAR_END_WINDOW_SECONDS = 3;
 const SPOTIFY_POSITION_RESET_SECONDS = 1;
-const SPOTIFY_SNAPSHOT_CORRECTION_SECONDS = 2.5;
+const SPOTIFY_SNAPSHOT_CORRECTION_SECONDS = 1;
 const SPOTIFY_START_POSITION_TOLERANCE_SECONDS = 3;
 const SPOTIFY_POLL_START_ADVANCE_SECONDS = 0.25;
 const SPOTIFY_START_STALE_GUARD_SECONDS = 6;
@@ -368,12 +368,6 @@ export function useAudioPlaybackEngines(
             return;
         }
 
-        const visiblePositionSeconds = spotifyDisplayPositionNow();
-        if (spotifyHasObservedPlayback && audioPlayer.isPlaying.value && visiblePositionSeconds !== null
-            && snapshot.positionMs / 1000 < visiblePositionSeconds - SPOTIFY_SNAPSHOT_CORRECTION_SECONDS) {
-            return;
-        }
-
         const shouldStartFromPoll = source === 'poll' && !spotifyHasObservedPlayback && !snapshot.paused && isSpotifyPollStartAdvanced(snapshot);
         const shouldUpdateDisplay = source === 'event'
             || spotifyHasObservedPlayback
@@ -494,12 +488,19 @@ export function useAudioPlaybackEngines(
                     if (spotifyPendingStart?.playConfirmedAt === null) {
                         spotifyPendingStart = { ...spotifyPendingStart, playConfirmedAt: Date.now() };
                     }
-                    syncSpotifySnapshot(confirmedSnapshot ?? {
+                    const playConfirmationSnapshot = confirmedSnapshot ?? {
                         durationMs: Math.max(0, Math.round(durationSeconds.value * 1000)),
-                        paused: false,
-                        positionMs: Math.max(0, Math.round(startPositionSeconds * 1000)),
-                        trackUri: spotifyUri,
-                    });
+                        paused: false, positionMs: Math.max(0, Math.round(startPositionSeconds * 1000)), trackUri: spotifyUri,
+                    };
+                    const visiblePositionSeconds = spotifyDisplayPositionNow();
+                    const playConfirmationPositionSeconds = playConfirmationSnapshot.positionMs / 1000;
+
+                    if (!spotifyHasObservedPlayback
+                        || visiblePositionSeconds === null
+                        || playConfirmationSnapshot.paused
+                        || playConfirmationPositionSeconds >= visiblePositionSeconds - SPOTIFY_SNAPSHOT_CORRECTION_SECONDS) {
+                        syncSpotifySnapshot(playConfirmationSnapshot);
+                    }
                     spotifyHasObservedPlayback = true;
                     startSpotifyProgressTicker(token);
                     startSpotifyPolling(token);
