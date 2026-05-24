@@ -46,7 +46,7 @@ describe('useAudioQueueDetails', () => {
                         {
                             id: 742,
                             title: 'Atlas Seed Track 0742',
-                            source: 'Spotify',
+                            source: 'Local',
                             artists: ['Mira Vale'],
                             albums: ['Late Indexes'],
                             cover_url: '/api/files/742/poster',
@@ -93,6 +93,114 @@ describe('useAudioQueueDetails', () => {
             artists: 'Mira Vale',
             album: 'Late Indexes',
             duration: '2:34',
+        });
+    });
+
+    it('keeps partial queue details visible when duration is missing', async () => {
+        const post = vi.fn()
+            .mockResolvedValue({
+                data: {
+                    items: [
+                        {
+                            id: 743,
+                            title: 'Atlas Seed Track 0743',
+                            source: 'Local',
+                            artists: ['Mira Vale'],
+                            albums: [],
+                            cover_url: null,
+                            duration_seconds: null,
+                            reaction: null,
+                            blacklisted_at: null,
+                            previewed_count: 0,
+                            seen_count: 0,
+                        },
+                    ],
+                },
+            });
+        Object.assign(window, {
+            axios: { post },
+        });
+
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(743, {
+                title: 'Audio #743',
+                artists: 'Loading metadata...',
+                album: 'Unknown album',
+                duration: '--:--',
+                durationSeconds: null,
+            }),
+        ], 743);
+
+        scope = effectScope();
+        const queueDetails = scope.run(() => useAudioQueueDetails(player));
+        await flushPromises();
+
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(player.queue.value[0]).toMatchObject({
+            id: 743,
+            title: 'Atlas Seed Track 0743',
+            artists: 'Mira Vale',
+            duration: '--:--',
+        });
+
+        await queueDetails?.handleQueueVisibleItemsChange(player.queue.value);
+        await flushPromises();
+
+        expect(post).toHaveBeenCalledTimes(1);
+    });
+
+    it('fetches details again when the same queue ids are replaced by placeholders', async () => {
+        const post = vi.fn()
+            .mockResolvedValue({
+                data: {
+                    items: [
+                        {
+                            id: 744,
+                            title: 'Atlas Seed Track 0744',
+                            source: 'Local',
+                            artists: ['Mira Vale'],
+                            albums: ['Late Indexes'],
+                            cover_url: '/api/files/744/poster',
+                            duration_seconds: 154,
+                            reaction: null,
+                            blacklisted_at: null,
+                            previewed_count: 2,
+                            seen_count: 1,
+                        },
+                    ],
+                },
+            });
+        Object.assign(window, {
+            axios: { post },
+        });
+
+        const player = useGlobalAudioPlayer();
+        const placeholderTrack = testTrack(744, {
+            title: 'Audio #744',
+            artists: 'Loading metadata...',
+            album: 'Unknown album',
+            duration: '--:--',
+            durationSeconds: null,
+        });
+        player.queueAndPlay([placeholderTrack], 744);
+
+        scope = effectScope();
+        const queueDetails = scope.run(() => useAudioQueueDetails(player));
+        await flushPromises();
+
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(player.queue.value[0]).toMatchObject({
+            title: 'Atlas Seed Track 0744',
+        });
+
+        player.queueAndPlay([placeholderTrack], 744);
+        await queueDetails?.handleQueueVisibleItemsChange(player.queue.value);
+        await flushPromises();
+
+        expect(post).toHaveBeenCalledTimes(2);
+        expect(player.queue.value[0]).toMatchObject({
+            title: 'Atlas Seed Track 0744',
         });
     });
 });

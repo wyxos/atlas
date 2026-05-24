@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 type VirtualListItem = unknown;
+type ScrollAlignment = 'start' | 'center';
 
 const props = withDefaults(defineProps<{
     items: VirtualListItem[];
@@ -54,12 +55,40 @@ function onScroll(event: Event) {
     emit('scroll', target.scrollTop);
 }
 
-function resetScroll() {
-    scrollTop.value = 0;
+function setScrollTop(top: number) {
+    const nextTop = Math.max(0, top);
+    scrollTop.value = nextTop;
+
     if (containerRef.value) {
-        containerRef.value.scrollTop = 0;
+        containerRef.value.scrollTop = nextTop;
     }
 }
+
+function resetScroll() {
+    setScrollTop(0);
+}
+
+function scrollToIndex(index: number, align: ScrollAlignment = 'start') {
+    if (index < 0 || index >= props.items.length) {
+        return;
+    }
+
+    const centeredOffset = align === 'center'
+        ? Math.max(0, (containerHeight.value - props.itemHeight) / 2)
+        : 0;
+
+    setScrollTop((index * props.itemHeight) - centeredOffset);
+}
+
+watch(
+    () => props.items.length,
+    () => {
+        const maxScrollTop = Math.max(0, totalHeight.value - containerHeight.value);
+        if (scrollTop.value > maxScrollTop) {
+            setScrollTop(maxScrollTop);
+        }
+    },
+);
 
 watch(
     visibleItems,
@@ -89,6 +118,7 @@ onBeforeUnmount(() => {
 
 defineExpose({
     resetScroll,
+    scrollToIndex,
 });
 </script>
 
