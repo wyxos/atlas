@@ -20,6 +20,7 @@ import AudioQueueSheet from './AudioQueueSheet.vue';
 import AudioVolumeControl from './AudioVolumeControl.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast/use-toast';
+import { useAudioMediaSession } from '@/composables/useAudioMediaSession';
 import { useAudioPlaybackEngines } from '@/composables/useAudioPlaybackEngines';
 import { useAudioQueueDetails } from '@/composables/useAudioQueueDetails';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
@@ -90,6 +91,18 @@ const {
     teardown,
 } = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds, {
     onSpotifyAuthenticationError: notifySpotifyAuthenticationError,
+});
+
+useAudioMediaSession({
+    currentTime,
+    currentTrack,
+    durationSeconds,
+    isPlaying,
+    onNext: audioPlayer.playNext,
+    onPause: audioPlayer.pause,
+    onPlay: audioPlayer.resume,
+    onPrevious: audioPlayer.playPrevious,
+    trackSubtitle,
 });
 
 const controlButtonClass = [
