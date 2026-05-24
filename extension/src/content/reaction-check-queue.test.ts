@@ -54,6 +54,21 @@ describe('reaction-check-queue', () => {
         });
     });
 
+    it('can request a cache-bypassing background badge check', async () => {
+        const queue = await import('./reaction-check-queue');
+
+        await queue.enqueueReactionCheck('https://cdn.example.com/restored.jpg', {
+            bypassCache: true,
+        });
+
+        expect(mockRequestQueuedBadgeCheckViaRuntime).toHaveBeenCalledWith({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedMediaUrl: 'https://cdn.example.com/restored.jpg',
+            bypassCache: true,
+        });
+    });
+
     it('applies the civitai.com media cleaner on civitai.red pages before dispatching background checks', async () => {
         Object.defineProperty(window, 'location', {
             configurable: true,

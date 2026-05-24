@@ -47,6 +47,7 @@ type QueueBadgeCheckPayload = {
     atlasDomain: string;
     apiToken: string;
     normalizedMediaUrl: string;
+    bypassCache?: unknown;
     pageVisibility?: unknown;
 };
 
@@ -273,6 +274,7 @@ export function handleQueuedBadgeCheckRuntimeMessage(
         atlasDomain,
         apiToken,
         normalizedMediaUrl,
+        bypassCache: queuePayload.bypassCache === true,
         cacheOnly: queueOptions.cacheOnly,
         priority: queueOptions.priority,
     })

@@ -37,8 +37,11 @@ import { isCivitAiHostname } from '../civitai-domains';
 type UseReactionBadgeProps = {
     media: MediaElement;
     onShortcutReady?: ((handler: ((type: BadgeSubmitType) => void) | null) => void) | undefined;
+    onRefreshReady?: ((handler: ((options?: ReactionBadgeRefreshOptions) => void) | null) => void) | undefined;
+    initialRefreshOptions?: ReactionBadgeRefreshOptions | undefined;
 };
 export type BadgeSubmitType = BadgeReactionType | 'blacklist';
+export type ReactionBadgeRefreshOptions = { bypassCheckCache?: boolean };
 const DEVIANT_ART_HOST_PATTERN = /(^|\.)deviantart\.com$/i;
 const RELATED_POST_THUMBNAIL_RETRY_DELAYS_MS = [120, 400, 1000, 2200] as const;
 export function useReactionBadge(props: UseReactionBadgeProps) {
@@ -258,9 +261,10 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         });
     }
 
-    async function refreshMatchForCurrentMedia(force = false): Promise<void> {
+    async function refreshMatchForCurrentMedia(options: { force?: boolean; bypassCheckCache?: boolean } = {}): Promise<void> {
         syncTrackedUrlsForCurrentMedia();
         const checkUrl = trackedMediaUrls.value[0] ?? null;
+        const force = options.force === true;
         if (!force && checkUrl === lastCheckedMediaUrl.value) {
             return;
         }
@@ -277,6 +281,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             const result = await enqueueReactionCheck(checkUrl, {
                 media: props.media,
                 candidatePageUrls: [window.location.href],
+                ...(options.bypassCheckCache === true ? { bypassCache: true } : {}),
             });
             if (!isActive || currentSequence !== checkSequence) {
                 return;
@@ -340,6 +345,12 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         });
 
         ensureProgressSubscription();
+        props.onRefreshReady?.((options?: ReactionBadgeRefreshOptions) => {
+            void refreshMatchForCurrentMedia({
+                force: true,
+                bypassCheckCache: options?.bypassCheckCache === true,
+            });
+        });
         unsubscribeTabCount = subscribeToTabCountChanged((snapshot) => {
             similarDomainTabCount.value = snapshot.similarDomainCount;
             openTabCount.value = snapshot.totalCount;
@@ -350,7 +361,10 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         });
         syncRelatedPostThumbnailContext();
         restartRelatedPostThumbnailRetry();
-        void refreshMatchForCurrentMedia(true);
+        void refreshMatchForCurrentMedia({
+            force: true,
+            bypassCheckCache: props.initialRefreshOptions?.bypassCheckCache === true,
+        });
     });
 
     onBeforeUnmount(() => {
@@ -358,6 +372,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         checkSequence += 1;
         persistCurrentBadgeState(isDownloadLocked.value);
         props.onShortcutReady?.(null);
+        props.onRefreshReady?.(null);
         props.media.removeEventListener('load', onMediaUpdate);
         props.media.removeEventListener('loadedmetadata', onMediaUpdate);
         props.media.removeEventListener('resize', onMediaUpdate);

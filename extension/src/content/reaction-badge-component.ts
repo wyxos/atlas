@@ -2,7 +2,7 @@ import type { PropType } from 'vue';
 import { defineComponent } from 'vue';
 import { renderReactionBadge } from './reaction-badge-view';
 import type { MediaElement } from './media-utils';
-import { type BadgeSubmitType, useReactionBadge } from './use-reaction-badge';
+import { type BadgeSubmitType, type ReactionBadgeRefreshOptions, useReactionBadge } from './use-reaction-badge';
 
 export const AtlasReactionBadge = defineComponent({
     name: 'AtlasReactionBadge',
@@ -13,6 +13,16 @@ export const AtlasReactionBadge = defineComponent({
         },
         onShortcutReady: {
             type: Function as PropType<((handler: ((type: BadgeSubmitType) => void) | null) => void) | undefined>,
+            required: false,
+            default: undefined,
+        },
+        onRefreshReady: {
+            type: Function as PropType<((handler: ((options?: ReactionBadgeRefreshOptions) => void) | null) => void) | undefined>,
+            required: false,
+            default: undefined,
+        },
+        initialRefreshOptions: {
+            type: Object as PropType<ReactionBadgeRefreshOptions | undefined>,
             required: false,
             default: undefined,
         },

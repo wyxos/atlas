@@ -22,6 +22,9 @@ import { createDuplicateAnchorTabGuard } from './content/duplicate-anchor-tab-gu
 import { clearDeviantArtBackgroundImageStyle } from './content/deviantart-background-image-style';
 import { installCivitAiModelBrowseCtas } from './content/civitai-model-browse-cta';
 import { installCivitAiUserBrowseLinks } from './content/civitai-user-browse-link';
+import { installPageVisibilityLifecycle, isPageVisible } from './content/page-work-lifecycle';
+import { shouldBypassBadgeCheckCacheForPageStart } from './content/restored-page-badge-check';
+import { isVisibleInViewport } from './content/viewport-visibility';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
@@ -30,6 +33,7 @@ const VISIBLE_RESUME_SCAN_LIMIT = 100;
 
 type LoadRulesAndProcessOptions = {
     fullScan?: boolean;
+    bypassBadgeCheckCache?: boolean;
 };
 
 let currentSiteCustomization: SiteCustomization | null = null;
@@ -56,23 +60,7 @@ let viewportListenersInstalled = false;
 let interactionFallbackListenersInstalled = false;
 let mediaDimensionListenersInstalled = false;
 let visiblePageWorkFrame: number | null = null;
-
-function isPageVisible(): boolean {
-    return document.visibilityState !== 'hidden';
-}
-
-function isVisibleInViewport(element: Element): boolean {
-    const rect = element.getBoundingClientRect();
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-
-    return rect.bottom > 0
-        && rect.right > 0
-        && rect.top < viewportHeight
-        && rect.left < viewportWidth
-        && rect.width > 0
-        && rect.height > 0;
-}
+let bypassBadgeCheckCacheForCurrentProcessing = false;
 
 function mediaMatchesRules(element: MediaElement): boolean {
     if (!isCurrentSiteEnabled) {
@@ -103,6 +91,11 @@ function processMedia(media: MediaElement): void {
     }
 
     if (mediaMatchesRules(media) && mediaHasEligibleWidgetWidth(media)) {
+        if (bypassBadgeCheckCacheForCurrentProcessing) {
+            overlayManager.apply(media, { refreshCheck: { bypassCheckCache: true } });
+            return;
+        }
+
         overlayManager.apply(media);
         return;
     }
@@ -519,17 +512,28 @@ async function loadRulesAndProcess(options: LoadRulesAndProcessOptions = {}): Pr
         return;
     }
 
+    const previousBypass = bypassBadgeCheckCacheForCurrentProcessing;
+    bypassBadgeCheckCacheForCurrentProcessing = options.bypassBadgeCheckCache === true;
+
     if (options.fullScan ?? true) {
         processAllCurrentMedia();
         anchorMediaRuntime.registerFromDocument();
+        bypassBadgeCheckCacheForCurrentProcessing = previousBypass;
         return;
     }
 
     processVisiblePageWork();
+    bypassBadgeCheckCacheForCurrentProcessing = previousBypass;
 }
 
-function startPageWork(options: { fullScan?: boolean } = {}): void {
+function startPageWork(options: { fullScan?: boolean; bypassBadgeCheckCache?: boolean } = {}): void {
     if (isPageWorkActive) {
+        if (options.bypassBadgeCheckCache === true) {
+            const previousBypass = bypassBadgeCheckCacheForCurrentProcessing;
+            bypassBadgeCheckCacheForCurrentProcessing = true;
+            processVisiblePageWork();
+            bypassBadgeCheckCacheForCurrentProcessing = previousBypass;
+        }
         return;
     }
 
@@ -542,7 +546,10 @@ function startPageWork(options: { fullScan?: boolean } = {}): void {
     installInteractionFallbackListeners();
     installMediaDimensionListeners();
     anchorMediaRuntime.resume();
-    void loadRulesAndProcess({ fullScan: options.fullScan ?? true });
+    void loadRulesAndProcess({
+        fullScan: options.fullScan ?? true,
+        bypassBadgeCheckCache: options.bypassBadgeCheckCache === true,
+    });
 }
 
 function stopPageWork(): void {
@@ -563,33 +570,23 @@ function stopPageWork(): void {
     anchorMediaRuntime.suspend();
 }
 
-function handleVisibilityChange(): void {
-    if (isPageVisible()) {
-        startPageWork({ fullScan: false });
-        return;
-    }
-
-    stopPageWork();
-}
-
-function installVisibilityListener(): void {
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-}
-
-function bootstrap(): void {
+async function bootstrap(): Promise<void> {
     installStorageListener();
     installRuntimeMessageListener();
-    installVisibilityListener();
+    installPageVisibilityLifecycle(startPageWork, stopPageWork);
 
+    const bypassBadgeCheckCache = await shouldBypassBadgeCheckCacheForPageStart();
     if (isPageVisible()) {
-        startPageWork({ fullScan: true });
+        startPageWork({ fullScan: true, bypassBadgeCheckCache });
     } else {
         anchorMediaRuntime.suspend();
     }
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+    document.addEventListener('DOMContentLoaded', () => {
+        void bootstrap();
+    }, { once: true });
 } else {
-    bootstrap();
+    void bootstrap();
 }

@@ -42,9 +42,11 @@ type BrowserTab = {
 const openComparableUrlByTabId = new Map<number, string>();
 const openComparableUrlCountByUrl = new Map<string, number>();
 const lastTabCountSnapshotByTabId = new Map<number, TabCountChangedMessage>();
+const recentlyClosedComparableUrlExpiresAt = new Map<string, number>();
 let discardInactiveTabsInFlight: Promise<{ discardedCount: number; failedCount: number; skippedCount: number }> | null = null;
 const DISCARD_INACTIVE_TABS_BATCH_SIZE = 8;
 const DISCARD_INACTIVE_TABS_BATCH_PAUSE_MS = 50;
+const RECENTLY_CLOSED_TAB_RECHECK_WINDOW_MS = 5 * 60 * 1000;
 
 function updateTrackedComparableTabUrl(tabId: number, nextComparableUrl: string | null): string[] {
     const previousComparableUrl = openComparableUrlByTabId.get(tabId) ?? null;
@@ -91,6 +93,36 @@ function getComparableOpenTabCounts(urls?: string[]): Record<string, number> {
 
 function getComparableOpenTabUrls(): string[] {
     return Array.from(openComparableUrlByTabId.values());
+}
+
+function pruneRecentlyClosedComparableUrls(now = Date.now()): void {
+    for (const [url, expiresAt] of recentlyClosedComparableUrlExpiresAt.entries()) {
+        if (expiresAt <= now) {
+            recentlyClosedComparableUrlExpiresAt.delete(url);
+        }
+    }
+}
+
+function rememberRecentlyClosedComparableUrls(urls: string[]): void {
+    const now = Date.now();
+    pruneRecentlyClosedComparableUrls(now);
+    for (const url of urls) {
+        recentlyClosedComparableUrlExpiresAt.set(url, now + RECENTLY_CLOSED_TAB_RECHECK_WINDOW_MS);
+    }
+}
+
+function consumeRecentlyClosedComparableUrl(url: string | null): boolean {
+    if (url === null) {
+        return false;
+    }
+
+    pruneRecentlyClosedComparableUrls();
+    if (!recentlyClosedComparableUrlExpiresAt.has(url)) {
+        return false;
+    }
+
+    recentlyClosedComparableUrlExpiresAt.delete(url);
+    return true;
 }
 
 function isMissingReceiverError(errorMessage: string): boolean {
@@ -347,6 +379,14 @@ chrome.runtime.onMessage.addListener((
         return true;
     }
 
+    if (payload.type === 'ATLAS_SHOULD_FORCE_BADGE_CHECK_ON_PAGE') {
+        const pageUrl = typeof payload.url === 'string' ? payload.url : sender.tab?.url ?? null;
+        sendResponse({
+            shouldForce: consumeRecentlyClosedComparableUrl(normalizeComparableOpenTabUrl(pageUrl)),
+        });
+        return false;
+    }
+
     if (payload.type === 'ATLAS_GET_OPEN_COMPARABLE_URLS') {
         sendResponse({ urls: getComparableOpenTabUrls() });
         return false;
@@ -399,6 +439,7 @@ chrome.tabs.onRemoved.addListener((tabId: number) => {
     removeDownloadProgressSubscriber(tabId);
     lastTabCountSnapshotByTabId.delete(tabId);
     const changedUrls = updateTrackedComparableTabUrl(tabId, null);
+    rememberRecentlyClosedComparableUrls(changedUrls);
     broadcastTabPresenceChanged(changedUrls);
     broadcastTabCountChanged();
 });

@@ -51,6 +51,7 @@ export type BackgroundAtlasCheckQueue<Result> = {
         atlasDomain: string;
         apiToken: string;
         normalizedInput: string;
+        bypassCache?: boolean;
         cacheOnly?: boolean;
         priority?: number;
     }) => Promise<AtlasCheckQueueResponse<Result>>;
@@ -384,9 +385,12 @@ export function createBackgroundAtlasCheckQueue<Result>(
     return {
         async enqueue(request) {
             const key = makeScopedKey(request.atlasDomain, request.apiToken, request.normalizedInput);
-            const cached = getCachedResponse(key);
-            if (cached) {
-                return cached;
+            const shouldBypassCache = request.bypassCache === true;
+            if (!shouldBypassCache) {
+                const cached = getCachedResponse(key);
+                if (cached) {
+                    return cached;
+                }
             }
 
             const pending = pendingByKey.get(key);
@@ -405,9 +409,11 @@ export function createBackgroundAtlasCheckQueue<Result>(
 
             const inputHash = await sha256Hex(request.normalizedInput, hashByInput, definition.maxHashCacheEntries);
 
-            const cachedAfterHash = getCachedResponse(key);
-            if (cachedAfterHash) {
-                return cachedAfterHash;
+            if (!shouldBypassCache) {
+                const cachedAfterHash = getCachedResponse(key);
+                if (cachedAfterHash) {
+                    return cachedAfterHash;
+                }
             }
 
             const pendingAfterHash = pendingByKey.get(key);

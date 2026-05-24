@@ -103,6 +103,7 @@ function enqueueGlobalBadgeCheck(
         atlasDomain: string;
         apiToken: string;
         normalizedMediaUrl: string;
+        bypassCache?: boolean;
         cacheOnly?: boolean;
         priority?: number;
     },
@@ -111,6 +112,7 @@ function enqueueGlobalBadgeCheck(
         atlasDomain: request.atlasDomain,
         apiToken: request.apiToken,
         normalizedInput: request.normalizedMediaUrl,
+        bypassCache: request.bypassCache,
         cacheOnly: request.cacheOnly,
         priority: request.priority,
     });

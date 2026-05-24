@@ -286,6 +286,13 @@ describe('background-atlas-check-queue', () => {
     it('caches successful empty matches but retries after network failures', async () => {
         const fetchMock = vi.fn()
             .mockResolvedValueOnce(createMatchResponse([]))
+            .mockResolvedValueOnce(createMatchResponse([
+                {
+                    request_id: 'req-0',
+                    exists: true,
+                    reaction: 'love',
+                },
+            ]))
             .mockRejectedValueOnce(new Error('offline'))
             .mockResolvedValueOnce(createMatchResponse([]));
         vi.stubGlobal('fetch', fetchMock);
@@ -310,13 +317,24 @@ describe('background-atlas-check-queue', () => {
         expect(cached.payload.exists).toBe(false);
         expect(fetchMock).toHaveBeenCalledTimes(1);
 
+        const forced = enqueueGlobalBadgeCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedMediaUrl: 'https://cdn.example.com/cached.jpg',
+            bypassCache: true,
+        });
+        await vi.waitFor(() => {
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+        });
+        expect((await forced).payload.reaction).toBe('love');
+
         const failed = enqueueGlobalBadgeCheck({
             atlasDomain: 'https://atlas.test',
             apiToken: 'token-two',
             normalizedMediaUrl: 'https://cdn.example.com/failure.jpg',
         });
         await vi.waitFor(() => {
-            expect(fetchMock).toHaveBeenCalledTimes(2);
+            expect(fetchMock).toHaveBeenCalledTimes(3);
         });
         expect((await failed).ok).toBe(false);
 
@@ -326,10 +344,10 @@ describe('background-atlas-check-queue', () => {
             normalizedMediaUrl: 'https://cdn.example.com/failure.jpg',
         });
         await vi.waitFor(() => {
-            expect(fetchMock).toHaveBeenCalledTimes(3);
+            expect(fetchMock).toHaveBeenCalledTimes(4);
         });
         expect((await retried).ok).toBe(true);
-        expect(fetchMock).toHaveBeenCalledTimes(3);
+        expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
     it('attaches callers to the in-flight badge request after the batch has already flushed', async () => {

@@ -4,13 +4,18 @@ const triggerReaction = vi.fn();
 const unmount = vi.fn();
 const triggerReactionByMedia = new WeakMap<Element, ReturnType<typeof vi.fn>>();
 const unmountByMedia = new WeakMap<Element, ReturnType<typeof vi.fn>>();
+const refreshCheckByMedia = new WeakMap<Element, ReturnType<typeof vi.fn>>();
+const initialRefreshOptionsByMedia = new WeakMap<Element, unknown>();
 
 vi.mock('./reaction-badge-app', () => ({
-    createReactionBadgeHost: (media: Element) => {
+    createReactionBadgeHost: (media: Element, initialRefreshOptions?: unknown) => {
         const mediaTriggerReaction = vi.fn();
         const mediaUnmount = vi.fn();
+        const mediaRefreshCheck = vi.fn();
         triggerReactionByMedia.set(media, mediaTriggerReaction);
         unmountByMedia.set(media, mediaUnmount);
+        refreshCheckByMedia.set(media, mediaRefreshCheck);
+        initialRefreshOptionsByMedia.set(media, initialRefreshOptions);
 
         return {
             element: document.createElement('div'),
@@ -18,6 +23,7 @@ vi.mock('./reaction-badge-app', () => ({
                 triggerReaction(type);
                 mediaTriggerReaction(type);
             },
+            refreshCheck: mediaRefreshCheck,
             unmount: () => {
                 unmount();
                 mediaUnmount();
@@ -89,6 +95,28 @@ describe('OverlayManager', () => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true, cancelable: true }));
 
         expect(triggerReaction).not.toHaveBeenCalled();
+
+        manager.remove(image);
+    });
+
+    it('passes forced check options into new badges and refreshes existing visible badges', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const { image } = appendTrackedImage({
+            imageRect: createRect(40, 50, 180, 120),
+        });
+
+        manager.apply(image, { refreshCheck: { bypassCheckCache: true } });
+
+        expect(initialRefreshOptionsByMedia.get(image)).toEqual({ bypassCheckCache: true });
+        expect(refreshCheckByMedia.get(image)).not.toHaveBeenCalled();
+
+        manager.apply(image, { refreshCheck: { bypassCheckCache: true } });
+        expect(refreshCheckByMedia.get(image)).toHaveBeenCalledWith({ bypassCheckCache: true });
+
+        refreshCheckByMedia.get(image)?.mockClear();
+        expect(manager.refreshVisibleChecks({ bypassCheckCache: true })).toBe(1);
+        expect(refreshCheckByMedia.get(image)).toHaveBeenCalledWith({ bypassCheckCache: true });
 
         manager.remove(image);
     });

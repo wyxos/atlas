@@ -15,7 +15,7 @@ type BrowserTab = {
 
 type RuntimeMessageListener = (
     message: unknown,
-    sender: { tab?: { id?: number } },
+    sender: { tab?: { id?: number; url?: string } },
     sendResponse: (response?: unknown) => void,
 ) => boolean | void;
 
@@ -115,7 +115,7 @@ function createChromeMock(initialTabs: BrowserTab[]) {
 function sendRuntimeMessage(
     listener: RuntimeMessageListener,
     message: unknown,
-    sender: { tab?: { id?: number } } = {},
+    sender: { tab?: { id?: number; url?: string } } = {},
 ): Promise<unknown> {
     return new Promise((resolve) => {
         listener(message, sender, resolve);

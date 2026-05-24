@@ -1,6 +1,6 @@
 import type { MediaElement } from './media-utils';
 import { createReactionBadgeHost } from './reaction-badge-app';
-import type { BadgeSubmitType } from './use-reaction-badge';
+import type { BadgeSubmitType, ReactionBadgeRefreshOptions } from './use-reaction-badge';
 
 const BADGE_ATTR = 'data-atlas-media-red-badge';
 const APPLIED_ATTR = 'data-atlas-media-red-applied';
@@ -8,7 +8,12 @@ const APPLIED_ATTR = 'data-atlas-media-red-applied';
 type BadgeHost = {
     element: HTMLDivElement;
     triggerReaction: (type: BadgeSubmitType) => void;
+    refreshCheck: (options?: ReactionBadgeRefreshOptions) => void;
     unmount: () => void;
+};
+
+type OverlayApplyOptions = {
+    refreshCheck?: ReactionBadgeRefreshOptions;
 };
 
 export class OverlayManager {
@@ -16,11 +21,15 @@ export class OverlayManager {
     private readonly activeMedia = new Set<MediaElement>();
     private isGlobalShortcutBound = false;
 
-    apply(media: MediaElement): void {
+    apply(media: MediaElement, options: OverlayApplyOptions = {}): void {
         this.activeMedia.add(media);
         media.setAttribute(APPLIED_ATTR, '1');
-        const badge = this.ensureBadge(media);
+        const existingHost = this.badgesByMedia.get(media);
+        const badge = this.ensureBadge(media, options.refreshCheck);
         this.syncBadgePlacement(media, badge);
+        if (existingHost && options.refreshCheck) {
+            existingHost.refreshCheck(options.refreshCheck);
+        }
         this.ensureGlobalShortcutBinding();
     }
 
@@ -53,14 +62,33 @@ export class OverlayManager {
         }
     }
 
-    private ensureBadge(media: MediaElement): HTMLDivElement {
+    refreshVisibleChecks(options: ReactionBadgeRefreshOptions): number {
+        let refreshedCount = 0;
+        for (const media of Array.from(this.activeMedia)) {
+            if (!this.isActiveConnectedMedia(media) || !this.isVisibleInViewport(media)) {
+                continue;
+            }
+
+            const badgeHost = this.badgesByMedia.get(media);
+            if (!badgeHost) {
+                continue;
+            }
+
+            badgeHost.refreshCheck(options);
+            refreshedCount += 1;
+        }
+
+        return refreshedCount;
+    }
+
+    private ensureBadge(media: MediaElement, initialRefreshOptions?: ReactionBadgeRefreshOptions): HTMLDivElement {
         const existingHost = this.badgesByMedia.get(media);
         if (existingHost) {
             this.syncBadgePlacement(media, existingHost.element);
             return existingHost.element;
         }
 
-        const badgeHost = createReactionBadgeHost(media);
+        const badgeHost = createReactionBadgeHost(media, initialRefreshOptions);
         const badge = badgeHost.element;
         badge.setAttribute(BADGE_ATTR, '1');
         badge.style.position = 'absolute';
@@ -234,6 +262,19 @@ export class OverlayManager {
 
     private isPointInsideRect(x: number, y: number, rect: DOMRect): boolean {
         return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    }
+
+    private isVisibleInViewport(media: MediaElement): boolean {
+        const rect = media.getBoundingClientRect();
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+        return rect.bottom > 0
+            && rect.right > 0
+            && rect.top < viewportHeight
+            && rect.left < viewportWidth
+            && rect.width > 0
+            && rect.height > 0;
     }
 
     private isActiveConnectedMedia(media: unknown): media is MediaElement {

@@ -35,6 +35,7 @@ const mockMediaMatchesRulesForPage = vi.fn();
 const mockOverlayApply = vi.fn();
 const mockOverlayRemove = vi.fn();
 const mockOverlayScheduleReposition = vi.fn();
+const mockOverlayRefreshVisibleChecks = vi.fn();
 const mockAnchorRuntime = {
     handleDownloadProgressEvent: vi.fn(),
     handleReferrerReactionSync: vi.fn(),
@@ -128,6 +129,7 @@ vi.mock('./content/overlay-manager', () => ({
         apply = mockOverlayApply;
         remove = mockOverlayRemove;
         scheduleReposition = mockOverlayScheduleReposition;
+        refreshVisibleChecks = mockOverlayRefreshVisibleChecks;
     },
 }));
 
@@ -357,6 +359,71 @@ describe('content-main', () => {
         await flushPromises();
 
         expect(mockGetStoredOptions).toHaveBeenCalledTimes(2);
+    });
+
+    it('bypasses the badge check cache when the background marks the page as restored', async () => {
+        const customization = {
+            domain: 'example.com',
+            matchRules: ['.*'],
+            referrerCleaner: {
+                stripQueryParams: [],
+            },
+        };
+        mockGetStoredOptions.mockResolvedValue({
+            siteCustomizations: [customization],
+        });
+        mockResolveSiteCustomizationForHostname.mockReturnValue(customization);
+        mockCreateCustomizationMatchRules.mockReturnValue([{ pattern: '.*' }]);
+
+        const runtimeSendMessage = vi.fn((message: unknown, callback?: (response: unknown) => void) => {
+            const payload = message as { type?: string };
+            if (payload.type === 'ATLAS_SHOULD_FORCE_BADGE_CHECK_ON_PAGE') {
+                callback?.({ shouldForce: true });
+                return;
+            }
+
+            callback?.(null);
+        });
+
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: runtimeSendMessage,
+                onMessage: {
+                    addListener: vi.fn((listener: (message: unknown) => void) => {
+                        runtimeMessageListener = listener;
+                    }),
+                },
+            },
+            storage: {
+                onChanged: {
+                    addListener: vi.fn((listener: () => void) => {
+                        storageChangeListener = listener;
+                    }),
+                },
+            },
+        });
+
+        const image = document.createElement('img');
+        image.src = 'https://cdn.example.com/restored.jpg';
+        document.body.appendChild(image);
+
+        await import('./content-main');
+        await flushPromises();
+        await flushPromises();
+
+        expect(runtimeSendMessage).toHaveBeenCalledWith(
+            {
+                type: 'ATLAS_SHOULD_FORCE_BADGE_CHECK_ON_PAGE',
+                url: window.location.href,
+            },
+            expect.any(Function),
+        );
+        expect(mockOverlayApply).toHaveBeenCalledWith(image, {
+            refreshCheck: {
+                bypassCheckCache: true,
+            },
+        });
     });
 
     it('does not start page work while hidden and resumes with a bounded visible scan', async () => {

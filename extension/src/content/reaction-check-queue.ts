@@ -19,6 +19,7 @@ export type BadgeMatchResult = {
 type ReactionCheckContext = {
     media?: MediaElement | null;
     candidatePageUrls?: Array<string | null | undefined>;
+    bypassCache?: boolean;
 };
 
 function emptyResult(): BadgeMatchResult {
@@ -95,12 +96,13 @@ export async function enqueueReactionCheck(
             endpoint,
             'POST',
             { media_url: normalizedMediaUrl },
-            () => requestQueuedBadgeCheckViaRuntime({
-                atlasDomain: stored.atlasDomain,
-                apiToken: stored.apiToken,
-                normalizedMediaUrl,
-            }),
-        );
+                () => requestQueuedBadgeCheckViaRuntime({
+                    atlasDomain: stored.atlasDomain,
+                    apiToken: stored.apiToken,
+                    normalizedMediaUrl,
+                    ...(context.bypassCache === true ? { bypassCache: true } : {}),
+                }),
+            );
 
         if (runtimeResponse === null || !runtimeResponse.ok) {
             return emptyResult();

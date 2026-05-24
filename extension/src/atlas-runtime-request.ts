@@ -16,6 +16,7 @@ type RuntimeQueuedBadgeCheckOptions = {
     atlasDomain: string;
     apiToken: string;
     normalizedMediaUrl: string;
+    bypassCache?: boolean;
 };
 
 type RuntimeQueuedReferrerCheckOptions = {
@@ -102,6 +103,7 @@ export async function requestQueuedBadgeCheckViaRuntime(
         atlasDomain: options.atlasDomain,
         apiToken: options.apiToken,
         normalizedMediaUrl: options.normalizedMediaUrl,
+        ...(options.bypassCache === true ? { bypassCache: true } : {}),
         pageVisibility: resolvePageVisibility(),
     });
 }
