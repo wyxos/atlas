@@ -5,6 +5,9 @@ import type { ReactionType } from '@/types/reaction';
 export type AudioPlayerTrack = {
     id: number;
     title: string;
+    source?: string | null;
+    sourceId?: string | null;
+    spotifyUri?: string | null;
     artists: string;
     album: string;
     coverUrl: string | null;
@@ -56,6 +59,9 @@ function isStoredTrack(value: unknown): value is AudioPlayerTrack {
     return typeof track.id === 'number'
         && Number.isFinite(track.id)
         && typeof track.title === 'string'
+        && (typeof track.source === 'string' || track.source === null || track.source === undefined)
+        && (typeof track.sourceId === 'string' || track.sourceId === null || track.sourceId === undefined)
+        && (typeof track.spotifyUri === 'string' || track.spotifyUri === null || track.spotifyUri === undefined)
         && typeof track.artists === 'string'
         && typeof track.album === 'string'
         && typeof track.duration === 'string';
@@ -64,6 +70,9 @@ function isStoredTrack(value: unknown): value is AudioPlayerTrack {
 function withPlaybackUrl(track: Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }): AudioPlayerTrack {
     return {
         ...track,
+        source: track.source ?? null,
+        sourceId: track.sourceId ?? null,
+        spotifyUri: track.spotifyUri ?? null,
         playbackUrl: track.playbackUrl ?? serve.url(track.id),
     };
 }

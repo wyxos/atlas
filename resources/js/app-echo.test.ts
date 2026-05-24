@@ -34,6 +34,9 @@ vi.mock('@fortawesome/free-solid-svg-icons', () => ({
 vi.mock('./App.vue', () => ({
     default: {},
 }));
+vi.mock('./components/HomeScreenshotCarousel.vue', () => ({
+    default: {},
+}));
 vi.mock('./routes', () => ({
     default: [],
 }));

@@ -31,6 +31,9 @@ function hydratedQueueTrack(
     return {
         ...existingTrack,
         title: title && title !== '' ? title : existingTrack.title,
+        source: item.source ?? existingTrack.source,
+        sourceId: item.source_id ?? existingTrack.sourceId,
+        spotifyUri: item.spotify_uri ?? existingTrack.spotifyUri,
         artists: item.artists.length > 0 ? item.artists.join(', ') : 'Unknown artist',
         album: item.albums[0] ?? 'Unknown album',
         coverUrl: item.cover_url,

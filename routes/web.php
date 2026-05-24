@@ -75,6 +75,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.services.spotify.refresh');
     Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])
         ->name('api.settings.services.spotify.disconnect');
+    Route::get('/api/spotify/playback-token', \App\Http\Controllers\SpotifyPlaybackTokenController::class)
+        ->name('api.spotify.playback-token');
     Route::post('/api/settings/services/deviantart/refresh', [\App\Http\Controllers\SettingsServicesController::class, 'deviantArtRefresh'])
         ->name('api.settings.services.deviantart.refresh');
     Route::delete('/api/settings/services/deviantart', [\App\Http\Controllers\SettingsServicesController::class, 'deviantArtDisconnect'])

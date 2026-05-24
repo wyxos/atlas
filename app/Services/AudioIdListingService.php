@@ -41,7 +41,7 @@ class AudioIdListingService
 
         $rows = (clone $baseQuery)
             ->forceIndex(self::AUDIO_ID_PAGE_INDEX)
-            ->select(['id', 'source'])
+            ->select(['id', 'source', 'source_id'])
             ->where('id', '>', $afterId)
             ->where('id', '<=', $maxId)
             ->orderBy('id')
@@ -56,9 +56,19 @@ class AudioIdListingService
             $chunk->all(),
         );
         $sourcesById = [];
+        $sourceIdsById = [];
+        $spotifyUrisById = [];
         foreach ($chunk as $row) {
             $source = trim((string) ($row->source ?? ''));
-            $sourcesById[(int) $row->id] = $source !== '' ? $source : null;
+            $sourceId = trim((string) ($row->source_id ?? ''));
+            $id = (int) $row->id;
+
+            $sourcesById[$id] = $source !== '' ? $source : null;
+            $sourceIdsById[$id] = $sourceId !== '' ? $sourceId : null;
+            $spotifyUrisById[$id] = $this->spotifyTrackUri(
+                $source,
+                $sourceId,
+            );
         }
 
         $nextAfterId = $hasMore && $ids !== []
@@ -76,6 +86,8 @@ class AudioIdListingService
         return [
             'ids' => $ids,
             'sources' => $sourcesById,
+            'source_ids' => $sourceIdsById,
+            'spotify_uris' => $spotifyUrisById,
             'cursor' => [
                 'after_id' => $afterId,
                 'next_after_id' => $nextAfterId,
@@ -99,6 +111,8 @@ class AudioIdListingService
      *         id: int,
      *         title: string|null,
      *         source: string|null,
+     *         source_id: string|null,
+     *         spotify_uri: string|null,
      *         artists: list<string>,
      *         albums: list<string>,
      *         cover_url: string|null,
@@ -127,6 +141,9 @@ class AudioIdListingService
                 'title',
                 'filename',
                 'source',
+                'source_id',
+                'url',
+                'referrer_url',
                 'listing_metadata',
                 'preview_url',
                 'preview_path',
@@ -161,6 +178,10 @@ class AudioIdListingService
             if (! is_array($payload)) {
                 $payload = [];
             }
+            $listingMetadata = $file->listing_metadata;
+            if (! is_array($listingMetadata)) {
+                $listingMetadata = [];
+            }
 
             $artists = $this->normalizeStringList([
                 data_get($payload, 'artist'),
@@ -169,11 +190,13 @@ class AudioIdListingService
                 data_get($payload, 'albumArtist'),
                 data_get($payload, 'albumartist'),
                 data_get($payload, 'performer'),
+                data_get($listingMetadata, 'track.artists.*.name'),
             ]);
 
             $albums = $this->normalizeStringList([
                 data_get($payload, 'album'),
                 data_get($payload, 'albums'),
+                data_get($listingMetadata, 'track.album.name'),
             ]);
 
             $containerArtists = $file->containers
@@ -203,10 +226,10 @@ class AudioIdListingService
 
             $artists = $relationshipArtists !== []
                 ? array_values(array_unique($relationshipArtists))
-                : array_values(array_unique([...$artists, ...$containerArtists]));
+                : ($artists !== [] ? $artists : array_values(array_unique($containerArtists)));
             $albums = $relationshipAlbums !== []
                 ? array_values(array_unique($relationshipAlbums))
-                : array_values(array_unique([...$albums, ...$containerAlbums]));
+                : ($albums !== [] ? $albums : array_values(array_unique($containerAlbums)));
 
             $title = trim((string) (data_get($payload, 'title') ?? $file->title ?? $file->filename ?? ''));
             $source = trim((string) ($file->source ?? ''));
@@ -216,6 +239,15 @@ class AudioIdListingService
                 'id' => (int) $file->id,
                 'title' => $title !== '' ? $title : null,
                 'source' => $source !== '' ? $source : null,
+                'source_id' => $file->source_id !== null && trim((string) $file->source_id) !== ''
+                    ? trim((string) $file->source_id)
+                    : null,
+                'spotify_uri' => $this->spotifyTrackUri(
+                    $source,
+                    (string) ($file->source_id ?? ''),
+                    (string) ($file->url ?? ''),
+                    (string) ($file->referrer_url ?? ''),
+                ),
                 'artists' => $artists,
                 'albums' => $albums,
                 'cover_url' => $this->coverUrl($file),
@@ -260,6 +292,39 @@ class AudioIdListingService
         $normalized = (int) round((float) $seconds);
 
         return $normalized > 0 ? $normalized : null;
+    }
+
+    private function spotifyTrackUri(string $source, string $sourceId, string ...$urlCandidates): ?string
+    {
+        if (strtolower(trim($source)) !== 'spotify') {
+            return null;
+        }
+
+        $sourceId = trim($sourceId);
+        if (preg_match('/^spotify:track:([A-Za-z0-9]{22})$/', $sourceId) === 1) {
+            return $sourceId;
+        }
+
+        if (preg_match('/^[A-Za-z0-9]{22}$/', $sourceId) === 1) {
+            return 'spotify:track:'.$sourceId;
+        }
+
+        foreach ($urlCandidates as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate === '') {
+                continue;
+            }
+
+            if (preg_match('/spotify:track:([A-Za-z0-9]{22})/', $candidate, $matches) === 1) {
+                return 'spotify:track:'.$matches[1];
+            }
+
+            if (preg_match('#open\.spotify\.com/track/([A-Za-z0-9]{22})#', $candidate, $matches) === 1) {
+                return 'spotify:track:'.$matches[1];
+            }
+        }
+
+        return null;
     }
 
     private function coverUrl(File $file): ?string

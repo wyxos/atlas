@@ -25,7 +25,9 @@ describe('GlobalAudioPlayer', () => {
     afterEach(() => {
         useGlobalAudioPlayer().clear();
         delete (window as unknown as { axios?: unknown }).axios;
+        delete window.Spotify;
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     it('renders a custom static player surface without native audio controls', () => {
@@ -214,6 +216,26 @@ describe('GlobalAudioPlayer', () => {
         expect((wrapper.get('audio').element as HTMLAudioElement).currentTime).toBe(45);
         expect((seekInput.element as HTMLInputElement).value).toBe('45');
         expect(wrapper.text()).toContain('0:45');
+    });
+
+    it('clears displayed progress immediately when moving between tracks', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([testTrack(41, { duration: '3:00', durationSeconds: 180 }), testTrack(42)], 41);
+
+        const wrapper = mount(GlobalAudioPlayer);
+        await wrapper.get('[aria-label="Playback progress"]').setValue('137');
+
+        expect(wrapper.text()).toContain('2:17');
+
+        await wrapper.get('[aria-label="Next"]').trigger('click');
+
+        expect(wrapper.text()).toContain('0:00');
+        expect(wrapper.text()).not.toContain('2:17');
+
+        await wrapper.get('[aria-label="Previous"]').trigger('click');
+
+        expect(wrapper.text()).toContain('0:00');
+        expect(wrapper.text()).not.toContain('2:17');
     });
 
     it('controls volume and restores the previous amount after mute', async () => {

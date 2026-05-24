@@ -3,6 +3,8 @@ import type { ReactionType } from './reaction';
 export type AudioIdsResponse = {
     ids: number[];
     sources: Record<number, string | null>;
+    source_ids: Record<number, string | null>;
+    spotify_uris: Record<number, string | null>;
     cursor: {
         after_id: number;
         next_after_id: number | null;
@@ -21,6 +23,8 @@ export type AudioDetailsResponse = {
         id: number;
         title: string | null;
         source: string | null;
+        source_id: string | null;
+        spotify_uri: string | null;
         artists: string[];
         albums: string[];
         cover_url: string | null;

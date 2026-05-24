@@ -7,7 +7,9 @@ import AudioListShell from '../components/AudioListShell.vue';
 import AudioLoadProgressPanel from '../components/AudioLoadProgressPanel.vue';
 import AudioPlaylistPanel from '../components/AudioPlaylistPanel.vue';
 import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
+import { audioDetailFromResponseItem, emptyAudioDetail } from '../composables/useAudioDetailMapping';
 import { useAudioPlaylistPanelOpenState } from '../composables/useAudioPlaylistPanelOpenState';
+import { useAudioSourceIdentityMaps } from '../composables/useAudioSourceIdentityMaps';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '../composables/useGlobalAudioPlayer';
 import type {
     AudioDetail,
@@ -25,7 +27,13 @@ const SCROLL_IDLE_MS = 180;
 const PROGRESS_HIDE_DELAY_MS = 350;
 
 const audioIds = ref<number[]>([]);
-const sourceById = ref<Record<number, string | null>>({});
+const {
+    mergeAudioSourceIdentityMaps,
+    resetAudioSourceIdentityMaps,
+    sourceById,
+    sourceIdById,
+    spotifyUriById,
+} = useAudioSourceIdentityMaps();
 const loadedPages = ref(0);
 const totalPages = ref(0);
 const totalAudioFiles = ref(0);
@@ -137,7 +145,7 @@ async function loadAllAudioIds(): Promise<void> {
     isLoading.value = true;
     error.value = null;
     audioIds.value = [];
-    sourceById.value = {};
+    resetAudioSourceIdentityMaps();
     loadedPages.value = 0;
     totalPages.value = 0;
     totalAudioFiles.value = 0;
@@ -163,10 +171,7 @@ async function loadAllAudioIds(): Promise<void> {
             }
 
             audioIds.value.push(...nextChunk.ids);
-            sourceById.value = {
-                ...sourceById.value,
-                ...nextChunk.sources,
-            };
+            mergeAudioSourceIdentityMaps(nextChunk);
             if (totalPages.value > 0) {
                 loadedPages.value = Math.min(totalPages.value, loadedPages.value + 1);
             }
@@ -232,6 +237,9 @@ function audioPlayerTrack(audioId: number): AudioPlayerTrack {
     return {
         id: audioId,
         title: detailTitle(audioId),
+        source: detailSource(audioId),
+        sourceId: details?.source_id ?? sourceIdById.value[audioId] ?? null,
+        spotifyUri: details?.spotify_uri ?? spotifyUriById.value[audioId] ?? null,
         artists: detailArtists(audioId),
         album: detailAlbum(audioId),
         coverUrl: detailCoverUrl(audioId),
@@ -386,18 +394,7 @@ async function fetchVisibleDetails(): Promise<void> {
 
         for (const item of data.items) {
             returnedIds.add(item.id);
-            nextDetails[item.id] = {
-                title: item.title,
-                source: item.source,
-                artists: item.artists,
-                albums: item.albums,
-                cover_url: item.cover_url,
-                duration_seconds: item.duration_seconds,
-                reaction: item.reaction,
-                blacklisted_at: item.blacklisted_at,
-                previewed_count: item.previewed_count,
-                seen_count: item.seen_count,
-            };
+            nextDetails[item.id] = audioDetailFromResponseItem(item);
         }
 
         for (const id of idsToFetch) {
@@ -405,18 +402,7 @@ async function fetchVisibleDetails(): Promise<void> {
                 continue;
             }
 
-            nextDetails[id] = {
-                title: null,
-                source: null,
-                artists: [],
-                albums: [],
-                cover_url: null,
-                duration_seconds: null,
-                reaction: null,
-                blacklisted_at: null,
-                previewed_count: 0,
-                seen_count: 0,
-            };
+            nextDetails[id] = emptyAudioDetail();
         }
 
         detailsById.value = nextDetails;

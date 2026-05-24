@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import {
     Ban,
     Heart,
@@ -19,6 +19,7 @@ import {
 import AudioQueueSheet from './AudioQueueSheet.vue';
 import AudioVolumeControl from './AudioVolumeControl.vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAudioPlaybackEngines } from '@/composables/useAudioPlaybackEngines';
 import { useAudioQueueDetails } from '@/composables/useAudioQueueDetails';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
 import type { ReactionType } from '@/types/reaction';
@@ -77,6 +78,16 @@ const repeatButtonLabel = computed(() => {
     return 'Repeat off';
 });
 
+const {
+    handleEnded,
+    handleLoadedMetadata,
+    handleSeek,
+    handleTimeUpdate,
+    nativeAudioSource,
+    startCurrentPlayback,
+    teardown,
+} = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds);
+
 const controlButtonClass = [
     'player-control-button inline-flex size-12 items-center justify-center rounded-full 2xl:size-14',
     'text-blue-slate-300 transition-colors',
@@ -96,78 +107,6 @@ function formatSeconds(value: number): string {
     const remainingSeconds = seconds % 60;
 
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-}
-
-async function attemptPlay(): Promise<void> {
-    await nextTick();
-
-    if (!audioRef.value || !currentTrack.value) {
-        return;
-    }
-
-    if (currentTime.value > 0) {
-        audioRef.value.currentTime = currentTime.value;
-    }
-
-    const playResult = audioRef.value.play();
-    void (playResult as Promise<void> | undefined)?.catch(() => {
-        audioPlayer.pause();
-    });
-}
-
-function syncPlaybackPositionFromPlayer(): void {
-    const storedPosition = audioPlayer.playbackPositionSeconds.value;
-    const targetPosition = durationSeconds.value > 0 ? Math.min(durationSeconds.value, storedPosition) : storedPosition;
-    currentTime.value = targetPosition;
-
-    if (audioRef.value) {
-        audioRef.value.currentTime = targetPosition;
-    }
-}
-
-function handleLoadedMetadata(): void {
-    mediaDuration.value = audioRef.value?.duration && Number.isFinite(audioRef.value.duration)
-        ? audioRef.value.duration
-        : currentTrack.value?.durationSeconds ?? 0;
-    syncPlaybackPositionFromPlayer();
-}
-
-function handleTimeUpdate(): void {
-    currentTime.value = audioRef.value?.currentTime ?? 0;
-    audioPlayer.updatePlaybackPosition(currentTime.value);
-}
-
-function handleSeek(event: Event): void {
-    if (!canSeek.value || !(event.target instanceof HTMLInputElement)) {
-        return;
-    }
-
-    const targetTime = Math.min(durationSeconds.value, Math.max(0, event.target.valueAsNumber));
-    currentTime.value = targetTime;
-
-    if (audioRef.value) {
-        audioRef.value.currentTime = targetTime;
-    }
-
-    audioPlayer.updatePlaybackPosition(targetTime);
-}
-
-function handleEnded(): void {
-    const endedTrackId = currentTrackId.value;
-
-    if (audioPlayer.repeatMode.value === 'one') {
-        restartHiddenAudio();
-        audioPlayer.restartCurrentTrack();
-        void attemptPlay();
-        return;
-    }
-
-    audioPlayer.playNext();
-
-    if (audioPlayer.isPlaying.value && audioPlayer.currentTrackId.value === endedTrackId) {
-        restartHiddenAudio();
-        void attemptPlay();
-    }
 }
 
 function handlePlaybackClick(): void {
@@ -210,31 +149,16 @@ async function handleBlacklist(): Promise<void> {
     });
 }
 
-function restartHiddenAudio(): void {
-    currentTime.value = 0;
-    audioPlayer.updatePlaybackPosition(0);
-
-    if (audioRef.value) {
-        audioRef.value.currentTime = 0;
-    }
-}
-
 watch(currentTrackId, () => {
-    mediaDuration.value = currentTrack.value?.durationSeconds ?? 0;
-    syncPlaybackPositionFromPlayer();
+    void startCurrentPlayback();
+}, { immediate: true, flush: 'sync' });
 
-    if (isPlaying.value) {
-        void attemptPlay();
-    }
-}, { immediate: true });
+watch(audioPlayer.playbackPositionSeconds, (positionSeconds) => {
+    currentTime.value = positionSeconds;
+}, { flush: 'sync' });
 
-watch(isPlaying, (playing) => {
-    if (playing) {
-        void attemptPlay();
-        return;
-    }
-
-    audioRef.value?.pause();
+watch(isPlaying, () => {
+    void startCurrentPlayback();
 });
 
 watch(audioPlayer.hasQueue, (hasQueue) => {
@@ -242,6 +166,8 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
         isQueueSheetOpen.value = false;
     }
 });
+
+onBeforeUnmount(teardown);
 
 </script>
 
@@ -279,7 +205,7 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
         <audio
             ref="audioRef"
             class="hidden"
-            :src="currentTrack?.playbackUrl"
+            :src="nativeAudioSource"
             preload="metadata"
             aria-hidden="true"
             tabindex="-1"

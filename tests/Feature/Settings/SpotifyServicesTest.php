@@ -128,6 +128,32 @@ test('spotify refresh endpoint refreshes token and returns updated status', func
     expect($token->refresh_token)->toBe('new-refresh-token');
 });
 
+test('spotify playback token endpoint returns an access token for connected user', function () {
+    $user = User::factory()->create();
+
+    SpotifyToken::query()->create([
+        'user_id' => $user->id,
+        'access_token' => 'playback-access-token',
+        'refresh_token' => 'playback-refresh-token',
+        'scope' => 'streaming user-modify-playback-state',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/spotify/playback-token');
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('access_token', 'playback-access-token');
+});
+
+test('spotify playback token endpoint requires a connected user', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->getJson('/api/spotify/playback-token');
+
+    $response->assertConflict();
+    $response->assertJsonPath('message', 'Spotify is not connected for this account.');
+});
+
 test('spotify disconnect endpoint removes spotify token', function () {
     $user = User::factory()->create();
     SpotifyToken::query()->create([
