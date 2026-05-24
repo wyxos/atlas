@@ -289,9 +289,13 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
         ></audio>
         <div class="grid gap-3 md:min-h-24 lg:grid-cols-[minmax(280px,1fr)_minmax(420px,2fr)_minmax(220px,1fr)] lg:items-stretch 2xl:min-h-32">
             <div class="flex h-full min-w-0 items-stretch justify-center gap-3 md:justify-start" data-test="global-audio-player-track">
-                <div
-                    class="hidden size-12 shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500 md:flex md:size-24 2xl:size-32"
+                <button
+                    type="button"
+                    class="hidden size-12 shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500 transition enabled:cursor-pointer enabled:hover:ring-smart-blue-300 disabled:cursor-default md:flex md:size-24 2xl:size-32"
                     data-test="global-audio-player-cover"
+                    :disabled="!hasTrack"
+                    aria-label="Focus current track in playlist"
+                    @click="audioPlayer.requestCurrentTrackFocus"
                 >
                     <img
                         v-if="currentTrack?.coverUrl"
@@ -300,7 +304,7 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
                         class="h-full w-full object-cover"
                     >
                     <Music v-else class="size-6 max-h-full max-w-full text-smart-blue-100 md:size-10 2xl:size-12" />
-                </div>
+                </button>
                 <div class="min-w-0 self-center text-center md:text-left lg:py-3" data-test="global-audio-player-details">
                     <template v-if="currentTrack">
                         <p

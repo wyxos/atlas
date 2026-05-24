@@ -132,7 +132,7 @@ describe('GlobalAudioPlayer', () => {
         expect(wrapper.get('[data-test="global-audio-player-track"]').find('[data-test="global-audio-player-reactions"]').exists()).toBe(true);
     });
 
-    it('renders the queued track and enables playback controls', () => {
+    it('renders the queued track and enables playback controls', async () => {
         const player = useGlobalAudioPlayer();
         player.queueAndPlay([
             {
@@ -179,6 +179,12 @@ describe('GlobalAudioPlayer', () => {
         expect(wrapper.get('[aria-label="Like"]').attributes('disabled')).toBeUndefined();
         expect(wrapper.get('[aria-label="Playback progress"]').attributes('aria-valuemax')).toBe('91');
         expect(wrapper.get('[aria-label="Playback progress"]').attributes('disabled')).toBeUndefined();
+
+        await wrapper.get('[data-test="global-audio-player-cover"]').trigger('click');
+
+        expect(player.trackFocusRequest.value).toMatchObject({
+            trackId: 41,
+        });
     });
 
     it('seeks the hidden audio element from the custom progress bar', async () => {

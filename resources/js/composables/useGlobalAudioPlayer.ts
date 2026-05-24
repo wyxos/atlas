@@ -35,6 +35,11 @@ type PersistedAudioPlayerState = {
     unshuffledQueueIds: number[];
 };
 
+type AudioTrackFocusRequest = {
+    sequence: number;
+    trackId: number;
+};
+
 export const AUDIO_PLAYER_STATE_STORAGE_KEY = 'atlas:audioPlayerState';
 
 function isAudioRepeatMode(value: unknown): value is AudioRepeatMode {
@@ -156,6 +161,8 @@ const isPlaying = ref(storedState?.isPlaying ?? false);
 const playbackPositionSeconds = ref(storedState?.playbackPositionSeconds ?? 0);
 const repeatMode = ref<AudioRepeatMode>(storedState?.repeatMode ?? 'none');
 const unshuffledQueueIds = ref<number[]>(storedState?.unshuffledQueueIds ?? trackIds(queue.value));
+const trackFocusRequest = ref<AudioTrackFocusRequest | null>(null);
+let trackFocusRequestSequence = 0;
 
 function writeAudioPlayerState(): void {
     if (typeof window === 'undefined' || !('sessionStorage' in window)) {
@@ -407,6 +414,17 @@ function updatePlaybackPosition(seconds: number): void {
     playbackPositionSeconds.value = Math.max(0, Math.round(seconds * 10) / 10);
 }
 
+function requestCurrentTrackFocus(): void {
+    if (currentTrackId.value === null) {
+        return;
+    }
+
+    trackFocusRequest.value = {
+        sequence: ++trackFocusRequestSequence,
+        trackId: currentTrackId.value,
+    };
+}
+
 export function useGlobalAudioPlayer() {
     return {
         canPlayNext,
@@ -429,12 +447,14 @@ export function useGlobalAudioPlayer() {
         queueAndPlay,
         queueAndShufflePlay,
         queueTracks,
+        requestCurrentTrackFocus,
         repeatMode,
         resume,
         restartCurrentTrack,
         setRepeatMode,
         shuffleQueue,
         togglePlayback,
+        trackFocusRequest,
         updateCurrentTrack,
         updatePlaybackPosition,
         updateQueuedTracks,

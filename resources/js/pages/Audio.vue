@@ -42,6 +42,7 @@ const showProgressPanel = ref(true);
 const visibleIds = ref<number[]>([]);
 const detailsById = ref<Record<number, AudioDetail>>({});
 const selectedAudioId = ref<number | null>(null);
+const audioListShellRef = ref<InstanceType<typeof AudioListShell> | null>(null);
 const audioPlayer = useGlobalAudioPlayer();
 const playerCurrentTrackId = audioPlayer.currentTrackId;
 const playerIsPlaying = audioPlayer.isPlaying;
@@ -347,6 +348,15 @@ function handleVirtualListScroll() {
     queueFetchAfterIdle();
 }
 
+function focusAudioTrackInList(audioId: number): void {
+    if (!filteredAudioIds.value.includes(audioId)) {
+        return;
+    }
+
+    selectedAudioId.value = audioId;
+    audioListShellRef.value?.scrollToAudioId(audioId);
+}
+
 async function fetchVisibleDetails(): Promise<void> {
     const ids = Array.from(new Set(visibleIds.value));
     const idsToFetch = ids.filter((id) => detailsById.value[id] === undefined);
@@ -462,6 +472,14 @@ watch(detailsById, () => {
     audioPlayer.updateQueuedTracks(audioPlayerQueue());
 });
 
+watch(audioPlayer.trackFocusRequest, (request) => {
+    if (!request) {
+        return;
+    }
+
+    focusAudioTrackInList(request.trackId);
+});
+
 onUnmounted(() => {
     isDisposed = true;
     if (idleTimeout) {
@@ -535,6 +553,7 @@ onUnmounted(() => {
                     </Transition>
                 </div>
                 <AudioListShell
+                    ref="audioListShellRef"
                     :active-filter-label="activeFilterLabel"
                     :audio-ids="filteredAudioIds"
                     :can-shuffle-play="filteredAudioIds.length > 0 && !isLoading"

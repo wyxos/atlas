@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import AudioListHeader from './AudioListHeader.vue';
 import AudioTrackRow from './AudioTrackRow.vue';
 import VirtualList from './VirtualList.vue';
 import type { ReactionType } from '@/types/reaction';
 
-defineProps<{
+const props = defineProps<{
     activeFilterLabel: string;
     audioIds: number[];
     canShufflePlay: boolean;
@@ -36,6 +37,23 @@ const emit = defineEmits<{
     reaction: [audioId: number, type: ReactionType];
     blacklist: [audioId: number];
 }>();
+
+const virtualListRef = ref<InstanceType<typeof VirtualList> | null>(null);
+
+function scrollToAudioId(audioId: number): boolean {
+    const index = props.audioIds.indexOf(audioId);
+    if (index < 0) {
+        return false;
+    }
+
+    virtualListRef.value?.scrollToIndex(index, 'center');
+
+    return true;
+}
+
+defineExpose({
+    scrollToAudioId,
+});
 </script>
 
 <template>
@@ -56,6 +74,7 @@ const emit = defineEmits<{
         </div>
         <VirtualList
             v-else
+            ref="virtualListRef"
             :items="audioIds"
             :item-height="72"
             :overscan="4"
