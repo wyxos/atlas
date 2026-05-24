@@ -48,7 +48,7 @@ watch(() => props.currentTrackId, scrollToCurrentTrack);
 <template>
     <aside
         id="audio-queue-sheet"
-        class="fixed inset-y-0 right-0 z-[80] flex w-[min(26rem,100vw)] flex-col border-l-2 border-twilight-indigo-500 bg-prussian-blue-800 text-twilight-indigo-100 shadow-2xl"
+        class="fixed inset-y-0 right-0 z-[80] flex w-full flex-col border-l-2 border-twilight-indigo-500 bg-prussian-blue-800 text-twilight-indigo-100 shadow-2xl sm:w-[26rem] sm:max-w-full"
         data-test="audio-queue-sheet"
         aria-label="Playback queue"
     >

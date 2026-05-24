@@ -282,7 +282,7 @@ describe('Audio', () => {
             'flex-col',
         ]));
         expect(wrapper.get('[data-test="audio-list-header"]').classes()).toEqual(expect.arrayContaining([
-            'h-10',
+            'h-14',
             'justify-between',
             'border-b',
         ]));
@@ -470,7 +470,7 @@ describe('Audio', () => {
         await firstRow.trigger('click');
 
         expect(firstRow.attributes('aria-selected')).toBe('true');
-        expect(firstRow.classes()).toContain('bg-smart-blue-800/75');
+        expect(firstRow.classes()).toContain('bg-smart-blue-700/90');
         const player = useGlobalAudioPlayer();
         expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
         expect(player.queueLabel.value).toBe('All audio');
@@ -485,7 +485,7 @@ describe('Audio', () => {
         expect(player.queue.value.map((track) => track.id)).toEqual([5, 6]);
         expect(player.currentTrack.value?.title).toBe('Target Track');
         expect(firstRow.attributes('data-current-track')).toBe('true');
-        expect(firstRow.classes()).toContain('bg-smart-blue-700/85');
+        expect(firstRow.classes()).toContain('bg-smart-blue-600/95');
         expect(firstRow.find('[data-test="audio-track-playing-bars"]').exists()).toBe(true);
         expect(firstRow.get('[data-test="audio-track-playing-bars"]').classes()).toContain('items-end');
         expect(firstRow.findAll('.audio-visual-bar')).toHaveLength(8);

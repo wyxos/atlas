@@ -9,6 +9,7 @@ const props = defineProps<{
     activeFilterLabel: string;
     audioIds: number[];
     canShufflePlay: boolean;
+    hasQueue: boolean;
     isLoading: boolean;
     hasDetails: (audioId: number) => boolean;
     detailTitle: (audioId: number) => string;
@@ -27,6 +28,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+    toggleQueue: [];
     togglePlaylists: [];
     shufflePlay: [];
     openFilter: [];
@@ -65,6 +67,8 @@ defineExpose({
         <AudioListHeader
             :active-filter-label="activeFilterLabel"
             :can-shuffle-play="canShufflePlay"
+            :has-queue="hasQueue"
+            @toggle-queue="emit('toggleQueue')"
             @toggle-playlists="emit('togglePlaylists')"
             @shuffle-play="emit('shufflePlay')"
             @open-filter="emit('openFilter')"

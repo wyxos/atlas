@@ -18,6 +18,9 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Storage::fake('atlas');
+    config()->set('downloads.disk', 'atlas');
+    config()->set('downloads.ffmpeg_path', '');
+    config()->set('media_processor.enabled', false);
     Cache::flush();
 });
 
@@ -341,6 +344,37 @@ test('determines extension from file content when Content-Type header is missing
     expect($file->path)->toEndWith('.png');
     // Path should be segmented
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
+});
+
+test('sniffs large downloads from a bounded prefix when Content-Type header is missing', function () {
+    $image = imagecreatetruecolor(1, 1);
+    $white = imagecolorallocate($image, 255, 255, 255);
+    imagefill($image, 0, 0, $white);
+
+    ob_start();
+    imagepng($image);
+    $pngContent = ob_get_clean();
+    imagedestroy($image);
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/file',
+        'filename' => 'large-download',
+        'ext' => null,
+        'mime_type' => null,
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $tmpPath = 'downloads/.tmp/transfer-1/large.tmp';
+    Storage::disk('atlas')->put($tmpPath, $pngContent.str_repeat("\0", 300000));
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, generatePreviews: false);
+
+    $file->refresh();
+
+    expect($file->downloaded)->toBeTrue()
+        ->and($file->mime_type)->toBe('image/png')
+        ->and($file->path)->toEndWith('.png');
 });
 
 test('corrects stale mime type when downloaded file content disagrees', function () {

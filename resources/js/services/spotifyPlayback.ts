@@ -40,6 +40,7 @@ type SpotifyPlayer = {
     getCurrentState(): Promise<SpotifySdkPlaybackState | null>;
     pause(): Promise<void>;
     seek(positionMs: number): Promise<void>;
+    setVolume(volume: number): Promise<void>;
 };
 
 type SpotifyNamespace = {
@@ -61,6 +62,7 @@ export type SpotifyPlaybackSnapshot = {
 };
 
 type SpotifyPlaybackOptions = {
+    initialVolume?: number;
     onError?: (message: string) => void;
     onStateChange?: (snapshot: SpotifyPlaybackSnapshot | null) => void;
 };
@@ -138,6 +140,10 @@ function sdkStateToSnapshot(state: SpotifySdkPlaybackState | null): SpotifyPlayb
         positionMs: Number.isFinite(state.position) ? state.position : 0,
         trackUri: state.track_window?.current_track?.uri ?? null,
     };
+}
+
+function clampSpotifyVolume(volume: number): number {
+    return Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.7;
 }
 
 function apiPlaybackToSnapshot(playback: SpotifyApiCurrentPlaybackResponse | null, deviceId: string | null): SpotifyPlaybackSnapshot | null {
@@ -403,6 +409,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
     let deviceId: string | null = null;
     let readyPromise: Promise<string> | null = null;
     let currentAccessToken = '';
+    let targetVolume = clampSpotifyVolume(options.initialVolume ?? 0.7);
 
     async function ensurePlayer(accessToken: string): Promise<string> {
         await loadSpotifySdk();
@@ -423,7 +430,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
                 getOAuthToken: (callback) => {
                     callback(currentAccessToken);
                 },
-                volume: 0.7,
+                volume: targetVolume,
             });
 
             player.addListener('ready', ({ device_id }) => {
@@ -533,6 +540,15 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             }
 
             await player.seek(Math.max(0, Math.round(positionSeconds * 1000)));
+        },
+        async setVolume(volume: number): Promise<void> {
+            targetVolume = clampSpotifyVolume(volume);
+
+            if (!player) {
+                return;
+            }
+
+            await player.setVolume(targetVolume);
         },
     };
 }

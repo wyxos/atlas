@@ -20,15 +20,8 @@ const SPOTIFY_START_STALE_GUARD_SECONDS = 6;
 
 type PlaybackEngine = 'local' | 'spotify';
 type GlobalAudioPlayer = ReturnType<typeof useGlobalAudioPlayer>;
-type AudioPlaybackEngineOptions = { onSpotifyAuthenticationError?: (message: string) => void };
-type SpotifyPendingStart = {
-    correctedStalePosition: boolean;
-    observedFreshPlaybackAt: number | null;
-    playConfirmedAt: number | null;
-    positionSeconds: number;
-    requestedAt: number;
-    uri: string;
-};
+type AudioPlaybackEngineOptions = { onSpotifyAuthenticationError?: (message: string) => void; volume?: Ref<number> };
+type SpotifyPendingStart = { correctedStalePosition: boolean; observedFreshPlaybackAt: number | null; playConfirmedAt: number | null; positionSeconds: number; requestedAt: number; uri: string };
 
 export function isSpotifyAudioTrack(track: AudioPlayerTrack | null): boolean {
     return Boolean(track?.spotifyUri && track.spotifyUri.trim() !== '');
@@ -64,11 +57,18 @@ export function useAudioPlaybackEngines(
 
     function spotifyController(): SpotifyPlaybackController {
         spotifyPlayback ??= createSpotifyPlaybackController({
+            initialVolume: options.volume?.value ?? 0.7,
             onError: (message) => console.error('Spotify playback error:', message),
             onStateChange: (snapshot) => handleSpotifyStateChange(snapshot, 'event'),
         });
 
         return spotifyPlayback;
+    }
+
+    function setSpotifyVolume(volume: number): void {
+        void spotifyPlayback?.setVolume(volume).catch((error: unknown) => {
+            console.error('Failed to update Spotify volume:', error);
+        });
     }
 
     function clearSpotifyPolling(): void {
@@ -599,6 +599,7 @@ export function useAudioPlaybackEngines(
         handleSeek,
         handleTimeUpdate,
         nativeAudioSource,
+        setSpotifyVolume,
         startCurrentPlayback,
         teardown,
     };

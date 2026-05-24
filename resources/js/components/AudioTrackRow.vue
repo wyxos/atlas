@@ -74,10 +74,10 @@ const sourceBadgeLabel = computed(() => {
 
 <template>
     <li
-        class="grid h-[72px] grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-center gap-2 px-3 text-twilight-indigo-100 transition-colors md:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_minmax(10rem,auto)_5rem] md:gap-4 md:px-4"
+        class="relative grid h-[72px] grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-center gap-2 px-3 text-twilight-indigo-100 transition-colors md:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_minmax(10rem,auto)_5rem] md:gap-4 md:px-4"
         :class="[
-            props.isPlaying ? 'bg-smart-blue-700/85 ring-2 ring-inset ring-smart-blue-200/90 hover:bg-smart-blue-700/90' : '',
-            props.isCurrentTrack && !props.isPlaying ? 'bg-smart-blue-800/75 ring-2 ring-inset ring-smart-blue-300/80 hover:bg-smart-blue-800/85' : '',
+            props.isPlaying ? 'bg-smart-blue-600/95 shadow-[inset_4px_0_0_rgb(219_238_255/0.95)] ring-2 ring-inset ring-smart-blue-100/90 hover:bg-smart-blue-600' : '',
+            props.isCurrentTrack && !props.isPlaying ? 'bg-smart-blue-700/90 shadow-[inset_4px_0_0_rgb(123_190_255/0.95)] ring-2 ring-inset ring-smart-blue-100/75 hover:bg-smart-blue-700' : '',
             props.isSelected && !props.isCurrentTrack ? 'bg-prussian-blue-600/55' : '',
             !props.isCurrentTrack ? 'hover:bg-prussian-blue-600/80' : '',
         ]"

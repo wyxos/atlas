@@ -18,6 +18,7 @@ const spotifyPlaybackMocks = vi.hoisted(() => ({
     pause: vi.fn().mockResolvedValue(undefined),
     play: vi.fn().mockResolvedValue(undefined),
     seek: vi.fn().mockResolvedValue(undefined),
+    setVolume: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/services/spotifyPlayback', () => ({
@@ -207,6 +208,37 @@ describe('useAudioPlaybackEngines', () => {
 
             expect(notifySpotifyAuthenticationError).toHaveBeenCalledWith('Spotify is not connected for this account.');
             expect(player.isPlaying.value).toBe(false);
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
+    it('applies volume changes to active Spotify playback', async () => {
+        const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const volume = ref(0.7);
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(91, { source: 'spotify', spotifyUri }),
+        ], 91);
+
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(
+            player,
+            ref(null),
+            currentTime,
+            mediaDuration,
+            durationSeconds,
+            { volume },
+        );
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+            volume.value = 0.25;
+            playbackEngines.setSpotifyVolume(volume.value);
+
+            expect(spotifyPlaybackMocks.setVolume).toHaveBeenCalledWith(0.25);
         } finally {
             playbackEngines.teardown();
         }

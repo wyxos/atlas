@@ -13,6 +13,8 @@ use League\MimeTypeDetection\FinfoMimeTypeDetector;
 
 class FileDownloadFinalizer
 {
+    private const MIME_SNIFF_BYTES = 262144;
+
     public function __construct(
         private readonly FileDownloadPreviewAssetGenerator $previewAssetGenerator,
         private readonly AtlasStorage $appStorage,
@@ -53,10 +55,11 @@ class FileDownloadFinalizer
         $disk = Storage::disk(config('downloads.disk'));
 
         $absolutePath = $disk->path($downloadedPath);
+        $detectedMimeType = $this->detectMimeTypeFromDownload($absolutePath, $contentTypeHeader);
 
         $extension = $this->resolveFinalExtension(
             $file,
-            $this->getExtensionFromFile($absolutePath, $contentTypeHeader),
+            $detectedMimeType ? $this->mimeTypeToExtension($detectedMimeType) : null,
         );
 
         $storedFilename = $this->resolveStoredFilename($file, $extension);
@@ -83,7 +86,7 @@ class FileDownloadFinalizer
 
         // Ensure mime_type/ext reflect the actual downloaded file. This matters for yt-dlp downloads
         // where the source URL can be a page URL (text/html), not a direct media URL.
-        $mimeType = FileMimeType::canonicalize($this->getMimeTypeFromFile($absolutePath, $contentTypeHeader));
+        $mimeType = FileMimeType::canonicalize($detectedMimeType);
         $currentMimeType = FileMimeType::canonicalize($file->mime_type);
         $resolvedMimeType = $mimeType ?? $currentMimeType;
         if (
@@ -217,34 +220,7 @@ class FileDownloadFinalizer
         return $extension ? strtolower($extension) : null;
     }
 
-    private function getExtensionFromFile(string $absolutePath, ?string $contentTypeHeader = null): ?string
-    {
-        if ($contentTypeHeader) {
-            $mimeType = $this->extractMimeTypeFromHeader($contentTypeHeader);
-            if ($mimeType && $mimeType !== 'application/octet-stream') {
-                $extension = $this->mimeTypeToExtension($mimeType);
-                if ($extension) {
-                    return $extension;
-                }
-            }
-        }
-
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        if (! $finfo) {
-            return null;
-        }
-
-        $mimeType = finfo_file($finfo, $absolutePath) ?: null;
-        finfo_close($finfo);
-
-        if (! $mimeType || $mimeType === 'application/octet-stream') {
-            return null;
-        }
-
-        return $this->mimeTypeToExtension($mimeType);
-    }
-
-    private function getMimeTypeFromFile(string $absolutePath, ?string $contentTypeHeader = null): ?string
+    private function detectMimeTypeFromDownload(string $absolutePath, ?string $contentTypeHeader = null): ?string
     {
         if ($contentTypeHeader) {
             $mimeType = $this->extractMimeTypeFromHeader($contentTypeHeader);
@@ -253,13 +229,34 @@ class FileDownloadFinalizer
             }
         }
 
+        return $this->sniffMimeTypeFromFile($absolutePath);
+    }
+
+    private function sniffMimeTypeFromFile(string $absolutePath): ?string
+    {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         if (! $finfo) {
             return null;
         }
 
-        $mimeType = finfo_file($finfo, $absolutePath) ?: null;
-        finfo_close($finfo);
+        try {
+            $handle = @fopen($absolutePath, 'rb');
+            if (! is_resource($handle)) {
+                return null;
+            }
+
+            try {
+                $buffer = fread($handle, self::MIME_SNIFF_BYTES);
+            } finally {
+                fclose($handle);
+            }
+
+            $mimeType = is_string($buffer) && $buffer !== ''
+                ? finfo_buffer($finfo, $buffer) ?: null
+                : null;
+        } finally {
+            finfo_close($finfo);
+        }
 
         return $mimeType && $mimeType !== 'application/octet-stream' ? $mimeType : null;
     }

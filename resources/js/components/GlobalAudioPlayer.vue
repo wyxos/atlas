@@ -30,9 +30,15 @@ const audioPlayer = useGlobalAudioPlayer();
 const audioRef = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(audioPlayer.playbackPositionSeconds.value);
 const mediaDuration = ref(0);
-const isQueueSheetOpen = ref(false);
+const playbackVolume = ref(0.7);
+const mobileActionsExpanded = ref(false);
+const touchStartX = ref<number | null>(null);
+const touchStartY = ref<number | null>(null);
+const isQueueSheetOpen = audioPlayer.isQueueSheetOpen;
 const toast = useToast();
 const { handleQueueVisibleItemsChange } = useAudioQueueDetails(audioPlayer);
+
+const MOBILE_ACTIONS_SWIPE_THRESHOLD = 28;
 
 const currentTrack = audioPlayer.currentTrack;
 const currentTrackId = audioPlayer.currentTrackId;
@@ -87,10 +93,12 @@ const {
     handleSeek,
     handleTimeUpdate,
     nativeAudioSource,
+    setSpotifyVolume,
     startCurrentPlayback,
     teardown,
 } = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds, {
     onSpotifyAuthenticationError: notifySpotifyAuthenticationError,
+    volume: playbackVolume,
 });
 
 useAudioMediaSession({
@@ -136,6 +144,45 @@ function formatSeconds(value: number): string {
 
 function handlePlaybackClick(): void {
     audioPlayer.togglePlayback();
+}
+
+function handleVolumeChange(volume: number): void {
+    playbackVolume.value = volume;
+    setSpotifyVolume(volume);
+}
+
+function handlePlayerTouchStart(event: TouchEvent): void {
+    if (window.innerWidth >= 768 || event.touches.length !== 1) {
+        touchStartX.value = null;
+        touchStartY.value = null;
+        return;
+    }
+
+    const touch = event.touches.item?.(0) ?? event.touches[0] ?? null;
+    touchStartX.value = touch?.clientX ?? null;
+    touchStartY.value = touch?.clientY ?? null;
+}
+
+function handlePlayerTouchEnd(event: TouchEvent): void {
+    if (window.innerWidth >= 768 || touchStartY.value === null || touchStartX.value === null) {
+        return;
+    }
+
+    const touch = event.changedTouches.item?.(0) ?? event.changedTouches[0] ?? null;
+    if (!touch) {
+        return;
+    }
+
+    const deltaX = touch.clientX - touchStartX.value;
+    const deltaY = touch.clientY - touchStartY.value;
+    touchStartX.value = null;
+    touchStartY.value = null;
+
+    if (Math.abs(deltaY) < MOBILE_ACTIONS_SWIPE_THRESHOLD || Math.abs(deltaY) < Math.abs(deltaX)) {
+        return;
+    }
+
+    mobileActionsExpanded.value = deltaY < 0;
 }
 
 async function handleReaction(type: ReactionType): Promise<void> {
@@ -188,7 +235,7 @@ watch(isPlaying, () => {
 
 watch(audioPlayer.hasQueue, (hasQueue) => {
     if (!hasQueue) {
-        isQueueSheetOpen.value = false;
+        audioPlayer.closeQueueSheet();
     }
 });
 
@@ -202,7 +249,7 @@ onBeforeUnmount(teardown);
         class="fixed inset-0 z-[70] cursor-default"
         data-test="audio-queue-backdrop"
         aria-hidden="true"
-        @click="isQueueSheetOpen = false"
+        @click="audioPlayer.closeQueueSheet"
     />
     <Transition
         enter-active-class="transition duration-500 ease-in-out"
@@ -217,7 +264,7 @@ onBeforeUnmount(teardown);
             :tracks="audioPlayer.queue.value"
             :current-track-id="currentTrackId"
             :queue-label="audioPlayer.queueLabel.value"
-            @close="isQueueSheetOpen = false"
+            @close="audioPlayer.closeQueueSheet"
             @play="audioPlayer.playQueueTrack"
             @visible-items-change="handleQueueVisibleItemsChange"
         />
@@ -225,7 +272,10 @@ onBeforeUnmount(teardown);
     <section
         class="relative z-[75] shrink-0 border-t border-twilight-indigo-500 bg-prussian-blue-900 px-4 py-3 text-twilight-indigo-100 shadow-lg lg:px-0 lg:py-0"
         data-test="global-audio-player"
+        :data-mobile-actions-expanded="mobileActionsExpanded ? 'true' : 'false'"
         aria-label="Global audio player"
+        @touchstart.passive="handlePlayerTouchStart"
+        @touchend.passive="handlePlayerTouchEnd"
     >
         <audio
             ref="audioRef"
@@ -284,7 +334,10 @@ onBeforeUnmount(teardown);
                         />
                     </template>
                     <div
-                        class="mt-2 flex w-fit items-center justify-center gap-3 max-lg:mx-auto md:gap-2.5 2xl:mt-3 2xl:gap-3"
+                        :class="[
+                            'mt-2 w-fit items-center justify-center gap-3 max-lg:mx-auto md:flex md:gap-2.5 2xl:mt-3 2xl:gap-3',
+                            mobileActionsExpanded ? 'flex' : 'hidden',
+                        ]"
                         data-test="global-audio-player-reactions"
                     >
                         <button
@@ -419,11 +472,11 @@ onBeforeUnmount(teardown);
                     :aria-expanded="isQueueSheetOpen"
                     aria-controls="audio-queue-sheet"
                     aria-label="Queue"
-                    @click="isQueueSheetOpen = !isQueueSheetOpen"
+                    @click="audioPlayer.toggleQueueSheet"
                 >
                     <ListMusic class="size-4 2xl:size-6" />
                 </button>
-                <AudioVolumeControl :audio-ref="audioRef" />
+                <AudioVolumeControl :audio-ref="audioRef" @volume-change="handleVolumeChange" />
                 <button type="button" :class="controlButtonClass" disabled aria-disabled="true" aria-label="More options">
                     <MoreVertical class="size-4 2xl:size-6" />
                 </button>

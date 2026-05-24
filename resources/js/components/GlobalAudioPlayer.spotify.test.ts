@@ -78,6 +78,8 @@ class MockSpotifyPlayer {
 
     pause = vi.fn().mockResolvedValue(undefined);
 
+    setVolume = vi.fn().mockResolvedValue(undefined);
+
     seek = vi.fn((positionMs: number) => {
         if (spotifyCurrentState) {
             spotifyCurrentState = {
@@ -606,4 +608,5 @@ describe('GlobalAudioPlayer Spotify playback', () => {
         );
         expect(player.isPlaying.value).toBe(false);
     });
+
 });

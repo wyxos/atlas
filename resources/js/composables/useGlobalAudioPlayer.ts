@@ -171,6 +171,7 @@ const playbackPositionSeconds = ref(storedState?.playbackPositionSeconds ?? 0);
 const repeatMode = ref<AudioRepeatMode>(storedState?.repeatMode ?? 'none');
 const unshuffledQueueIds = ref<number[]>(storedState?.unshuffledQueueIds ?? trackIds(queue.value));
 const trackFocusRequest = ref<AudioTrackFocusRequest | null>(null);
+const isQueueSheetOpen = ref(false);
 let trackFocusRequestSequence = 0;
 
 function writeAudioPlayerState(): void {
@@ -413,6 +414,7 @@ function clear(): void {
     playbackPositionSeconds.value = 0;
     isPlaying.value = false;
     repeatMode.value = 'none';
+    isQueueSheetOpen.value = false;
 }
 
 function updatePlaybackPosition(seconds: number): void {
@@ -434,17 +436,41 @@ function requestCurrentTrackFocus(): void {
     };
 }
 
+function openQueueSheet(): void {
+    if (!hasQueue.value) {
+        return;
+    }
+
+    isQueueSheetOpen.value = true;
+}
+
+function closeQueueSheet(): void {
+    isQueueSheetOpen.value = false;
+}
+
+function toggleQueueSheet(): void {
+    if (isQueueSheetOpen.value) {
+        closeQueueSheet();
+        return;
+    }
+
+    openQueueSheet();
+}
+
 export function useGlobalAudioPlayer() {
     return {
         canPlayNext,
         canPlayPrevious,
+        closeQueueSheet,
         cycleRepeatMode,
         clear,
         currentTrack,
         currentTrackId,
         hasQueue,
+        isQueueSheetOpen,
         isShuffleEnabled,
         isPlaying,
+        openQueueSheet,
         pause,
         playbackPositionSeconds,
         playNext,
@@ -463,6 +489,7 @@ export function useGlobalAudioPlayer() {
         setRepeatMode,
         shuffleQueue,
         togglePlayback,
+        toggleQueueSheet,
         trackFocusRequest,
         updateCurrentTrack,
         updatePlaybackPosition,

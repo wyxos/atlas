@@ -25,7 +25,7 @@ function handleToggleMenu(): void {
 
 <template>
     <header class="sticky top-0 z-50 w-full md:hidden">
-        <div class="relative flex h-16 items-center justify-center px-4">
+        <div class="relative flex h-12 items-center justify-center px-4">
             <!-- Mobile Menu Toggle (Only visible on mobile) -->
             <Button
                 v-if="!props.menuOpen"

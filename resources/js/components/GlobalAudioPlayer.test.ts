@@ -98,6 +98,8 @@ describe('GlobalAudioPlayer', () => {
 
         const reactions = wrapper.get('[data-test="global-audio-player-reactions"]');
         expect(reactions.classes()).toContain('max-lg:mx-auto');
+        expect(reactions.classes()).toContain('hidden');
+        expect(reactions.classes()).toContain('md:flex');
         expect(reactions.classes()).toContain('gap-3');
         expect(reactions.classes()).toContain('md:gap-2.5');
         expect(reactions.classes()).toContain('2xl:gap-3');
@@ -132,6 +134,38 @@ describe('GlobalAudioPlayer', () => {
         expect(reactions.get('[aria-label="Funny"]').find('svg').classes()).toContain('size-6');
         expect(reactions.get('[aria-label="Funny"]').find('svg').classes()).toContain('md:size-8');
         expect(wrapper.get('[data-test="global-audio-player-track"]').find('[data-test="global-audio-player-reactions"]').exists()).toBe(true);
+    });
+
+    it('reveals and hides mobile reactions with vertical swipes on the player', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([testTrack(41)], 41);
+        vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(375);
+
+        const wrapper = mount(GlobalAudioPlayer);
+        const playerSurface = wrapper.get('[data-test="global-audio-player"]');
+
+        expect(playerSurface.attributes('data-mobile-actions-expanded')).toBe('false');
+        expect(wrapper.get('[data-test="global-audio-player-reactions"]').classes()).toContain('hidden');
+
+        await playerSurface.trigger('touchstart', {
+            touches: [{ clientX: 180, clientY: 620 }],
+        });
+        await playerSurface.trigger('touchend', {
+            changedTouches: [{ clientX: 180, clientY: 560 }],
+        });
+
+        expect(playerSurface.attributes('data-mobile-actions-expanded')).toBe('true');
+        expect(wrapper.get('[data-test="global-audio-player-reactions"]').classes()).toContain('flex');
+
+        await playerSurface.trigger('touchstart', {
+            touches: [{ clientX: 180, clientY: 560 }],
+        });
+        await playerSurface.trigger('touchend', {
+            changedTouches: [{ clientX: 180, clientY: 620 }],
+        });
+
+        expect(playerSurface.attributes('data-mobile-actions-expanded')).toBe('false');
+        expect(wrapper.get('[data-test="global-audio-player-reactions"]').classes()).toContain('hidden');
     });
 
     it('renders the queued track and enables playback controls', async () => {

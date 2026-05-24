@@ -6,6 +6,10 @@ const props = defineProps<{
     audioRef: HTMLAudioElement | null;
 }>();
 
+const emit = defineEmits<{
+    volumeChange: [volume: number];
+}>();
+
 const volume = ref(0.7);
 const previousVolume = ref(0.7);
 const isMuted = ref(false);
@@ -16,13 +20,14 @@ const volumeProgressWidth = computed(() => `${volumePercent.value}%`);
 
 function syncAudioVolume(): void {
     const audio = props.audioRef;
+    const nextEffectiveVolume = effectiveVolume.value;
 
-    if (!audio) {
-        return;
+    if (audio) {
+        audio.volume = volume.value;
+        audio.muted = isMuted.value;
     }
 
-    audio.volume = volume.value;
-    audio.muted = isMuted.value;
+    emit('volumeChange', nextEffectiveVolume);
 }
 
 function handleVolumeInput(event: Event): void {
