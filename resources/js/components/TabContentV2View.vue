@@ -225,6 +225,7 @@ function handleContainerSheetEscape(event: KeyboardEvent): void {
 const vibeLayoutBindings = computed(() => ({
     activeIndex: props.activeIndex,
     emptyStateMode: 'hidden' as const,
+    fillDelayMaxMs: props.form.data.feed === 'local' ? 0 : 15000,
     fillDelayMs: props.form.data.feed === 'local' ? 0 : 2000,
     fillDelayStepMs: props.form.data.feed === 'local' ? 0 : 1000,
     initialCursor: props.vibeInitialCursor,

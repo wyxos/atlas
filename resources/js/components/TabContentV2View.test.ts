@@ -77,6 +77,7 @@ vi.mock('@wyxos/vibe', () => ({
         props: {
             activeIndex: { type: Number, default: 0 },
             emptyStateMode: { type: String, default: 'inline' },
+            fillDelayMaxMs: { type: Number, default: undefined },
             fillDelayMs: { type: Number, default: undefined },
             fillDelayStepMs: { type: Number, default: undefined },
             loopFullscreenVideo: { type: Boolean, default: false },
@@ -90,6 +91,7 @@ vi.mock('@wyxos/vibe', () => ({
                 props: {
                     activeIndex: props.activeIndex,
                     emptyStateMode: props.emptyStateMode,
+                    fillDelayMaxMs: props.fillDelayMaxMs,
                     fillDelayMs: props.fillDelayMs,
                     fillDelayStepMs: props.fillDelayStepMs,
                     loopFullscreenVideo: props.loopFullscreenVideo,
@@ -342,6 +344,7 @@ describe('TabContentV2View', () => {
         expect(vibeLayoutSpy).toHaveBeenCalled();
         expect(vibeLayoutSpy.mock.calls[0][0].props.activeIndex).toBe(1);
         expect(vibeLayoutSpy.mock.calls[0][0].props.emptyStateMode).toBe('hidden');
+        expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayMaxMs).toBe(15000);
         expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayMs).toBe(2000);
         expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayStepMs).toBe(1000);
         expect(vibeLayoutSpy.mock.calls[0][0].props.loopFullscreenVideo).toBe(true);
@@ -363,6 +366,7 @@ describe('TabContentV2View', () => {
 
         expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayMs).toBe(0);
         expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayStepMs).toBe(0);
+        expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayMaxMs).toBe(0);
     });
 
     it('does not provide Vibe status badge slots when Atlas disables them', () => {
