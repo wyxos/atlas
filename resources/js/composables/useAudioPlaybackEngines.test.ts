@@ -49,6 +49,25 @@ function testTrack(id: number, overrides: Partial<AudioPlayerTrack> = {}): Audio
     };
 }
 
+function createDeferred<T>() {
+    let resolve: ((value: T | PromiseLike<T>) => void) | null = null;
+    const promise = new Promise<T>((innerResolve) => {
+        resolve = innerResolve;
+    });
+
+    return {
+        promise,
+        resolve: (value: T) => {
+            resolve?.(value);
+        },
+    };
+}
+
+async function flushMicrotasks(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+}
+
 describe('useAudioPlaybackEngines', () => {
     afterEach(() => {
         useGlobalAudioPlayer().clear();
@@ -112,6 +131,63 @@ describe('useAudioPlaybackEngines', () => {
             expect(currentTime.value).toBe(0);
             expect(player.playbackPositionSeconds.value).toBe(0);
             expect(spotifyPlaybackMocks.seek).not.toHaveBeenCalled();
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
+    it('pauses a stale Spotify start that completes after switching to local playback', async () => {
+        const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const spotifyStart = createDeferred<{
+            durationMs: number;
+            paused: boolean;
+            positionMs: number;
+            trackUri: string | null;
+        }>();
+        spotifyPlaybackMocks.play.mockReturnValueOnce(spotifyStart.promise);
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(91, { source: 'spotify', spotifyUri }),
+            testTrack(41, { source: 'local', spotifyUri: null }),
+        ], 91);
+
+        const audioElement = {
+            currentTime: 0,
+            pause: vi.fn(),
+            play: vi.fn().mockResolvedValue(undefined),
+        } as unknown as HTMLAudioElement;
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(player, ref(audioElement), currentTime, mediaDuration, durationSeconds);
+
+        try {
+            const staleSpotifyStart = playbackEngines.startCurrentPlayback();
+            await flushMicrotasks();
+            expect(spotifyPlaybackMocks.play).toHaveBeenCalledWith(
+                spotifyUri,
+                0,
+                expect.objectContaining({ shouldContinue: expect.any(Function) }),
+            );
+
+            player.playNext();
+            await playbackEngines.startCurrentPlayback();
+
+            const pauseCallsAfterLocalStart = spotifyPlaybackMocks.pause.mock.calls.length;
+            expect(audioElement.play).toHaveBeenCalledTimes(1);
+            expect(player.currentTrackId.value).toBe(41);
+
+            spotifyStart.resolve({
+                durationMs: 180000,
+                paused: false,
+                positionMs: 0,
+                trackUri: spotifyUri,
+            });
+            await staleSpotifyStart;
+
+            expect(spotifyPlaybackMocks.pause).toHaveBeenCalledTimes(pauseCallsAfterLocalStart + 1);
+            expect(player.currentTrackId.value).toBe(41);
+            expect(player.isPlaying.value).toBe(true);
         } finally {
             playbackEngines.teardown();
         }

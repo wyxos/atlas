@@ -7,6 +7,7 @@ import {
     type SpotifyPlaybackController,
     type SpotifyPlaybackSnapshot,
 } from '@/services/spotifyPlayback';
+import { canTrackOwnSpotifyPlayback, isSpotifyAudioTrack, type PlaybackEngine, spotifyStartConfirmationSnapshot } from '@/lib/audioPlaybackOwnership';
 
 const SPOTIFY_POLL_INTERVAL_MS = 750;
 const SPOTIFY_PROGRESS_TICK_INTERVAL_MS = 250;
@@ -17,16 +18,9 @@ const SPOTIFY_SNAPSHOT_CORRECTION_SECONDS = 1;
 const SPOTIFY_START_POSITION_TOLERANCE_SECONDS = 3;
 const SPOTIFY_POLL_START_ADVANCE_SECONDS = 0.25;
 const SPOTIFY_START_STALE_GUARD_SECONDS = 6;
-
-type PlaybackEngine = 'local' | 'spotify';
 type GlobalAudioPlayer = ReturnType<typeof useGlobalAudioPlayer>;
 type AudioPlaybackEngineOptions = { onSpotifyAuthenticationError?: (message: string) => void; volume?: Ref<number> };
 type SpotifyPendingStart = { correctedStalePosition: boolean; observedFreshPlaybackAt: number | null; playConfirmedAt: number | null; positionSeconds: number; requestedAt: number; uri: string };
-
-export function isSpotifyAudioTrack(track: AudioPlayerTrack | null): boolean {
-    return Boolean(track?.spotifyUri && track.spotifyUri.trim() !== '');
-}
-
 export function useAudioPlaybackEngines(
     audioPlayer: GlobalAudioPlayer,
     audioRef: Ref<HTMLAudioElement | null>,
@@ -37,7 +31,6 @@ export function useAudioPlaybackEngines(
 ) {
     const nativeAudioSource = computed(() => {
         const track = audioPlayer.currentTrack.value;
-
         return track && !isSpotifyAudioTrack(track) ? track.playbackUrl : undefined;
     });
 
@@ -115,6 +108,10 @@ export function useAudioPlaybackEngines(
         activeEngine = null;
         audioRef.value?.pause();
         await stopSpotifyPlayback();
+    }
+
+    async function stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(): Promise<void> {
+        if (!canTrackOwnSpotifyPlayback(audioPlayer.isPlaying.value, audioPlayer.currentTrack.value)) { await stopSpotifyPlayback(); }
     }
 
     function handlePageHide(): void {
@@ -484,29 +481,30 @@ export function useAudioPlaybackEngines(
                 const confirmedSnapshot = await spotifyController().play(spotifyUri, startPositionSeconds, {
                     shouldContinue: isCurrentSpotifyStart,
                 });
-                if (isCurrentSpotifyStart()) {
-                    if (spotifyPendingStart?.playConfirmedAt === null) {
-                        spotifyPendingStart = { ...spotifyPendingStart, playConfirmedAt: Date.now() };
-                    }
-                    const playConfirmationSnapshot = confirmedSnapshot ?? {
-                        durationMs: Math.max(0, Math.round(durationSeconds.value * 1000)),
-                        paused: false, positionMs: Math.max(0, Math.round(startPositionSeconds * 1000)), trackUri: spotifyUri,
-                    };
-                    const visiblePositionSeconds = spotifyDisplayPositionNow();
-                    const playConfirmationPositionSeconds = playConfirmationSnapshot.positionMs / 1000;
-
-                    if (!spotifyHasObservedPlayback
-                        || visiblePositionSeconds === null
-                        || playConfirmationSnapshot.paused
-                        || playConfirmationPositionSeconds >= visiblePositionSeconds - SPOTIFY_SNAPSHOT_CORRECTION_SECONDS) {
-                        syncSpotifySnapshot(playConfirmationSnapshot);
-                    }
-                    spotifyHasObservedPlayback = true;
-                    startSpotifyProgressTicker(token);
-                    startSpotifyPolling(token);
+                if (!isCurrentSpotifyStart()) {
+                    await stopSpotifyPlaybackIfCurrentTrackCannotOwnIt();
+                    return;
                 }
+
+                if (spotifyPendingStart?.playConfirmedAt === null) {
+                    spotifyPendingStart = { ...spotifyPendingStart, playConfirmedAt: Date.now() };
+                }
+                const playConfirmationSnapshot = spotifyStartConfirmationSnapshot(confirmedSnapshot, durationSeconds.value, startPositionSeconds, spotifyUri);
+                const visiblePositionSeconds = spotifyDisplayPositionNow();
+                const playConfirmationPositionSeconds = playConfirmationSnapshot.positionMs / 1000;
+
+                if (!spotifyHasObservedPlayback
+                    || visiblePositionSeconds === null
+                    || playConfirmationSnapshot.paused
+                    || playConfirmationPositionSeconds >= visiblePositionSeconds - SPOTIFY_SNAPSHOT_CORRECTION_SECONDS) {
+                    syncSpotifySnapshot(playConfirmationSnapshot);
+                }
+                spotifyHasObservedPlayback = true;
+                startSpotifyProgressTicker(token);
+                startSpotifyPolling(token);
             } catch (error) {
                 if (!isCurrentSpotifyStart() || isSpotifyPlaybackSuperseded(error)) {
+                    await stopSpotifyPlaybackIfCurrentTrackCannotOwnIt();
                     return;
                 }
 
