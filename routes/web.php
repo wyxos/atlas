@@ -71,6 +71,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.extension.store');
     Route::post('/api/settings/extension/generate', [\App\Http\Controllers\SettingsServicesController::class, 'extensionApiKeyGenerate'])
         ->name('api.settings.extension.generate');
+    Route::get('/api/settings/infrastructure-health', [\App\Http\Controllers\SettingsServicesController::class, 'infrastructureHealth'])
+        ->name('api.settings.infrastructure-health');
     Route::post('/api/settings/services/spotify/refresh', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyRefresh'])
         ->name('api.settings.services.spotify.refresh');
     Route::delete('/api/settings/services/spotify', [\App\Http\Controllers\SettingsServicesController::class, 'spotifyDisconnect'])

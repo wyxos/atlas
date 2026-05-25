@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\DeviantArt\DeviantArtOAuthException;
 use App\Services\DeviantArt\DeviantArtOAuthService;
 use App\Services\ExtensionApiKeyService;
+use App\Services\SettingsInfrastructureHealthService;
 use App\Services\Spotify\SpotifyOAuthException;
 use App\Services\Spotify\SpotifyOAuthService;
 use Illuminate\Http\JsonResponse;
@@ -54,6 +55,11 @@ class SettingsServicesController extends Controller
             'api_key_configured' => true,
             'message' => 'Extension API key generated.',
         ]);
+    }
+
+    public function infrastructureHealth(SettingsInfrastructureHealthService $health): JsonResponse
+    {
+        return response()->json($health->check());
     }
 
     public function spotifyRedirect(Request $request, SpotifyOAuthService $spotify): RedirectResponse

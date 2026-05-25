@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/PageLayout.vue';
+import InfrastructureHealthSettings from '@/components/settings/InfrastructureHealthSettings.vue';
 import LibraryScanSettings from '@/components/settings/LibraryScanSettings.vue';
 import ModerationFeedRemovalBackfillSettings from '@/components/settings/ModerationFeedRemovalBackfillSettings.vue';
 import OAuthServiceCard from '@/components/settings/OAuthServiceCard.vue';
@@ -299,20 +300,12 @@ async function handleDisconnectDeviantArt(): Promise<void> {
 async function handleResetApp(): Promise<void> {
     isResetting.value = true;
     try {
-        // Delete all files first
         await window.axios.delete(deleteAllFiles.url());
-
-        // Then delete all tabs
         await window.axios.delete(deleteAllTabs.url());
-
-        // Close dialog
         resetDialogOpen.value = false;
-
-        // Redirect to home page
         await router.push('/');
     } catch (error) {
         console.error('Failed to reset app:', error);
-        // Error is logged, user can try again
     } finally {
         isResetting.value = false;
     }
@@ -383,6 +376,8 @@ onMounted(() => {
                         {{ servicesNotice }}
                     </p>
                 </div>
+
+                <InfrastructureHealthSettings />
 
                 <div class="border border-smart-blue-500/30 rounded-lg p-6 bg-prussian-blue-700/50">
                     <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
@@ -473,7 +468,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- Reset App Confirmation Dialog -->
         <Dialog v-model="resetDialogOpen">
             <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
                 <DialogHeader>
@@ -497,6 +491,5 @@ onMounted(() => {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-
     </PageLayout>
 </template>
