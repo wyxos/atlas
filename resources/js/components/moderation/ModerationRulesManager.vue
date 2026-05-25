@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { Shield, Plus, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
     Dialog,
@@ -254,16 +254,28 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
     }
 }
 
-function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMode): string {
+function previewedCountModeBadgeLabel(mode?: ModerationRuleBlacklistPreviewedCountMode): string {
     return mode === 'feed_removed' ? '99,999' : 'keep count';
+}
+
+function previewedCountModeSelectLabel(mode?: ModerationRuleBlacklistPreviewedCountMode): string {
+    return mode === 'feed_removed' ? 'Blacklist, set to 99,999' : 'Blacklist, keep current count';
 }
 </script>
 
 <template>
     <div>
         <!-- Trigger Button -->
-        <Button size="sm" variant="ghost" class="h-10 w-10" data-test="moderation-rules-button" title="Moderation Rules"
-            :disabled="disabled" @click="openDialog">
+        <Button
+            size="sm"
+            variant="ghost"
+            color="danger"
+            class="h-10 w-10"
+            data-test="moderation-rules-button"
+            title="Moderation Rules"
+            :disabled="disabled"
+            @click="openDialog"
+        >
             <Shield :size="14" />
         </Button>
 
@@ -284,9 +296,9 @@ function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMod
 
                 <div class="flex h-[65vh]">
                     <!-- Left Panel: Rule Editor -->
-                    <div class="flex-1 p-6 overflow-y-auto border-r border-twilight-indigo-500/30">
+                    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto border-r border-twilight-indigo-500/30">
                         <template v-if="ruleForm">
-                            <div class="space-y-5">
+                            <div class="flex-1 space-y-5 p-6 pb-4">
                                 <!-- Name -->
                                 <div class="space-y-2">
                                     <label class="text-sm font-medium text-regal-navy-100">Rule Name</label>
@@ -312,8 +324,13 @@ function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMod
                                         :model-value="ruleForm.blacklist_previewed_count_mode"
                                         @update:model-value="updateBlacklistPreviewedCountMode"
                                     >
-                                        <SelectTrigger class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
-                                            <SelectValue />
+                                        <SelectTrigger
+                                            class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100"
+                                            data-test="previewed-count-select-trigger"
+                                        >
+                                            <span class="truncate">
+                                                {{ previewedCountModeSelectLabel(ruleForm.blacklist_previewed_count_mode) }}
+                                            </span>
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="preserve">Blacklist, keep current count</SelectItem>
@@ -331,17 +348,20 @@ function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMod
                                     <RuleEditor v-if="ruleNodeFromForm" :model-value="ruleNodeFromForm"
                                         @update:model-value="onRuleNodeUpdate" />
                                 </div>
+                            </div>
 
-                                <!-- Actions -->
-                                <div class="flex items-center gap-3 pt-4 border-t border-twilight-indigo-500/30">
-                                    <Button @click="saveRule" :disabled="isSaving" class="h-10">
-                                        <Loader2 v-if="isSaving" :size="14" class="mr-2 animate-spin" />
-                                        {{ ruleForm.id ? 'Save Changes' : 'Create Rule' }}
-                                    </Button>
-                                    <Button variant="outline" @click="isDialogOpen = false" class="h-10">
-                                        Close
-                                    </Button>
-                                </div>
+                            <!-- Actions -->
+                            <div
+                                class="sticky bottom-0 z-10 flex items-center gap-3 border-t border-twilight-indigo-500/30 bg-prussian-blue-600 px-6 py-4"
+                                data-test="moderation-rules-action-row"
+                            >
+                                <Button @click="saveRule" :disabled="isSaving" class="h-10">
+                                    <Loader2 v-if="isSaving" :size="14" class="mr-2 animate-spin" />
+                                    {{ ruleForm.id ? 'Save Changes' : 'Create Rule' }}
+                                </Button>
+                                <Button variant="outline" @click="isDialogOpen = false" class="h-10">
+                                    Close
+                                </Button>
                             </div>
                         </template>
                         <template v-else>
@@ -362,7 +382,13 @@ function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMod
                                 Rules ({{ rules.length }})
                             </span>
                             <div class="flex items-center gap-2">
-                                <Button size="sm" variant="outline" @click="startNewRule" class="h-8">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    @click="startNewRule"
+                                    class="h-8"
+                                    data-test="moderation-rules-add-new-button"
+                                >
                                     <Plus :size="14" class="mr-1" />
                                     Add New
                                 </Button>
@@ -398,6 +424,7 @@ function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMod
                             <!-- Rules List -->
                             <ul v-else>
                                 <li v-for="rule in rules" :key="rule.id" @click="selectRule(rule)"
+                                    :data-test="`moderation-rule-list-item-${rule.id}`"
                                     class="cursor-pointer border-b border-twilight-indigo-500/20 p-3 hover:bg-prussian-blue-500/50 transition-colors"
                                     :class="selectedRule?.id === rule.id ? 'bg-prussian-blue-500/70' : ''">
                                     <div class="flex items-center justify-between mb-1">
@@ -416,7 +443,7 @@ function previewedCountModeLabel(mode?: ModerationRuleBlacklistPreviewedCountMod
                                             <span
                                                 class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-smart-blue-500/20 text-smart-blue-300"
                                             >
-                                                {{ previewedCountModeLabel(rule.blacklist_previewed_count_mode) }}
+                                                {{ previewedCountModeBadgeLabel(rule.blacklist_previewed_count_mode) }}
                                             </span>
                                         </div>
                                     </div>

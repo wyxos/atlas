@@ -72,6 +72,7 @@ const props = defineProps<{
     currentVisibleItem: FeedItem | null;
     downloadedReactionPrompt: DownloadedReactionPromptShape;
     fileSheetState: FileSheetState;
+    fileSheetItem: FeedItem | null;
     fileViewerData: FileViewerDataShape;
     form: BrowseFormInstance;
     fillActionsDisabled?: boolean;
@@ -137,8 +138,9 @@ const isSheetPromptLoading = computed(() => {
     return Boolean(promptLoading);
 });
 const showSheetPrompt = computed(() => sheetPromptItemId.value !== null);
-const isFileSheetOverlay = computed(() => props.fileSheetPresentation === 'overlay' && props.surfaceMode === 'list');
+const isFileSheetOverlay = computed(() => props.fileSheetPresentation === 'overlay' && props.surfaceMode === 'list' && props.fileSheetState.isOpen);
 const shouldReserveFileSheetSpace = computed(() => props.fileSheetState.isOpen && !isFileSheetOverlay.value);
+const fileSheetFileId = computed(() => props.fileSheetItem?.id ?? null);
 
 function closeGlobalStartPanel(): void {
     globalStartPanel?.close();
@@ -415,7 +417,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                             v-if="fileSheetState.isOpen"
                             embedded
                             :is-open="fileSheetState.isOpen"
-                            :file-id="currentVisibleItem?.id ?? null"
+                            :file-id="fileSheetFileId"
                             :file-data="fileViewerData.fileData.value"
                             :is-loading="fileViewerData.isLoadingFileData.value"
                             :is-prompt-loading="isSheetPromptLoading"
@@ -429,28 +431,38 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                     </template>
                 </VibeLayout>
 
-                <template v-if="fileSheetState.isOpen && surfaceMode === 'list'">
-                    <div
-                        v-if="isFileSheetOverlay"
-                        class="pointer-events-none absolute inset-y-0 right-0 z-20 flex max-w-full justify-end"
-                        data-test="file-viewer-sheet-overlay"
+                <template v-if="surfaceMode === 'list'">
+                    <Transition
+                        enter-active-class="transition duration-150 ease-out"
+                        enter-from-class="translate-x-6 opacity-0"
+                        enter-to-class="translate-x-0 opacity-100"
+                        leave-active-class="transition duration-150 ease-in"
+                        leave-from-class="translate-x-0 opacity-100"
+                        leave-to-class="translate-x-6 opacity-0"
                     >
-                        <FileViewerSheet
-                            :is-open="fileSheetState.isOpen"
-                            :file-id="currentVisibleItem?.id ?? null"
-                            :file-data="fileViewerData.fileData.value"
-                            :is-loading="fileViewerData.isLoadingFileData.value"
-                            :is-prompt-loading="isSheetPromptLoading"
-                            :prompt="promptDialog.data.currentPromptData.value"
-                            :show-prompt="showSheetPrompt"
-                            @close="closeFileSheet"
-                        />
-                    </div>
+                        <div
+                            v-if="isFileSheetOverlay"
+                            class="absolute inset-0 z-20 flex max-w-full justify-end"
+                            data-test="file-viewer-sheet-overlay"
+                            @click.self="closeFileSheet"
+                        >
+                            <FileViewerSheet
+                                :is-open="fileSheetState.isOpen"
+                                :file-id="fileSheetFileId"
+                                :file-data="fileViewerData.fileData.value"
+                                :is-loading="fileViewerData.isLoadingFileData.value"
+                                :is-prompt-loading="isSheetPromptLoading"
+                                :prompt="promptDialog.data.currentPromptData.value"
+                                :show-prompt="showSheetPrompt"
+                                @close="closeFileSheet"
+                            />
+                        </div>
+                    </Transition>
                     <FileViewerSheet
-                        v-else
+                        v-if="!isFileSheetOverlay"
                         data-test="file-viewer-sheet-inline"
                         :is-open="fileSheetState.isOpen"
-                        :file-id="currentVisibleItem?.id ?? null"
+                        :file-id="fileSheetFileId"
                         :file-data="fileViewerData.fileData.value"
                         :is-loading="fileViewerData.isLoadingFileData.value"
                         :is-prompt-loading="isSheetPromptLoading"

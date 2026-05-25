@@ -182,20 +182,10 @@ function removeChild(idx: number): void {
 
         <!-- Terms (for term-based operations) -->
         <div v-if="usesTerms" class="space-y-2">
-            <div class="flex items-center justify-between">
+            <div>
                 <label class="text-sm font-medium text-regal-navy-100">Terms</label>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    @click="addTerm"
-                    class="h-8"
-                >
-                    <Plus :size="14" class="mr-1" />
-                    Add Term
-                </Button>
             </div>
-            <div class="space-y-2">
+            <div class="space-y-2" data-test="terms-list">
                 <div
                     v-for="(term, idx) in (node.terms || [])"
                     :key="idx"
@@ -229,6 +219,17 @@ function removeChild(idx: number): void {
                 <p v-if="!node.terms?.length" class="text-sm text-twilight-indigo-400">
                     No terms added. Click "Add Term" to add one.
                 </p>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    @click="addTerm"
+                    class="h-8"
+                    data-test="add-term-button"
+                >
+                    <Plus :size="14" class="mr-1" />
+                    Add Term
+                </Button>
             </div>
         </div>
 
@@ -307,4 +308,3 @@ function removeChild(idx: number): void {
         </div>
     </div>
 </template>
-

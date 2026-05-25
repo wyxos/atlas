@@ -14,6 +14,7 @@ export function useFileViewerData(params: {
     sheet: {
         isOpen: boolean;
     };
+    targetFileId?: Ref<number | null>;
 }) {
     const { currentItemIndex } = toRefs(params.navigation);
     const { fillComplete } = toRefs(params.overlay);
@@ -24,6 +25,10 @@ export function useFileViewerData(params: {
     const fetchSequence = ref(0);
 
     const currentItemId = computed(() => {
+        if (params.targetFileId) {
+            return params.targetFileId.value;
+        }
+
         const index = currentItemIndex.value;
         if (index === null || index < 0 || index >= params.items.value.length) {
             return null;
@@ -116,8 +121,8 @@ export function useFileViewerData(params: {
         item.capabilities = file.capabilities;
     }
 
-    // Keep the sheet data in sync with navigation. The overlay sets fillComplete=false during transitions,
-    // so we must also react to fillComplete toggling back to true for the newly-selected item.
+    // Keep sheet data in sync with either navigation or an explicitly pinned grid item.
+    // The overlay sets fillComplete=false during transitions, so also react when it toggles back.
     watch(
         [() => currentItemId.value, () => isOpen.value, () => fillComplete.value],
         async ([fileId, open, filled]) => {

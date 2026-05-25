@@ -33,10 +33,10 @@ function queueTrackButtonClass(track: AudioPlayerTrack): string[] {
 
     return [
         isCurrentTrack && props.isPlaying
-            ? 'bg-smart-blue-600/95 text-smart-blue-100 shadow-[inset_4px_0_0_rgb(219_238_255/0.95)] ring-2 ring-inset ring-smart-blue-100/90 hover:bg-smart-blue-600 focus-visible:bg-smart-blue-600'
+            ? 'bg-smart-blue-600/95 text-smart-blue-100 hover:bg-smart-blue-600 focus-visible:bg-smart-blue-600'
             : '',
         isCurrentTrack && !props.isPlaying
-            ? 'bg-smart-blue-700/90 text-smart-blue-100 shadow-[inset_4px_0_0_rgb(123_190_255/0.95)] ring-2 ring-inset ring-smart-blue-100/75 hover:bg-smart-blue-700 focus-visible:bg-smart-blue-700'
+            ? 'bg-smart-blue-700/90 text-smart-blue-100 hover:bg-smart-blue-700 focus-visible:bg-smart-blue-700'
             : '',
         !isCurrentTrack ? 'hover:bg-prussian-blue-600/80 focus-visible:bg-prussian-blue-600/80' : '',
     ];

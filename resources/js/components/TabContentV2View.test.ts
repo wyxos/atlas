@@ -184,6 +184,7 @@ function createProps() {
             setOpen: vi.fn(),
         },
         fileSheetState: { isOpen: false },
+        fileSheetItem: null,
         fileSheetPresentation: 'inline' as 'inline' | 'overlay',
         fileViewerData: {
             fileData: ref(null),
@@ -488,7 +489,7 @@ describe('TabContentV2View', () => {
         expect(unlockPageLoading).toHaveBeenCalledTimes(1);
     });
 
-    it('overlays the list-mode file sheet without reserving grid space for grid item info actions', () => {
+    it('overlays the list-mode file sheet without reserving grid space for grid item info actions', async () => {
         const props = createProps();
         props.fileSheetPresentation = 'overlay';
         props.fileSheetState.isOpen = true;
@@ -505,6 +506,9 @@ describe('TabContentV2View', () => {
         expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="vibe-layout"]').classes()).not.toContain('atlas-file-viewer-wide-aside');
         expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({});
+
+        await wrapper.get('[data-test="file-viewer-sheet-overlay"]').trigger('click');
+        expect(props.closeFileSheet).toHaveBeenCalledTimes(1);
     });
 
     it('keeps the inline list-mode file sheet in the sibling path', () => {

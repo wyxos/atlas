@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, useAttrs } from 'vue';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
 import type { File, FileMetadataRecord } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -27,6 +27,12 @@ const props = withDefaults(defineProps<Props>(), {
     showPrompt: false,
     totalItems: 0,
 });
+
+defineOptions({
+    inheritAttrs: false,
+});
+
+const attrs = useAttrs();
 
 const emit = defineEmits<{
     close: [];
@@ -100,11 +106,22 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
 </script>
 
 <template>
-    <div
-        class="relative flex h-full min-h-0 flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden pointer-events-auto"
-        :class="embedded ? 'w-full max-w-none' : (isOpen ? 'w-[30rem] max-w-[30rem]' : 'w-0 max-w-0')"
+    <Transition
+        appear
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="translate-x-6 opacity-0"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-to-class="translate-x-6 opacity-0"
     >
-        <div class="flex h-full min-h-0 flex-col" :class="embedded ? 'w-full min-w-0 max-w-none' : 'w-[30rem] min-w-[30rem] max-w-[30rem]'">
+        <div
+            v-if="isOpen"
+            v-bind="attrs"
+            class="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l-2 border-twilight-indigo-500 bg-prussian-blue-800 pointer-events-auto"
+            :class="embedded ? 'w-full max-w-none' : 'w-[30rem] max-w-[30rem]'"
+        >
+            <div class="flex h-full min-h-0 flex-col" :class="embedded ? 'w-full min-w-0 max-w-none' : 'w-[30rem] min-w-[30rem] max-w-[30rem]'">
             <div
                 class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap"
                 :class="isOpen ? '' : 'opacity-0 pointer-events-none'"
@@ -436,8 +453,9 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                 :total-items="totalItems"
                 @select="emit('select-preview', $event)"
             />
+            </div>
         </div>
-    </div>
+    </Transition>
 </template>
 
 

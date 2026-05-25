@@ -278,6 +278,13 @@ onBeforeUnmount(teardown);
         @touchstart.passive="handlePlayerTouchStart"
         @touchend.passive="handlePlayerTouchEnd"
     >
+        <div
+            v-if="isQueueSheetOpen"
+            class="absolute inset-0 z-10 cursor-default"
+            data-test="audio-queue-player-dismiss"
+            aria-hidden="true"
+            @click="audioPlayer.closeQueueSheet"
+        />
         <audio
             ref="audioRef"
             class="hidden"

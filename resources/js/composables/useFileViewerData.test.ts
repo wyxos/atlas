@@ -122,4 +122,34 @@ describe('useFileViewerData', () => {
         expect(items.value[0].previewed_count).toBe(3);
         expect(items.value[0].seen_count).toBe(4);
     });
+
+    it('keeps sheet data pinned to an explicit file id while navigation changes', async () => {
+        mockAxios.get.mockResolvedValueOnce({ data: { file: { id: 2, filename: 'two.jpg' } } });
+
+        const items = ref([{ id: 1 }, { id: 2 }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: true });
+        const targetFileId = ref<number | null>(2);
+
+        const { fileData } = useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+            targetFileId,
+        });
+
+        await flushPromises();
+
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/files/2');
+        expect(fileData.value?.id).toBe(2);
+
+        navigation.currentItemIndex = 1;
+        await nextTick();
+        await flushPromises();
+
+        expect(mockAxios.get).toHaveBeenCalledTimes(1);
+        expect(fileData.value?.id).toBe(2);
+    });
 });

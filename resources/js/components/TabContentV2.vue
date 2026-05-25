@@ -8,13 +8,13 @@ import { useBrowseGridAutoScrollShortcut } from '@/composables/useBrowseGridAuto
 import { createBrowseForm, BrowseFormKey } from '@/composables/useBrowseForm';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useFileViewerData } from '@/composables/useFileViewerData';
-import { useFileViewerSheetState } from '@/composables/useFileViewerSheetState';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { useLocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
 import { useTabContentV2ContainerBlacklists } from '@/composables/useTabContentV2ContainerBlacklists';
+import { useTabContentV2FileSheet } from '@/composables/useTabContentV2FileSheet';
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
 import { AUTO_SCROLL_SPEED_MAX, AUTO_SCROLL_SPEED_MIN, FILL_CALL_COUNT_MAX, FILL_CALL_COUNT_MIN, useVibeFillControls } from '@/composables/useVibeFillControls';
 import type { ServiceOption } from '@/lib/browseCatalog';
@@ -228,9 +228,6 @@ const fullscreenOverlayState = reactive({
     isClosing: false,
     mediaType: 'image' as OverlayMediaType,
 });
-const fileViewerSheet = useFileViewerSheetState({ overlay: fullscreenOverlayState });
-const fileSheetState = fileViewerSheet.sheetState;
-const fileSheetPresentation = ref<'inline' | 'overlay'>('inline');
 const vibeInitialCursor = computed(() => (standaloneItem.value ? null : normalizeCursor(browseState.startPageToken.value)));
 const vibeInitialState = computed<VibeInitialState | undefined>(() => {
     if (standaloneItem.value) {
@@ -246,6 +243,14 @@ const vibeInitialState = computed<VibeInitialState | undefined>(() => {
     return hydratedInitialState.value;
 });
 const viewerKey = computed(() => `${tab.value?.id ?? 'tab'}-${masonryRenderKey.value}-${standaloneItem.value?.id ?? 'feed'}`);
+const currentVisibleItem = computed(() => {
+    if (sessionItems.value.length === 0) {
+        return null;
+    }
+    const safeIndex = Math.max(0, Math.min(activeIndex.value, sessionItems.value.length - 1));
+    return sessionItems.value[safeIndex] ?? null;
+});
+const fileSheet = useTabContentV2FileSheet({ activeIndex, currentVisibleItem, overlay: fullscreenOverlayState, promptDialog });
 const shouldShowStandaloneRouteBootstrap = computed(() => Boolean(tab.value)
     && hasRouteFileSelection.value
     && !isClosingFullscreenRoute.value
@@ -255,16 +260,10 @@ const fileViewerData = useFileViewerData({
     items: sessionItems,
     navigation: currentNavigation,
     overlay: fullscreenOverlayState,
-    sheet: fileSheetState,
+    sheet: fileSheet.state,
+    targetFileId: fileSheet.targetFileId,
 });
 const syncedFileViewerData = createSyncedFileViewerData({ fileViewerData, getCurrentVibeItems: () => vibeRef.value?.getItems() ?? [] });
-const currentVisibleItem = computed(() => {
-    if (sessionItems.value.length === 0) {
-        return null;
-    }
-    const safeIndex = Math.max(0, Math.min(activeIndex.value, sessionItems.value.length - 1));
-    return sessionItems.value[safeIndex] ?? null;
-});
 const headerMasonry = vibeMasonry;
 const fillControls = useVibeFillControls({ getVibeHandle: () => vibeRef.value, status: vibeStatus, surfaceMode });
 const { autoScrollActive, autoScrollSpeed, fillActionsDisabled, fillCallCount } = fillControls;
@@ -291,7 +290,7 @@ function handleVibeItemsChange(vibeItems: VibeViewerItem[]): void {
         .filter((item): item is FeedItem => item !== null);
 }
 
-function resetLocalFeedState(): void { items.value = []; removedItemIds.value = new Set(); fileSheetPresentation.value = 'inline'; fileViewerSheet.setSheetOpen(false, { persist: false }); }
+function resetLocalFeedState(): void { items.value = []; removedItemIds.value = new Set(); fileSheet.reset(); }
 
 function applyRestoredSession(): void {
     isSessionReady.value = false;
@@ -363,10 +362,6 @@ function handleAssetLoads(loads: VibeAssetLoadEvent[]): void { const batch = loa
 function handleAssetErrors(errors: VibeAssetErrorEvent[]): void { itemInteractions.preload.onBatchFailures(errors.map((error) => ({ item: error.item.feedItem as FeedItem, error }))); }
 async function handleReaction(item: VibeViewerItem, type: ReactionType): Promise<void> { const feedItem = getFeedItemFromVibeItem(item); if (feedItem) itemInteractions.reactions.onFileReaction(feedItem, type); }
 
-function openFileSheet(): void { fileSheetPresentation.value = 'inline'; promptDialog.clear(); fileViewerSheet.setSheetOpen(true); }
-function openFileSheetForItem(item: FeedItem, index: number): void { activeIndex.value = index; fileSheetPresentation.value = 'overlay'; promptDialog.select(item); fileViewerSheet.setSheetOpen(true); }
-function closeFileSheet(): void { fileViewerSheet.setSheetOpen(false); fileSheetPresentation.value = 'inline'; promptDialog.clear(); }
-
 async function loadStandaloneFileItem(fileId: number): Promise<FeedItem | null> {
     try {
         return await loadBrowseV2StandaloneFileItem(fileId);
@@ -432,6 +427,7 @@ watch(
 
         if (previousMode === 'fullscreen' && mode !== 'fullscreen') {
             itemInteractions.viewer.onClose();
+            fileSheet.closeForFullscreenExit();
         }
     },
 );
@@ -527,12 +523,13 @@ watch(
         :prompt-dialog="promptDialog"
         :local-file-deletion="localFileDeletion"
         :handle-reaction="handleReaction"
-        :file-sheet-state="fileSheetState"
-        :file-sheet-presentation="fileSheetPresentation"
+        :file-sheet-state="fileSheet.state"
+        :file-sheet-item="fileSheet.item"
+        :file-sheet-presentation="fileSheet.presentation"
         :current-visible-item="currentVisibleItem"
         :file-viewer-data="syncedFileViewerData"
-        :open-file-sheet="openFileSheet" :open-file-sheet-for-item="openFileSheetForItem"
-        :close-file-sheet="closeFileSheet"
+        :open-file-sheet="fileSheet.open" :open-file-sheet-for-item="fileSheet.openForItem"
+        :close-file-sheet="fileSheet.close"
         :downloaded-reaction-prompt="downloadedReactionPrompt"
         :handle-container-blacklist-change="containerBlacklists.handleContainerBlacklistChange"
     />

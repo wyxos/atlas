@@ -141,6 +141,22 @@ describe('RuleEditor', () => {
             });
         });
 
+        it('renders the add term action after the terms list content', () => {
+            const wrapper = mount(RuleEditor, {
+                props: {
+                    modelValue: {
+                        op: 'any',
+                        terms: [{ term: 'existing term', allow_digit_prefix: false }],
+                        options: { case_sensitive: false, whole_word: true },
+                    },
+                },
+            });
+
+            const termsList = wrapper.get('[data-test="terms-list"]');
+
+            expect(termsList.element.lastElementChild?.getAttribute('data-test')).toBe('add-term-button');
+        });
+
         it('emits update when updating a term value', async () => {
             const node: ModerationRuleNode = {
                 op: 'any',
@@ -397,4 +413,3 @@ describe('RuleEditor', () => {
         });
     });
 });
-

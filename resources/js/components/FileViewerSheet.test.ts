@@ -209,6 +209,24 @@ describe('FileViewerSheet', () => {
         expect(root.classes()).toContain('max-w-[30rem]');
     });
 
+    it('owns the sheet enter and leave transition', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile(),
+            },
+        });
+
+        const transition = wrapper.findComponent({ name: 'Transition' });
+
+        expect(transition.exists()).toBe(true);
+        expect(transition.props('appear')).toBe(true);
+        expect(transition.props('enterFromClass')).toContain('translate-x-6');
+        expect(transition.props('leaveToClass')).toContain('translate-x-6');
+    });
+
     it('renders saved provider metadata as structured sections', () => {
         const wrapper = mount(FileViewerSheet, {
             props: {

@@ -155,7 +155,24 @@ describe('GlobalAudioPlayer queue', () => {
         expect(queueSheet.find('[aria-current="true"]').text()).toContain('Visible Track 91');
     });
 
-    it('uses the strong active track treatment in the queue sheet', async () => {
+    it('closes the queue sheet from a player surface click', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([testTrack(41), testTrack(42)], 41);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        await wrapper.get('[aria-label="Queue"]').trigger('click');
+
+        expect(wrapper.get('[data-test="audio-queue-sheet"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="audio-queue-player-dismiss"]').exists()).toBe(true);
+
+        await wrapper.get('[data-test="audio-queue-player-dismiss"]').trigger('click');
+
+        expect(wrapper.find('[data-test="audio-queue-sheet"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="audio-queue-player-dismiss"]').exists()).toBe(false);
+    });
+
+    it('uses only the active background treatment in the queue sheet', async () => {
         const player = useGlobalAudioPlayer();
         player.queueAndPlay([
             testTrack(41, { title: 'Previous Track' }),
@@ -169,16 +186,13 @@ describe('GlobalAudioPlayer queue', () => {
 
         const playingTrack = wrapper.get('[data-test="audio-queue-track"][aria-current="true"]');
         expect(playingTrack.classes()).toContain('bg-smart-blue-600/95');
-        expect(playingTrack.classes()).toContain('ring-2');
-        expect(playingTrack.classes()).toContain('ring-smart-blue-100/90');
-        expect(playingTrack.classes()).toContain('shadow-[inset_4px_0_0_rgb(219_238_255/0.95)]');
+        expect(playingTrack.classes().some((className) => className.startsWith('ring-') || className.startsWith('shadow-'))).toBe(false);
 
         player.pause();
         await flushPromises();
 
         const pausedTrack = wrapper.get('[data-test="audio-queue-track"][aria-current="true"]');
         expect(pausedTrack.classes()).toContain('bg-smart-blue-700/90');
-        expect(pausedTrack.classes()).toContain('ring-smart-blue-100/75');
-        expect(pausedTrack.classes()).toContain('shadow-[inset_4px_0_0_rgb(123_190_255/0.95)]');
+        expect(pausedTrack.classes().some((className) => className.startsWith('ring-') || className.startsWith('shadow-'))).toBe(false);
     });
 });

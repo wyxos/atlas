@@ -145,6 +145,7 @@ function createProps() {
         currentVisibleItem: null,
         downloadedReactionPrompt: { data: { open: ref(false) }, chooseReact: vi.fn(), chooseRedownload: vi.fn(), close: vi.fn(), setOpen: vi.fn() },
         fileSheetState: { isOpen: false },
+        fileSheetItem: null,
         fileSheetPresentation: 'inline' as 'inline' | 'overlay',
         fileViewerData: { fileData: ref(null), isLoadingFileData: ref(false), setFileData: vi.fn() },
         form: { data: { limit: 20, feed: 'online', source: null }, reset: vi.fn() },
@@ -292,6 +293,7 @@ describe('TabContentV2View fullscreen chrome', () => {
         const sheetSpy = vi.fn();
         props.fileSheetState.isOpen = true;
         props.currentVisibleItem = { id: 11 } as never;
+        props.fileSheetItem = props.currentVisibleItem;
 
         const fileViewerSheetStub = defineComponent({
             name: 'FileViewerSheetStub',
@@ -321,6 +323,19 @@ describe('TabContentV2View fullscreen chrome', () => {
             totalItems: 20,
         }));
         expect(sheetSpy.mock.calls[0][0].nextPreviews).toHaveLength(1);
+    });
+
+    it('leaves the fullscreen aside empty when the file sheet is closed', () => {
+        const fileViewerSheetStub = defineComponent({
+            name: 'FileViewerSheetStub',
+            setup() {
+                return () => h('div', { 'data-testid': 'file-viewer-sheet-stub' });
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, { props: createProps(), global: { stubs: { ...defaultStubs, FileViewerSheet: fileViewerSheetStub } } });
+
+        expect(wrapper.find('[data-testid="file-viewer-sheet-stub"]').exists()).toBe(false);
     });
 
     it('wires the fullscreen file sheet toggle', async () => {
