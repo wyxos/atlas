@@ -406,7 +406,7 @@ return [
                 'memory' => 384,
             ],
             'supervisor-library-sync' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 6,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
                 'memory' => 256,
