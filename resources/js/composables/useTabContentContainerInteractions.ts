@@ -196,6 +196,11 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     }
 
     function openDrawer(container: ContainerTarget, reason: Exclude<DrawerOpenReason, null>): void {
+        if (getVisibleSiblingItems(container.id).length <= 1) {
+            closeDrawer();
+            return;
+        }
+
         cancelPendingHoverOpen();
 
         selectedContainerId.value = container.id;
@@ -225,6 +230,10 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
 
     function openSheetFromClick(container: ContainerTarget): void {
         cancelPendingHoverOpen();
+
+        if (getVisibleSiblingItems(container.id).length <= 1) {
+            return;
+        }
 
         closeDrawer();
         selectedSheetContainerId.value = container.id;
@@ -286,7 +295,7 @@ export function useTabContentContainerInteractions(options: UseTabContentContain
     }
 
     watch([selectedContainer, relatedItems], ([container, items]) => {
-        if (isDrawerOpen.value && (!container || items.length === 0)) {
+        if (isDrawerOpen.value && (!container || items.length <= 1)) {
             closeDrawer();
         }
     });

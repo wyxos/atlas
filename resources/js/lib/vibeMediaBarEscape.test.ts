@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shouldCloseContainerSheetForEscape, shouldExitFullscreenForMediaBarEscape } from './vibeMediaBarEscape';
+import { shouldCloseContainerSheetForEscape, shouldCloseFileSheetForEscape, shouldExitFullscreenForMediaBarEscape } from './vibeMediaBarEscape';
 
 function createEvent(target: EventTarget, overrides: Partial<KeyboardEvent> = {}): KeyboardEvent {
     return {
@@ -35,5 +35,14 @@ describe('shouldCloseContainerSheetForEscape', () => {
         expect(shouldCloseContainerSheetForEscape(createEvent(document.body), false)).toBe(false);
         expect(shouldCloseContainerSheetForEscape(createEvent(document.body, { repeat: true }), true)).toBe(false);
         expect(shouldCloseContainerSheetForEscape(createEvent(document.body, { key: 'Enter' }), true)).toBe(false);
+    });
+});
+
+describe('shouldCloseFileSheetForEscape', () => {
+    it('matches a first Escape keydown only while the file sheet is open', () => {
+        expect(shouldCloseFileSheetForEscape(createEvent(document.body), true)).toBe(true);
+        expect(shouldCloseFileSheetForEscape(createEvent(document.body), false)).toBe(false);
+        expect(shouldCloseFileSheetForEscape(createEvent(document.body, { repeat: true }), true)).toBe(false);
+        expect(shouldCloseFileSheetForEscape(createEvent(document.body, { key: 'Enter' }), true)).toBe(false);
     });
 });

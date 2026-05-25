@@ -91,6 +91,10 @@ export function useContainerPillInteractions(
         });
     }
 
+    function hasMultipleSiblingItems(containerId: number): boolean {
+        return getSiblingItems(containerId).length > 1;
+    }
+
     /**
      * Get the referrer URL for a container (from the first item that has this container).
      */
@@ -288,6 +292,10 @@ export function useContainerPillInteractions(
      * Handle middle click to open container URL in new tab without focus.
      */
     function handleMiddleClick(containerId: number): void {
+        if (!hasMultipleSiblingItems(containerId)) {
+            return;
+        }
+
         if (options.onOpenContainerTab) {
             const container = getContainer(containerId);
             if (container) {
@@ -345,7 +353,7 @@ export function useContainerPillInteractions(
             pendingLeftClickTimer = null;
 
             const container = getContainer(containerId);
-            if (container) {
+            if (container && hasMultipleSiblingItems(containerId)) {
                 options.onPlainLeftClick?.(container);
             }
         }, DOUBLE_CLICK_DELAY_MS);
@@ -489,6 +497,7 @@ export function useContainerPillInteractions(
     return {
         getContainersForItem,
         getSiblingItems,
+        hasMultipleSiblingItems,
         getContainer,
         getContainerUrl,
         batchReactToSiblings,

@@ -17,7 +17,7 @@ import type { BrowseFeedHandle } from '@/types/browse';
 import type { File } from '@/types/file';
 import type { ReactionType } from '@/types/reaction';
 import type { LocalSourceSelection } from '@/utils/localSourceSelection';
-import { shouldCloseContainerSheetForEscape, shouldExitFullscreenForMediaBarEscape } from '@/lib/vibeMediaBarEscape';
+import { createTabContentV2KeydownHandler } from '@/lib/tabContentV2Keyboard';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -200,29 +200,14 @@ function togglePageLoadingLock(): void {
     props.headerMasonry.lockPageLoading();
 }
 
-function handleFullscreenMediaBarEscape(event: KeyboardEvent): void {
-    if (!shouldExitFullscreenForMediaBarEscape(event, props.surfaceMode)) {
-        return;
-    }
-
-    event.preventDefault();
-    props.updateSurfaceMode('list');
-}
-
-function handleContainerSheetEscape(event: KeyboardEvent): void {
-    if (
-        !shouldCloseContainerSheetForEscape(
-            event,
-            props.containerInteractions.sheet.state.isOpen.value,
-        )
-    ) {
-        return;
-    }
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    props.containerInteractions.sheet.actions.close();
-}
+const handleRootKeydown = createTabContentV2KeydownHandler({
+    closeContainerSheet: props.containerInteractions.sheet.actions.close,
+    closeFileSheet: props.closeFileSheet,
+    getContainerSheetOpen: () => props.containerInteractions.sheet.state.isOpen.value,
+    getFileSheetOpen: () => props.fileSheetState.isOpen,
+    getSurfaceMode: () => props.surfaceMode,
+    updateSurfaceMode: props.updateSurfaceMode,
+});
 
 const vibeLayoutBindings = computed(() => ({
     activeIndex: props.activeIndex,
@@ -244,7 +229,7 @@ useEventListener(document, 'pointermove', (event) => {
     props.containerInteractions.drawer.actions.syncHoverTarget?.(event.target);
 });
 
-useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true });
+useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
 
 </script>
 
@@ -252,7 +237,8 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
     <div
         v-if="tab"
         class="relative flex h-full min-h-0 flex-col overflow-hidden"
-        @keydown.capture="handleFullscreenMediaBarEscape"
+        data-test="tab-content-v2-view"
+        @keydown.capture="handleRootKeydown"
     >
         <TabContentServiceHeader
             v-if="!shouldShowForm"

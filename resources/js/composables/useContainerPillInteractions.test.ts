@@ -43,8 +43,7 @@ describe('useContainerPillInteractions', () => {
             } as FeedItem,
             {
                 id: 2,
-                width: 500,
-                height: 500,
+                width: 500, height: 500,
                 page: 1,
                 key: '1-2',
                 index: 1,
@@ -206,7 +205,7 @@ describe('useContainerPillInteractions', () => {
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 
-    it('handles middle click without alt to open container tab', () => {
+    it('handles middle click without alt to open multi-item container tab', () => {
         vi.useFakeTimers();
         const items = ref<FeedItem[]>([
             {
@@ -217,6 +216,16 @@ describe('useContainerPillInteractions', () => {
                 key: '1-1',
                 index: 0,
                 src: 'https://example.com/image1.jpg',
+                containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
+            } as FeedItem,
+            {
+                id: 2,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-2',
+                index: 1,
+                src: 'https://example.com/image2.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
             } as FeedItem,
         ]);
@@ -233,7 +242,6 @@ describe('useContainerPillInteractions', () => {
             onOpenContainerTab,
         });
 
-        // Simulate middle click without alt
         const mockEvent = {
             button: 1,
             altKey: false,

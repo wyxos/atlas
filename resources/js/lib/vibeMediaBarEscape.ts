@@ -19,3 +19,10 @@ export function shouldCloseContainerSheetForEscape(event: KeyboardEvent, sheetOp
         && !event.repeat
         && event.key === 'Escape';
 }
+
+export function shouldCloseFileSheetForEscape(event: KeyboardEvent, sheetOpen: boolean): boolean {
+    return sheetOpen
+        && !event.defaultPrevented
+        && !event.repeat
+        && event.key === 'Escape';
+}

@@ -87,7 +87,7 @@ describe('useTabContentContainerInteractions', () => {
         vi.useRealTimers();
     });
 
-    it('opens the drawer when the hovered container has one loaded item', () => {
+    it('does not open the drawer when the hovered container has one loaded item', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -98,10 +98,10 @@ describe('useTabContentContainerInteractions', () => {
         vi.advanceTimersByTime(700);
         vi.runOnlyPendingTimers();
 
-        expect(interactions.drawer.state.isOpen.value).toBe(true);
-        expect(interactions.drawer.derived.container.value?.id).toBe(10);
-        expect(interactions.drawer.derived.items.value.map((item) => item.id)).toEqual([1]);
-        expect([...interactions.drawer.derived.highlightedItemIds.value]).toEqual([1]);
+        expect(interactions.drawer.state.isOpen.value).toBe(false);
+        expect(interactions.drawer.derived.container.value).toBeNull();
+        expect(interactions.drawer.derived.items.value).toEqual([]);
+        expect(interactions.drawer.derived.highlightedItemIds.value.size).toBe(0);
 
         vi.useRealTimers();
     });
@@ -245,7 +245,7 @@ describe('useTabContentContainerInteractions', () => {
         vi.useRealTimers();
     });
 
-    it('opens the sheet when the container has only one loaded item', () => {
+    it('does not open the sheet when the container has only one loaded item', () => {
         vi.useFakeTimers();
         const interactions = createSubject([
             createItem(1, [{ id: 10, type: 'gallery' }]),
@@ -259,9 +259,9 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.drawer.state.isOpen.value).toBe(false);
         expect(interactions.drawer.derived.container.value).toBeNull();
         expect(interactions.drawer.derived.items.value).toEqual([]);
-        expect(interactions.sheet.state.isOpen.value).toBe(true);
-        expect(interactions.sheet.derived.container.value?.id).toBe(10);
-        expect(interactions.sheet.derived.items.value.map((item) => item.id)).toEqual([1]);
+        expect(interactions.sheet.state.isOpen.value).toBe(false);
+        expect(interactions.sheet.derived.container.value).toBeNull();
+        expect(interactions.sheet.derived.items.value).toEqual([]);
 
         vi.useRealTimers();
     });
@@ -454,6 +454,46 @@ describe('useTabContentContainerInteractions', () => {
         expect(interactions.drawer.state.isOpen.value).toBe(true);
 
         removedIds.value = new Set([1, 2]);
+        await nextTick();
+
+        expect(interactions.drawer.state.isOpen.value).toBe(false);
+        expect(interactions.drawer.derived.container.value).toBeNull();
+
+        vi.useRealTimers();
+    });
+
+    it('closes a hover-open drawer when the selected container drops to one loaded item', async () => {
+        vi.useFakeTimers();
+        const subjectItems = shallowRef([
+            createItem(1, [{ id: 10, type: 'gallery' }]),
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+            createItem(3, [{ id: 20, type: 'album' }]),
+        ]);
+        const interactions = useTabContentContainerInteractions({
+            items: subjectItems,
+            tab: ref<TabData | null>({
+                id: 1,
+                label: 'Test tab',
+                params: {},
+                position: 0,
+                isActive: true,
+                updatedAt: null,
+            }),
+            form: { isLocal: ref(false) } as unknown as BrowseFormInstance,
+            masonry: ref(null),
+            onReaction: vi.fn(),
+            onOpenContainerTab: vi.fn(),
+        });
+
+        interactions.pillHandlers.onMouseEnter(10);
+        vi.advanceTimersByTime(700);
+        vi.runOnlyPendingTimers();
+        expect(interactions.drawer.state.isOpen.value).toBe(true);
+
+        subjectItems.value = [
+            createItem(2, [{ id: 10, type: 'gallery' }]),
+            createItem(3, [{ id: 20, type: 'album' }]),
+        ];
         await nextTick();
 
         expect(interactions.drawer.state.isOpen.value).toBe(false);

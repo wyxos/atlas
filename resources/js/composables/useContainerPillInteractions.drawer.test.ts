@@ -41,9 +41,9 @@ describe('useContainerPillInteractions drawer callbacks', () => {
     const onlineMode = computed(() => false);
     const mockOnReaction = vi.fn();
 
-    it('handles single left click without modifiers to trigger the drawer callback', () => {
+    it('handles single left click without modifiers to trigger the drawer callback for multi-item containers', () => {
         vi.useFakeTimers();
-        const items = ref<FeedItem[]>([createItem(1)]);
+        const items = ref<FeedItem[]>([createItem(1), createItem(2)]);
         const onPlainLeftClick = vi.fn();
 
         const { handlePillClick } = useContainerPillInteractions({
@@ -64,6 +64,31 @@ describe('useContainerPillInteractions drawer callbacks', () => {
         expect(onPlainLeftClick).toHaveBeenCalledWith(
             expect.objectContaining({ id: 1, type: 'gallery' }),
         );
+
+        vi.useRealTimers();
+    });
+
+    it('ignores single left click for one-item containers', () => {
+        vi.useFakeTimers();
+        const items = ref<FeedItem[]>([createItem(1)]);
+        const onPlainLeftClick = vi.fn();
+
+        const { handlePillClick } = useContainerPillInteractions({
+            items,
+            masonry: ref({}),
+            tabId: 1,
+            isLocal: onlineMode,
+            onReaction: mockOnReaction,
+            onPlainLeftClick,
+        });
+
+        const event = createLeftClickEvent();
+        handlePillClick(1, event);
+        vi.advanceTimersByTime(300);
+        vi.runOnlyPendingTimers();
+
+        expect(event.stopPropagation).toHaveBeenCalled();
+        expect(onPlainLeftClick).not.toHaveBeenCalled();
 
         vi.useRealTimers();
     });
