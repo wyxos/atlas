@@ -1,7 +1,7 @@
 <?php
 
 use App\Events\FileMarkedNotFound;
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\SyncLibraryFiles;
 use App\Models\File;
 use App\Models\Tab;
 use App\Models\User;
@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
 
 test('preview failure marks civitai files as not found, detaches them from all tabs, and broadcasts affected tabs', function () {
     Event::fake([FileMarkedNotFound::class]);
-    Queue::fake([SyncLibraryIndex::class]);
+    Queue::fake([SyncLibraryFiles::class]);
 
     $requester = User::factory()->admin()->create();
     $otherUser = User::factory()->admin()->create();
@@ -75,10 +75,8 @@ test('preview failure marks civitai files as not found, detaches them from all t
             && $tabIds === [$otherTabA->id, $otherTabB->id];
     });
     Queue::assertPushed(
-        SyncLibraryIndex::class,
-        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
-            && $job->syncFiles
-            && ! $job->syncReactions,
+        SyncLibraryFiles::class,
+        fn (SyncLibraryFiles $job): bool => $job->fileIds === [$file->id],
     );
 });
 

@@ -1,7 +1,8 @@
 <?php
 
 use App\Jobs\DownloadFile;
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\SyncLibraryFileReactions;
+use App\Jobs\SyncLibraryFiles;
 use App\Models\File;
 use App\Models\User;
 use App\Services\FileReactionService;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 it('syncs library file and reaction projections when a reaction is added', function () {
-    Queue::fake([DownloadFile::class, SyncLibraryIndex::class]);
+    Queue::fake([DownloadFile::class, SyncLibraryFiles::class, SyncLibraryFileReactions::class]);
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -25,16 +26,19 @@ it('syncs library file and reaction projections when a reaction is added', funct
     app(FileReactionService::class)->toggle($file, $user, 'like');
 
     Queue::assertPushed(
-        SyncLibraryIndex::class,
-        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
-            && $job->syncFiles
-            && $job->syncReactions
-            && $job->queue === 'library-sync',
+        SyncLibraryFiles::class,
+        fn (SyncLibraryFiles $job): bool => $job->fileIds === [$file->id]
+            && $job->queue === 'library-file-sync',
+    );
+    Queue::assertPushed(
+        SyncLibraryFileReactions::class,
+        fn (SyncLibraryFileReactions $job): bool => $job->fileIds === [$file->id]
+            && $job->queue === 'library-reaction-sync',
     );
 });
 
 it('syncs library file and reaction projections when a reaction is removed', function () {
-    Queue::fake([DownloadFile::class, SyncLibraryIndex::class]);
+    Queue::fake([DownloadFile::class, SyncLibraryFiles::class, SyncLibraryFileReactions::class]);
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -51,16 +55,19 @@ it('syncs library file and reaction projections when a reaction is removed', fun
     $service->toggle($file, $user, 'like');
 
     Queue::assertPushed(
-        SyncLibraryIndex::class,
-        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
-            && $job->syncFiles
-            && $job->syncReactions,
+        SyncLibraryFiles::class,
+        fn (SyncLibraryFiles $job): bool => $job->fileIds === [$file->id],
     );
-    Queue::assertPushed(SyncLibraryIndex::class, 2);
+    Queue::assertPushed(
+        SyncLibraryFileReactions::class,
+        fn (SyncLibraryFileReactions $job): bool => $job->fileIds === [$file->id],
+    );
+    Queue::assertPushed(SyncLibraryFiles::class, 2);
+    Queue::assertPushed(SyncLibraryFileReactions::class, 2);
 });
 
 it('can defer library projection sync for batch callers', function () {
-    Queue::fake([DownloadFile::class, SyncLibraryIndex::class]);
+    Queue::fake([DownloadFile::class, SyncLibraryFiles::class, SyncLibraryFileReactions::class]);
 
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -74,5 +81,6 @@ it('can defer library projection sync for batch callers', function () {
         'queueLibrarySync' => false,
     ]);
 
-    Queue::assertNotPushed(SyncLibraryIndex::class);
+    Queue::assertNotPushed(SyncLibraryFiles::class);
+    Queue::assertNotPushed(SyncLibraryFileReactions::class);
 });

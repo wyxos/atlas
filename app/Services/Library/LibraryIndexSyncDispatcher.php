@@ -2,7 +2,10 @@
 
 namespace App\Services\Library;
 
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\DeleteLibraryFiles;
+use App\Jobs\DeleteLibraryIndex;
+use App\Jobs\SyncLibraryFileReactions;
+use App\Jobs\SyncLibraryFiles;
 
 class LibraryIndexSyncDispatcher
 {
@@ -11,7 +14,7 @@ class LibraryIndexSyncDispatcher
      */
     public function files(array $fileIds): void
     {
-        $this->dispatch($fileIds, syncFiles: true, syncReactions: false);
+        $this->dispatchFiles($fileIds);
     }
 
     /**
@@ -19,7 +22,8 @@ class LibraryIndexSyncDispatcher
      */
     public function filesAndReactions(array $fileIds): void
     {
-        $this->dispatch($fileIds, syncFiles: true, syncReactions: true);
+        $this->dispatchFiles($fileIds);
+        $this->dispatchReactions($fileIds);
     }
 
     /**
@@ -34,28 +38,44 @@ class LibraryIndexSyncDispatcher
         }
 
         foreach (array_chunk($fileIds, $this->chunkSize()) as $chunk) {
-            SyncLibraryIndex::dispatch($chunk, syncFiles: false, syncReactions: false, operation: 'deleteFiles')->afterCommit();
+            DeleteLibraryFiles::dispatch($chunk)->afterCommit();
         }
     }
 
     public function deleteAll(): void
     {
-        SyncLibraryIndex::dispatch([], syncFiles: false, syncReactions: false, operation: 'deleteAll')->afterCommit();
+        DeleteLibraryIndex::dispatch()->afterCommit();
     }
 
     /**
      * @param  array<int, int>  $fileIds
      */
-    private function dispatch(array $fileIds, bool $syncFiles, bool $syncReactions): void
+    private function dispatchFiles(array $fileIds): void
     {
         $fileIds = $this->normalizeIds($fileIds);
 
-        if ($fileIds === [] || (! $syncFiles && ! $syncReactions)) {
+        if ($fileIds === []) {
             return;
         }
 
         foreach (array_chunk($fileIds, $this->chunkSize()) as $chunk) {
-            SyncLibraryIndex::dispatch($chunk, $syncFiles, $syncReactions)->afterCommit();
+            SyncLibraryFiles::dispatch($chunk)->afterCommit();
+        }
+    }
+
+    /**
+     * @param  array<int, int>  $fileIds
+     */
+    private function dispatchReactions(array $fileIds): void
+    {
+        $fileIds = $this->normalizeIds($fileIds);
+
+        if ($fileIds === []) {
+            return;
+        }
+
+        foreach (array_chunk($fileIds, $this->chunkSize()) as $chunk) {
+            SyncLibraryFileReactions::dispatch($chunk)->afterCommit();
         }
     }
 

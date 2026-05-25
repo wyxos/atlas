@@ -3,6 +3,9 @@
 use Illuminate\Support\Str;
 
 $librarySyncQueue = env('LIBRARY_SYNC_QUEUE', 'library-sync');
+$libraryFileSyncQueue = env('LIBRARY_FILE_SYNC_QUEUE', 'library-file-sync');
+$libraryReactionSyncQueue = env('LIBRARY_REACTION_SYNC_QUEUE', 'library-reaction-sync');
+$libraryDeleteQueue = env('LIBRARY_DELETE_QUEUE', 'library-delete');
 $libraryReindexQueue = env('LIBRARY_REINDEX_QUEUE', 'library-reindex');
 $libraryReindexTimeout = (int) env('LIBRARY_REINDEX_TIMEOUT_SECONDS', 21600);
 
@@ -108,6 +111,9 @@ return [
         'redis:media-conversions' => 3600,
         'redis:media-previews' => 600,
         'redis:'.$librarySyncQueue => 300,
+        'redis:'.$libraryFileSyncQueue => 300,
+        'redis:'.$libraryReactionSyncQueue => 300,
+        'redis:'.$libraryDeleteQueue => 300,
         'redis:'.$libraryReindexQueue => 3600,
         'redis:processing' => 300,
         'redis:scout' => 300,
@@ -340,6 +346,45 @@ return [
             'timeout' => 300,
             'nice' => 0,
         ],
+        'supervisor-library-file-sync' => [
+            'connection' => 'redis',
+            'queue' => [$libraryFileSyncQueue],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
+        'supervisor-library-reaction-sync' => [
+            'connection' => 'redis',
+            'queue' => [$libraryReactionSyncQueue],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
+        'supervisor-library-delete' => [
+            'connection' => 'redis',
+            'queue' => [$libraryDeleteQueue],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
         'supervisor-scout' => [
             'connection' => 'redis',
             'queue' => ['scout'],
@@ -406,10 +451,24 @@ return [
                 'memory' => 384,
             ],
             'supervisor-library-sync' => [
+                'maxProcesses' => 1,
+                'memory' => 256,
+            ],
+            'supervisor-library-file-sync' => [
                 'minProcesses' => 6,
                 'maxProcesses' => 6,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
+                'memory' => 256,
+            ],
+            'supervisor-library-reaction-sync' => [
+                'maxProcesses' => 2,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 256,
+            ],
+            'supervisor-library-delete' => [
+                'maxProcesses' => 1,
                 'memory' => 256,
             ],
             'supervisor-scout' => [
@@ -447,7 +506,16 @@ return [
                 'maxProcesses' => 1,
             ],
             'supervisor-library-sync' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-library-file-sync' => [
+                'maxProcesses' => 4,
+            ],
+            'supervisor-library-reaction-sync' => [
                 'maxProcesses' => 2,
+            ],
+            'supervisor-library-delete' => [
+                'maxProcesses' => 1,
             ],
             'supervisor-scout' => [
                 'maxProcesses' => 2,

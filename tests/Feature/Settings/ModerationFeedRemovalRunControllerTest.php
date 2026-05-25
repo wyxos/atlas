@@ -3,7 +3,7 @@
 use App\Enums\BlacklistPreviewedCountMode;
 use App\Enums\ModerationFeedRemovalRunStatus;
 use App\Jobs\PreviewModerationFeedRemovalRun;
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\SyncLibraryFiles;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationFeedRemovalRun;
@@ -117,7 +117,7 @@ test('backfill service previews exact matches and applies only that report', fun
         ->and($noMatchFile->fresh()->previewed_count)->toBe(5)
         ->and($alreadyFeedRemovedFile->fresh()->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
 
-    Queue::assertPushed(SyncLibraryIndex::class, 2);
+    Queue::assertPushed(SyncLibraryFiles::class, 2);
 });
 
 test('apply is blocked when active feed removal rules changed after preview', function () {

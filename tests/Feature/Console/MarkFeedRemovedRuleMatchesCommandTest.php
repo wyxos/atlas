@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\BlacklistPreviewedCountMode;
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\SyncLibraryFiles;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationRule;
@@ -140,7 +140,7 @@ test('marks only blacklisted files matching feed removal rules in chunks', funct
     expect($metrics[MetricsService::KEY_FILES_BLACKLISTED_FEED_REMOVED])->toBe(3)
         ->and($metrics[MetricsService::KEY_FILES_BLACKLISTED_MANUAL_IN_FEED])->toBe(4);
 
-    Queue::assertPushed(SyncLibraryIndex::class, 2);
+    Queue::assertPushed(SyncLibraryFiles::class, 2);
 });
 
 function createBackfillBlacklistedFile(array $attributes = []): File

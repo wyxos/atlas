@@ -4,7 +4,7 @@ use App\Enums\LibraryScanItemStatus;
 use App\Enums\LibraryScanMediaTask as MediaTask;
 use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
 use App\Jobs\LibraryScans\GenerateLibraryScanPreviewAssets;
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\SyncLibraryFiles;
 use App\Models\File;
 use App\Models\LibraryScanItem;
 use App\Models\LibraryScanMediaTask;
@@ -22,7 +22,7 @@ uses(RefreshDatabase::class);
 
 it('completes a parser item after its media preview task completes', function () {
 
-    Queue::fake([SyncLibraryIndex::class]);
+    Queue::fake([SyncLibraryFiles::class]);
 
     $run = LibraryScanRun::factory()->create([
 
@@ -92,13 +92,9 @@ it('completes a parser item after its media preview task completes', function ()
 
     Queue::assertPushed(
 
-        SyncLibraryIndex::class,
+        SyncLibraryFiles::class,
 
-        fn (SyncLibraryIndex $job): bool => $job->fileIds === [$file->id]
-
-            && $job->syncFiles === true
-
-            && $job->syncReactions === false
+        fn (SyncLibraryFiles $job): bool => $job->fileIds === [$file->id]
 
     );
 

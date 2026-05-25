@@ -1,6 +1,6 @@
 <?php
 
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\SyncLibraryFiles;
 use App\Models\Container;
 use App\Models\DeviantArtToken;
 use App\Models\File;
@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 test('user can watch DeviantArt source account and refresh source media for a file', function () {
-    Bus::fake([SyncLibraryIndex::class]);
+    Bus::fake([SyncLibraryFiles::class]);
 
     $user = User::factory()->create();
     DeviantArtToken::query()->create([
@@ -119,7 +119,7 @@ test('user can watch DeviantArt source account and refresh source media for a fi
         && $request->url() === "https://www.deviantart.com/api/v1/oauth2/deviation/{$deviationId}"
         && $request->header('Authorization')[0] === 'Bearer connected-access-token');
 
-    Bus::assertDispatched(SyncLibraryIndex::class);
+    Bus::assertDispatched(SyncLibraryFiles::class);
 });
 
 test('source watch refresh rejects unsupported sources', function () {

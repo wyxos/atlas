@@ -2,7 +2,8 @@
 
 use App\Enums\DownloadTransferStatus;
 use App\Jobs\DownloadFile;
-use App\Jobs\SyncLibraryIndex;
+use App\Jobs\SyncLibraryFileReactions;
+use App\Jobs\SyncLibraryFiles;
 use App\Models\Container;
 use App\Models\DownloadTransfer;
 use App\Models\File;
@@ -110,12 +111,15 @@ test('extension batch reactions queue all submitted gallery items and return the
 
     Queue::assertPushed(DownloadFile::class, 2);
     Queue::assertPushed(
-        SyncLibraryIndex::class,
-        fn (SyncLibraryIndex $job): bool => $job->syncFiles
-            && $job->syncReactions
-            && $job->fileIds === [$firstFile?->id, $secondFile?->id],
+        SyncLibraryFiles::class,
+        fn (SyncLibraryFiles $job): bool => $job->fileIds === [$firstFile?->id, $secondFile?->id],
     );
-    Queue::assertPushed(SyncLibraryIndex::class, 1);
+    Queue::assertPushed(
+        SyncLibraryFileReactions::class,
+        fn (SyncLibraryFileReactions $job): bool => $job->fileIds === [$firstFile?->id, $secondFile?->id],
+    );
+    Queue::assertPushed(SyncLibraryFiles::class, 1);
+    Queue::assertPushed(SyncLibraryFileReactions::class, 1);
 });
 
 test('extension batch reactions hydrate active transfers with one bulk lookup', function () {
