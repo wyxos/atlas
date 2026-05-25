@@ -511,7 +511,7 @@ describe('TabContentV2View', () => {
         expect(props.closeFileSheet).toHaveBeenCalledTimes(1);
     });
 
-    it('keeps the inline list-mode file sheet in the sibling path', () => {
+    it('renders list-mode file sheets as a grid overlay even when the saved sheet state is inline', () => {
         const props = createProps();
         props.fileSheetState.isOpen = true;
         props.surfaceMode = 'list';
@@ -523,10 +523,10 @@ describe('TabContentV2View', () => {
             },
         });
 
-        expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(false);
-        expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(true);
-        expect(wrapper.get('[data-testid="vibe-layout"]').classes()).toContain('atlas-file-viewer-wide-aside');
-        expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({ '--vibe-fullscreen-aside-width': '33rem' });
+        expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="vibe-layout"]').classes()).not.toContain('atlas-file-viewer-wide-aside');
+        expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({});
     });
 
 });

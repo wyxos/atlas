@@ -315,6 +315,8 @@ describe('TabContentV2View fullscreen chrome', () => {
         const sheet = wrapper.get('[data-testid="file-viewer-sheet-stub"]');
 
         expect(aside.element.contains(sheet.element)).toBe(true);
+        expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="mock-vibe-header"]').element.contains(sheet.element)).toBe(false);
         expect(wrapper.get('[data-testid="mock-vibe-footer"]').element.contains(sheet.element)).toBe(false);
         expect(sheetSpy).toHaveBeenCalledWith(expect.objectContaining({

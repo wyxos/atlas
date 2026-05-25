@@ -138,7 +138,7 @@ const isSheetPromptLoading = computed(() => {
     return Boolean(promptLoading);
 });
 const showSheetPrompt = computed(() => sheetPromptItemId.value !== null);
-const isFileSheetOverlay = computed(() => props.fileSheetPresentation === 'overlay' && props.surfaceMode === 'list' && props.fileSheetState.isOpen);
+const isFileSheetOverlay = computed(() => props.surfaceMode === 'list' && props.fileSheetState.isOpen);
 const shouldReserveFileSheetSpace = computed(() => props.fileSheetState.isOpen && !isFileSheetOverlay.value);
 const fileSheetFileId = computed(() => props.fileSheetItem?.id ?? null);
 
@@ -454,6 +454,7 @@ useEventListener(window, 'keydown', handleContainerSheetEscape, { capture: true 
                                 :is-prompt-loading="isSheetPromptLoading"
                                 :prompt="promptDialog.data.currentPromptData.value"
                                 :show-prompt="showSheetPrompt"
+                                data-test="file-viewer-sheet-panel"
                                 @close="closeFileSheet"
                             />
                         </div>

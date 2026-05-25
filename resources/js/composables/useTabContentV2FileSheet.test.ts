@@ -52,6 +52,24 @@ describe('useTabContentV2FileSheet', () => {
         vi.clearAllMocks();
     });
 
+    it('keeps file-viewer-triggered sheets bound to the current visible item', () => {
+        const { promptDialog, sheet, visibleItem } = mountSheet();
+
+        sheet.open();
+
+        expect(sheet.state.isOpen).toBe(true);
+        expect(sheet.presentation.value).toBe('inline');
+        expect(sheet.item.value?.id).toBe(1);
+        expect(sheet.targetFileId.value).toBe(1);
+        expect(promptDialog.clear).toHaveBeenCalledTimes(1);
+        expect(promptDialog.select).not.toHaveBeenCalled();
+
+        visibleItem.value = makeItem(4);
+
+        expect(sheet.item.value?.id).toBe(4);
+        expect(sheet.targetFileId.value).toBe(4);
+    });
+
     it('pins grid info sheets to the clicked item while the visible item changes', () => {
         const { activeIndex, promptDialog, sheet, visibleItem } = mountSheet();
         const pinnedItem = makeItem(2);

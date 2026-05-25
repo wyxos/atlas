@@ -110,7 +110,7 @@ describe('TabContentV2GridOverlay', () => {
         expect(wrapper.exists()).toBe(true);
     });
 
-    it('opens the file sheet from the prompt action', async () => {
+    it('uses the grid item info action to open the file sheet for that grid item', async () => {
         const props = createProps({ hovered: true });
 
         const wrapper = mount(TabContentV2GridOverlay, {
