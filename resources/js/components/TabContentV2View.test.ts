@@ -506,6 +506,12 @@ describe('TabContentV2View', () => {
         expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="vibe-layout"]').classes()).not.toContain('atlas-file-viewer-wide-aside');
         expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({});
+        const overlayTransition = wrapper.findAllComponents({ name: 'Transition' })
+            .find((transition) => String(transition.props('enterFromClass')).includes('translate-x-full'));
+
+        expect(overlayTransition?.props('leaveToClass')).toContain('translate-x-full');
+        expect(overlayTransition?.props('enterActiveClass')).toContain('duration-500');
+        expect(overlayTransition?.props('leaveActiveClass')).toContain('duration-300');
 
         await wrapper.get('[data-test="file-viewer-sheet-overlay"]').trigger('click');
         expect(props.closeFileSheet).toHaveBeenCalledTimes(1);

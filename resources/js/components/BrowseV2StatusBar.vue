@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { ChevronsDown, ListPlus, Loader2, LockKeyhole, LockKeyholeOpen, Pause, Play, X } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
@@ -196,44 +196,53 @@ const fillControlsDisabled = computed(() => (
   || isPending.value
 ))
 
-function handleTogglePageLoadingLock(): void {
+function handleTogglePageLoadingLock(event?: MouseEvent): void {
   if (!props.togglePageLoadingLock) {
     return
   }
 
   props.togglePageLoadingLock()
+  blurMouseActivatedControl(event)
 }
 
-function handleCancelFill(): void {
+function handleCancelFill(event?: MouseEvent): void {
   props.cancelFill?.()
+  blurMouseActivatedControl(event)
 }
 
 function handleFillCallCountInput(value: number): void {
   props.setFillCallCount?.(value)
 }
 
-function handleFillUntilCount(): void {
+function handleFillCallCountSubmit(): void {
+  handleFillUntilCount()
+}
+
+function handleFillUntilCount(event?: MouseEvent): void {
   if (fillControlsDisabled.value) {
     return
   }
 
   props.fillUntilCount?.()
+  blurMouseActivatedControl(event)
 }
 
-function handleFillUntilEnd(): void {
+function handleFillUntilEnd(event?: MouseEvent): void {
   if (fillControlsDisabled.value) {
     return
   }
 
   props.fillUntilEnd?.()
+  blurMouseActivatedControl(event)
 }
 
 function handleAutoScrollSpeedInput(value: number): void {
   props.setAutoScrollSpeed?.(value)
 }
 
-function handleToggleAutoScroll(): void {
+function handleToggleAutoScroll(event?: MouseEvent): void {
   props.toggleAutoScroll?.()
+  blurMouseActivatedControl(event)
 }
 
 function clampProgress(value: unknown): number {
@@ -244,6 +253,75 @@ function clampProgress(value: unknown): number {
   }
 
   return Math.min(Math.max(numeric, 0), 1)
+}
+
+function blurMouseActivatedControl(event?: MouseEvent): void {
+  if (!event || event.detail === 0) {
+    return
+  }
+
+  const control = resolveBlurrableControl(event)
+  const controlTestId = control?.getAttribute('data-test') ?? null
+  const blurActiveControl = (): void => {
+    const activeElement = document.activeElement
+
+    if (!isBlurrableElement(activeElement)) {
+      return
+    }
+
+    if (
+      activeElement === control
+      || (control?.contains(activeElement) ?? false)
+      || (controlTestId !== null && activeElement.getAttribute('data-test') === controlTestId)
+    ) {
+      activeElement.blur()
+    }
+  }
+
+  control?.blur()
+  blurActiveControl()
+  void nextTick(() => {
+    blurActiveControl()
+    scheduleNextFrame(blurActiveControl)
+  })
+}
+
+function resolveBlurrableControl(event: MouseEvent): HTMLElement | null {
+  const candidates = typeof event.composedPath === 'function'
+    ? event.composedPath()
+    : [event.currentTarget, event.target]
+
+  for (const candidate of candidates) {
+    if (!isElement(candidate)) {
+      continue
+    }
+
+    const control = candidate.closest('button, input, select, textarea, [role="button"], [tabindex]')
+
+    if (isBlurrableElement(control)) {
+      return control
+    }
+  }
+
+  return isBlurrableElement(event.currentTarget) ? event.currentTarget : null
+}
+
+function isElement(value: unknown): value is Element {
+  return typeof (value as Element | null)?.closest === 'function'
+}
+
+function isBlurrableElement(value: unknown): value is HTMLElement {
+  return typeof (value as HTMLElement | null)?.blur === 'function'
+}
+
+function scheduleNextFrame(callback: () => void): void {
+  if (typeof globalThis.requestAnimationFrame === 'function') {
+    globalThis.requestAnimationFrame(callback)
+
+    return
+  }
+
+  globalThis.setTimeout(callback, 0)
 }
 
 </script>
@@ -332,6 +410,7 @@ function clampProgress(value: unknown): number {
             :model-value="props.fillCallCount"
             :disabled="fillControlsDisabled || !props.setFillCallCount"
             @update:model-value="handleFillCallCountInput"
+            @submit="handleFillCallCountSubmit"
           />
           <Button
             size="icon-sm"
@@ -341,7 +420,7 @@ function clampProgress(value: unknown): number {
             aria-label="Fill selected call count"
             title="Fill selected call count"
             :disabled="fillControlsDisabled || !props.fillUntilCount"
-            @click="handleFillUntilCount"
+            @click="(event) => handleFillUntilCount(event)"
           >
             <ListPlus :size="14" />
           </Button>
@@ -353,7 +432,7 @@ function clampProgress(value: unknown): number {
             aria-label="Fill to end"
             title="Fill to end"
             :disabled="fillControlsDisabled || !props.fillUntilEnd"
-            @click="handleFillUntilEnd"
+            @click="(event) => handleFillUntilEnd(event)"
           >
             <ChevronsDown :size="14" />
           </Button>
@@ -384,7 +463,7 @@ function clampProgress(value: unknown): number {
             :aria-pressed="props.autoScrollActive ? 'true' : 'false'"
             :title="props.autoScrollActive ? 'Stop auto scroll' : 'Start auto scroll'"
             :disabled="!props.toggleAutoScroll"
-            @click="handleToggleAutoScroll"
+            @click="(event) => handleToggleAutoScroll(event)"
           >
             <component :is="props.autoScrollActive ? Pause : Play" :size="14" />
           </Button>
@@ -398,7 +477,7 @@ function clampProgress(value: unknown): number {
           data-test="cancel-fill-button"
           aria-label="Cancel fill"
           title="Cancel Vibe fill"
-          @click="handleCancelFill"
+          @click="(event) => handleCancelFill(event)"
         >
           <X :size="14" />
         </Button>
@@ -413,7 +492,7 @@ function clampProgress(value: unknown): number {
           :aria-pressed="props.pageLoadingLocked ? 'true' : 'false'"
           :disabled="!props.canTogglePageLoadingLock"
           :title="props.pageLoadingLocked ? 'Unlock Vibe page loading' : 'Lock Vibe page loading'"
-          @click="handleTogglePageLoadingLock"
+          @click="(event) => handleTogglePageLoadingLock(event)"
         >
           <component :is="props.pageLoadingLocked ? LockKeyhole : LockKeyholeOpen" :size="14" />
         </Button>

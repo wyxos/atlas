@@ -223,8 +223,8 @@ describe('FileViewerSheet', () => {
 
         expect(transition.exists()).toBe(true);
         expect(transition.props('appear')).toBe(true);
-        expect(transition.props('enterFromClass')).toContain('translate-x-6');
-        expect(transition.props('leaveToClass')).toContain('translate-x-6');
+        expect(transition.props('enterFromClass')).toContain('translate-x-full');
+        expect(transition.props('leaveToClass')).toContain('translate-x-full');
     });
 
     it('renders saved provider metadata as structured sections', () => {

@@ -92,7 +92,7 @@ watch([triggerElement, wrapperRef], updateTriggerRef, { immediate: true, flush: 
         ref="wrapperRef"
         @click="handleClick"
         @touchend="handleTouchEnd"
-        style="display: block; width: 100%;"
+        style="display: contents;"
     >
         <slot />
     </span>

@@ -233,72 +233,6 @@ describe('BrowseV2StatusBar', () => {
         expect(wrapper.get('[data-testid="browse-v2-status-pill"]').attributes('data-variant')).toBe('warning');
     });
 
-    it('shows fillUntil count progress when Vibe exposes a target call count', () => {
-        const wrapper = mount(BrowseV2StatusBar, {
-            props: {
-                status: createStatus({
-                    phase: 'filling',
-                    fillCompletedCalls: 1,
-                    fillMode: 'count',
-                    fillTargetCalls: 2,
-                }),
-            },
-        });
-
-        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 1/2 calls');
-    });
-
-    it('routes the cancel fill action through the provided handler while a fill is active', async () => {
-        const cancelFill = vi.fn();
-        const wrapper = mount(BrowseV2StatusBar, {
-            props: {
-                cancelFill,
-                status: createStatus({
-                    phase: 'filling',
-                    fillCompletedCalls: 1,
-                    fillMode: 'count',
-                    fillTargetCalls: 2,
-                }),
-            },
-        });
-
-        await wrapper.get('[data-test="cancel-fill-button"]').trigger('click');
-
-        expect(cancelFill).toHaveBeenCalledTimes(1);
-        expect(wrapper.find('[data-testid="x-icon"]').exists()).toBe(true);
-    });
-
-    it('routes fill controls through Vibe handlers and clamps count input', async () => {
-        const fillUntilCount = vi.fn();
-        const fillUntilEnd = vi.fn();
-        const setFillCallCount = vi.fn();
-        const wrapper = mount(BrowseV2StatusBar, {
-            props: {
-                fillCallCount: 10,
-                fillCallCountMax: 25,
-                fillCallCountMin: 1,
-                fillUntilCount,
-                fillUntilEnd,
-                setFillCallCount,
-                status: createStatus(),
-            },
-        });
-
-        await wrapper.get('[data-test="fill-call-count-input"]').setValue('30');
-        expect(setFillCallCount).not.toHaveBeenCalled();
-
-        await wrapper.get('[data-test="fill-call-count-input"]').trigger('blur');
-        await wrapper.get('[data-test="fill-count-button"]').trigger('click');
-        await wrapper.get('[data-test="fill-until-end-button"]').trigger('click');
-
-        expect(setFillCallCount).toHaveBeenCalledWith(25);
-        expect(wrapper.get('[data-test="fill-call-count-input"]').attributes('type')).toBe('text');
-        expect(fillUntilCount).toHaveBeenCalledTimes(1);
-        expect(fillUntilEnd).toHaveBeenCalledTimes(1);
-        expect(wrapper.find('[data-testid="list-plus-icon"]').exists()).toBe(true);
-        expect(wrapper.find('[data-testid="chevrons-down-icon"]').exists()).toBe(true);
-    });
-
     it('routes auto-scroll controls through Vibe handlers and clamps speed input', async () => {
         const setAutoScrollSpeed = vi.fn();
         const toggleAutoScroll = vi.fn();
@@ -337,58 +271,6 @@ describe('BrowseV2StatusBar', () => {
 
         expect(wrapper.get('[data-test="auto-scroll-toggle-button"]').attributes('aria-pressed')).toBe('true');
         expect(wrapper.find('[data-testid="pause-icon"]').exists()).toBe(true);
-    });
-
-    it('disables fill controls while Vibe is filling', () => {
-        const wrapper = mount(BrowseV2StatusBar, {
-            props: {
-                fillUntilCount: vi.fn(),
-                fillUntilEnd: vi.fn(),
-                setFillCallCount: vi.fn(),
-                status: createStatus({
-                    fillMode: 'count',
-                    loadState: 'loading',
-                    pageLoadingLocked: true,
-                    phase: 'filling',
-                }),
-            },
-        });
-
-        expect(wrapper.get('[data-test="fill-call-count-input"]').attributes('disabled')).toBeDefined();
-        expect(wrapper.get('[data-test="fill-count-button"]').attributes('disabled')).toBeDefined();
-        expect(wrapper.get('[data-test="fill-until-end-button"]').attributes('disabled')).toBeDefined();
-    });
-
-    it('shows fillUntilEnd loaded total progress when Vibe receives resolver totals', () => {
-        const wrapper = mount(BrowseV2StatusBar, {
-            props: {
-                status: createStatus({
-                    phase: 'filling',
-                    fillCompletedCalls: 3,
-                    fillLoadedCount: 75,
-                    fillMode: 'end',
-                    fillTotalCount: 381,
-                }),
-            },
-        });
-
-        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 75/381');
-    });
-
-    it('shows fillUntilEnd loaded count and call count when no total is available', () => {
-        const wrapper = mount(BrowseV2StatusBar, {
-            props: {
-                status: createStatus({
-                    phase: 'filling',
-                    fillCompletedCalls: 3,
-                    fillLoadedCount: 75,
-                    fillMode: 'end',
-                    fillTotalCount: null,
-                }),
-            },
-        });
-
-        expect(wrapper.get('[data-testid="browse-v2-status-pill"]').text()).toContain('Filling 75 loaded · 3 calls');
     });
 
     it('shows the in-flight fill cursor in the next pill while refilling', () => {

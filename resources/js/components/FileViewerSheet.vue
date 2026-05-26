@@ -108,12 +108,12 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
 <template>
     <Transition
         appear
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="translate-x-6 opacity-0"
+        enter-active-class="transform-gpu transition-all duration-500 ease-out"
+        enter-from-class="translate-x-full opacity-0"
         enter-to-class="translate-x-0 opacity-100"
-        leave-active-class="transition duration-150 ease-in"
+        leave-active-class="transform-gpu transition-all duration-300 ease-in"
         leave-from-class="translate-x-0 opacity-100"
-        leave-to-class="translate-x-6 opacity-0"
+        leave-to-class="translate-x-full opacity-0"
     >
         <div
             v-if="isOpen"

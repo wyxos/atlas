@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: number]
+  submit: [value: number]
 }>()
 
 const draft = ref(String(clampInteger(props.modelValue)))
@@ -50,11 +51,13 @@ function handleInput(event: Event): void {
   }
 }
 
-function commitDraft(): void {
+function commitDraft(): number {
   const nextValue = clampInteger(Number(draft.value))
   isEditing.value = false
   draft.value = String(nextValue)
   emit('update:modelValue', nextValue)
+
+  return nextValue
 }
 
 function resetDraft(): void {
@@ -68,6 +71,25 @@ function stepValue(direction: -1 | 1): void {
   isEditing.value = false
   draft.value = String(nextValue)
   emit('update:modelValue', nextValue)
+}
+
+function handleSubmit(): void {
+  emit('submit', commitDraft())
+}
+
+function handleStepClick(event: MouseEvent, direction: -1 | 1): void {
+  stepValue(direction)
+  blurMouseActivatedControl(event)
+}
+
+function blurMouseActivatedControl(event: MouseEvent): void {
+  if (event.detail === 0) {
+    return
+  }
+
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.blur()
+  }
 }
 
 function normalizeDraft(value: string): string {
@@ -98,7 +120,7 @@ function clampInteger(value: number): number {
       :disabled="decrementDisabled"
       :aria-label="`Decrease ${ariaLabel}`"
       :title="`Decrease ${title}`"
-      @click="stepValue(-1)"
+      @click="(event) => handleStepClick(event, -1)"
     >
       <Minus :size="12" />
     </Button>
@@ -115,7 +137,7 @@ function clampInteger(value: number): number {
       @focus="handleFocus"
       @input="handleInput"
       @blur="commitDraft"
-      @keydown.enter.prevent="commitDraft"
+      @keydown.enter.prevent="handleSubmit"
       @keydown.escape.prevent="resetDraft"
     >
     <Button
@@ -125,7 +147,7 @@ function clampInteger(value: number): number {
       :disabled="incrementDisabled"
       :aria-label="`Increase ${ariaLabel}`"
       :title="`Increase ${title}`"
-      @click="stepValue(1)"
+      @click="(event) => handleStepClick(event, 1)"
     >
       <Plus :size="12" />
     </Button>
