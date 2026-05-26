@@ -75,7 +75,9 @@ class AudioPlaylistQueryService
                 ->orderBy('playlist_cover_entries.position')
                 ->orderBy('files.id');
         } else {
-            $query->orderBy('files.id');
+            $fileId = $query->min('files.id');
+
+            return is_numeric($fileId) ? (int) $fileId : null;
         }
 
         $fileId = $query->value('files.id');
