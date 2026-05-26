@@ -14,6 +14,8 @@ export function audioDetailFromResponseItem(item: AudioDetailsResponse['items'][
         blacklisted_at: item.blacklisted_at,
         previewed_count: item.previewed_count,
         seen_count: item.seen_count,
+        play_count: item.play_count ?? 0,
+        skip_count: item.skip_count ?? 0,
     };
 }
 
@@ -31,5 +33,7 @@ export function emptyAudioDetail(): AudioDetail {
         blacklisted_at: null,
         previewed_count: 0,
         seen_count: 0,
+        play_count: 0,
+        skip_count: 0,
     };
 }

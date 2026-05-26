@@ -43,6 +43,8 @@ function hydratedQueueTrack(
         blacklistedAt: item.blacklisted_at,
         previewedCount: item.previewed_count,
         seenCount: item.seen_count,
+        playCount: item.play_count ?? 0,
+        skipCount: item.skip_count ?? 0,
     };
 }
 

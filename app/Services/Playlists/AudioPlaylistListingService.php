@@ -4,12 +4,14 @@ namespace App\Services\Playlists;
 
 use App\Models\Playlist;
 use App\Models\User;
+use App\Services\Audio\AudioCoverResolver;
 use Illuminate\Support\Collection;
 
 class AudioPlaylistListingService
 {
     public function __construct(
         private readonly AudioPlaylistQueryService $queryService,
+        private readonly AudioCoverResolver $coverResolver,
     ) {}
 
     /**
@@ -53,8 +55,10 @@ class AudioPlaylistListingService
     /**
      * @return array<string, mixed>
      */
-    private function format(Playlist $playlist): array
+    public function format(Playlist $playlist): array
     {
+        $cover = $this->coverResolver->forPlaylist($playlist);
+
         return [
             'id' => (int) $playlist->id,
             'slug' => $playlist->slug,
@@ -66,6 +70,7 @@ class AudioPlaylistListingService
             'is_editable' => (bool) $playlist->is_editable,
             'is_deletable' => (bool) $playlist->is_deletable,
             'count' => $this->queryService->countForPlaylist($playlist),
+            ...$cover,
         ];
     }
 }

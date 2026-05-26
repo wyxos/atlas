@@ -26,6 +26,8 @@ class Playlist extends Model
         'sort_order',
         'smart_parameters',
         'user_id',
+        'cover_mode',
+        'cover_file_ids',
     ];
 
     protected function casts(): array
@@ -37,6 +39,7 @@ class Playlist extends Model
             'is_system' => 'boolean',
             'is_editable' => 'boolean',
             'is_deletable' => 'boolean',
+            'cover_file_ids' => 'array',
         ];
     }
 

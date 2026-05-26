@@ -3,14 +3,17 @@
 namespace App\Services;
 
 use App\Models\File;
+use App\Services\Audio\AudioCoverResolver;
+use App\Services\Audio\AudioPlaybackStatsService;
 use App\Services\Playlists\AudioPlaylistQueryService;
-use App\Support\FileApiPath;
 
 class AudioIdListingService
 {
     private const string AUDIO_ID_PAGE_INDEX = 'files_mime_type_id_index';
 
     public function __construct(
+        private readonly AudioCoverResolver $coverResolver,
+        private readonly AudioPlaybackStatsService $playbackStats,
         private readonly AudioPlaylistQueryService $playlistQuery,
     ) {}
 
@@ -120,7 +123,9 @@ class AudioIdListingService
      *         reaction: array{type:string}|null,
      *         blacklisted_at: string|null,
      *         previewed_count: int,
-     *         seen_count: int
+     *         seen_count: int,
+     *         play_count: int,
+     *         skip_count: int
      *     }>
      * }
      */
@@ -166,6 +171,9 @@ class AudioIdListingService
             ])
             ->get()
             ->keyBy('id');
+        $statsByFileId = $userId !== null
+            ? $this->playbackStats->forFiles($userId, $ids)
+            : collect();
 
         $items = [];
         foreach ($ids as $id) {
@@ -173,6 +181,7 @@ class AudioIdListingService
             if (! $file) {
                 continue;
             }
+            $stats = $statsByFileId->get($id);
 
             $payload = $file->metadata?->payload;
             if (! is_array($payload)) {
@@ -250,12 +259,14 @@ class AudioIdListingService
                 ),
                 'artists' => $artists,
                 'albums' => $albums,
-                'cover_url' => $this->coverUrl($file),
+                'cover_url' => $this->coverResolver->forFile($file),
                 'duration_seconds' => $this->durationSeconds($file, $payload),
                 'reaction' => $reaction ? ['type' => (string) $reaction->type] : null,
                 'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
                 'previewed_count' => (int) ($file->previewed_count ?? 0),
                 'seen_count' => (int) ($file->seen_count ?? 0),
+                'play_count' => (int) ($stats?->play_count ?? 0),
+                'skip_count' => (int) ($stats?->skip_count ?? 0),
             ];
         }
 
@@ -325,30 +336,6 @@ class AudioIdListingService
         }
 
         return null;
-    }
-
-    private function coverUrl(File $file): ?string
-    {
-        $albumCover = $file->albums
-            ->map(fn ($album) => $album->defaultCover)
-            ->filter()
-            ->first();
-
-        if ($albumCover) {
-            return FileApiPath::albumCover((int) $albumCover->id);
-        }
-
-        if (is_string($file->poster_path) && trim($file->poster_path) !== '') {
-            return FileApiPath::poster((int) $file->id);
-        }
-
-        if (is_string($file->preview_path) && trim($file->preview_path) !== '') {
-            return FileApiPath::preview((int) $file->id);
-        }
-
-        $previewUrl = trim((string) ($file->preview_url ?? ''));
-
-        return $previewUrl !== '' ? $previewUrl : null;
     }
 
     /**

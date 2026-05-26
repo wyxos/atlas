@@ -23,6 +23,7 @@ import { useToast } from '@/components/ui/toast/use-toast';
 import { useAudioMediaSession } from '@/composables/useAudioMediaSession';
 import { useAudioPlaybackEngines } from '@/composables/useAudioPlaybackEngines';
 import { useAudioQueueDetails } from '@/composables/useAudioQueueDetails';
+import { useAudioPlaybackStatsRecorder } from '@/composables/useAudioPlaybackStatsRecorder';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
 import type { ReactionType } from '@/types/reaction';
 
@@ -37,12 +38,11 @@ const touchStartY = ref<number | null>(null);
 const isQueueSheetOpen = audioPlayer.isQueueSheetOpen;
 const toast = useToast();
 const { handleQueueVisibleItemsChange } = useAudioQueueDetails(audioPlayer);
+const { handleTrackNaturallyEnded } = useAudioPlaybackStatsRecorder(audioPlayer);
 
 const MOBILE_ACTIONS_SWIPE_THRESHOLD = 28;
 
-const currentTrack = audioPlayer.currentTrack;
-const currentTrackId = audioPlayer.currentTrackId;
-const isPlaying = audioPlayer.isPlaying;
+const currentTrack = audioPlayer.currentTrack, currentTrackId = audioPlayer.currentTrackId, isPlaying = audioPlayer.isPlaying;
 const hasTrack = computed(() => currentTrack.value !== null);
 const hasFavorite = computed(() => currentTrack.value?.reaction?.type === 'love');
 const hasLike = computed(() => currentTrack.value?.reaction?.type === 'like');
@@ -98,6 +98,7 @@ const {
     teardown,
 } = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds, {
     onSpotifyAuthenticationError: notifySpotifyAuthenticationError,
+    onTrackEnded: handleTrackNaturallyEnded,
     volume: playbackVolume,
 });
 

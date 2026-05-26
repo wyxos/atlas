@@ -21,6 +21,8 @@ const props = defineProps<{
     detailBlacklistedAt: (audioId: number) => string | null;
     detailPreviewedCount: (audioId: number) => number;
     detailSeenCount: (audioId: number) => number;
+    detailPlayCount: (audioId: number) => number;
+    detailSkipCount: (audioId: number) => number;
     detailDuration: (audioId: number) => string;
     selectedAudioId: number | null;
     currentTrackId: number | null;
@@ -104,6 +106,8 @@ defineExpose({
                         :blacklisted-at="detailBlacklistedAt(audioId)"
                         :previewed-count="detailPreviewedCount(audioId)"
                         :seen-count="detailSeenCount(audioId)"
+                        :play-count="detailPlayCount(audioId)"
+                        :skip-count="detailSkipCount(audioId)"
                         :duration="detailDuration(audioId)"
                         :is-selected="selectedAudioId === audioId"
                         :is-current-track="currentTrackId === audioId"

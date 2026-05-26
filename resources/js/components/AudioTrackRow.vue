@@ -18,6 +18,8 @@ const props = defineProps<{
     blacklistedAt: string | null;
     previewedCount: number;
     seenCount: number;
+    playCount: number;
+    skipCount: number;
     duration: string;
     isSelected: boolean;
     isCurrentTrack: boolean;
@@ -74,7 +76,7 @@ const sourceBadgeLabel = computed(() => {
 
 <template>
     <li
-        class="relative grid h-[72px] grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-center gap-2 px-3 text-twilight-indigo-100 transition-colors md:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_minmax(10rem,auto)_5rem] md:gap-4 md:px-4"
+        class="relative grid h-[72px] grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-center gap-2 px-3 text-twilight-indigo-100 transition-colors md:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_minmax(10rem,auto)_5rem] md:gap-4 md:px-4 lg:grid-cols-[3rem_minmax(18rem,32rem)_minmax(12rem,1fr)_7rem_minmax(10rem,auto)_5rem]"
         :class="[
             props.isPlaying ? 'bg-smart-blue-600/95 shadow-[inset_4px_0_0_rgb(219_238_255/0.95)] ring-2 ring-inset ring-smart-blue-100/90 hover:bg-smart-blue-600' : '',
             props.isCurrentTrack && !props.isPlaying ? 'bg-smart-blue-700/90 shadow-[inset_4px_0_0_rgb(123_190_255/0.95)] ring-2 ring-inset ring-smart-blue-100/75 hover:bg-smart-blue-700' : '',
@@ -155,6 +157,10 @@ const sourceBadgeLabel = computed(() => {
                 </div>
             </div>
             <p class="hidden truncate text-sm text-blue-slate-300 md:block" data-test="audio-track-album">{{ props.album }}</p>
+            <p class="hidden text-xs leading-4 tabular-nums text-blue-slate-300 lg:block" data-test="audio-track-playback-counts">
+                <span class="block" data-test="audio-track-play-count">{{ props.playCount }} plays</span>
+                <span class="block" data-test="audio-track-skip-count">{{ props.skipCount }} skips</span>
+            </p>
             <div class="hidden md:block">
                 <FileReactions
                     :file-id="props.audioId"
@@ -185,6 +191,7 @@ const sourceBadgeLabel = computed(() => {
                 </div>
             </div>
             <Skeleton class="hidden h-4 w-2/3 bg-prussian-blue-500/60 md:block" />
+            <Skeleton class="hidden h-8 w-20 bg-prussian-blue-500/60 lg:block" />
             <div
                 class="hidden h-8 w-36 rounded-lg bg-black/40 md:block"
                 aria-hidden="true"

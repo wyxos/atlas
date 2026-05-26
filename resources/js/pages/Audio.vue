@@ -9,6 +9,7 @@ import AudioPlaylistPanelFrame from '../components/AudioPlaylistPanelFrame.vue';
 import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
 import { audioDetailFromResponseItem, emptyAudioDetail } from '../composables/useAudioDetailMapping';
 import { useAudioPlaylistPanelOpenState } from '../composables/useAudioPlaylistPanelOpenState';
+import { useAudioPlaybackStatsEvents } from '../composables/useAudioPlaybackStatsEvents';
 import { useAudioSourceIdentityMaps } from '../composables/useAudioSourceIdentityMaps';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '../composables/useGlobalAudioPlayer';
 import type {
@@ -56,6 +57,7 @@ const playerCurrentTrackId = audioPlayer.currentTrackId;
 const playerIsPlaying = audioPlayer.isPlaying;
 const route = useRoute();
 const router = useRouter();
+useAudioPlaybackStatsEvents(detailsById);
 
 const {
     detailAlbum,
@@ -64,8 +66,10 @@ const {
     detailCoverUrl,
     detailDuration,
     detailPreviewedCount,
+    detailPlayCount,
     detailReaction,
     detailSeenCount,
+    detailSkipCount,
     detailSource,
     detailTitle,
     hasDetails,
@@ -249,6 +253,8 @@ function audioPlayerTrack(audioId: number): AudioPlayerTrack {
         blacklistedAt: detailBlacklistedAt(audioId),
         previewedCount: detailPreviewedCount(audioId),
         seenCount: detailSeenCount(audioId),
+        playCount: details?.play_count ?? 0,
+        skipCount: details?.skip_count ?? 0,
         playbackUrl: `/api/files/${audioId}/serve`,
     };
 }
@@ -541,6 +547,8 @@ onUnmounted(() => {
                     :detail-blacklisted-at="detailBlacklistedAt"
                     :detail-previewed-count="detailPreviewedCount"
                     :detail-seen-count="detailSeenCount"
+                    :detail-play-count="detailPlayCount"
+                    :detail-skip-count="detailSkipCount"
                     :detail-duration="detailDuration"
                     :selected-audio-id="selectedAudioId"
                     :current-track-id="playerCurrentTrackId"

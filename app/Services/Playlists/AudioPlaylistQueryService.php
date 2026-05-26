@@ -42,16 +42,69 @@ class AudioPlaylistQueryService
 
     public function countForPlaylist(Playlist $playlist): int
     {
+        $query = $this->queryForPlaylist($playlist);
+
+        return (int) $query->count();
+    }
+
+    public function queryForPlaylist(Playlist $playlist): Builder
+    {
         $query = $this->baseAudioQuery();
-        $this->applyPlaylistData(
+
+        return $this->applyPlaylistData(
             $query,
             (string) $playlist->membership_mode,
             $playlist->membership_rules,
             (int) $playlist->id,
             (int) $playlist->user_id,
         );
+    }
 
-        return (int) $query->count();
+    public function firstFileIdForPlaylist(Playlist $playlist): ?int
+    {
+        $query = $this->queryForPlaylist($playlist);
+
+        if ($playlist->membership_mode === 'manual') {
+            $query
+                ->join('file_playlist as playlist_cover_entries', function ($join) use ($playlist): void {
+                    $join
+                        ->on('playlist_cover_entries.file_id', '=', 'files.id')
+                        ->where('playlist_cover_entries.playlist_id', (int) $playlist->id);
+                })
+                ->orderByRaw('playlist_cover_entries.position IS NULL')
+                ->orderBy('playlist_cover_entries.position')
+                ->orderBy('files.id');
+        } else {
+            $query->orderBy('files.id');
+        }
+
+        $fileId = $query->value('files.id');
+
+        return is_numeric($fileId) ? (int) $fileId : null;
+    }
+
+    public function randomFileIdForPlaylist(Playlist $playlist): ?int
+    {
+        $baseQuery = $this->queryForPlaylist($playlist);
+        $maxId = (int) (clone $baseQuery)->max('files.id');
+
+        if ($maxId <= 0) {
+            return null;
+        }
+
+        $startId = random_int(1, $maxId);
+        $fileId = (clone $baseQuery)
+            ->where('files.id', '>=', $startId)
+            ->orderBy('files.id')
+            ->value('files.id');
+
+        if (! is_numeric($fileId)) {
+            $fileId = (clone $baseQuery)
+                ->orderBy('files.id')
+                ->value('files.id');
+        }
+
+        return is_numeric($fileId) ? (int) $fileId : null;
     }
 
     private function applyPlaylistData(

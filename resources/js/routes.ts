@@ -33,7 +33,9 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/audio',
-        redirect: '/playlists/all',
+        name: 'audio-playlists',
+        component: () => import('./pages/AudioPlaylists.vue'),
+        meta: { layout: 'DashboardLayout' },
     },
     {
         path: '/playlists/:playlistSlug',

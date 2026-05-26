@@ -3,6 +3,7 @@
 use App\Models\Album;
 use App\Models\AlbumCover;
 use App\Models\Artist;
+use App\Models\AudioTrackStat;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
@@ -112,6 +113,12 @@ test('authenticated user can fetch audio details batch for ids', function () {
         'user_id' => $user->id,
         'type' => 'like',
     ]);
+    AudioTrackStat::query()->create([
+        'file_id' => $audio->id,
+        'play_count' => 3,
+        'skip_count' => 1,
+        'user_id' => $user->id,
+    ]);
 
     $response = $this->actingAs($user)->postJson('/api/audio/details', [
         'ids' => [$audio->id],
@@ -134,6 +141,8 @@ test('authenticated user can fetch audio details batch for ids', function () {
                 'blacklisted_at' => null,
                 'previewed_count' => 12,
                 'seen_count' => 4,
+                'play_count' => 3,
+                'skip_count' => 1,
             ],
         ],
     ]);

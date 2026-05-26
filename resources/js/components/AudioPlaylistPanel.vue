@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { Music } from 'lucide-vue-next';
 import type { AudioPlaylist, AudioPlaylistSection } from '@/types/audio';
 
 const props = defineProps<{
@@ -53,8 +54,23 @@ const visibleSections = computed(() => props.sections.filter((section) => sectio
                         data-test="audio-playlist-option"
                         @click="emit('select', playlist)"
                     >
-                        <span class="min-w-0">
-                            <span class="block truncate text-sm font-medium text-regal-navy-100">{{ playlist.name }}</span>
+                        <span class="flex min-w-0 items-center gap-3">
+                            <span
+                                class="flex size-10 shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500/70"
+                                data-test="audio-playlist-cover"
+                            >
+                                <img
+                                    v-if="playlist.cover_url"
+                                    :src="playlist.cover_url"
+                                    alt=""
+                                    class="h-full w-full object-cover"
+                                    loading="lazy"
+                                >
+                                <Music v-else class="size-4 text-blue-slate-300" />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-medium text-regal-navy-100">{{ playlist.name }}</span>
+                            </span>
                         </span>
                         <span class="shrink-0 text-xs tabular-nums text-blue-slate-300 group-hover:text-regal-navy-100">
                             {{ playlist.count }}

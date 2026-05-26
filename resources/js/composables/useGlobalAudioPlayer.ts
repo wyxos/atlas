@@ -17,8 +17,20 @@ export type AudioPlayerTrack = {
     blacklistedAt: string | null;
     previewedCount: number;
     seenCount: number;
+    playCount?: number;
+    skipCount?: number;
     playbackUrl: string;
 };
+
+export type AudioPlaybackStatsEventDetail = {
+    file_id: number;
+    last_played_at: string | null;
+    last_skipped_at: string | null;
+    play_count: number;
+    skip_count: number;
+};
+
+export const AUDIO_PLAYBACK_STATS_EVENT = 'atlas:audio-playback-stats';
 
 type AudioQueueOptions = {
     queueLabel?: string | null;
@@ -73,6 +85,8 @@ function withPlaybackUrl(track: Omit<AudioPlayerTrack, 'playbackUrl'> & { playba
         source: track.source ?? null,
         sourceId: track.sourceId ?? null,
         spotifyUri: track.spotifyUri ?? null,
+        playCount: track.playCount ?? 0,
+        skipCount: track.skipCount ?? 0,
         playbackUrl: track.playbackUrl ?? serve.url(track.id),
     };
 }

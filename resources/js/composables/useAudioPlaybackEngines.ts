@@ -19,7 +19,7 @@ const SPOTIFY_START_POSITION_TOLERANCE_SECONDS = 3;
 const SPOTIFY_POLL_START_ADVANCE_SECONDS = 0.25;
 const SPOTIFY_START_STALE_GUARD_SECONDS = 6;
 type GlobalAudioPlayer = ReturnType<typeof useGlobalAudioPlayer>;
-type AudioPlaybackEngineOptions = { onSpotifyAuthenticationError?: (message: string) => void; volume?: Ref<number> };
+type AudioPlaybackEngineOptions = { onSpotifyAuthenticationError?: (message: string) => void; onTrackEnded?: (trackId: number) => void; volume?: Ref<number> };
 type SpotifyPendingStart = { correctedStalePosition: boolean; observedFreshPlaybackAt: number | null; playConfirmedAt: number | null; positionSeconds: number; requestedAt: number; uri: string };
 export function useAudioPlaybackEngines(
     audioPlayer: GlobalAudioPlayer,
@@ -439,12 +439,8 @@ export function useAudioPlaybackEngines(
     async function startCurrentPlayback(): Promise<void> {
         const token = ++playbackToken;
         const track = audioPlayer.currentTrack.value;
-        const trackChanged = track?.id !== displayedTrackId;
+        if (track?.id !== displayedTrackId) { resetDisplayedPlaybackPosition(track); }
         displayedTrackId = track?.id ?? null;
-
-        if (trackChanged) {
-            resetDisplayedPlaybackPosition(track);
-        }
 
         mediaDuration.value = track?.durationSeconds ?? 0;
         syncPlaybackPositionFromPlayer();
@@ -568,6 +564,7 @@ export function useAudioPlaybackEngines(
 
     function handleEnded(): void {
         const endedTrackId = audioPlayer.currentTrackId.value;
+        if (endedTrackId !== null) { options.onTrackEnded?.(endedTrackId); }
 
         if (audioPlayer.repeatMode.value === 'one') {
             restartCurrentTrackPosition();

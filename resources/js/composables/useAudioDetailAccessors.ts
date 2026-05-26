@@ -41,8 +41,10 @@ export function useAudioDetailAccessors(
         detailCoverUrl: (audioId: number) => detailsById.value[audioId]?.cover_url ?? null,
         detailDuration,
         detailPreviewedCount: (audioId: number) => detailsById.value[audioId]?.previewed_count ?? 0,
+        detailPlayCount: (audioId: number) => detailsById.value[audioId]?.play_count ?? 0,
         detailReaction: (audioId: number): { type: ReactionType } | null => detailsById.value[audioId]?.reaction ?? null,
         detailSeenCount: (audioId: number) => detailsById.value[audioId]?.seen_count ?? 0,
+        detailSkipCount: (audioId: number) => detailsById.value[audioId]?.skip_count ?? 0,
         detailSource,
         detailTitle: (audioId: number) => {
             const title = detailsById.value[audioId]?.title;

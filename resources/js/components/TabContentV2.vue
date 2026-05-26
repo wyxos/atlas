@@ -525,7 +525,7 @@ watch(
         :handle-reaction="handleReaction"
         :file-sheet-state="fileSheet.state"
         :file-sheet-item="fileSheet.item"
-        :file-sheet-presentation="fileSheet.presentation"
+        :file-sheet-presentation="fileSheet.presentation.value"
         :current-visible-item="currentVisibleItem"
         :file-viewer-data="syncedFileViewerData"
         :open-file-sheet="fileSheet.open" :open-file-sheet-for-item="fileSheet.openForItem"

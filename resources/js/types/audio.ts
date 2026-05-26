@@ -33,6 +33,8 @@ export type AudioDetailsResponse = {
         blacklisted_at: string | null;
         previewed_count: number;
         seen_count: number;
+        play_count?: number;
+        skip_count?: number;
     }>;
 };
 
@@ -51,6 +53,10 @@ export type AudioPlaylist = {
     is_editable: boolean;
     is_deletable: boolean;
     count: number;
+    cover_mode: 'first_track' | 'custom' | 'random_track';
+    cover_url: string | null;
+    cover_file_id: number | null;
+    cover_file_ids: number[];
 };
 
 export type AudioPlaylistSection = {

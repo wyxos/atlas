@@ -117,8 +117,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/dashboard/metrics', DashboardMetricsController::class)->name('api.dashboard.metrics');
     Route::get('/api/files', [\App\Http\Controllers\FilesController::class, 'index'])->name('api.files.index');
     Route::get('/api/audio/playlists', [\App\Http\Controllers\AudioPlaylistController::class, 'index'])->name('api.audio.playlists.index');
+    Route::patch('/api/audio/playlists/{playlist}/cover', [\App\Http\Controllers\AudioPlaylistController::class, 'updateCover'])->name('api.audio.playlists.cover.update');
     Route::get('/api/audio/ids', [\App\Http\Controllers\AudioController::class, 'ids'])->name('api.audio.ids');
     Route::post('/api/audio/details', [\App\Http\Controllers\AudioController::class, 'details'])->name('api.audio.details');
+    Route::post('/api/audio/playback-events', [\App\Http\Controllers\AudioPlaybackEventController::class, 'store'])->name('api.audio.playback-events.store');
     Route::get('/api/audio/album-covers/{albumCover}', [\App\Http\Controllers\AlbumCoverController::class, 'show'])->name('api.audio.album-covers.show');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::post('/api/files/{file}/refresh-source-media', [\App\Http\Controllers\FilesController::class, 'refreshSourceMedia'])->name('api.files.refresh-source-media');

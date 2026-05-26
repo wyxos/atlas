@@ -175,6 +175,11 @@ class File extends Model
         return $this->hasMany(Reaction::class);
     }
 
+    public function audioTrackStats(): HasMany
+    {
+        return $this->hasMany(AudioTrackStat::class);
+    }
+
     public function moderationActions(): HasMany
     {
         return $this->hasMany(FileModerationAction::class);
