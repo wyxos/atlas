@@ -47,34 +47,46 @@ class FilePreviewService
             ->pluck('id')
             ->map(fn (mixed $fileId): int => (int) $fileId)
             ->all();
+        $mutableFiles = $files
+            ->reject(fn (File $file): bool => $file->blacklisted_at !== null && (int) $file->previewed_count >= self::FEED_REMOVED_PREVIEW_COUNT)
+            ->values();
+
+        if ($mutableFiles->isEmpty()) {
+            return $this->formatResults($fileIds, $userId);
+        }
+
+        $mutableFileIds = $mutableFiles
+            ->pluck('id')
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->all();
         $metrics = app(MetricsService::class);
 
-        $metrics->applyPreviewIncrement($fileIds);
-        $metrics->applyBlacklistedFeedRemovedMark($fileIds);
+        $metrics->applyPreviewIncrement($mutableFileIds);
+        $metrics->applyBlacklistedFeedRemovedMark($mutableFileIds);
 
         File::query()
-            ->whereIn('id', $fileIds)
+            ->whereIn('id', $mutableFileIds)
             ->increment('previewed_count', max(1, $increments));
 
         File::query()
-            ->whereIn('id', $fileIds)
+            ->whereIn('id', $mutableFileIds)
             ->update(['previewed_at' => now()]);
 
         $freshFiles = File::query()
-            ->whereIn('id', $fileIds)
+            ->whereIn('id', $mutableFileIds)
             ->get()
             ->keyBy('id');
 
         $currentUserReactions = Reaction::query()
             ->where('user_id', $userId)
-            ->whereIn('file_id', $fileIds)
+            ->whereIn('file_id', $mutableFileIds)
             ->get()
             ->keyBy('file_id');
 
         $filesToAutoBlacklist = [];
         $blacklistedFileIdsToMarkRemoved = [];
 
-        foreach ($fileIds as $fileId) {
+        foreach ($mutableFileIds as $fileId) {
             /** @var File|null $file */
             $file = $freshFiles->get($fileId);
             if (! $file) {
@@ -119,7 +131,7 @@ class FilePreviewService
                 ]);
         }
 
-        $this->libraryIndexSyncDispatcher->filesAndReactions($fileIds);
+        $this->libraryIndexSyncDispatcher->filesAndReactions($mutableFileIds);
 
         return $this->formatResults($fileIds, $userId);
     }
