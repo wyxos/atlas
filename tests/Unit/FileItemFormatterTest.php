@@ -235,6 +235,32 @@ it('extracts prompt text from nested metadata payloads', function () {
     ]);
 });
 
+it('formats detail metadata prompts before listing metadata prompts', function () {
+    $file = formatterFile([
+        'id' => 108,
+        'mime_type' => 'image/jpeg',
+        'url' => 'https://image.civitai.com/example/detail.jpeg',
+        'preview_url' => 'https://image.civitai.com/example/detail-preview.jpeg',
+        'detail_metadata' => [
+            'prompt' => 'detail prompt',
+        ],
+        'listing_metadata' => [
+            'meta' => [
+                'prompt' => 'listing prompt',
+                'meta' => [
+                    'prompt' => 'nested listing prompt',
+                ],
+            ],
+        ],
+    ]);
+
+    $items = FileItemFormatter::format([$file], 1);
+
+    expect($items[0]['metadata'])->toBe([
+        'prompt' => 'detail prompt',
+    ]);
+});
+
 it('includes minimal source access state for DeviantArt watcher-gated library items', function () {
     $file = formatterFile([
         'id' => 107,

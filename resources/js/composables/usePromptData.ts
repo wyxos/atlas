@@ -9,27 +9,53 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
     const promptDataCache = ref<Map<number, string>>(new Map());
     const promptDialogOpen = ref<boolean>(false);
     const promptDialogItemId = ref<number | null>(null);
-    type ItemMetadata = {
+    type PromptNode = {
         prompt?: unknown;
-        meta?: {
-            prompt?: unknown;
-        } | null;
+        meta?: PromptNode | null;
     };
 
-    function extractPrompt(metadata?: ItemMetadata | null): string | null {
+    type FilePromptPayload = {
+        metadata?: {
+            payload?: PromptNode | null;
+        } | null;
+        detail_metadata?: PromptNode | null;
+        listing_metadata?: PromptNode | null;
+    };
+
+    function hasPromptNode(value: unknown): value is PromptNode {
+        return typeof value === 'object' && value !== null;
+    }
+
+    function filledPrompt(value: unknown): string | null {
+        return typeof value === 'string' && value !== '' ? value : null;
+    }
+
+    function extractPrompt(metadata?: PromptNode | null): string | null {
         if (!metadata || typeof metadata !== 'object') {
             return null;
         }
 
-        if (typeof metadata.prompt === 'string' && metadata.prompt !== '') {
-            return metadata.prompt;
+        return filledPrompt(metadata.prompt)
+            ?? (hasPromptNode(metadata.meta) ? filledPrompt(metadata.meta.prompt) : null);
+    }
+
+    function extractListingPrompt(metadata?: PromptNode | null): string | null {
+        if (!hasPromptNode(metadata) || !hasPromptNode(metadata.meta)) {
+            return null;
         }
 
-        if (metadata.meta && typeof metadata.meta === 'object' && typeof metadata.meta.prompt === 'string' && metadata.meta.prompt !== '') {
-            return metadata.meta.prompt;
+        return filledPrompt(metadata.meta.prompt)
+            ?? (hasPromptNode(metadata.meta.meta) ? filledPrompt(metadata.meta.meta.prompt) : null);
+    }
+
+    function extractFilePrompt(file?: FilePromptPayload | null): string | null {
+        if (!file) {
+            return null;
         }
 
-        return null;
+        return extractPrompt(file.metadata?.payload)
+            ?? filledPrompt(file.detail_metadata?.prompt)
+            ?? extractListingPrompt(file.listing_metadata);
     }
 
     // Load prompt data for an item (from metadata or API)
@@ -40,7 +66,7 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
         }
 
         // Check if prompt is already in metadata
-        const metadata = item.metadata as ItemMetadata | undefined;
+        const metadata = item.metadata as PromptNode | undefined;
         const cachedPrompt = extractPrompt(metadata);
         if (cachedPrompt) {
             promptDataCache.value.set(item.id, cachedPrompt);
@@ -55,12 +81,8 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
         promptDataLoading.value.set(item.id, true);
         try {
             const { data } = await window.axios.get(`/api/files/${item.id}`);
-            const file = data?.file;
-            // Check metadata payload (JSON) or detail_metadata
-            const metadataPayload = file?.metadata?.payload as ItemMetadata | undefined;
-            const prompt = extractPrompt(metadataPayload)
-                ?? extractPrompt(file?.detail_metadata as ItemMetadata | undefined)
-                ?? extractPrompt(file?.listing_metadata as ItemMetadata | undefined);
+            const file = data?.file as FilePromptPayload | undefined;
+            const prompt = extractFilePrompt(file);
             if (prompt) {
                 promptDataCache.value.set(item.id, prompt);
                 return prompt;
@@ -76,7 +98,7 @@ export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
 
     // Get prompt data for display (from cache or metadata)
     function getPromptData(item: FeedItem): string | null {
-        const metadata = item.metadata as ItemMetadata | undefined;
+        const metadata = item.metadata as PromptNode | undefined;
         return promptDataCache.value.get(item.id) || extractPrompt(metadata);
     }
 

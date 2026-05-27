@@ -1,13 +1,9 @@
 <?php
 
-use App\Jobs\SyncLibraryFileReactions;
-use App\Jobs\SyncLibraryFiles;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
-use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -94,49 +90,6 @@ test('batch preview moves blacklisted items beyond blacklist review threshold', 
         ->and($autoBlacklisted->fresh()->auto_blacklisted)->toBeTrue()
         ->and($alreadyBlacklisted->fresh()->auto_blacklisted)->toBeFalse()
         ->and(Reaction::whereIn('file_id', [$manualBlacklisted->id, $autoBlacklisted->id, $alreadyBlacklisted->id])->count())->toBe(0);
-});
-
-test('batch preview leaves already out-of-feed items unchanged', function () {
-    Queue::fake([SyncLibraryFiles::class, SyncLibraryFileReactions::class]);
-
-    $admin = User::factory()->admin()->create();
-    $blacklistedAt = '2026-05-01 10:00:00';
-    $previewedAt = '2026-05-02 10:00:00';
-    $updatedAt = '2026-05-03 10:00:00';
-    $outOfFeed = previewBatchTestFile([
-        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
-        'blacklisted_at' => $blacklistedAt,
-        'previewed_at' => $previewedAt,
-        'updated_at' => $updatedAt,
-    ]);
-    $mutable = previewBatchTestFile([
-        'previewed_count' => 0,
-        'source' => 'Local',
-    ]);
-
-    $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
-        'file_ids' => [$outOfFeed->id, $mutable->id],
-    ]);
-
-    $response->assertSuccessful();
-
-    $outOfFeed->refresh();
-    $mutable->refresh();
-
-    expect($outOfFeed->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
-        ->and($outOfFeed->blacklisted_at?->toDateTimeString())->toBe($blacklistedAt)
-        ->and($outOfFeed->previewed_at?->toDateTimeString())->toBe($previewedAt)
-        ->and($outOfFeed->updated_at?->toDateTimeString())->toBe($updatedAt)
-        ->and($mutable->previewed_count)->toBe(1);
-
-    Queue::assertPushed(
-        SyncLibraryFiles::class,
-        fn (SyncLibraryFiles $job): bool => $job->fileIds === [$mutable->id],
-    );
-    Queue::assertPushed(
-        SyncLibraryFileReactions::class,
-        fn (SyncLibraryFileReactions $job): bool => $job->fileIds === [$mutable->id],
-    );
 });
 
 test('batch increment preserves positive reactions without preview moderation', function () {

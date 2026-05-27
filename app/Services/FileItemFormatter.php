@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Container;
 use App\Models\File;
+use App\Services\Moderation\FilePromptResolver;
 use App\Services\SourceMedia\SourceMediaRefreshService;
 use App\Services\SourceMedia\SourceWatchRefreshService;
 use App\Support\ContainerBrowseTabPayload;
@@ -158,6 +159,7 @@ class FileItemFormatter
         $index = 0;
         $sourceMediaRefreshes = app(SourceMediaRefreshService::class);
         $sourceWatchRefreshes = app(SourceWatchRefreshService::class);
+        $promptResolver = app(FilePromptResolver::class);
 
         foreach ($files as $file) {
             // Only extract essential metadata properties needed for masonry display
@@ -170,14 +172,7 @@ class FileItemFormatter
             $width = (int) ($metadata['width'] ?? ($listing['width'] ?? 500));
             $height = (int) ($metadata['height'] ?? ($listing['height'] ?? 500));
 
-            // Support both the normalized payload and older nested CivitAI payloads.
-            $prompt = data_get($metadata, 'prompt')
-                ?? data_get($metadata, 'meta.prompt')
-                ?? data_get($listing, 'meta.prompt')
-                ?? data_get($listing, 'meta.meta.prompt');
-            if (! is_string($prompt) || trim($prompt) === '') {
-                $prompt = null;
-            }
+            $prompt = $promptResolver->resolve($file);
 
             // Ensure containers relation is loaded (even if empty)
             if (! $file->relationLoaded('containers')) {

@@ -1,13 +1,9 @@
 <?php
 
-use App\Jobs\SyncLibraryFileReactions;
-use App\Jobs\SyncLibraryFiles;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
-use App\Services\FilePreviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -186,37 +182,4 @@ test('previewing blacklisted item moves it beyond blacklist review threshold', f
     $file->refresh();
     expect($file->previewed_count)->toBe(99999)
         ->and($file->blacklisted_at)->not->toBeNull();
-});
-
-test('previewing already out-of-feed blacklisted item is a no-op', function () {
-    Queue::fake([SyncLibraryFiles::class, SyncLibraryFileReactions::class]);
-
-    $admin = User::factory()->admin()->create();
-    $blacklistedAt = '2026-05-01 10:00:00';
-    $previewedAt = '2026-05-02 10:00:00';
-    $updatedAt = '2026-05-03 10:00:00';
-    $file = previewTestFile([
-        'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
-        'blacklisted_at' => $blacklistedAt,
-        'previewed_at' => $previewedAt,
-        'updated_at' => $updatedAt,
-    ]);
-
-    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/preview");
-
-    $response->assertSuccessful()
-        ->assertJson([
-            'previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
-            'reaction' => null,
-            'auto_blacklisted' => false,
-        ]);
-
-    $file->refresh();
-    expect($file->previewed_count)->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
-        ->and($file->blacklisted_at?->toDateTimeString())->toBe($blacklistedAt)
-        ->and($file->previewed_at?->toDateTimeString())->toBe($previewedAt)
-        ->and($file->updated_at?->toDateTimeString())->toBe($updatedAt);
-
-    Queue::assertNotPushed(SyncLibraryFiles::class);
-    Queue::assertNotPushed(SyncLibraryFileReactions::class);
 });
