@@ -76,13 +76,8 @@ class Browser
             && (string) ($params['service'] ?? '') === ''
             && (string) ($params['source'] ?? '') === $requestedService;
 
-        // If we're starting a new browse session (page=1), clear the tab's existing file attachments.
-        // This keeps tab history consistent and prevents results from accumulating across new searches.
-        // Note: we do this even if the upcoming fetch returns zero items.
         $pageParam = request()->input('page', 1);
-        if ($tabId && (string) $pageParam === '1') {
-            $this->detachFilesFromTab((int) $tabId);
-        }
+        $shouldDetachTabFiles = $tabId && (string) $pageParam === '1';
 
         // Resolve service instance
         // If local mode, use LocalService; otherwise use the selected service
@@ -206,11 +201,15 @@ class Browser
 
         // Attach filtered files to tab if tab_id is provided and not in local mode
         // Local mode doesn't attach files to tabs as they get updated every time
-        if ($tabId && ! $isLocalMode) {
+        if ($tabId && $shouldDetachTabFiles && $serviceError === null) {
+            $this->detachFilesFromTab((int) $tabId);
+        }
+
+        if ($tabId && ! $isLocalMode && $serviceError === null) {
             $this->attachFilesToTab($tabId, $persisted);
         }
 
-        if ($tabId) {
+        if ($tabId && $serviceError === null) {
             // Update tab's params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation.
 

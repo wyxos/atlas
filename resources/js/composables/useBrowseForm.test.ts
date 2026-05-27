@@ -138,6 +138,38 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.serviceFilters.postId).toBe(321);
     });
 
+    it('does not hydrate saved next cursor state as a service filter', () => {
+        const form = createBrowseForm();
+        form.reset();
+
+        const tab: TabData = {
+            id: 7,
+            label: 'DeviantArt tab',
+            position: 0,
+            isActive: true,
+            params: {
+                service: 'deviantart-images',
+                feed: 'online',
+                source: 'all',
+                page: 220,
+                next: 80,
+                nsfw: 1,
+                serviceFiltersByKey: {
+                    'deviantart-images': {
+                        page: 220,
+                        limit: 20,
+                    },
+                },
+            } as any,
+        };
+
+        form.syncFromTab(tab);
+
+        expect(form.data.page).toBe(220);
+        expect(form.data.serviceFilters.nsfw).toBe(1);
+        expect(form.data.serviceFilters.next).toBeUndefined();
+    });
+
     it('does not let online service cache override local limit and preset', () => {
         const form = createBrowseForm();
         form.reset();

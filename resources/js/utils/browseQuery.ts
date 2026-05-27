@@ -5,6 +5,7 @@ const RESERVED_BROWSE_QUERY_KEYS = new Set([
     'tab_id',
     'page',
     'limit',
+    'next',
     'serviceFilters',
 ]);
 

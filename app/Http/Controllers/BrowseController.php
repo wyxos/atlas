@@ -33,6 +33,23 @@ class BrowseController extends Controller
             ], 503, self::NO_STORE_HEADERS);
         }
 
+        if (isset($payload['error']) && is_array($payload['error'])) {
+            return response()->json([
+                'message' => $this->browseServiceErrorMessage($payload['error']),
+                'service' => $payload['filter']['service'] ?? null,
+                'reason' => 'browse_service_error',
+                'items' => [],
+                'nextPage' => null,
+                'total' => $payload['meta']['total'] ?? null,
+                'services' => $payload['services'] ?? [],
+                'moderation' => $payload['moderation'] ?? [
+                    'toBlacklist' => [],
+                    'moderatedOut' => [],
+                ],
+                'error' => $payload['error'],
+            ], 502, self::NO_STORE_HEADERS);
+        }
+
         // FileItemFormatter already sets index, page, and key for each item
         return response()->json([
             'items' => $payload['items'],
@@ -45,6 +62,20 @@ class BrowseController extends Controller
             ],
             'error' => $payload['error'] ?? null,
         ], headers: self::NO_STORE_HEADERS);
+    }
+
+    /**
+     * @param  array<string, mixed>  $error
+     */
+    private function browseServiceErrorMessage(array $error): string
+    {
+        $message = $error['message'] ?? null;
+
+        if (is_string($message) && trim($message) !== '') {
+            return trim($message);
+        }
+
+        return 'Browse service unavailable';
     }
 
     /**

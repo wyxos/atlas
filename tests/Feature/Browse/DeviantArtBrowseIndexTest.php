@@ -96,6 +96,47 @@ test('authenticated user can browse DeviantArt images through the official API s
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/deviation/download/'));
 });
 
+test('DeviantArt browse retries one transient connection timeout', function () {
+    config([
+        'services.deviantart.max_retries' => 1,
+    ]);
+
+    $user = User::factory()->create();
+    DeviantArtToken::query()->create([
+        'user_id' => $user->id,
+        'access_token' => 'connected-access-token',
+        'refresh_token' => 'connected-refresh-token',
+        'scope' => 'browse user',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    Http::fakeSequence('https://www.deviantart.com/api/v1/oauth2/browse/home*')
+        ->pushFailedConnection('cURL error 28: Resolving timed out after 4000 milliseconds')
+        ->push([
+            'has_more' => false,
+            'results' => [[
+                'deviationid' => '52BAFA97-9DB9-0E5F-FF2D-C39083F89817',
+                'url' => 'https://www.deviantart.com/artist/art/Astana-Hotel-487117484',
+                'title' => 'Astana Hotel',
+                'author' => [
+                    'username' => 'artist',
+                ],
+                'content' => [
+                    'src' => 'https://fc.example.test/content.jpg',
+                    'height' => 1200,
+                    'width' => 1600,
+                ],
+            ]],
+        ], 200);
+
+    $response = $this->actingAs($user)->getJson('/api/browse?service=deviantart-images&limit=20');
+
+    $response->assertSuccessful();
+    $response->assertJsonCount(1, 'items');
+
+    Http::assertSentCount(2);
+});
+
 test('DeviantArt browse stores listing media and does not resolve original downloads', function () {
     config([
         'services.deviantart.user_agent' => 'AtlasTest/1.0',

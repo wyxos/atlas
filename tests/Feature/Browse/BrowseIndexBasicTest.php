@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\DeviantArtToken;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -346,24 +348,53 @@ test('browse handles service errors gracefully', function () {
 
 });
 
-test('browse returns empty items array when service fails', function () {
+test('browse service connection failures return a server error without poisoning saved tab pagination', function () {
 
     $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => [
+            'feed' => 'online',
+            'service' => 'deviantart-images',
+            'page' => 200,
+            'next' => 80,
+            'serviceFiltersByKey' => [
+                'deviantart-images' => [
+                    'limit' => 20,
+                    'nsfw' => 1,
+                    'page' => 200,
+                ],
+            ],
+        ],
+    ]);
+    DeviantArtToken::query()->create([
+        'user_id' => $user->id,
+        'access_token' => 'connected-access-token',
+        'refresh_token' => 'connected-refresh-token',
+        'scope' => 'browse user',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    config([
+        'services.deviantart.max_retries' => 0,
+    ]);
 
     Http::fake([
 
-        '*' => Http::throw(fn () => new \Illuminate\Http\Client\ConnectionException('Connection failed')),
+        'https://www.deviantart.com/api/v1/oauth2/browse/home*' => Http::failedConnection('cURL error 28: Resolving timed out after 4000 milliseconds'),
 
     ]);
 
-    $response = $this->actingAs($user)->getJson('/api/browse');
+    $response = $this->actingAs($user)->getJson("/api/browse?feed=online&tab_id={$tab->id}&service=deviantart-images&page=220&limit=20&nsfw=1");
 
-    $response->assertSuccessful();
+    $response->assertStatus(502);
 
-    $data = $response->json();
+    $response->assertJsonPath('message', 'Unable to connect to service');
+    $response->assertJsonPath('reason', 'browse_service_error');
+    $response->assertJsonPath('nextPage', null);
 
-    expect($data['items'])->toBeArray();
+    $tab->refresh();
 
-    expect($data['items'])->toBeEmpty();
+    expect($tab->params['page'])->toBe(200);
+    expect($tab->params['next'])->toBe(80);
 
 });

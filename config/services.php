@@ -54,6 +54,9 @@ return [
         'authorize_url' => env('DEVIANTART_AUTHORIZE_URL', 'https://www.deviantart.com/oauth2/authorize'),
         'token_url' => env('DEVIANTART_TOKEN_URL', 'https://www.deviantart.com/oauth2/token'),
         'api_base_url' => env('DEVIANTART_API_BASE_URL', 'https://www.deviantart.com/api/v1/oauth2'),
+        'connect_timeout' => env('DEVIANTART_CONNECT_TIMEOUT', 6),
+        'timeout' => env('DEVIANTART_TIMEOUT', 12),
+        'max_retries' => env('DEVIANTART_MAX_RETRIES', 1),
     ],
 
     'spotify' => [

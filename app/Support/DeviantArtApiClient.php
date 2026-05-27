@@ -77,11 +77,11 @@ class DeviantArtApiClient
             fn () => Http::withToken($token)
                 ->withHeaders($this->headers())
                 ->acceptJson()
-                ->connectTimeout(4)
-                ->timeout(8),
+                ->connectTimeout($this->configInt('connect_timeout', 6, 1, 30))
+                ->timeout($this->configInt('timeout', 12, 1, 60)),
             $url,
             $query,
-            maxRetries: 0,
+            maxRetries: $this->configInt('max_retries', 1, 0, 5),
         );
 
         if ($response->status() === 429) {
@@ -148,6 +148,14 @@ class DeviantArtApiClient
             'Accept-Encoding' => 'gzip',
             'User-Agent' => config('services.deviantart.user_agent', 'Atlas/1.0 (+https://www.deviantart.com)'),
         ];
+    }
+
+    private function configInt(string $key, int $default, int $min, int $max): int
+    {
+        $value = config("services.deviantart.{$key}", $default);
+        $integer = is_numeric($value) ? (int) $value : $default;
+
+        return max($min, min($max, $integer));
     }
 
     private function emptyResponse(): array

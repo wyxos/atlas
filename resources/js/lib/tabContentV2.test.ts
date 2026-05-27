@@ -151,7 +151,7 @@ describe('tabContentV2 resolve', () => {
         expect(result.items).toHaveLength(1);
     });
 
-    it('does not show a toast when an online service returns an empty error payload', async () => {
+    it('throws when an online service returns an error payload', async () => {
         const totalAvailable = ref<number | null>(381);
         const toast = {
             error: vi.fn(),
@@ -186,13 +186,10 @@ describe('tabContentV2 resolve', () => {
             toast,
         });
 
-        const result = await resolve({ cursor: 1, pageSize: 20 });
+        await expect(resolve({ cursor: 1, pageSize: 20 })).rejects.toThrow('Unable to connect to service');
 
-        expect(result.items).toEqual([]);
-        expect(result.nextPage).toBeNull();
-        expect(result.total).toBeNull();
         expect(totalAvailable.value).toBeNull();
-        expect(toast.error).not.toHaveBeenCalled();
+        expect(toast.error).toHaveBeenCalledWith('Unable to connect to service');
     });
 
     it('throws browse request failures instead of converting them into empty final pages', async () => {
@@ -230,6 +227,46 @@ describe('tabContentV2 resolve', () => {
 
         expect(toast.error).toHaveBeenCalledWith('Upstream failed');
         expect(totalAvailable.value).toBeNull();
+    });
+
+    it('does not forward restored next cursor state as a service filter', async () => {
+        window.axios.get = vi.fn().mockResolvedValue({
+            data: {
+                items: [],
+                nextPage: null,
+                previousPage: null,
+                total: null,
+            },
+        }) as typeof window.axios.get;
+
+        const resolve = createTabContentV2Resolve({
+            form: {
+                getData: () => ({
+                    feed: 'online',
+                    limit: 20,
+                    page: 220,
+                    service: 'deviantart-images',
+                    serviceFilters: {
+                        next: 80,
+                        nsfw: 1,
+                    },
+                    source: 'all',
+                    tab_id: 213,
+                }),
+            } as any,
+            startPageToken: ref(220),
+            toast: {
+                error: vi.fn(),
+            },
+        });
+
+        await resolve({ cursor: 220, pageSize: 20 });
+
+        const requestedUrl = decodeURIComponent(vi.mocked(window.axios.get).mock.calls[0]?.[0] as string);
+
+        expect(requestedUrl).toContain('page=220');
+        expect(requestedUrl).toContain('nsfw=1');
+        expect(requestedUrl).not.toContain('next=80');
     });
 
     it('auto-hides the Library unavailable toast', async () => {

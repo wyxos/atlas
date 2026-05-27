@@ -96,6 +96,7 @@ function createFormInstance() {
             'tab_id',
             'page',
             'limit',
+            'next',
             'serviceFilters',
             'serviceFiltersByKey',
         ]);
