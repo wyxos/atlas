@@ -3,6 +3,7 @@
 use App\Exceptions\LibraryUnavailableException;
 use App\Models\File;
 use App\Models\User;
+use App\Services\FilePreviewService;
 use App\Services\Library\LibraryTypesenseCompiler;
 use App\Services\Library\LibraryTypesenseGateway;
 use App\Services\Library\LibraryTypesenseNames;
@@ -198,6 +199,55 @@ test('local service keeps seeded random sort when using typesense', function () 
 
     expect($gateway->compiled)->toHaveCount(1)
         ->and($gateway->compiled[0]['options']['sort_by'])->toBe('_rand(12345):desc,sort_id:desc');
+});
+
+test('local service compiles out-of-feed filters with updated timestamp sort', function () {
+    $names = fakeLibraryNames();
+    app()->instance(LibraryTypesenseNames::class, $names);
+
+    $gateway = new class(app(LibraryTypesenseCompiler::class), $names, ['hits' => [], 'found' => 0]) extends LibraryTypesenseGateway
+    {
+        public array $compiled = [];
+
+        /**
+         * @param  array<string, mixed>  $results
+         */
+        public function __construct($compiler, $names, private array $results)
+        {
+            parent::__construct($compiler, $names);
+        }
+
+        protected function runScoutSearch(array $compiled): array
+        {
+            $this->compiled[] = $compiled;
+
+            return $this->results;
+        }
+    };
+
+    app()->instance(LibraryTypesenseGateway::class, $gateway);
+
+    app(LocalService::class)->fetch([
+        'page' => 1,
+        'limit' => 20,
+        'blacklisted' => 'yes',
+        'min_previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+        'sort' => 'updated_at',
+    ]);
+
+    app(LocalService::class)->fetch([
+        'page' => 1,
+        'limit' => 20,
+        'blacklisted' => 'yes',
+        'min_previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+        'sort' => 'updated_at_asc',
+    ]);
+
+    expect($gateway->compiled)->toHaveCount(2)
+        ->and($gateway->compiled[0]['options']['filter_by'])->toContain('blacklisted:=true')
+        ->and($gateway->compiled[0]['options']['filter_by'])->toContain('previewed_count:>='.FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
+        ->and($gateway->compiled[0]['options']['sort_by'])->toBe('updated_at:desc,sort_id:desc')
+        ->and($gateway->compiled[1]['options']['sort_by'])->toBe('updated_at:asc,sort_id:asc');
 });
 
 test('local service throws when library aliases are missing', function () {

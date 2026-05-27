@@ -161,6 +161,30 @@ describe('localReactionState', () => {
         }), filters)).toBe(false);
     });
 
+    it('matches only feed-removed blacklisted items for out-of-feed filters', () => {
+        const filters = {
+            reaction_mode: 'any',
+            blacklisted: 'yes',
+            auto_blacklisted: 'any',
+            min_previewed_count: 99999,
+        };
+
+        expect(matchesLocalViewFilters(createItem({
+            blacklisted_at: '2026-04-30T00:00:00Z',
+            previewed_count: 99999,
+        }), filters)).toBe(true);
+
+        expect(matchesLocalViewFilters(createItem({
+            blacklisted_at: '2026-04-30T00:00:00Z',
+            previewed_count: 99998,
+        }), filters)).toBe(false);
+
+        expect(matchesLocalViewFilters(createItem({
+            blacklisted_at: null,
+            previewed_count: 99999,
+        }), filters)).toBe(false);
+    });
+
     it('treats reacted mode as a positive-only local view', () => {
         expect(isPositiveOnlyLocalView({
             reaction_mode: 'reacted',

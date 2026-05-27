@@ -121,6 +121,7 @@ class BrowseController extends Controller
                         'sort' => 'stored_at',
                         'seed' => null,
                         'max_previewed_count' => null,
+                        'min_previewed_count' => null,
                     ],
                     'schema' => $localSchema->fields([
                         $localSchema->pageField([

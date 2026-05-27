@@ -5,7 +5,7 @@ import TabFilter from './TabFilter.vue';
 import { BrowseFormKey, createBrowseForm } from '@/composables/useBrowseForm';
 import type { TabData } from '@/composables/useTabs';
 import { LOCAL_TAB_FILTER_PRESET_GROUPS, LOCAL_TAB_FILTER_PRESETS } from '@/utils/tabFilter';
-import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT } from '@/lib/feedModeration';
+import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT, FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 
 const Stub = defineComponent({
     template: '<div><slot /></div>',
@@ -73,6 +73,8 @@ describe('TabFilter', () => {
         expect(moderationGroup?.presets.map((preset) => preset.label)).toEqual([
             'Blacklisted (Newest)',
             'Blacklisted (Oldest)',
+            'Out of Feed (Newest)',
+            'Out of Feed (Oldest)',
         ]);
         expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'blacklisted_any')?.filters).toMatchObject({
             blacklisted: 'yes',
@@ -83,6 +85,18 @@ describe('TabFilter', () => {
             blacklisted: 'yes',
             max_previewed_count: FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT,
             sort: 'blacklisted_at_asc',
+        });
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'out_of_feed_newest')?.filters).toMatchObject({
+            blacklisted: 'yes',
+            max_previewed_count: null,
+            min_previewed_count: FEED_REMOVED_PREVIEW_COUNT,
+            sort: 'updated_at',
+        });
+        expect(LOCAL_TAB_FILTER_PRESETS.find((preset) => preset.value === 'out_of_feed_oldest')?.filters).toMatchObject({
+            blacklisted: 'yes',
+            max_previewed_count: null,
+            min_previewed_count: FEED_REMOVED_PREVIEW_COUNT,
+            sort: 'updated_at_asc',
         });
     });
 
@@ -379,6 +393,8 @@ describe('TabFilter', () => {
         expect(wrapper.text()).toContain('Anomalies');
         expect(wrapper.text()).toContain('Blacklisted (Newest)');
         expect(wrapper.text()).toContain('Blacklisted (Oldest)');
+        expect(wrapper.text()).toContain('Out of Feed (Newest)');
+        expect(wrapper.text()).toContain('Out of Feed (Oldest)');
         expect(wrapper.text()).toContain('Not Found');
         expect(wrapper.text()).toContain('Not Found (Reacted)');
         expect(wrapper.text()).toContain('Saved Blacklisted');

@@ -131,6 +131,20 @@ describe('browseTabLabel', () => {
         })).toBe('Library - Blacklisted (Oldest) - 2');
     });
 
+    it('uses the configured label for out-of-feed presets in library tab labels', () => {
+        expect(buildBrowseTabLabel({
+            formData: createBrowseFormData({
+                feed: 'local',
+                serviceFilters: {
+                    local_preset: 'out_of_feed_newest',
+                },
+            }),
+            pageToken: 2,
+            availableServices: [],
+            localService: { key: 'local', label: 'Library' },
+        })).toBe('Library - Out of Feed (Newest) - 2');
+    });
+
     it('uses the configured label for not found reacted presets in library tab labels', () => {
         expect(buildBrowseTabLabel({
             formData: createBrowseFormData({

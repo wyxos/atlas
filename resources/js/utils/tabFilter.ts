@@ -1,6 +1,6 @@
 import type { BrowseFormData } from '@/composables/useBrowseForm';
 import type { ServiceFilterField, ServiceFilterSchema } from '@/lib/browseCatalog';
-import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT } from '@/lib/feedModeration';
+import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT, FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 
 export type LocalPreset = {
     label: string;
@@ -285,6 +285,32 @@ export const LOCAL_TAB_FILTER_PRESET_GROUPS: LocalPresetGroup[] = [
                     auto_blacklisted: 'any',
                     max_previewed_count: FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT,
                     sort: 'blacklisted_at_asc',
+                },
+            },
+            {
+                label: 'Out of Feed (Newest)',
+                value: 'out_of_feed_newest',
+                filters: {
+                    downloaded: 'any',
+                    reaction_mode: 'any',
+                    blacklisted: 'yes',
+                    auto_blacklisted: 'any',
+                    max_previewed_count: null,
+                    min_previewed_count: FEED_REMOVED_PREVIEW_COUNT,
+                    sort: 'updated_at',
+                },
+            },
+            {
+                label: 'Out of Feed (Oldest)',
+                value: 'out_of_feed_oldest',
+                filters: {
+                    downloaded: 'any',
+                    reaction_mode: 'any',
+                    blacklisted: 'yes',
+                    auto_blacklisted: 'any',
+                    max_previewed_count: null,
+                    min_previewed_count: FEED_REMOVED_PREVIEW_COUNT,
+                    sort: 'updated_at_asc',
                 },
             },
         ],

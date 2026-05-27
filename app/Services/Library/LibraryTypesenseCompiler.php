@@ -162,6 +162,11 @@ class LibraryTypesenseCompiler
             $filters[] = 'previewed_count:<='.(int) $maxPreviewed;
         }
 
+        $minPreviewed = $context['minPreviewed'] ?? null;
+        if (is_int($minPreviewed) && $minPreviewed >= 0) {
+            $filters[] = 'previewed_count:>='.(int) $minPreviewed;
+        }
+
         $fileTypes = is_array($context['fileTypes'] ?? null) ? $context['fileTypes'] : ['all'];
         if (! in_array('all', $fileTypes, true)) {
             $allowedFileTypes = array_values(array_filter(

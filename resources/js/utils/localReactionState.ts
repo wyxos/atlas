@@ -178,7 +178,7 @@ function matchesAutoBlacklistedFilter(item: FeedItem, value: unknown): boolean {
     return value === 'yes' ? item.auto_blacklisted === true : item.auto_blacklisted !== true;
 }
 
-function matchesPreviewedCountFilter(item: FeedItem, value: unknown): boolean {
+function matchesMaxPreviewedCountFilter(item: FeedItem, value: unknown): boolean {
     if (value === null || value === undefined || value === '') {
         return true;
     }
@@ -190,6 +190,20 @@ function matchesPreviewedCountFilter(item: FeedItem, value: unknown): boolean {
     }
 
     return Number(item.previewed_count ?? 0) <= maxPreviewedCount;
+}
+
+function matchesMinPreviewedCountFilter(item: FeedItem, value: unknown): boolean {
+    if (value === null || value === undefined || value === '') {
+        return true;
+    }
+
+    const minPreviewedCount = Number(value);
+
+    if (!Number.isFinite(minPreviewedCount)) {
+        return true;
+    }
+
+    return Number(item.previewed_count ?? 0) >= minPreviewedCount;
 }
 
 function matchesReactionFilter(item: FeedItem, filters: Record<string, unknown>): boolean {
@@ -241,7 +255,11 @@ export function matchesLocalViewFilters(
         return false;
     }
 
-    if (!matchesPreviewedCountFilter(item, filters.max_previewed_count)) {
+    if (!matchesMaxPreviewedCountFilter(item, filters.max_previewed_count)) {
+        return false;
+    }
+
+    if (!matchesMinPreviewedCountFilter(item, filters.min_previewed_count)) {
         return false;
     }
 

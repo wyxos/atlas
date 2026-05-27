@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\File;
+use App\Services\FilePreviewService;
 use App\Services\Library\LibraryTypesenseGateway;
 use App\Services\LocalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,6 +34,7 @@ test('fetch delegates normalized params to the typesense gateway', function () {
                 ->and($context['fileTypes'])->toBe(['video'])
                 ->and($context['reactionMode'])->toBe('types')
                 ->and($context['reactionTypes'])->toBe(['funny'])
+                ->and($context['minPreviewed'])->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
                 ->and($context['sort'])->toBe('reaction_at');
 
             return true;
@@ -53,6 +55,7 @@ test('fetch delegates normalized params to the typesense gateway', function () {
         'file_type' => ['video'],
         'reaction_mode' => 'types',
         'reaction' => ['funny'],
+        'min_previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
         'sort' => 'reaction_at',
     ]);
 

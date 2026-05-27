@@ -18,6 +18,7 @@ class LocalFetchParams
      *   fileTypes: array<int, string>,
      *   seed: ?int,
      *   maxPreviewed: ?int,
+     *   minPreviewed: ?int,
      *   reactionMode: string,
      *   autoBlacklisted: string,
      *   reactionTypes: ?array<int, string>,
@@ -48,6 +49,12 @@ class LocalFetchParams
         if (is_int($maxPreviewed) && $maxPreviewed < 0) {
             $maxPreviewed = null;
         }
+        $hasMinPreviewedParam = array_key_exists('min_previewed_count', $params);
+        $minPreviewedRaw = $params['min_previewed_count'] ?? null;
+        $minPreviewed = is_numeric($minPreviewedRaw) ? (int) $minPreviewedRaw : null;
+        if (is_int($minPreviewed) && $minPreviewed < 0) {
+            $minPreviewed = null;
+        }
 
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
         $autoBlacklisted = is_string($params['auto_blacklisted'] ?? null) ? (string) $params['auto_blacklisted'] : 'any';
@@ -71,6 +78,7 @@ class LocalFetchParams
                 'fileTypes' => $fileTypes,
                 'seed' => $seed,
                 'maxPreviewed' => $maxPreviewed,
+                'minPreviewed' => $minPreviewed,
                 'reactionMode' => $reactionMode,
                 'autoBlacklisted' => $autoBlacklisted,
                 'reactionTypes' => $reactionTypes,
@@ -83,6 +91,11 @@ class LocalFetchParams
         if (! $hasMaxPreviewedParam) {
             $maxPreviewed = null;
             $params['max_previewed_count'] = $maxPreviewed;
+        }
+
+        if (! $hasMinPreviewedParam) {
+            $minPreviewed = null;
+            $params['min_previewed_count'] = $minPreviewed;
         }
 
         return [
@@ -98,6 +111,7 @@ class LocalFetchParams
             'fileTypes' => $fileTypes,
             'seed' => $seed,
             'maxPreviewed' => $maxPreviewed,
+            'minPreviewed' => $minPreviewed,
             'reactionMode' => $reactionMode,
             'autoBlacklisted' => $autoBlacklisted,
             'reactionTypes' => $reactionTypes,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT } from '@/lib/feedModeration';
+import { FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT, FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 import { getTabFilterLimitOptions, LOCAL_TAB_FILTER_PRESET_GROUPS } from '@/utils/tabFilter';
 
 describe('getTabFilterLimitOptions', () => {
@@ -33,5 +33,22 @@ describe('LOCAL_TAB_FILTER_PRESET_GROUPS', () => {
             .find((preset) => preset.value === 'blacklisted_any');
 
         expect(blacklistedPreset?.filters.max_previewed_count).toBe(FEED_REMOVED_MAX_VISIBLE_PREVIEW_COUNT);
+    });
+
+    it('provides out-of-feed presets sorted by removal update timestamp', () => {
+        const outOfFeedNewest = LOCAL_TAB_FILTER_PRESET_GROUPS
+            .flatMap((group) => group.presets)
+            .find((preset) => preset.value === 'out_of_feed_newest');
+        const outOfFeedOldest = LOCAL_TAB_FILTER_PRESET_GROUPS
+            .flatMap((group) => group.presets)
+            .find((preset) => preset.value === 'out_of_feed_oldest');
+
+        expect(outOfFeedNewest?.filters).toMatchObject({
+            blacklisted: 'yes',
+            max_previewed_count: null,
+            min_previewed_count: FEED_REMOVED_PREVIEW_COUNT,
+            sort: 'updated_at',
+        });
+        expect(outOfFeedOldest?.filters.sort).toBe('updated_at_asc');
     });
 });

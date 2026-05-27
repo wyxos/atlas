@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\FilePreviewService;
 use App\Services\Local\LocalFetchParams;
 
 it('returns empty response flag for invalid reaction types filter', function () {
@@ -34,6 +35,16 @@ it('does not default max_previewed_count for moderated views when not explicitly
         ->and($context['params']['max_previewed_count'])->toBeNull();
 });
 
+it('does not default min_previewed_count when not explicitly provided', function () {
+    $context = LocalFetchParams::normalize([
+        'reaction_mode' => 'types',
+        'reaction' => ['funny'],
+    ]);
+
+    expect($context['minPreviewed'])->toBeNull()
+        ->and($context['params']['min_previewed_count'])->toBeNull();
+});
+
 it('keeps explicit max_previewed_count untouched', function () {
     $context = LocalFetchParams::normalize([
         'reaction_mode' => 'types',
@@ -42,6 +53,17 @@ it('keeps explicit max_previewed_count untouched', function () {
     ]);
 
     expect($context['maxPreviewed'])->toBe(0);
+});
+
+it('keeps explicit min_previewed_count untouched', function () {
+    $context = LocalFetchParams::normalize([
+        'reaction_mode' => 'any',
+        'blacklisted' => 'yes',
+        'min_previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+    ]);
+
+    expect($context['minPreviewed'])->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
+        ->and($context['params']['min_previewed_count'])->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT);
 });
 
 it('defaults not found filtering to no and keeps explicit values', function () {
