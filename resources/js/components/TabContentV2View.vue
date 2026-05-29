@@ -17,6 +17,7 @@ import type { BrowseFeedHandle } from '@/types/browse';
 import type { File } from '@/types/file';
 import type { ReactionType } from '@/types/reaction';
 import type { LocalSourceSelection } from '@/utils/localSourceSelection';
+import type { LoadedItemsBulkAction } from '@/lib/tabContentLoadedItemsBulkActions';
 import { createTabContentV2KeydownHandler } from '@/lib/tabContentV2Keyboard';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
@@ -24,6 +25,7 @@ import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistM
 import DownloadedReactionDialog from './DownloadedReactionDialog.vue';
 import FileReactions from './FileReactions.vue';
 import FileViewerSheet from './FileViewerSheet.vue';
+import LoadedItemsBatchActionDialog from './LoadedItemsBatchActionDialog.vue';
 import LocalFileDeleteDialog from './LocalFileDeleteDialog.vue';
 import Pill from './ui/Pill.vue';
 import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
@@ -33,26 +35,15 @@ import TabContentStartForm from './TabContentStartForm.vue';
 import TabContentV2FullscreenPageLoadingLock from './TabContentV2FullscreenPageLoadingLock.vue';
 import TabContentV2GridOverlay from './TabContentV2GridOverlay.vue';
 
-type FileSheetState = {
-    isOpen: boolean;
-};
-
+type FileSheetState = { isOpen: boolean };
 type FileSheetPresentation = 'inline' | 'overlay';
-
-type FileViewerDataShape = {
-    fileData: { value: File | null };
-    isLoadingFileData: { value: boolean };
-    setFileData: (file: File) => void;
-};
+type FileViewerDataShape = { fileData: { value: File | null }; isLoadingFileData: { value: boolean }; setFileData: (file: File) => void };
 
 type DownloadedReactionPromptShape = {
-    data: {
-        open: { value: boolean };
-    };
+    data: { open: { value: boolean } };
     chooseReact: () => void;
     chooseRedownload: () => void;
-    close: () => void;
-    setOpen: (value: boolean) => void;
+    close: () => void; setOpen: (value: boolean) => void;
 };
 
 type MouseShortcutHandlers = ReturnType<typeof import('@/lib/tabContentV2MouseShortcuts').createBrowseV2MouseShortcutHandlers>;
@@ -69,8 +60,10 @@ const props = defineProps<{
     applyService: () => Promise<void>;
     cancelFill: () => void;
     closeFileSheet: () => void;
+    confirmBatchAction?: () => void;
     containerInteractions: TabContentContainerInteractions;
     currentVisibleItem: FeedItem | null;
+    cancelBatchAction?: () => void;
     downloadedReactionPrompt: DownloadedReactionPromptShape;
     fileSheetState: FileSheetState;
     fileSheetItem: FeedItem | null;
@@ -98,6 +91,7 @@ const props = defineProps<{
     mouseShortcuts: MouseShortcutHandlers;
     openFileSheet: () => void;
     openFileSheetForItem: (item: FeedItem, index: number) => void;
+    pendingBatchAction?: LoadedItemsBulkAction | null;
     promptDialog: TabContentPromptDialogHandle;
     fileSheetPresentation: FileSheetPresentation;
     resolve: (params: { cursor: string | null; pageSize: number; signal?: AbortSignal }) => Promise<VibeResolveResult>;
@@ -144,12 +138,8 @@ const shouldReserveFileSheetSpace = computed(() => props.fileSheetState.isOpen &
 const fileSheetFileId = computed(() => props.fileSheetItem?.id ?? null);
 const canTogglePageLoadingLock = computed(() => Boolean(props.headerMasonry?.lockPageLoading && props.headerMasonry?.unlockPageLoading));
 const pageLoadingLocked = computed(() => Boolean(props.vibeStatus.pageLoadingLocked || props.headerMasonry?.pageLoadingLocked));
-const showFullscreenPageLoadingLock = computed(() => (
-    props.surfaceMode === 'fullscreen'
-    && pageLoadingLocked.value
-    && props.vibeStatus.hasNextPage
-    && props.vibeStatus.activeIndex >= props.vibeStatus.itemCount
-));
+const showFullscreenPageLoadingLock = computed(() => props.surfaceMode === 'fullscreen'
+    && pageLoadingLocked.value && props.vibeStatus.hasNextPage && props.vibeStatus.activeIndex >= props.vibeStatus.itemCount);
 
 function closeGlobalStartPanel(): void {
     globalStartPanel?.close();
@@ -217,6 +207,8 @@ function unlockPageLoading(): void {
     props.headerMasonry?.unlockPageLoading?.();
 }
 
+function cancelMasonryLoad(): void { if (props.headerMasonry) { props.headerMasonry.cancel(); } else { props.cancelFill(); } }
+
 const handleRootKeydown = createTabContentV2KeydownHandler({
     closeContainerSheet: props.containerInteractions.sheet.actions.close,
     closeFileSheet: props.closeFileSheet,
@@ -272,6 +264,7 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
             :apply-service="applyService"
             :apply-filters="applyFilters"
             :reset-filters="form.reset"
+            :cancel-masonry-load="cancelMasonryLoad"
             :go-to-first-page="goToFirstPage"
             :load-next-page="loadNext"
         >
@@ -533,6 +526,13 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
             @update:open="(value) => { if (!value) localFileDeletion.actions.close(); }"
             @cancel="localFileDeletion.actions.close"
             @confirm="localFileDeletion.actions.confirm"
+        />
+
+        <LoadedItemsBatchActionDialog
+            :action="pendingBatchAction ?? null"
+            :item-count="vibeStatus.itemCount"
+            @cancel="cancelBatchAction?.()"
+            @confirm="confirmBatchAction?.()"
         />
     </div>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ChevronDown, ChevronsUp, PanelRightOpen, Play } from 'lucide-vue-next';
+import { ChevronDown, ChevronsUp, ListChecks, Play, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { queueManager } from '@/composables/useQueue';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
@@ -28,6 +28,7 @@ interface Props {
     applyService: () => void | Promise<void>;
     applyFilters: () => void | Promise<void>;
     resetFilters: () => void;
+    cancelMasonryLoad?: (() => void) | null;
     goToFirstPage: () => void | Promise<void>;
     loadNextPage: () => void | Promise<void>;
 }
@@ -36,11 +37,17 @@ const props = withDefaults(defineProps<Props>(), {
     localService: null,
     masonry: null,
     filterSheetOpen: false,
+    cancelMasonryLoad: null,
 });
 
 const globalStartPanel = useBrowseGlobalStartPanel();
 const queuedReactionCount = queueManager.collection.getAllComputed();
 const localSourceOptions = computed(() => createLocalSourceOptions(props.availableSources));
+const queuedReactionTotal = computed(() => queuedReactionCount.value.length);
+const queuedReactionCountLabel = computed(() => queuedReactionTotal.value > 99 ? '99+' : String(queuedReactionTotal.value));
+const queueButtonLabel = computed(() => queuedReactionTotal.value > 0
+    ? `Open reaction queue (${queuedReactionTotal.value} queued)`
+    : 'Open reaction queue');
 const feedOptions = [
     { label: 'Online', value: 'online' },
     { label: 'Library', value: 'local' },
@@ -96,24 +103,40 @@ const onlineServiceOptions = computed(() => serviceDropdownOptions(props.availab
             <Button
                 v-if="globalStartPanel"
                 type="button"
-                size="sm"
+                size="icon-lg"
                 variant="secondary"
-                class="h-10 gap-2 px-3"
+                class="relative h-10 w-10 p-0"
                 data-test="global-start-panel-button"
                 aria-controls="browse-global-start-panel"
                 :aria-expanded="String(globalStartPanel.isOpen.value)"
-                title="Open reaction queue"
+                :aria-label="queueButtonLabel"
+                :title="queueButtonLabel"
                 @click="globalStartPanel.toggle"
             >
-                <PanelRightOpen :size="14" />
-                <span>Queue</span>
+                <ListChecks :size="16" />
                 <span
-                    v-if="queuedReactionCount.length > 0"
-                    class="ml-1 inline-flex min-w-5 justify-center rounded-full bg-smart-blue-500 px-1.5 text-[11px] font-semibold text-white"
+                    v-if="queuedReactionTotal > 0"
+                    class="absolute -right-1 -top-1 inline-flex min-w-5 justify-center rounded-full bg-smart-blue-500 px-1.5 text-[11px] font-semibold leading-5 text-white"
                     data-test="global-start-panel-queue-count"
                 >
-                    {{ queuedReactionCount.length }}
+                    {{ queuedReactionCountLabel }}
                 </span>
+            </Button>
+
+            <Button
+                v-if="masonry?.isLoading"
+                type="button"
+                size="icon-lg"
+                variant="ghost"
+                color="danger"
+                class="h-10 w-10 p-0"
+                data-test="cancel-loading-button"
+                title="Cancel loading"
+                aria-label="Cancel loading"
+                :disabled="cancelMasonryLoad === null"
+                @click="cancelMasonryLoad?.()"
+            >
+                <X :size="16" />
             </Button>
 
             <Button @click="goToFirstPage" size="sm" variant="ghost" class="h-10 w-10"

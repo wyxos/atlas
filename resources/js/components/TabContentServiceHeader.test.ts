@@ -59,6 +59,7 @@ function createProps() {
         applyService: vi.fn(async () => undefined),
         applyFilters: vi.fn(async () => undefined),
         resetFilters: vi.fn(),
+        cancelMasonryLoad: vi.fn(),
         goToFirstPage: vi.fn(async () => undefined),
         loadNextPage: vi.fn(async () => undefined),
     };
@@ -79,9 +80,9 @@ function mountHeader(props = createProps()) {
                 Button: buttonStub,
                 ChevronDown: simpleStub,
                 ChevronsUp: simpleStub,
+                ListChecks: simpleStub,
                 ModerationRulesManager: simpleStub,
                 LocalSourceDropdown: simpleStub,
-                PanelRightOpen: simpleStub,
                 Play: simpleStub,
                 Select: simpleStub,
                 SelectContent: simpleStub,
@@ -90,6 +91,7 @@ function mountHeader(props = createProps()) {
                 SelectValue: simpleStub,
                 SearchableDropdown: searchableDropdownStub,
                 TabFilter: simpleStub,
+                X: simpleStub,
             },
         },
     });
@@ -113,6 +115,7 @@ describe('TabContentServiceHeader', () => {
         expect(wrapper.find('[data-test="loaded-items-love-button"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="loaded-items-blacklist-button"]').exists()).toBe(false);
         expect(wrapper.get('[data-test="global-start-panel-button"]').exists()).toBe(true);
+        expect(wrapper.get('[data-test="global-start-panel-button"]').text()).not.toContain('Queue');
         expect(wrapper.get('[data-test="apply-service-button"]').exists()).toBe(true);
     });
 
@@ -141,6 +144,22 @@ describe('TabContentServiceHeader', () => {
         expect(props.goToFirstPage).toHaveBeenCalledTimes(1);
         expect(props.loadNextPage).toHaveBeenCalledTimes(1);
         expect(props.applyService).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows and routes the cancel loading CTA while Vibe is loading', async () => {
+        const props = createProps();
+        props.masonry = {
+            cancel: vi.fn(),
+            isLoading: true,
+            remove: vi.fn(),
+            restore: vi.fn(),
+        };
+
+        const wrapper = mountHeader(props);
+
+        await wrapper.get('[data-test="cancel-loading-button"]').trigger('click');
+
+        expect(props.cancelMasonryLoad).toHaveBeenCalledTimes(1);
     });
 
     it('toggles the global start panel from the setup CTA', async () => {

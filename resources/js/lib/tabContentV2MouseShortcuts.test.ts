@@ -199,4 +199,52 @@ describe('tabContentV2MouseShortcuts', () => {
         expect(onReaction).not.toHaveBeenCalled();
         expect(onBlacklist).not.toHaveBeenCalled();
     });
+
+    it('asks for confirmation before running an empty-area batch reaction', async () => {
+        const onBatchAction = vi.fn();
+        const confirmBatchAction = vi.fn(async () => true);
+        const handlers = createBrowseV2MouseShortcutHandlers({
+            confirmBatchAction,
+            getCurrentItem: () => null,
+            getItemFromTarget: () => null,
+            getSurfaceMode: () => 'list',
+            onBatchAction,
+            onBlacklist: vi.fn(),
+            onReaction: vi.fn(),
+        });
+
+        document.body.innerHTML = '<div id="grid-gap"></div>';
+        const event = new MouseEvent('click', { altKey: true, button: 0 });
+        Object.defineProperty(event, 'target', { value: document.getElementById('grid-gap'), configurable: true });
+
+        handlers.handleClickCapture(event);
+        await Promise.resolve();
+
+        expect(confirmBatchAction).toHaveBeenCalledWith('love');
+        expect(onBatchAction).toHaveBeenCalledWith('love');
+    });
+
+    it('skips the batch reaction when empty-area confirmation is declined', async () => {
+        const onBatchAction = vi.fn();
+        const confirmBatchAction = vi.fn(async () => false);
+        const handlers = createBrowseV2MouseShortcutHandlers({
+            confirmBatchAction,
+            getCurrentItem: () => null,
+            getItemFromTarget: () => null,
+            getSurfaceMode: () => 'list',
+            onBatchAction,
+            onBlacklist: vi.fn(),
+            onReaction: vi.fn(),
+        });
+
+        document.body.innerHTML = '<div id="grid-gap"></div>';
+        const event = new MouseEvent('contextmenu', { altKey: true, button: 2 });
+        Object.defineProperty(event, 'target', { value: document.getElementById('grid-gap'), configurable: true });
+
+        handlers.handleContextMenuCapture(event);
+        await Promise.resolve();
+
+        expect(confirmBatchAction).toHaveBeenCalledWith('blacklist');
+        expect(onBatchAction).not.toHaveBeenCalled();
+    });
 });

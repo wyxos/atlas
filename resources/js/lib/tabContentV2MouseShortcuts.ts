@@ -3,6 +3,7 @@ import type { LoadedItemsBulkAction } from '@/lib/tabContentLoadedItemsBulkActio
 import type { ReactionType } from '@/types/reaction';
 
 type BrowseV2MouseShortcutOptions = {
+    confirmBatchAction?: (action: LoadedItemsBulkAction) => boolean | Promise<boolean>;
     getCurrentItem: () => FeedItem | null;
     getItemFromTarget: (target: EventTarget | null) => FeedItem | null;
     getSurfaceMode: () => 'fullscreen' | 'list';
@@ -53,13 +54,18 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
         }
     }
 
-    function performBatchShortcut(event: MouseEvent, action: LoadedItemsBulkAction): void {
+    async function performBatchShortcut(event: MouseEvent, action: LoadedItemsBulkAction): Promise<void> {
         if (!options.onBatchAction) {
             return;
         }
 
         event.preventDefault();
         event.stopPropagation();
+
+        if (options.confirmBatchAction && !await options.confirmBatchAction(action)) {
+            return;
+        }
+
         void options.onBatchAction(action);
     }
 
@@ -70,7 +76,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
 
         const item = getShortcutItemFromTarget(event.target);
         if (!item) {
-            performBatchShortcut(event, 'love');
+            void performBatchShortcut(event, 'love');
             return;
         }
 
@@ -86,7 +92,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
 
         const item = getShortcutItemFromTarget(event.target);
         if (!item) {
-            performBatchShortcut(event, 'blacklist');
+            void performBatchShortcut(event, 'blacklist');
             return;
         }
 
@@ -103,7 +109,7 @@ export function createBrowseV2MouseShortcutHandlers(options: BrowseV2MouseShortc
         const item = getShortcutItemFromTarget(event.target);
         if (!item) {
             if (event.altKey) {
-                performBatchShortcut(event, 'like');
+                void performBatchShortcut(event, 'like');
             }
             return;
         }

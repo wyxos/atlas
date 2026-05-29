@@ -61,6 +61,7 @@ const defaultStubs = {
     DownloadedReactionDialog: testStub,
     FileReactions: testStub,
     FileViewerSheet: testStub,
+    LoadedItemsBatchActionDialog: testStub,
     LocalFileDeleteDialog: testStub,
     PanelRightOpen: testStub, TabContentContainerDrawer: testStub,
     TabContentContainerSheet: testStub,
@@ -165,7 +166,9 @@ function createProps() {
         applyFilters: vi.fn(async () => undefined),
         applyService: vi.fn(async () => undefined),
         cancelFill: vi.fn(),
+        cancelBatchAction: vi.fn(),
         closeFileSheet: vi.fn(),
+        confirmBatchAction: vi.fn(),
         containerInteractions: {
             managerRef: ref(null),
             drawer: {

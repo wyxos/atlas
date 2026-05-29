@@ -9,6 +9,7 @@ import { createBrowseForm, BrowseFormKey } from '@/composables/useBrowseForm';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
 import { useFileViewerData } from '@/composables/useFileViewerData';
 import { useItemPreview } from '@/composables/useItemPreview';
+import { useLoadedItemsBatchActionConfirmation } from '@/composables/useLoadedItemsBatchActionConfirmation';
 import { useLocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
@@ -93,6 +94,7 @@ const isVibeLoading = computed(() => vibeStatus.value.phase === 'loading'
     || vibeStatus.value.phase === 'refreshing'
     || vibeStatus.value.loadState === 'loading');
 const hasRouteFileSelection = computed(() => route.name === 'browse-file');
+const batchActionConfirmation = useLoadedItemsBatchActionConfirmation();
 
 function matchesActiveLocalFilters(item: FeedItem): boolean {
     return !form.isLocal.value || matchesLocalViewFilters(item, form.data.serviceFilters);
@@ -396,6 +398,7 @@ const mouseShortcuts = createBrowseV2MouseShortcutHandlers({
     onBlacklist: async (item) => {
         await itemInteractions.reactions.onFileBlacklist(item);
     },
+    confirmBatchAction: batchActionConfirmation.request,
     onBatchAction: async (action) => (isVibeLoading.value || vibeStatus.value.itemCount === 0 ? 0 : itemInteractions.performLoadedItemsBulkAction(action)),
 });
 
@@ -518,6 +521,7 @@ watch(
         :update-active-index="handleVibeActiveIndexUpdate"
         :update-surface-mode="handleVibeSurfaceModeUpdate"
         :mouse-shortcuts="mouseShortcuts"
+        :pending-batch-action="batchActionConfirmation.pendingAction.value" :confirm-batch-action="batchActionConfirmation.confirm" :cancel-batch-action="batchActionConfirmation.cancel"
         :container-interactions="containerInteractions"
         :item-interactions="itemInteractions"
         :prompt-dialog="promptDialog"
