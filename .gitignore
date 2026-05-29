@@ -36,3 +36,4 @@ package-lock.json
 .zephyr/
 /tasks
 /tests/Browser/Screenshots
+/.codex/environments/*.win32.ps1
