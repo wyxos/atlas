@@ -348,4 +348,54 @@ describe('TabContentV2View fullscreen chrome', () => {
 
         expect(props.openFileSheet).toHaveBeenCalledTimes(1);
     });
+
+    it('shows an Atlas fullscreen lock message at the trailing placeholder and unlocks from there', async () => {
+        const props = createProps();
+        const unlockPageLoading = vi.fn();
+
+        props.headerMasonry = {
+            isLoading: false,
+            lockPageLoading: vi.fn(),
+            pageLoadingLocked: true,
+            remove: vi.fn(),
+            restore: vi.fn(),
+            unlockPageLoading,
+        };
+        props.vibeStatus.activeIndex = 20;
+        props.vibeStatus.itemCount = 20;
+        props.vibeStatus.hasNextPage = true;
+        props.vibeStatus.pageLoadingLocked = true;
+
+        const lockOverlayStub = defineComponent({
+            name: 'TabContentV2FullscreenPageLoadingLock',
+            props: {
+                canUnlock: { type: Boolean, default: false },
+                unlockPageLoading: { type: Function, default: null },
+            },
+            setup(stubProps) {
+                return () => h('button', {
+                    'data-can-unlock': String(stubProps.canUnlock),
+                    'data-testid': 'fullscreen-page-loading-lock-stub',
+                    onClick: () => (stubProps.unlockPageLoading as (() => void) | null)?.(),
+                }, 'Locked');
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, {
+            props,
+            global: {
+                stubs: {
+                    ...defaultStubs,
+                    TabContentV2FullscreenPageLoadingLock: lockOverlayStub,
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-testid="browse-fullscreen-page-loading-locked-overlay"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="fullscreen-page-loading-lock-stub"]').attributes('data-can-unlock')).toBe('true');
+
+        await wrapper.get('[data-testid="fullscreen-page-loading-lock-stub"]').trigger('click');
+
+        expect(unlockPageLoading).toHaveBeenCalledTimes(1);
+    });
 });
