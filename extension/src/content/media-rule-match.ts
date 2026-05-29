@@ -1,4 +1,4 @@
-import { urlMatchesAnyRule, type UrlMatchRule } from '../match-rules';
+import { hostMatchesRuleDomain, urlMatchesAnyRule, type UrlMatchRule } from '../match-rules';
 import {
     isBlobBackedVideo,
     normalizeUrl,
@@ -6,6 +6,29 @@ import {
     shouldExcludeMediaOrAnchorUrl,
     type MediaElement,
 } from './media-utils';
+
+const BLOB_VIDEO_RULE_BYPASS_DOMAINS = ['reddit.com', 'redd.it'] as const;
+
+function hostnameFromUrl(url: string | null): string | null {
+    if (url === null) {
+        return null;
+    }
+
+    try {
+        return new URL(url).hostname.toLowerCase();
+    } catch {
+        return null;
+    }
+}
+
+function shouldBypassRulesForBlobVideo(pageHostname: string | undefined, pageUrl: string | null): boolean {
+    const hostname = pageHostname?.trim().toLowerCase() || hostnameFromUrl(pageUrl);
+    if (hostname === null || hostname === '') {
+        return false;
+    }
+
+    return BLOB_VIDEO_RULE_BYPASS_DOMAINS.some((domain) => hostMatchesRuleDomain(hostname, domain));
+}
 
 export function mediaMatchesRulesForPage(
     element: MediaElement,
@@ -19,9 +42,7 @@ export function mediaMatchesRulesForPage(
         return false;
     }
 
-    // Blob-backed videos have no stable fetchable media URL, so keep the direct
-    // video widget eligible the same way pages with no active domain rule do.
-    if (isBlobBackedVideo(element)) {
+    if (isBlobBackedVideo(element) && shouldBypassRulesForBlobVideo(pageHostname, normalizedPageUrl)) {
         return true;
     }
 
