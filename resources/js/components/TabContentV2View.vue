@@ -30,6 +30,7 @@ import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
 import TabContentContainerSheet from './TabContentContainerSheet.vue';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentStartForm from './TabContentStartForm.vue';
+import TabContentV2FullscreenPageLoadingLock from './TabContentV2FullscreenPageLoadingLock.vue';
 import TabContentV2GridOverlay from './TabContentV2GridOverlay.vue';
 
 type FileSheetState = {
@@ -141,6 +142,14 @@ const showSheetPrompt = computed(() => sheetPromptItemId.value !== null);
 const isFileSheetOverlay = computed(() => props.surfaceMode === 'list' && props.fileSheetState.isOpen);
 const shouldReserveFileSheetSpace = computed(() => props.fileSheetState.isOpen && !isFileSheetOverlay.value);
 const fileSheetFileId = computed(() => props.fileSheetItem?.id ?? null);
+const canTogglePageLoadingLock = computed(() => Boolean(props.headerMasonry?.lockPageLoading && props.headerMasonry?.unlockPageLoading));
+const pageLoadingLocked = computed(() => Boolean(props.vibeStatus.pageLoadingLocked || props.headerMasonry?.pageLoadingLocked));
+const showFullscreenPageLoadingLock = computed(() => (
+    props.surfaceMode === 'fullscreen'
+    && pageLoadingLocked.value
+    && props.vibeStatus.hasNextPage
+    && props.vibeStatus.activeIndex >= props.vibeStatus.itemCount
+));
 
 function closeGlobalStartPanel(): void {
     globalStartPanel?.close();
@@ -188,16 +197,24 @@ async function handleBlacklist(item: VibeViewerItem): Promise<void> {
 }
 
 function togglePageLoadingLock(): void {
-    if (!props.headerMasonry?.lockPageLoading || !props.headerMasonry?.unlockPageLoading) {
+    if (!canTogglePageLoadingLock.value) {
         return;
     }
 
-    if (props.headerMasonry.pageLoadingLocked) {
-        props.headerMasonry.unlockPageLoading();
+    if (isPageLoadingCurrentlyLocked()) {
+        unlockPageLoading();
         return;
     }
 
-    props.headerMasonry.lockPageLoading();
+    props.headerMasonry?.lockPageLoading?.();
+}
+
+function isPageLoadingCurrentlyLocked(): boolean {
+    return Boolean(props.vibeStatus.pageLoadingLocked || props.headerMasonry?.pageLoadingLocked);
+}
+
+function unlockPageLoading(): void {
+    props.headerMasonry?.unlockPageLoading?.();
 }
 
 const handleRootKeydown = createTabContentV2KeydownHandler({
@@ -323,14 +340,14 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                                 :auto-scroll-min="autoScrollMin"
                                 :auto-scroll-speed="autoScrollSpeed"
                                 :cancel-fill="cancelFill"
-                                :can-toggle-page-loading-lock="Boolean(headerMasonry?.lockPageLoading && headerMasonry?.unlockPageLoading)"
+                                :can-toggle-page-loading-lock="canTogglePageLoadingLock"
                                 :fill-actions-disabled="fillActionsDisabled"
                                 :fill-call-count="fillCallCount"
                                 :fill-call-count-max="fillCallCountMax"
                                 :fill-call-count-min="fillCallCountMin"
                                 :fill-until-count="fillUntilCount"
                                 :fill-until-end="fillUntilEnd"
-                                :page-loading-locked="Boolean(headerMasonry?.pageLoadingLocked)"
+                                :page-loading-locked="pageLoadingLocked"
                                 :set-auto-scroll-speed="setAutoScrollSpeed"
                                 :set-fill-call-count="setFillCallCount"
                                 :toggle-auto-scroll="toggleAutoScroll"
@@ -416,6 +433,17 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         />
                     </template>
                 </VibeLayout>
+
+                <div
+                    v-if="showFullscreenPageLoadingLock"
+                    class="pointer-events-none absolute inset-0 z-10 grid place-items-center px-4"
+                    data-testid="browse-fullscreen-page-loading-locked-overlay"
+                >
+                    <TabContentV2FullscreenPageLoadingLock
+                        :can-unlock="canTogglePageLoadingLock"
+                        :unlock-page-loading="unlockPageLoading"
+                    />
+                </div>
 
                 <template v-if="surfaceMode === 'list'">
                     <Transition
