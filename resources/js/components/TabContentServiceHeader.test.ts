@@ -60,8 +60,12 @@ function createProps() {
         applyFilters: vi.fn(async () => undefined),
         resetFilters: vi.fn(),
         cancelMasonryLoad: vi.fn(),
+        canRemoveLoadedItems: false,
         goToFirstPage: vi.fn(async () => undefined),
         loadNextPage: vi.fn(async () => undefined),
+        loadedItemCount: 0,
+        removeLoadedItems: null as (() => void) | null,
+        removingLoadedItems: false,
     };
 }
 
@@ -81,6 +85,7 @@ function mountHeader(props = createProps()) {
                 ChevronDown: simpleStub,
                 ChevronsUp: simpleStub,
                 ListChecks: simpleStub,
+                Loader2: simpleStub,
                 ModerationRulesManager: simpleStub,
                 LocalSourceDropdown: simpleStub,
                 Play: simpleStub,
@@ -91,6 +96,7 @@ function mountHeader(props = createProps()) {
                 SelectValue: simpleStub,
                 SearchableDropdown: searchableDropdownStub,
                 TabFilter: simpleStub,
+                Unlink: simpleStub,
                 X: simpleStub,
             },
         },
@@ -117,6 +123,22 @@ describe('TabContentServiceHeader', () => {
         expect(wrapper.get('[data-test="global-start-panel-button"]').exists()).toBe(true);
         expect(wrapper.get('[data-test="global-start-panel-button"]').text()).not.toContain('Queue');
         expect(wrapper.get('[data-test="apply-service-button"]').exists()).toBe(true);
+    });
+
+    it('routes the loaded item removal CTA through the provided confirmation opener', async () => {
+        const props = createProps();
+        props.canRemoveLoadedItems = true;
+        props.loadedItemCount = 3;
+        props.removeLoadedItems = vi.fn();
+
+        const wrapper = mountHeader(props);
+        const button = wrapper.get('[data-test="remove-loaded-items-button"]');
+
+        expect(button.attributes('aria-label')).toBe('Remove 3 loaded items from this tab');
+
+        await button.trigger('click');
+
+        expect(props.removeLoadedItems).toHaveBeenCalledTimes(1);
     });
 
     it('renders the selected local feed as Library', () => {

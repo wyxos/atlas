@@ -149,6 +149,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'show'])->name('api.tabs.show');
     Route::post('/api/tabs', [\App\Http\Controllers\TabController::class, 'store'])->name('api.tabs.store');
     Route::put('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'update'])->name('api.tabs.update');
+    Route::delete('/api/tabs/{tab}/files', [\App\Http\Controllers\TabController::class, 'detachFiles'])->name('api.tabs.files.detach');
     Route::delete('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'destroy'])->name('api.tabs.destroy');
     Route::post('/api/tabs/reorder', [\App\Http\Controllers\TabController::class, 'reorder'])->name('api.tabs.reorder');
     Route::post('/api/tabs/bulk-delete', [\App\Http\Controllers\TabController::class, 'destroyBatch'])->name('api.tabs.destroy-batch');

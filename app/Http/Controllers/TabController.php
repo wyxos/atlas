@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\BulkDeleteTabsRequest;
+use App\Http\Requests\DetachTabFilesRequest;
 use App\Http\Requests\ReorderTabsRequest;
 use App\Http\Requests\StoreTabRequest;
 use App\Http\Requests\UpdateTabRequest;
 use App\Models\Tab;
 use App\Services\BrowseModerationService;
+use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -109,6 +111,30 @@ class TabController extends Controller
         $tab->delete();
 
         return response()->json(['message' => 'Tab deleted successfully']);
+    }
+
+    public function detachFiles(DetachTabFilesRequest $request, Tab $tab, TabFileService $tabFileService): JsonResponse
+    {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
+
+        if ($userId === null) {
+            abort(401);
+        }
+
+        if ($tab->user_id !== $userId) {
+            abort(403, 'Unauthorized');
+        }
+
+        $fileIds = array_map('intval', $request->validated('file_ids'));
+        $detachedCount = $tabFileService->detachFilesFromTab($userId, $tab->id, $fileIds);
+
+        return response()->json([
+            'detached_file_ids' => $fileIds,
+            'detached_count' => $detachedCount,
+        ], headers: self::NO_STORE_HEADERS);
     }
 
     public function reorder(ReorderTabsRequest $request): JsonResponse

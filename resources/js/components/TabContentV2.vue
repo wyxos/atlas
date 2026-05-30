@@ -14,6 +14,7 @@ import { useLocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useTabContentBrowseState } from '@/composables/useTabContentBrowseState';
 import { useTabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
 import { useTabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
+import { useTabContentVibeRemoval } from '@/composables/useTabContentVibeRemoval';
 import { useTabContentV2ContainerBlacklists } from '@/composables/useTabContentV2ContainerBlacklists';
 import { useTabContentV2FileSheet } from '@/composables/useTabContentV2FileSheet';
 import { useTabContentPromptDialog } from '@/composables/useTabContentPromptDialog';
@@ -182,6 +183,7 @@ const itemInteractions = useTabContentItemInteractions({
     promptDownloadedReaction: downloadedReactionPrompt.prompt,
     clearHoveredContainer: containerInteractions.clearHoveredContainer,
 });
+const vibeRemoval = useTabContentVibeRemoval({ tab, getLoadedItems: getCurrentVibeFeedItems, masonry: vibeMasonry, isLoading: isVibeLoading, toast, clearHover: itemInteractions.state.clearHover });
 
 const browse = useTabContentBrowseState({
     tabId,
@@ -474,24 +476,13 @@ watch(
 <template>
     <TabContentV2View
         v-if="tab && !shouldShowStandaloneRouteBootstrap"
-        :active-index="activeIndex"
-        :tab="tab"
-        :total-available="totalAvailable"
-        :should-show-form="shouldShowForm"
-        :form="form"
-        :available-services="availableServices"
-        :available-sources="availableSources"
-        :local-service="localService"
-        :header-masonry="headerMasonry"
-        :is-filter-sheet-open="isFilterSheetOpen"
+        :active-index="activeIndex" :tab="tab" :total-available="totalAvailable" :should-show-form="shouldShowForm"
+        :form="form" :available-services="availableServices" :available-sources="availableSources" :local-service="localService"
+        :header-masonry="headerMasonry" :is-filter-sheet-open="isFilterSheetOpen"
         :set-filter-sheet-open="(value) => isFilterSheetOpen = value"
-        :update-feed="(value) => form.data.feed = value"
-        :set-local-mode="(value) => form.isLocalMode.value = value"
-        :update-service="browseActions.updateService"
-        :update-source="(value) => form.data.source = value"
-        :apply-service="applyService"
-        :apply-filters="applyFilters"
-        :go-to-first-page="goToFirstPage"
+        :update-feed="(value) => form.data.feed = value" :set-local-mode="(value) => form.isLocalMode.value = value"
+        :update-service="browseActions.updateService" :update-source="(value) => form.data.source = value"
+        :apply-service="applyService" :apply-filters="applyFilters" :go-to-first-page="goToFirstPage"
         :auto-scroll-active="autoScrollActive"
         :auto-scroll-max="AUTO_SCROLL_SPEED_MAX"
         :auto-scroll-min="AUTO_SCROLL_SPEED_MIN"
@@ -521,6 +512,9 @@ watch(
         :update-active-index="handleVibeActiveIndexUpdate"
         :update-surface-mode="handleVibeSurfaceModeUpdate"
         :mouse-shortcuts="mouseShortcuts"
+        :can-remove-loaded-items="vibeRemoval.state.canRemoveLoadedItems.value" :cancel-remove-loaded-items="vibeRemoval.actions.cancelLoadedItemsRemoval" :confirm-remove-loaded-items="vibeRemoval.actions.confirmLoadedItemsRemoval"
+        :is-removing-item-from-tab="vibeRemoval.actions.isRemovingItem" :loaded-items-removal-count="vibeRemoval.state.loadedItemCount.value" :loaded-items-removal-open="vibeRemoval.state.dialogOpen.value"
+        :remove-item-from-tab="vibeRemoval.actions.removeItem" :remove-loaded-items="vibeRemoval.actions.openLoadedItemsDialog" :removing-loaded-items="vibeRemoval.state.removingLoadedItems.value"
         :pending-batch-action="batchActionConfirmation.pendingAction.value" :confirm-batch-action="batchActionConfirmation.confirm" :cancel-batch-action="batchActionConfirmation.cancel"
         :container-interactions="containerInteractions"
         :item-interactions="itemInteractions"

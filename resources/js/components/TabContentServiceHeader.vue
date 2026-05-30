@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ChevronDown, ChevronsUp, ListChecks, Play, X } from 'lucide-vue-next';
+import { ChevronDown, ChevronsUp, ListChecks, Loader2, Play, Unlink, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { queueManager } from '@/composables/useQueue';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
@@ -29,8 +29,12 @@ interface Props {
     applyFilters: () => void | Promise<void>;
     resetFilters: () => void;
     cancelMasonryLoad?: (() => void) | null;
+    canRemoveLoadedItems?: boolean;
     goToFirstPage: () => void | Promise<void>;
     loadNextPage: () => void | Promise<void>;
+    loadedItemCount?: number;
+    removeLoadedItems?: (() => void) | null;
+    removingLoadedItems?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -38,6 +42,10 @@ const props = withDefaults(defineProps<Props>(), {
     masonry: null,
     filterSheetOpen: false,
     cancelMasonryLoad: null,
+    canRemoveLoadedItems: false,
+    loadedItemCount: 0,
+    removeLoadedItems: null,
+    removingLoadedItems: false,
 });
 
 const globalStartPanel = useBrowseGlobalStartPanel();
@@ -48,6 +56,15 @@ const queuedReactionCountLabel = computed(() => queuedReactionTotal.value > 99 ?
 const queueButtonLabel = computed(() => queuedReactionTotal.value > 0
     ? `Open reaction queue (${queuedReactionTotal.value} queued)`
     : 'Open reaction queue');
+const removeLoadedItemsLabel = computed(() => {
+    if (props.loadedItemCount === 1) {
+        return 'Remove 1 loaded item from this tab';
+    }
+
+    return props.loadedItemCount > 0
+        ? `Remove ${props.loadedItemCount} loaded items from this tab`
+        : 'Remove loaded items from this tab';
+});
 const feedOptions = [
     { label: 'Online', value: 'online' },
     { label: 'Library', value: 'local' },
@@ -99,6 +116,23 @@ const onlineServiceOptions = computed(() => serviceDropdownOptions(props.availab
 
             <ModerationRulesManager :disabled="masonry?.isLoading" />
             <slot />
+
+            <Button
+                v-if="removeLoadedItems"
+                type="button"
+                size="icon-lg"
+                variant="ghost"
+                color="danger"
+                class="h-10 w-10 p-0"
+                data-test="remove-loaded-items-button"
+                :disabled="!canRemoveLoadedItems || Boolean(masonry?.isLoading) || removingLoadedItems"
+                :aria-label="removeLoadedItemsLabel"
+                :title="removeLoadedItemsLabel"
+                @click="removeLoadedItems"
+            >
+                <Loader2 v-if="removingLoadedItems" :size="16" class="animate-spin" />
+                <Unlink v-else :size="16" />
+            </Button>
 
             <Button
                 v-if="globalStartPanel"

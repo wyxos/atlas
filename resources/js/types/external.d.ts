@@ -29,6 +29,7 @@ declare module '@/actions/App/Http/Controllers/TabController' {
     export const show: ActionHandler;
     export const store: ActionHandler;
     export const update: ActionHandler;
+    export const detachFiles: ActionHandler;
     export const destroy: ActionHandler;
     export const reorder: ActionHandler;
     export const destroyBatch: ActionHandler;

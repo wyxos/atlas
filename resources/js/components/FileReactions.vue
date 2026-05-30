@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Ban, Heart, ThumbsUp, Smile, Eye, EyeOff, Hash, Infinity as InfinityIcon } from 'lucide-vue-next';
+import { Ban, Heart, ThumbsUp, Smile, Eye, EyeOff, Hash, Infinity as InfinityIcon, Loader2, Unlink } from 'lucide-vue-next';
 import { FEED_REMOVED_PREVIEW_COUNT } from '@/lib/feedModeration';
 import type { ReactionType } from '@/types/reaction';
 
@@ -15,6 +15,8 @@ interface Props {
     variant?: 'default' | 'small';
     mode?: 'default' | 'reaction-only';
     showBlacklist?: boolean;
+    showRemove?: boolean;
+    removing?: boolean;
     surface?: 'default' | 'none';
     iconSize?: number;
 }
@@ -30,6 +32,8 @@ const props = withDefaults(defineProps<Props>(), {
     variant: 'default',
     mode: 'default',
     showBlacklist: false,
+    showRemove: false,
+    removing: false,
     surface: 'default',
     iconSize: 18,
 });
@@ -37,6 +41,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     reaction: [type: ReactionType];
     blacklist: [];
+    remove: [];
 }>();
 
 // Computed properties for each reaction type
@@ -75,10 +80,19 @@ function handleBlacklistClick(): void {
     emit('blacklist');
 }
 
+function handleRemoveClick(): void {
+    if (!props.fileId || props.removing) {
+        return;
+    }
+
+    emit('remove');
+}
+
 // Computed properties for variant checks
 const isSmall = computed(() => props.variant === 'small');
 const isReactionOnly = computed(() => props.mode === 'reaction-only');
 const shouldShowBlacklist = computed(() => !isReactionOnly.value || props.showBlacklist);
+const shouldShowRemove = computed(() => !isReactionOnly.value && props.showRemove);
 const hasDefaultSurface = computed(() => props.surface === 'default');
 
 // Computed properties for styling classes
@@ -151,6 +165,24 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
                 funny ? 'bg-yellow-500 text-white' : 'text-white hover:text-yellow-400'
             ]" aria-label="Funny">
                 <Smile :size="iconSize" />
+            </button>
+
+            <!-- Remove from Tab -->
+            <button
+                v-if="shouldShowRemove"
+                @click="handleRemoveClick"
+                :disabled="removing"
+                :class="[
+                    'rounded transition-colors',
+                    isSmall ? 'p-1' : 'p-2',
+                    removing ? 'cursor-wait text-danger-200 opacity-80' : 'text-white hover:text-danger-300'
+                ]"
+                aria-label="Remove from tab"
+                title="Remove from tab"
+                data-test="file-reactions-remove"
+            >
+                <Loader2 v-if="removing" :size="iconSize" class="animate-spin" />
+                <Unlink v-else :size="iconSize" />
             </button>
         </div>
 

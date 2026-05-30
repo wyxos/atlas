@@ -23,7 +23,9 @@ interface Props {
     containers: TabContentContainerInteractions;
     itemInteractions: TabContentItemInteractions;
     localFileDeletion: LocalFileDeletion;
+    isRemovingFromTab?: (item: FeedItem) => boolean;
     openFileSheet: (item: FeedItem, index: number) => void;
+    removeItemFromTab?: (item: FeedItem) => void | Promise<void>;
     sourceWatchRefresh: SourceWatchRefreshActions;
     onReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
 }
@@ -51,6 +53,8 @@ const showPromptButton = computed(() => props.hovered && isPreloaded.value);
 const showDeleteButton = computed(() => props.hovered
     && isPreloaded.value
     && props.localFileDeletion.actions.canDelete(props.item));
+const showRemoveFromTab = computed(() => Boolean(props.removeItemFromTab));
+const isRemovingFromTab = computed(() => props.isRemovingFromTab?.(props.item) ?? false);
 const showReactions = computed(() => (
     (
         props.hovered
@@ -194,8 +198,11 @@ const showReactions = computed(() => (
                     :current-index="index"
                     :total-items="totalItems"
                     variant="small"
+                    :show-remove="showRemoveFromTab"
+                    :removing="isRemovingFromTab"
                     @reaction="(type) => onReaction(vibeItem, type)"
                     @blacklist="() => itemInteractions.reactions.onFileBlacklist(item)"
+                    @remove="() => removeItemFromTab?.(item)"
                 />
             </div>
         </div>

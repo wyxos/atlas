@@ -62,6 +62,7 @@ const defaultStubs = {
     FileReactions: testStub,
     FileViewerSheet: testStub,
     LoadedItemsBatchActionDialog: testStub,
+    LoadedItemsRemovalDialog: testStub,
     LocalFileDeleteDialog: testStub,
     PanelRightOpen: testStub, TabContentContainerDrawer: testStub,
     TabContentContainerSheet: testStub,

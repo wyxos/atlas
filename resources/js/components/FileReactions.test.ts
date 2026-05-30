@@ -14,6 +14,7 @@ describe('FileReactions', () => {
         expect(wrapper.find('button[aria-label="Like"]').exists()).toBe(true);
         expect(wrapper.find('button[aria-label="Blacklist"]').exists()).toBe(true);
         expect(wrapper.find('button[aria-label="Funny"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="file-reactions-remove"]').exists()).toBe(false);
     });
 
     it('renders count icons and index display', () => {
@@ -165,6 +166,39 @@ describe('FileReactions', () => {
         await wrapper.vm.$nextTick();
 
         expect(wrapper.emitted('blacklist')).toEqual([[]]);
+    });
+
+    it('emits remove from tab when the optional remove action is clicked', async () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                reaction: null,
+                showRemove: true,
+            },
+        });
+
+        await wrapper.get('[data-test="file-reactions-remove"]').trigger('click');
+
+        expect(wrapper.emitted('remove')).toEqual([[]]);
+    });
+
+    it('does not emit remove while the remove action is pending', async () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                reaction: null,
+                showRemove: true,
+                removing: true,
+            },
+        });
+
+        const removeButton = wrapper.get('[data-test="file-reactions-remove"]');
+
+        expect(removeButton.attributes('disabled')).toBeDefined();
+
+        await removeButton.trigger('click');
+
+        expect(wrapper.emitted('remove')).toBeFalsy();
     });
 
     it('does not emit blacklist when fileId is not provided', async () => {

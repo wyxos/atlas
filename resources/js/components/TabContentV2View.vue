@@ -23,9 +23,9 @@ import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import DownloadedReactionDialog from './DownloadedReactionDialog.vue';
-import FileReactions from './FileReactions.vue';
 import FileViewerSheet from './FileViewerSheet.vue';
 import LoadedItemsBatchActionDialog from './LoadedItemsBatchActionDialog.vue';
+import LoadedItemsRemovalDialog from './LoadedItemsRemovalDialog.vue';
 import LocalFileDeleteDialog from './LocalFileDeleteDialog.vue';
 import Pill from './ui/Pill.vue';
 import TabContentContainerDrawer from './TabContentContainerDrawer.vue';
@@ -33,6 +33,7 @@ import TabContentContainerSheet from './TabContentContainerSheet.vue';
 import TabContentServiceHeader from './TabContentServiceHeader.vue';
 import TabContentStartForm from './TabContentStartForm.vue';
 import TabContentV2FullscreenPageLoadingLock from './TabContentV2FullscreenPageLoadingLock.vue';
+import TabContentV2FullscreenReactions from './TabContentV2FullscreenReactions.vue';
 import TabContentV2GridOverlay from './TabContentV2GridOverlay.vue';
 
 type FileSheetState = { isOpen: boolean };
@@ -64,6 +65,8 @@ const props = defineProps<{
     containerInteractions: TabContentContainerInteractions;
     currentVisibleItem: FeedItem | null;
     cancelBatchAction?: () => void;
+    cancelRemoveLoadedItems?: () => void;
+    canRemoveLoadedItems?: boolean;
     downloadedReactionPrompt: DownloadedReactionPromptShape;
     fileSheetState: FileSheetState;
     fileSheetItem: FeedItem | null;
@@ -76,6 +79,7 @@ const props = defineProps<{
     fillUntilCount?: () => void;
     fillUntilEnd?: () => void;
     goToFirstPage: () => Promise<void>;
+    confirmRemoveLoadedItems?: () => void | Promise<void>;
     handleAssetErrors: (errors: VibeAssetErrorEvent[]) => void;
     handleAssetLoads: (loads: VibeAssetLoadEvent[]) => void;
     handleContainerBlacklistChange: (change: { action: 'created' | 'deleted'; blacklist: import('@/types/container-blacklist').ContainerBlacklist }) => void;
@@ -87,10 +91,15 @@ const props = defineProps<{
     localFileDeletion: LocalFileDeletion;
     localService: ServiceOption | null | undefined;
     loadNext: () => void | Promise<void>;
+    loadedItemsRemovalCount?: number;
+    loadedItemsRemovalOpen?: boolean;
     masonryRenderKey: number;
     mouseShortcuts: MouseShortcutHandlers;
     openFileSheet: () => void;
     openFileSheetForItem: (item: FeedItem, index: number) => void;
+    removeItemFromTab?: (item: FeedItem) => void | Promise<void>;
+    removeLoadedItems?: () => void;
+    removingLoadedItems?: boolean;
     pendingBatchAction?: LoadedItemsBulkAction | null;
     promptDialog: TabContentPromptDialogHandle;
     fileSheetPresentation: FileSheetPresentation;
@@ -100,6 +109,7 @@ const props = defineProps<{
     setFilterSheetOpen: (value: boolean) => void;
     setLocalMode: (value: boolean) => void;
     setVibeHandle: (value: VibeHandle | null) => void;
+    isRemovingItemFromTab?: (item: FeedItem) => boolean;
     shouldShowForm: boolean;
     tab: TabData | null;
     totalAvailable: number | null;
@@ -251,22 +261,14 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
     >
         <TabContentServiceHeader
             v-if="!shouldShowForm"
-            :form="form"
-            :available-services="availableServices"
-            :available-sources="availableSources"
-            :local-service="localService ?? null"
-            :masonry="headerMasonry"
-            :filter-sheet-open="isFilterSheetOpen"
-            :update-filter-sheet-open="setFilterSheetOpen"
-            :update-feed="updateFeed"
-            :update-service="updateService"
-            :update-source="updateSource"
-            :apply-service="applyService"
-            :apply-filters="applyFilters"
-            :reset-filters="form.reset"
-            :cancel-masonry-load="cancelMasonryLoad"
-            :go-to-first-page="goToFirstPage"
-            :load-next-page="loadNext"
+            :form="form" :available-services="availableServices" :available-sources="availableSources"
+            :local-service="localService ?? null" :masonry="headerMasonry"
+            :filter-sheet-open="isFilterSheetOpen" :update-filter-sheet-open="setFilterSheetOpen"
+            :update-feed="updateFeed" :update-service="updateService" :update-source="updateSource"
+            :apply-service="applyService" :apply-filters="applyFilters" :reset-filters="form.reset"
+            :cancel-masonry-load="cancelMasonryLoad" :can-remove-loaded-items="canRemoveLoadedItems"
+            :go-to-first-page="goToFirstPage" :load-next-page="loadNext"
+            :loaded-item-count="loadedItemsRemovalCount" :remove-loaded-items="removeLoadedItems" :removing-loaded-items="removingLoadedItems"
         >
             <ContainerBlacklistManager
                 :ref="containerInteractions.managerRef"
@@ -308,19 +310,13 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                     <template #grid-item-overlay="{ item, hovered, active, index }">
                         <TabContentV2GridOverlay
                             v-if="getFeedItemFromVibeItem(item as VibeViewerItem)"
-                            :active="active"
-                            :hovered="hovered"
-                            :index="index"
+                            :active="active" :hovered="hovered" :index="index"
                             :dimmed="shouldDimGridItemForContainerDrawer(item as VibeViewerItem)"
                             :item="getFeedItemFromVibeItem(item as VibeViewerItem)!"
-                            :total-items="vibeStatus.itemCount"
-                            :vibe-item="item as VibeViewerItem"
-                            :containers="containerInteractions"
-                            :item-interactions="itemInteractions"
-                            :local-file-deletion="localFileDeletion"
-                            :open-file-sheet="openFileSheetForItem"
-                            :source-watch-refresh="sourceWatchRefresh"
-                            :on-reaction="handleReaction"
+                            :total-items="vibeStatus.itemCount" :vibe-item="item as VibeViewerItem"
+                            :containers="containerInteractions" :item-interactions="itemInteractions" :local-file-deletion="localFileDeletion"
+                            :is-removing-from-tab="isRemovingItemFromTab" :open-file-sheet="openFileSheetForItem" :remove-item-from-tab="removeItemFromTab"
+                            :source-watch-refresh="sourceWatchRefresh" :on-reaction="handleReaction"
                         />
                     </template>
                     <template #grid-footer>
@@ -388,25 +384,15 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         </div>
                     </template>
                     <template #fullscreen-footer="{ item, index, total }">
-                        <div
-                            data-testid="browse-fullscreen-reactions"
-                            class="flex justify-center"
-                        >
-                            <FileReactions
-                                :file-id="(item as Record<string, unknown>).fileId as number"
-                                :reaction="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.reaction ?? null"
-                                :blacklisted-at="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.blacklisted_at ?? null"
-                                :previewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.previewed_count ?? 0"
-                                :viewed-count="((item as Record<string, unknown>).feedItem as FeedItem | undefined)?.seen_count ?? 0"
-                                :current-index="index"
-                                :total-items="total"
-                                :icon-size="16"
-                                surface="none"
-                                variant="small"
-                                @reaction="(type) => handleReaction(item as VibeViewerItem, type)"
-                                @blacklist="() => handleBlacklist(item as VibeViewerItem)"
-                            />
-                        </div>
+                        <TabContentV2FullscreenReactions
+                            :item="item as VibeViewerItem"
+                            :index="index"
+                            :total="total"
+                            :handle-blacklist="handleBlacklist"
+                            :handle-reaction="handleReaction"
+                            :is-removing-item-from-tab="isRemovingItemFromTab"
+                            :remove-item-from-tab="removeItemFromTab"
+                        />
                     </template>
                     <template #fullscreen-aside="{ nextPreviews, total }">
                         <FileViewerSheet
@@ -533,6 +519,14 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
             :item-count="vibeStatus.itemCount"
             @cancel="cancelBatchAction?.()"
             @confirm="confirmBatchAction?.()"
+        />
+
+        <LoadedItemsRemovalDialog
+            :open="loadedItemsRemovalOpen ?? false"
+            :item-count="loadedItemsRemovalCount ?? 0"
+            :removing="removingLoadedItems"
+            @cancel="cancelRemoveLoadedItems?.()"
+            @confirm="confirmRemoveLoadedItems?.()"
         />
     </div>
 </template>

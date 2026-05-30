@@ -11,7 +11,7 @@ export function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
 }
 
 export function getFeedItemsFromVibeHandle(handle: AtlasVibeHandle | null, fallbackItems: FeedItem[]): FeedItem[] {
-    if (!handle) {
+    if (!handle || typeof handle.getItems !== 'function') {
         return fallbackItems;
     }
 

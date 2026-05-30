@@ -58,6 +58,8 @@ const defaultStubs = {
     ContainerBlacklistManager: testStub,
     DownloadedReactionDialog: testStub,
     FileViewerSheet: testStub,
+    LoadedItemsBatchActionDialog: testStub,
+    LoadedItemsRemovalDialog: testStub,
     LocalFileDeleteDialog: testStub,
     PanelRightOpen: testStub,
     TabContentContainerDrawer: testStub,
@@ -165,6 +167,8 @@ function createProps() {
         mouseShortcuts: { handleAuxClickCapture: vi.fn(), handleClickCapture: vi.fn(), handleContextMenuCapture: vi.fn(), handleMouseDownCapture: vi.fn() },
         openFileSheet: vi.fn(),
         openFileSheetForItem: vi.fn(),
+        removeItemFromTab: undefined as ((item: unknown) => void) | undefined,
+        isRemovingItemFromTab: undefined as ((item: unknown) => boolean) | undefined,
         promptDialog: { data: { promptDialogOpen: ref(false), promptDialogItemId: ref(null), promptDataLoading: ref(false), currentPromptData: ref(null) }, clear: vi.fn(), setOpen: vi.fn(), select: vi.fn(), copy: vi.fn(), openTestPage: vi.fn(), close: vi.fn() },
         resolve: vi.fn(),
         setFilterSheetOpen: vi.fn(),
@@ -244,6 +248,36 @@ describe('TabContentV2View fullscreen chrome', () => {
         await wrapper.get('[data-testid="fullscreen-blacklist-trigger"]').trigger('click');
 
         expect(props.itemInteractions.reactions.onFileBlacklist).toHaveBeenCalledWith(testState.item.feedItem);
+    });
+
+    it('passes fullscreen remove state and action to FileReactions', async () => {
+        const props = createProps();
+        props.removeItemFromTab = vi.fn();
+        props.isRemovingItemFromTab = vi.fn().mockReturnValue(true);
+        const fileReactionsSpy = vi.fn();
+        const fileReactionsStub = defineComponent({
+            name: 'FileReactionsStub',
+            emits: ['remove'],
+            props: {
+                removing: { type: Boolean, default: false },
+                showRemove: { type: Boolean, default: false },
+            },
+            setup(stubProps, { emit }) {
+                fileReactionsSpy(stubProps);
+                return () => h('button', { 'data-testid': 'fullscreen-remove-trigger', onClick: () => emit('remove') });
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, { props, global: { stubs: { ...defaultStubs, FileReactions: fileReactionsStub } } });
+
+        expect(fileReactionsSpy).toHaveBeenCalledWith(expect.objectContaining({
+            removing: true,
+            showRemove: true,
+        }));
+
+        await wrapper.get('[data-testid="fullscreen-remove-trigger"]').trigger('click');
+
+        expect(props.removeItemFromTab).toHaveBeenCalledWith(testState.item.feedItem);
     });
 
     it('renders fullscreen container pills with the shared pill interactions', async () => {

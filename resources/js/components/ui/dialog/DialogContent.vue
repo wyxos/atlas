@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Teleport is used in template but linter doesn't recognize template usage
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { inject, onMounted, onUnmounted, watch, computed, Teleport } from 'vue';
+import { computed, inject, onMounted, onUnmounted, Teleport, useAttrs, watch } from 'vue';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-vue-next';
 
@@ -13,6 +13,11 @@ const props = withDefaults(defineProps<Props>(), {
     class: '',
 });
 
+defineOptions({
+    inheritAttrs: false,
+});
+
+const attrs = useAttrs();
 const dialogOpen = inject<{ value: boolean } | { get: () => boolean; set: (value: boolean) => void }>('dialogOpen');
 const setDialogOpen = inject<(value: boolean) => void>('setDialogOpen');
 
@@ -93,6 +98,7 @@ onUnmounted(() => {
                 >
                     <div
                         v-if="isOpen"
+                        v-bind="attrs"
                         :class="cn(
                             'relative z-50 w-full max-w-lg rounded-lg border border-twilight-indigo-500 bg-prussian-blue-600 p-6 shadow-lg focus:outline-none',
                             props.class

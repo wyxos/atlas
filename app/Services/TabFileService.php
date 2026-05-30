@@ -44,6 +44,36 @@ class TabFileService
     }
 
     /**
+     * Detach multiple files from one tab owned by a user.
+     *
+     * @param  array<int, mixed>  $fileIds
+     */
+    public function detachFilesFromTab(int $userId, int $tabId, array $fileIds): int
+    {
+        $normalizedFileIds = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $fileId): int => is_numeric($fileId) ? (int) $fileId : 0, $fileIds),
+            static fn (int $fileId): bool => $fileId > 0,
+        )));
+
+        if ($normalizedFileIds === []) {
+            return 0;
+        }
+
+        $ownsTab = Tab::forUser($userId)
+            ->whereKey($tabId)
+            ->exists();
+
+        if (! $ownsTab) {
+            return 0;
+        }
+
+        return DB::table('tab_file')
+            ->where('tab_id', $tabId)
+            ->whereIn('file_id', $normalizedFileIds)
+            ->delete();
+    }
+
+    /**
      * Detach a file from every tab it is currently attached to.
      *
      * @return array<int, array{user_id: int, tab_ids: array<int>}>

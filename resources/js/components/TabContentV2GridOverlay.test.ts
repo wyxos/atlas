@@ -78,7 +78,9 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
                 open: vi.fn(),
             },
         } as any,
+        isRemovingFromTab: undefined as ((item: FeedItem) => boolean) | undefined,
         openFileSheet: vi.fn(),
+        removeItemFromTab: undefined as ((item: FeedItem) => void) | undefined,
         sourceWatchRefresh: {
             canRefreshSourceMedia: vi.fn().mockReturnValue(false),
             canWatchAndRefresh: vi.fn().mockReturnValue(false),
@@ -148,7 +150,7 @@ describe('TabContentV2GridOverlay', () => {
     });
 
     it('shows and wires the blacklist state action for blacklisted items', async () => {
-        const props = createProps();
+        const props = createProps({ hovered: true });
         props.item.blacklisted_at = '2026-04-30T00:00:00Z';
         const fileReactionsSpy = vi.fn();
 
@@ -186,6 +188,50 @@ describe('TabContentV2GridOverlay', () => {
         await wrapper.get('[data-testid="blacklist-trigger"]').trigger('click');
 
         expect(props.itemInteractions.reactions.onFileBlacklist).toHaveBeenCalledWith(props.item);
+    });
+
+    it('shows and wires the remove from tab action when provided', async () => {
+        const props = createProps({ hovered: true });
+        props.removeItemFromTab = vi.fn();
+        props.isRemovingFromTab = vi.fn().mockReturnValue(true);
+        const fileReactionsSpy = vi.fn();
+
+        const fileReactionsStub = defineComponent({
+            name: 'FileReactionsStub',
+            emits: ['remove'],
+            props: {
+                removing: { type: Boolean, default: false },
+                showRemove: { type: Boolean, default: false },
+            },
+            setup(stubProps, { emit }) {
+                fileReactionsSpy(stubProps);
+
+                return () => h('button', {
+                    'data-testid': 'remove-from-tab-trigger',
+                    onClick: () => emit('remove'),
+                });
+            },
+        });
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: testStub,
+                    FileReactions: fileReactionsStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        expect(fileReactionsSpy).toHaveBeenCalledWith(expect.objectContaining({
+            removing: true,
+            showRemove: true,
+        }));
+
+        await wrapper.get('[data-testid="remove-from-tab-trigger"]').trigger('click');
+
+        expect(props.removeItemFromTab).toHaveBeenCalledWith(props.item);
     });
 
     it('shows source watch refresh action for DeviantArt items with a user container', async () => {
