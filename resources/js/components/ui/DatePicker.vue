@@ -11,11 +11,13 @@ import { Popover, PopoverContent, PopoverTrigger } from './popover';
 interface Props {
     modelValue?: string;
     placeholder?: string;
+    disabled?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     modelValue: '',
     placeholder: 'Pick a date',
+    disabled: false,
 });
 
 const emit = defineEmits<{
@@ -123,6 +125,7 @@ function handleDateSelect(value: DateValue | null): void {
             <Button
                 type="button"
                 variant="outline"
+                :disabled="disabled"
                 :class="cn(
                     'w-full justify-start text-left font-normal',
                     !date && 'text-twilight-indigo-300'

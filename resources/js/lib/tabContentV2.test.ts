@@ -105,6 +105,45 @@ describe('tabContentV2 resolve', () => {
         expect(requestedUrl).toContain('source[]=Wallhaven');
     });
 
+    it('serializes local date range filters into the browse request', async () => {
+        window.axios.get = vi.fn().mockResolvedValue({
+            data: {
+                items: [],
+                nextPage: null,
+                previousPage: null,
+                total: 0,
+            },
+        }) as typeof window.axios.get;
+
+        const resolve = createTabContentV2Resolve({
+            form: {
+                getData: () => ({
+                    feed: 'local',
+                    limit: 20,
+                    page: 1,
+                    service: '',
+                    serviceFilters: {
+                        date_from: '2026-05-01',
+                        date_to: '2026-05-30',
+                    },
+                    source: 'all',
+                    tab_id: 1,
+                }),
+            } as any,
+            startPageToken: ref(1),
+            toast: {
+                error: vi.fn(),
+            },
+        });
+
+        await resolve({ cursor: null, pageSize: 20 });
+
+        const requestedUrl = decodeURIComponent(vi.mocked(window.axios.get).mock.calls[0]?.[0] as string);
+
+        expect(requestedUrl).toContain('date_from=2026-05-01');
+        expect(requestedUrl).toContain('date_to=2026-05-30');
+    });
+
     it('resolves a params-only CivitAI startup state as a page one model-version query', async () => {
         window.axios.get = vi.fn().mockResolvedValue({
             data: {

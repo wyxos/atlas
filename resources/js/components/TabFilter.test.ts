@@ -31,6 +31,24 @@ const SearchableDropdownStub = defineComponent({
     },
 });
 
+const DatePickerStub = defineComponent({
+    name: 'DatePicker',
+    props: {
+        modelValue: { type: String, default: '' },
+        placeholder: { type: String, default: '' },
+    },
+    emits: ['update:modelValue'],
+    setup(props, { emit }) {
+        return () => h('input', {
+            value: props.modelValue,
+            placeholder: props.placeholder,
+            onInput: (event: Event) => {
+                emit('update:modelValue', (event.target as HTMLInputElement).value);
+            },
+        });
+    },
+});
+
 describe('TabFilter', () => {
     it('provides random newest and oldest presets for each local reaction view', () => {
         const reactionsGroup = LOCAL_TAB_FILTER_PRESET_GROUPS.find((group) => group.label === 'Reactions');
@@ -304,6 +322,94 @@ describe('TabFilter', () => {
 
         expect(wrapper.text()).toContain('Unreacted (Newest)');
         expect(form.data.serviceFilters.local_preset).toBe('inbox_newest');
+    });
+
+    it('applies local date range fields as service filters', async () => {
+        const form = createBrowseForm();
+        form.syncFromTab({
+            id: 13,
+            label: 'Local Tab',
+            position: 0,
+            isActive: true,
+            params: {
+                feed: 'local',
+                source: 'all',
+                page: 1,
+                limit: 20,
+            } as any,
+        });
+
+        const wrapper = mount(TabFilter, {
+            props: {
+                open: true,
+                availableServices: [],
+                localDef: {
+                    key: 'local',
+                    label: 'Library',
+                    defaults: {},
+                    schema: {
+                        fields: [
+                            { uiKey: 'page', serviceKey: 'page', type: 'hidden', label: 'Page' },
+                            { uiKey: 'limit', serviceKey: 'limit', type: 'number', label: 'Limit' },
+                            {
+                                uiKey: 'source',
+                                serviceKey: 'source',
+                                type: 'select',
+                                label: 'Source',
+                                options: [{ label: 'All', value: 'all' }],
+                            },
+                            {
+                                uiKey: 'date_from',
+                                serviceKey: 'date_from',
+                                type: 'date',
+                                label: 'Created From',
+                                placeholder: 'From date',
+                            },
+                            {
+                                uiKey: 'date_to',
+                                serviceKey: 'date_to',
+                                type: 'date',
+                                label: 'Created To',
+                                placeholder: 'To date',
+                            },
+                        ],
+                    },
+                },
+                masonry: null,
+            },
+            global: {
+                provide: {
+                    [BrowseFormKey as symbol]: form,
+                },
+                stubs: {
+                    Sheet: Stub,
+                    SheetContent: Stub,
+                    SheetHeader: Stub,
+                    SheetTitle: Stub,
+                    SheetTrigger: Stub,
+                    SheetFooter: Stub,
+                    LocalSourceDropdown: Stub,
+                    Select: Stub,
+                    SelectContent: Stub,
+                    SelectItem: Stub,
+                    SelectTrigger: Stub,
+                    SelectValue: Stub,
+                    SearchableDropdown: SearchableDropdownStub,
+                    DatePicker: DatePickerStub,
+                    RadioGroup: Stub,
+                    RadioGroupItem: Stub,
+                    Switch: Stub,
+                    Checkbox: Stub,
+                    Button: Stub,
+                },
+            },
+        });
+
+        await wrapper.get('input[placeholder="From date"]').setValue('2026-05-01');
+        await wrapper.get('input[placeholder="To date"]').setValue('2026-05-30');
+
+        expect(form.data.serviceFilters.date_from).toBe('2026-05-01');
+        expect(form.data.serviceFilters.date_to).toBe('2026-05-30');
     });
 
     it('includes blacklist-only local preset options', async () => {

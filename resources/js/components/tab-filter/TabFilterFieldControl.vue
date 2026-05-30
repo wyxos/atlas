@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import Checkbox from '@/components/ui/Checkbox.vue';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import Input from '@/components/ui/input/Input.vue';
 import SearchableDropdown from '@/components/ui/SearchableDropdown.vue';
 import type { ServiceFilterField } from '@/lib/browseCatalog';
@@ -85,6 +86,14 @@ function updateCheckboxGroupValue(value: string, checked: boolean): void {
             :disabled="disabled"
             :placeholder="placeholder || 'Select…'"
             :search-placeholder="`Search ${field.label.toLowerCase()}...`"
+            @update:model-value="(value) => emit('update:modelValue', value)"
+        />
+
+        <DatePicker
+            v-else-if="field.type === 'date'"
+            :model-value="String(resolvedValue ?? '')"
+            :placeholder="placeholder || field.label"
+            :disabled="disabled"
             @update:model-value="(value) => emit('update:modelValue', value)"
         />
 

@@ -22,6 +22,7 @@ export type ServiceFilterFieldType =
     | 'checkbox'
     | 'checkbox-group'
     | 'boolean'
+    | 'date'
     | 'text'
     | 'number'
     | 'hidden';

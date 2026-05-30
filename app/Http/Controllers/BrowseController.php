@@ -135,6 +135,8 @@ class BrowseController extends Controller
                     'defaults' => [
                         'limit' => 20,
                         'source' => 'all',
+                        'date_from' => '',
+                        'date_to' => '',
                         'file_type' => ['all'],
                         // Reaction filtering:
                         // - any: ignore reactions entirely (show all files)
@@ -171,6 +173,20 @@ class BrowseController extends Controller
                             'description' => 'Filter by file source.',
                             'options' => $sourceOptions,
                             'default' => 'all',
+                        ]),
+                        $localSchema->field('date_from', [
+                            'type' => 'date',
+                            'label' => 'Created From',
+                            'description' => 'Only include library files created on or after this date.',
+                            'placeholder' => 'From date',
+                            'default' => '',
+                        ]),
+                        $localSchema->field('date_to', [
+                            'type' => 'date',
+                            'label' => 'Created To',
+                            'description' => 'Only include library files created on or before this date.',
+                            'placeholder' => 'To date',
+                            'default' => '',
                         ]),
                         $localSchema->field('file_type', [
                             'type' => 'checkbox-group',

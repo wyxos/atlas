@@ -77,6 +77,28 @@ test('compiler builds multiple source filter', function () {
         ->and($filter)->toContain('not_found:=false');
 });
 
+test('compiler builds created date range filters', function () {
+    $compiler = app(LibraryTypesenseCompiler::class);
+    $timezone = new DateTimeZone('UTC');
+    $createdFrom = (new DateTimeImmutable('2026-05-01 00:00:00', $timezone))->getTimestamp();
+    $createdTo = (new DateTimeImmutable('2026-05-30 23:59:59', $timezone))->getTimestamp();
+
+    $filter = $compiler->compileFileFilter([
+        'createdFrom' => $createdFrom,
+        'createdTo' => $createdTo,
+        'downloaded' => 'any',
+        'blacklisted' => 'any',
+        'autoBlacklisted' => 'any',
+        'reactionMode' => 'any',
+        'reactionTypes' => null,
+        'fileTypes' => ['all'],
+    ], 11);
+
+    expect($filter)->toContain('created_at:>='.$createdFrom)
+        ->and($filter)->toContain('created_at:<='.$createdTo)
+        ->and($filter)->toContain('not_found:=false');
+});
+
 test('compiler ignores source filters when all is selected with other sources', function () {
     $compiler = app(LibraryTypesenseCompiler::class);
 

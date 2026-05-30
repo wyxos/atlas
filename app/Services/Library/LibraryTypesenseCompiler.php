@@ -139,6 +139,16 @@ class LibraryTypesenseCompiler
                 : 'source:=['.$this->implodeExactValues($sources).']';
         }
 
+        $createdFrom = $context['createdFrom'] ?? null;
+        if (is_int($createdFrom)) {
+            $filters[] = 'created_at:>='.$createdFrom;
+        }
+
+        $createdTo = $context['createdTo'] ?? null;
+        if (is_int($createdTo)) {
+            $filters[] = 'created_at:<='.$createdTo;
+        }
+
         $downloaded = (string) ($context['downloaded'] ?? 'any');
         if ($downloaded === 'yes') {
             $filters[] = 'downloaded:=true';

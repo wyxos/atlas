@@ -22,11 +22,12 @@ test('returns correct key source and label', function () {
 
 test('fetch delegates normalized params to the typesense gateway', function () {
     $file = File::factory()->create();
+    $timezone = new DateTimeZone(date_default_timezone_get() ?: 'UTC');
 
     mock(LibraryTypesenseGateway::class)
         ->shouldReceive('search')
         ->once()
-        ->withArgs(function (array $context): bool {
+        ->withArgs(function (array $context) use ($timezone): bool {
             expect($context['page'])->toBe(2)
                 ->and($context['limit'])->toBe(15)
                 ->and($context['source'])->toBe(['Wallhaven'])
@@ -35,6 +36,8 @@ test('fetch delegates normalized params to the typesense gateway', function () {
                 ->and($context['reactionMode'])->toBe('types')
                 ->and($context['reactionTypes'])->toBe(['funny'])
                 ->and($context['minPreviewed'])->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
+                ->and($context['createdFrom'])->toBe((new DateTimeImmutable('2026-05-01 00:00:00', $timezone))->getTimestamp())
+                ->and($context['createdTo'])->toBe((new DateTimeImmutable('2026-05-30 23:59:59', $timezone))->getTimestamp())
                 ->and($context['sort'])->toBe('reaction_at');
 
             return true;
@@ -56,6 +59,8 @@ test('fetch delegates normalized params to the typesense gateway', function () {
         'reaction_mode' => 'types',
         'reaction' => ['funny'],
         'min_previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
+        'date_from' => '2026-05-01',
+        'date_to' => '2026-05-30',
         'sort' => 'reaction_at',
     ]);
 

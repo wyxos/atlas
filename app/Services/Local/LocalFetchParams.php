@@ -2,6 +2,9 @@
 
 namespace App\Services\Local;
 
+use DateTimeImmutable;
+use DateTimeZone;
+
 class LocalFetchParams
 {
     /**
@@ -19,6 +22,8 @@ class LocalFetchParams
      *   seed: ?int,
      *   maxPreviewed: ?int,
      *   minPreviewed: ?int,
+     *   createdFrom: ?int,
+     *   createdTo: ?int,
      *   reactionMode: string,
      *   autoBlacklisted: string,
      *   reactionTypes: ?array<int, string>,
@@ -56,6 +61,21 @@ class LocalFetchParams
             $minPreviewed = null;
         }
 
+        $createdFrom = self::normalizeDateBoundary($params['date_from'] ?? null, false);
+        $createdTo = self::normalizeDateBoundary($params['date_to'] ?? null, true);
+
+        if ($createdFrom) {
+            $params['date_from'] = $createdFrom['date'];
+        } else {
+            unset($params['date_from']);
+        }
+
+        if ($createdTo) {
+            $params['date_to'] = $createdTo['date'];
+        } else {
+            unset($params['date_to']);
+        }
+
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
         $autoBlacklisted = is_string($params['auto_blacklisted'] ?? null) ? (string) $params['auto_blacklisted'] : 'any';
         $reaction = $params['reaction'] ?? null;
@@ -79,6 +99,8 @@ class LocalFetchParams
                 'seed' => $seed,
                 'maxPreviewed' => $maxPreviewed,
                 'minPreviewed' => $minPreviewed,
+                'createdFrom' => $createdFrom['timestamp'] ?? null,
+                'createdTo' => $createdTo['timestamp'] ?? null,
                 'reactionMode' => $reactionMode,
                 'autoBlacklisted' => $autoBlacklisted,
                 'reactionTypes' => $reactionTypes,
@@ -112,6 +134,8 @@ class LocalFetchParams
             'seed' => $seed,
             'maxPreviewed' => $maxPreviewed,
             'minPreviewed' => $minPreviewed,
+            'createdFrom' => $createdFrom['timestamp'] ?? null,
+            'createdTo' => $createdTo['timestamp'] ?? null,
             'reactionMode' => $reactionMode,
             'autoBlacklisted' => $autoBlacklisted,
             'reactionTypes' => $reactionTypes,
@@ -180,6 +204,38 @@ class LocalFetchParams
         }
 
         return $reactionTypes;
+    }
+
+    /**
+     * @return array{date: string, timestamp: int}|null
+     */
+    private static function normalizeDateBoundary(mixed $value, bool $endOfDay): ?array
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+            return null;
+        }
+
+        [$year, $month, $day] = array_map('intval', explode('-', $raw));
+        if (! checkdate($month, $day, $year)) {
+            return null;
+        }
+
+        $timezone = new DateTimeZone(date_default_timezone_get() ?: 'UTC');
+        $date = new DateTimeImmutable(
+            sprintf('%04d-%02d-%02d 00:00:00', $year, $month, $day),
+            $timezone,
+        );
+        $date = $endOfDay ? $date->setTime(23, 59, 59) : $date->setTime(0, 0);
+
+        return [
+            'date' => $date->format('Y-m-d'),
+            'timestamp' => $date->getTimestamp(),
+        ];
     }
 
     private static function normalizeStringList(mixed $value): array

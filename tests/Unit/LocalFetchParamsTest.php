@@ -102,3 +102,29 @@ it('normalizes multiple local sources and keeps them in params', function () {
     expect($context['source'])->toBe(['CivitAI', 'Wallhaven'])
         ->and($context['params']['source'])->toBe(['CivitAI', 'Wallhaven']);
 });
+
+it('normalizes local created date range filters', function () {
+    $timezone = new DateTimeZone(date_default_timezone_get() ?: 'UTC');
+
+    $context = LocalFetchParams::normalize([
+        'date_from' => '2026-05-01',
+        'date_to' => '2026-05-30',
+    ]);
+
+    expect($context['createdFrom'])->toBe((new DateTimeImmutable('2026-05-01 00:00:00', $timezone))->getTimestamp())
+        ->and($context['createdTo'])->toBe((new DateTimeImmutable('2026-05-30 23:59:59', $timezone))->getTimestamp())
+        ->and($context['params']['date_from'])->toBe('2026-05-01')
+        ->and($context['params']['date_to'])->toBe('2026-05-30');
+});
+
+it('drops invalid local created date range filters', function () {
+    $context = LocalFetchParams::normalize([
+        'date_from' => 'not-a-date',
+        'date_to' => '2026-99-99',
+    ]);
+
+    expect($context['createdFrom'])->toBeNull()
+        ->and($context['createdTo'])->toBeNull()
+        ->and($context['params'])->not->toHaveKey('date_from')
+        ->and($context['params'])->not->toHaveKey('date_to');
+});

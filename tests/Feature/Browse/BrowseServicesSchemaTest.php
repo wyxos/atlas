@@ -48,6 +48,8 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($local['defaults'])->toHaveKey('seed');
     expect($local['defaults'])->toHaveKey('max_previewed_count');
     expect($local['defaults'])->toHaveKey('min_previewed_count');
+    expect($local['defaults']['date_from'])->toBe('');
+    expect($local['defaults']['date_to'])->toBe('');
     expect($local['defaults']['file_type'])->toBe(['all']);
 
     $localFields = $local['schema']['fields'] ?? null;
@@ -56,6 +58,8 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'page',
         'limit',
         'source',
+        'date_from',
+        'date_to',
         'file_type',
         'reaction_mode',
         'reaction',
@@ -89,6 +93,13 @@ test('browse services endpoint returns civitai schema with expected field mappin
 
     $localReactionMode = collect($localFields)->firstWhere('uiKey', 'reaction_mode');
     expect($localReactionMode['type'])->toBe('radio');
+
+    $localDateFrom = collect($localFields)->firstWhere('uiKey', 'date_from');
+    $localDateTo = collect($localFields)->firstWhere('uiKey', 'date_to');
+    expect($localDateFrom['type'])->toBe('date')
+        ->and($localDateFrom['label'])->toBe('Created From')
+        ->and($localDateTo['type'])->toBe('date')
+        ->and($localDateTo['label'])->toBe('Created To');
 
     $civit = collect($services)->firstWhere('key', 'civit-ai-images');
     expect($civit)->not->toBeNull();

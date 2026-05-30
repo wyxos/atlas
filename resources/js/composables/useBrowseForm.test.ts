@@ -253,6 +253,30 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.source).toEqual(['CivitAI', 'Wallhaven']);
     });
 
+    it('restores local date range filters from tab params', () => {
+        const form = createBrowseForm();
+        form.reset();
+
+        form.syncFromTab({
+            id: 8,
+            label: 'Local date range tab',
+            position: 0,
+            isActive: true,
+            params: {
+                feed: 'local',
+                source: 'all',
+                page: 1,
+                limit: 20,
+                date_from: '2026-05-01',
+                date_to: '2026-05-30',
+            } as any,
+        });
+
+        expect(form.data.feed).toBe('local');
+        expect(form.data.serviceFilters.date_from).toBe('2026-05-01');
+        expect(form.data.serviceFilters.date_to).toBe('2026-05-30');
+    });
+
     it('uses provided instance when available (tab isolation)', () => {
         const Parent = defineComponent({
             name: 'ParentWrapper',
