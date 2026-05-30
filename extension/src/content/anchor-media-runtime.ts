@@ -9,6 +9,7 @@ import {
 } from './media-utils';
 import { urlMatchesAnyRule } from '../match-rules';
 import {
+    applyAnchorBlacklistedDecoration,
     applyAnchorCheckingDecoration,
     applyAnchorMatchDecoration,
     clearAnchorMatchDecoration,
@@ -368,7 +369,15 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
                 ? parseKnownReaction(mediaElement.getAttribute('data-atlas-anchor-reaction'))
                 : reaction;
 
-            applyAnchorMatchDecoration(mediaElement, reactionForDecoration);
+            const blacklistedForDecoration = blacklistedAt === undefined
+                ? mediaElement.getAttribute('data-atlas-anchor-blacklisted-at')
+                : blacklistedAt;
+
+            if (blacklistedForDecoration) {
+                applyAnchorBlacklistedDecoration(mediaElement);
+            } else {
+                applyAnchorMatchDecoration(mediaElement, reactionForDecoration);
+            }
             mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
             mediaElement.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
             mediaElement.removeAttribute('data-atlas-anchor-checking');

@@ -312,7 +312,7 @@ describe('FileViewerSheet', () => {
         expect(copyToClipboard).toHaveBeenCalledWith('high detail test prompt', 'Prompt', { showToast: false });
     });
 
-    it('renders prompt moderation and auto-blacklist provenance', () => {
+    it('renders prompt moderation and auto-blacklist provenance in the prompt danger card', () => {
         const wrapper = mount(FileViewerSheet, {
             props: {
                 isOpen: true,
@@ -331,6 +331,14 @@ describe('FileViewerSheet', () => {
                         blacklist_previewed_count_mode: 'feed_removed',
                     },
                     auto_blacklist_rule: {
+                        id: 4,
+                        name: 'Prompt rule',
+                        action_type: 'blacklist',
+                        matched_terms: ['term one'],
+                        reason: 'Matched prompt terms: term one',
+                        blacklist_previewed_count_mode: 'feed_removed',
+                    },
+                    blacklist_rule: {
                         id: 4,
                         name: 'Prompt rule',
                         action_type: 'blacklist',
@@ -365,12 +373,101 @@ describe('FileViewerSheet', () => {
         const text = wrapper.text();
 
         expect(text).toContain('# 77');
-        expect(wrapper.get('[data-test="file-prompt-moderation-rule"]').text()).toContain('#4 Prompt rule');
-        expect(text).toContain('Terms: term one, term two');
-        expect(text).toContain('Moderation Rule (Flagged)');
-        expect(text).toContain('Concerned Container');
-        expect(text).toContain('#12 User');
-        expect(text).toContain('deviantart.com · artist');
+        const moderationCard = wrapper.get('[data-test="file-prompt-moderation-card"]');
+
+        expect(moderationCard.text()).toContain('Auto blacklist');
+        expect(moderationCard.text()).toContain('Auto blacklist rule');
+        expect(moderationCard.text()).toContain('#4 Prompt rule (blacklist)');
+        expect(moderationCard.text()).toContain('Terms: term one');
+        expect(moderationCard.text()).toContain('Concerned container');
+        expect(moderationCard.text()).toContain('#12 User');
+        expect(moderationCard.text()).toContain('deviantart.com · artist');
+        expect(text).not.toContain('Moderation Rule (Flagged)');
+        expect(text).not.toContain('Moderation Rule (Matched)');
+    });
+
+    it('uses the persisted blacklist rule in the prompt danger card when active prompt match details are absent', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: null,
+                isLoading: false,
+                fileData: makeFile({
+                    id: 161323,
+                    auto_blacklisted: true,
+                    blacklisted_at: '2026-05-30T10:00:00Z',
+                    blacklist_rule: {
+                        id: 24,
+                        name: 'Fat',
+                        action_type: 'blacklist',
+                        matched_terms: ['fat'],
+                        reason: 'Matched prompt terms: fat',
+                        blacklist_previewed_count_mode: 'preserve',
+                    },
+                }),
+                prompt: 'character with fat body type',
+                showPrompt: true,
+            },
+        });
+
+        const text = wrapper.text();
+        const moderationCard = wrapper.get('[data-test="file-prompt-moderation-card"]');
+
+        expect(moderationCard.text()).toContain('Auto blacklist rule');
+        expect(moderationCard.text()).toContain('#24 Fat (blacklist)');
+        expect(moderationCard.text()).toContain('Terms: fat');
+        expect(moderationCard.text()).toContain('Matched prompt terms: fat');
+        expect(text).not.toContain('Moderation Rule (Matched)');
+    });
+
+    it('explains preview-count auto blacklists when no rule or container is attached', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: null,
+                isLoading: false,
+                fileData: makeFile({
+                    id: 2308,
+                    auto_blacklisted: true,
+                    blacklisted_at: '2026-05-30T07:11:02Z',
+                    previewed_count: 2,
+                }),
+                showPrompt: true,
+            },
+        });
+
+        const text = wrapper.text();
+        const moderationCard = wrapper.get('[data-test="file-prompt-moderation-card"]');
+        const previewCountProvenance = wrapper.get('[data-test="file-prompt-preview-count-blacklist"]');
+
+        expect(moderationCard.text()).toContain('Auto blacklist');
+        expect(moderationCard.text()).toContain('Likely preview threshold');
+        expect(previewCountProvenance.text()).toContain('Preview count auto blacklist');
+        expect(previewCountProvenance.text()).toContain('No moderation rule or blacklisted container is attached.');
+        expect(previewCountProvenance.text()).toContain('Previewed 2 times.');
+        expect(text).not.toContain('Moderation Rule (Matched)');
+    });
+
+    it('describes terminal preview-count auto blacklists without showing the sentinel as literal views', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: null,
+                isLoading: false,
+                fileData: makeFile({
+                    id: 2308,
+                    auto_blacklisted: true,
+                    blacklisted_at: '2026-05-30T07:11:02Z',
+                    previewed_count: 100000,
+                }),
+                showPrompt: true,
+            },
+        });
+
+        const previewCountProvenance = wrapper.get('[data-test="file-prompt-preview-count-blacklist"]');
+
+        expect(previewCountProvenance.text()).toContain('Reached the feed-removal threshold.');
+        expect(previewCountProvenance.text()).not.toContain('Previewed 100000 times.');
     });
 
     it('shows prompt loading state in the sheet', () => {

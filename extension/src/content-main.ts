@@ -421,7 +421,8 @@ function installInteractionFallbackListeners(): void {
 
     document.addEventListener('mouseover', handleInteraction, { passive: true });
     document.addEventListener('mouseup', handleInteraction, { passive: true });
-    document.addEventListener('contextmenu', handleAnchorReferrerShortcut, { capture: true });
+    window.addEventListener('mousedown', handleAnchorReferrerShortcut, true);
+    window.addEventListener('contextmenu', handleAnchorReferrerShortcut, true);
     interactionFallbackListenersInstalled = true;
 }
 
@@ -432,7 +433,8 @@ function removeInteractionFallbackListeners(): void {
 
     document.removeEventListener('mouseover', handleInteraction);
     document.removeEventListener('mouseup', handleInteraction);
-    document.removeEventListener('contextmenu', handleAnchorReferrerShortcut, { capture: true });
+    window.removeEventListener('mousedown', handleAnchorReferrerShortcut, true);
+    window.removeEventListener('contextmenu', handleAnchorReferrerShortcut, true);
     interactionFallbackListenersInstalled = false;
 }
 

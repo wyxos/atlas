@@ -37,6 +37,7 @@ const mockOverlayRemove = vi.fn();
 const mockOverlayScheduleReposition = vi.fn();
 const mockOverlayRefreshVisibleChecks = vi.fn();
 const mockAnchorRuntime = {
+    handleAltRightClick: vi.fn(),
     handleDownloadProgressEvent: vi.fn(),
     handleReferrerReactionSync: vi.fn(),
     handleTabPresenceChanged: vi.fn(),
@@ -359,6 +360,65 @@ describe('content-main', () => {
         await flushPromises();
 
         expect(mockGetStoredOptions).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles only Alt right mouse down referrer shortcuts from the window capture listener', async () => {
+        mockGetStoredOptions.mockResolvedValue({
+            siteCustomizations: [],
+        });
+        mockResolveSiteCustomizationForHostname.mockReturnValue(null);
+        mockAnchorRuntime.handleAltRightClick.mockReturnValue(true);
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post';
+        const image = document.createElement('img');
+        image.src = 'https://cdn.example.com/linked.jpg';
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+
+        await import('./content-main');
+        await flushPromises();
+        await flushPromises();
+
+        const shortcutHandler = addEventListenerSpy.mock.calls.find(([type]) => type === 'mousedown')?.[1];
+        expect(addEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function), true);
+        expect(addEventListenerSpy).toHaveBeenCalledWith('contextmenu', expect.any(Function), true);
+        expect(shortcutHandler).toEqual(expect.any(Function));
+
+        const contextMenuOnly = new MouseEvent('contextmenu', {
+            altKey: true,
+            bubbles: true,
+            button: 0,
+            cancelable: true,
+        });
+        (shortcutHandler as (event: MouseEvent) => void)(contextMenuOnly);
+
+        expect(mockAnchorRuntime.handleAltRightClick).not.toHaveBeenCalled();
+        expect(contextMenuOnly.defaultPrevented).toBe(false);
+
+        const event = new MouseEvent('mousedown', {
+            altKey: true,
+            bubbles: true,
+            button: 2,
+            cancelable: true,
+        });
+        (shortcutHandler as (event: MouseEvent) => void)(event);
+
+        expect(mockAnchorRuntime.handleAltRightClick).toHaveBeenCalledWith(event);
+        expect(event.defaultPrevented).toBe(true);
+
+        const suppressedContextMenu = new MouseEvent('contextmenu', {
+            altKey: true,
+            bubbles: true,
+            button: 0,
+            cancelable: true,
+        });
+        (shortcutHandler as (event: MouseEvent) => void)(suppressedContextMenu);
+
+        expect(mockAnchorRuntime.handleAltRightClick).toHaveBeenCalledTimes(1);
+        expect(suppressedContextMenu.defaultPrevented).toBe(true);
     });
 
     it('bypasses the badge check cache when the background marks the page as restored', async () => {

@@ -1,5 +1,6 @@
 import type { MediaElement } from './media-utils';
 import {
+    applyAnchorBlacklistedDecoration,
     applyAnchorMatchDecoration,
     applyAnchorOpenedDecoration,
     applyAnchorSamePageDecoration,
@@ -45,7 +46,11 @@ export function applyAnchorMediaMatch(media: MediaElement, result: AnchorMediaMa
         ? result.reaction
         : null;
 
-    applyAnchorMatchDecoration(media, reaction);
+    if (result.blacklistedAt) {
+        applyAnchorBlacklistedDecoration(media);
+    } else {
+        applyAnchorMatchDecoration(media, reaction);
+    }
     media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
     media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
     media.removeAttribute('data-atlas-anchor-checking');

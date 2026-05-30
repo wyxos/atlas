@@ -15,18 +15,47 @@ type ReferrerBlacklistShortcutOptions = {
     refreshReferrerUrlsFromCache: (referrerUrls: string[]) => void;
 };
 
+function isAltRightClickShortcut(event: MouseEvent): boolean {
+    return event.type === 'mousedown' && event.altKey && event.button === 2;
+}
+
+function resolveAnchorMedia(anchor: HTMLAnchorElement): MediaElement | null {
+    const outlinedMedia = anchor.querySelector(`img[${ANCHOR_MEDIA_BORDER_ATTR}="1"],video[${ANCHOR_MEDIA_BORDER_ATTR}="1"]`);
+    if (outlinedMedia && isMediaElement(outlinedMedia)) {
+        return outlinedMedia;
+    }
+
+    const media = anchor.querySelector('img,video');
+    return media && isMediaElement(media) ? media : null;
+}
+
+function resolveMediaFromElement(element: Element): MediaElement | null {
+    const fromTarget = element.closest('img,video');
+    if (fromTarget && isMediaElement(fromTarget)) {
+        return fromTarget;
+    }
+
+    const anchor = element.closest('a[href]');
+    if (anchor instanceof HTMLAnchorElement) {
+        return resolveAnchorMedia(anchor);
+    }
+
+    return null;
+}
+
 function resolveMediaFromEvent(event: MouseEvent): MediaElement | null {
     const target = event.target;
     if (target instanceof Element) {
-        const fromTarget = target.closest('img,video');
-        if (fromTarget && isMediaElement(fromTarget)) {
-            return fromTarget;
+        const targetMedia = resolveMediaFromElement(target);
+        if (targetMedia !== null) {
+            return targetMedia;
         }
     }
 
     for (const element of document.elementsFromPoint(event.clientX, event.clientY)) {
-        if (isMediaElement(element)) {
-            return element;
+        const pointMedia = resolveMediaFromElement(element);
+        if (pointMedia !== null) {
+            return pointMedia;
         }
     }
 
@@ -34,7 +63,7 @@ function resolveMediaFromEvent(event: MouseEvent): MediaElement | null {
 }
 
 export function handleAltRightClickReferrerBlacklist(options: ReferrerBlacklistShortcutOptions): boolean {
-    if (options.isPaused() || options.event.button !== 2 || !options.event.altKey) {
+    if (options.isPaused() || !isAltRightClickShortcut(options.event)) {
         return false;
     }
 
@@ -74,6 +103,7 @@ export function handleAltRightClickReferrerBlacklist(options: ReferrerBlacklistS
 
             if (!options.isPaused()) {
                 applyAnchorMediaMatch(media, { reaction: null, downloadedAt: null, blacklistedAt });
+                options.refreshReferrerUrlsFromCache([referrerUrl]);
             }
         })
         .catch(() => {

@@ -1,7 +1,7 @@
 import type { MediaElement } from './media-utils';
 
 type ReactionType = 'love' | 'like' | 'funny' | null;
-type AnchorDecorationKind = 'checking' | 'reaction' | 'opened' | 'same-page';
+type AnchorDecorationKind = 'blacklisted' | 'checking' | 'reaction' | 'opened' | 'same-page';
 
 const BADGE_ATTR = 'data-atlas-anchor-reaction-badge';
 const badgeByMedia = new WeakMap<MediaElement, HTMLDivElement>();
@@ -21,6 +21,10 @@ function reactionColor(reaction: ReactionType): string {
 }
 
 function iconMarkup(reaction: ReactionType, kind: AnchorDecorationKind): string {
+    if (kind === 'blacklisted') {
+        return '<circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path>';
+    }
+
     if (kind === 'checking') {
         return '<g><circle cx="12" cy="12" r="8" opacity="0.25"></circle><path d="M20 12a8 8 0 0 0-8-8"></path><animateTransform attributeName="transform" dur="0.9s" from="0 12 12" repeatCount="indefinite" to="360 12 12" type="rotate"></animateTransform></g>';
     }
@@ -107,6 +111,16 @@ export function applyAnchorMatchDecoration(media: MediaElement, reaction: Reacti
     media.style.opacity = '0.25';
 
     ensureBadge(media, reaction, color, 'reaction');
+}
+
+export function applyAnchorBlacklistedDecoration(media: MediaElement): void {
+    const color = '#ef4444';
+
+    media.style.outline = `4px solid ${color}`;
+    media.style.outlineOffset = '-4px';
+    media.style.opacity = '0.25';
+
+    ensureBadge(media, null, color, 'blacklisted');
 }
 
 export function applyAnchorCheckingDecoration(media: MediaElement): void {
