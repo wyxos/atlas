@@ -45,6 +45,15 @@ export interface FileSourceAccess {
     can_unwatch: boolean;
 }
 
+export interface FileModerationRuleDetails {
+    id: number;
+    name: string;
+    action_type: string;
+    matched_terms: string[];
+    reason: string;
+    blacklist_previewed_count_mode: string;
+}
+
 export interface File {
     id: number;
     source: string;
@@ -78,10 +87,12 @@ export interface File {
     previewed_count: number;
     seen_at: string | null;
     seen_count: number;
+    prompt_moderation_rule?: FileModerationRuleDetails | null;
     auto_blacklisted: boolean;
-    auto_blacklist_rule?: { id: number; name: string } | null;
+    auto_blacklist_rule?: FileModerationRuleDetails | null;
+    auto_blacklist_containers?: FileContainer[];
     blacklisted_at: string | null;
-    blacklist_rule?: { id: number; name: string } | null;
+    blacklist_rule?: FileModerationRuleDetails | null;
     downloaded: boolean;
     downloaded_at: string | null;
     imported_at: string | null;

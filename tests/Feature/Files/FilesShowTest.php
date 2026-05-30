@@ -4,6 +4,7 @@ use App\Models\Album;
 use App\Models\AlbumCover;
 use App\Models\Container;
 use App\Models\File;
+use App\Models\ModerationRule;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,6 +118,56 @@ test('file show includes container state and stats for the current user', functi
     $response->assertJsonPath('file.containers.0.file_stats.unreacted', 2);
     $response->assertJsonPath('file.containers.0.file_stats.blacklisted', 1);
     $response->assertJsonPath('file.containers.0.file_stats.positive', 2);
+});
+
+test('file show includes active prompt moderation match details', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create();
+    $file->metadata()->create([
+        'payload' => [
+            'prompt' => 'a red car beside a blue boat',
+        ],
+    ]);
+    $rule = ModerationRule::factory()->create([
+        'name' => 'Vehicle rule',
+        'active' => true,
+        'action_type' => 'blacklist',
+        'op' => 'any',
+        'terms' => ['car', 'train'],
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.prompt_moderation_rule.id', $rule->id);
+    $response->assertJsonPath('file.prompt_moderation_rule.name', 'Vehicle rule');
+    $response->assertJsonPath('file.prompt_moderation_rule.matched_terms', ['car']);
+    $response->assertJsonPath('file.prompt_moderation_rule.reason', 'Matched prompt terms: car');
+});
+
+test('file show includes concerned containers for container auto blacklist state', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'blacklisted_at' => now(),
+        'auto_blacklisted' => true,
+    ]);
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => 'artist-name',
+        'referrer' => 'https://www.deviantart.com/artist-name',
+        'action_type' => 'blacklist',
+        'blacklisted_at' => now(),
+    ]);
+
+    $container->files()->attach($file->id);
+
+    $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.auto_blacklist_containers.0.id', $container->id);
+    $response->assertJsonPath('file.auto_blacklist_containers.0.source_id', 'artist-name');
+    $response->assertJsonPath('file.auto_blacklist_containers.0.blacklisted', true);
 });
 
 test('file show includes audio album cover url', function () {

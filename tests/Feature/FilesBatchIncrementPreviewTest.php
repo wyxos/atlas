@@ -117,6 +117,37 @@ test('batch increment preserves positive reactions without preview moderation', 
         ->and($file->auto_blacklisted)->toBeFalse();
 });
 
+test('batch increment does not auto blacklist deviantart locked tier items', function () {
+    $admin = User::factory()->admin()->create();
+    $file = previewBatchTestFile([
+        'previewed_count' => 1,
+        'source' => 'deviantart.com',
+        'listing_metadata' => [
+            'tier_access' => 'locked',
+            'primary_tier' => [
+                'tier' => [
+                    'name' => 'Supporter',
+                ],
+            ],
+        ],
+    ]);
+
+    $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
+        'file_ids' => [$file->id],
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJsonPath('results.0.previewed_count', 2)
+        ->assertJsonPath('results.0.reaction', null)
+        ->assertJsonPath('results.0.auto_blacklisted', false)
+        ->assertJsonPath('results.0.blacklisted_at', null);
+
+    $file->refresh();
+    expect($file->previewed_count)->toBe(2)
+        ->and($file->blacklisted_at)->toBeNull()
+        ->and($file->auto_blacklisted)->toBeFalse();
+});
+
 test('batch increments preview count by a custom amount', function () {
     $admin = User::factory()->admin()->create();
     $file1 = previewBatchTestFile(['previewed_count' => 0]);

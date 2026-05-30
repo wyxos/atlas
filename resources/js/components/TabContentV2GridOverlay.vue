@@ -193,6 +193,7 @@ const showReactions = computed(() => (
                     :file-id="item.id"
                     :reaction="item.reaction ?? null"
                     :blacklisted-at="item.blacklisted_at ?? null"
+                    :allow-blacklist-toggle="itemInteractions.reactions.canToggleBlacklist?.(item) ?? false"
                     :previewed-count="item.previewed_count ?? 0"
                     :viewed-count="item.seen_count ?? 0"
                     :current-index="index"

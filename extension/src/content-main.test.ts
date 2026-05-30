@@ -457,7 +457,7 @@ describe('content-main', () => {
         expect(mockAnchorRuntime.registerVisibleFromDocument).toHaveBeenCalledWith(100);
     });
 
-    it('disconnects active page observers and ignores events when the tab becomes hidden', async () => {
+    it('disconnects active page observers and keeps referrer reaction cache syncs when the tab becomes hidden', async () => {
         mockGetStoredOptions.mockResolvedValue({
             siteCustomizations: [],
         });
@@ -498,6 +498,10 @@ describe('content-main', () => {
         });
 
         expect(mockDownloadEventSheetPush).not.toHaveBeenCalled();
-        expect(mockAnchorRuntime.handleReferrerReactionSync).not.toHaveBeenCalled();
+        expect(mockAnchorRuntime.handleReferrerReactionSync).toHaveBeenCalledWith({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'pending',
+            urls: ['https://example.com/post'],
+        });
     });
 });

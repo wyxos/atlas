@@ -15,6 +15,7 @@ interface Props {
     variant?: 'default' | 'small';
     mode?: 'default' | 'reaction-only';
     showBlacklist?: boolean;
+    allowBlacklistToggle?: boolean;
     showRemove?: boolean;
     removing?: boolean;
     surface?: 'default' | 'none';
@@ -32,6 +33,7 @@ const props = withDefaults(defineProps<Props>(), {
     variant: 'default',
     mode: 'default',
     showBlacklist: false,
+    allowBlacklistToggle: false,
     showRemove: false,
     removing: false,
     surface: 'default',
@@ -73,7 +75,7 @@ function handleFunnyClick(): void {
 }
 
 function handleBlacklistClick(): void {
-    if (!props.fileId || blacklisted.value) {
+    if (!props.fileId || (blacklisted.value && !props.allowBlacklistToggle)) {
         return;
     }
 
@@ -118,6 +120,9 @@ const indexDisplay = computed(() => {
     return null;
 });
 const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= FEED_REMOVED_PREVIEW_COUNT);
+const blacklistAriaLabel = computed(() => (
+    blacklisted.value && props.allowBlacklistToggle ? 'Remove blacklist' : 'Blacklist'
+));
 </script>
 
 <template>
@@ -146,14 +151,16 @@ const hasTerminalPreviewCount = computed(() => Number(props.previewedCount) >= F
             <button
                 v-if="shouldShowBlacklist"
                 @click="handleBlacklistClick"
-                :disabled="blacklisted"
+                :disabled="blacklisted && !allowBlacklistToggle"
                 :aria-pressed="blacklisted"
                 :class="[
                     'rounded transition-colors',
                     isSmall ? 'p-1' : 'p-2',
-                    blacklisted ? 'cursor-default bg-danger-600 text-white' : 'text-white hover:text-danger-300'
+                    blacklisted
+                        ? (allowBlacklistToggle ? 'bg-danger-600 text-white hover:bg-danger-500' : 'cursor-default bg-danger-600 text-white')
+                        : 'text-white hover:text-danger-300'
                 ]"
-                aria-label="Blacklist"
+                :aria-label="blacklistAriaLabel"
             >
                 <Ban :size="iconSize" />
             </button>

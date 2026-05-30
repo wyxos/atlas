@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Library\LibraryIndexSyncDispatcher;
+use App\Support\SourceAccessState;
 use Illuminate\Support\Collection;
 
 class FilePreviewService
@@ -168,10 +169,6 @@ class FilePreviewService
 
     private function isPreviewAutoBlacklistExempt(File $file): bool
     {
-        if ((string) $file->source !== DeviantArtImages::SOURCE) {
-            return false;
-        }
-
-        return data_get($file->listing_metadata, 'premium_folder_data') !== null;
+        return SourceAccessState::isAccessGated($file);
     }
 }

@@ -312,6 +312,67 @@ describe('FileViewerSheet', () => {
         expect(copyToClipboard).toHaveBeenCalledWith('high detail test prompt', 'Prompt', { showToast: false });
     });
 
+    it('renders prompt moderation and auto-blacklist provenance', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: null,
+                isLoading: false,
+                fileData: makeFile({
+                    id: 77,
+                    auto_blacklisted: true,
+                    blacklisted_at: '2026-05-01T10:00:00Z',
+                    prompt_moderation_rule: {
+                        id: 4,
+                        name: 'Prompt rule',
+                        action_type: 'blacklist',
+                        matched_terms: ['term one', 'term two'],
+                        reason: 'Matched prompt terms: term one, term two',
+                        blacklist_previewed_count_mode: 'feed_removed',
+                    },
+                    auto_blacklist_rule: {
+                        id: 4,
+                        name: 'Prompt rule',
+                        action_type: 'blacklist',
+                        matched_terms: ['term one'],
+                        reason: 'Matched prompt terms: term one',
+                        blacklist_previewed_count_mode: 'feed_removed',
+                    },
+                    auto_blacklist_containers: [
+                        {
+                            id: 12,
+                            type: 'User',
+                            source: 'deviantart.com',
+                            source_id: 'artist',
+                            referrer: 'https://www.deviantart.com/artist',
+                            blacklisted: true,
+                            blacklisted_at: '2026-05-01T09:00:00Z',
+                            action_type: 'blacklist',
+                            blacklist_previewed_count_mode: 'preserve',
+                            file_stats: {
+                                unreacted: 1,
+                                blacklisted: 2,
+                                positive: 3,
+                            },
+                        },
+                    ],
+                }),
+                prompt: 'term one and term two are present',
+                showPrompt: true,
+            },
+        });
+
+        const text = wrapper.text();
+
+        expect(text).toContain('# 77');
+        expect(wrapper.get('[data-test="file-prompt-moderation-rule"]').text()).toContain('#4 Prompt rule');
+        expect(text).toContain('Terms: term one, term two');
+        expect(text).toContain('Moderation Rule (Flagged)');
+        expect(text).toContain('Concerned Container');
+        expect(text).toContain('#12 User');
+        expect(text).toContain('deviantart.com · artist');
+    });
+
     it('shows prompt loading state in the sheet', () => {
         const wrapper = mount(FileViewerSheet, {
             props: {

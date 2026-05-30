@@ -94,7 +94,10 @@ test('persist the moderation rule that flagged a file for auto-blacklist', funct
         ->assertOk()
         ->assertJsonPath('file.auto_blacklisted', true)
         ->assertJsonPath('file.auto_blacklist_rule.id', $rule->id)
-        ->assertJsonPath('file.auto_blacklist_rule.name', $rule->name);
+        ->assertJsonPath('file.auto_blacklist_rule.name', $rule->name)
+        ->assertJsonPath('file.auto_blacklist_rule.matched_terms', ['spam', 'advertisement'])
+        ->assertJsonPath('file.prompt_moderation_rule.id', $rule->id)
+        ->assertJsonPath('file.prompt_moderation_rule.matched_terms', ['spam', 'advertisement']);
 });
 
 test('rule blacklist preserves previewed count by default', function () {

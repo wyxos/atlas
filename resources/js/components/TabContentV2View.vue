@@ -145,7 +145,10 @@ const isSheetPromptLoading = computed(() => {
 const showSheetPrompt = computed(() => sheetPromptItemId.value !== null);
 const isFileSheetOverlay = computed(() => props.surfaceMode === 'list' && props.fileSheetState.isOpen);
 const shouldReserveFileSheetSpace = computed(() => props.fileSheetState.isOpen && !isFileSheetOverlay.value);
-const fileSheetFileId = computed(() => props.fileSheetItem?.id ?? null);
+const fileSheetFileId = computed(() => props.fileSheetItem?.id
+    ?? props.fileViewerData.fileData.value?.id
+    ?? props.currentVisibleItem?.id
+    ?? null);
 const canTogglePageLoadingLock = computed(() => Boolean(props.headerMasonry?.lockPageLoading && props.headerMasonry?.unlockPageLoading));
 const pageLoadingLocked = computed(() => Boolean(props.vibeStatus.pageLoadingLocked || props.headerMasonry?.pageLoadingLocked));
 const showFullscreenPageLoadingLock = computed(() => props.surfaceMode === 'fullscreen'
@@ -388,6 +391,7 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             :item="item as VibeViewerItem"
                             :index="index"
                             :total="total"
+                            :can-toggle-blacklist="itemInteractions.reactions.canToggleBlacklist"
                             :handle-blacklist="handleBlacklist"
                             :handle-reaction="handleReaction"
                             :is-removing-item-from-tab="isRemovingItemFromTab"

@@ -75,4 +75,68 @@ describe('submitBadgeReaction blacklist', () => {
             cookies: null,
         });
     });
+
+    it('can submit blacklist against an overridden hash-aware referrer while preserving page url', async () => {
+        mockGetStoredOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'test-api-token',
+            siteCustomizations: [
+                {
+                    domain: window.location.hostname,
+                    matchRules: [],
+                    referrerCleaner: {
+                        stripQueryParams: ['utm_source'],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: [],
+                    },
+                },
+            ],
+        });
+
+        const pageUrl = window.location.href;
+        const runtimeSendMessage = vi.fn((payload: unknown, callback: (response: unknown) => void) => {
+            const typed = payload as { type?: string };
+            if (typed.type !== 'ATLAS_SUBMIT_REACTION') {
+                callback(null);
+                return;
+            }
+
+            callback({
+                ok: true,
+                status: 200,
+                payload: {
+                    reaction: null,
+                    exists: true,
+                    blacklisted_at: '2026-05-10T12:00:00Z',
+                    file: { id: 42 },
+                },
+            });
+        });
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: runtimeSendMessage,
+            },
+        });
+
+        const { submitBadgeReaction } = await import('./reaction-submit');
+        const image = document.createElement('img');
+        image.src = 'https://images.example.com/direct-image-2.jpg';
+
+        const result = await submitBadgeReaction(image, 'blacklist', {
+            referrerUrlOverride: 'https://example.com/post?utm_source=feed#image-2',
+        });
+
+        expect(result.ok).toBe(true);
+
+        const submitCall = runtimeSendMessage.mock.calls[0] as [Record<string, unknown>, (response: unknown) => void];
+        expect(submitCall[0].body).toMatchObject({
+            type: 'blacklist',
+            referrer_url_hash_aware: 'https://example.com/post#image-2',
+            page_url: pageUrl,
+        });
+    });
 });

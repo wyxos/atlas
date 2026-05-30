@@ -6,6 +6,7 @@ const mockGetCachedReferrerCheck = vi.fn();
 const mockUpsertReferrerCheckCache = vi.fn();
 const mockInvalidateOpenTabCheckCache = vi.fn();
 const mockIsUrlOpenInAnotherTab = vi.fn();
+const mockSubmitBadgeReaction = vi.fn();
 
 vi.mock('../match-rules', async () => {
     const actual = await vi.importActual<typeof import('../match-rules')>('../match-rules');
@@ -26,6 +27,10 @@ vi.mock('./open-anchor-tab-check', () => ({
     invalidateOpenTabCheckCache: mockInvalidateOpenTabCheckCache,
     isUrlOpenInAnotherTab: mockIsUrlOpenInAnotherTab,
     toComparableOpenTabUrl: (url: string | null) => url,
+}));
+
+vi.mock('./reaction-submit', () => ({
+    submitBadgeReaction: mockSubmitBadgeReaction,
 }));
 
 function visibleRect(): DOMRect {
@@ -338,6 +343,112 @@ describe('anchor-media-runtime', () => {
         expect(image.getAttribute('data-atlas-anchor-checking')).toBeNull();
         expect(image.getAttribute('data-atlas-anchor-reaction')).toBe('love');
         expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')?.getAttribute('data-atlas-anchor-badge-kind')).toBe('reaction');
+    });
+
+    it('updates referrer sync cache while paused without touching the DOM', async () => {
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post#image-2';
+        const image = document.createElement('img');
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.suspend();
+        runtime.handleReferrerReactionSync({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'settled',
+            urls: [anchor.href],
+            reaction: 'like',
+            reactedAt: '2026-03-26T12:00:00Z',
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
+
+        expect(mockUpsertReferrerCheckCache).toHaveBeenCalledWith(
+            'https://example.com/post#image-2',
+            {
+                exists: true,
+                reaction: 'like',
+                reactedAt: '2026-03-26T12:00:00Z',
+                downloadedAt: null,
+                blacklistedAt: null,
+            },
+            [],
+        );
+        expect(image.getAttribute('data-atlas-anchor-reaction')).toBeNull();
+    });
+
+    it('blacklists an outlined anchor referrer on Alt right click', async () => {
+        mockSubmitBadgeReaction.mockResolvedValue({
+            ok: true,
+            reaction: null,
+            exists: true,
+            fileId: 42,
+            blacklistedAt: '2026-05-10T12:00:00Z',
+            downloadRequested: false,
+            shouldCloseTabAfterQueue: false,
+            downloadTransferId: null,
+            downloadStatus: null,
+            downloadProgressPercent: null,
+            downloadCloseTargets: [],
+            reverbConfig: null,
+        });
+
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => ['utm_source'],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post?utm_source=feed#image-2';
+        const image = document.createElement('img');
+        image.src = 'https://cdn.example.com/image.jpg';
+        image.setAttribute('data-atlas-anchor-media-red-border', '1');
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        let handled = false;
+        image.addEventListener('contextmenu', (event) => {
+            handled = runtime.handleAltRightClick(event);
+        });
+        image.dispatchEvent(new MouseEvent('contextmenu', {
+            altKey: true,
+            bubbles: true,
+            button: 2,
+            cancelable: true,
+            clientX: 20,
+            clientY: 20,
+        }));
+
+        expect(handled).toBe(true);
+        expect(mockSubmitBadgeReaction).toHaveBeenCalledWith(image, 'blacklist', {
+            referrerUrlOverride: 'https://example.com/post#image-2',
+        });
+
+        await flushPromises();
+
+        expect(mockUpsertReferrerCheckCache).toHaveBeenCalledWith(
+            'https://example.com/post#image-2',
+            {
+                exists: true,
+                reaction: null,
+                reactedAt: null,
+                downloadedAt: null,
+                blacklistedAt: '2026-05-10T12:00:00Z',
+            },
+            ['utm_source'],
+        );
+        expect(image.getAttribute('data-atlas-anchor-blacklisted-at')).toBe('2026-05-10T12:00:00Z');
     });
 
     it('updates matching anchors when download progress events carry reaction metadata', async () => {

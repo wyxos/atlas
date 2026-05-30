@@ -25,6 +25,7 @@ import {
 import { enqueueReferrerCheck, getCachedReferrerCheck, upsertReferrerCheckCache } from './referrer-check-queue';
 import { invalidateOpenTabCheckCache, isUrlOpenInAnotherTab, toComparableOpenTabUrl } from './open-anchor-tab-check';
 import type { ProgressEvent } from './download-progress-bus';
+import { handleAltRightClickReferrerBlacklist } from './anchor-referrer-blacklist-shortcut';
 
 type AnchorMediaRuntimeOptions = {
     getIsEnabled: () => boolean;
@@ -420,6 +421,17 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         });
     }
 
+    function handleAltRightClick(event: MouseEvent): boolean {
+        return handleAltRightClickReferrerBlacklist({
+            event,
+            isPaused: () => isPaused,
+            resolveEligibleAnchorReferrerUrl,
+            getReferrerCleanerQueryParams: options.getReferrerCleanerQueryParams,
+            applyPendingForReferrerUrls,
+            refreshReferrerUrlsFromCache,
+        });
+    }
+
     function handleDownloadProgressEvent(event: ProgressEvent): void {
         if (isPaused) {
             return;
@@ -470,10 +482,6 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
     }
 
     function handleReferrerReactionSync(message: unknown): void {
-        if (isPaused) {
-            return;
-        }
-
         if (!message || typeof message !== 'object') {
             return;
         }
@@ -502,12 +510,16 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         }
 
         if (phase === 'pending') {
-            applyPendingForReferrerUrls(referrerUrls);
+            if (!isPaused) {
+                applyPendingForReferrerUrls(referrerUrls);
+            }
             return;
         }
 
         if (phase === 'failed') {
-            refreshReferrerUrlsFromCache(referrerUrls);
+            if (!isPaused) {
+                refreshReferrerUrlsFromCache(referrerUrls);
+            }
             return;
         }
 
@@ -524,11 +536,14 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
                 downloadedAt,
                 blacklistedAt,
             }, referrerCleanerQueryParams);
-            applyReactionForReferrerUrl(referrerUrl, reaction, downloadedAt, blacklistedAt);
+            if (!isPaused) {
+                applyReactionForReferrerUrl(referrerUrl, reaction, downloadedAt, blacklistedAt);
+            }
         });
     }
 
     return {
+        handleAltRightClick,
         handleDownloadProgressEvent,
         handleReferrerReactionSync,
         handleTabPresenceChanged,

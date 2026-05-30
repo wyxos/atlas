@@ -8,6 +8,7 @@ const props = defineProps<{
     item: VibeViewerItem;
     index: number;
     total: number;
+    canToggleBlacklist?: (item: FeedItem) => boolean;
     handleBlacklist: (item: VibeViewerItem) => void | Promise<void>;
     handleReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
     isRemovingItemFromTab?: (item: FeedItem) => boolean;
@@ -31,6 +32,12 @@ function removeFromTab(): void {
         void props.removeItemFromTab?.(feedItem);
     }
 }
+
+function shouldAllowBlacklistToggle(): boolean {
+    const feedItem = getFeedItem();
+
+    return feedItem ? props.canToggleBlacklist?.(feedItem) ?? false : false;
+}
 </script>
 
 <template>
@@ -42,6 +49,7 @@ function removeFromTab(): void {
             :file-id="getFeedItem()?.id"
             :reaction="getFeedItem()?.reaction ?? null"
             :blacklisted-at="getFeedItem()?.blacklisted_at ?? null"
+            :allow-blacklist-toggle="shouldAllowBlacklistToggle()"
             :previewed-count="getFeedItem()?.previewed_count ?? 0"
             :viewed-count="getFeedItem()?.seen_count ?? 0"
             :current-index="index"

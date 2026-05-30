@@ -123,6 +123,52 @@ class FileBlacklistService
         return $fileIds;
     }
 
+    public function clear(File $file): File
+    {
+        $wasBlacklisted = $file->blacklisted_at !== null;
+        $wasAutoBlacklisted = (bool) $file->auto_blacklisted;
+
+        if (! $wasBlacklisted && ! $wasAutoBlacklisted) {
+            return $file;
+        }
+
+        $hadTerminalPreviewCount = (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT;
+
+        DB::transaction(function () use ($file, $wasBlacklisted, $wasAutoBlacklisted, $hadTerminalPreviewCount): void {
+            if ($wasAutoBlacklisted) {
+                $this->metricsService->applyAutoBlacklistClear($file, countAsManualBlacklisted: false);
+            }
+
+            if ($wasBlacklisted) {
+                $this->metricsService->applyBlacklistClear(
+                    $file,
+                    adjustUnreacted: true,
+                    wasAutoBlacklisted: $wasAutoBlacklisted,
+                    hadTerminalPreviewCount: $hadTerminalPreviewCount,
+                );
+            }
+
+            $updates = [
+                'blacklisted_at' => null,
+                'auto_blacklisted' => false,
+                'updated_at' => now(),
+            ];
+
+            if ($wasBlacklisted && $hadTerminalPreviewCount) {
+                $updates['previewed_count'] = FilePreviewService::RECOVERED_PREVIEW_COUNT;
+            }
+
+            File::query()
+                ->whereKey($file->id)
+                ->update($updates);
+        });
+
+        $file->refresh();
+        $this->libraryIndexSyncDispatcher->filesAndReactions([(int) $file->id]);
+
+        return $file;
+    }
+
     /**
      * @return iterable<int, Reaction>
      */

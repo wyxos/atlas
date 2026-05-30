@@ -2,7 +2,9 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\ActionType;
 use App\Models\File;
+use App\Services\FileModerationService;
 use App\Services\SourceMedia\SourceMediaRefreshService;
 use App\Services\SourceMedia\SourceWatchRefreshService;
 use App\Support\AtlasPathResolver;
@@ -155,10 +157,11 @@ class FileResource extends JsonResource
                 if ($this->resource->relationLoaded('autoBlacklistModerationAction')) {
                     $hit = $this->resource->getRelation('autoBlacklistModerationAction');
                     if ($hit) {
-                        $blacklistRule = [
-                            'id' => (int) ($hit->moderation_rule_id ?? 0),
-                            'name' => (string) ($hit->moderation_rule_name ?? ''),
-                        ];
+                        $blacklistRule = app(FileModerationService::class)->explainPersistedRule(
+                            $this->resource,
+                            (int) ($hit->moderation_rule_id ?? 0),
+                            (string) ($hit->moderation_rule_name ?? ''),
+                        );
                     }
                 }
             } catch (\Throwable $e) {
@@ -167,6 +170,16 @@ class FileResource extends JsonResource
 
             if ($blacklistRule && $blacklistRule['id'] <= 0 && $blacklistRule['name'] === '') {
                 $blacklistRule = null;
+            }
+        }
+
+        $promptModerationRule = null;
+        if ($this->resource->relationLoaded('metadata')) {
+            try {
+                $promptModerationRule = app(FileModerationService::class)
+                    ->matchRuleDetails($this->resource, ActionType::BLACKLIST);
+            } catch (\Throwable $e) {
+                // Prompt moderation details are informational; never fail file rendering for them.
             }
         }
 
@@ -197,6 +210,13 @@ class FileResource extends JsonResource
                     ],
                 ];
             })->values()->all()
+            : [];
+        $autoBlacklistContainers = (bool) ($this->auto_blacklisted ?? false)
+            ? array_values(array_filter(
+                $containers,
+                static fn (array $container): bool => $container['blacklisted'] === true
+                    && ($container['action_type'] === ActionType::BLACKLIST || $container['action_type'] === null),
+            ))
             : [];
 
         return [
@@ -232,8 +252,10 @@ class FileResource extends JsonResource
             'previewed_count' => $this->previewed_count,
             'seen_at' => $this->seen_at?->toIso8601String(),
             'seen_count' => $this->seen_count,
+            'prompt_moderation_rule' => $promptModerationRule,
             'auto_blacklisted' => (bool) ($this->auto_blacklisted ?? false),
             'auto_blacklist_rule' => $this->auto_blacklisted ? $blacklistRule : null,
+            'auto_blacklist_containers' => $autoBlacklistContainers,
             'blacklisted_at' => $this->blacklisted_at?->toIso8601String(),
             'blacklist_rule' => $blacklistRule,
             'downloaded' => $this->downloaded,

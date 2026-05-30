@@ -1,4 +1,5 @@
 import { store as storeReaction } from '@/actions/App/Http/Controllers/FileReactionController';
+import { clearBlacklist } from '@/actions/App/Http/Controllers/FilesController';
 import type { ReactionType } from '@/types/reaction';
 
 const BATCH_STORE_URL = '/api/files/reactions/batch/store';
@@ -12,6 +13,13 @@ export type ReactionStoreResponse = {
 export type BatchBlacklistResult = {
     id: number;
     blacklisted_at: string;
+    previewed_count?: number;
+};
+
+export type ClearBlacklistResult = {
+    id: number;
+    blacklisted_at: string | null;
+    auto_blacklisted: boolean;
     previewed_count?: number;
 };
 
@@ -87,5 +95,15 @@ export function createBatchBlacklistCallback(): (
         }
 
         return results;
+    };
+}
+
+export function createClearBlacklistCallback(): (
+    fileId: number
+) => Promise<ClearBlacklistResult> {
+    return async (fileId: number) => {
+        const { data } = await window.axios.delete<{ file: ClearBlacklistResult }>(clearBlacklist.url(fileId));
+
+        return data.file;
     };
 }

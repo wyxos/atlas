@@ -107,6 +107,7 @@ export function useFileViewerData(params: {
         item.seen_count = file.seen_count;
         item.auto_blacklisted = file.auto_blacklisted;
         item.auto_blacklist_rule = file.auto_blacklist_rule ?? null;
+        item.auto_blacklist_containers = file.auto_blacklist_containers ?? [];
         item.blacklisted_at = file.blacklisted_at;
         item.blacklist_rule = file.blacklist_rule ?? null;
         item.downloaded = file.downloaded;

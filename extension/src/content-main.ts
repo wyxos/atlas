@@ -25,6 +25,7 @@ import { installCivitAiUserBrowseLinks } from './content/civitai-user-browse-lin
 import { installPageVisibilityLifecycle, isPageVisible } from './content/page-work-lifecycle';
 import { shouldBypassBadgeCheckCacheForPageStart } from './content/restored-page-badge-check';
 import { isVisibleInViewport } from './content/viewport-visibility';
+import { createAnchorReferrerShortcutListener } from './content/anchor-referrer-shortcut-listener';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
@@ -349,10 +350,6 @@ function installRuntimeMessageListener(): void {
         }
 
         if ((message as { type?: unknown }).type === 'ATLAS_REFERRER_REACTION_SYNC') {
-            if (!isPageWorkActive) {
-                return;
-            }
-
             anchorMediaRuntime.handleReferrerReactionSync(message);
         }
     });
@@ -415,6 +412,8 @@ const handleInteraction = (event: MouseEvent): void => {
     tryApplyMediaWidgetFromInteraction(event);
 };
 
+const handleAnchorReferrerShortcut = createAnchorReferrerShortcutListener(anchorMediaRuntime, () => isPageWorkActive);
+
 function installInteractionFallbackListeners(): void {
     if (interactionFallbackListenersInstalled) {
         return;
@@ -422,6 +421,7 @@ function installInteractionFallbackListeners(): void {
 
     document.addEventListener('mouseover', handleInteraction, { passive: true });
     document.addEventListener('mouseup', handleInteraction, { passive: true });
+    document.addEventListener('contextmenu', handleAnchorReferrerShortcut, { capture: true });
     interactionFallbackListenersInstalled = true;
 }
 
@@ -432,6 +432,7 @@ function removeInteractionFallbackListeners(): void {
 
     document.removeEventListener('mouseover', handleInteraction);
     document.removeEventListener('mouseup', handleInteraction);
+    document.removeEventListener('contextmenu', handleAnchorReferrerShortcut, { capture: true });
     interactionFallbackListenersInstalled = false;
 }
 

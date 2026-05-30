@@ -233,6 +233,25 @@ describe('FileReactions', () => {
         expect(wrapper.emitted('blacklist')).toBeFalsy();
     });
 
+    it('can re-emit blacklist when toggle mode is allowed', async () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                blacklistedAt: '2026-04-30T00:00:00Z',
+                allowBlacklistToggle: true,
+                reaction: null,
+            },
+        });
+
+        const blacklistButton = wrapper.find('button[aria-label="Remove blacklist"]');
+
+        expect(blacklistButton.attributes('disabled')).toBeUndefined();
+
+        await blacklistButton.trigger('click');
+
+        expect(wrapper.emitted('blacklist')).toEqual([[]]);
+    });
+
     it('hides blacklist in reaction-only mode', () => {
         const wrapper = mount(FileReactions, {
             props: {

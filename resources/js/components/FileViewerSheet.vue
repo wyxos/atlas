@@ -2,7 +2,7 @@
 import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
 import { computed, useAttrs } from 'vue';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
-import type { File, FileMetadataRecord } from '@/types/file';
+import type { File, FileContainer, FileMetadataRecord, FileModerationRuleDetails } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
 import FullscreenSheetPreviewStrip from './FullscreenSheetPreviewStrip.vue';
 import FileViewerMetadataTree from './FileViewerMetadataTree.vue';
@@ -41,6 +41,8 @@ const emit = defineEmits<{
 
 const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
 const shouldShowPrompt = computed(() => props.showPrompt || props.isPromptLoading || Boolean(props.prompt));
+const displayFileId = computed(() => props.fileId ?? props.fileData?.id ?? null);
+const autoBlacklistContainers = computed(() => props.fileData?.auto_blacklist_containers ?? []);
 const metadataSections = computed(() => {
     if (!props.fileData) {
         return [];
@@ -68,6 +70,21 @@ const hasMetadataSections = computed(() => metadataSections.value.length > 0);
 
 function hasMetadata(value: FileMetadataRecord | null | undefined): value is FileMetadataRecord {
     return Boolean(value) && Object.keys(value).length > 0;
+}
+
+function formatRule(rule: FileModerationRuleDetails): string {
+    return `#${rule.id} ${rule.name}`;
+}
+
+function formatRuleTerms(rule: FileModerationRuleDetails): string | null {
+    return rule.matched_terms.length > 0 ? rule.matched_terms.join(', ') : null;
+}
+
+function formatContainer(container: FileContainer): string {
+    const label = `#${container.id} ${container.type || 'Container'}`;
+    const source = [container.source, container.source_id].filter(Boolean).join(' · ');
+
+    return source ? `${label} · ${source}` : label;
 }
 
 function normalizePathForOs(path: string): string {
@@ -127,7 +144,7 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                 :class="isOpen ? '' : 'opacity-0 pointer-events-none'"
             >
                 <h2 class="text-lg font-semibold text-white">
-                    # {{ fileId || '' }}
+                    # {{ displayFileId || '' }}
                 </h2>
                 <button
                     @click="emit('close')"
@@ -210,6 +227,25 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                         </div>
                         <div v-else class="text-sm text-twilight-indigo-300">
                             No prompt data available
+                        </div>
+                        <div
+                            v-if="fileData?.prompt_moderation_rule"
+                            class="rounded border border-danger-500/45 bg-danger-950/25 p-3 text-xs text-twilight-indigo-100"
+                            data-test="file-prompt-moderation-rule"
+                        >
+                            <div class="font-semibold text-white">Moderation Match</div>
+                            <div class="mt-1 wrap-break-word">
+                                {{ formatRule(fileData.prompt_moderation_rule) }}
+                            </div>
+                            <div
+                                v-if="formatRuleTerms(fileData.prompt_moderation_rule)"
+                                class="mt-2 wrap-break-word"
+                            >
+                                Terms: {{ formatRuleTerms(fileData.prompt_moderation_rule) }}
+                            </div>
+                            <div class="mt-2 wrap-break-word text-twilight-indigo-200">
+                                {{ fileData.prompt_moderation_rule.reason }}
+                            </div>
                         </div>
                     </div>
                     <div v-if="fileData.url">
@@ -344,7 +380,23 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                         <div v-if="fileData.auto_blacklist_rule">
                             <div class="font-semibold text-white mb-1">Moderation Rule (Flagged)</div>
                             <div class="wrap-break-word">
-                                #{{ fileData.auto_blacklist_rule.id }} {{ fileData.auto_blacklist_rule.name }}
+                                {{ formatRule(fileData.auto_blacklist_rule) }}
+                            </div>
+                            <div
+                                v-if="formatRuleTerms(fileData.auto_blacklist_rule)"
+                                class="mt-1 wrap-break-word text-xs"
+                            >
+                                Terms: {{ formatRuleTerms(fileData.auto_blacklist_rule) }}
+                            </div>
+                        </div>
+                        <div v-if="autoBlacklistContainers.length > 0" data-test="file-auto-blacklist-containers">
+                            <div class="font-semibold text-white mb-1">Concerned Container</div>
+                            <div
+                                v-for="container in autoBlacklistContainers"
+                                :key="container.id"
+                                class="wrap-break-word"
+                            >
+                                {{ formatContainer(container) }}
                             </div>
                         </div>
                     </div>
@@ -353,7 +405,13 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                         <div>{{ new Date(fileData.blacklisted_at).toLocaleString() }}</div>
                         <div v-if="fileData.blacklist_rule">
                             <div class="font-semibold text-white mb-1">Moderation Rule (Matched)</div>
-                            <div class="wrap-break-word">#{{ fileData.blacklist_rule.id }} {{ fileData.blacklist_rule.name }}</div>
+                            <div class="wrap-break-word">{{ formatRule(fileData.blacklist_rule) }}</div>
+                            <div
+                                v-if="formatRuleTerms(fileData.blacklist_rule)"
+                                class="mt-1 wrap-break-word text-xs"
+                            >
+                                Terms: {{ formatRuleTerms(fileData.blacklist_rule) }}
+                            </div>
                         </div>
                     </div>
                     <div v-if="fileData.containers && fileData.containers.length > 0" class="space-y-2">

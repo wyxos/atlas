@@ -69,6 +69,7 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         seen_count: file.seen_count,
         auto_blacklisted: file.auto_blacklisted,
         auto_blacklist_rule: file.auto_blacklist_rule ?? null,
+        auto_blacklist_containers: file.auto_blacklist_containers ?? [],
         blacklisted_at: file.blacklisted_at,
         blacklist_rule: file.blacklist_rule ?? null,
         downloaded: file.downloaded,

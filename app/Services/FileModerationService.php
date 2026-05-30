@@ -69,6 +69,58 @@ final class FileModerationService extends BaseModerationService
         return $this->getMatchForFile($file);
     }
 
+    /**
+     * @return array{id:int,name:string,action_type:string,matched_terms:array<int,string>,reason:string,blacklist_previewed_count_mode:string}|null
+     */
+    public function matchRuleDetails(File $file, ?string $actionType = null): ?array
+    {
+        $query = ModerationRule::query()
+            ->where('active', true)
+            ->orderBy('id', 'asc');
+
+        if (is_string($actionType) && $actionType !== '') {
+            $query->where('action_type', $actionType);
+        }
+
+        $this->activeRules = $query->get();
+
+        return $this->getMatchDetailsForFile($file);
+    }
+
+    /**
+     * @return array{id:int,name:string,action_type:string,matched_terms:array<int,string>,reason:string,blacklist_previewed_count_mode:string}|null
+     */
+    public function explainPersistedRule(File $file, int $ruleId, string $fallbackName): ?array
+    {
+        if ($ruleId <= 0 && $fallbackName === '') {
+            return null;
+        }
+
+        $rule = $ruleId > 0 ? ModerationRule::query()->find($ruleId) : null;
+        if (! $rule instanceof ModerationRule) {
+            return [
+                'id' => $ruleId,
+                'name' => $fallbackName,
+                'action_type' => ActionType::BLACKLIST,
+                'matched_terms' => [],
+                'reason' => 'The file was previously flagged by this moderation rule.',
+                'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
+            ];
+        }
+
+        $prompt = $this->getPromptForFile($file);
+        if ($prompt === null) {
+            return $this->formatRuleDetails($rule, []);
+        }
+
+        $this->moderator->loadRule($rule);
+        $matchedTerms = $this->moderator->check($prompt)
+            ? $this->moderator->collectMatches($prompt)
+            : [];
+
+        return $this->formatRuleDetails($rule, $matchedTerms);
+    }
+
     protected function hasRules(): bool
     {
         return $this->activeRules !== null && ! $this->activeRules->isEmpty();
@@ -100,6 +152,58 @@ final class FileModerationService extends BaseModerationService
         }
 
         return $firstMatch;
+    }
+
+    /**
+     * @return array{id:int,name:string,action_type:string,matched_terms:array<int,string>,reason:string,blacklist_previewed_count_mode:string}|null
+     */
+    private function getMatchDetailsForFile(File $file): ?array
+    {
+        $prompt = $this->getPromptForFile($file);
+        if ($prompt === null) {
+            return null;
+        }
+
+        $firstMatch = null;
+
+        foreach ($this->activeRules as $rule) {
+            $this->moderator->loadRule($rule);
+            if (! $this->moderator->check($prompt)) {
+                continue;
+            }
+
+            $details = $this->formatRuleDetails($rule, $this->moderator->collectMatches($prompt));
+            $firstMatch ??= $details;
+
+            if ($rule->blacklist_previewed_count_mode === BlacklistPreviewedCountMode::FEED_REMOVED) {
+                return $details;
+            }
+        }
+
+        return $firstMatch;
+    }
+
+    /**
+     * @param  array<int, string>  $matchedTerms
+     * @return array{id:int,name:string,action_type:string,matched_terms:array<int,string>,reason:string,blacklist_previewed_count_mode:string}
+     */
+    private function formatRuleDetails(ModerationRule $rule, array $matchedTerms): array
+    {
+        $matchedTerms = array_values(array_filter(
+            array_unique($matchedTerms),
+            static fn (string $term): bool => trim($term) !== '',
+        ));
+
+        return [
+            'id' => (int) $rule->id,
+            'name' => (string) $rule->name,
+            'action_type' => (string) $rule->action_type,
+            'matched_terms' => $matchedTerms,
+            'reason' => $matchedTerms === []
+                ? 'The rule expression matched the prompt.'
+                : 'Matched prompt terms: '.implode(', ', $matchedTerms),
+            'blacklist_previewed_count_mode' => (string) $rule->blacklist_previewed_count_mode,
+        ];
     }
 
     protected function getActionType(object $match): string

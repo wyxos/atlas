@@ -333,6 +333,72 @@ describe('useTabContentItemInteractions', () => {
         expect(item.previewed_count).toBe(99999);
     });
 
+    it('clears blacklist for a blacklisted item in the local blacklisted view', async () => {
+        const item = {
+            id: 42,
+            width: 500,
+            height: 500,
+            page: 1,
+            key: '1-42',
+            index: 0,
+            src: 'https://example.com/image42.jpg',
+            blacklisted_at: '2026-04-30T00:00:00Z',
+            auto_blacklisted: true,
+            auto_blacklist_rule: { id: 7, name: 'Auto blacklist' },
+            previewed_count: 99999,
+        } as FeedItem;
+        const items = shallowRef<FeedItem[]>([item]);
+        const remove = vi.fn().mockResolvedValue(undefined);
+
+        (window.axios.delete as any).mockResolvedValue({
+            data: {
+                file: {
+                    id: 42,
+                    blacklisted_at: null,
+                    auto_blacklisted: false,
+                    previewed_count: 4,
+                },
+            },
+        });
+
+        const interactions = useTabContentItemInteractions({
+            items,
+            tab: ref(null),
+            form: {
+                isLocal: ref(true),
+                data: {
+                    feed: 'local',
+                    serviceFilters: {
+                        blacklisted: 'yes',
+                    },
+                },
+            } as any,
+            masonry: ref({ remove, restore: vi.fn() } as any),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount: vi.fn(),
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+            matchesActiveLocalFilters: (candidate) => Boolean(candidate.blacklisted_at),
+            isBlacklistedOnlyLocalView: () => true,
+        });
+
+        const count = await interactions.reactions.onFileBlacklist(item);
+
+        expect(count).toBe(1);
+        expect(remove).toHaveBeenCalledWith(item);
+        expect(window.axios.delete).toHaveBeenCalledWith('/api/files/42/blacklist');
+        expect(mockQueueBlacklist).not.toHaveBeenCalled();
+        expect(item.blacklisted_at).toBeNull();
+        expect(item.auto_blacklisted).toBe(false);
+        expect(item.auto_blacklist_rule).toBeNull();
+        expect(item.previewed_count).toBe(4);
+    });
+
     it('keeps locally loaded blacklist items visible when active filters still match and restores them on undo', async () => {
         const items = shallowRef<FeedItem[]>([
             {

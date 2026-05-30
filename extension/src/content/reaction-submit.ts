@@ -1,7 +1,7 @@
 import { getStoredOptions } from '../atlas-options';
 import { getActivePageSiteCustomization } from '../page-customization-state';
 import { cleanupUrlQueryParams } from '../referrer-cleanup';
-import { normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
+import { normalizeHashAwareUrl, normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
 import type { BatchReactionItem, ListingMetadataOverrides } from './reaction-batch-types';
 import type { BadgeReactionType } from './reaction-check-queue';
 import { atlasLoggedFetch, atlasLoggedRuntimeRequest } from './atlas-request-log';
@@ -43,6 +43,7 @@ type SubmitBadgeReactionOptions = {
     batchItems?: BatchReactionItem[] | null;
     downloadBehavior?: SubmitDownloadBehavior;
     listingMetadataOverrides?: ListingMetadataOverrides | null;
+    referrerUrlOverride?: string | null;
 };
 
 type BadgeSubmitType = BadgeReactionType | 'blacklist';
@@ -234,13 +235,14 @@ export async function submitBadgeReaction(
             };
         }
 
+        const rawPageReferrerUrl = normalizeHashAwareUrl(options.referrerUrlOverride) ?? window.location.href;
         const cookieUrls = usesBatchEndpoint
             ? normalizeCookieUrls([
                 ...batchItems.map((item) => item.url),
                 ...batchItems.map((item) => item.pageUrl),
                 ...batchItems.map((item) => item.referrerUrlHashAware),
             ])
-            : normalizeCookieUrls([reactionUrl, pageUrl]);
+            : normalizeCookieUrls([reactionUrl, rawPageReferrerUrl, pageUrl]);
         const cookies = reactionType === 'blacklist' ? [] : await getRuntimeCookies(cookieUrls);
         const userAgent = getSafeUserAgent();
         const siteCustomization = getActivePageSiteCustomization()
@@ -251,13 +253,13 @@ export async function submitBadgeReaction(
             rewriteRules: [],
             strategies: [],
         };
-        const cleanedPageReferrerUrl = cleanupUrlQueryParams(window.location.href, referrerCleanerQueryParams)
-            ?? window.location.href;
+        const cleanedPageReferrerUrl = cleanupUrlQueryParams(rawPageReferrerUrl, referrerCleanerQueryParams)
+            ?? rawPageReferrerUrl;
         const cleanedReactionUrl = usesBatchEndpoint
             ? reactionUrl
             : applyMediaCleaner(reactionUrl, mediaCleaner, {
                 media,
-                candidatePageUrls: [window.location.href],
+                candidatePageUrls: [rawPageReferrerUrl, window.location.href],
             }) ?? reactionUrl;
         const requestBody = usesBatchEndpoint
             ? {

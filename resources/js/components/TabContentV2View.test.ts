@@ -306,6 +306,10 @@ function createProps() {
     };
 }
 
+function mountView(props: ReturnType<typeof createProps> = createProps()) {
+    return mount(TabContentV2View, { props, global: { stubs: defaultStubs } });
+}
+
 describe('TabContentV2View', () => {
     beforeEach(() => {
         vibeLayoutSpy.mockClear();
@@ -335,12 +339,7 @@ describe('TabContentV2View', () => {
     });
 
     it('passes the controlled surface props through to VibeLayout', () => {
-        const wrapper = mount(TabContentV2View, {
-            props: createProps(),
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        const wrapper = mountView();
 
         expect(wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names')).toContain('grid-footer');
         expect(wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names')).toContain('fullscreen-aside');
@@ -362,12 +361,7 @@ describe('TabContentV2View', () => {
         const props = createProps();
         props.form.data.feed = 'local';
 
-        mount(TabContentV2View, {
-            props,
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        mountView(props);
 
         expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayMs).toBe(0);
         expect(vibeLayoutSpy.mock.calls[0][0].props.fillDelayStepMs).toBe(0);
@@ -375,12 +369,7 @@ describe('TabContentV2View', () => {
     });
 
     it('does not provide Vibe status badge slots when Atlas disables them', () => {
-        const wrapper = mount(TabContentV2View, {
-            props: createProps(),
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        const wrapper = mountView();
 
         const slotNames = wrapper.get('[data-testid="vibe-layout"]').attributes('data-slot-names');
 
@@ -390,12 +379,7 @@ describe('TabContentV2View', () => {
 
     it('wires Vibe emitted events through to the Atlas callbacks', async () => {
         const props = createProps();
-        const wrapper = mount(TabContentV2View, {
-            props,
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        const wrapper = mountView(props);
 
         await wrapper.get('[data-testid="emit-active-index"]').trigger('click');
         await wrapper.get('[data-testid="emit-surface-mode"]').trigger('click');
@@ -444,12 +428,7 @@ describe('TabContentV2View', () => {
         const props = createProps();
         props.totalAvailable = 312;
 
-        mount(TabContentV2View, {
-            props,
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        mountView(props);
 
         expect(browseV2StatusBarSpy).toHaveBeenCalled();
         expect(browseV2StatusBarSpy.mock.calls[0][0].totalAvailable).toBe(312);
@@ -469,12 +448,7 @@ describe('TabContentV2View', () => {
             unlockPageLoading,
         };
 
-        mount(TabContentV2View, {
-            props,
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        mountView(props);
 
         expect(browseV2StatusBarSpy).toHaveBeenCalled();
 
@@ -499,12 +473,7 @@ describe('TabContentV2View', () => {
         props.fileSheetState.isOpen = true;
         props.surfaceMode = 'list';
 
-        const wrapper = mount(TabContentV2View, {
-            props,
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        const wrapper = mountView(props);
 
         expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
@@ -526,17 +495,21 @@ describe('TabContentV2View', () => {
         props.fileSheetState.isOpen = true;
         props.surfaceMode = 'list';
 
-        const wrapper = mount(TabContentV2View, {
-            props,
-            global: {
-                stubs: defaultStubs,
-            },
-        });
+        const wrapper = mountView(props);
 
         expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="file-viewer-sheet-inline"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="vibe-layout"]').classes()).not.toContain('atlas-file-viewer-wide-aside');
         expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({});
+    });
+
+    it('uses loaded file data for the list-mode file sheet id when no sheet item is pinned', () => {
+        const props = createProps();
+        const fileViewerSheetSpy = vi.fn();
+        const fileViewerSheetStub = defineComponent({ props: { fileId: { type: Number, default: null } }, setup: (stubProps) => (fileViewerSheetSpy(stubProps), () => h('div')) });
+        props.fileSheetState.isOpen = true; props.surfaceMode = 'list'; props.fileSheetItem = null; (props.fileViewerData.fileData as { value: { id: number } | null }).value = { id: 222 };
+        mount(TabContentV2View, { props, global: { stubs: { ...defaultStubs, FileViewerSheet: fileViewerSheetStub } } });
+        expect(fileViewerSheetSpy.mock.calls[0][0].fileId).toBe(222);
     });
 
 });

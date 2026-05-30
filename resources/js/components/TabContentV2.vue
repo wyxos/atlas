@@ -105,6 +105,10 @@ function isActivePositiveOnlyLocalView(): boolean {
     return form.isLocal.value && isPositiveOnlyLocalView(form.data.serviceFilters);
 }
 
+function isActiveBlacklistedOnlyLocalView(): boolean {
+    return form.isLocal.value && form.data.serviceFilters.blacklisted === 'yes';
+}
+
 function collectTargetIds(target: FeedItem | FeedItem[] | string | string[]): string[] {
     const values = Array.isArray(target) ? target : [target];
 
@@ -178,6 +182,7 @@ const itemInteractions = useTabContentItemInteractions({
     fileViewer: fileViewerStub,
     matchesActiveLocalFilters,
     isPositiveOnlyLocalView: isActivePositiveOnlyLocalView,
+    isBlacklistedOnlyLocalView: isActiveBlacklistedOnlyLocalView,
     itemPreview,
     onReaction: props.onReaction,
     promptDownloadedReaction: downloadedReactionPrompt.prompt,
@@ -248,11 +253,18 @@ const vibeInitialState = computed<VibeInitialState | undefined>(() => {
 });
 const viewerKey = computed(() => `${tab.value?.id ?? 'tab'}-${masonryRenderKey.value}-${standaloneItem.value?.id ?? 'feed'}`);
 const currentVisibleItem = computed(() => {
-    if (sessionItems.value.length === 0) {
+    void vibeStatus.value.itemsRevision;
+
+    const currentItems = getCurrentVibeFeedItems();
+    const candidateItems = standaloneItem.value ? [standaloneItem.value] : (currentItems.length > 0 ? currentItems : sessionItems.value);
+
+    if (candidateItems.length === 0) {
         return null;
     }
-    const safeIndex = Math.max(0, Math.min(activeIndex.value, sessionItems.value.length - 1));
-    return sessionItems.value[safeIndex] ?? null;
+
+    const safeIndex = Math.max(0, Math.min(activeIndex.value, candidateItems.length - 1));
+
+    return candidateItems[safeIndex] ?? null;
 });
 const fileSheet = useTabContentV2FileSheet({ activeIndex, currentVisibleItem, overlay: fullscreenOverlayState, promptDialog });
 const shouldShowStandaloneRouteBootstrap = computed(() => Boolean(tab.value)
@@ -483,26 +495,16 @@ watch(
         :update-feed="(value) => form.data.feed = value" :set-local-mode="(value) => form.isLocalMode.value = value"
         :update-service="browseActions.updateService" :update-source="(value) => form.data.source = value"
         :apply-service="applyService" :apply-filters="applyFilters" :go-to-first-page="goToFirstPage"
-        :auto-scroll-active="autoScrollActive"
-        :auto-scroll-max="AUTO_SCROLL_SPEED_MAX"
-        :auto-scroll-min="AUTO_SCROLL_SPEED_MIN"
-        :auto-scroll-speed="autoScrollSpeed"
-        :cancel-fill="cancelActiveVibeFill"
-        :fill-actions-disabled="fillActionsDisabled"
-        :fill-call-count="fillCallCount"
-        :fill-call-count-max="FILL_CALL_COUNT_MAX"
-        :fill-call-count-min="FILL_CALL_COUNT_MIN"
-        :fill-until-count="fillControls.fillUntilCount"
-        :fill-until-end="fillControls.fillUntilEnd"
+        :auto-scroll-active="autoScrollActive" :auto-scroll-max="AUTO_SCROLL_SPEED_MAX" :auto-scroll-min="AUTO_SCROLL_SPEED_MIN" :auto-scroll-speed="autoScrollSpeed"
+        :cancel-fill="cancelActiveVibeFill" :fill-actions-disabled="fillActionsDisabled"
+        :fill-call-count="fillCallCount" :fill-call-count-max="FILL_CALL_COUNT_MAX" :fill-call-count-min="FILL_CALL_COUNT_MIN"
+        :fill-until-count="fillControls.fillUntilCount" :fill-until-end="fillControls.fillUntilEnd"
         :load-next="() => vibeRef?.loadNext()"
         :set-auto-scroll-speed="fillControls.setAutoScrollSpeed"
         :set-fill-call-count="fillControls.setFillCallCount"
         :toggle-auto-scroll="fillControls.toggleAutoScroll"
-        :vibe-status="vibeStatus"
-        :set-vibe-handle="setVibeHandle"
-        :masonry-render-key="masonryRenderKey"
-        :resolve="resolve"
-        :viewer-key="viewerKey"
+        :vibe-status="vibeStatus" :set-vibe-handle="setVibeHandle"
+        :masonry-render-key="masonryRenderKey" :resolve="resolve" :viewer-key="viewerKey"
         :vibe-initial-cursor="vibeInitialCursor"
         :vibe-initial-state="vibeInitialState"
         :handle-asset-loads="handleAssetLoads"

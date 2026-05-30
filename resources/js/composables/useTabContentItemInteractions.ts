@@ -1,4 +1,5 @@
 import { computed, nextTick, onUnmounted, ref, triggerRef, type Ref, type ShallowRef } from 'vue';
+import { useToast } from '@/components/ui/toast/use-toast';
 import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import type { DownloadedReactionChoice } from './useDownloadedReactionPrompt';
 import { useMasonryReactionHandler } from './useMasonryReactionHandler';
@@ -7,6 +8,12 @@ import type { FeedItem, TabData } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
 import type { BrowseFeedHandle } from '@/types/browse';
 import { createLoadedItemsBulkActions } from '@/lib/tabContentLoadedItemsBulkActions';
+import { createClearBlacklistCallback } from '@/utils/reactions';
+import {
+    applyConfirmedLocalBlacklistClearState,
+    applyOptimisticLocalBlacklistClearState,
+    restoreOptimisticLocalReactionState,
+} from '@/utils/localReactionState';
 import { useTabContentNotFoundReconciliation } from './useTabContentNotFoundReconciliation';
 
 export type { LoadedItemsBulkAction } from '@/lib/tabContentLoadedItemsBulkActions';
@@ -24,6 +31,7 @@ type UseTabContentItemInteractionsOptions = {
     fileViewer: Ref<FileViewerRef | null>;
     matchesActiveLocalFilters?: (item: FeedItem) => boolean;
     isPositiveOnlyLocalView?: () => boolean;
+    isBlacklistedOnlyLocalView?: () => boolean;
     itemPreview: {
         incrementPreviewCount: (fileId: number) => Promise<{ previewed_count: number } | null>;
         clearPreviewedItems: (fileIds?: number[]) => void;
@@ -47,9 +55,11 @@ function safelyPlayVideoPreview(video: HTMLVideoElement): void {
 }
 
 export function useTabContentItemInteractions(options: UseTabContentItemInteractionsOptions) {
+    const toast = useToast();
     const hoveredItemIndex = ref<number | null>(null);
     const hoveredItemId = ref<number | null>(null);
     const preloadedItemIds = ref<Set<number>>(new Set());
+    const clearBlacklistCallback = createClearBlacklistCallback();
 
     const itemIndexById = computed(() => {
         const map = new Map<number, number>();
@@ -95,6 +105,12 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
     function hasBlacklistState(item: FeedItem): boolean {
         return Boolean(item.blacklisted_at);
+    }
+
+    function canToggleBlacklist(item: FeedItem): boolean {
+        return options.form.isLocal.value
+            && options.isBlacklistedOnlyLocalView?.() === true
+            && hasBlacklistState(item);
     }
 
     const { handleMasonryReaction } = useMasonryReactionHandler({
@@ -276,6 +292,48 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
         return fileIds.length;
     }
 
+    async function clearLocalBlacklist(item: FeedItem): Promise<number> {
+        if (!canToggleBlacklist(item)) {
+            return 0;
+        }
+
+        const snapshot = applyOptimisticLocalBlacklistClearState(item);
+        const shouldRemoveFromView = options.matchesActiveLocalFilters
+            ? !options.matchesActiveLocalFilters(item)
+            : false;
+
+        if (shouldRemoveFromView) {
+            if (hoveredItemId.value === item.id) {
+                clearHoverState();
+            }
+            await options.masonry.value?.remove(item);
+        } else {
+            triggerRef(options.items);
+        }
+
+        try {
+            const result = await clearBlacklistCallback(item.id);
+            applyConfirmedLocalBlacklistClearState(item, result);
+            triggerRef(options.items);
+
+            return 1;
+        } catch (error) {
+            console.error('Failed to clear blacklist:', error);
+            restoreOptimisticLocalReactionState(item, snapshot);
+            triggerRef(options.items);
+
+            if (shouldRemoveFromView) {
+                await options.masonry.value?.restore(item);
+            }
+
+            toast.error('Failed to clear blacklist', {
+                id: `clear-blacklist-${item.id}-error`,
+            });
+
+            return 0;
+        }
+    }
+
     const preloadHandlers = {
         reset: resetPreloadedItems,
         isItemPreloaded,
@@ -296,11 +354,16 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
 
     const reactionHandlers = {
         hasActiveReaction,
+        canToggleBlacklist,
         hasBlacklistState,
         onFileReaction(item: FeedItem, type: ReactionType): void {
             void handleMasonryReaction(item, type);
         },
         async onFileBlacklist(item: FeedItem): Promise<number> {
+            if (canToggleBlacklist(item)) {
+                return clearLocalBlacklist(item);
+            }
+
             return loadedItemsBulkActions.blacklistItems([item]);
         },
         onFileViewerReaction(itemId: number, type: ReactionType): void {

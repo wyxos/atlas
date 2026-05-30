@@ -344,6 +344,21 @@ SVG;
         ]);
     }
 
+    public function clearBlacklist(File $file, FileBlacklistService $fileBlacklistService): JsonResponse
+    {
+        $file = $fileBlacklistService->clear($file);
+
+        return response()->json([
+            'message' => 'File blacklist cleared.',
+            'file' => [
+                'id' => (int) $file->id,
+                'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
+                'auto_blacklisted' => (bool) $file->auto_blacklisted,
+                'previewed_count' => (int) $file->previewed_count,
+            ],
+        ]);
+    }
+
     /**
      * Reset preview counts for multiple files.
      */

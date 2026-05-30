@@ -15,6 +15,7 @@ export type LocalReactionSnapshot = {
     originalUrl: FeedItem['originalUrl'];
     auto_blacklisted: boolean;
     auto_blacklist_rule: FeedItem['auto_blacklist_rule'];
+    auto_blacklist_containers: FeedItem['auto_blacklist_containers'];
     blacklisted_at: FeedItem['blacklisted_at'];
     blacklist_rule: FeedItem['blacklist_rule'];
     previewed_count: FeedItem['previewed_count'];
@@ -63,6 +64,7 @@ export function createLocalReactionSnapshot(item: FeedItem): LocalReactionSnapsh
         originalUrl: item.originalUrl,
         auto_blacklisted: item.auto_blacklisted === true,
         auto_blacklist_rule: item.auto_blacklist_rule ?? null,
+        auto_blacklist_containers: item.auto_blacklist_containers ? [...item.auto_blacklist_containers] : [],
         blacklisted_at: item.blacklisted_at ?? null,
         blacklist_rule: item.blacklist_rule ?? null,
         previewed_count: item.previewed_count,
@@ -118,6 +120,18 @@ export function applyOptimisticLocalBlacklistState(item: FeedItem): LocalReactio
     return snapshot;
 }
 
+export function applyOptimisticLocalBlacklistClearState(item: FeedItem): LocalReactionSnapshot {
+    const snapshot = createLocalReactionSnapshot(item);
+
+    item.auto_blacklisted = false;
+    item.auto_blacklist_rule = null;
+    item.auto_blacklist_containers = [];
+    item.blacklisted_at = null;
+    item.blacklist_rule = null;
+
+    return snapshot;
+}
+
 export function applyConfirmedLocalBlacklistState(
     item: FeedItem,
     result: { blacklisted_at: string; previewed_count?: number },
@@ -134,6 +148,21 @@ export function applyConfirmedLocalBlacklistState(
     );
 }
 
+export function applyConfirmedLocalBlacklistClearState(
+    item: FeedItem,
+    result: { blacklisted_at: string | null; auto_blacklisted: boolean; previewed_count?: number },
+): void {
+    item.auto_blacklisted = result.auto_blacklisted;
+    item.auto_blacklist_rule = null;
+    item.auto_blacklist_containers = [];
+    item.blacklisted_at = result.blacklisted_at;
+    item.blacklist_rule = null;
+
+    if (typeof result.previewed_count === 'number') {
+        item.previewed_count = result.previewed_count;
+    }
+}
+
 export function restoreOptimisticLocalReactionState(
     item: FeedItem,
     snapshot: LocalReactionSnapshot,
@@ -147,6 +176,7 @@ export function restoreOptimisticLocalReactionState(
     item.originalUrl = snapshot.originalUrl;
     item.auto_blacklisted = snapshot.auto_blacklisted;
     item.auto_blacklist_rule = snapshot.auto_blacklist_rule ?? null;
+    item.auto_blacklist_containers = snapshot.auto_blacklist_containers ? [...snapshot.auto_blacklist_containers] : [];
     item.blacklisted_at = snapshot.blacklisted_at ?? null;
     item.blacklist_rule = snapshot.blacklist_rule ?? null;
     item.previewed_count = snapshot.previewed_count;

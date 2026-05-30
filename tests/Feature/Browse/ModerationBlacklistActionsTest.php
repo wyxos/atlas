@@ -245,5 +245,8 @@ test('persist the moderation rule that blacklisted a file without classification
         ->assertJsonMissingPath('file.blacklist_type')
         ->assertJsonMissingPath('file.blacklist_reason')
         ->assertJsonPath('file.blacklist_rule.id', $rule->id)
-        ->assertJsonPath('file.blacklist_rule.name', $rule->name);
+        ->assertJsonPath('file.blacklist_rule.name', $rule->name)
+        ->assertJsonPath('file.blacklist_rule.matched_terms', ['spam'])
+        ->assertJsonPath('file.prompt_moderation_rule.id', $rule->id)
+        ->assertJsonPath('file.prompt_moderation_rule.matched_terms', ['spam']);
 });
