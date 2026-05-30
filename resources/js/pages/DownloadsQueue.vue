@@ -23,6 +23,10 @@ const {
     downloads,
     detailsById,
     isInitialLoading,
+    loadError,
+    loadedPages,
+    totalPages,
+    totalDownloads,
     removeDownloads,
     cancelActiveRequest,
     scheduleVisibleDetailsFetch,
@@ -115,6 +119,18 @@ const sortDirections = computed(() => ({
     completedAt: getSortDirection('completedAt'),
 }));
 
+const loadProgressPercent = computed(() => {
+    if (totalPages.value === 0) {
+        return 100;
+    }
+
+    return Math.round((loadedPages.value / totalPages.value) * 100);
+});
+
+const showLoadProgressPanel = computed(() =>
+    isInitialLoading.value || (totalPages.value > 0 && loadedPages.value < totalPages.value),
+);
+
 function handleStatusSelect(status: DownloadQueueFilterStatus): void {
     selectedStatus.value = status;
 }
@@ -201,7 +217,33 @@ watch([sortKey, sortDirection], () => {
                 @remove-filtered="handleRemoveFiltered"
             />
 
+            <div
+                v-if="showLoadProgressPanel"
+                class="mb-4 overflow-hidden rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 p-4"
+                data-test="downloads-progress-panel"
+            >
+                <div class="mb-2 flex items-center justify-between text-sm text-twilight-indigo-100">
+                    <span>Pages: {{ loadedPages }} / {{ totalPages }}</span>
+                    <span>{{ loadProgressPercent }}%</span>
+                </div>
+                <div class="h-2 w-full rounded-full bg-twilight-indigo-600">
+                    <div
+                        class="h-2 rounded-full bg-smart-blue-400 transition-[width] duration-200"
+                        :style="{ width: `${loadProgressPercent}%` }"
+                    />
+                </div>
+                <div class="mt-2 text-xs text-blue-slate-300">
+                    Downloads loaded: {{ downloads.length }} / {{ totalDownloads }}
+                    <span v-if="isInitialLoading" class="ml-2">Loading...</span>
+                </div>
+            </div>
+
+            <div v-if="loadError" class="rounded-lg border border-danger-500 bg-prussian-blue-700 p-4 text-danger-200">
+                {{ loadError }}
+            </div>
+
             <DownloadsQueueTable
+                v-else
                 ref="queueTableRef"
                 :items="sortedItems"
                 :details-by-id="detailsById"

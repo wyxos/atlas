@@ -2,6 +2,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import downloadTransfers from '@/routes/api/download-transfers/index';
 import type {
     DownloadQueueDetails,
+    DownloadQueueIndexResponse,
     DownloadQueueItem,
     DownloadQueueProgressPayload,
     DownloadQueueQueuedPayload,
@@ -9,6 +10,7 @@ import type {
 } from '@/types/downloadQueue';
 import { normalizeDownloadQueueProgress } from '@/utils/downloadQueue';
 
+const PER_PAGE = 100;
 const SCROLL_IDLE_MS = 180;
 const SOCKET_CHANNEL = 'downloads';
 
@@ -39,8 +41,13 @@ export function useDownloadsQueueTransfers() {
     const downloads = ref<DownloadQueueItem[]>([]);
     const detailsById = ref<Record<number, DownloadQueueDetails>>({});
     const isInitialLoading = ref(true);
+    const loadError = ref<string | null>(null);
+    const loadedPages = ref(0);
+    const totalPages = ref(0);
+    const totalDownloads = ref(0);
     const visibleItems = ref<DownloadQueueItem[]>([]);
 
+    let activeListRequestToken = 0;
     let activeRequestToken = 0;
     let idleTimeout: ReturnType<typeof setTimeout> | null = null;
     let detailsAbortController: AbortController | null = null;
@@ -63,6 +70,7 @@ export function useDownloadsQueueTransfers() {
 
         if (index === -1) {
             downloads.value = [item, ...downloads.value];
+            totalDownloads.value += 1;
             return;
         }
 
@@ -77,8 +85,11 @@ export function useDownloadsQueueTransfers() {
         }
 
         const removedIds = new Set(ids);
+        const nextDownloads = downloads.value.filter((item) => !removedIds.has(item.id));
+        const removedCount = downloads.value.length - nextDownloads.length;
 
-        downloads.value = downloads.value.filter((item) => !removedIds.has(item.id));
+        downloads.value = nextDownloads;
+        totalDownloads.value = Math.max(0, totalDownloads.value - removedCount);
         visibleItems.value = visibleItems.value.filter((item) => !removedIds.has(item.id));
         detailsById.value = Object.fromEntries(
             Object.entries(detailsById.value).filter(([key]) => !removedIds.has(Number(key))),
@@ -271,6 +282,19 @@ export function useDownloadsQueueTransfers() {
         }, SCROLL_IDLE_MS);
     }
 
+    async function fetchDownloadsPage(afterId: number, maxId: number | null): Promise<DownloadQueueIndexResponse> {
+        const params = {
+            after_id: afterId,
+            per_page: PER_PAGE,
+            ...(maxId !== null ? { max_id: maxId } : {}),
+        };
+        const { data } = await window.axios.get<DownloadQueueIndexResponse>(downloadTransfers.index.url(), {
+            params,
+        });
+
+        return data;
+    }
+
     function setVisibleItems(items: DownloadQueueItem[]): void {
         visibleItems.value = items;
         scheduleVisibleDetailsFetch();
@@ -282,15 +306,63 @@ export function useDownloadsQueueTransfers() {
     }
 
     async function loadDownloads(): Promise<void> {
+        const requestToken = ++activeListRequestToken;
+
         isInitialLoading.value = true;
+        loadError.value = null;
+        loadedPages.value = 0;
+        totalPages.value = 0;
+        totalDownloads.value = 0;
+        downloads.value = [];
+        detailsById.value = {};
+        visibleItems.value = [];
+        cancelActiveRequest();
 
         try {
-            const { data } = await window.axios.get<{ items: DownloadQueueItem[] }>(downloadTransfers.index.url());
-            downloads.value = data.items;
-            detailsById.value = {};
+            let afterId = 0;
+            let maxId: number | null = null;
+            let hasMore = true;
+
+            while (hasMore) {
+                const nextPage = await fetchDownloadsPage(afterId, maxId);
+                if (requestToken !== activeListRequestToken) {
+                    return;
+                }
+
+                downloads.value = [
+                    ...downloads.value,
+                    ...(Array.isArray(nextPage.items) ? nextPage.items : []),
+                ];
+
+                if (!nextPage.cursor || !nextPage.pagination) {
+                    totalDownloads.value = downloads.value.length;
+                    totalPages.value = downloads.value.length > 0 ? 1 : 0;
+                    loadedPages.value = totalPages.value;
+                    hasMore = false;
+                    continue;
+                }
+
+                if (maxId === null) {
+                    maxId = nextPage.cursor.max_id;
+                    totalDownloads.value = nextPage.pagination.total ?? 0;
+                    totalPages.value = nextPage.pagination.total_pages ?? (totalDownloads.value > 0 ? 1 : 0);
+                }
+
+                if (totalPages.value > 0) {
+                    loadedPages.value = Math.min(totalPages.value, loadedPages.value + 1);
+                }
+
+                afterId = nextPage.cursor.next_after_id ?? afterId;
+                hasMore = nextPage.cursor.has_more && nextPage.cursor.next_after_id !== null;
+            }
+        } catch (error) {
+            console.error('Failed to load downloads:', error);
+            loadError.value = 'Failed to load downloads.';
         } finally {
-            isInitialLoading.value = false;
-            scheduleVisibleDetailsFetch();
+            if (requestToken === activeListRequestToken) {
+                isInitialLoading.value = false;
+                scheduleVisibleDetailsFetch();
+            }
         }
     }
 
@@ -300,6 +372,8 @@ export function useDownloadsQueueTransfers() {
     });
 
     onBeforeUnmount(() => {
+        activeListRequestToken += 1;
+
         if (idleTimeout) {
             clearTimeout(idleTimeout);
         }
@@ -312,6 +386,10 @@ export function useDownloadsQueueTransfers() {
         downloads,
         detailsById,
         isInitialLoading,
+        loadError,
+        loadedPages,
+        totalPages,
+        totalDownloads,
         visibleItems,
         loadDownloads,
         removeDownloads,

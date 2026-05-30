@@ -37,6 +37,21 @@ export interface DownloadQueueItem {
     can_restart?: boolean;
 }
 
+export interface DownloadQueueIndexResponse {
+    items: DownloadQueueItem[];
+    cursor?: {
+        after_id: number;
+        next_after_id: number | null;
+        has_more: boolean;
+        max_id: number;
+    };
+    pagination?: {
+        per_page: number;
+        total: number | null;
+        total_pages: number | null;
+    };
+}
+
 export interface DownloadQueueDetails {
     path: string | null;
     absolute_path: string | null;

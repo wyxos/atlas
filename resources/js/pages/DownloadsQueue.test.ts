@@ -1,6 +1,35 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, expect, it, vi } from 'vitest';
 import DownloadsQueue from './DownloadsQueue.vue';
+import type { DownloadQueueIndexResponse, DownloadQueueItem } from '@/types/downloadQueue';
+
+function createDeferred<T>() {
+    let resolve: ((value: T | PromiseLike<T>) => void) | null = null;
+    const promise = new Promise<T>((innerResolve) => {
+        resolve = innerResolve;
+    });
+
+    return {
+        promise,
+        resolve: (value: T) => {
+            resolve?.(value);
+        },
+    };
+}
+
+function downloadQueueItem(overrides: Partial<DownloadQueueItem> & Pick<DownloadQueueItem, 'id'>): DownloadQueueItem {
+    return {
+        status: 'queued',
+        created_at: null,
+        queued_at: null,
+        started_at: null,
+        finished_at: null,
+        failed_at: null,
+        percent: 0,
+        error: null,
+        ...overrides,
+    };
+}
 
 const mockToast = {
     info: vi.fn(),
@@ -36,6 +65,89 @@ it('renders the downloads queue', async () => {
 
     expect(wrapper.text()).toContain('Downloads Queue');
     expect(wrapper.text()).toContain('Manage queued downloads.');
+});
+
+it('loads downloads with cursor pagination before rendering rows', async () => {
+    const secondPage = createDeferred<{ data: DownloadQueueIndexResponse }>();
+    window.axios.get = vi.fn((_url: string, config?: { params?: { after_id?: number } }) => {
+        if (config?.params?.after_id === 0) {
+            return Promise.resolve({
+                data: {
+                    items: [
+                        downloadQueueItem({
+                            id: 1,
+                            error: 'First page queued',
+                        }),
+                    ],
+                    cursor: {
+                        after_id: 0,
+                        next_after_id: 1,
+                        has_more: true,
+                        max_id: 2,
+                    },
+                    pagination: {
+                        per_page: 100,
+                        total: 2,
+                        total_pages: 2,
+                    },
+                } satisfies DownloadQueueIndexResponse,
+            });
+        }
+
+        if (config?.params?.after_id === 1) {
+            return secondPage.promise;
+        }
+
+        return Promise.reject(new Error(`Unexpected cursor: ${String(config?.params?.after_id)}`));
+    });
+
+    const wrapper = mount(DownloadsQueue);
+    await flushPromises();
+
+    expect(window.axios.get).toHaveBeenNthCalledWith(1, '/api/download-transfers', {
+        params: {
+            after_id: 0,
+            per_page: 100,
+        },
+    });
+    expect(window.axios.get).toHaveBeenNthCalledWith(2, '/api/download-transfers', {
+        params: {
+            after_id: 1,
+            max_id: 2,
+            per_page: 100,
+        },
+    });
+    expect(wrapper.text()).toContain('Pages: 1 / 2');
+    expect(wrapper.text()).toContain('Downloads loaded: 1 / 2');
+    expect(wrapper.text()).toContain('Loading downloads...');
+    expect(wrapper.text()).not.toContain('First page queued');
+
+    secondPage.resolve({
+        data: {
+            items: [
+                downloadQueueItem({
+                    id: 2,
+                    error: 'Second page queued',
+                }),
+            ],
+            cursor: {
+                after_id: 1,
+                next_after_id: null,
+                has_more: false,
+                max_id: 2,
+            },
+            pagination: {
+                per_page: 100,
+                total: null,
+                total_pages: null,
+            },
+        } satisfies DownloadQueueIndexResponse,
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="downloads-progress-panel"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('First page queued');
+    expect(wrapper.text()).toContain('Second page queued');
 });
 
 it('disables pause and cancel when progress is complete', async () => {
