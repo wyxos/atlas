@@ -15,7 +15,7 @@ import {
 } from './content/media-utils';
 import { mediaMatchesRulesForPage } from './content/media-rule-match';
 import { OverlayManager } from './content/overlay-manager';
-import { sameStatusLinkedMediaTargetMatchesRules, shouldSkipLinkedMedia } from './content/linked-media-target';
+import { samePageLinkedMediaTargetMatchesRules, shouldSkipLinkedMedia } from './content/linked-media-target';
 import { createAnchorMediaRuntime } from './content/anchor-media-runtime';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { createDownloadEventSheet } from './content/download-event-sheet';
@@ -67,7 +67,7 @@ function mediaMatchesRules(element: MediaElement): boolean {
     }
 
     return mediaMatchesRulesForPage(element, window.location.href, currentRules, currentPageHostname)
-        || sameStatusLinkedMediaTargetMatchesRules(element, window.location.href, currentRules, currentPageHostname);
+        || samePageLinkedMediaTargetMatchesRules(element, window.location.href, currentRules, currentPageHostname);
 }
 
 function mediaHasEligibleWidgetWidth(element: MediaElement): boolean {

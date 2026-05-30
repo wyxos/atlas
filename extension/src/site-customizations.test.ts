@@ -72,16 +72,8 @@ describe('site-customizations', () => {
         expect(customization).toBeNull();
     });
 
-    it('includes civitai.red in the built-in customization set', () => {
+    it('includes civitai.red in the built-in customization set without non-owned site defaults', () => {
         expect(getDefaultSiteCustomizations()).toEqual(expect.arrayContaining([
-            expect.objectContaining({
-                domain: 'x.com',
-                matchRules: ['.*\\/status\\/\\d+.*'],
-            }),
-            expect.objectContaining({
-                domain: 'twitter.com',
-                matchRules: ['.*\\/status\\/\\d+.*'],
-            }),
             expect.objectContaining({
                 domain: 'civitai.com',
                 mediaCleaner: expect.objectContaining({
@@ -93,6 +85,14 @@ describe('site-customizations', () => {
                 mediaCleaner: expect.objectContaining({
                     strategies: ['civitaiCanonical'],
                 }),
+            }),
+        ]));
+        expect(getDefaultSiteCustomizations()).not.toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                domain: 'x.com',
+            }),
+            expect.objectContaining({
+                domain: 'twitter.com',
             }),
         ]));
     });
@@ -129,25 +129,13 @@ describe('site-customizations', () => {
         });
     });
 
-    it('uses the built-in X status customization when stored customizations do not include X', () => {
+    it('does not enable X when stored customizations do not include X', () => {
         const customization = resolveSiteCustomizationForHostname([], 'x.com');
 
-        expect(customization).toEqual({
-            enabled: true,
-            domain: 'x.com',
-            matchRules: ['.*\\/status\\/\\d+.*'],
-            referrerCleaner: {
-                stripQueryParams: [],
-            },
-            mediaCleaner: {
-                stripQueryParams: [],
-                rewriteRules: [],
-                strategies: [],
-            },
-        });
+        expect(customization).toBeNull();
     });
 
-    it('treats twitter.com and x.com customizations as aliases', () => {
+    it('does not alias twitter.com customizations onto x.com', () => {
         const customization = resolveSiteCustomizationForHostname([
             {
                 enabled: true,
@@ -164,7 +152,7 @@ describe('site-customizations', () => {
             },
         ], 'x.com');
 
-        expect(customization?.domain).toBe('twitter.com');
+        expect(customization).toBeNull();
     });
 
     it('prefers the direct civitai.red profile over the civitai.com fallback', () => {

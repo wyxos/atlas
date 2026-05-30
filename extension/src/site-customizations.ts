@@ -72,12 +72,6 @@ function normalizeSiteCustomizationDomain(input: string): string {
     return trimmed.replace(/^\.+/, '').replace(/\.+$/, '');
 }
 
-function normalizeXTwitterDomainAlias(input: string): string {
-    const normalized = input.trim().toLowerCase().replace(/^www\./, '').replace(/^mobile\./, '');
-
-    return normalized === 'x.com' || normalized === 'twitter.com' ? 'twitter.com' : normalized;
-}
-
 function normalizeMediaRewriteRules(rules: MediaRewriteRule[]): MediaRewriteRule[] {
     const seen = new Set<string>();
 
@@ -420,16 +414,10 @@ export function resolveStoredSiteCustomizationForHostname(
             return 0;
         }
 
-        const normalizedSocialHostname = normalizeXTwitterDomainAlias(normalizedHostname);
-        const normalizedSocialDomain = normalizeXTwitterDomainAlias(domain);
-        if (hostMatchesRuleDomain(normalizedSocialHostname, normalizedSocialDomain)) {
-            return 1;
-        }
-
         const normalizedAliasHostname = normalizeCivitAiHostnameForMatching(normalizedHostname);
         const normalizedAliasDomain = normalizeCivitAiHostnameForMatching(domain);
 
-        return hostMatchesRuleDomain(normalizedAliasHostname, normalizedAliasDomain) ? 2 : null;
+        return hostMatchesRuleDomain(normalizedAliasHostname, normalizedAliasDomain) ? 1 : null;
     };
 
     const matches = customizations

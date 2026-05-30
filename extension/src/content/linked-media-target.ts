@@ -1,43 +1,34 @@
 import { urlMatchesAnyRule, type UrlMatchRule } from '../match-rules';
 import { normalizeUrl, type MediaElement } from './media-utils';
 
-type XStatusTarget = {
-    id: string;
-    url: string;
-};
-
-function isXStatusHost(hostname: string): boolean {
-    const normalized = hostname.toLowerCase().replace(/^www\./, '').replace(/^mobile\./, '');
-
-    return normalized === 'x.com' || normalized === 'twitter.com';
-}
-
-function extractXStatusTarget(value: string | null): XStatusTarget | null {
+function parseComparableUrl(value: string | null): URL | null {
     const normalizedUrl = normalizeUrl(value);
     if (normalizedUrl === null) {
         return null;
     }
 
     try {
-        const parsed = new URL(normalizedUrl);
-        if (!isXStatusHost(parsed.hostname)) {
-            return null;
-        }
-
-        const segments = parsed.pathname.split('/').filter((segment) => segment !== '');
-        const statusIndex = segments.findIndex((segment) => segment === 'status');
-        const statusId = statusIndex >= 0 ? segments[statusIndex + 1] : null;
-        if (typeof statusId !== 'string' || !/^\d+$/.test(statusId)) {
-            return null;
-        }
-
-        return {
-            id: statusId,
-            url: normalizedUrl,
-        };
+        return new URL(normalizedUrl);
     } catch {
         return null;
     }
+}
+
+function normalizePathname(pathname: string): string {
+    const normalized = pathname.replace(/\/+$/, '');
+
+    return normalized === '' ? '/' : normalized;
+}
+
+function isSamePageOrChildUrl(pageUrl: URL, anchorUrl: URL): boolean {
+    if (pageUrl.origin !== anchorUrl.origin) {
+        return false;
+    }
+
+    const pagePath = normalizePathname(pageUrl.pathname);
+    const anchorPath = normalizePathname(anchorUrl.pathname);
+
+    return anchorPath === pagePath || anchorPath.startsWith(`${pagePath}/`);
 }
 
 function closestLinkedAnchor(media: MediaElement): HTMLAnchorElement | null {
@@ -46,7 +37,7 @@ function closestLinkedAnchor(media: MediaElement): HTMLAnchorElement | null {
     return anchor instanceof HTMLAnchorElement ? anchor : null;
 }
 
-function resolveSameStatusLinkedMediaTargetUrl(
+function resolveSamePageLinkedMediaTargetUrl(
     media: MediaElement,
     pageUrl: string = window.location.href,
 ): string | null {
@@ -55,33 +46,33 @@ function resolveSameStatusLinkedMediaTargetUrl(
         return null;
     }
 
-    const pageTarget = extractXStatusTarget(pageUrl);
-    const anchorTarget = extractXStatusTarget(anchor.href);
-    if (pageTarget === null || anchorTarget === null || pageTarget.id !== anchorTarget.id) {
+    const parsedPageUrl = parseComparableUrl(pageUrl);
+    const parsedAnchorUrl = parseComparableUrl(anchor.href);
+    if (parsedPageUrl === null || parsedAnchorUrl === null || !isSamePageOrChildUrl(parsedPageUrl, parsedAnchorUrl)) {
         return null;
     }
 
-    return anchorTarget.url;
+    return parsedAnchorUrl.href;
 }
 
 function shouldSkipLinkedMedia(
     media: MediaElement,
     pageUrl: string = window.location.href,
 ): boolean {
-    return closestLinkedAnchor(media) !== null && resolveSameStatusLinkedMediaTargetUrl(media, pageUrl) === null;
+    return closestLinkedAnchor(media) !== null && resolveSamePageLinkedMediaTargetUrl(media, pageUrl) === null;
 }
 
-function sameStatusLinkedMediaTargetMatchesRules(
+function samePageLinkedMediaTargetMatchesRules(
     media: MediaElement,
     pageUrl: string,
     rules: UrlMatchRule[],
     pageHostname: string,
 ): boolean {
-    return urlMatchesAnyRule(resolveSameStatusLinkedMediaTargetUrl(media, pageUrl), rules, pageHostname);
+    return urlMatchesAnyRule(resolveSamePageLinkedMediaTargetUrl(media, pageUrl), rules, pageHostname);
 }
 
 export {
-    resolveSameStatusLinkedMediaTargetUrl,
-    sameStatusLinkedMediaTargetMatchesRules,
+    resolveSamePageLinkedMediaTargetUrl,
+    samePageLinkedMediaTargetMatchesRules,
     shouldSkipLinkedMedia,
 };

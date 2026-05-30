@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-    resolveSameStatusLinkedMediaTargetUrl,
-    sameStatusLinkedMediaTargetMatchesRules,
+    resolveSamePageLinkedMediaTargetUrl,
+    samePageLinkedMediaTargetMatchesRules,
     shouldSkipLinkedMedia,
 } from './linked-media-target';
 
@@ -21,12 +21,12 @@ describe('linked media targets', () => {
         document.body.innerHTML = '';
     });
 
-    it('allows X status media links that point at the current status', () => {
+    it('allows linked media that points at the current page or a child URL', () => {
         const image = linkedImage('https://x.com/SD_Tutorial/status/2056050638291947756/photo/1');
         const pageUrl = 'https://x.com/SD_Tutorial/status/2056050638291947756';
 
         expect(shouldSkipLinkedMedia(image, pageUrl)).toBe(false);
-        expect(resolveSameStatusLinkedMediaTargetUrl(image, pageUrl)).toBe('https://x.com/SD_Tutorial/status/2056050638291947756/photo/1');
+        expect(resolveSamePageLinkedMediaTargetUrl(image, pageUrl)).toBe('https://x.com/SD_Tutorial/status/2056050638291947756/photo/1');
     });
 
     it('keeps skipping linked media that points somewhere else', () => {
@@ -35,10 +35,10 @@ describe('linked media targets', () => {
         expect(shouldSkipLinkedMedia(image, 'https://x.com/SD_Tutorial/status/2056050638291947756')).toBe(true);
     });
 
-    it('matches same-status X links against the page rules', () => {
-        const image = linkedImage('https://twitter.com/SD_Tutorial/status/2056050638291947756/video/1');
+    it('matches same-page linked media against the page rules', () => {
+        const image = linkedImage('https://x.com/SD_Tutorial/status/2056050638291947756/video/1');
 
-        expect(sameStatusLinkedMediaTargetMatchesRules(
+        expect(samePageLinkedMediaTargetMatchesRules(
             image,
             'https://x.com/SD_Tutorial/status/2056050638291947756',
             [{

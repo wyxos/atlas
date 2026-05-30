@@ -22,12 +22,6 @@ function createDefaultSiteCustomization(
 }
 
 export const BUILT_IN_SITE_CUSTOMIZATIONS: SiteCustomization[] = [
-    createDefaultSiteCustomization('x.com', {
-        matchRules: ['.*\\/status\\/\\d+.*'],
-    }),
-    createDefaultSiteCustomization('twitter.com', {
-        matchRules: ['.*\\/status\\/\\d+.*'],
-    }),
     createDefaultSiteCustomization('deviantart.com', {
         matchRules: DEFAULT_MATCH_RULES[0]?.regexes ?? [],
     }),
