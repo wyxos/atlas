@@ -1,3 +1,5 @@
+import { createAtlasApiHeaders, createAtlasFetchAuthOptions } from './atlas-auth';
+
 export type AtlasCheckQueueResponse<Result> = {
     ok: boolean;
     status: number;
@@ -256,10 +258,8 @@ export function createBackgroundAtlasCheckQueue<Result>(
         try {
             const response = await fetch(`${first.atlasDomain}${definition.endpointPath}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Atlas-Api-Key': first.apiToken,
-                },
+                headers: createAtlasApiHeaders(first.apiToken, true),
+                ...createAtlasFetchAuthOptions(first.apiToken),
                 body: JSON.stringify({ items }),
             });
 

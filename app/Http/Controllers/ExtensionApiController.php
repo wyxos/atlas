@@ -11,25 +11,29 @@ use App\Services\Extension\ExtensionDownloadRuntimeContext;
 use App\Services\Extension\ExtensionListingMetadataOverridesNormalizer;
 use App\Services\Extension\ExtensionMediaMatchService;
 use App\Services\Extension\ExtensionReactionProcessor;
+use App\Services\Extension\ExtensionRequestAuthenticator;
 use App\Services\ExtensionApiKeyService;
 use App\Services\FileBlacklistService;
 use App\Services\FileReactionService;
 use App\Services\Library\LibraryIndexSyncDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ExtensionApiController extends Controller
 {
+    public function __construct(private readonly ExtensionRequestAuthenticator $extensionAuthenticator) {}
+
     public function ping(Request $request, ExtensionApiKeyService $extensionApiKey): JsonResponse
     {
-        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
-        if ($apiKey === '' || ! $this->resolveExtensionUser($request, $extensionApiKey)) {
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
+        if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
             ], 401);
         }
 
-        $extensionChannel = app(ExtensionApiPayloadSupport::class)->channelHash($apiKey);
+        $extensionChannel = $this->extensionAuthenticator->resolveChannel($request, $user);
 
         return response()->json([
             'ok' => true,
@@ -41,16 +45,15 @@ class ExtensionApiController extends Controller
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
     ): JsonResponse {
-        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
-        if ($apiKey === '' || ! $user) {
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
+        if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
             ], 401);
         }
 
         $channelName = trim((string) $request->input('channel_name', ''));
-        $expectedChannel = 'private-extension-downloads.'.app(ExtensionApiPayloadSupport::class)->channelHash($apiKey);
+        $expectedChannel = 'private-extension-downloads.'.$this->extensionAuthenticator->resolveChannel($request, $user);
         if ($channelName === '' || ! hash_equals($expectedChannel, $channelName)) {
             return response()->json([
                 'message' => 'Invalid Reverb channel authorization request.',
@@ -83,7 +86,7 @@ class ExtensionApiController extends Controller
         ExtensionApiKeyService $extensionApiKey,
         ExtensionMediaMatchService $mediaMatchService,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -109,7 +112,7 @@ class ExtensionApiController extends Controller
         ExtensionApiKeyService $extensionApiKey,
         ExtensionMediaMatchService $mediaMatchService,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -134,7 +137,7 @@ class ExtensionApiController extends Controller
         ExtensionApiKeyService $extensionApiKey,
         ExtensionMediaMatchService $mediaMatchService,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -164,7 +167,7 @@ class ExtensionApiController extends Controller
         ExtensionListingMetadataOverridesNormalizer $listingMetadataOverridesNormalizer,
         ExtensionReactionProcessor $reactionProcessor,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -199,7 +202,7 @@ class ExtensionApiController extends Controller
             'user_agent' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $extensionChannel = app(ExtensionApiPayloadSupport::class)->channelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
+        $extensionChannel = $this->extensionAuthenticator->resolveChannel($request, $user);
         $urlDerivedListingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
             $validated['referrer_url_hash_aware'] ?? null,
             $validated['referrer_url'] ?? null,
@@ -240,7 +243,7 @@ class ExtensionApiController extends Controller
         ExtensionReactionProcessor $reactionProcessor,
         LibraryIndexSyncDispatcher $libraryIndexSyncDispatcher,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -278,7 +281,7 @@ class ExtensionApiController extends Controller
             'user_agent' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $extensionChannel = app(ExtensionApiPayloadSupport::class)->channelHash(trim((string) $request->header('X-Atlas-Api-Key', '')));
+        $extensionChannel = $this->extensionAuthenticator->resolveChannel($request, $user);
         $runtimeContext = $downloadRuntimeContext->fromValidated($validated, $request);
         $firstItem = $validated['items'][0] ?? [];
         $urlDerivedListingMetadataOverrides = $containerMetadataService->metadataOverridesFromCandidateUrls([
@@ -369,7 +372,7 @@ class ExtensionApiController extends Controller
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -423,7 +426,7 @@ class ExtensionApiController extends Controller
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -445,7 +448,7 @@ class ExtensionApiController extends Controller
         Request $request,
         ExtensionApiKeyService $extensionApiKey,
     ): JsonResponse {
-        $user = $this->resolveExtensionUser($request, $extensionApiKey);
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
         if (! $user) {
             return response()->json([
                 'message' => 'Invalid extension API key.',
@@ -460,15 +463,5 @@ class ExtensionApiController extends Controller
         return response()->json(
             app(ExtensionCivitAiBrowseTabService::class)->openUserTab($user, $validated)
         );
-    }
-
-    private function resolveExtensionUser(Request $request, ExtensionApiKeyService $extensionApiKey): ?\App\Models\User
-    {
-        $apiKey = trim((string) $request->header('X-Atlas-Api-Key', ''));
-        if ($apiKey === '') {
-            return null;
-        }
-
-        return $extensionApiKey->resolveUserForApiKey($apiKey);
     }
 }

@@ -304,6 +304,51 @@ describe('background runtime message bridge', () => {
         ]);
     });
 
+    it('submits atlas.test reactions without an API token by including cookies', async () => {
+        const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+            reaction: 'like',
+        }), { status: 200 }));
+        vi.stubGlobal('chrome', chromeMock);
+        vi.stubGlobal('fetch', fetchMock);
+
+        await import('./background');
+
+        const listener = getRuntimeMessageListener();
+        expect(listener).toBeTypeOf('function');
+
+        const response = await sendRuntimeMessage(listener!, {
+            type: 'ATLAS_SUBMIT_REACTION',
+            atlasDomain: 'https://atlas.test',
+            apiToken: '',
+            endpoint: 'https://atlas.test/api/extension/reactions',
+            body: {
+                type: 'like',
+                page_url: 'https://www.youtube.com/watch?v=9KSGUVcNfZM',
+            },
+        });
+
+        expect(response).toEqual({
+            ok: true,
+            status: 200,
+            payload: {
+                reaction: 'like',
+            },
+        });
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.test/api/extension/reactions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Atlas-Local-Extension': '1',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                type: 'like',
+                page_url: 'https://www.youtube.com/watch?v=9KSGUVcNfZM',
+            }),
+        });
+    });
+
     it('creates a new Atlas browser tab for a Civitai model browse request', async () => {
         const { chromeMock, getRuntimeMessageListener } = createChromeMock([]);
         const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({

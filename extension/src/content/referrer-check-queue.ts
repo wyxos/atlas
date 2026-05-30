@@ -1,4 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
+import { hasAtlasApiAuth } from '../atlas-auth';
 import { requestQueuedReferrerCheckViaRuntime } from '../atlas-runtime-request';
 import { cleanupUrlQueryParams } from '../referrer-cleanup';
 import { atlasLoggedRuntimeRequest } from './atlas-request-log';
@@ -103,7 +104,7 @@ export async function enqueueReferrerCheck(
 
     try {
         const stored = await getStoredOptions();
-        if (stored.apiToken === '') {
+        if (!hasAtlasApiAuth(stored.atlasDomain, stored.apiToken)) {
             return emptyResult();
         }
 

@@ -22,6 +22,10 @@ export class OverlayManager {
     private isGlobalShortcutBound = false;
 
     apply(media: MediaElement, options: OverlayApplyOptions = {}): void {
+        if (!this.activeMedia.has(media) && !this.resolveOverlappingMedia(media)) {
+            return;
+        }
+
         this.activeMedia.add(media);
         media.setAttribute(APPLIED_ATTR, '1');
         const existingHost = this.badgesByMedia.get(media);
@@ -101,6 +105,21 @@ export class OverlayManager {
         this.syncBadgePlacement(media, badge);
         this.badgesByMedia.set(media, badgeHost);
         return badge;
+    }
+
+    private resolveOverlappingMedia(media: MediaElement): boolean {
+        const overlappingMedia = this.findOverlappingActiveMedia(media);
+        const preferredExisting = overlappingMedia.find((existingMedia) => this.shouldPreferExistingMedia(existingMedia, media));
+        if (preferredExisting) {
+            this.remove(media);
+            return false;
+        }
+
+        overlappingMedia.forEach((existingMedia) => {
+            this.remove(existingMedia);
+        });
+
+        return true;
     }
 
     private ensureGlobalShortcutBinding(): void {
@@ -225,6 +244,48 @@ export class OverlayManager {
         }
 
         return null;
+    }
+
+    private findOverlappingActiveMedia(candidate: MediaElement): MediaElement[] {
+        const candidateRect = candidate.getBoundingClientRect();
+        if (this.rectArea(candidateRect) <= 0) {
+            return [];
+        }
+
+        return Array.from(this.activeMedia)
+            .filter((media) => media !== candidate && this.isActiveConnectedMedia(media))
+            .filter((media) => this.overlapRatio(candidateRect, media.getBoundingClientRect()) >= 0.8);
+    }
+
+    private shouldPreferExistingMedia(existingMedia: MediaElement, candidate: MediaElement): boolean {
+        if (existingMedia instanceof HTMLVideoElement && candidate instanceof HTMLImageElement) {
+            return true;
+        }
+
+        if (existingMedia instanceof HTMLImageElement && candidate instanceof HTMLVideoElement) {
+            return false;
+        }
+
+        const existingArea = this.rectArea(existingMedia.getBoundingClientRect());
+        const candidateArea = this.rectArea(candidate.getBoundingClientRect());
+        if (candidateArea > existingArea * 1.05) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private overlapRatio(left: DOMRect, right: DOMRect): number {
+        const overlapWidth = Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left));
+        const overlapHeight = Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top));
+        const overlapArea = overlapWidth * overlapHeight;
+        const smallerArea = Math.min(this.rectArea(left), this.rectArea(right));
+
+        return smallerArea > 0 ? overlapArea / smallerArea : 0;
+    }
+
+    private rectArea(rect: DOMRect): number {
+        return Math.max(0, rect.width) * Math.max(0, rect.height);
     }
 
     private findActiveMediaCandidatesAtPoint(x: number, y: number): MediaElement[] {

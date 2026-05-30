@@ -95,6 +95,49 @@ function hasExtensionChanges(string $projectRoot): bool
     return false;
 }
 
+function suggestCodexBump(string $projectRoot, string $currentVersion): string
+{
+    $advisorPath = $projectRoot.'/scripts/suggest-extension-version-bump.mjs';
+    if (! file_exists($advisorPath)) {
+        fwrite(STDERR, "Extension version bump advisor not found: {$advisorPath}\n");
+        exit(1);
+    }
+
+    $command = implode(' ', [
+        'node',
+        escapeshellarg($advisorPath),
+        '--current-version',
+        escapeshellarg($currentVersion),
+        '--package-name',
+        escapeshellarg('Atlas Extension'),
+        '--path-prefix',
+        escapeshellarg('extension'),
+        '--root-dir',
+        escapeshellarg($projectRoot),
+        '2>&1',
+    ]);
+
+    $output = [];
+    exec($command, $output, $exitCode);
+    if ($exitCode !== 0) {
+        fwrite(STDERR, "Failed to determine extension version bump with Codex helper.\n");
+        fwrite(STDERR, implode(PHP_EOL, $output).PHP_EOL);
+        exit(1);
+    }
+
+    $validBumps = ['major', 'minor', 'patch'];
+    foreach (array_reverse($output) as $line) {
+        $candidate = strtolower(trim((string) $line));
+        if (in_array($candidate, $validBumps, true)) {
+            return $candidate;
+        }
+    }
+
+    fwrite(STDERR, "Codex helper returned invalid bump type.\n");
+    fwrite(STDERR, implode(PHP_EOL, $output).PHP_EOL);
+    exit(1);
+}
+
 function normalizeEnvValue(string $value): string
 {
     $trimmed = trim($value);
@@ -189,8 +232,12 @@ if ($requestedVersion !== null && $requestedVersion !== '' && parseSemver($reque
     exit(1);
 }
 
-if ($requestedBump !== null && $requestedBump !== '' && ! in_array($requestedBump, ['major', 'minor', 'patch'], true)) {
-    fwrite(STDERR, "Invalid --bump value '{$requestedBump}'. Use major, minor, or patch.\n");
+if ($requestedBump !== null && $requestedBump !== '') {
+    $requestedBump = strtolower($requestedBump);
+}
+
+if ($requestedBump !== null && $requestedBump !== '' && ! in_array($requestedBump, ['major', 'minor', 'patch', 'codex', 'auto'], true)) {
+    fwrite(STDERR, "Invalid --bump value '{$requestedBump}'. Use major, minor, patch, or codex.\n");
     exit(1);
 }
 
@@ -212,6 +259,11 @@ if ($requestedVersion !== null && $requestedVersion !== '') {
     if ($bumpIfExtensionChanged && ! hasExtensionChanges($projectRoot)) {
         fwrite(STDOUT, "Skipped extension version bump ({$requestedBump}); no extension changes detected.\n");
     } else {
+        if ($requestedBump === 'auto' || $requestedBump === 'codex') {
+            $requestedBump = suggestCodexBump($projectRoot, $currentVersion);
+            fwrite(STDOUT, "Codex selected {$requestedBump} extension version bump.\n");
+        }
+
         $nextVersion = incrementSemver($currentVersion, $requestedBump);
         if ($nextVersion === null) {
             fwrite(STDERR, "Unable to bump version '{$currentVersion}'. Expected SemVer format like 1.2.3.\n");

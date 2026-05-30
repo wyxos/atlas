@@ -1,4 +1,5 @@
 import { getStoredOptions } from './atlas-options';
+import { hasAtlasApiAuth } from './atlas-auth';
 import {
     emptyReferrerCheckResult,
     getCachedGlobalReferrerCheck,
@@ -67,7 +68,7 @@ async function resolveGlobalReferrerScope(
 
     try {
         const stored = await getStoredOptions();
-        if (stored.apiToken === '') {
+        if (!hasAtlasApiAuth(stored.atlasDomain, stored.apiToken)) {
             return null;
         }
 

@@ -1,4 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
+import { hasAtlasApiAuth } from '../atlas-auth';
 import { getActivePageSiteCustomization } from '../page-customization-state';
 import { resolveSiteCustomizationForHostname } from '../site-customizations';
 import { requestQueuedBadgeCheckViaRuntime } from '../atlas-runtime-request';
@@ -87,7 +88,7 @@ export async function enqueueReactionCheck(
 
     try {
         const stored = await getStoredOptions();
-        if (stored.apiToken === '') {
+        if (!hasAtlasApiAuth(stored.atlasDomain, stored.apiToken)) {
             return emptyResult();
         }
 

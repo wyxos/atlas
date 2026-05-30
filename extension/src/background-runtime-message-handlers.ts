@@ -1,5 +1,11 @@
 import { collectCookiesForUrls } from './background-cookie-runtime';
 import {
+    createAtlasApiHeaders,
+    createAtlasFetchAuthOptions,
+    hasAtlasApiAuth,
+    normalizeAtlasDomain,
+} from './atlas-auth';
+import {
     emptyBadgeCheckResult,
     emptyReferrerCheckResult,
     enqueueGlobalBadgeCheck,
@@ -154,13 +160,13 @@ export function handleSubmitReactionRuntimeMessage(
         return false;
     }
 
-    const atlasDomain = typeof submitPayload.atlasDomain === 'string' ? submitPayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+    const atlasDomain = typeof submitPayload.atlasDomain === 'string' ? normalizeAtlasDomain(submitPayload.atlasDomain) : '';
     const apiToken = typeof submitPayload.apiToken === 'string' ? submitPayload.apiToken.trim() : '';
     const endpoint = typeof submitPayload.endpoint === 'string' ? submitPayload.endpoint.trim() : '';
     const body = submitPayload.body;
     const isAllowedEndpoint = endpoint === `${atlasDomain}/api/extension/reactions`
         || endpoint === `${atlasDomain}/api/extension/reactions/batch`;
-    if (atlasDomain === '' || apiToken === '' || !isAllowedEndpoint || typeof body !== 'object' || body === null) {
+    if (atlasDomain === '' || !hasAtlasApiAuth(atlasDomain, apiToken) || !isAllowedEndpoint || typeof body !== 'object' || body === null) {
         sendResponse({ ok: false, status: 0, payload: null });
         return false;
     }
@@ -177,10 +183,8 @@ export function handleSubmitReactionRuntimeMessage(
 
     void fetch(endpoint, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Atlas-Api-Key': apiToken,
-        },
+        headers: createAtlasApiHeaders(apiToken, true),
+        ...createAtlasFetchAuthOptions(apiToken),
         body: JSON.stringify(body),
     })
         .then(async (response) => {
@@ -258,13 +262,13 @@ export function handleQueuedBadgeCheckRuntimeMessage(
         return false;
     }
 
-    const atlasDomain = typeof queuePayload.atlasDomain === 'string' ? queuePayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+    const atlasDomain = typeof queuePayload.atlasDomain === 'string' ? normalizeAtlasDomain(queuePayload.atlasDomain) : '';
     const apiToken = typeof queuePayload.apiToken === 'string' ? queuePayload.apiToken.trim() : '';
     const normalizedMediaUrl = typeof queuePayload.normalizedMediaUrl === 'string'
         ? queuePayload.normalizedMediaUrl.trim()
         : '';
 
-    if (atlasDomain === '' || apiToken === '' || normalizedMediaUrl === '') {
+    if (atlasDomain === '' || !hasAtlasApiAuth(atlasDomain, apiToken) || normalizedMediaUrl === '') {
         sendResponse({ ok: false, status: 0, payload: emptyBadgeCheckResult() });
         return false;
     }
@@ -302,13 +306,13 @@ export function handleQueuedReferrerCheckRuntimeMessage(
         return false;
     }
 
-    const atlasDomain = typeof queuePayload.atlasDomain === 'string' ? queuePayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+    const atlasDomain = typeof queuePayload.atlasDomain === 'string' ? normalizeAtlasDomain(queuePayload.atlasDomain) : '';
     const apiToken = typeof queuePayload.apiToken === 'string' ? queuePayload.apiToken.trim() : '';
     const normalizedReferrerUrl = typeof queuePayload.normalizedReferrerUrl === 'string'
         ? queuePayload.normalizedReferrerUrl.trim()
         : '';
 
-    if (atlasDomain === '' || apiToken === '' || normalizedReferrerUrl === '') {
+    if (atlasDomain === '' || !hasAtlasApiAuth(atlasDomain, apiToken) || normalizedReferrerUrl === '') {
         sendResponse({ ok: false, status: 0, payload: emptyReferrerCheckResult() });
         return false;
     }
@@ -344,7 +348,7 @@ export function handleAtlasApiRequestRuntimeMessage(
         return false;
     }
 
-    const atlasDomain = typeof requestPayload.atlasDomain === 'string' ? requestPayload.atlasDomain.trim().replace(/\/+$/, '') : '';
+    const atlasDomain = typeof requestPayload.atlasDomain === 'string' ? normalizeAtlasDomain(requestPayload.atlasDomain) : '';
     const apiToken = typeof requestPayload.apiToken === 'string' ? requestPayload.apiToken.trim() : '';
     const endpoint = typeof requestPayload.endpoint === 'string' ? requestPayload.endpoint.trim() : '';
     const method = requestPayload.method === 'POST' ? 'POST' : requestPayload.method === 'GET' ? 'GET' : null;
@@ -353,7 +357,7 @@ export function handleAtlasApiRequestRuntimeMessage(
 
     if (
         method === null
-        || apiToken === ''
+        || !hasAtlasApiAuth(atlasDomain, apiToken)
         || !isAllowedAtlasApiEndpoint(atlasDomain, endpoint, method)
         || (requiresBody && (typeof body !== 'object' || body === null))
     ) {
@@ -361,12 +365,11 @@ export function handleAtlasApiRequestRuntimeMessage(
         return false;
     }
 
-    const headers: Record<string, string> = {
-        'X-Atlas-Api-Key': apiToken,
-    };
+    const headers: Record<string, string> = createAtlasApiHeaders(apiToken);
     const init: RequestInit = {
         method,
         headers,
+        ...createAtlasFetchAuthOptions(apiToken),
     };
 
     if (method === 'POST') {

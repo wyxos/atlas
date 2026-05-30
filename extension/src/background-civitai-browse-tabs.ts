@@ -1,4 +1,5 @@
 import { getStoredOptions } from './atlas-options';
+import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth, normalizeAtlasDomain } from './atlas-auth';
 import { isCivitAiNsfwHostname } from './civitai-domains';
 
 type RuntimeSendResponse = (response?: unknown) => void;
@@ -112,19 +113,17 @@ async function openCivitAiBrowseTab(
     sendResponse: RuntimeSendResponse,
 ): Promise<void> {
     const stored = await getStoredOptions();
-    const atlasDomain = stored.atlasDomain.trim().replace(/\/+$/, '');
+    const atlasDomain = normalizeAtlasDomain(stored.atlasDomain);
     const apiToken = stored.apiToken.trim();
-    if (atlasDomain === '' || apiToken === '') {
+    if (atlasDomain === '' || !hasAtlasApiAuth(atlasDomain, apiToken)) {
         sendResponse({ ok: false, status: 0, payload: null });
         return;
     }
 
     const response = await fetch(`${atlasDomain}/api/extension/browse-tabs/${endpoint}`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Atlas-Api-Key': apiToken,
-        },
+        headers: createAtlasApiHeaders(apiToken, true),
+        ...createAtlasFetchAuthOptions(apiToken),
         body: JSON.stringify(body),
     });
     const responsePayload = await parseJsonResponse(response);

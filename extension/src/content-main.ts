@@ -15,6 +15,7 @@ import {
 } from './content/media-utils';
 import { mediaMatchesRulesForPage } from './content/media-rule-match';
 import { OverlayManager } from './content/overlay-manager';
+import { sameStatusLinkedMediaTargetMatchesRules, shouldSkipLinkedMedia } from './content/linked-media-target';
 import { createAnchorMediaRuntime } from './content/anchor-media-runtime';
 import { subscribeToDownloadProgress } from './content/download-progress-bus';
 import { createDownloadEventSheet } from './content/download-event-sheet';
@@ -32,10 +33,7 @@ const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
 const MIN_WIDGET_MEDIA_WIDTH = 200;
 const VISIBLE_RESUME_SCAN_LIMIT = 100;
 
-type LoadRulesAndProcessOptions = {
-    fullScan?: boolean;
-    bypassBadgeCheckCache?: boolean;
-};
+type LoadRulesAndProcessOptions = { fullScan?: boolean; bypassBadgeCheckCache?: boolean };
 
 let currentSiteCustomization: SiteCustomization | null = null;
 let currentRules: UrlMatchRule[] = [];
@@ -68,7 +66,8 @@ function mediaMatchesRules(element: MediaElement): boolean {
         return false;
     }
 
-    return mediaMatchesRulesForPage(element, window.location.href, currentRules, currentPageHostname);
+    return mediaMatchesRulesForPage(element, window.location.href, currentRules, currentPageHostname)
+        || sameStatusLinkedMediaTargetMatchesRules(element, window.location.href, currentRules, currentPageHostname);
 }
 
 function mediaHasEligibleWidgetWidth(element: MediaElement): boolean {
@@ -86,7 +85,7 @@ function mediaHasEligibleWidgetWidth(element: MediaElement): boolean {
 }
 
 function processMedia(media: MediaElement): void {
-    if (media.closest('a[href]') !== null) {
+    if (shouldSkipLinkedMedia(media)) {
         overlayManager.remove(media);
         return;
     }
@@ -229,7 +228,7 @@ function tryApplyMediaWidgetFromInteraction(event: MouseEvent): void {
     }
 
     const mediaCandidate = resolveMediaCandidateFromInteraction(event);
-    if (!mediaCandidate || mediaCandidate.closest('a[href]') !== null) {
+    if (!mediaCandidate || shouldSkipLinkedMedia(mediaCandidate)) {
         return;
     }
 
@@ -405,11 +404,9 @@ function removeViewportListeners(): void {
 }
 
 const handleInteraction = (event: MouseEvent): void => {
-    if (!isPageWorkActive) {
-        return;
+    if (isPageWorkActive) {
+        tryApplyMediaWidgetFromInteraction(event);
     }
-
-    tryApplyMediaWidgetFromInteraction(event);
 };
 
 const handleAnchorReferrerShortcut = createAnchorReferrerShortcutListener(anchorMediaRuntime, () => isPageWorkActive);

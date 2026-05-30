@@ -1,4 +1,5 @@
 import { getStoredOptions } from '../atlas-options';
+import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth } from '../atlas-auth';
 import { getActivePageSiteCustomization } from '../page-customization-state';
 import { cleanupUrlQueryParams } from '../referrer-cleanup';
 import { normalizeHashAwareUrl, normalizeUrl, resolveReactionTargetUrl, type MediaElement } from './media-utils';
@@ -218,7 +219,7 @@ export async function submitBadgeReaction(
 
     try {
         const stored = await getStoredOptions();
-        if (stored.apiToken === '') {
+        if (!hasAtlasApiAuth(stored.atlasDomain, stored.apiToken)) {
             return {
                 ok: false,
                 reaction: null,
@@ -325,10 +326,8 @@ export async function submitBadgeReaction(
         } else {
             const response = await atlasLoggedFetch(endpoint, 'POST', requestBody, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Atlas-Api-Key': stored.apiToken,
-                },
+                headers: createAtlasApiHeaders(stored.apiToken, true),
+                ...createAtlasFetchAuthOptions(stored.apiToken),
                 body: requestBodyJson,
             });
 

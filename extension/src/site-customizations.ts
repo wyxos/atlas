@@ -1,5 +1,4 @@
 import {
-    DEFAULT_MATCH_RULES,
     hostMatchesRuleDomain,
     normalizeMatchRules,
     parseStoredMatchRules,
@@ -12,7 +11,8 @@ import {
     parseStoredReferrerQueryParamsToStripByDomain,
     validateReferrerQueryParam,
 } from './referrer-cleanup';
-import { CIVITAI_SUPPORTED_DOMAINS, normalizeCivitAiHostnameForMatching } from './civitai-domains';
+import { normalizeCivitAiHostnameForMatching } from './civitai-domains';
+import { BUILT_IN_SITE_CUSTOMIZATIONS } from './site-customization-defaults';
 
 export const MEDIA_CLEANER_STRATEGIES = ['civitaiCanonical'] as const;
 export const SITE_CUSTOMIZATIONS_EXPORT_VERSION = 1 as const;
@@ -55,35 +55,6 @@ type ParsedSiteCustomizationEntry = Partial<{
     mediaCleaner: unknown;
 }>;
 
-const BUILT_IN_SITE_CUSTOMIZATIONS: SiteCustomization[] = [
-    {
-        enabled: true,
-        domain: 'deviantart.com',
-        matchRules: DEFAULT_MATCH_RULES[0]?.regexes ?? [],
-        referrerCleaner: {
-            stripQueryParams: [],
-        },
-        mediaCleaner: {
-            stripQueryParams: [],
-            rewriteRules: [],
-            strategies: [],
-        },
-    },
-    ...CIVITAI_SUPPORTED_DOMAINS.map((domain) => ({
-        enabled: true,
-        domain,
-        matchRules: [],
-        referrerCleaner: {
-            stripQueryParams: [],
-        },
-        mediaCleaner: {
-            stripQueryParams: [],
-            rewriteRules: [],
-            strategies: ['civitaiCanonical'] as MediaCleanerStrategy[],
-        },
-    })),
-];
-
 function normalizeSiteCustomizationDomain(input: string): string {
     const trimmed = input.trim().toLowerCase();
     if (trimmed === '') {
@@ -99,6 +70,12 @@ function normalizeSiteCustomizationDomain(input: string): string {
     }
 
     return trimmed.replace(/^\.+/, '').replace(/\.+$/, '');
+}
+
+function normalizeXTwitterDomainAlias(input: string): string {
+    const normalized = input.trim().toLowerCase().replace(/^www\./, '').replace(/^mobile\./, '');
+
+    return normalized === 'x.com' || normalized === 'twitter.com' ? 'twitter.com' : normalized;
 }
 
 function normalizeMediaRewriteRules(rules: MediaRewriteRule[]): MediaRewriteRule[] {
@@ -443,10 +420,16 @@ export function resolveStoredSiteCustomizationForHostname(
             return 0;
         }
 
+        const normalizedSocialHostname = normalizeXTwitterDomainAlias(normalizedHostname);
+        const normalizedSocialDomain = normalizeXTwitterDomainAlias(domain);
+        if (hostMatchesRuleDomain(normalizedSocialHostname, normalizedSocialDomain)) {
+            return 1;
+        }
+
         const normalizedAliasHostname = normalizeCivitAiHostnameForMatching(normalizedHostname);
         const normalizedAliasDomain = normalizeCivitAiHostnameForMatching(domain);
 
-        return hostMatchesRuleDomain(normalizedAliasHostname, normalizedAliasDomain) ? 1 : null;
+        return hostMatchesRuleDomain(normalizedAliasHostname, normalizedAliasDomain) ? 2 : null;
     };
 
     const matches = customizations
@@ -468,11 +451,16 @@ export function resolveSiteCustomizationForHostname(
     hostname: string,
 ): SiteCustomization | null {
     const customization = resolveStoredSiteCustomizationForHostname(customizations, hostname);
-    if (customization === null || customization.enabled === false) {
+    if (customization !== null) {
+        return customization.enabled === false ? null : customization;
+    }
+
+    const builtInCustomization = resolveStoredSiteCustomizationForHostname(BUILT_IN_SITE_CUSTOMIZATIONS, hostname);
+    if (builtInCustomization === null || builtInCustomization.enabled === false) {
         return null;
     }
 
-    return customization;
+    return builtInCustomization;
 }
 
 export function exportSiteCustomizationsPayload(siteCustomizations: SiteCustomization[]): SiteCustomizationsExport {

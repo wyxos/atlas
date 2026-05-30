@@ -27,6 +27,7 @@ type WorkerFetchResponse = {
 type WorkerFetch = (input: string, init?: {
     method?: string;
     headers?: Record<string, string>;
+    credentials?: RequestCredentials;
     body?: string;
 }) => Promise<WorkerFetchResponse>;
 
@@ -289,6 +290,7 @@ function createWorkerReverbClient(
                 'Content-Type': 'application/json',
                 ...config.auth.headers,
             },
+            ...(config.auth.credentials !== undefined ? { credentials: config.auth.credentials } : {}),
             body: JSON.stringify({
                 socket_id: socketId,
                 channel_name: config.channel,

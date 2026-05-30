@@ -113,3 +113,51 @@ test('extension ping validates api key', function () {
     $authorized->assertJsonPath('ok', true);
     $authorized->assertJsonPath('reverb.channel', 'private-extension-downloads.'.hash('sha256', 'secret-key-123'));
 });
+
+test('extension ping allows atlas test session auth without api key', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->getJson('https://atlas.test/api/extension/ping');
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('ok', true);
+    $response->assertJsonPath('reverb.channel', 'private-extension-downloads.'.hash('sha256', 'local-session:'.(string) $user->id));
+});
+
+test('extension ping allows atlas test local extension auth without api key', function () {
+    $user = User::factory()->create();
+
+    $response = $this
+        ->withHeaders([
+            'Origin' => 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+            'X-Atlas-Local-Extension' => '1',
+        ])
+        ->getJson('https://atlas.test/api/extension/ping');
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('ok', true);
+    $response->assertJsonPath('reverb.channel', 'private-extension-downloads.'.hash('sha256', 'local-session:'.(string) $user->id));
+});
+
+test('extension ping rejects tokenless local extension auth from web origins', function () {
+    User::factory()->create();
+
+    $response = $this
+        ->withHeaders([
+            'Origin' => 'https://www.youtube.com',
+            'X-Atlas-Local-Extension' => '1',
+        ])
+        ->getJson('https://atlas.test/api/extension/ping');
+
+    $response->assertUnauthorized();
+});
+
+test('extension ping rejects tokenless session auth outside atlas test', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->getJson('https://example.test/api/extension/ping');
+
+    $response->assertUnauthorized();
+});

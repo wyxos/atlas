@@ -1,6 +1,7 @@
 type ReverbAuthConfig = {
     endpoint: string;
     headers: Record<string, string>;
+    credentials?: RequestCredentials;
 };
 
 type ReverbConfig = {

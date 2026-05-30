@@ -76,6 +76,27 @@ function appendTrackedImage(options?: {
     return { image, wrapper };
 }
 
+function appendTrackedVideo(options?: {
+    parentRect?: DOMRect;
+    videoRect?: DOMRect;
+}): { video: HTMLVideoElement; wrapper: HTMLDivElement } {
+    const wrapper = document.createElement('div');
+    const video = document.createElement('video');
+    wrapper.appendChild(video);
+    document.body.appendChild(wrapper);
+
+    Object.defineProperty(wrapper, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => options?.parentRect ?? createRect(0, 0, 320, 240),
+    });
+    Object.defineProperty(video, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => options?.videoRect ?? createRect(40, 50, 180, 120),
+    });
+
+    return { video, wrapper };
+}
+
 describe('OverlayManager', () => {
     beforeEach(() => {
         vi.resetModules();
@@ -222,6 +243,50 @@ describe('OverlayManager', () => {
 
         manager.remove(regularImage);
         manager.remove(dialogImage);
+    });
+
+    it('prefers a video over an overlapping poster image', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const image = appendTrackedImage({
+            imageRect: createRect(10, 20, 640, 360),
+        }).image;
+        const video = appendTrackedVideo({
+            videoRect: createRect(10, 20, 640, 360),
+        }).video;
+
+        manager.apply(image);
+        manager.apply(video);
+
+        expect(document.querySelectorAll('[data-atlas-media-red-badge="1"]')).toHaveLength(1);
+        expect(image.getAttribute('data-atlas-media-red-applied')).toBeNull();
+        expect(video.getAttribute('data-atlas-media-red-applied')).toBe('1');
+        expect(unmountByMedia.get(image)).toHaveBeenCalledTimes(1);
+        expect(unmountByMedia.get(video)).not.toHaveBeenCalled();
+
+        manager.remove(video);
+    });
+
+    it('does not apply an overlapping poster image after the video already has a badge', async () => {
+        const { OverlayManager } = await import('./overlay-manager');
+        const manager = new OverlayManager();
+        const video = appendTrackedVideo({
+            videoRect: createRect(10, 20, 640, 360),
+        }).video;
+        const image = appendTrackedImage({
+            imageRect: createRect(10, 20, 640, 360),
+        }).image;
+
+        manager.apply(video);
+        manager.apply(image);
+
+        expect(document.querySelectorAll('[data-atlas-media-red-badge="1"]')).toHaveLength(1);
+        expect(video.getAttribute('data-atlas-media-red-applied')).toBe('1');
+        expect(image.getAttribute('data-atlas-media-red-applied')).toBeNull();
+        expect(unmountByMedia.get(video)).not.toHaveBeenCalled();
+        expect(unmountByMedia.get(image)).toBeUndefined();
+
+        manager.remove(video);
     });
 
     it('pins the badge to the viewport when the media parent is collapsed', async () => {

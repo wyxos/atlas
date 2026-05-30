@@ -1,3 +1,4 @@
+import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth, normalizeAtlasDomain } from './atlas-auth';
 import type { ReverbAuthConfig, ReverbConfig } from './reverb-types';
 
 function asString(value: unknown): string | null {
@@ -47,17 +48,16 @@ function parseReverbConfig(value: unknown): ReverbConfig | null {
 }
 
 function createExtensionReverbAuthConfig(atlasDomain: string, apiToken: string): ReverbAuthConfig | null {
-    const normalizedDomain = atlasDomain.trim().replace(/\/+$/, '');
+    const normalizedDomain = normalizeAtlasDomain(atlasDomain);
     const normalizedToken = apiToken.trim();
-    if (normalizedDomain === '' || normalizedToken === '') {
+    if (normalizedDomain === '' || !hasAtlasApiAuth(normalizedDomain, normalizedToken)) {
         return null;
     }
 
     return {
         endpoint: `${normalizedDomain}/api/extension/broadcasting/auth`,
-        headers: {
-            'X-Atlas-Api-Key': normalizedToken,
-        },
+        headers: createAtlasApiHeaders(normalizedToken),
+        ...createAtlasFetchAuthOptions(normalizedToken),
     };
 }
 

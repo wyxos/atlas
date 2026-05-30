@@ -75,6 +75,14 @@ describe('site-customizations', () => {
     it('includes civitai.red in the built-in customization set', () => {
         expect(getDefaultSiteCustomizations()).toEqual(expect.arrayContaining([
             expect.objectContaining({
+                domain: 'x.com',
+                matchRules: ['.*\\/status\\/\\d+.*'],
+            }),
+            expect.objectContaining({
+                domain: 'twitter.com',
+                matchRules: ['.*\\/status\\/\\d+.*'],
+            }),
+            expect.objectContaining({
                 domain: 'civitai.com',
                 mediaCleaner: expect.objectContaining({
                     strategies: ['civitaiCanonical'],
@@ -119,6 +127,44 @@ describe('site-customizations', () => {
                 strategies: ['civitaiCanonical'],
             },
         });
+    });
+
+    it('uses the built-in X status customization when stored customizations do not include X', () => {
+        const customization = resolveSiteCustomizationForHostname([], 'x.com');
+
+        expect(customization).toEqual({
+            enabled: true,
+            domain: 'x.com',
+            matchRules: ['.*\\/status\\/\\d+.*'],
+            referrerCleaner: {
+                stripQueryParams: [],
+            },
+            mediaCleaner: {
+                stripQueryParams: [],
+                rewriteRules: [],
+                strategies: [],
+            },
+        });
+    });
+
+    it('treats twitter.com and x.com customizations as aliases', () => {
+        const customization = resolveSiteCustomizationForHostname([
+            {
+                enabled: true,
+                domain: 'twitter.com',
+                matchRules: ['.*\\/status\\/.*'],
+                referrerCleaner: {
+                    stripQueryParams: [],
+                },
+                mediaCleaner: {
+                    stripQueryParams: [],
+                    rewriteRules: [],
+                    strategies: [],
+                },
+            },
+        ], 'x.com');
+
+        expect(customization?.domain).toBe('twitter.com');
     });
 
     it('prefers the direct civitai.red profile over the civitai.com fallback', () => {

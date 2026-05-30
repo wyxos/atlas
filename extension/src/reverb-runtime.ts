@@ -1,4 +1,5 @@
 import { getStoredOptions } from './atlas-options';
+import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth } from './atlas-auth';
 import { connectReverb, type ReverbClient, type ReverbConnectionState } from './reverb-client';
 import { requestAtlasViaRuntime } from './atlas-runtime-request';
 import { createExtensionReverbAuthConfig, formatReverbEndpoint, parseReverbConfig } from './reverb-config';
@@ -18,7 +19,7 @@ type ReverbPingResponse = {
 async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
     try {
         const stored = await getStoredOptions();
-        if (stored.apiToken === '') {
+        if (!hasAtlasApiAuth(stored.atlasDomain, stored.apiToken)) {
             return { kind: 'setup_required' };
         }
 
@@ -39,9 +40,8 @@ async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
         } else {
             const response = await fetch(pingEndpoint, {
                 method: 'GET',
-                headers: {
-                    'X-Atlas-Api-Key': stored.apiToken,
-                },
+                headers: createAtlasApiHeaders(stored.apiToken),
+                ...createAtlasFetchAuthOptions(stored.apiToken),
             });
 
             if (!response.ok) {

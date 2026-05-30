@@ -21,6 +21,11 @@ type PusherLike = {
 };
 
 type PusherCtor = new (key: string, options: Record<string, unknown>) => PusherLike;
+type PusherChannelAuthCallback = (error: Error | null, authData: unknown) => void;
+type PusherChannelAuthParams = {
+    socketId?: string;
+    channelName?: string;
+};
 
 function mapPusherState(raw: string | null): ReverbConnectionState | null {
     if (raw === null) {
@@ -69,6 +74,30 @@ function createReverbClient(config: ReverbConfig, pusherCtor: PusherCtor): Rever
                 endpoint: config.auth.endpoint,
                 transport: 'ajax',
                 headersProvider: () => ({ ...config.auth?.headers }),
+                ...(config.auth.credentials !== undefined ? {
+                    customHandler: (params: PusherChannelAuthParams, callback: PusherChannelAuthCallback): void => {
+                        void fetch(config.auth?.endpoint ?? '', {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                ...(config.auth?.headers ?? {}),
+                            },
+                            credentials: config.auth?.credentials,
+                            body: JSON.stringify({
+                                socket_id: params.socketId ?? '',
+                                channel_name: params.channelName ?? config.channel,
+                            }),
+                        })
+                            .then(async (response) => {
+                                const payload = await response.json().catch(() => null);
+                                callback(response.ok ? null : new Error(`Private Reverb channel auth failed with status ${response.status}.`), payload);
+                            })
+                            .catch((error: unknown) => {
+                                callback(error instanceof Error ? error : new Error('Private Reverb channel auth failed.'), null);
+                            });
+                    },
+                } : {}),
             },
         } : {}),
     });

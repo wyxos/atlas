@@ -32,6 +32,7 @@ const mockCollectOpenShadowRootsFromNode = vi.fn((node: Node): ShadowRoot[] => {
     return roots;
 });
 const mockMediaMatchesRulesForPage = vi.fn();
+const mockUrlMatchesAnyRule = vi.fn();
 const mockOverlayApply = vi.fn();
 const mockOverlayRemove = vi.fn();
 const mockOverlayScheduleReposition = vi.fn();
@@ -118,11 +119,22 @@ vi.mock('./content/media-utils', () => ({
         return media;
     },
     isMediaElement: (value: unknown) => value instanceof HTMLImageElement || value instanceof HTMLVideoElement,
+    normalizeUrl: (value: string | null | undefined) => {
+        if (typeof value !== 'string' || value.trim() === '' || !/^https?:\/\//i.test(value.trim())) {
+            return null;
+        }
+
+        return value.trim().replace(/#.*$/, '');
+    },
     resolveMediaResolution: mockResolveMediaResolution,
 }));
 
 vi.mock('./content/media-rule-match', () => ({
     mediaMatchesRulesForPage: mockMediaMatchesRulesForPage,
+}));
+
+vi.mock('./match-rules', () => ({
+    urlMatchesAnyRule: mockUrlMatchesAnyRule,
 }));
 
 vi.mock('./content/overlay-manager', () => ({
@@ -242,6 +254,7 @@ describe('content-main', () => {
             height: 240,
         });
         mockMediaMatchesRulesForPage.mockReturnValue(true);
+        mockUrlMatchesAnyRule.mockReturnValue(true);
     });
 
     it('bootstraps media widgets and forwards runtime, mutation, and download events', async () => {
