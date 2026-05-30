@@ -60,12 +60,103 @@ it('returns only active transfers by default', function () {
     $items = $response->json('items');
     expect($items)->toHaveCount(4);
     expect(collect($items)->pluck('status')->all())->toContain(DownloadTransferStatus::COMPLETED);
+    expect($response->json('pagination'))->toMatchArray([
+        'per_page' => 100,
+        'total' => 4,
+        'total_pages' => 1,
+    ]);
+});
+
+it('returns cursor paginated transfer pages', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'url' => 'https://example.com/file.bin',
+    ]);
+
+    $firstTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://example.com/file-1.bin',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::QUEUED,
+        'bytes_total' => null,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 0,
+    ]);
+    $secondTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://example.com/file-2.bin',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 10,
+        'last_broadcast_percent' => 10,
+    ]);
+    $thirdTransfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://example.com/file-3.bin',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/download-transfers?after_id=0&per_page=2');
+
+    $response->assertSuccessful();
+    expect(collect($response->json('items'))->pluck('id')->all())->toBe([
+        $firstTransfer->id,
+        $secondTransfer->id,
+    ]);
+    $response->assertJson([
+        'cursor' => [
+            'after_id' => 0,
+            'next_after_id' => $secondTransfer->id,
+            'has_more' => true,
+            'max_id' => $thirdTransfer->id,
+        ],
+        'pagination' => [
+            'per_page' => 2,
+            'total' => 3,
+            'total_pages' => 2,
+        ],
+    ]);
+
+    $nextChunk = $this->actingAs($user)->getJson('/api/download-transfers?after_id='.$secondTransfer->id.'&max_id='.$thirdTransfer->id.'&per_page=2');
+
+    $nextChunk->assertSuccessful();
+    expect(collect($nextChunk->json('items'))->pluck('id')->all())->toBe([
+        $thirdTransfer->id,
+    ]);
+    $nextChunk->assertJson([
+        'cursor' => [
+            'after_id' => $secondTransfer->id,
+            'next_after_id' => null,
+            'has_more' => false,
+            'max_id' => $thirdTransfer->id,
+        ],
+        'pagination' => [
+            'per_page' => 2,
+            'total' => null,
+            'total_pages' => null,
+        ],
+    ]);
 });
 
 it('can filter by completed status', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
         'url' => 'https://example.com/file.bin',
+    ]);
+
+    DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://example.com/file.bin',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::QUEUED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 0,
+        'last_broadcast_percent' => 0,
     ]);
 
     DownloadTransfer::query()->create([
