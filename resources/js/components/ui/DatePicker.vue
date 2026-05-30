@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { DateValue } from '@internationalized/date';
 import { CalendarDate, DateFormatter, getLocalTimeZone, today } from '@internationalized/date';
-import { CalendarIcon } from 'lucide-vue-next';
+import { CalendarIcon, X } from 'lucide-vue-next';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Calendar from './Calendar.vue';
@@ -12,12 +12,16 @@ interface Props {
     modelValue?: string;
     placeholder?: string;
     disabled?: boolean;
+    clearable?: boolean;
+    clearLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     modelValue: '',
     placeholder: 'Pick a date',
     disabled: false,
+    clearable: true,
+    clearLabel: 'Clear date',
 });
 
 const emit = defineEmits<{
@@ -91,6 +95,13 @@ const displayValue = computed(() => {
     }
 });
 
+const canClear = computed(() => props.clearable && !props.disabled && Boolean(localValue.value));
+
+function clearDate(): void {
+    localValue.value = '';
+    emit('update:modelValue', '');
+}
+
 function handleDateSelect(value: DateValue | null): void {
     if (value) {
         try {
@@ -120,31 +131,45 @@ function handleDateSelect(value: DateValue | null): void {
 </script>
 
 <template>
-    <Popover v-slot="{ close }">
-        <PopoverTrigger as-child>
-            <Button
-                type="button"
-                variant="outline"
-                :disabled="disabled"
-                :class="cn(
-                    'w-full justify-start text-left font-normal',
-                    !date && 'text-twilight-indigo-300'
-                )"
-            >
-                <CalendarIcon :size="16" class="mr-2" />
-                {{ displayValue }}
-            </Button>
-        </PopoverTrigger>
-        <PopoverContent class="w-auto p-0" align="start">
-            <Calendar
-                :model-value="date"
-                :default-placeholder="defaultPlaceholder"
-                layout="month-and-year"
-                @update:model-value="(value) => { 
-                    handleDateSelect(value);
-                    close();
-                }"
-            />
-        </PopoverContent>
-    </Popover>
+    <div class="flex w-full items-center gap-2">
+        <Popover v-slot="{ close }">
+            <PopoverTrigger as-child>
+                <Button
+                    type="button"
+                    variant="outline"
+                    :disabled="disabled"
+                    :class="cn(
+                        'min-w-0 flex-1 justify-start text-left font-normal',
+                        !date && 'text-twilight-indigo-300'
+                    )"
+                >
+                    <CalendarIcon :size="16" class="mr-2" />
+                    <span class="truncate">{{ displayValue }}</span>
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent class="w-auto p-0" align="start">
+                <Calendar
+                    :model-value="date"
+                    :default-placeholder="defaultPlaceholder"
+                    layout="month-and-year"
+                    @update:model-value="(value) => {
+                        handleDateSelect(value);
+                        close();
+                    }"
+                />
+            </PopoverContent>
+        </Popover>
+
+        <Button
+            v-if="canClear"
+            type="button"
+            variant="ghost"
+            size="icon"
+            :aria-label="clearLabel"
+            :title="clearLabel"
+            @click="clearDate"
+        >
+            <X :size="16" />
+        </Button>
+    </div>
 </template>

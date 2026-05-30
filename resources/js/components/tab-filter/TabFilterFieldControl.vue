@@ -93,6 +93,7 @@ function updateCheckboxGroupValue(value: string, checked: boolean): void {
             v-else-if="field.type === 'date'"
             :model-value="String(resolvedValue ?? '')"
             :placeholder="placeholder || field.label"
+            :clear-label="`Clear ${field.label}`"
             :disabled="disabled"
             @update:model-value="(value) => emit('update:modelValue', value)"
         />

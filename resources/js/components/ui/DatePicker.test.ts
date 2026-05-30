@@ -35,6 +35,38 @@ describe('DatePicker', () => {
 
         // Calendar popover should render into body (days of week visible)
         expect(document.body.textContent).toMatch(/Sun|Mon|Tue|Wed|Thu|Fri|Sat/);
+
+        wrapper.unmount();
+    });
+
+    it('clears a selected date without submitting the form', async () => {
+        const formSubmitted = ref(false);
+        const model = ref('2026-05-30');
+
+        const Wrapper = defineComponent({
+            components: { DatePicker },
+            setup() {
+                return { formSubmitted, model };
+            },
+            template: `
+                <form @submit.prevent="formSubmitted = true">
+                    <DatePicker v-model="model" placeholder="Pick a date" />
+                </form>
+            `,
+        });
+
+        const wrapper = mount(Wrapper, {
+            attachTo: document.body,
+        });
+
+        await wrapper.get('button[aria-label="Clear date"]').trigger('click');
+        await nextTick();
+
+        expect(model.value).toBe('');
+        expect(formSubmitted.value).toBe(false);
+        expect(wrapper.find('button[aria-label="Clear date"]').exists()).toBe(false);
+
+        wrapper.unmount();
     });
 });
 

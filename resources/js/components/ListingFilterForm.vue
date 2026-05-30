@@ -66,6 +66,7 @@ const dateToModel = computed({
                     <DatePicker
                         v-model="dateFromModel"
                         placeholder="Pick start date"
+                        clear-label="Clear start date"
                     />
                 </div>
                 <div>
@@ -75,6 +76,7 @@ const dateToModel = computed({
                     <DatePicker
                         v-model="dateToModel"
                         placeholder="Pick end date"
+                        clear-label="Clear end date"
                     />
                 </div>
             </div>

@@ -39,13 +39,22 @@ const DatePickerStub = defineComponent({
     },
     emits: ['update:modelValue'],
     setup(props, { emit }) {
-        return () => h('input', {
-            value: props.modelValue,
-            placeholder: props.placeholder,
-            onInput: (event: Event) => {
-                emit('update:modelValue', (event.target as HTMLInputElement).value);
-            },
-        });
+        return () => h('div', [
+            h('input', {
+                value: props.modelValue,
+                placeholder: props.placeholder,
+                onInput: (event: Event) => {
+                    emit('update:modelValue', (event.target as HTMLInputElement).value);
+                },
+            }),
+            props.modelValue
+                ? h('button', {
+                    type: 'button',
+                    'aria-label': `Clear ${props.placeholder}`,
+                    onClick: () => emit('update:modelValue', ''),
+                }, 'Clear')
+                : null,
+        ]);
     },
 });
 
@@ -410,6 +419,12 @@ describe('TabFilter', () => {
 
         expect(form.data.serviceFilters.date_from).toBe('2026-05-01');
         expect(form.data.serviceFilters.date_to).toBe('2026-05-30');
+
+        await wrapper.get('button[aria-label="Clear From date"]').trigger('click');
+        await wrapper.get('button[aria-label="Clear To date"]').trigger('click');
+
+        expect(form.data.serviceFilters.date_from).toBe('');
+        expect(form.data.serviceFilters.date_to).toBe('');
     });
 
     it('includes blacklist-only local preset options', async () => {
