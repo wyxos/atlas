@@ -184,3 +184,39 @@ it('enables nsfw params for civitai user browse tabs when requested by the exten
     expect($createdTab)->not->toBeNull();
     expect($createdTab?->params['nsfw'] ?? null)->toBeTrue();
 });
+
+it('creates and activates a deviantart browse tab for the requested username filter', function () {
+    $user = User::factory()->create();
+    setExtensionBrowseTabsApiKey('valid-api-key', $user->id);
+
+    $existingActiveTab = Tab::factory()->create([
+        'user_id' => $user->id,
+        'label' => 'Existing Active',
+        'position' => 0,
+        'is_active' => true,
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/browse-tabs/deviantart-user', [
+        'username' => ' velvetemberartist ',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('tab.label', 'DeviantArt Images: User velvetemberartist - 1');
+    $response->assertJsonPath('tab.params.feed', 'online');
+    $response->assertJsonPath('tab.params.service', 'deviantart-images');
+    $response->assertJsonPath('tab.params.username', 'velvetemberartist');
+    $response->assertJsonPath('browse_url', url('/browse'));
+
+    $createdTab = Tab::query()
+        ->where('user_id', $user->id)
+        ->where('label', 'DeviantArt Images: User velvetemberartist - 1')
+        ->first();
+
+    expect($createdTab)->not->toBeNull();
+    expect($createdTab?->position)->toBe(1);
+    expect($createdTab?->is_active)->toBeTrue();
+    expect($existingActiveTab->fresh()?->is_active)->toBeFalse();
+    expect($createdTab?->params['username'] ?? null)->toBe('velvetemberartist');
+});

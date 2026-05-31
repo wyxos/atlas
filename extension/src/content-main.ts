@@ -23,6 +23,7 @@ import { createDuplicateAnchorTabGuard } from './content/duplicate-anchor-tab-gu
 import { clearDeviantArtBackgroundImageStyle } from './content/deviantart-background-image-style';
 import { installCivitAiModelBrowseCtas } from './content/civitai-model-browse-cta';
 import { installCivitAiUserBrowseLinks } from './content/civitai-user-browse-link';
+import { installDeviantArtArtistBrowseCtas } from './content/deviantart-artist-browse-cta';
 import { installPageVisibilityLifecycle, isPageVisible } from './content/page-work-lifecycle';
 import { shouldBypassBadgeCheckCacheForPageStart } from './content/restored-page-badge-check';
 import { isVisibleInViewport } from './content/viewport-visibility';
@@ -479,6 +480,7 @@ function installPageEnhancements(): void {
     const cleanups = [
         installCivitAiModelBrowseCtas(),
         installCivitAiUserBrowseLinks(),
+        installDeviantArtArtistBrowseCtas(),
     ].filter((cleanup): cleanup is () => void => typeof cleanup === 'function');
     pageEnhancementCleanups.push(...cleanups);
 }

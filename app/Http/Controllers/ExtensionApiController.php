@@ -7,6 +7,7 @@ use App\Models\Reaction;
 use App\Services\Extension\ExtensionApiPayloadSupport;
 use App\Services\Extension\ExtensionCivitAiBrowseTabService;
 use App\Services\Extension\ExtensionContainerMetadataService;
+use App\Services\Extension\ExtensionDeviantArtBrowseTabService;
 use App\Services\Extension\ExtensionDownloadRuntimeContext;
 use App\Services\Extension\ExtensionListingMetadataOverridesNormalizer;
 use App\Services\Extension\ExtensionMediaMatchService;
@@ -462,6 +463,26 @@ class ExtensionApiController extends Controller
 
         return response()->json(
             app(ExtensionCivitAiBrowseTabService::class)->openUserTab($user, $validated)
+        );
+    }
+
+    public function openDeviantArtUserBrowseTab(
+        Request $request,
+        ExtensionApiKeyService $extensionApiKey,
+    ): JsonResponse {
+        $user = $this->extensionAuthenticator->resolveUser($request, $extensionApiKey);
+        if (! $user) {
+            return response()->json([
+                'message' => 'Invalid extension API key.',
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'username' => ['required', 'string', 'max:255'],
+        ]);
+
+        return response()->json(
+            app(ExtensionDeviantArtBrowseTabService::class)->openUserTab($user, $validated)
         );
     }
 }

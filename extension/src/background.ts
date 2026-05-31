@@ -14,6 +14,7 @@ import {
     handleOpenCivitAiModelTabRuntimeMessage,
     handleOpenCivitAiUsernameTabRuntimeMessage,
 } from './background-civitai-browse-tabs';
+import { handleOpenDeviantArtUsernameTabRuntimeMessage } from './background-deviantart-browse-tabs';
 import { isHttpTabUrl } from './background-url-utils';
 import { normalizeComparableOpenTabUrl } from './open-tab-url';
 import { resolveTabDomainGroupKey, summarizeTabCounts } from './tab-counts';
@@ -323,7 +324,8 @@ chrome.runtime.onMessage.addListener((
         || handleQueuedReferrerCheckRuntimeMessage(message, sender, sendResponse)
         || handleAtlasApiRequestRuntimeMessage(message, sendResponse)
         || handleOpenCivitAiModelTabRuntimeMessage(message, sender, sendResponse)
-        || handleOpenCivitAiUsernameTabRuntimeMessage(message, sender, sendResponse)) {
+        || handleOpenCivitAiUsernameTabRuntimeMessage(message, sender, sendResponse)
+        || handleOpenDeviantArtUsernameTabRuntimeMessage(message, sendResponse)) {
         return true;
     }
 

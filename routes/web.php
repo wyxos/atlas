@@ -46,6 +46,8 @@ Route::post('/api/extension/browse-tabs/civitai-model', [\App\Http\Controllers\E
     ->name('api.extension.browse-tabs.civitai-model');
 Route::post('/api/extension/browse-tabs/civitai-user', [\App\Http\Controllers\ExtensionApiController::class, 'openCivitAiUserBrowseTab'])
     ->name('api.extension.browse-tabs.civitai-user');
+Route::post('/api/extension/browse-tabs/deviantart-user', [\App\Http\Controllers\ExtensionApiController::class, 'openDeviantArtUserBrowseTab'])
+    ->name('api.extension.browse-tabs.deviantart-user');
 Route::post('/api/extension/broadcasting/auth', [\App\Http\Controllers\ExtensionApiController::class, 'broadcastAuth'])
     ->name('api.extension.broadcast-auth');
 
