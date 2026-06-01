@@ -125,6 +125,10 @@ describe('tabContentV2 resolve', () => {
                     serviceFilters: {
                         date_from: '2026-05-01',
                         date_to: '2026-05-30',
+                        downloaded_at_from: '2026-04-01',
+                        downloaded_at_to: '2026-04-30',
+                        blacklisted_at_from: '2026-03-01',
+                        blacklisted_at_to: '2026-03-31',
                     },
                     source: 'all',
                     tab_id: 1,
@@ -142,6 +146,10 @@ describe('tabContentV2 resolve', () => {
 
         expect(requestedUrl).toContain('date_from=2026-05-01');
         expect(requestedUrl).toContain('date_to=2026-05-30');
+        expect(requestedUrl).toContain('downloaded_at_from=2026-04-01');
+        expect(requestedUrl).toContain('downloaded_at_to=2026-04-30');
+        expect(requestedUrl).toContain('blacklisted_at_from=2026-03-01');
+        expect(requestedUrl).toContain('blacklisted_at_to=2026-03-31');
     });
 
     it('resolves a params-only CivitAI startup state as a page one model-version query', async () => {

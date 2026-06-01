@@ -50,6 +50,10 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($local['defaults'])->toHaveKey('min_previewed_count');
     expect($local['defaults']['date_from'])->toBe('');
     expect($local['defaults']['date_to'])->toBe('');
+    expect($local['defaults']['downloaded_at_from'])->toBe('');
+    expect($local['defaults']['downloaded_at_to'])->toBe('');
+    expect($local['defaults']['blacklisted_at_from'])->toBe('');
+    expect($local['defaults']['blacklisted_at_to'])->toBe('');
     expect($local['defaults']['file_type'])->toBe(['all']);
 
     $localFields = $local['schema']['fields'] ?? null;
@@ -60,6 +64,10 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'source',
         'date_from',
         'date_to',
+        'downloaded_at_from',
+        'downloaded_at_to',
+        'blacklisted_at_from',
+        'blacklisted_at_to',
         'file_type',
         'reaction_mode',
         'reaction',
@@ -96,10 +104,22 @@ test('browse services endpoint returns civitai schema with expected field mappin
 
     $localDateFrom = collect($localFields)->firstWhere('uiKey', 'date_from');
     $localDateTo = collect($localFields)->firstWhere('uiKey', 'date_to');
+    $localDownloadedFrom = collect($localFields)->firstWhere('uiKey', 'downloaded_at_from');
+    $localDownloadedTo = collect($localFields)->firstWhere('uiKey', 'downloaded_at_to');
+    $localBlacklistedFrom = collect($localFields)->firstWhere('uiKey', 'blacklisted_at_from');
+    $localBlacklistedTo = collect($localFields)->firstWhere('uiKey', 'blacklisted_at_to');
     expect($localDateFrom['type'])->toBe('date')
         ->and($localDateFrom['label'])->toBe('Created From')
         ->and($localDateTo['type'])->toBe('date')
-        ->and($localDateTo['label'])->toBe('Created To');
+        ->and($localDateTo['label'])->toBe('Created To')
+        ->and($localDownloadedFrom['type'])->toBe('date')
+        ->and($localDownloadedFrom['label'])->toBe('Downloaded From')
+        ->and($localDownloadedTo['type'])->toBe('date')
+        ->and($localDownloadedTo['label'])->toBe('Downloaded To')
+        ->and($localBlacklistedFrom['type'])->toBe('date')
+        ->and($localBlacklistedFrom['label'])->toBe('Blacklisted From')
+        ->and($localBlacklistedTo['type'])->toBe('date')
+        ->and($localBlacklistedTo['label'])->toBe('Blacklisted To');
 
     $civit = collect($services)->firstWhere('key', 'civit-ai-images');
     expect($civit)->not->toBeNull();

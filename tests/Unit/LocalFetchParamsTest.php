@@ -103,28 +103,52 @@ it('normalizes multiple local sources and keeps them in params', function () {
         ->and($context['params']['source'])->toBe(['CivitAI', 'Wallhaven']);
 });
 
-it('normalizes local created date range filters', function () {
+it('normalizes local date range filters', function () {
     $timezone = new DateTimeZone(date_default_timezone_get() ?: 'UTC');
 
     $context = LocalFetchParams::normalize([
         'date_from' => '2026-05-01',
         'date_to' => '2026-05-30',
+        'downloaded_at_from' => '2026-04-01',
+        'downloaded_at_to' => '2026-04-30',
+        'blacklisted_at_from' => '2026-03-01',
+        'blacklisted_at_to' => '2026-03-31',
     ]);
 
     expect($context['createdFrom'])->toBe((new DateTimeImmutable('2026-05-01 00:00:00', $timezone))->getTimestamp())
         ->and($context['createdTo'])->toBe((new DateTimeImmutable('2026-05-30 23:59:59', $timezone))->getTimestamp())
+        ->and($context['downloadedFrom'])->toBe((new DateTimeImmutable('2026-04-01 00:00:00', $timezone))->getTimestamp())
+        ->and($context['downloadedTo'])->toBe((new DateTimeImmutable('2026-04-30 23:59:59', $timezone))->getTimestamp())
+        ->and($context['blacklistedFrom'])->toBe((new DateTimeImmutable('2026-03-01 00:00:00', $timezone))->getTimestamp())
+        ->and($context['blacklistedTo'])->toBe((new DateTimeImmutable('2026-03-31 23:59:59', $timezone))->getTimestamp())
         ->and($context['params']['date_from'])->toBe('2026-05-01')
-        ->and($context['params']['date_to'])->toBe('2026-05-30');
+        ->and($context['params']['date_to'])->toBe('2026-05-30')
+        ->and($context['params']['downloaded_at_from'])->toBe('2026-04-01')
+        ->and($context['params']['downloaded_at_to'])->toBe('2026-04-30')
+        ->and($context['params']['blacklisted_at_from'])->toBe('2026-03-01')
+        ->and($context['params']['blacklisted_at_to'])->toBe('2026-03-31');
 });
 
-it('drops invalid local created date range filters', function () {
+it('drops invalid local date range filters', function () {
     $context = LocalFetchParams::normalize([
         'date_from' => 'not-a-date',
         'date_to' => '2026-99-99',
+        'downloaded_at_from' => '2026-02-30',
+        'downloaded_at_to' => 'latest',
+        'blacklisted_at_from' => '',
+        'blacklisted_at_to' => [],
     ]);
 
     expect($context['createdFrom'])->toBeNull()
         ->and($context['createdTo'])->toBeNull()
+        ->and($context['downloadedFrom'])->toBeNull()
+        ->and($context['downloadedTo'])->toBeNull()
+        ->and($context['blacklistedFrom'])->toBeNull()
+        ->and($context['blacklistedTo'])->toBeNull()
         ->and($context['params'])->not->toHaveKey('date_from')
-        ->and($context['params'])->not->toHaveKey('date_to');
+        ->and($context['params'])->not->toHaveKey('date_to')
+        ->and($context['params'])->not->toHaveKey('downloaded_at_from')
+        ->and($context['params'])->not->toHaveKey('downloaded_at_to')
+        ->and($context['params'])->not->toHaveKey('blacklisted_at_from')
+        ->and($context['params'])->not->toHaveKey('blacklisted_at_to');
 });

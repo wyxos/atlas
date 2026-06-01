@@ -38,6 +38,10 @@ test('fetch delegates normalized params to the typesense gateway', function () {
                 ->and($context['minPreviewed'])->toBe(FilePreviewService::FEED_REMOVED_PREVIEW_COUNT)
                 ->and($context['createdFrom'])->toBe((new DateTimeImmutable('2026-05-01 00:00:00', $timezone))->getTimestamp())
                 ->and($context['createdTo'])->toBe((new DateTimeImmutable('2026-05-30 23:59:59', $timezone))->getTimestamp())
+                ->and($context['downloadedFrom'])->toBe((new DateTimeImmutable('2026-04-01 00:00:00', $timezone))->getTimestamp())
+                ->and($context['downloadedTo'])->toBe((new DateTimeImmutable('2026-04-30 23:59:59', $timezone))->getTimestamp())
+                ->and($context['blacklistedFrom'])->toBe((new DateTimeImmutable('2026-03-01 00:00:00', $timezone))->getTimestamp())
+                ->and($context['blacklistedTo'])->toBe((new DateTimeImmutable('2026-03-31 23:59:59', $timezone))->getTimestamp())
                 ->and($context['sort'])->toBe('reaction_at');
 
             return true;
@@ -61,6 +65,10 @@ test('fetch delegates normalized params to the typesense gateway', function () {
         'min_previewed_count' => FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
         'date_from' => '2026-05-01',
         'date_to' => '2026-05-30',
+        'downloaded_at_from' => '2026-04-01',
+        'downloaded_at_to' => '2026-04-30',
+        'blacklisted_at_from' => '2026-03-01',
+        'blacklisted_at_to' => '2026-03-31',
         'sort' => 'reaction_at',
     ]);
 

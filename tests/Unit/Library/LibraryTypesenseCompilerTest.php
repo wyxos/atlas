@@ -77,15 +77,23 @@ test('compiler builds multiple source filter', function () {
         ->and($filter)->toContain('not_found:=false');
 });
 
-test('compiler builds created date range filters', function () {
+test('compiler builds date range filters', function () {
     $compiler = app(LibraryTypesenseCompiler::class);
     $timezone = new DateTimeZone('UTC');
     $createdFrom = (new DateTimeImmutable('2026-05-01 00:00:00', $timezone))->getTimestamp();
     $createdTo = (new DateTimeImmutable('2026-05-30 23:59:59', $timezone))->getTimestamp();
+    $downloadedFrom = (new DateTimeImmutable('2026-04-01 00:00:00', $timezone))->getTimestamp();
+    $downloadedTo = (new DateTimeImmutable('2026-04-30 23:59:59', $timezone))->getTimestamp();
+    $blacklistedFrom = (new DateTimeImmutable('2026-03-01 00:00:00', $timezone))->getTimestamp();
+    $blacklistedTo = (new DateTimeImmutable('2026-03-31 23:59:59', $timezone))->getTimestamp();
 
     $filter = $compiler->compileFileFilter([
         'createdFrom' => $createdFrom,
         'createdTo' => $createdTo,
+        'downloadedFrom' => $downloadedFrom,
+        'downloadedTo' => $downloadedTo,
+        'blacklistedFrom' => $blacklistedFrom,
+        'blacklistedTo' => $blacklistedTo,
         'downloaded' => 'any',
         'blacklisted' => 'any',
         'autoBlacklisted' => 'any',
@@ -96,6 +104,10 @@ test('compiler builds created date range filters', function () {
 
     expect($filter)->toContain('created_at:>='.$createdFrom)
         ->and($filter)->toContain('created_at:<='.$createdTo)
+        ->and($filter)->toContain('downloaded_at:>='.$downloadedFrom)
+        ->and($filter)->toContain('downloaded_at:<='.$downloadedTo)
+        ->and($filter)->toContain('blacklisted_at:>='.$blacklistedFrom)
+        ->and($filter)->toContain('blacklisted_at:<='.$blacklistedTo)
         ->and($filter)->toContain('not_found:=false');
 });
 

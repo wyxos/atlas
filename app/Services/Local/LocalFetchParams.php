@@ -24,6 +24,10 @@ class LocalFetchParams
      *   minPreviewed: ?int,
      *   createdFrom: ?int,
      *   createdTo: ?int,
+     *   downloadedFrom: ?int,
+     *   downloadedTo: ?int,
+     *   blacklistedFrom: ?int,
+     *   blacklistedTo: ?int,
      *   reactionMode: string,
      *   autoBlacklisted: string,
      *   reactionTypes: ?array<int, string>,
@@ -61,20 +65,12 @@ class LocalFetchParams
             $minPreviewed = null;
         }
 
-        $createdFrom = self::normalizeDateBoundary($params['date_from'] ?? null, false);
-        $createdTo = self::normalizeDateBoundary($params['date_to'] ?? null, true);
-
-        if ($createdFrom) {
-            $params['date_from'] = $createdFrom['date'];
-        } else {
-            unset($params['date_from']);
-        }
-
-        if ($createdTo) {
-            $params['date_to'] = $createdTo['date'];
-        } else {
-            unset($params['date_to']);
-        }
+        $createdFrom = self::normalizeDateBoundaryParam($params, 'date_from', false);
+        $createdTo = self::normalizeDateBoundaryParam($params, 'date_to', true);
+        $downloadedFrom = self::normalizeDateBoundaryParam($params, 'downloaded_at_from', false);
+        $downloadedTo = self::normalizeDateBoundaryParam($params, 'downloaded_at_to', true);
+        $blacklistedFrom = self::normalizeDateBoundaryParam($params, 'blacklisted_at_from', false);
+        $blacklistedTo = self::normalizeDateBoundaryParam($params, 'blacklisted_at_to', true);
 
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
         $autoBlacklisted = is_string($params['auto_blacklisted'] ?? null) ? (string) $params['auto_blacklisted'] : 'any';
@@ -101,6 +97,10 @@ class LocalFetchParams
                 'minPreviewed' => $minPreviewed,
                 'createdFrom' => $createdFrom['timestamp'] ?? null,
                 'createdTo' => $createdTo['timestamp'] ?? null,
+                'downloadedFrom' => $downloadedFrom['timestamp'] ?? null,
+                'downloadedTo' => $downloadedTo['timestamp'] ?? null,
+                'blacklistedFrom' => $blacklistedFrom['timestamp'] ?? null,
+                'blacklistedTo' => $blacklistedTo['timestamp'] ?? null,
                 'reactionMode' => $reactionMode,
                 'autoBlacklisted' => $autoBlacklisted,
                 'reactionTypes' => $reactionTypes,
@@ -136,6 +136,10 @@ class LocalFetchParams
             'minPreviewed' => $minPreviewed,
             'createdFrom' => $createdFrom['timestamp'] ?? null,
             'createdTo' => $createdTo['timestamp'] ?? null,
+            'downloadedFrom' => $downloadedFrom['timestamp'] ?? null,
+            'downloadedTo' => $downloadedTo['timestamp'] ?? null,
+            'blacklistedFrom' => $blacklistedFrom['timestamp'] ?? null,
+            'blacklistedTo' => $blacklistedTo['timestamp'] ?? null,
             'reactionMode' => $reactionMode,
             'autoBlacklisted' => $autoBlacklisted,
             'reactionTypes' => $reactionTypes,
@@ -204,6 +208,24 @@ class LocalFetchParams
         }
 
         return $reactionTypes;
+    }
+
+    /**
+     * @return array{date: string, timestamp: int}|null
+     */
+    private static function normalizeDateBoundaryParam(array &$params, string $key, bool $endOfDay): ?array
+    {
+        $boundary = self::normalizeDateBoundary($params[$key] ?? null, $endOfDay);
+
+        if ($boundary) {
+            $params[$key] = $boundary['date'];
+
+            return $boundary;
+        }
+
+        unset($params[$key]);
+
+        return null;
     }
 
     /**

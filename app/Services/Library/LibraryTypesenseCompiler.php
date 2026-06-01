@@ -149,6 +149,26 @@ class LibraryTypesenseCompiler
             $filters[] = 'created_at:<='.$createdTo;
         }
 
+        $downloadedFrom = $context['downloadedFrom'] ?? null;
+        if (is_int($downloadedFrom)) {
+            $filters[] = 'downloaded_at:>='.$downloadedFrom;
+        }
+
+        $downloadedTo = $context['downloadedTo'] ?? null;
+        if (is_int($downloadedTo)) {
+            $filters[] = 'downloaded_at:<='.$downloadedTo;
+        }
+
+        $blacklistedFrom = $context['blacklistedFrom'] ?? null;
+        if (is_int($blacklistedFrom)) {
+            $filters[] = 'blacklisted_at:>='.$blacklistedFrom;
+        }
+
+        $blacklistedTo = $context['blacklistedTo'] ?? null;
+        if (is_int($blacklistedTo)) {
+            $filters[] = 'blacklisted_at:<='.$blacklistedTo;
+        }
+
         $downloaded = (string) ($context['downloaded'] ?? 'any');
         if ($downloaded === 'yes') {
             $filters[] = 'downloaded:=true';

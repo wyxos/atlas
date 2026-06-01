@@ -269,12 +269,20 @@ describe('useBrowseForm - defaults merging', () => {
                 limit: 20,
                 date_from: '2026-05-01',
                 date_to: '2026-05-30',
+                downloaded_at_from: '2026-04-01',
+                downloaded_at_to: '2026-04-30',
+                blacklisted_at_from: '2026-03-01',
+                blacklisted_at_to: '2026-03-31',
             } as any,
         });
 
         expect(form.data.feed).toBe('local');
         expect(form.data.serviceFilters.date_from).toBe('2026-05-01');
         expect(form.data.serviceFilters.date_to).toBe('2026-05-30');
+        expect(form.data.serviceFilters.downloaded_at_from).toBe('2026-04-01');
+        expect(form.data.serviceFilters.downloaded_at_to).toBe('2026-04-30');
+        expect(form.data.serviceFilters.blacklisted_at_from).toBe('2026-03-01');
+        expect(form.data.serviceFilters.blacklisted_at_to).toBe('2026-03-31');
     });
 
     it('uses provided instance when available (tab isolation)', () => {
