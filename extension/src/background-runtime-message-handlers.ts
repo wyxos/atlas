@@ -99,7 +99,9 @@ function isAllowedAtlasApiEndpoint(
         return false;
     }
 
-    return method === 'GET' && endpoint === `${atlasDomain}/api/extension/ping`;
+    return (method === 'GET' && endpoint === `${atlasDomain}/api/extension/ping`)
+        || (method === 'GET' && endpoint === `${atlasDomain}/api/extension/settings`)
+        || (method === 'POST' && endpoint === `${atlasDomain}/api/extension/settings`);
 }
 
 function resolveQueueRuntimeOptions(payload: { pageVisibility?: unknown }, sender: RuntimeMessageSender): QueueRuntimeOptions {

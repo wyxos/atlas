@@ -1,4 +1,4 @@
-import { getStoredOptions } from './atlas-options';
+import { getStoredConnectionOptions } from './atlas-options';
 import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth } from './atlas-auth';
 import { connectWorkerReverb, type ReverbClient } from './reverb-client-worker';
 import { createExtensionReverbAuthConfig, formatReverbEndpoint, parseReverbConfig } from './reverb-config';
@@ -17,7 +17,7 @@ type ReverbPingResponse = {
 
 export async function connectBackgroundReverb(): Promise<BackgroundReverbStatus> {
     try {
-        const stored = await getStoredOptions();
+        const stored = await getStoredConnectionOptions();
         if (!hasAtlasApiAuth(stored.atlasDomain, stored.apiToken)) {
             return { kind: 'setup_required' };
         }

@@ -7,6 +7,7 @@ const mockPrimeGlobalReferrerCheckCache = vi.fn();
 
 vi.mock('./atlas-options', () => ({
     getStoredOptions: mockGetStoredOptions,
+    getStoredConnectionOptions: mockGetStoredOptions,
 }));
 
 vi.mock('./background-cookie-runtime', () => ({

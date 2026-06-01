@@ -64,7 +64,9 @@ function installStorageListener(): void {
 
     storageListenerInstalled = true;
     chrome.storage.onChanged.addListener((changes: Record<string, { newValue?: unknown }>, areaName: string) => {
-        if (areaName !== 'local' || !(STORAGE_KEYS.closeTabAfterQueueByDomain in changes)) {
+        if (areaName !== 'local'
+            || (!(STORAGE_KEYS.closeTabAfterQueueByDomain in changes)
+                && !(STORAGE_KEYS.settingsUpdatedAt in changes))) {
             return;
         }
 

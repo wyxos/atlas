@@ -7,6 +7,7 @@ vi.mock('../atlas-options', () => ({
     STORAGE_KEYS: {
         reactAllItemsInPostByDomain: 'reactAllItemsInPostByDomain',
         reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
+        settingsUpdatedAt: 'settingsUpdatedAt',
     },
     getReactAllItemsInPostPreferenceForHostname: mockGetReactAllItemsInPostPreferenceForHostname,
     setReactAllItemsInPostPreferenceForHostname: mockSetReactAllItemsInPostPreferenceForHostname,
@@ -33,9 +34,7 @@ describe('react-all-items-in-post-state', () => {
         mockSetReactAllItemsInPostPreferenceForHostname.mockImplementation(async (_hostname: string, enabled: boolean) => {
             persistedEnabled = enabled;
             storageChangeListener?.({
-                reactAllItemsInPostByDomain: {
-                    newValue: { 'example.com': enabled },
-                },
+                settingsUpdatedAt: { newValue: String(Date.now()) },
             }, 'local');
         });
 
@@ -68,9 +67,7 @@ describe('react-all-items-in-post-state', () => {
 
         persistedEnabled = false;
         storageChangeListener?.({
-            reactAllItemsInPostByDomain: {
-                newValue: { 'example.com': false },
-            },
+            settingsUpdatedAt: { newValue: String(Date.now()) },
         }, 'local');
         await flushPromises();
 

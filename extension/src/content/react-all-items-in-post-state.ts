@@ -68,7 +68,8 @@ function installStorageListener(): void {
         }
 
         if (!(STORAGE_KEYS.reactAllItemsInPostByDomain in changes)
-            && !(STORAGE_KEYS.reactAllItemsInPostEnabled in changes)) {
+            && !(STORAGE_KEYS.reactAllItemsInPostEnabled in changes)
+            && !(STORAGE_KEYS.settingsUpdatedAt in changes)) {
             return;
         }
 
