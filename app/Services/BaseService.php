@@ -98,4 +98,37 @@ abstract class BaseService
             'fields' => [],
         ];
     }
+
+    /**
+     * Determine whether a raw upstream result should be transformed and persisted.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    public function shouldPersistResult(array $item): bool
+    {
+        return true;
+    }
+
+    /**
+     * @param  iterable<mixed>  $items
+     * @return list<array<string, mixed>>
+     */
+    protected function persistableResults(iterable $items): array
+    {
+        $persistable = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            if (! $this->shouldPersistResult($item)) {
+                continue;
+            }
+
+            $persistable[] = $item;
+        }
+
+        return $persistable;
+    }
 }

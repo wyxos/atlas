@@ -174,6 +174,53 @@ it('prefers the largest video when a deviation has videos', function () {
         ->and($payload['download_mode'])->toBe('video');
 });
 
+it('filters locked DeviantArt results before mapping files', function () {
+    $service = new DeviantArtImages;
+
+    $result = $service->transform([
+        'results' => [
+            deviantArtImagesTestRow('locked-tier', [
+                'tier_access' => 'locked',
+                'primary_tier' => [
+                    'tier' => [
+                        'name' => 'Supporter',
+                    ],
+                ],
+            ]),
+            deviantArtImagesTestRow('locked-subscription-folder', [
+                'premium_folder_data' => [
+                    'type' => 'subscribers',
+                    'has_access' => false,
+                ],
+            ]),
+            deviantArtImagesTestRow('unwatched-user', [
+                'premium_folder_data' => [
+                    'type' => 'watchers',
+                    'has_access' => false,
+                ],
+            ]),
+            deviantArtImagesTestRow('subscribed-tier', [
+                'tier_access' => 'unlocked',
+                'primary_tier' => [
+                    'tier' => [
+                        'name' => 'Supporter',
+                    ],
+                ],
+            ]),
+            deviantArtImagesTestRow('regular'),
+        ],
+    ]);
+
+    expect(array_map(
+        fn (array $item): string => $item['file']['source_id'],
+        $result['files'],
+    ))->toBe([
+        'unwatched-user',
+        'subscribed-tier',
+        'regular',
+    ]);
+});
+
 it('formats DeviantArt query params for tags, offsets, and gallery limits', function () {
     $defaultService = new DeviantArtImages;
     expect($defaultService->formatParams())->toMatchArray([
@@ -210,3 +257,19 @@ it('formats DeviantArt query params for tags, offsets, and gallery limits', func
         'username' => 'artist',
     ]);
 });
+
+function deviantArtImagesTestRow(string $id, array $attributes = []): array
+{
+    return array_replace_recursive([
+        'deviationid' => $id,
+        'url' => "https://www.deviantart.com/artist/art/{$id}",
+        'author' => [
+            'username' => 'artist',
+        ],
+        'content' => [
+            'src' => "https://fc.example.test/{$id}.jpg",
+            'height' => 900,
+            'width' => 1200,
+        ],
+    ], $attributes);
+}
