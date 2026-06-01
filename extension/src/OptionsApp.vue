@@ -383,7 +383,7 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
                         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Extension Build</p>
                         <p class="mt-3 text-3xl font-semibold text-smart-blue-100">{{ extensionVersion }}</p>
                         <p class="mt-3 text-sm text-blue-slate-300">
-                            Site customizations stay local to this browser profile. Enabled and disabled domains both carry over in the JSON import/export payload.
+                            Site customizations sync with the connected Atlas instance. Existing browser-profile settings are migrated there once after upgrade.
                         </p>
                     </article>
                 </div>

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetStoredOptions = vi.fn();
+const mockGetStoredConnectionOptions = vi.fn();
 const mockConnectReverb = vi.fn();
 
 vi.mock('./atlas-options', () => ({
-    getStoredOptions: mockGetStoredOptions,
+    getStoredConnectionOptions: mockGetStoredConnectionOptions,
 }));
 
 vi.mock('./reverb-client', () => ({
@@ -17,7 +17,7 @@ describe('connectRuntimeReverb', () => {
         vi.clearAllMocks();
         vi.unstubAllGlobals();
 
-        mockGetStoredOptions.mockResolvedValue({
+        mockGetStoredConnectionOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.wyxos.com',
             apiToken: 'test-api-token',
             siteCustomizations: [],

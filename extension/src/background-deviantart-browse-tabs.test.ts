@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetStoredOptions = vi.fn();
+const mockGetStoredConnectionOptions = vi.fn();
 
 vi.mock('./atlas-options', () => ({
-    getStoredOptions: mockGetStoredOptions,
+    getStoredConnectionOptions: mockGetStoredConnectionOptions,
 }));
 
 function createChromeMock() {
@@ -24,7 +24,7 @@ describe('handleOpenDeviantArtUsernameTabRuntimeMessage', () => {
         vi.resetModules();
         vi.clearAllMocks();
         vi.unstubAllGlobals();
-        mockGetStoredOptions.mockResolvedValue({
+        mockGetStoredConnectionOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.test',
             apiToken: 'test-api-token',
         });
@@ -53,7 +53,7 @@ describe('handleOpenDeviantArtUsernameTabRuntimeMessage', () => {
             expect(handled).toBe(true);
         });
 
-        expect(mockGetStoredOptions).toHaveBeenCalledTimes(1);
+        expect(mockGetStoredConnectionOptions).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledWith('https://atlas.test/api/extension/browse-tabs/deviantart-user', {
             method: 'POST',
             headers: {

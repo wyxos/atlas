@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetStoredOptions = vi.fn();
+const mockGetStoredConnectionOptions = vi.fn();
 const mockConnectWorkerReverb = vi.fn();
 
 vi.mock('./atlas-options', () => ({
-    getStoredOptions: mockGetStoredOptions,
+    getStoredConnectionOptions: mockGetStoredConnectionOptions,
 }));
 
 vi.mock('./reverb-client-worker', () => ({
@@ -17,7 +17,7 @@ describe('connectBackgroundReverb', () => {
         vi.clearAllMocks();
         vi.unstubAllGlobals();
 
-        mockGetStoredOptions.mockResolvedValue({
+        mockGetStoredConnectionOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.wyxos.com',
             apiToken: 'test-api-token',
             siteCustomizations: [],
@@ -25,7 +25,7 @@ describe('connectBackgroundReverb', () => {
     });
 
     it('returns setup required when no API token is configured', async () => {
-        mockGetStoredOptions.mockResolvedValue({
+        mockGetStoredConnectionOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.wyxos.com',
             apiToken: '',
             siteCustomizations: [],
@@ -181,12 +181,12 @@ describe('connectBackgroundReverb', () => {
     });
 
     it('returns offline when stored options or the ping request cannot be read', async () => {
-        mockGetStoredOptions.mockRejectedValue(new Error('storage unavailable'));
+        mockGetStoredConnectionOptions.mockRejectedValue(new Error('storage unavailable'));
 
         const { connectBackgroundReverb } = await import('./background-reverb-runtime');
         await expect(connectBackgroundReverb()).resolves.toEqual({ kind: 'offline' });
 
-        mockGetStoredOptions.mockResolvedValue({
+        mockGetStoredConnectionOptions.mockResolvedValue({
             atlasDomain: 'https://atlas.wyxos.com',
             apiToken: 'test-api-token',
             siteCustomizations: [],

@@ -6,6 +6,7 @@ const mockSetCloseTabAfterQueuePreferenceForHostname = vi.fn();
 vi.mock('../atlas-options', () => ({
     STORAGE_KEYS: {
         closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
+        settingsUpdatedAt: 'settingsUpdatedAt',
     },
     getCloseTabAfterQueuePreferenceForHostname: mockGetCloseTabAfterQueuePreferenceForHostname,
     setCloseTabAfterQueuePreferenceForHostname: mockSetCloseTabAfterQueuePreferenceForHostname,
@@ -33,9 +34,7 @@ describe('close-tab-after-queue-state', () => {
             async (_hostname: string, mode: 'off' | 'queued' | 'completed') => {
                 persistedMode = mode;
                 storageChangeListener?.({
-                    closeTabAfterQueueByDomain: {
-                        newValue: mode === 'off' ? {} : { 'example.com': mode },
-                    },
+                    settingsUpdatedAt: { newValue: String(Date.now()) },
                 }, 'local');
             },
         );
@@ -69,9 +68,7 @@ describe('close-tab-after-queue-state', () => {
 
         persistedMode = 'completed';
         storageChangeListener?.({
-            closeTabAfterQueueByDomain: {
-                newValue: { 'example.com': 'completed' },
-            },
+            settingsUpdatedAt: { newValue: String(Date.now()) },
         }, 'local');
         await flushPromises();
 

@@ -1,4 +1,4 @@
-import { getStoredOptions } from './atlas-options';
+import { getStoredConnectionOptions } from './atlas-options';
 import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth, normalizeAtlasDomain } from './atlas-auth';
 
 type RuntimeSendResponse = (response?: unknown) => void;
@@ -50,7 +50,7 @@ async function openDeviantArtBrowseTab(
     body: Record<string, unknown>,
     sendResponse: RuntimeSendResponse,
 ): Promise<void> {
-    const stored = await getStoredOptions();
+    const stored = await getStoredConnectionOptions();
     const atlasDomain = normalizeAtlasDomain(stored.atlasDomain);
     const apiToken = stored.apiToken.trim();
     if (atlasDomain === '' || !hasAtlasApiAuth(atlasDomain, apiToken)) {
