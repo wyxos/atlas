@@ -95,6 +95,7 @@ const isVibeLoading = computed(() => vibeStatus.value.phase === 'loading'
     || vibeStatus.value.phase === 'refreshing'
     || vibeStatus.value.loadState === 'loading');
 const hasRouteFileSelection = computed(() => route.name === 'browse-file');
+const canDetachFilesFromTab = computed(() => form.data.feed !== 'local' && tab.value?.feed !== 'local');
 const batchActionConfirmation = useLoadedItemsBatchActionConfirmation();
 
 function matchesActiveLocalFilters(item: FeedItem): boolean {
@@ -188,7 +189,7 @@ const itemInteractions = useTabContentItemInteractions({
     promptDownloadedReaction: downloadedReactionPrompt.prompt,
     clearHoveredContainer: containerInteractions.clearHoveredContainer,
 });
-const vibeRemoval = useTabContentVibeRemoval({ tab, getLoadedItems: getCurrentVibeFeedItems, masonry: vibeMasonry, isLoading: isVibeLoading, toast, clearHover: itemInteractions.state.clearHover });
+const vibeRemoval = useTabContentVibeRemoval({ tab, getLoadedItems: getCurrentVibeFeedItems, masonry: vibeMasonry, isLoading: isVibeLoading, canRemoveFromTab: canDetachFilesFromTab, toast, clearHover: itemInteractions.state.clearHover });
 
 const browse = useTabContentBrowseState({
     tabId,
@@ -516,7 +517,7 @@ watch(
         :mouse-shortcuts="mouseShortcuts"
         :can-remove-loaded-items="vibeRemoval.state.canRemoveLoadedItems.value" :cancel-remove-loaded-items="vibeRemoval.actions.cancelLoadedItemsRemoval" :confirm-remove-loaded-items="vibeRemoval.actions.confirmLoadedItemsRemoval"
         :is-removing-item-from-tab="vibeRemoval.actions.isRemovingItem" :loaded-items-removal-count="vibeRemoval.state.loadedItemCount.value" :loaded-items-removal-open="vibeRemoval.state.dialogOpen.value"
-        :remove-item-from-tab="vibeRemoval.actions.removeItem" :remove-loaded-items="vibeRemoval.actions.openLoadedItemsDialog" :removing-loaded-items="vibeRemoval.state.removingLoadedItems.value"
+        :remove-item-from-tab="canDetachFilesFromTab ? vibeRemoval.actions.removeItem : undefined" :remove-loaded-items="canDetachFilesFromTab ? vibeRemoval.actions.openLoadedItemsDialog : null" :removing-loaded-items="vibeRemoval.state.removingLoadedItems.value"
         :pending-batch-action="batchActionConfirmation.pendingAction.value" :confirm-batch-action="batchActionConfirmation.confirm" :cancel-batch-action="batchActionConfirmation.cancel"
         :container-interactions="containerInteractions"
         :item-interactions="itemInteractions"

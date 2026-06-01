@@ -27,7 +27,7 @@ function createTab(): TabData {
     };
 }
 
-function createHarness(items = [createFeedItem(1), createFeedItem(2)]) {
+function createHarness(items = [createFeedItem(1), createFeedItem(2)], canRemoveFromTab = ref(true)) {
     const masonry = ref<BrowseFeedHandle>({
         cancel: vi.fn(),
         isLoading: false,
@@ -44,6 +44,7 @@ function createHarness(items = [createFeedItem(1), createFeedItem(2)]) {
         getLoadedItems: () => items,
         masonry,
         isLoading: ref(false),
+        canRemoveFromTab,
         toast,
         clearHover,
     });
@@ -116,5 +117,19 @@ describe('useTabContentVibeRemoval', () => {
         });
         expect(harness.removal.state.dialogOpen.value).toBe(false);
         expect(harness.toast.success).toHaveBeenCalledWith('Removed 2 items from this tab.');
+    });
+
+    it('disables tab unlink actions when the current tab cannot be detached', async () => {
+        const harness = createHarness([createFeedItem(1)], ref(false));
+
+        expect(harness.removal.state.canRemoveFromTab.value).toBe(false);
+        expect(harness.removal.state.canRemoveLoadedItems.value).toBe(false);
+
+        harness.removal.actions.openLoadedItemsDialog();
+        await harness.removal.actions.removeItem(harness.items[0]);
+
+        expect(harness.removal.state.dialogOpen.value).toBe(false);
+        expect(harness.masonry.value.remove).not.toHaveBeenCalled();
+        expect(window.axios.delete).not.toHaveBeenCalled();
     });
 });

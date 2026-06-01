@@ -13,6 +13,7 @@ type UseTabContentVibeRemovalOptions = {
     getLoadedItems: () => FeedItem[];
     masonry: ComputedRef<BrowseFeedHandle | null> | Ref<BrowseFeedHandle | null>;
     isLoading: ComputedRef<boolean> | Ref<boolean>;
+    canRemoveFromTab?: ComputedRef<boolean> | Ref<boolean>;
     toast: ToastApi;
     clearHover: () => void;
 };
@@ -38,8 +39,11 @@ export function useTabContentVibeRemoval(options: UseTabContentVibeRemovalOption
     const dialogOpen = ref(false);
     const removingLoadedItems = ref(false);
     const removingItemIds = ref<Set<number>>(new Set());
+    const canRemoveFromTab = computed(() => options.canRemoveFromTab?.value ?? true);
     const loadedItemCount = computed(() => uniqueItemsById(options.getLoadedItems()).length);
     const canRemoveLoadedItems = computed(() => (
+        canRemoveFromTab.value
+        &&
         loadedItemCount.value > 0
         && options.tab.value?.id !== undefined
         && options.masonry.value !== null
@@ -81,7 +85,7 @@ export function useTabContentVibeRemoval(options: UseTabContentVibeRemovalOption
         const uniqueItems = uniqueItemsById(items);
         const fileIds = uniqueItems.map((item) => item.id);
 
-        if (!targetTabId || uniqueItems.length === 0 || !options.masonry.value) {
+        if (!canRemoveFromTab.value || !targetTabId || uniqueItems.length === 0 || !options.masonry.value) {
             return false;
         }
 
@@ -98,6 +102,10 @@ export function useTabContentVibeRemoval(options: UseTabContentVibeRemovalOption
     }
 
     async function removeItem(item: FeedItem): Promise<void> {
+        if (!canRemoveFromTab.value) {
+            return;
+        }
+
         if (removingItemIds.value.has(item.id)) {
             return;
         }
@@ -160,6 +168,7 @@ export function useTabContentVibeRemoval(options: UseTabContentVibeRemovalOption
     return {
         state: {
             canRemoveLoadedItems,
+            canRemoveFromTab,
             dialogOpen,
             loadedItemCount,
             removingLoadedItems,

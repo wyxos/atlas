@@ -7,6 +7,8 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use App\Services\Library\LibraryIndexSyncDispatcher;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class FileReactionService
 {
@@ -148,6 +150,40 @@ class FileReactionService
         ];
     }
 
+    /**
+     * Remove all reactions from the given files while preserving metrics and library sync.
+     *
+     * @param  iterable<int, File>  $files
+     * @return array<int, int>
+     */
+    public function clearMany(iterable $files, bool $queueLibrarySync = true): array
+    {
+        $files = collect($files)
+            ->filter(fn (mixed $file): bool => $file instanceof File)
+            ->keyBy(fn (File $file): int => (int) $file->id)
+            ->values();
+
+        if ($files->isEmpty()) {
+            return [];
+        }
+
+        $removedByFileId = [];
+
+        foreach ($files as $file) {
+            $removedCount = $this->clearFileReactions($file);
+
+            if ($removedCount > 0) {
+                $removedByFileId[(int) $file->id] = $removedCount;
+            }
+        }
+
+        if ($queueLibrarySync && $removedByFileId !== []) {
+            app(LibraryIndexSyncDispatcher::class)->filesAndReactions(array_keys($removedByFileId));
+        }
+
+        return $removedByFileId;
+    }
+
     private function applyReactionChange(
         File $file,
         User $user,
@@ -208,6 +244,48 @@ class FileReactionService
         }
 
         return $reaction;
+    }
+
+    private function clearFileReactions(File $file): int
+    {
+        $reactions = $this->reactionsForFile($file);
+        if ($reactions->isEmpty()) {
+            return 0;
+        }
+
+        $removedCount = 0;
+        $metrics = app(MetricsService::class);
+        $wasBlacklisted = $file->blacklisted_at !== null;
+
+        DB::transaction(function () use ($file, $reactions, $metrics, $wasBlacklisted, &$removedCount): void {
+            foreach ($reactions as $reaction) {
+                if (! $reaction instanceof Reaction) {
+                    continue;
+                }
+
+                $metrics->applyReactionChange($file, $reaction->type, null, $wasBlacklisted, $wasBlacklisted);
+                $reaction->delete();
+                $removedCount++;
+            }
+        });
+
+        return $removedCount;
+    }
+
+    /**
+     * @return Collection<int, Reaction>
+     */
+    private function reactionsForFile(File $file): Collection
+    {
+        if ($file->relationLoaded('reactions')) {
+            return $file->reactions
+                ->filter(fn (mixed $reaction): bool => $reaction instanceof Reaction)
+                ->values();
+        }
+
+        return Reaction::query()
+            ->where('file_id', $file->id)
+            ->get();
     }
 
     /**
