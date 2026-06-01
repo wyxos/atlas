@@ -14,7 +14,8 @@ test('dry run reports reacted downloaded deviant art tier gates without mutating
     Bus::fake();
 
     $target = reactedDeviantArtTierFile();
-    $watcherGate = reactedDeviantArtTierFile([
+    $paidGate = reactedDeviantArtPaidFile();
+    $watcherGate = reactedDeviantArtPaidFile([
         'listing_metadata' => [
             'premium_folder_data' => [
                 'type' => 'watchers',
@@ -43,13 +44,15 @@ test('dry run reports reacted downloaded deviant art tier gates without mutating
 
     expect($target->fresh()->downloaded)->toBeTrue()
         ->and(Reaction::query()->where('file_id', $target->id)->exists())->toBeTrue()
+        ->and($paidGate->fresh()->downloaded)->toBeTrue()
+        ->and(Reaction::query()->where('file_id', $paidGate->id)->exists())->toBeTrue()
         ->and($watcherGate->fresh()->downloaded)->toBeTrue()
         ->and($notDownloaded->fresh()->downloaded)->toBeFalse()
         ->and($civitaiFile->fresh()->downloaded)->toBeTrue()
-        ->and($output)->toContain('candidate files: 2')
-        ->and($output)->toContain('Matched tier-gated files: 1')
-        ->and($output)->toContain('Reactions that would be removed: 1')
-        ->and($output)->toContain('Downloads that would be cleared: 1')
+        ->and($output)->toContain('candidate files: 3')
+        ->and($output)->toContain('Matched subscriber-gated files: 2')
+        ->and($output)->toContain('Reactions that would be removed: 2')
+        ->and($output)->toContain('Downloads that would be cleared: 2')
         ->and($output)->toContain('Dry run only. No rows were changed.');
 
     Bus::assertNothingDispatched();
@@ -78,7 +81,33 @@ test('force mode clears reactions and downloaded state for tier gated deviant ar
         ->and(Reaction::query()->where('file_id', $target->id)->exists())->toBeFalse()
         ->and($output)->toContain('scope: file IDs '.$target->id)
         ->and($output)->toContain('candidate files: 1')
-        ->and($output)->toContain('Matched tier-gated files: 1')
+        ->and($output)->toContain('Matched subscriber-gated files: 1')
+        ->and($output)->toContain('Reactions removed: 1')
+        ->and($output)->toContain('Downloads cleared: 1');
+
+    Bus::assertDispatched(DeleteStoredFileJob::class);
+});
+
+test('force mode clears reactions and downloaded state for paid premium folder files', function () {
+    Bus::fake();
+
+    $target = reactedDeviantArtPaidFile();
+
+    Artisan::call('atlas:clean-reacted-deviantart-tier-downloads', [
+        '--id' => [$target->id],
+        '--force' => true,
+    ]);
+
+    $output = Artisan::output();
+    $freshTarget = $target->fresh();
+
+    expect($freshTarget->downloaded)->toBeFalse()
+        ->and($freshTarget->downloaded_at)->toBeNull()
+        ->and($freshTarget->path)->toBeNull()
+        ->and($freshTarget->preview_path)->toBeNull()
+        ->and($freshTarget->download_progress)->toBe(0)
+        ->and(Reaction::query()->where('file_id', $target->id)->exists())->toBeFalse()
+        ->and($output)->toContain('Matched subscriber-gated files: 1')
         ->and($output)->toContain('Reactions removed: 1')
         ->and($output)->toContain('Downloads cleared: 1');
 
@@ -130,4 +159,19 @@ function reactedDeviantArtTierFile(array $attributes = [], string $reactionType 
     ]);
 
     return $file;
+}
+
+function reactedDeviantArtPaidFile(array $attributes = [], string $reactionType = 'love'): File
+{
+    return reactedDeviantArtTierFile(array_merge([
+        'listing_metadata' => [
+            'premium_folder_data' => [
+                'type' => 'paid',
+                'has_access' => false,
+                'gallery_id' => '805B20D8-ACFC-EFCC-DBDC-E99D430446E4',
+                'points_price' => 800,
+                'dollar_price' => 10,
+            ],
+        ],
+    ], $attributes), $reactionType);
 }

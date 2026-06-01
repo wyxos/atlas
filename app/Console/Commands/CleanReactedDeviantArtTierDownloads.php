@@ -80,7 +80,7 @@ class CleanReactedDeviantArtTierDownloads extends Command
         }
 
         $this->line('Scanned files: '.$stats['scanned']);
-        $this->line('Matched tier-gated files: '.$stats['matched']);
+        $this->line('Matched subscriber-gated files: '.$stats['matched']);
         $this->line(($dryRun ? 'Reactions that would be removed: ' : 'Reactions removed: ').$stats['reactions_removed']);
         $this->line(($dryRun ? 'Downloads that would be cleared: ' : 'Downloads cleared: ').$stats['downloads_cleared']);
         $this->line(($dryRun ? 'Library syncs that would be queued: ' : 'Library syncs queued: ').$stats['library_syncs_queued']);
@@ -159,7 +159,7 @@ class CleanReactedDeviantArtTierDownloads extends Command
 
             $stats['scanned']++;
 
-            if (! $this->isTierGatedDeviantArtFile($file)) {
+            if (! $this->isSubscriberGatedDeviantArtFile($file)) {
                 continue;
             }
 
@@ -188,13 +188,20 @@ class CleanReactedDeviantArtTierDownloads extends Command
         $this->libraryIndexSyncDispatcher->filesAndReactions($matchedFileIds);
     }
 
-    private function isTierGatedDeviantArtFile(File $file): bool
+    private function isSubscriberGatedDeviantArtFile(File $file): bool
     {
         $access = SourceAccessState::forFile($file);
 
-        return is_array($access)
-            && ($access['provider'] ?? null) === 'deviantart'
-            && ($access['access_type'] ?? null) === 'tier';
+        if (! is_array($access) || ($access['provider'] ?? null) !== 'deviantart') {
+            return false;
+        }
+
+        $accessType = $access['access_type'] ?? null;
+        if ($accessType === 'tier') {
+            return true;
+        }
+
+        return $accessType === 'paid' && ($access['has_access'] ?? null) === false;
     }
 
     private function emptyStats(int $candidateCount): array
