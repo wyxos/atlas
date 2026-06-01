@@ -165,16 +165,21 @@ class DeviantArtImages extends BaseService
         return DeviantArtImagesFilterSchema::make();
     }
 
+    public function shouldPersistResult(array $item): bool
+    {
+        if ($this->hasLockedTierAccess($item)) {
+            return false;
+        }
+
+        return ! $this->hasLockedPremiumFolderAccess($item);
+    }
+
     public function transform(array $response, array $params = []): array
     {
         [$rows, $next, $total] = $this->transformResponse($response);
         $mapped = [];
 
-        foreach ($rows as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
+        foreach ($this->persistableResults($rows) as $row) {
             $transformed = $this->transformRow($row);
             if ($transformed !== null) {
                 $mapped[] = $transformed;
@@ -372,6 +377,51 @@ class DeviantArtImages extends BaseService
 
         if (in_array($normalized, ['false', '0', 'no', 'off'], true)) {
             return false;
+        }
+
+        return null;
+    }
+
+    private function hasLockedTierAccess(array $item): bool
+    {
+        return strtolower((string) $this->nullableString(data_get($item, 'tier_access'))) === 'locked';
+    }
+
+    private function hasLockedPremiumFolderAccess(array $item): bool
+    {
+        $premiumFolderData = data_get($item, 'premium_folder_data');
+        if (! is_array($premiumFolderData)) {
+            return false;
+        }
+
+        $hasAccess = $this->nullableBoolean($premiumFolderData['has_access'] ?? null);
+        if ($hasAccess !== false) {
+            return false;
+        }
+
+        $type = strtolower((string) $this->nullableString($premiumFolderData['type'] ?? null));
+        if ($type === '') {
+            return false;
+        }
+
+        return $type !== 'watchers';
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function nullableBoolean(mixed $value): ?bool
+    {
+        if (is_bool($value)) {
+            return $value;
         }
 
         return null;
