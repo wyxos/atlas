@@ -350,6 +350,56 @@ describe('background-atlas-check-queue', () => {
         expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
+    it('does not cache successful empty referrer matches but keeps matched referrers cached', async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal('crypto', {
+            ...crypto,
+            subtle: {
+                digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
+            },
+        });
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(createMatchResponse([]))
+            .mockResolvedValueOnce(createMatchResponse([
+                {
+                    request_id: 'req-0',
+                    exists: true,
+                    reaction: 'love',
+                },
+            ]));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { enqueueGlobalReferrerCheck } = await import('./background-atlas-check-queue');
+
+        const first = enqueueGlobalReferrerCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedReferrerUrl: 'https://example.com/post#image-1',
+        });
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(700);
+        expect((await first).payload.exists).toBe(false);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        const second = enqueueGlobalReferrerCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedReferrerUrl: 'https://example.com/post#image-1',
+        });
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(700);
+        expect((await second).payload.reaction).toBe('love');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+
+        const cached = await enqueueGlobalReferrerCheck({
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'token',
+            normalizedReferrerUrl: 'https://example.com/post#image-1',
+        });
+        expect(cached.payload.reaction).toBe('love');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
     it('attaches callers to the in-flight badge request after the batch has already flushed', async () => {
         let resolveFetch: (() => void) | null = null;
         const fetchMock = vi.fn().mockImplementation((_endpoint: string, init?: RequestInit) => {

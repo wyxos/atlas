@@ -74,6 +74,9 @@ describe('atlas-options', () => {
                     enabled: true,
                     domain: 'civitai.com',
                     matchRules: [],
+                    widget: {
+                        minImageWidth: null,
+                    },
                     referrerCleaner: {
                         stripQueryParams: [],
                     },
@@ -87,6 +90,9 @@ describe('atlas-options', () => {
                     enabled: true,
                     domain: 'civitai.red',
                     matchRules: [],
+                    widget: {
+                        minImageWidth: null,
+                    },
                     referrerCleaner: {
                         stripQueryParams: [],
                     },
@@ -100,6 +106,9 @@ describe('atlas-options', () => {
                     enabled: true,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
+                    widget: {
+                        minImageWidth: null,
+                    },
                     referrerCleaner: {
                         stripQueryParams: ['tag', 'tags'],
                     },
@@ -113,6 +122,9 @@ describe('atlas-options', () => {
                     enabled: true,
                     domain: 'sub.example.com',
                     matchRules: [],
+                    widget: {
+                        minImageWidth: null,
+                    },
                     referrerCleaner: {
                         stripQueryParams: ['*'],
                     },
@@ -134,6 +146,9 @@ describe('atlas-options', () => {
                 enabled: false,
                 domain: 'https://Example.com/path',
                 matchRules: [' .*\\/gallery\\/.* ', ''],
+                widget: {
+                    minImageWidth: 120.8,
+                },
                 referrerCleaner: {
                     stripQueryParams: ['Tag', 'tag'],
                 },
@@ -159,6 +174,9 @@ describe('atlas-options', () => {
                 enabled: false,
                 domain: 'example.com',
                 matchRules: ['.*\\/gallery\\/.*'],
+                widget: {
+                    minImageWidth: 120,
+                },
                 referrerCleaner: {
                     stripQueryParams: ['tag'],
                 },
@@ -183,6 +201,9 @@ describe('atlas-options', () => {
                     enabled: false,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
+                    widget: {
+                        minImageWidth: 120,
+                    },
                     referrerCleaner: {
                         stripQueryParams: ['tag'],
                     },
@@ -216,6 +237,9 @@ describe('atlas-options', () => {
                 enabled: false,
                 domain: 'www.example.com',
                 matchRules: [],
+                widget: {
+                    minImageWidth: null,
+                },
                 referrerCleaner: {
                     stripQueryParams: [],
                 },

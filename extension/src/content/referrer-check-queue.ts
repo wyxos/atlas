@@ -64,6 +64,13 @@ function hasMatch(result: ReferrerMatchResult): boolean {
 }
 
 function cacheResult(urls: string[], result: ReferrerMatchResult): void {
+    if (!hasMatch(result)) {
+        urls.forEach((url) => {
+            resultCacheByKey.delete(url);
+        });
+        return;
+    }
+
     const cachedAt = Date.now();
     urls.forEach((url) => {
         resultCacheByKey.set(url, {

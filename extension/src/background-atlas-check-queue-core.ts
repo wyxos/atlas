@@ -18,6 +18,7 @@ export type QueueDefinition<Result> = {
     buildRequestItem: (requestId: string, entry: PendingQueueItem<Result>) => Record<string, string>;
     emptyPayload: () => Result;
     parsePayloadItem: (row: MatchResponseItem) => Result;
+    shouldCachePayload?: (payload: Result) => boolean;
 };
 
 export type PendingQueueItem<Result> = {
@@ -144,6 +145,11 @@ export function createBackgroundAtlasCheckQueue<Result>(
     }
 
     function setCachedResponse(key: string, response: AtlasCheckQueueResponse<Result>): void {
+        if (definition.shouldCachePayload?.(response.payload) === false) {
+            resultCacheByKey.delete(key);
+            return;
+        }
+
         resultCacheByKey.delete(key);
         resultCacheByKey.set(key, {
             response,

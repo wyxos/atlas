@@ -12,6 +12,7 @@ import {
     MEDIA_CLEANER_STRATEGY_META,
 } from './site-customization-manager-meta';
 import type { MediaCleanerStrategy } from './site-customizations';
+import SiteCustomizationWidgetPanel from './SiteCustomizationWidgetPanel.vue';
 
 const props = defineProps<{
     customizations: SiteCustomizationForm[];
@@ -338,6 +339,11 @@ function handleImportCustomizations(event: Event): void {
                             </div>
                         </div>
                     </div>
+
+                    <SiteCustomizationWidgetPanel
+                        v-else-if="activeCustomizationTab === 'widget'"
+                        v-model="selectedCustomization.widgetMinImageWidthText"
+                    />
 
                     <div
                         v-else-if="activeCustomizationTab === 'referrerCleaner'"

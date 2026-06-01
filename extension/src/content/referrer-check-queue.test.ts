@@ -60,6 +60,38 @@ describe('referrer-check-queue', () => {
         expect(queue.getCachedReferrerCheck('https://example.com/gallery?tab=1#section')).toEqual(result);
     });
 
+    it('does not store successful empty runtime responses in the local mirror cache', async () => {
+        mockRequestQueuedReferrerCheckViaRuntime
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                payload: {
+                    exists: false,
+                    reaction: null,
+                },
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                payload: {
+                    exists: true,
+                    reaction: 'love',
+                },
+            });
+
+        const queue = await import('./referrer-check-queue');
+        const first = await queue.enqueueReferrerCheck('https://example.com/gallery?tab=1#section');
+
+        expect(first.exists).toBe(false);
+        expect(queue.getCachedReferrerCheck('https://example.com/gallery?tab=1#section')).toBeNull();
+
+        const second = await queue.enqueueReferrerCheck('https://example.com/gallery?tab=1#section');
+
+        expect(second.reaction).toBe('love');
+        expect(mockRequestQueuedReferrerCheckViaRuntime).toHaveBeenCalledTimes(2);
+        expect(queue.getCachedReferrerCheck('https://example.com/gallery?tab=1#section')).toEqual(second);
+    });
+
     it('falls back to the civitai.com referrer alias when a civitai.red check misses', async () => {
         mockRequestQueuedReferrerCheckViaRuntime.mockImplementation(({ normalizedReferrerUrl }) => Promise.resolve({
             ok: true,

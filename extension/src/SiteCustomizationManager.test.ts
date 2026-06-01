@@ -7,6 +7,7 @@ function createCustomization(overrides: Partial<SiteCustomizationForm> = {}): Si
         enabled: overrides.enabled ?? true,
         domain: overrides.domain ?? 'example.com',
         matchRules: overrides.matchRules ?? [],
+        widgetMinImageWidthText: overrides.widgetMinImageWidthText ?? '',
         referrerCleanerQueryParamsText: overrides.referrerCleanerQueryParamsText ?? '',
         mediaCleanerQueryParamsText: overrides.mediaCleanerQueryParamsText ?? '',
         mediaCleanerRewriteRules: overrides.mediaCleanerRewriteRules ?? [],
@@ -16,7 +17,7 @@ function createCustomization(overrides: Partial<SiteCustomizationForm> = {}): Si
 
 async function mountManager(
     overrides: Partial<{
-        activeCustomizationTab: 'matchRules' | 'referrerCleaner' | 'mediaCleaner';
+        activeCustomizationTab: 'matchRules' | 'widget' | 'referrerCleaner' | 'mediaCleaner';
         customizations: SiteCustomizationForm[];
         isCustomizationJsonCopied: boolean;
         newCustomizationDomain: string;
@@ -36,6 +37,12 @@ async function mountManager(
         },
         global: {
             stubs: {
+                Minus: {
+                    template: '<svg />',
+                },
+                Plus: {
+                    template: '<svg />',
+                },
                 Trash2: {
                     template: '<svg />',
                 },
@@ -110,6 +117,52 @@ describe('SiteCustomizationManager', () => {
         expect(wrapper.emitted('add-match-rule')).toHaveLength(1);
         expect(wrapper.emitted('remove-customization')?.at(-1)).toEqual([0]);
         expect(wrapper.text()).toContain('Disabled profiles stay saved');
+    });
+
+    it('shows the widget editor state', async () => {
+        const wrapper = await mountManager({
+            activeCustomizationTab: 'widget',
+            customizations: [
+                createCustomization({
+                    domain: 'example.com',
+                    widgetMinImageWidthText: '120',
+                }),
+            ],
+        });
+
+        expect((wrapper.get('[data-test-widget-min-image-width]').element as HTMLInputElement).value)
+            .toBe('120');
+        expect(wrapper.text()).toContain('Leave blank to use the global 200px image threshold.');
+        expect(wrapper.text()).toContain('Min 120px');
+    });
+
+    it('keeps profiles visible while typing or stepping the widget minimum width', async () => {
+        const wrapper = await mountManager({
+            activeCustomizationTab: 'widget',
+            customizations: [
+                createCustomization({
+                    domain: 'example.com',
+                    widgetMinImageWidthText: '120',
+                }),
+                createCustomization({
+                    domain: 'civitai.com',
+                }),
+            ],
+        });
+
+        const input = wrapper.get('[data-test-widget-min-image-width]');
+        await input.setValue('180px');
+
+        expect((input.element as HTMLInputElement).value).toBe('180');
+        expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
+
+        await wrapper.get('[data-test-widget-min-image-width-increment]').trigger('click');
+        expect((input.element as HTMLInputElement).value).toBe('181');
+        expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
+
+        await wrapper.get('[data-test-widget-min-image-width-decrement]').trigger('click');
+        expect((input.element as HTMLInputElement).value).toBe('180');
+        expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
     });
 
     it('shows the media cleaner editor states and emits rewrite-rule actions', async () => {

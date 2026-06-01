@@ -2,6 +2,7 @@ import { getStoredOptions } from './atlas-options';
 import type { UrlMatchRule } from './match-rules';
 import {
     createCustomizationMatchRules,
+    DEFAULT_WIDGET_MIN_IMAGE_WIDTH,
     resolveSiteCustomizationForHostname,
     type SiteCustomization,
 } from './site-customizations';
@@ -10,7 +11,6 @@ import {
     collectOpenShadowRootsFromNode,
     collectMediaFromNode,
     isMediaElement,
-    resolveMediaResolution,
     type MediaElement,
 } from './content/media-utils';
 import { mediaMatchesRulesForPage } from './content/media-rule-match';
@@ -28,10 +28,10 @@ import { installPageVisibilityLifecycle, isPageVisible } from './content/page-wo
 import { shouldBypassBadgeCheckCacheForPageStart } from './content/restored-page-badge-check';
 import { isVisibleInViewport } from './content/viewport-visibility';
 import { createAnchorReferrerShortcutListener } from './content/anchor-referrer-shortcut-listener';
+import { mediaHasEligibleWidgetWidth as mediaWidthExceedsThreshold } from './content/widget-media-eligibility';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;
 const MEDIA_WIDGET_APPLIED_ATTR = 'data-atlas-media-red-applied';
-const MIN_WIDGET_MEDIA_WIDTH = 200;
 const VISIBLE_RESUME_SCAN_LIMIT = 100;
 
 type LoadRulesAndProcessOptions = { fullScan?: boolean; bypassBadgeCheckCache?: boolean };
@@ -39,6 +39,7 @@ type LoadRulesAndProcessOptions = { fullScan?: boolean; bypassBadgeCheckCache?: 
 let currentSiteCustomization: SiteCustomization | null = null;
 let currentRules: UrlMatchRule[] = [];
 let currentReferrerCleanerQueryParams: string[] = [];
+let currentWidgetMinImageWidth = DEFAULT_WIDGET_MIN_IMAGE_WIDTH;
 let currentPageHostname = window.location.hostname;
 let isCurrentSiteEnabled = false;
 const overlayManager = new OverlayManager();
@@ -71,19 +72,8 @@ function mediaMatchesRules(element: MediaElement): boolean {
         || samePageLinkedMediaTargetMatchesRules(element, window.location.href, currentRules, currentPageHostname);
 }
 
-function mediaHasEligibleWidgetWidth(element: MediaElement): boolean {
-    if (element instanceof HTMLVideoElement) {
-        return true;
-    }
-
-    const resolution = resolveMediaResolution(element);
-    if (resolution === null) {
-        // Dimensions are unknown until media metadata is available.
-        return true;
-    }
-
-    return resolution.width > MIN_WIDGET_MEDIA_WIDTH;
-}
+const mediaHasEligibleWidgetWidth = (element: MediaElement): boolean =>
+    mediaWidthExceedsThreshold(element, currentWidgetMinImageWidth);
 
 function processMedia(media: MediaElement): void {
     if (shouldSkipLinkedMedia(media)) {
@@ -233,7 +223,11 @@ function tryApplyMediaWidgetFromInteraction(event: MouseEvent): void {
         return;
     }
 
-    if (mediaCandidate.getAttribute(MEDIA_WIDGET_APPLIED_ATTR) === '1' || !mediaMatchesRules(mediaCandidate)) {
+    if (
+        mediaCandidate.getAttribute(MEDIA_WIDGET_APPLIED_ATTR) === '1'
+        || !mediaMatchesRules(mediaCandidate)
+        || !mediaHasEligibleWidgetWidth(mediaCandidate)
+    ) {
         return;
     }
 
@@ -501,12 +495,14 @@ async function loadRulesAndProcess(options: LoadRulesAndProcessOptions = {}): Pr
         isCurrentSiteEnabled = currentSiteCustomization !== null;
         currentRules = currentSiteCustomization ? createCustomizationMatchRules(currentSiteCustomization) : [];
         currentReferrerCleanerQueryParams = currentSiteCustomization?.referrerCleaner.stripQueryParams ?? [];
+        currentWidgetMinImageWidth = currentSiteCustomization?.widget?.minImageWidth ?? DEFAULT_WIDGET_MIN_IMAGE_WIDTH;
     } catch {
         currentPageHostname = window.location.hostname;
         currentSiteCustomization = null;
         isCurrentSiteEnabled = false;
         currentRules = [];
         currentReferrerCleanerQueryParams = [];
+        currentWidgetMinImageWidth = DEFAULT_WIDGET_MIN_IMAGE_WIDTH;
     }
 
     setActivePageSiteCustomization(currentSiteCustomization);

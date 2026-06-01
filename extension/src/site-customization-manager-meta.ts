@@ -9,6 +9,10 @@ export const CUSTOMIZATION_TAB_META: Record<CustomizationTab, { title: string; d
         title: 'Match rules',
         description: 'Gate widget rendering to URL patterns on this page host. Leave this empty to keep the site permissive.',
     },
+    widget: {
+        title: 'Widget',
+        description: 'Tune when the Atlas widget appears on media for this page host.',
+    },
     referrerCleaner: {
         title: 'Referrer cleaner',
         description: 'Strip unstable query params from page and anchor URLs before Atlas checks or stores them.',
@@ -44,6 +48,11 @@ export function describeCustomization(customization: SiteCustomizationForm): str
             ? 'Permissive matching'
             : formatCount(customization.matchRules.length, 'match rule'),
     ];
+
+    const widgetMinImageWidth = customization.widgetMinImageWidthText.trim();
+    if (widgetMinImageWidth !== '') {
+        summary.push(`Min ${widgetMinImageWidth}px`);
+    }
 
     const referrerParamCount = countListEntries(customization.referrerCleanerQueryParamsText);
     if (referrerParamCount > 0) {

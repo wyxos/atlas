@@ -32,6 +32,14 @@ function emptyReferrerCheckResult(): ReferrerMatchResult {
     };
 }
 
+function hasReferrerMatch(result: ReferrerMatchResult): boolean {
+    return result.exists
+        || result.reaction !== null
+        || result.reactedAt !== null
+        || result.downloadedAt !== null
+        || result.blacklistedAt !== null;
+}
+
 function normalizeReaction(value: unknown): BadgeReactionType | null {
     return value === 'love' || value === 'like' || value === 'funny'
         ? value
@@ -86,6 +94,7 @@ const referrerCheckQueue = createBackgroundAtlasCheckQueue<ReferrerMatchResult>(
         downloadedAt: stringOrNull(row.downloaded_at),
         blacklistedAt: stringOrNull(row.blacklisted_at),
     }),
+    shouldCachePayload: hasReferrerMatch,
 });
 
 export {

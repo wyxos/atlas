@@ -76,6 +76,7 @@ vi.mock('./atlas-options', () => ({
 }));
 
 vi.mock('./site-customizations', () => ({
+    DEFAULT_WIDGET_MIN_IMAGE_WIDTH: 200,
     createCustomizationMatchRules: mockCreateCustomizationMatchRules,
     resolveSiteCustomizationForHostname: mockResolveSiteCustomizationForHostname,
 }));
@@ -261,6 +262,9 @@ describe('content-main', () => {
         const customization = {
             domain: 'example.com',
             matchRules: ['.*'],
+            widget: {
+                minImageWidth: null,
+            },
             referrerCleaner: {
                 stripQueryParams: ['tag'],
             },

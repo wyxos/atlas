@@ -4,12 +4,15 @@ import type { MediaCleanerStrategy, SiteCustomization } from './site-customizati
 
 function createDefaultSiteCustomization(
     domain: string,
-    options: Partial<Pick<SiteCustomization, 'matchRules' | 'mediaCleaner'>> = {},
+    options: Partial<Pick<SiteCustomization, 'matchRules' | 'mediaCleaner' | 'widget'>> = {},
 ): SiteCustomization {
     return {
         enabled: true,
         domain,
         matchRules: options.matchRules ?? [],
+        widget: options.widget ?? {
+            minImageWidth: null,
+        },
         referrerCleaner: {
             stripQueryParams: [],
         },

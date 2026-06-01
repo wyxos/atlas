@@ -206,6 +206,9 @@ describe('site-customizations', () => {
                 enabled: false,
                 domain: 'Example.com',
                 matchRules: ['.*\\/gallery\\/.*'],
+                widget: {
+                    minImageWidth: 140,
+                },
                 referrerCleaner: {
                     stripQueryParams: ['Tag'],
                 },
@@ -226,12 +229,15 @@ describe('site-customizations', () => {
             version: 1,
             siteCustomizations: [
                 {
-                    enabled: false,
-                    domain: 'example.com',
-                    matchRules: ['.*\\/gallery\\/.*'],
-                    referrerCleaner: {
-                        stripQueryParams: ['tag'],
-                    },
+                enabled: false,
+                domain: 'example.com',
+                matchRules: ['.*\\/gallery\\/.*'],
+                widget: {
+                    minImageWidth: 140,
+                },
+                referrerCleaner: {
+                    stripQueryParams: ['tag'],
+                },
                     mediaCleaner: {
                         stripQueryParams: ['quality'],
                         rewriteRules: [
@@ -268,6 +274,18 @@ describe('site-customizations', () => {
                 },
             ],
         }))).toThrow('Domain "example.com" has an invalid media rewrite rule.');
+        expect(() => parseSiteCustomizationsImportJson(JSON.stringify({
+            version: 1,
+            siteCustomizations: [
+                {
+                    enabled: true,
+                    domain: 'example.com',
+                    widget: {
+                        minImageWidth: -1,
+                    },
+                },
+            ],
+        }))).toThrow('Domain "example.com" widget.minImageWidth must be a non-negative integer or null.');
     });
 
     it('rejects duplicate normalized domains in imports', () => {

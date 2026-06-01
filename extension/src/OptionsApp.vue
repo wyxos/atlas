@@ -55,11 +55,25 @@ function splitQueryParamsText(input: string): string[] {
     return input.split(/[,\n]+/);
 }
 
+function parseWidgetMinImageWidthText(input: string): number | null {
+    const trimmed = input.trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    return /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
+}
+
 function createCustomizationForm(customization: SiteCustomization): SiteCustomizationForm {
+    const widgetMinImageWidth = customization.widget?.minImageWidth ?? null;
+
     return {
         enabled: customization.enabled,
         domain: customization.domain,
         matchRules: [...customization.matchRules],
+        widgetMinImageWidthText: widgetMinImageWidth === null
+            ? ''
+            : String(widgetMinImageWidth),
         referrerCleanerQueryParamsText: customization.referrerCleaner.stripQueryParams.join(', '),
         mediaCleanerQueryParamsText: customization.mediaCleaner.stripQueryParams.join(', '),
         mediaCleanerRewriteRules: customization.mediaCleaner.rewriteRules.map((rule) => ({ ...rule })),
@@ -78,6 +92,9 @@ function buildSiteCustomizationsFromForms(): SiteCustomization[] {
         matchRules: form.matchRules
             .map((rule) => rule.trim())
             .filter((rule) => rule !== ''),
+        widget: {
+            minImageWidth: parseWidgetMinImageWidthText(form.widgetMinImageWidthText),
+        },
         referrerCleaner: {
             stripQueryParams: normalizeReferrerQueryParams(splitQueryParamsText(form.referrerCleanerQueryParamsText)),
         },

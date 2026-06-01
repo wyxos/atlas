@@ -27,6 +27,9 @@ function createStoredOptions() {
                 enabled: true,
                 domain: 'civitai.com',
                 matchRules: [],
+                widget: {
+                    minImageWidth: null,
+                },
                 referrerCleaner: {
                     stripQueryParams: [],
                 },
@@ -40,6 +43,9 @@ function createStoredOptions() {
                 enabled: true,
                 domain: 'example.com',
                 matchRules: ['.*\\/gallery\\/.*'],
+                widget: {
+                    minImageWidth: 160,
+                },
                 referrerCleaner: {
                     stripQueryParams: ['tag'],
                 },
@@ -148,6 +154,11 @@ describe('OptionsApp', () => {
 
         await wrapper.get('[data-test-customization-tab="mediaCleaner"]').trigger('click');
         expect(wrapper.get('[data-test-customization-panel="mediaCleaner"]').exists()).toBe(true);
+
+        await wrapper.get('[data-test-customization-tab="widget"]').trigger('click');
+        expect(wrapper.get('[data-test-customization-panel="widget"]').exists()).toBe(true);
+        expect((wrapper.get('[data-test-widget-min-image-width]').element as HTMLInputElement).value)
+            .toBe('160');
     });
 
     it('imports customizations and replaces the current form state', async () => {
@@ -165,6 +176,9 @@ describe('OptionsApp', () => {
                             {
                                 domain: 'imported.example.com',
                                 matchRules: ['.*\\/art\\/.*'],
+                                widget: {
+                                    minImageWidth: 90,
+                                },
                                 referrerCleaner: {
                                     stripQueryParams: ['tag'],
                                 },
@@ -194,11 +208,50 @@ describe('OptionsApp', () => {
         expect((wrapper.get('[data-test-selected-customization-domain]').element as HTMLInputElement).value)
             .toBe('imported.example.com');
 
+        await wrapper.get('[data-test-customization-tab="widget"]').trigger('click');
+        expect((wrapper.get('[data-test-widget-min-image-width]').element as HTMLInputElement).value)
+            .toBe('90');
+
         await wrapper.get('[data-test-customization-tab="mediaCleaner"]').trigger('click');
         expect((wrapper.get('[data-test-media-cleaner-query-params]').element as HTMLTextAreaElement).value)
             .toBe('quality');
         expect(wrapper.get('[data-test-media-cleaner-strategy="civitaiCanonical"]').text())
             .toContain('civitaiCanonical');
+    });
+
+    it('keeps profiles visible while editing widget width and saves the sanitized value', async () => {
+        const wrapper = await mountOptionsApp();
+        await flushPromises();
+
+        await wrapper.findAll('[data-test-customization-domain-button]')[1]!.trigger('click');
+        await wrapper.get('[data-test-customization-tab="widget"]').trigger('click');
+
+        const input = wrapper.get('[data-test-widget-min-image-width]');
+        await input.setValue('170px');
+
+        expect((input.element as HTMLInputElement).value).toBe('170');
+        expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
+
+        await wrapper.get('[data-test-widget-min-image-width-increment]').trigger('click');
+
+        expect((input.element as HTMLInputElement).value).toBe('171');
+        expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
+
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(mockSaveStoredOptions).toHaveBeenCalledWith(
+            'https://atlas.test',
+            'test-token',
+            expect.arrayContaining([
+                expect.objectContaining({
+                    domain: 'example.com',
+                    widget: {
+                        minImageWidth: 171,
+                    },
+                }),
+            ]),
+        );
     });
 
     it('exports the current customization set as versioned json', async () => {
@@ -330,6 +383,9 @@ describe('OptionsApp', () => {
                     enabled: false,
                     domain: 'civitai.com',
                     matchRules: [],
+                    widget: {
+                        minImageWidth: null,
+                    },
                     referrerCleaner: {
                         stripQueryParams: [],
                     },
@@ -343,6 +399,9 @@ describe('OptionsApp', () => {
                     enabled: true,
                     domain: 'example.com',
                     matchRules: ['.*\\/gallery\\/.*'],
+                    widget: {
+                        minImageWidth: 160,
+                    },
                     referrerCleaner: {
                         stripQueryParams: ['tag'],
                     },

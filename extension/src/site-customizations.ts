@@ -13,9 +13,18 @@ import {
 } from './referrer-cleanup';
 import { normalizeCivitAiHostnameForMatching } from './civitai-domains';
 import { BUILT_IN_SITE_CUSTOMIZATIONS } from './site-customization-defaults';
+import {
+    normalizeWidgetMinImageWidth,
+    parseImportWidgetConfig,
+    parseStoredWidgetConfig,
+    validateWidgetConfig,
+    type WidgetConfig,
+} from './site-customization-widget';
 
 export const MEDIA_CLEANER_STRATEGIES = ['civitaiCanonical'] as const;
 export const SITE_CUSTOMIZATIONS_EXPORT_VERSION = 1 as const;
+export { DEFAULT_WIDGET_MIN_IMAGE_WIDTH } from './site-customization-widget';
+export type { WidgetConfig } from './site-customization-widget';
 
 export type MediaCleanerStrategy = typeof MEDIA_CLEANER_STRATEGIES[number];
 
@@ -38,6 +47,7 @@ export type SiteCustomization = {
     enabled: boolean;
     domain: string;
     matchRules: string[];
+    widget?: WidgetConfig;
     referrerCleaner: ReferrerCleanerConfig;
     mediaCleaner: MediaCleanerConfig;
 };
@@ -51,6 +61,7 @@ type ParsedSiteCustomizationEntry = Partial<{
     enabled: unknown;
     domain: unknown;
     matchRules: unknown;
+    widget: unknown;
     referrerCleaner: unknown;
     mediaCleaner: unknown;
 }>;
@@ -120,6 +131,9 @@ function normalizeSiteCustomization(customization: SiteCustomization): SiteCusto
             domain: customization.domain,
             regexes: customization.matchRules,
         }])[0]?.regexes ?? [],
+        widget: {
+            minImageWidth: normalizeWidgetMinImageWidth(customization.widget?.minImageWidth),
+        },
         referrerCleaner: {
             stripQueryParams: normalizeReferrerQueryParams(customization.referrerCleaner.stripQueryParams),
         },
@@ -230,6 +244,7 @@ function parseSiteCustomizationImportEntry(entry: unknown, index: number): SiteC
     const domain = normalizeSiteCustomizationDomain(row.domain);
     const referrerCleaner = row.referrerCleaner;
     const mediaCleaner = row.mediaCleaner;
+
     if (referrerCleaner !== undefined && (!referrerCleaner || typeof referrerCleaner !== 'object')) {
         throw new Error(`Domain "${row.domain}" referrerCleaner must be an object.`);
     }
@@ -242,6 +257,7 @@ function parseSiteCustomizationImportEntry(entry: unknown, index: number): SiteC
         enabled: row.enabled !== false,
         domain,
         matchRules: parseImportStringArray(row.matchRules, `Domain "${row.domain}" matchRules`),
+        widget: parseImportWidgetConfig(row.widget, row.domain),
         referrerCleaner: {
             stripQueryParams: parseImportStringArray(
                 (referrerCleaner as Record<string, unknown> | undefined)?.stripQueryParams,
@@ -276,6 +292,9 @@ export function createEmptySiteCustomization(domain: string = ''): SiteCustomiza
         enabled: true,
         domain: normalizeSiteCustomizationDomain(domain),
         matchRules: [],
+        widget: {
+            minImageWidth: null,
+        },
         referrerCleaner: {
             stripQueryParams: [],
         },
@@ -292,6 +311,9 @@ export function getDefaultSiteCustomizations(): SiteCustomization[] {
         enabled: customization.enabled,
         domain: customization.domain,
         matchRules: [...customization.matchRules],
+        widget: {
+            minImageWidth: customization.widget?.minImageWidth ?? null,
+        },
         referrerCleaner: {
             stripQueryParams: [...customization.referrerCleaner.stripQueryParams],
         },
@@ -338,6 +360,7 @@ function parseStoredSiteCustomization(entry: ParsedSiteCustomizationEntry): Site
         enabled: normalizeSiteCustomizationEnabled(entry.enabled === false ? false : true),
         domain,
         matchRules,
+        widget: parseStoredWidgetConfig(entry.widget),
         referrerCleaner: {
             stripQueryParams: Array.isArray(referrerCleanerRow.stripQueryParams)
                 ? referrerCleanerRow.stripQueryParams.filter((param): param is string => typeof param === 'string')
@@ -478,6 +501,11 @@ export function validateSiteCustomizations(siteCustomizations: SiteCustomization
             if (regexError !== null) {
                 return regexError;
             }
+        }
+
+        const widgetError = validateWidgetConfig(customization.domain, customization.widget);
+        if (widgetError !== null) {
+            return widgetError;
         }
 
         for (const queryParam of customization.referrerCleaner.stripQueryParams) {
