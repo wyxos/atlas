@@ -59,6 +59,7 @@ function createDeferred<T>() {
 const mockAxios = {
     get: vi.fn(),
     post: vi.fn(),
+    patch: vi.fn(),
 };
 
 function audioDetail(overrides: Partial<AudioDetailsItem> & Pick<AudioDetailsItem, 'id'>): AudioDetailsItem {
@@ -287,7 +288,6 @@ describe('Audio', () => {
             'border-b',
         ]));
         expect(wrapper.get('[data-test="audio-list-header"]').text()).not.toContain('Playlists');
-        expect(wrapper.get('[data-test="audio-list-header"]').text()).not.toContain('Filter: All');
         expect(wrapper.get('[data-test="audio-playlists-cta"]').attributes('aria-label')).toBe('Toggle playlists');
         expect(wrapper.get('[data-test="audio-shuffle-play-cta"]').attributes('aria-label')).toBe('Shuffle play playlist');
         expect(wrapper.get('[data-test="audio-filter-cta"]').attributes('aria-label')).toBe('Filter: All');

@@ -14,6 +14,8 @@ final class MediaProcessorOperation
 
     public const string STREAMABLE_VIDEO = 'streamable_video';
 
+    public const string AUDIO_FINGERPRINT = 'audio_fingerprint';
+
     /**
      * @return list<string>
      */
@@ -24,6 +26,7 @@ final class MediaProcessorOperation
             self::VIDEO_PREVIEW,
             self::AUDIO_NORMALIZATION,
             self::STREAMABLE_VIDEO,
+            self::AUDIO_FINGERPRINT,
         ];
     }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-import { ListFilter, ListMusic, Music, Shuffle } from 'lucide-vue-next';
+import { ListFilter, ListMusic, Music, Shuffle, Tags } from 'lucide-vue-next';
 
 defineProps<{
     activeFilterLabel: string;
@@ -12,6 +12,7 @@ const emit = defineEmits<{
     toggleQueue: [];
     togglePlaylists: [];
     shufflePlay: [];
+    scanMetadata: [];
     openFilter: [];
 }>();
 </script>
@@ -47,6 +48,18 @@ const emit = defineEmits<{
                 @click="emit('shufflePlay')"
             >
                 <Shuffle class="size-5 md:size-4" aria-hidden="true" />
+            </Button>
+            <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                data-test="audio-metadata-scan-cta"
+                class="size-10 md:size-7"
+                aria-label="Scan metadata"
+                title="Scan metadata"
+                @click="emit('scanMetadata')"
+            >
+                <Tags class="size-5 md:size-4" aria-hidden="true" />
             </Button>
         </div>
         <div class="flex items-center gap-2 md:gap-1.5">

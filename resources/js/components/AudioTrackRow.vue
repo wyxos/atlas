@@ -28,6 +28,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     select: [];
+    openDetails: [];
     play: [];
     pause: [];
     reaction: [audioId: number, type: ReactionType];
@@ -139,12 +140,15 @@ const sourceBadgeLabel = computed(() => {
                 </div>
                 <div class="min-w-0">
                     <div class="flex min-w-0 items-center gap-2">
-                        <p
-                            class="min-w-0 truncate text-sm font-medium"
+                        <button
+                            type="button"
+                            class="block min-w-0 truncate text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-300"
                             :class="props.isCurrentTrack ? 'text-smart-blue-100' : 'text-regal-navy-100'"
+                            data-test="audio-track-title"
+                            @click="emit('openDetails')"
                         >
                             {{ props.title }}
-                        </p>
+                        </button>
                         <span
                             v-if="sourceBadgeLabel"
                             class="shrink-0 rounded border border-smart-blue-400/60 bg-smart-blue-950/85 px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none text-smart-blue-100 uppercase"

@@ -33,10 +33,12 @@ const emit = defineEmits<{
     toggleQueue: [];
     togglePlaylists: [];
     shufflePlay: [];
+    scanMetadata: [];
     openFilter: [];
     scroll: [];
     visibleItemsChange: [items: unknown[]];
     select: [audioId: number];
+    openDetails: [audioId: number];
     play: [audioId: number];
     pause: [audioId: number];
     reaction: [audioId: number, type: ReactionType];
@@ -73,6 +75,7 @@ defineExpose({
             @toggle-queue="emit('toggleQueue')"
             @toggle-playlists="emit('togglePlaylists')"
             @shuffle-play="emit('shufflePlay')"
+            @scan-metadata="emit('scanMetadata')"
             @open-filter="emit('openFilter')"
         />
         <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>
@@ -113,6 +116,7 @@ defineExpose({
                         :is-current-track="currentTrackId === audioId"
                         :is-playing="isPlaying && currentTrackId === audioId"
                         @select="emit('select', audioId)"
+                        @open-details="emit('openDetails', audioId)"
                         @play="emit('play', audioId)"
                         @pause="emit('pause', audioId)"
                         @reaction="(audioId, type) => emit('reaction', audioId, type)"
