@@ -58,6 +58,38 @@ function proposalFixture(status: AudioMetadataProposal['status'] = 'pending'): A
     };
 }
 
+function coverProposalFixture(): AudioMetadataProposal {
+    return {
+        id: 22,
+        file_id: 7,
+        run_id: 11,
+        provider: 'musicbrainz_cover_art',
+        status: 'pending',
+        confidence: 82,
+        current_values: {
+            cover_url: '/api/audio/album-covers/7',
+        },
+        proposed_values: {
+            cover_url: 'http://coverartarchive.org/release/release-mbid/front-500.jpg',
+        },
+        changes: {
+            cover_url: {
+                current: '/api/audio/album-covers/7',
+                proposed: 'http://coverartarchive.org/release/release-mbid/front-500.jpg',
+            },
+        },
+        evidence: {
+            source: 'musicbrainz_release_search',
+            matched_existing_fields: ['artists', 'album'],
+            cover_source: 'cover_art_archive',
+        },
+        created_at: null,
+        reviewed_at: null,
+        applied_at: null,
+        ignored_at: null,
+    };
+}
+
 beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
@@ -177,5 +209,73 @@ describe('Audio metadata review', () => {
         expect(document.body.textContent).toContain('No metadata changes found.');
         expect(document.body.textContent).toContain('No pending proposal');
         expect(document.body.textContent).not.toContain('Apply selected');
+    });
+
+    it('previews current and proposed cover changes', async () => {
+        mockAxios.get.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/ids') {
+                return {
+                    data: {
+                        ids: [7],
+                        sources: { 7: 'local' },
+                        source_ids: { 7: null },
+                        spotify_uris: { 7: null },
+                        cursor: { after_id: 0, next_after_id: null, has_more: false, max_id: 7 },
+                        pagination: { per_page: 100, total: 1, total_pages: 1 },
+                    } satisfies AudioIdsResponse,
+                };
+            }
+
+            if (url === '/api/audio/7/metadata-proposals/latest') {
+                return { data: { proposal: coverProposalFixture() } };
+            }
+
+            throw new Error(`Unexpected get URL: ${url}`);
+        });
+
+        mockAxios.post.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/details') {
+                return {
+                    data: {
+                        items: [{
+                            id: 7,
+                            title: 'Original Track',
+                            source: 'local',
+                            source_id: null,
+                            spotify_uri: null,
+                            artists: ['Original Artist'],
+                            albums: ['Original Album'],
+                            cover_url: '/api/audio/album-covers/7',
+                            duration_seconds: null,
+                            reaction: null,
+                            blacklisted_at: null,
+                            previewed_count: 0,
+                            seen_count: 0,
+                        }],
+                    } satisfies AudioDetailsResponse,
+                };
+            }
+
+            throw new Error(`Unexpected post URL: ${url}`);
+        });
+
+        const wrapper = await mountAudio();
+        await flushPromises();
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        await wrapper.get('[data-test="audio-track-title"]').trigger('click');
+        await flushPromises();
+
+        const currentCover = document.body.querySelector('[data-test="audio-metadata-cover-current"]');
+        const proposedCover = document.body.querySelector('[data-test="audio-metadata-cover-proposed"]');
+
+        expect(currentCover).toBeInstanceOf(HTMLImageElement);
+        expect(proposedCover).toBeInstanceOf(HTMLImageElement);
+        expect(currentCover?.getAttribute('src')).toBe('/api/audio/album-covers/7');
+        expect(proposedCover?.getAttribute('src')).toBe('https://coverartarchive.org/release/release-mbid/front-500.jpg');
+        expect(document.body.textContent).toContain('MusicBrainz Cover Art - 82%');
+        expect(document.body.textContent).toContain('MusicBrainz release search / Matched artists, album / Cover Art Archive');
     });
 });

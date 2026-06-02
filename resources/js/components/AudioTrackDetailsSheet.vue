@@ -92,6 +92,23 @@ function formatValue(value: unknown): string {
     return String(value);
 }
 
+function isCoverField(field: string): boolean {
+    return field === 'cover_url';
+}
+
+function coverPreviewUrl(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    return trimmed.replace(/^http:\/\/coverartarchive\.org\//i, 'https://coverartarchive.org/');
+}
+
 function providerLabel(provider: string): string {
     if (provider === 'acoustid_musicbrainz') {
         return 'AcoustID / MusicBrainz';
@@ -253,7 +270,35 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
                                 >
                                 {{ fieldLabel(field) }}
                             </span>
-                            <span class="grid gap-1 pl-6 text-xs">
+                            <span v-if="isCoverField(field)" class="grid grid-cols-2 gap-3 pl-6 text-xs sm:max-w-sm">
+                                <span class="grid gap-1">
+                                    <span class="text-blue-slate-300">Current</span>
+                                    <span class="flex aspect-square w-20 items-center justify-center overflow-hidden rounded border border-twilight-indigo-500 bg-prussian-blue-900 sm:w-24">
+                                        <img
+                                            v-if="coverPreviewUrl(pendingProposal.changes[field]?.current)"
+                                            :src="coverPreviewUrl(pendingProposal.changes[field]?.current) ?? ''"
+                                            alt="Current cover"
+                                            class="h-full w-full object-cover"
+                                            data-test="audio-metadata-cover-current"
+                                        >
+                                        <Tags v-else class="size-5 text-blue-slate-400" aria-hidden="true" />
+                                    </span>
+                                </span>
+                                <span class="grid gap-1">
+                                    <span class="text-smart-blue-100">Proposed</span>
+                                    <span class="flex aspect-square w-20 items-center justify-center overflow-hidden rounded border border-smart-blue-400/60 bg-prussian-blue-900 sm:w-24">
+                                        <img
+                                            v-if="coverPreviewUrl(pendingProposal.changes[field]?.proposed)"
+                                            :src="coverPreviewUrl(pendingProposal.changes[field]?.proposed) ?? ''"
+                                            alt="Proposed cover"
+                                            class="h-full w-full object-cover"
+                                            data-test="audio-metadata-cover-proposed"
+                                        >
+                                        <Tags v-else class="size-5 text-blue-slate-400" aria-hidden="true" />
+                                    </span>
+                                </span>
+                            </span>
+                            <span v-else class="grid gap-1 pl-6 text-xs">
                                 <span class="text-blue-slate-300">Current: {{ formatValue(pendingProposal.changes[field]?.current) }}</span>
                                 <span class="text-smart-blue-100">Proposed: {{ formatValue(pendingProposal.changes[field]?.proposed) }}</span>
                             </span>
