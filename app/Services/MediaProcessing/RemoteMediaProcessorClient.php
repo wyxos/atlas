@@ -75,7 +75,7 @@ class RemoteMediaProcessorClient
             'storage_profile' => $this->storageProfile(),
             'operation' => $operation,
             'input_path' => $inputPath,
-            'output_paths' => $outputPaths,
+            'output_paths' => (object) $outputPaths,
             'options' => $options,
             'callback_url' => URL::to("/api/media-processor/tasks/{$task->id}/events"),
             'websocket_required' => (bool) config('media_processor.websocket_required', true),

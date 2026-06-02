@@ -69,6 +69,22 @@ return [
         'api_base_url' => env('SPOTIFY_API_BASE_URL', 'https://api.spotify.com/v1'),
     ],
 
+    'audio_metadata' => [
+        'fingerprinting_enabled' => env('AUDIO_METADATA_FINGERPRINTING_ENABLED', true),
+        'remote_fingerprinting_enabled' => env('AUDIO_METADATA_REMOTE_FINGERPRINTING_ENABLED', true),
+        'remote_fingerprint_timeout_seconds' => env('AUDIO_METADATA_REMOTE_FINGERPRINT_TIMEOUT_SECONDS', 75),
+        'remote_fingerprint_poll_milliseconds' => env('AUDIO_METADATA_REMOTE_FINGERPRINT_POLL_MILLISECONDS', 250),
+        'local_fingerprinting_enabled' => env('AUDIO_METADATA_LOCAL_FINGERPRINTING_ENABLED', true),
+        'fpcalc_path' => env('AUDIO_METADATA_FPCALC_PATH', 'fpcalc'),
+        'fpcalc_timeout_seconds' => env('AUDIO_METADATA_FPCALC_TIMEOUT_SECONDS', 45),
+        'acoustid_client_key' => env('ACOUSTID_CLIENT_KEY'),
+        'acoustid_api_base_url' => env('ACOUSTID_API_BASE_URL', 'https://api.acoustid.org/v2'),
+        'acoustid_min_score' => env('ACOUSTID_MIN_SCORE', 0.65),
+        'cover_art_archive_base_url' => env('COVER_ART_ARCHIVE_BASE_URL', 'https://coverartarchive.org'),
+        'http_timeout_seconds' => env('AUDIO_METADATA_HTTP_TIMEOUT_SECONDS', 15),
+        'user_agent' => env('AUDIO_METADATA_USER_AGENT', 'Atlas/1.0 (+'.rtrim((string) env('APP_URL', 'http://localhost'), '/').')'),
+    ],
+
     'google_analytics' => [
         'enabled' => env('GOOGLE_ANALYTICS_ENABLED', env('APP_ENV') === 'production'),
         'measurement_id' => env('GOOGLE_ANALYTICS_MEASUREMENT_ID'),

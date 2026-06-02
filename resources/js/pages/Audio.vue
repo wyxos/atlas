@@ -6,15 +6,15 @@ import AudioFilterSheet from '../components/AudioFilterSheet.vue';
 import AudioListShell from '../components/AudioListShell.vue';
 import AudioLoadProgressPanel from '../components/AudioLoadProgressPanel.vue';
 import AudioPlaylistPanelFrame from '../components/AudioPlaylistPanelFrame.vue';
+import AudioTrackDetailsSheet from '../components/AudioTrackDetailsSheet.vue';
 import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
-import { audioDetailFromResponseItem, emptyAudioDetail } from '../composables/useAudioDetailMapping';
 import { useAudioPlaylistPanelOpenState } from '../composables/useAudioPlaylistPanelOpenState';
 import { useAudioPlaybackStatsEvents } from '../composables/useAudioPlaybackStatsEvents';
+import { useAudioMetadataReview } from '../composables/useAudioMetadataReview';
 import { useAudioSourceIdentityMaps } from '../composables/useAudioSourceIdentityMaps';
+import { useAudioVisibleDetails } from '../composables/useAudioVisibleDetails';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '../composables/useGlobalAudioPlayer';
 import type {
-    AudioDetail,
-    AudioDetailsResponse,
     AudioIdsResponse,
     AudioPlaylist,
     AudioPlaylistSection,
@@ -24,7 +24,6 @@ import type {
 import type { ReactionType } from '@/types/reaction';
 
 const PER_PAGE = 100;
-const SCROLL_IDLE_MS = 180;
 const PROGRESS_HIDE_DELAY_MS = 350;
 
 const audioIds = ref<number[]>([]);
@@ -48,8 +47,6 @@ const arePlaylistsLoading = ref(false);
 const playlistsLoaded = ref(false);
 const playlistsError = ref<string | null>(null);
 const showProgressPanel = ref(true);
-const visibleIds = ref<number[]>([]);
-const detailsById = ref<Record<number, AudioDetail>>({});
 const selectedAudioId = ref<number | null>(null);
 const audioListShellRef = ref<InstanceType<typeof AudioListShell> | null>(null);
 const audioPlayer = useGlobalAudioPlayer();
@@ -57,6 +54,16 @@ const playerCurrentTrackId = audioPlayer.currentTrackId;
 const playerIsPlaying = audioPlayer.isPlaying;
 const route = useRoute();
 const router = useRouter();
+const {
+    cancelActiveRequest,
+    detailsById,
+    disposeAudioDetails,
+    fetchAudioDetails,
+    handleVisibleItemsChange,
+    handleVirtualListScroll,
+    queueFetchAfterIdle,
+    resetAudioDetails,
+} = useAudioVisibleDetails(isLoading);
 useAudioPlaybackStatsEvents(detailsById);
 
 const {
@@ -122,10 +129,7 @@ const activePlaylistSlug = computed(() => {
 });
 
 let isDisposed = false;
-let activeRequestToken = 0;
 let activeIdsRequestToken = 0;
-let idleTimeout: ReturnType<typeof setTimeout> | null = null;
-let detailsAbortController: AbortController | null = null;
 let progressHideTimeout: ReturnType<typeof setTimeout> | null = null;
 
 async function fetchChunk(afterId: number, maxId: number | null, playlistSlug: string): Promise<AudioIdsResponse> {
@@ -153,8 +157,7 @@ async function loadAllAudioIds(): Promise<void> {
     loadedPages.value = 0;
     totalPages.value = 0;
     totalAudioFiles.value = 0;
-    visibleIds.value = [];
-    detailsById.value = {};
+    resetAudioDetails();
     showProgressPanel.value = true;
 
     try {
@@ -327,41 +330,6 @@ async function handleAudioBlacklist(audioId: number): Promise<void> {
     };
 }
 
-function cancelActiveRequest() {
-    if (detailsAbortController) {
-        detailsAbortController.abort();
-        detailsAbortController = null;
-    }
-    activeRequestToken += 1;
-}
-
-function queueFetchAfterIdle() {
-    if (isLoading.value) {
-        return;
-    }
-
-    if (idleTimeout) {
-        clearTimeout(idleTimeout);
-    }
-
-    idleTimeout = setTimeout(() => {
-        idleTimeout = null;
-        void fetchVisibleDetails();
-    }, SCROLL_IDLE_MS);
-}
-
-function handleVisibleItemsChange(items: unknown[]) {
-    visibleIds.value = items
-        .map((item) => Number(item))
-        .filter((item) => Number.isInteger(item) && item > 0);
-    queueFetchAfterIdle();
-}
-
-function handleVirtualListScroll() {
-    cancelActiveRequest();
-    queueFetchAfterIdle();
-}
-
 function focusAudioTrackInList(audioId: number): void {
     if (!filteredAudioIds.value.includes(audioId)) {
         return;
@@ -371,57 +339,34 @@ function focusAudioTrackInList(audioId: number): void {
     audioListShellRef.value?.scrollToAudioId(audioId);
 }
 
-async function fetchVisibleDetails(): Promise<void> {
-    const ids = Array.from(new Set(visibleIds.value));
-    const idsToFetch = ids.filter((id) => detailsById.value[id] === undefined);
-
-    if (idsToFetch.length === 0) {
-        return;
-    }
-
-    cancelActiveRequest();
-    const requestToken = activeRequestToken;
-    const controller = new AbortController();
-    detailsAbortController = controller;
-
-    try {
-        const { data } = await window.axios.post<AudioDetailsResponse>('/api/audio/details', {
-            ids: idsToFetch,
-        }, {
-            signal: controller.signal,
-        });
-
-        if (requestToken !== activeRequestToken) {
-            return;
-        }
-
-        const nextDetails = { ...detailsById.value };
-        const returnedIds = new Set<number>();
-
-        for (const item of data.items) {
-            returnedIds.add(item.id);
-            nextDetails[item.id] = audioDetailFromResponseItem(item);
-        }
-
-        for (const id of idsToFetch) {
-            if (returnedIds.has(id)) {
-                continue;
-            }
-
-            nextDetails[id] = emptyAudioDetail();
-        }
-
-        detailsById.value = nextDetails;
-    } catch {
-        if (controller.signal.aborted) {
-            return;
-        }
-    } finally {
-        if (detailsAbortController === controller) {
-            detailsAbortController = null;
-        }
-    }
-}
+const {
+    batchMetadataError,
+    batchMetadataMessage,
+    detailsSheetProposal,
+    detailsSheetTrack,
+    handleAudioDetailsOpen,
+    handleBatchMetadataRun,
+    handleMetadataProposalApply,
+    handleMetadataProposalIgnore,
+    handleTrackMetadataRun,
+    isMetadataProposalLoading,
+    isMetadataProposalReviewing,
+    isMetadataRunStarting,
+    isTrackDetailsSheetOpen,
+    metadataReviewError,
+    metadataReviewMessage,
+} = useAudioMetadataReview({
+    activeFilter,
+    selectedAudioId,
+    hasDetails,
+    fetchAudioDetails,
+    detailTitle,
+    detailArtists,
+    detailAlbum,
+    detailCoverUrl,
+    detailSource,
+    detailDuration,
+});
 
 onMounted(() => {
     void loadAllAudioIds();
@@ -474,13 +419,10 @@ watch(audioPlayer.trackFocusRequest, (request) => {
 
 onUnmounted(() => {
     isDisposed = true;
-    if (idleTimeout) {
-        clearTimeout(idleTimeout);
-    }
     if (progressHideTimeout) {
         clearTimeout(progressHideTimeout);
     }
-    cancelActiveRequest();
+    disposeAudioDetails();
 });
 </script>
 
@@ -492,6 +434,19 @@ onUnmounted(() => {
                 v-model:active-filter="activeFilter"
                 :visible-count="filteredAudioIds.length"
                 :total-count="audioIds.length"
+            />
+            <AudioTrackDetailsSheet
+                v-model:open="isTrackDetailsSheetOpen"
+                :track="detailsSheetTrack"
+                :proposal="detailsSheetProposal"
+                :is-proposal-loading="isMetadataProposalLoading"
+                :is-running="isMetadataRunStarting"
+                :is-reviewing="isMetadataProposalReviewing"
+                :message="metadataReviewMessage"
+                :error="metadataReviewError"
+                @run-metadata="handleTrackMetadataRun"
+                @apply-proposal="handleMetadataProposalApply"
+                @ignore-proposal="handleMetadataProposalIgnore"
             />
 
             <Transition
@@ -512,6 +467,11 @@ onUnmounted(() => {
                     :is-loading="isLoading"
                 />
             </Transition>
+
+            <div v-if="batchMetadataMessage || batchMetadataError" class="border-x border-twilight-indigo-500 bg-prussian-blue-800 px-4 py-2 text-xs">
+                <p v-if="batchMetadataMessage" class="text-smart-blue-100">{{ batchMetadataMessage }}</p>
+                <p v-if="batchMetadataError" class="text-danger-100">{{ batchMetadataError }}</p>
+            </div>
 
             <div v-if="error" class="rounded-lg border border-danger-500 bg-prussian-blue-700 p-4 text-danger-200">
                 {{ error }}
@@ -556,10 +516,12 @@ onUnmounted(() => {
                     @toggle-queue="audioPlayer.toggleQueueSheet"
                     @toggle-playlists="isPlaylistPanelOpen = !isPlaylistPanelOpen"
                     @shuffle-play="audioPlayer.queueAndShufflePlay(audioPlayerQueue(), { queueLabel: activePlaylistLabel })"
+                    @scan-metadata="handleBatchMetadataRun"
                     @open-filter="isFilterSheetOpen = true"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"
                     @select="handleAudioSelect"
+                    @open-details="handleAudioDetailsOpen"
                     @play="handleAudioPlay"
                     @pause="handleAudioPause"
                     @reaction="handleAudioReaction"

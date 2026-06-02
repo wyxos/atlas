@@ -122,6 +122,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('/api/audio/playlists/{playlist}/cover', [\App\Http\Controllers\AudioPlaylistController::class, 'updateCover'])->name('api.audio.playlists.cover.update');
     Route::get('/api/audio/ids', [\App\Http\Controllers\AudioController::class, 'ids'])->name('api.audio.ids');
     Route::post('/api/audio/details', [\App\Http\Controllers\AudioController::class, 'details'])->name('api.audio.details');
+    Route::post('/api/audio/metadata-runs', [\App\Http\Controllers\AudioMetadataController::class, 'store'])->name('api.audio.metadata-runs.store');
+    Route::get('/api/audio/metadata-runs/{audioMetadataRun}', [\App\Http\Controllers\AudioMetadataController::class, 'showRun'])->name('api.audio.metadata-runs.show');
+    Route::patch('/api/audio/metadata-proposals/{audioMetadataProposal}', [\App\Http\Controllers\AudioMetadataController::class, 'review'])->name('api.audio.metadata-proposals.review');
+    Route::get('/api/audio/{file}/metadata-proposals/latest', [\App\Http\Controllers\AudioMetadataController::class, 'latestForFile'])->name('api.audio.files.metadata-proposals.latest');
+    Route::post('/api/audio/{file}/metadata-runs', [\App\Http\Controllers\AudioMetadataController::class, 'storeForFile'])->name('api.audio.files.metadata-runs.store');
     Route::post('/api/audio/playback-events', [\App\Http\Controllers\AudioPlaybackEventController::class, 'store'])->name('api.audio.playback-events.store');
     Route::get('/api/audio/album-covers/{albumCover}', [\App\Http\Controllers\AlbumCoverController::class, 'show'])->name('api.audio.album-covers.show');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');

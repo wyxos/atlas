@@ -61,6 +61,29 @@ it('submits downloaded video preview work to the remote processor with managed h
     });
 });
 
+it('submits no-output processor tasks with an empty output path object', function () {
+    configureRemoteMediaProcessor();
+    Http::fake([
+        'processor.test/tasks' => Http::response(['accepted' => true], 202),
+    ]);
+
+    $file = File::factory()->create([
+        'path' => 'imports/aa/aa/audio.aac',
+        'mime_type' => 'audio/x-m4a',
+    ]);
+
+    app(\App\Services\MediaProcessing\RemoteMediaProcessorClient::class)->submit(
+        $file,
+        MediaProcessorOperation::AUDIO_FINGERPRINT,
+        'imports/aa/aa/audio.aac',
+        [],
+    );
+
+    Http::assertSent(function ($request): bool {
+        return str_contains($request->body(), '"output_paths":{}');
+    });
+});
+
 it('submits GIF image preview work with an animated preview extension', function () {
     configureRemoteMediaProcessor();
     Http::fake([

@@ -68,3 +68,45 @@ export type AudioPlaylistSection = {
 export type AudioPlaylistsResponse = {
     sections: AudioPlaylistSection[];
 };
+
+export type AudioMetadataChange = {
+    current: unknown;
+    proposed: unknown;
+};
+
+export type AudioMetadataProposal = {
+    id: number;
+    file_id: number;
+    run_id: number;
+    provider: string;
+    status: 'pending' | 'applied' | 'ignored' | 'superseded' | string;
+    confidence: number;
+    current_values: Record<string, unknown>;
+    proposed_values: Record<string, unknown>;
+    changes: Record<string, AudioMetadataChange>;
+    evidence: Record<string, unknown>;
+    created_at: string | null;
+    reviewed_at: string | null;
+    applied_at: string | null;
+    ignored_at: string | null;
+};
+
+export type AudioMetadataRun = {
+    id: number;
+    scope: string;
+    source_filter: string;
+    status: string;
+    total_files: number;
+    processed_files: number;
+    proposal_count: number;
+    failed_files: number;
+    error: string | null;
+    created_at: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+};
+
+export type AudioMetadataRunResponse = {
+    run: AudioMetadataRun;
+    proposal?: AudioMetadataProposal | null;
+};
