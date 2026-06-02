@@ -125,6 +125,38 @@ export function canRestartDownloadQueueItem(item: DownloadQueueItem): boolean {
     return item.can_restart ?? ['failed', 'canceled', 'completed'].includes(item.status);
 }
 
+export function normalizeDownloadQueueSourceUrl(value: string | null | undefined): string | null {
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    if (trimmed === '' || !/^https?:\/\//i.test(trimmed)) {
+        return null;
+    }
+
+    try {
+        const url = new URL(trimmed);
+
+        return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+    } catch {
+        return null;
+    }
+}
+
+export function getFailedDownloadQueueSourceUrls(items: DownloadQueueItem[]): string[] {
+    const urls = new Set<string>();
+
+    items.forEach((item) => {
+        if (item.status !== 'failed') {
+            return;
+        }
+
+        const url = normalizeDownloadQueueSourceUrl(item.referrer_url);
+        if (url !== null) {
+            urls.add(url);
+        }
+    });
+
+    return Array.from(urls);
+}
+
 function pad2(value: number): string {
     return value.toString().padStart(2, '0');
 }

@@ -12,6 +12,7 @@ import {
     canResumeDownloadQueueItem,
     compareDownloadQueueItems,
     downloadQueueItemMatchesSearch,
+    getFailedDownloadQueueSourceUrls,
 } from '@/utils/downloadQueue';
 import { DEFAULT_DOWNLOAD_QUEUE_SORT } from '@/types/downloadQueue';
 
@@ -83,6 +84,7 @@ export function useDownloadsQueueTableState(params: {
             .filter((item) => item.status === 'failed' && item.can_restart)
             .map((item) => item.id),
     );
+    const failedSourceUrls = computed(() => getFailedDownloadQueueSourceUrls(params.downloads.value));
     const completedIds = computed(() =>
         params.downloads.value.filter((item) => item.status === 'completed').map((item) => item.id),
     );
@@ -240,6 +242,7 @@ export function useDownloadsQueueTableState(params: {
         lastSelectedId,
         resumableFailedIds,
         restartableFailedIds,
+        failedSourceUrls,
         completedIds,
         allFilteredSelected,
         someFilteredSelected,

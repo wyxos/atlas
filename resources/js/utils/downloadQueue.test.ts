@@ -3,6 +3,7 @@ import {
     canRestartDownloadQueueItem,
     canResumeDownloadQueueItem,
     downloadQueueItemMatchesSearch,
+    getFailedDownloadQueueSourceUrls,
 } from '@/utils/downloadQueue';
 import type { DownloadQueueItem } from '@/types/downloadQueue';
 
@@ -52,5 +53,35 @@ describe('downloadQueue search', () => {
 
         expect(downloadQueueItemMatchesSearch(item, 'cvta')).toBe(true);
         expect(downloadQueueItemMatchesSearch(item, 'ct')).toBe(false);
+    });
+});
+
+describe('downloadQueue failed source URLs', () => {
+    it('collects unique valid source pages for failed downloads only', () => {
+        expect(getFailedDownloadQueueSourceUrls([
+            makeItem({
+                id: 1,
+                status: 'failed',
+                referrer_url: ' https://www.deviantart.com/artist/art/example ',
+                url: 'https://expired-media.example.test/file.jpg?token=old',
+            }),
+            makeItem({
+                id: 2,
+                status: 'failed',
+                referrer_url: 'https://www.deviantart.com/artist/art/example',
+            }),
+            makeItem({
+                id: 3,
+                status: 'failed',
+                referrer_url: 'javascript:alert(1)',
+            }),
+            makeItem({
+                id: 4,
+                status: 'queued',
+                referrer_url: 'https://www.deviantart.com/artist/art/queued',
+            }),
+        ])).toEqual([
+            'https://www.deviantart.com/artist/art/example',
+        ]);
     });
 });

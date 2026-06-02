@@ -34,6 +34,7 @@ interface Props {
     batchIsRestarting: boolean;
     batchIsResumingFailed: boolean;
     batchIsRestartingFailed: boolean;
+    failedSourceUrlCount: number;
     removeIsDeleting: boolean;
 }
 
@@ -42,6 +43,7 @@ defineProps<Props>();
 defineEmits<{
     selectStatus: [status: DownloadQueueFilterStatus];
     'update:searchQuery': [query: string];
+    openFailedSourcePages: [];
     resumeFailed: [];
     restartFailed: [];
     removeCompleted: [];
@@ -109,10 +111,10 @@ defineEmits<{
                 Selected: {{ selectedCount }} | In filter: {{ selectedInFilterCount }}
             </span>
             <div
-                v-if="selectedCount || filteredCount || resumableFailedCount || restartableFailedCount || completedCount"
+                v-if="selectedCount || filteredCount || resumableFailedCount || restartableFailedCount || failedSourceUrlCount || completedCount"
                 class="flex items-center gap-2"
             >
-                <DropdownMenu v-if="filteredCount || resumableFailedCount || restartableFailedCount || completedCount">
+                <DropdownMenu v-if="filteredCount || resumableFailedCount || restartableFailedCount || failedSourceUrlCount || completedCount">
                     <DropdownMenuTrigger as-child>
                         <Button variant="outline" size="sm" class="gap-2">
                             <span>All actions</span>
@@ -126,6 +128,14 @@ defineEmits<{
                         <DropdownMenuLabel class="text-smart-blue-100">
                             Queue and filter actions
                         </DropdownMenuLabel>
+                        <DropdownMenuSeparator class="bg-twilight-indigo-500" />
+                        <DropdownMenuItem
+                            :disabled="failedSourceUrlCount === 0"
+                            class="cursor-pointer focus:bg-smart-blue-700/50 focus:text-white"
+                            @select="$emit('openFailedSourcePages')"
+                        >
+                            {{ `Open failed source pages (${failedSourceUrlCount})` }}
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator class="bg-twilight-indigo-500" />
                         <DropdownMenuItem
                             :disabled="batchIsResumingFailed || resumableFailedCount === 0"
