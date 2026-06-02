@@ -80,9 +80,16 @@ return [
         'acoustid_client_key' => env('ACOUSTID_CLIENT_KEY'),
         'acoustid_api_base_url' => env('ACOUSTID_API_BASE_URL', 'https://api.acoustid.org/v2'),
         'acoustid_min_score' => env('ACOUSTID_MIN_SCORE', 0.65),
+        'musicbrainz_api_base_url' => env('MUSICBRAINZ_API_BASE_URL', 'https://musicbrainz.org'),
         'cover_art_archive_base_url' => env('COVER_ART_ARCHIVE_BASE_URL', 'https://coverartarchive.org'),
         'http_timeout_seconds' => env('AUDIO_METADATA_HTTP_TIMEOUT_SECONDS', 15),
         'user_agent' => env('AUDIO_METADATA_USER_AGENT', 'Atlas/1.0 (+'.rtrim((string) env('APP_URL', 'http://localhost'), '/').')'),
+        'ai_enabled' => env('AUDIO_METADATA_AI_ENABLED', true),
+        'ai_driver' => env('AUDIO_METADATA_AI_DRIVER', 'gateway'),
+        'ai_base_url' => env('AUDIO_METADATA_AI_BASE_URL'),
+        'ai_token' => env('AUDIO_METADATA_AI_TOKEN'),
+        'ai_model' => env('AUDIO_METADATA_AI_MODEL', 'qwen2.5:3b'),
+        'ai_timeout_seconds' => env('AUDIO_METADATA_AI_TIMEOUT', 90),
     ],
 
     'google_analytics' => [

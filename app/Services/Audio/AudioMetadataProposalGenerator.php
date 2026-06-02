@@ -16,6 +16,8 @@ class AudioMetadataProposalGenerator
 {
     public function __construct(
         private readonly AudioCoverResolver $coverResolver,
+        private readonly AudioMetadataAiReviewer $aiReviewer,
+        private readonly AudioMetadataCoverLookupProvider $coverLookup,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
         private readonly AudioMetadataValueExtractor $values,
         private readonly SpotifyOAuthConfig $spotifyConfig,
@@ -33,7 +35,11 @@ class AudioMetadataProposalGenerator
         $currentValues = $this->currentValues($file);
         $candidate = $this->isSpotifyFile($file)
             ? $this->spotifyCandidate($file, $user)
-            : $this->localCandidate($file);
+            : $this->localCandidate($file, $currentValues);
+
+        if ($candidate === null) {
+            return null;
+        }
 
         $proposedValues = $candidate['values'];
         if ($proposedValues === []) {
@@ -93,28 +99,93 @@ class AudioMetadataProposalGenerator
     }
 
     /**
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
+     * @param  array<string, mixed>  $currentValues
+     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null
      */
-    private function localCandidate(File $file): array
+    private function localCandidate(File $file, array $currentValues): ?array
     {
+        $candidates = [];
+
         $fingerprintCandidate = $this->fingerprintProvider->candidate($file);
+        if ($fingerprintCandidate !== null) {
+            $fingerprintCandidate = $this->reviewFingerprintCandidate($file, $currentValues, $fingerprintCandidate);
+            if ($fingerprintCandidate !== null) {
+                $candidates[] = $fingerprintCandidate;
+            }
+        }
+
+        $coverCandidate = $this->coverLookup->candidate($file, $currentValues);
+        if ($coverCandidate !== null) {
+            $candidates[] = $coverCandidate;
+        }
+
         $tagCandidate = $this->localTagCandidate($file);
-
-        if ($fingerprintCandidate === null) {
-            return $tagCandidate;
+        if ($tagCandidate['values'] !== []) {
+            $candidates[] = $tagCandidate;
         }
 
-        if ($tagCandidate['values'] === []) {
-            return $fingerprintCandidate;
+        $candidate = collect($candidates)
+            ->filter(fn (array $candidate): bool => $this->changes($currentValues, $candidate['values']) !== [])
+            ->sortByDesc(fn (array $candidate): int => $this->candidatePriority($candidate))
+            ->first();
+
+        return is_array($candidate) ? $candidate : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null
+     */
+    private function reviewFingerprintCandidate(File $file, array $currentValues, array $candidate): ?array
+    {
+        if ($this->fingerprintCandidateHasIdentitySupport($candidate)) {
+            return $candidate;
         }
 
-        if ($fingerprintCandidate['confidence'] >= 65) {
-            return $fingerprintCandidate;
+        $changes = $this->changes($currentValues, $candidate['values']);
+        if ($changes === []) {
+            return null;
         }
 
-        return $fingerprintCandidate['confidence'] >= $tagCandidate['confidence']
-            ? $fingerprintCandidate
-            : $tagCandidate;
+        $review = $this->aiReviewer->review($file, $currentValues, $candidate, $changes);
+        if (($review['verdict'] ?? null) !== 'accept') {
+            return null;
+        }
+
+        $candidate['evidence']['ai_review'] = $review;
+        if (is_numeric($review['confidence'] ?? null)) {
+            $candidate['confidence'] = max(60, min(92, (int) round(((float) $review['confidence']) * 100)));
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     */
+    private function fingerprintCandidateHasIdentitySupport(array $candidate): bool
+    {
+        if (($candidate['provider'] ?? null) !== 'acoustid_musicbrainz') {
+            return true;
+        }
+
+        return in_array($candidate['evidence']['identity_support'] ?? null, ['matched_existing_identity', 'release_with_cover'], true);
+    }
+
+    /**
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     */
+    private function candidatePriority(array $candidate): int
+    {
+        $providerPriority = match ($candidate['provider']) {
+            'acoustid_musicbrainz' => 300,
+            'musicbrainz_cover_art' => 220,
+            'spotify' => 250,
+            default => 100,
+        };
+
+        return $providerPriority + (int) $candidate['confidence'];
     }
 
     /**

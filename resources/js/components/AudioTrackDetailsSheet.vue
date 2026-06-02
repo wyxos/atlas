@@ -97,6 +97,10 @@ function providerLabel(provider: string): string {
         return 'AcoustID / MusicBrainz';
     }
 
+    if (provider === 'musicbrainz_cover_art') {
+        return 'MusicBrainz Cover Art';
+    }
+
     return provider
         .split(/[_\s-]+/)
         .filter(Boolean)
@@ -110,6 +114,9 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
     const source = typeof evidence.source === 'string' ? evidence.source : null;
     const acoustidScore = typeof evidence.acoustid_score === 'number' ? evidence.acoustid_score : null;
     const durationDelta = typeof evidence.duration_delta_seconds === 'number' ? evidence.duration_delta_seconds : null;
+    const matchedFields = Array.isArray(evidence.matched_existing_fields)
+        ? evidence.matched_existing_fields.filter((field): field is string => typeof field === 'string')
+        : [];
 
     if (acoustidScore !== null) {
         items.push(`Fingerprint ${acoustidScore}%`);
@@ -117,6 +124,12 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
         items.push('Embedded tags');
     } else if (source === 'filename') {
         items.push('Filename fallback');
+    } else if (source === 'musicbrainz_release_search') {
+        items.push('MusicBrainz release search');
+    }
+
+    if (matchedFields.length > 0) {
+        items.push(`Matched ${matchedFields.join(', ')}`);
     }
 
     if (typeof evidence.musicbrainz_recording_id === 'string') {
@@ -129,6 +142,16 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
 
     if (evidence.cover_source === 'cover_art_archive') {
         items.push('Cover Art Archive');
+    }
+
+    const aiReview = evidence.ai_review;
+    if (
+        aiReview !== null
+        && typeof aiReview === 'object'
+        && 'verdict' in aiReview
+        && typeof aiReview.verdict === 'string'
+    ) {
+        items.push(`AI ${aiReview.verdict}`);
     }
 
     return items;

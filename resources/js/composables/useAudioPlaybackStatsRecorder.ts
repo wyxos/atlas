@@ -66,16 +66,17 @@ export function useAudioPlaybackStatsRecorder(audioPlayer: GlobalAudioPlayer) {
         naturallyEndedTrackIds.add(trackId);
         countedPlayTrackId = null;
         countedSkipTrackId = null;
+        recordPlayIfNeeded(trackId);
 
         if (audioPlayer.repeatMode.value !== 'one') {
             return;
         }
 
         naturallyEndedTrackIds.delete(trackId);
-        recordPlayIfNeeded(trackId);
+        countedPlayTrackId = null;
     }
 
-    watch([audioPlayer.currentTrackId, audioPlayer.isPlaying], ([trackId, playing], [oldTrackId, wasPlaying]) => {
+    watch([audioPlayer.currentTrackId, audioPlayer.isPlaying], ([trackId], [oldTrackId, wasPlaying]) => {
         if (!isActiveRecorder()) {
             return;
         }
@@ -90,10 +91,6 @@ export function useAudioPlaybackStatsRecorder(audioPlayer: GlobalAudioPlayer) {
         if (previousTrackId !== trackId) {
             countedPlayTrackId = null;
             countedSkipTrackId = null;
-        }
-
-        if (trackId !== null && playing) {
-            recordPlayIfNeeded(trackId);
         }
     }, { immediate: true, flush: 'sync' });
 

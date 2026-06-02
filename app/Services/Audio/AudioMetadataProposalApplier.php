@@ -3,13 +3,18 @@
 namespace App\Services\Audio;
 
 use App\Models\Album;
+use App\Models\AlbumCover;
 use App\Models\Artist;
 use App\Models\AudioMetadataProposal;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\User;
+use App\Support\AtlasStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class AudioMetadataProposalApplier
 {
@@ -79,7 +84,9 @@ class AudioMetadataProposalApplier
         if (in_array('cover_url', $fields, true)) {
             $coverUrl = $this->cleanString($proposed['cover_url'] ?? null);
             if ($coverUrl !== null) {
-                $file->forceFill(['preview_url' => $coverUrl]);
+                if (! $this->applyAlbumCoverUrl($file, $coverUrl)) {
+                    $file->forceFill(['preview_url' => $coverUrl]);
+                }
             }
         }
 
@@ -91,6 +98,64 @@ class AudioMetadataProposalApplier
         }
 
         $file->save();
+    }
+
+    private function applyAlbumCoverUrl(File $file, string $coverUrl): bool
+    {
+        $album = $file->albums->first();
+        if (! $album instanceof Album) {
+            return false;
+        }
+
+        try {
+            $response = Http::timeout((int) config('services.audio_metadata.http_timeout_seconds', 15))
+                ->get($coverUrl);
+        } catch (Throwable) {
+            return false;
+        }
+
+        if (! $response->successful()) {
+            return false;
+        }
+
+        $mimeType = $this->imageMimeType($response->header('content-type'));
+        if ($mimeType === null) {
+            return false;
+        }
+
+        $body = $response->body();
+        if ($body === '') {
+            return false;
+        }
+
+        $hash = hash('sha256', $body);
+        $extension = $this->imageExtension($mimeType);
+        $path = "imports/audio-metadata-covers/album-{$album->id}/{$hash}.{$extension}";
+
+        $disk = Storage::disk(AtlasStorage::DISK);
+        if (! $disk->exists($path)) {
+            $disk->put($path, $body);
+        }
+
+        AlbumCover::query()
+            ->where('album_id', $album->id)
+            ->update(['is_default' => false]);
+
+        AlbumCover::query()->updateOrCreate([
+            'album_id' => $album->id,
+            'path_hash' => hash('sha256', $path),
+        ], [
+            'file_id' => $file->id,
+            'path' => $path,
+            'hash' => $hash,
+            'size' => strlen($body),
+            'mime_type' => $mimeType,
+            'picture_type' => 'front',
+            'sort_order' => 0,
+            'is_default' => true,
+        ]);
+
+        return true;
     }
 
     /**
@@ -223,6 +288,26 @@ class AudioMetadataProposalApplier
         $clean = preg_replace('/\s+/', ' ', trim((string) $value)) ?? '';
 
         return $clean !== '' ? $clean : null;
+    }
+
+    private function imageMimeType(?string $header): ?string
+    {
+        if (! is_string($header) || trim($header) === '') {
+            return null;
+        }
+
+        $mimeType = mb_strtolower(trim(explode(';', $header, 2)[0]));
+
+        return in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true) ? $mimeType : null;
+    }
+
+    private function imageExtension(string $mimeType): string
+    {
+        return match ($mimeType) {
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => 'jpg',
+        };
     }
 
     /**

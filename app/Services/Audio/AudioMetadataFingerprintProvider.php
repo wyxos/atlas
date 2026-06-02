@@ -281,6 +281,13 @@ class AudioMetadataFingerprintProvider
             $confidence += 2;
         }
 
+        $identitySupport = $this->identitySupport($matchedFields, $release, $coverUrl);
+        if ($identitySupport === 'weak') {
+            $confidence = min($confidence, 74);
+        } elseif ($identitySupport === 'release_only') {
+            $confidence = min($confidence, 84);
+        }
+
         return [
             'confidence' => max(60, min(96, $confidence)),
             'evidence' => [
@@ -294,6 +301,7 @@ class AudioMetadataFingerprintProvider
                 'musicbrainz_release_id' => $this->cleanString($release['id'] ?? null),
                 'duration_delta_seconds' => $durationDelta,
                 'matched_existing_fields' => $matchedFields,
+                'identity_support' => $identitySupport,
                 'cover_source' => $coverUrl !== null ? 'cover_art_archive' : null,
             ],
         ];
@@ -305,11 +313,20 @@ class AudioMetadataFingerprintProvider
     private function metadataHints(File $file): array
     {
         $payload = $this->values->metadataPayload($file);
+        $artists = $this->values->extractNames($payload, ['artist', 'artists', 'album_artist', 'albumArtist', 'albumartist', 'performer']);
+        if ($artists === []) {
+            $artists = $file->artists
+                ->map(fn ($artist): ?string => $this->cleanString($artist->name ?? null))
+                ->filter()
+                ->values()
+                ->all();
+        }
 
         return [
-            'title' => $this->values->firstStringForKeys($payload, ['title']),
-            'artists' => $this->values->extractNames($payload, ['artist', 'artists', 'album_artist', 'albumArtist', 'albumartist', 'performer']),
-            'album' => $this->values->firstStringForKeys($payload, ['album', 'albums']),
+            'title' => $this->values->firstStringForKeys($payload, ['title']) ?? $this->cleanString($file->title),
+            'artists' => $artists,
+            'album' => $this->values->firstStringForKeys($payload, ['album', 'albums'])
+                ?? $this->cleanString($file->albums->first()?->name ?? null),
             'duration_seconds' => $this->values->durationSeconds($file, $payload),
         ];
     }
@@ -342,6 +359,27 @@ class AudioMetadataFingerprintProvider
     private function acoustIdScore(array $result): float
     {
         return is_numeric($result['score'] ?? null) ? (float) $result['score'] : 0.0;
+    }
+
+    /**
+     * @param  list<string>  $matchedFields
+     * @param  array<string, mixed>  $release
+     */
+    private function identitySupport(array $matchedFields, array $release, ?string $coverUrl): string
+    {
+        if (array_values(array_intersect($matchedFields, ['title', 'artists', 'album'])) !== []) {
+            return 'matched_existing_identity';
+        }
+
+        if ($this->cleanString($release['id'] ?? null) !== null && $coverUrl !== null) {
+            return 'release_with_cover';
+        }
+
+        if ($this->cleanString($release['id'] ?? null) !== null) {
+            return 'release_only';
+        }
+
+        return 'weak';
     }
 
     private function stringsMatch(mixed $left, mixed $right): bool
