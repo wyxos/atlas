@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockConnectRuntimeReverb = vi.fn();
-const mockWaitForReverbState = vi.fn();
+const mockResolveRuntimeReverbAvailability = vi.fn();
 
 vi.mock('./reverb-runtime', () => ({
-    connectRuntimeReverb: mockConnectRuntimeReverb,
-    waitForReverbState: mockWaitForReverbState,
+    resolveRuntimeReverbAvailability: mockResolveRuntimeReverbAvailability,
 }));
 
 describe('resolveApiConnectionStatus', () => {
@@ -60,105 +58,25 @@ describe('resolveApiConnectionStatus', () => {
             },
         ],
         [
-            'disconnected runtime',
+            'available runtime',
             {
-                kind: 'disconnected',
+                kind: 'available',
                 domain: 'https://atlas.test',
                 endpoint: 'wss://atlas.test/reverb',
-                detail: 'socket closed',
+                config: {},
             },
             {
                 label: 'Ready',
                 detail: 'Connected to https://atlas.test',
-                reverbLabel: 'Disconnected',
-                reverbDetail: 'socket closed',
+                reverbLabel: 'Available',
+                reverbDetail: 'Reverb config is available.',
                 reverbEndpoint: 'wss://atlas.test/reverb',
             },
         ],
     ])('maps the %s runtime result', async (_label, runtimeResult, expected) => {
-        mockConnectRuntimeReverb.mockResolvedValueOnce(runtimeResult);
+        mockResolveRuntimeReverbAvailability.mockResolvedValueOnce(runtimeResult);
 
         const { resolveApiConnectionStatus } = await import('./atlas-api');
         await expect(resolveApiConnectionStatus()).resolves.toEqual(expected);
-        expect(mockWaitForReverbState).not.toHaveBeenCalled();
-    });
-
-    it('maps a fully connected runtime result and disconnects the probe client', async () => {
-        const client = {
-            disconnect: vi.fn(),
-        };
-        mockConnectRuntimeReverb.mockResolvedValueOnce({
-            kind: 'connected',
-            domain: 'https://atlas.test',
-            endpoint: 'wss://atlas.test/reverb',
-            client,
-        });
-        mockWaitForReverbState.mockResolvedValueOnce({
-            state: 'connected',
-            error: null,
-        });
-
-        const { resolveApiConnectionStatus } = await import('./atlas-api');
-        await expect(resolveApiConnectionStatus()).resolves.toEqual({
-            label: 'Ready',
-            detail: 'Connected to https://atlas.test',
-            reverbLabel: 'Connected',
-            reverbDetail: 'Reverb websocket connected.',
-            reverbEndpoint: 'wss://atlas.test/reverb',
-        });
-        expect(mockWaitForReverbState).toHaveBeenCalledWith(client);
-        expect(client.disconnect).toHaveBeenCalledTimes(1);
-    });
-
-    it('maps a timed out websocket state to a disconnected reverb detail', async () => {
-        const client = {
-            disconnect: vi.fn(),
-        };
-        mockConnectRuntimeReverb.mockResolvedValueOnce({
-            kind: 'connected',
-            domain: 'https://atlas.test',
-            endpoint: 'wss://atlas.test/reverb',
-            client,
-        });
-        mockWaitForReverbState.mockResolvedValueOnce({
-            state: 'timeout',
-            error: null,
-        });
-
-        const { resolveApiConnectionStatus } = await import('./atlas-api');
-        await expect(resolveApiConnectionStatus()).resolves.toEqual({
-            label: 'Ready',
-            detail: 'Connected to https://atlas.test',
-            reverbLabel: 'Disconnected',
-            reverbDetail: 'Reverb websocket timed out.',
-            reverbEndpoint: 'wss://atlas.test/reverb',
-        });
-        expect(client.disconnect).toHaveBeenCalledTimes(1);
-    });
-
-    it('includes the websocket error when a connected runtime settles in a failed state', async () => {
-        const client = {
-            disconnect: vi.fn(),
-        };
-        mockConnectRuntimeReverb.mockResolvedValueOnce({
-            kind: 'connected',
-            domain: 'https://atlas.test',
-            endpoint: 'wss://atlas.test/reverb',
-            client,
-        });
-        mockWaitForReverbState.mockResolvedValueOnce({
-            state: 'failed',
-            error: 'socket refused',
-        });
-
-        const { resolveApiConnectionStatus } = await import('./atlas-api');
-        await expect(resolveApiConnectionStatus()).resolves.toEqual({
-            label: 'Ready',
-            detail: 'Connected to https://atlas.test',
-            reverbLabel: 'Disconnected',
-            reverbDetail: 'Reverb websocket state: failed. socket refused',
-            reverbEndpoint: 'wss://atlas.test/reverb',
-        });
-        expect(client.disconnect).toHaveBeenCalledTimes(1);
     });
 });

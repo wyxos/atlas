@@ -1,8 +1,10 @@
 import { getStoredConnectionOptions } from './atlas-options';
-import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth } from './atlas-auth';
+import { hasAtlasApiAuth } from './atlas-auth';
 import { connectReverb, type ReverbClient, type ReverbConnectionState } from './reverb-client';
 import { requestAtlasViaRuntime } from './atlas-runtime-request';
 import { createExtensionReverbAuthConfig, formatReverbEndpoint, parseReverbConfig } from './reverb-config';
+import { fetchCachedReverbPing, type ReverbPingPayload } from './reverb-ping-cache';
+import type { ReverbConfig } from './reverb-types';
 
 type RuntimeReverbStatus =
     | { kind: 'setup_required' }
@@ -12,46 +14,66 @@ type RuntimeReverbStatus =
     | { kind: 'connected'; domain: string; endpoint: string | null; client: ReverbClient }
     | { kind: 'disconnected'; domain: string; endpoint: string | null; detail: string };
 
-type ReverbPingResponse = {
-    reverb?: unknown;
+type RuntimeReverbAvailabilityStatus =
+    | { kind: 'setup_required' }
+    | { kind: 'auth_failed' }
+    | { kind: 'offline' }
+    | { kind: 'reverb_unavailable'; domain: string; endpoint: string | null }
+    | { kind: 'available'; domain: string; apiToken: string; endpoint: string | null; config: ReverbConfig };
+
+type StoredReverbConnection = {
+    atlasDomain: string;
+    apiToken: string;
 };
 
-async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
+async function loadRuntimeReverbPing(stored: StoredReverbConnection): Promise<{
+    kind: 'ok';
+    payload: ReverbPingPayload | null;
+} | {
+    kind: 'auth_failed' | 'offline';
+}> {
+    const pingEndpoint = `${stored.atlasDomain}/api/extension/ping`;
+    const runtimeResponse = await requestAtlasViaRuntime({
+        endpoint: pingEndpoint,
+        atlasDomain: stored.atlasDomain,
+        apiToken: stored.apiToken,
+        method: 'GET',
+    });
+    if (runtimeResponse !== null) {
+        if (!runtimeResponse.ok) {
+            return { kind: runtimeResponse.status === 0 ? 'offline' : 'auth_failed' };
+        }
+
+        return {
+            kind: 'ok',
+            payload: runtimeResponse.payload as ReverbPingPayload | null,
+        };
+    }
+
+    const directResponse = await fetchCachedReverbPing(stored.atlasDomain, stored.apiToken);
+    if (!directResponse.ok) {
+        return { kind: directResponse.status === 0 ? 'offline' : 'auth_failed' };
+    }
+
+    return {
+        kind: 'ok',
+        payload: directResponse.payload,
+    };
+}
+
+async function resolveRuntimeReverbAvailability(): Promise<RuntimeReverbAvailabilityStatus> {
     try {
         const stored = await getStoredConnectionOptions();
         if (!hasAtlasApiAuth(stored.atlasDomain, stored.apiToken)) {
             return { kind: 'setup_required' };
         }
 
-        const pingEndpoint = `${stored.atlasDomain}/api/extension/ping`;
-        let payload: ReverbPingResponse | null = null;
-        const runtimeResponse = await requestAtlasViaRuntime({
-            endpoint: pingEndpoint,
-            atlasDomain: stored.atlasDomain,
-            apiToken: stored.apiToken,
-            method: 'GET',
-        });
-        if (runtimeResponse !== null) {
-            if (!runtimeResponse.ok) {
-                return { kind: 'auth_failed' };
-            }
-
-            payload = runtimeResponse.payload as ReverbPingResponse;
-        } else {
-            const response = await fetch(pingEndpoint, {
-                method: 'GET',
-                headers: createAtlasApiHeaders(stored.apiToken),
-                ...createAtlasFetchAuthOptions(stored.apiToken),
-            });
-
-            if (!response.ok) {
-                return { kind: 'auth_failed' };
-            }
-
-            payload = await response.json() as ReverbPingResponse;
+        const ping = await loadRuntimeReverbPing(stored);
+        if (ping.kind !== 'ok') {
+            return { kind: ping.kind };
         }
 
-        const config = parseReverbConfig(payload.reverb);
+        const config = parseReverbConfig(ping.payload?.reverb);
         const endpoint = formatReverbEndpoint(config);
 
         if (!config || !config.enabled) {
@@ -62,31 +84,50 @@ async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
             };
         }
 
+        return {
+            kind: 'available',
+            domain: stored.atlasDomain,
+            apiToken: stored.apiToken,
+            endpoint,
+            config,
+        };
+    } catch {
+        return { kind: 'offline' };
+    }
+}
+
+async function connectRuntimeReverb(): Promise<RuntimeReverbStatus> {
+    try {
+        const runtime = await resolveRuntimeReverbAvailability();
+        if (runtime.kind !== 'available') {
+            return runtime;
+        }
+
         try {
             const client = await connectReverb({
-                ...config,
-                auth: createExtensionReverbAuthConfig(stored.atlasDomain, stored.apiToken),
+                ...runtime.config,
+                auth: createExtensionReverbAuthConfig(runtime.domain, runtime.apiToken),
             });
             if (!client) {
                 return {
                     kind: 'disconnected',
-                    domain: stored.atlasDomain,
-                    endpoint,
+                    domain: runtime.domain,
+                    endpoint: runtime.endpoint,
                     detail: 'Unable to initialize Reverb client.',
                 };
             }
 
             return {
                 kind: 'connected',
-                domain: stored.atlasDomain,
-                endpoint,
+                domain: runtime.domain,
+                endpoint: runtime.endpoint,
                 client,
             };
         } catch (error) {
             return {
                 kind: 'disconnected',
-                domain: stored.atlasDomain,
-                endpoint,
+                domain: runtime.domain,
+                endpoint: runtime.endpoint,
                 detail: error instanceof Error && error.message.trim() !== ''
                     ? `Reverb connection failed: ${error.message}`
                     : 'Reverb connection failed.',
@@ -148,6 +189,8 @@ export {
     connectRuntimeReverb,
     formatReverbEndpoint,
     parseReverbConfig,
+    resolveRuntimeReverbAvailability,
     waitForReverbState,
+    type RuntimeReverbAvailabilityStatus,
     type RuntimeReverbStatus,
 };

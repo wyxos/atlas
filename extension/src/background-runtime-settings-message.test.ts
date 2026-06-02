@@ -49,4 +49,110 @@ describe('background runtime settings message bridge', () => {
             payload: { settings },
         });
     });
+
+    it('coalesces repeated Atlas extension settings reads and refreshes the cache after writes', async () => {
+        const initialSettings = {
+            version: 1,
+            siteCustomizations: [],
+            closeTabAfterQueueByDomain: {},
+            reactAllItemsInPostByDomain: {},
+        };
+        const updatedSettings = {
+            ...initialSettings,
+            reactAllItemsInPostByDomain: {
+                'example.com': true,
+            },
+        };
+        let remoteSettings = initialSettings;
+        const fetchMock = vi.fn(async (_endpoint: string, init?: RequestInit) => {
+            if (init?.method === 'POST') {
+                const body = JSON.parse(String(init.body ?? '{}')) as { settings?: typeof initialSettings };
+                remoteSettings = body.settings ?? initialSettings;
+            }
+
+            return new Response(JSON.stringify({ settings: remoteSettings }), { status: 200 });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const getMessage = {
+            type: 'ATLAS_API_REQUEST',
+            atlasDomain: 'https://atlas.wyxos.com',
+            apiToken: 'cache-token',
+            endpoint: 'https://atlas.wyxos.com/api/extension/settings',
+            method: 'GET',
+        };
+
+        const [first, second] = await Promise.all([
+            sendAtlasApiRequest(getMessage),
+            sendAtlasApiRequest(getMessage),
+        ]);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(first).toEqual({
+            ok: true,
+            status: 200,
+            payload: { settings: initialSettings },
+        });
+        expect(second).toEqual(first);
+
+        await sendAtlasApiRequest(getMessage);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        await sendAtlasApiRequest({
+            ...getMessage,
+            method: 'POST',
+            body: { settings: updatedSettings },
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+
+        const cachedAfterWrite = await sendAtlasApiRequest(getMessage);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(cachedAfterWrite).toEqual({
+            ok: true,
+            status: 200,
+            payload: { settings: updatedSettings },
+        });
+    });
+
+    it('coalesces repeated Atlas extension ping reads through the background fetch path', async () => {
+        const pingPayload = {
+            ok: true,
+            reverb: {
+                enabled: true,
+                key: 'atlas-key',
+                host: 'atlas.wyxos.com',
+                port: 443,
+                scheme: 'https',
+                channel: 'private-extension-downloads.test-hash',
+            },
+        };
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify(pingPayload), { status: 200 }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        const getMessage = {
+            type: 'ATLAS_API_REQUEST',
+            atlasDomain: 'https://atlas.wyxos.com',
+            apiToken: 'ping-cache-token',
+            endpoint: 'https://atlas.wyxos.com/api/extension/ping',
+            method: 'GET',
+        };
+
+        const [first, second] = await Promise.all([
+            sendAtlasApiRequest(getMessage),
+            sendAtlasApiRequest(getMessage),
+        ]);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(first).toEqual({
+            ok: true,
+            status: 200,
+            payload: pingPayload,
+        });
+        expect(second).toEqual(first);
+
+        await sendAtlasApiRequest(getMessage);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
 });

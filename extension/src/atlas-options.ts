@@ -1,13 +1,21 @@
 /* global chrome */
 import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth } from './atlas-auth';
 import { requestAtlasViaRuntime } from './atlas-runtime-request';
+import {
+    forgetStoredOptionsLoad,
+    getFreshStoredOptions,
+    getStoredOptionsCacheGeneration,
+    getStoredOptionsLoad,
+    invalidateStoredOptionsCache,
+    rememberStoredOptions,
+    rememberStoredOptionsLoad,
+    storedOptionsCacheKey,
+} from './stored-options-cache';
 import type { SiteCustomization } from './site-customizations';
 import {
-    createEmptySiteCustomization,
     deriveSiteCustomizationsFromLegacyStorage,
     normalizeSiteCustomizations,
     parseStoredSiteCustomizations,
-    resolveStoredSiteCustomizationForHostname,
 } from './site-customizations';
 
 export const STORAGE_KEYS = {
@@ -45,6 +53,7 @@ type LocalOptionsSnapshot = StoredConnectionOptions & {
     localSettings: ExtensionSettings;
     hasLocalSettings: boolean;
     settingsMigrationByDomain: Record<string, true>;
+    settingsUpdatedAt: string;
 };
 
 type RemoteSettingsPayload = {
@@ -92,7 +101,7 @@ function emptyExtensionSettings(): ExtensionSettings {
     };
 }
 
-function normalizePreferenceDomainKey(input: string): string {
+export function normalizePreferenceDomainKey(input: string): string {
     const trimmed = input.trim().toLowerCase();
     if (trimmed === '') {
         return '';
@@ -283,17 +292,26 @@ async function clearLocalExtensionSettings(): Promise<void> {
     await removeLocalStorage(LOCAL_EXTENSION_SETTING_KEYS);
 }
 
-async function notifySettingsChanged(extraItems: Record<string, unknown> = {}): Promise<void> {
+function cacheKeyForSnapshot(snapshot: LocalOptionsSnapshot): string {
+    return storedOptionsCacheKey(snapshot.atlasDomain, snapshot.apiToken, snapshot.settingsUpdatedAt);
+}
+
+async function notifySettingsChanged(extraItems: Record<string, unknown> = {}): Promise<string> {
+    const settingsUpdatedAt = String(Date.now());
+
     await writeLocalStorage({
         ...extraItems,
-        [STORAGE_KEYS.settingsUpdatedAt]: String(Date.now()),
+        [STORAGE_KEYS.settingsUpdatedAt]: settingsUpdatedAt,
     });
+
+    return settingsUpdatedAt;
 }
 
 async function readLocalOptionsSnapshot(): Promise<LocalOptionsSnapshot> {
     const stored = await readLocalStorage([
         STORAGE_KEYS.atlasDomain,
         STORAGE_KEYS.apiToken,
+        STORAGE_KEYS.settingsUpdatedAt,
         STORAGE_KEYS.matchRules,
         STORAGE_KEYS.referrerQueryParamsToStripByDomain,
         STORAGE_KEYS.siteCustomizations,
@@ -305,6 +323,10 @@ async function readLocalOptionsSnapshot(): Promise<LocalOptionsSnapshot> {
     const storedDomain = typeof stored.atlasDomain === 'string' ? normalizeDomain(stored.atlasDomain) : '';
     const atlasDomain = storedDomain !== '' ? storedDomain : DEFAULT_ATLAS_DOMAIN;
     const apiToken = typeof stored.apiToken === 'string' ? stored.apiToken.trim() : '';
+    const storedSettingsUpdatedAt = stored[STORAGE_KEYS.settingsUpdatedAt];
+    const settingsUpdatedAt = typeof storedSettingsUpdatedAt === 'string'
+        ? storedSettingsUpdatedAt
+        : '';
     const siteCustomizations = stored[STORAGE_KEYS.siteCustomizations] !== undefined
         ? parseStoredSiteCustomizations(stored[STORAGE_KEYS.siteCustomizations])
         : deriveSiteCustomizationsFromLegacyStorage(
@@ -327,6 +349,7 @@ async function readLocalOptionsSnapshot(): Promise<LocalOptionsSnapshot> {
         localSettings,
         hasLocalSettings: hasMigrationSettings(localSettings),
         settingsMigrationByDomain: parseStoredMigrationMap(stored[STORAGE_KEYS.settingsMigrationByDomain]),
+        settingsUpdatedAt,
     };
 }
 
@@ -424,15 +447,46 @@ async function loadRemoteSettingsForSnapshot(
     }
 }
 
-export async function getStoredOptions(): Promise<StoredOptions> {
+export async function getStoredOptions(options: { bypassCache?: boolean } = {}): Promise<StoredOptions> {
     const snapshot = await readLocalOptionsSnapshot();
-    const settings = await loadRemoteSettingsForSnapshot(snapshot, { fallbackToLocalOnError: true });
+    const cacheKey = cacheKeyForSnapshot(snapshot);
 
-    return {
-        atlasDomain: snapshot.atlasDomain,
-        apiToken: snapshot.apiToken,
-        ...settings,
-    };
+    if (options.bypassCache !== true) {
+        const cachedOptions = getFreshStoredOptions(cacheKey);
+        if (cachedOptions !== null) {
+            return cachedOptions;
+        }
+
+        const activeLoad = getStoredOptionsLoad(cacheKey);
+        if (activeLoad !== null) {
+            return activeLoad;
+        }
+    }
+
+    const cacheGeneration = getStoredOptionsCacheGeneration();
+    const loadPromise = loadRemoteSettingsForSnapshot(snapshot, { fallbackToLocalOnError: true })
+        .then((settings) => {
+            const storedOptions = {
+                atlasDomain: snapshot.atlasDomain,
+                apiToken: snapshot.apiToken,
+                ...settings,
+            };
+
+            if (getStoredOptionsCacheGeneration() === cacheGeneration) {
+                rememberStoredOptions(cacheKey, storedOptions);
+            }
+
+            return storedOptions;
+        })
+        .finally(() => {
+            forgetStoredOptionsLoad(loadPromise);
+        });
+
+    if (options.bypassCache !== true) {
+        rememberStoredOptionsLoad(cacheKey, loadPromise);
+    }
+
+    return loadPromise;
 }
 
 async function saveConnectionOptions(atlasDomain: string, apiToken: string): Promise<void> {
@@ -462,6 +516,7 @@ export async function saveStoredOptions(
     const normalizedDomain = normalizeDomain(atlasDomain);
     const normalizedToken = apiToken.trim();
     const snapshot = await readLocalOptionsSnapshot();
+    invalidateStoredOptionsCache();
 
     const connectionSnapshot: LocalOptionsSnapshot = {
         ...snapshot,
@@ -469,116 +524,38 @@ export async function saveStoredOptions(
         apiToken: normalizedToken,
     };
     const currentSettings = await loadRemoteSettingsForSnapshot(connectionSnapshot);
-    await saveRemoteSettingsForConnection(normalizedDomain, normalizedToken, {
+    const savedSettings = await saveRemoteSettingsForConnection(normalizedDomain, normalizedToken, {
         ...currentSettings,
         siteCustomizations: normalizeSiteCustomizations(siteCustomizations),
     });
     await saveConnectionOptions(normalizedDomain, normalizedToken);
     await clearLocalExtensionSettings();
-    await notifySettingsChanged();
+    const settingsUpdatedAt = await notifySettingsChanged();
+    rememberStoredOptions(storedOptionsCacheKey(normalizedDomain, normalizedToken, settingsUpdatedAt), {
+        atlasDomain: normalizedDomain,
+        apiToken: normalizedToken,
+        ...savedSettings,
+    });
 }
 
-async function saveFullSettingsForCurrentConnection(settings: ExtensionSettings): Promise<void> {
+export async function saveFullSettingsForCurrentConnection(settings: ExtensionSettings): Promise<void> {
     const { atlasDomain, apiToken } = await getStoredConnectionOptions();
-    await saveRemoteSettingsForConnection(atlasDomain, apiToken, settings);
-    await notifySettingsChanged();
-}
-
-export async function setSiteCustomizationEnabledForDomain(domain: string, enabled: boolean): Promise<void> {
-    const normalizedDomain = normalizePreferenceDomainKey(domain);
-    if (normalizedDomain === '') {
-        return;
-    }
-
-    const stored = await getStoredOptions();
-    const existingCustomization = resolveStoredSiteCustomizationForHostname(stored.siteCustomizations, normalizedDomain);
-    const nextSiteCustomizations = existingCustomization === null
-        ? [...stored.siteCustomizations, {
-            ...createEmptySiteCustomization(normalizedDomain),
-            enabled,
-        }]
-        : stored.siteCustomizations.map((customization) => customization.domain === existingCustomization.domain
-            ? {
-                ...customization,
-                enabled,
-            }
-            : customization);
-
-    await saveRemoteSettingsForConnection(stored.atlasDomain, stored.apiToken, {
-        ...stored,
-        siteCustomizations: nextSiteCustomizations,
-    });
-    await notifySettingsChanged();
-}
-
-export async function getCloseTabAfterQueueByDomain(): Promise<CloseTabAfterQueueByDomain> {
-    const stored = await getStoredOptions();
-
-    return stored.closeTabAfterQueueByDomain;
-}
-
-export async function getCloseTabAfterQueuePreferenceForHostname(hostname: string): Promise<CloseTabAfterQueueMode> {
-    const key = normalizePreferenceDomainKey(hostname);
-    if (key === '') {
-        return 'off';
-    }
-
-    const preferences = await getCloseTabAfterQueueByDomain();
-    return preferences[key] ?? 'off';
-}
-
-export async function setCloseTabAfterQueuePreferenceForHostname(
-    hostname: string,
-    mode: CloseTabAfterQueueMode,
-): Promise<void> {
-    const key = normalizePreferenceDomainKey(hostname);
-    if (key === '') {
-        return;
-    }
-
-    const stored = await getStoredOptions();
-    const nextPreferences: CloseTabAfterQueueByDomain = { ...stored.closeTabAfterQueueByDomain };
-    if (mode === 'queued' || mode === 'completed') {
-        nextPreferences[key] = mode;
-    } else {
-        delete nextPreferences[key];
-    }
-
-    await saveFullSettingsForCurrentConnection({
-        ...stored,
-        closeTabAfterQueueByDomain: nextPreferences,
+    invalidateStoredOptionsCache();
+    const savedSettings = await saveRemoteSettingsForConnection(atlasDomain, apiToken, settings);
+    const settingsUpdatedAt = await notifySettingsChanged();
+    rememberStoredOptions(storedOptionsCacheKey(atlasDomain, apiToken, settingsUpdatedAt), {
+        atlasDomain,
+        apiToken,
+        ...savedSettings,
     });
 }
 
-export async function getReactAllItemsInPostByDomain(): Promise<ReactAllItemsInPostByDomain> {
-    const stored = await getStoredOptions();
-
-    return stored.reactAllItemsInPostByDomain;
-}
-
-export async function getReactAllItemsInPostPreferenceForHostname(hostname: string): Promise<boolean> {
-    const key = normalizePreferenceDomainKey(hostname);
-    if (key === '') {
-        return false;
-    }
-
-    const preferences = await getReactAllItemsInPostByDomain();
-    return preferences[key] === true;
-}
-
-export async function setReactAllItemsInPostPreferenceForHostname(hostname: string, enabled: boolean): Promise<void> {
-    const key = normalizePreferenceDomainKey(hostname);
-    if (key === '') {
-        return;
-    }
-
-    const stored = await getStoredOptions();
-
-    await saveFullSettingsForCurrentConnection({
-        ...stored,
-        reactAllItemsInPostByDomain: {
-            ...stored.reactAllItemsInPostByDomain,
-            [key]: enabled,
-        },
-    });
-}
+export {
+    getCloseTabAfterQueueByDomain,
+    getCloseTabAfterQueuePreferenceForHostname,
+    getReactAllItemsInPostByDomain,
+    getReactAllItemsInPostPreferenceForHostname,
+    setCloseTabAfterQueuePreferenceForHostname,
+    setReactAllItemsInPostPreferenceForHostname,
+    setSiteCustomizationEnabledForDomain,
+} from './atlas-option-preferences';

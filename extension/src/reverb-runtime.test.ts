@@ -81,6 +81,46 @@ describe('connectRuntimeReverb', () => {
         expect(mockConnectReverb).not.toHaveBeenCalled();
     });
 
+    it('resolves Reverb availability without opening a websocket client', async () => {
+        const runtimeSendMessage = vi.fn((payload: unknown, callback: (response: unknown) => void) => {
+            const typed = payload as Record<string, unknown>;
+            if (typed.type === 'ATLAS_API_REQUEST') {
+                callback({
+                    ok: true,
+                    status: 200,
+                    payload: {
+                        reverb: {
+                            enabled: true,
+                            key: 'atlas-key',
+                            host: 'atlas.wyxos.com',
+                            port: 443,
+                            scheme: 'https',
+                            channel: 'private-extension-downloads.test-hash',
+                        },
+                    },
+                });
+                return;
+            }
+
+            callback(null);
+        });
+
+        vi.stubGlobal('chrome', {
+            runtime: {
+                lastError: null,
+                sendMessage: runtimeSendMessage,
+            },
+        });
+
+        const { resolveRuntimeReverbAvailability } = await import('./reverb-runtime');
+        await expect(resolveRuntimeReverbAvailability()).resolves.toMatchObject({
+            kind: 'available',
+            domain: 'https://atlas.wyxos.com',
+            endpoint: 'https://atlas.wyxos.com:443',
+        });
+        expect(mockConnectReverb).not.toHaveBeenCalled();
+    });
+
     it('falls back to direct fetch when the runtime request is unavailable', async () => {
         const fetchMock = vi.fn().mockResolvedValue(
             new Response(JSON.stringify({

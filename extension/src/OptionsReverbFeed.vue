@@ -13,8 +13,8 @@ type ReverbEventLogEntry = ProgressEvent & {
 
 const MAX_REVERB_EVENT_LOG_ROWS = 20;
 
-const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
-const reverbStatusDetail = ref('Checking Reverb connection.');
+const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Checking' | 'Idle'>('Idle');
+const reverbStatusDetail = ref('Direct Reverb monitor is idle.');
 const reverbEndpoint = ref<string | null>(null);
 const reverbEvents = ref<ReverbEventLogEntry[]>([]);
 
@@ -26,6 +26,7 @@ let activeReverbErrorSubscription: ReverbSubscription | null = null;
 let activeReverbEventSubscription: ReverbSubscription | null = null;
 let reverbMonitorSequence = 0;
 let nextReverbEventLogId = 1;
+const hasStartedReverbMonitor = ref(false);
 
 function formatJson(value: unknown): string {
     return JSON.stringify(value, null, 2) ?? '';
@@ -106,6 +107,7 @@ function hasRelevantStorageChanges(changes?: Record<string, unknown> | null): bo
 }
 
 async function refreshReverbMonitor(): Promise<void> {
+    hasStartedReverbMonitor.value = true;
     const currentSequence = ++reverbMonitorSequence;
     disconnectActiveReverbMonitor();
 
@@ -174,7 +176,7 @@ async function refreshReverbMonitor(): Promise<void> {
 }
 
 function handleStorageChanged(changes?: Record<string, unknown> | null): void {
-    if (!hasRelevantStorageChanges(changes)) {
+    if (!hasStartedReverbMonitor.value || !hasRelevantStorageChanges(changes)) {
         return;
     }
 
@@ -185,8 +187,6 @@ onMounted(() => {
     if (chrome.storage?.onChanged) {
         chrome.storage.onChanged.addListener(handleStorageChanged);
     }
-
-    void refreshReverbMonitor();
 });
 
 onBeforeUnmount(() => {
@@ -224,7 +224,7 @@ onBeforeUnmount(() => {
                     class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
                     @click="void refreshReverbMonitor()"
                 >
-                    Reconnect Reverb
+                    {{ hasStartedReverbMonitor ? 'Reconnect Reverb' : 'Connect Reverb' }}
                 </button>
                 <button
                     type="button"

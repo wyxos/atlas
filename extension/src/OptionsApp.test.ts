@@ -90,8 +90,8 @@ describe('OptionsApp', () => {
         mockResolveApiConnectionStatus.mockResolvedValue({
             label: 'Ready',
             detail: 'Connected.',
-            reverbLabel: 'Connected',
-            reverbDetail: 'Listening.',
+            reverbLabel: 'Available',
+            reverbDetail: 'Reverb config is available.',
             reverbEndpoint: 'wss://atlas.test/reverb',
         });
 
@@ -350,8 +350,8 @@ describe('OptionsApp', () => {
             .mockResolvedValueOnce({
                 label: 'Ready',
                 detail: 'Connected.',
-                reverbLabel: 'Connected',
-                reverbDetail: 'Listening.',
+                reverbLabel: 'Available',
+                reverbDetail: 'Reverb config is available.',
                 reverbEndpoint: 'wss://atlas.test/reverb',
             })
             .mockResolvedValueOnce({

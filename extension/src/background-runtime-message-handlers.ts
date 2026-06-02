@@ -48,6 +48,23 @@ type AtlasApiRequestPayload = {
     body?: Record<string, unknown> | null;
 };
 
+type AtlasApiRuntimeResponse = {
+    ok: boolean;
+    status: number;
+    payload: unknown;
+};
+
+type CachedAtlasApiRequestEntry = {
+    cacheKey: string;
+    cachedAt: number;
+    response: AtlasApiRuntimeResponse;
+};
+
+type CachedAtlasApiRequestLoad = {
+    cacheKey: string;
+    promise: Promise<AtlasApiRuntimeResponse>;
+};
+
 type QueueBadgeCheckPayload = {
     type: 'ATLAS_QUEUE_BADGE_CHECK';
     atlasDomain: string;
@@ -67,6 +84,10 @@ type QueueReferrerCheckPayload = {
 
 const ATLAS_CHECK_PRIORITY_NORMAL = 1;
 const ATLAS_CHECK_PRIORITY_ACTIVE = 2;
+const CACHED_ATLAS_GET_REQUEST_TTL_MS = 10 * 1000;
+
+let cachedAtlasApiRequestEntry: CachedAtlasApiRequestEntry | null = null;
+let cachedAtlasApiRequestLoad: CachedAtlasApiRequestLoad | null = null;
 
 type QueueRuntimeOptions = {
     cacheOnly: boolean;
@@ -102,6 +123,37 @@ function isAllowedAtlasApiEndpoint(
     return (method === 'GET' && endpoint === `${atlasDomain}/api/extension/ping`)
         || (method === 'GET' && endpoint === `${atlasDomain}/api/extension/settings`)
         || (method === 'POST' && endpoint === `${atlasDomain}/api/extension/settings`);
+}
+
+function isCacheableAtlasGetEndpoint(atlasDomain: string, endpoint: string): boolean {
+    return atlasDomain !== ''
+        && (endpoint === `${atlasDomain}/api/extension/settings`
+            || endpoint === `${atlasDomain}/api/extension/ping`);
+}
+
+function atlasGetRequestCacheKey(endpoint: string, apiToken: string): string {
+    return JSON.stringify({
+        endpoint,
+        apiToken,
+    });
+}
+
+function getCachedAtlasApiResponse(cacheKey: string): AtlasApiRuntimeResponse | null {
+    if (cachedAtlasApiRequestEntry === null
+        || cachedAtlasApiRequestEntry.cacheKey !== cacheKey
+        || Date.now() - cachedAtlasApiRequestEntry.cachedAt >= CACHED_ATLAS_GET_REQUEST_TTL_MS) {
+        return null;
+    }
+
+    return cachedAtlasApiRequestEntry.response;
+}
+
+function rememberAtlasApiResponse(cacheKey: string, response: AtlasApiRuntimeResponse): void {
+    cachedAtlasApiRequestEntry = {
+        cacheKey,
+        cachedAt: Date.now(),
+        response,
+    };
 }
 
 function resolveQueueRuntimeOptions(payload: { pageVisibility?: unknown }, sender: RuntimeMessageSender): QueueRuntimeOptions {
@@ -379,16 +431,59 @@ export function handleAtlasApiRequestRuntimeMessage(
         init.body = JSON.stringify(body);
     }
 
-    void fetch(endpoint, init)
-        .then(async (response) => {
-            sendResponse({
-                ok: response.ok,
-                status: response.status,
-                payload: await parseJsonResponse(response),
-            });
+    const isCacheableAtlasGetRequest = method === 'GET' && isCacheableAtlasGetEndpoint(atlasDomain, endpoint);
+    const isSettingsRequest = endpoint === `${atlasDomain}/api/extension/settings`;
+    const cacheKey = isCacheableAtlasGetRequest || isSettingsRequest
+        ? atlasGetRequestCacheKey(endpoint, apiToken)
+        : '';
+
+    if (isCacheableAtlasGetRequest) {
+        const cachedResponse = getCachedAtlasApiResponse(cacheKey);
+        if (cachedResponse !== null) {
+            sendResponse(cachedResponse);
+            return true;
+        }
+
+        if (cachedAtlasApiRequestLoad !== null && cachedAtlasApiRequestLoad.cacheKey === cacheKey) {
+            void cachedAtlasApiRequestLoad.promise
+                .then(sendResponse)
+                .catch(() => {
+                    sendResponse({ ok: false, status: 0, payload: null });
+                });
+
+            return true;
+        }
+    }
+
+    const requestPromise = fetch(endpoint, init)
+        .then(async (response): Promise<AtlasApiRuntimeResponse> => ({
+            ok: response.ok,
+            status: response.status,
+            payload: await parseJsonResponse(response),
+        }));
+
+    if (isCacheableAtlasGetRequest) {
+        cachedAtlasApiRequestLoad = {
+            cacheKey,
+            promise: requestPromise,
+        };
+    }
+
+    void requestPromise
+        .then((response) => {
+            if (isSettingsRequest || isCacheableAtlasGetRequest) {
+                rememberAtlasApiResponse(cacheKey, response);
+            }
+
+            sendResponse(response);
         })
         .catch(() => {
             sendResponse({ ok: false, status: 0, payload: null });
+        })
+        .finally(() => {
+            if (cachedAtlasApiRequestLoad?.promise === requestPromise) {
+                cachedAtlasApiRequestLoad = null;
+            }
         });
 
     return true;

@@ -276,6 +276,49 @@ describe('atlas-options', () => {
         expect(storageState[STORAGE_KEYS.apiToken]).toBe('existing-token');
     });
 
+    it('coalesces and caches remote settings reads until settings storage changes', async () => {
+        const { STORAGE_KEYS, getStoredOptions } = await import('./atlas-options');
+        const remote = installRemoteSettingsFetchMock({
+            ...emptyRemoteSettings(),
+            siteCustomizations: [
+                {
+                    enabled: true,
+                    domain: 'example.com',
+                    matchRules: ['.*\\/gallery\\/.*'],
+                    widget: {
+                        minImageWidth: null,
+                    },
+                    referrerCleaner: {
+                        stripQueryParams: [],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: [],
+                    },
+                },
+            ],
+        });
+        storageState[STORAGE_KEYS.settingsMigrationByDomain] = {
+            'https://atlas.test': true,
+        };
+
+        const [first, second] = await Promise.all([
+            getStoredOptions(),
+            getStoredOptions(),
+        ]);
+
+        expect(first.siteCustomizations).toEqual(second.siteCustomizations);
+        expect(remote.fetchMock).toHaveBeenCalledTimes(1);
+
+        await getStoredOptions();
+        expect(remote.fetchMock).toHaveBeenCalledTimes(1);
+
+        storageState[STORAGE_KEYS.settingsUpdatedAt] = 'remote-refresh';
+        await getStoredOptions();
+        expect(remote.fetchMock).toHaveBeenCalledTimes(2);
+    });
+
     it('does not overwrite the bootstrap connection when remote settings save fails', async () => {
         const { STORAGE_KEYS, saveStoredOptions } = await import('./atlas-options');
         vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'Unauthenticated.' }), { status: 401 })));

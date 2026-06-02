@@ -137,8 +137,8 @@ describe('App', () => {
         mockResolveApiConnectionStatus.mockResolvedValue({
             label: 'Ready',
             detail: 'Connected.',
-            reverbLabel: 'Connected',
-            reverbDetail: 'Listening.',
+            reverbLabel: 'Available',
+            reverbDetail: 'Reverb config is available.',
             reverbEndpoint: 'wss://atlas.test/reverb',
         });
         storedOptions = {
@@ -228,8 +228,8 @@ describe('App', () => {
 
         expect(wrapper.text()).toContain('Ready');
         expect(wrapper.text()).toContain('Connected.');
-        expect(wrapper.text()).toContain('Reverb: Connected');
-        expect(wrapper.text()).toContain('Listening.');
+        expect(wrapper.text()).toContain('Reverb: Available');
+        expect(wrapper.text()).toContain('Reverb config is available.');
         expect(wrapper.text()).toContain('wss://atlas.test/reverb');
     });
 

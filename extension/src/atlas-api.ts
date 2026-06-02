@@ -1,15 +1,15 @@
-import { connectRuntimeReverb, waitForReverbState } from './reverb-runtime';
+import { resolveRuntimeReverbAvailability } from './reverb-runtime';
 
 export type AtlasApiConnectionStatus = {
     label: 'Ready' | 'Setup required' | 'Auth failed' | 'Offline';
     detail: string;
-    reverbLabel: 'Connected' | 'Disconnected' | 'Unavailable';
+    reverbLabel: 'Available' | 'Disconnected' | 'Unavailable';
     reverbDetail: string;
     reverbEndpoint: string | null;
 };
 
 export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionStatus> {
-    const runtime = await connectRuntimeReverb();
+    const runtime = await resolveRuntimeReverbAvailability();
     switch (runtime.kind) {
         case 'setup_required':
             return {
@@ -43,39 +43,13 @@ export async function resolveApiConnectionStatus(): Promise<AtlasApiConnectionSt
                 reverbDetail: 'Reverb is not configured on Atlas.',
                 reverbEndpoint: runtime.endpoint,
             };
-        case 'disconnected':
+        case 'available':
             return {
                 label: 'Ready',
                 detail: `Connected to ${runtime.domain}`,
-                reverbLabel: 'Disconnected',
-                reverbDetail: runtime.detail,
+                reverbLabel: 'Available',
+                reverbDetail: 'Reverb config is available.',
                 reverbEndpoint: runtime.endpoint,
             };
-        case 'connected': {
-            const stateResult = await waitForReverbState(runtime.client);
-            runtime.client.disconnect();
-
-            if (stateResult.state === 'connected') {
-                return {
-                    label: 'Ready',
-                    detail: `Connected to ${runtime.domain}`,
-                    reverbLabel: 'Connected',
-                    reverbDetail: 'Reverb websocket connected.',
-                    reverbEndpoint: runtime.endpoint,
-                };
-            }
-
-            return {
-                label: 'Ready',
-                detail: `Connected to ${runtime.domain}`,
-                reverbLabel: 'Disconnected',
-                reverbDetail: stateResult.state === 'timeout'
-                    ? 'Reverb websocket timed out.'
-                    : stateResult.error
-                        ? `Reverb websocket state: ${stateResult.state}. ${stateResult.error}`
-                        : `Reverb websocket state: ${stateResult.state}.`,
-                reverbEndpoint: runtime.endpoint,
-            };
-        }
     }
 }

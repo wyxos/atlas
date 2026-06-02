@@ -1,7 +1,8 @@
 import { getStoredConnectionOptions } from './atlas-options';
-import { createAtlasApiHeaders, createAtlasFetchAuthOptions, hasAtlasApiAuth } from './atlas-auth';
+import { hasAtlasApiAuth } from './atlas-auth';
 import { connectWorkerReverb, type ReverbClient } from './reverb-client-worker';
 import { createExtensionReverbAuthConfig, formatReverbEndpoint, parseReverbConfig } from './reverb-config';
+import { fetchCachedReverbPing } from './reverb-ping-cache';
 
 type BackgroundReverbStatus =
     | { kind: 'setup_required' }
@@ -11,10 +12,6 @@ type BackgroundReverbStatus =
     | { kind: 'connected'; domain: string; endpoint: string | null; client: ReverbClient }
     | { kind: 'disconnected'; domain: string; endpoint: string | null; detail: string };
 
-type ReverbPingResponse = {
-    reverb?: unknown;
-};
-
 export async function connectBackgroundReverb(): Promise<BackgroundReverbStatus> {
     try {
         const stored = await getStoredConnectionOptions();
@@ -22,19 +19,12 @@ export async function connectBackgroundReverb(): Promise<BackgroundReverbStatus>
             return { kind: 'setup_required' };
         }
 
-        const pingEndpoint = `${stored.atlasDomain}/api/extension/ping`;
-        const response = await fetch(pingEndpoint, {
-            method: 'GET',
-            headers: createAtlasApiHeaders(stored.apiToken),
-            ...createAtlasFetchAuthOptions(stored.apiToken),
-        });
-
-        if (!response.ok) {
-            return { kind: 'auth_failed' };
+        const ping = await fetchCachedReverbPing(stored.atlasDomain, stored.apiToken);
+        if (!ping.ok) {
+            return ping.status === 0 ? { kind: 'offline' } : { kind: 'auth_failed' };
         }
 
-        const payload = await response.json() as ReverbPingResponse;
-        const config = parseReverbConfig(payload.reverb);
+        const config = parseReverbConfig(ping.payload?.reverb);
         const endpoint = formatReverbEndpoint(config);
 
         if (!config || !config.enabled) {

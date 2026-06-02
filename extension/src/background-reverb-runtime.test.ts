@@ -128,6 +128,40 @@ describe('connectBackgroundReverb', () => {
         });
     });
 
+    it('coalesces background ping reads before opening worker reverb clients', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({
+                reverb: {
+                    enabled: true,
+                    key: 'atlas-key',
+                    host: 'atlas.wyxos.com',
+                    port: 443,
+                    scheme: 'https',
+                    channel: 'private-extension-downloads.test-hash',
+                },
+            }), { status: 200 }),
+        );
+        const connectedClient = {
+            onEvent: vi.fn(),
+            onConnectionState: vi.fn(),
+            onConnectionError: vi.fn(),
+            getConnectionState: vi.fn(),
+            getLastConnectionError: vi.fn(),
+            disconnect: vi.fn(),
+        };
+        mockConnectWorkerReverb.mockResolvedValue(connectedClient);
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { connectBackgroundReverb } = await import('./background-reverb-runtime');
+        await Promise.all([
+            connectBackgroundReverb(),
+            connectBackgroundReverb(),
+        ]);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(mockConnectWorkerReverb).toHaveBeenCalledTimes(2);
+    });
+
     it('returns disconnected when the worker runtime cannot initialize a client', async () => {
         const fetchMock = vi.fn().mockResolvedValue(
             new Response(JSON.stringify({

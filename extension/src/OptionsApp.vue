@@ -43,7 +43,7 @@ const isSaved = ref(false);
 const isCustomizationJsonCopied = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
 const statusDetail = ref('Validating extension API access.');
-const reverbStatusLabel = ref<'Connected' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
+const reverbStatusLabel = ref<'Available' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 const reverbEndpoint = ref<string | null>(null);
 let customizationCopyTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -369,7 +369,7 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
                                 <p class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Reverb</p>
                                 <h2 class="mt-2 text-lg font-semibold text-regal-navy-100">Realtime Channel</h2>
                             </div>
-                            <Badge :variant="reverbStatusLabel === 'Connected' ? 'active' : 'inactive'">
+                            <Badge :variant="reverbStatusLabel === 'Available' ? 'active' : 'inactive'">
                                 {{ reverbStatusLabel }}
                             </Badge>
                         </div>

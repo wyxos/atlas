@@ -98,6 +98,15 @@ async function mountComponent(storageAddListener = vi.fn(), storageRemoveListene
     });
 }
 
+async function connectReverbFeed(wrapper: Awaited<ReturnType<typeof mountComponent>>): Promise<void> {
+    const connectButton = wrapper.findAll('button')
+        .find((button) => button.text() === 'Connect Reverb' || button.text() === 'Reconnect Reverb');
+    expect(connectButton).toBeTruthy();
+
+    await connectButton!.trigger('click');
+    await flushPromises();
+}
+
 describe('OptionsReverbFeed', () => {
     beforeEach(() => {
         vi.resetModules();
@@ -110,11 +119,21 @@ describe('OptionsReverbFeed', () => {
         vi.restoreAllMocks();
     });
 
+    it('stays idle until the direct monitor is manually connected', async () => {
+        const wrapper = await mountComponent();
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Idle');
+        expect(wrapper.text()).toContain('Direct Reverb monitor is idle.');
+        expect(mockConnectRuntimeReverb).not.toHaveBeenCalled();
+    });
+
     it('renders a connected reverb session, logs events, and clears them', async () => {
         const runtime = createConnectedRuntime();
         mockConnectRuntimeReverb.mockResolvedValueOnce(runtime.response);
         const wrapper = await mountComponent();
         await flushPromises();
+        await connectReverbFeed(wrapper);
         runtime.emitState('connected');
         await flushPromises();
 
@@ -157,6 +176,7 @@ describe('OptionsReverbFeed', () => {
 
         const wrapper = await mountComponent();
         await flushPromises();
+        await connectReverbFeed(wrapper);
 
         expect(wrapper.text()).toContain(expectedLabel);
         expect(wrapper.text()).toContain(expectedDetail);
@@ -180,6 +200,7 @@ describe('OptionsReverbFeed', () => {
 
         const wrapper = await mountComponent();
         await flushPromises();
+        await connectReverbFeed(wrapper);
         runtime.emitState('connected');
         await flushPromises();
 
@@ -215,6 +236,7 @@ describe('OptionsReverbFeed', () => {
             }),
         );
         await flushPromises();
+        await connectReverbFeed(wrapper);
 
         runtime.emitState('failed');
         runtime.emitConnectionError('socket refused');
@@ -252,6 +274,7 @@ describe('OptionsReverbFeed', () => {
             }),
         );
         await flushPromises();
+        await connectReverbFeed(wrapper);
 
         runtime.emitState('connected');
         await flushPromises();
@@ -288,6 +311,7 @@ describe('OptionsReverbFeed', () => {
 
         const wrapper = await mountComponent(storageAddListener, storageRemoveListener);
         await flushPromises();
+        await connectReverbFeed(wrapper);
         runtime.emitState('connected');
         await flushPromises();
 
