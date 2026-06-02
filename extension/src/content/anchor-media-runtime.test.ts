@@ -52,6 +52,16 @@ async function flushPromises(): Promise<void> {
     await Promise.resolve();
 }
 
+function missedReferrerResult(): { exists: false; reaction: null; reactedAt: null; downloadedAt: null; blacklistedAt: null } {
+    return {
+        exists: false,
+        reaction: null,
+        reactedAt: null,
+        downloadedAt: null,
+        blacklistedAt: null,
+    };
+}
+
 describe('anchor-media-runtime', () => {
     beforeEach(() => {
         vi.useRealTimers();
@@ -120,6 +130,50 @@ describe('anchor-media-runtime', () => {
         expect(image.style.opacity).toBe('');
         expect(image.getAttribute('data-atlas-anchor-checking')).toBeNull();
         expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')).toBeNull();
+    });
+
+    it('does not requeue an already checked visible referrer while scroll fallback repeats registration', async () => {
+        let resolveCheck: ((value: ReturnType<typeof missedReferrerResult>) => void) | null = null;
+        const checkPromise = new Promise<ReturnType<typeof missedReferrerResult>>((resolve) => {
+            resolveCheck = resolve;
+        });
+        mockEnqueueReferrerCheck.mockReturnValue(checkPromise);
+
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post#image-2';
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.registerVisibleFromDocument();
+        runtime.registerVisibleFromDocument();
+
+        expect(mockEnqueueReferrerCheck).toHaveBeenCalledTimes(1);
+
+        resolveCheck?.(missedReferrerResult());
+        await flushPromises();
+
+        expect(mockIsUrlOpenInAnotherTab).toHaveBeenCalledTimes(1);
+
+        mockEnqueueReferrerCheck.mockClear();
+        mockIsUrlOpenInAnotherTab.mockClear();
+
+        runtime.registerVisibleFromDocument();
+        await flushPromises();
+
+        expect(mockEnqueueReferrerCheck).not.toHaveBeenCalled();
+        expect(mockIsUrlOpenInAnotherTab).not.toHaveBeenCalled();
     });
 
     it('skips the checking state when the referrer result is already cached', async () => {
@@ -383,6 +437,58 @@ describe('anchor-media-runtime', () => {
             [],
         );
         expect(image.getAttribute('data-atlas-anchor-reaction')).toBeNull();
+    });
+
+    it('repaints paused referrer syncs from local state without rechecking on resume', async () => {
+        mockEnqueueReferrerCheck.mockResolvedValue(missedReferrerResult());
+
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/post#image-2';
+        const image = document.createElement('img');
+        Object.defineProperty(image, 'getBoundingClientRect', {
+            value: () => visibleRect(),
+        });
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.registerFromDocument();
+        await flushPromises();
+
+        expect(image.getAttribute('data-atlas-anchor-reaction')).toBeNull();
+
+        mockEnqueueReferrerCheck.mockClear();
+        mockGetCachedReferrerCheck.mockClear();
+
+        runtime.suspend();
+        runtime.handleReferrerReactionSync({
+            type: 'ATLAS_REFERRER_REACTION_SYNC',
+            phase: 'settled',
+            urls: [anchor.href],
+            reaction: 'love',
+            reactedAt: '2026-03-26T12:00:00Z',
+            downloadedAt: null,
+            blacklistedAt: null,
+        });
+
+        expect(image.getAttribute('data-atlas-anchor-reaction')).toBeNull();
+
+        runtime.resume();
+        runtime.registerVisibleFromDocument();
+        await flushPromises();
+
+        expect(mockEnqueueReferrerCheck).not.toHaveBeenCalled();
+        expect(mockGetCachedReferrerCheck).not.toHaveBeenCalled();
+        expect(image.getAttribute('data-atlas-anchor-checking')).toBeNull();
+        expect(image.getAttribute('data-atlas-anchor-reaction')).toBe('love');
+        expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')?.getAttribute('data-atlas-anchor-badge-kind')).toBe('reaction');
     });
 
     it('updates matching anchors when download progress events carry reaction metadata', async () => {

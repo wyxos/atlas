@@ -9,9 +9,7 @@ import {
 } from './media-utils';
 import { urlMatchesAnyRule } from '../match-rules';
 import {
-    applyAnchorBlacklistedDecoration,
     applyAnchorCheckingDecoration,
-    applyAnchorMatchDecoration,
     clearAnchorMatchDecoration,
 } from './anchor-match-decoration';
 import {
@@ -23,10 +21,17 @@ import {
     applyAnchorMediaSamePage,
     clearAnchorMediaAttributes,
 } from './anchor-media-state';
-import { enqueueReferrerCheck, getCachedReferrerCheck, upsertReferrerCheckCache } from './referrer-check-queue';
+import {
+    enqueueReferrerCheck,
+    getCachedReferrerCheck,
+    upsertReferrerCheckCache,
+    type ReferrerMatchResult,
+} from './referrer-check-queue';
 import { invalidateOpenTabCheckCache, isUrlOpenInAnotherTab, toComparableOpenTabUrl } from './open-anchor-tab-check';
 import type { ProgressEvent } from './download-progress-bus';
 import { handleAltRightClickReferrerBlacklist } from './anchor-referrer-blacklist-shortcut';
+import { createAnchorReferrerSyncDecorations } from './anchor-referrer-sync-decorations';
+import { isVisibleInViewport } from './viewport-visibility';
 
 type AnchorMediaRuntimeOptions = {
     getIsEnabled: () => boolean;
@@ -34,19 +39,6 @@ type AnchorMediaRuntimeOptions = {
     getReferrerCleanerQueryParams: () => string[];
     getPageHostname: () => string;
 };
-
-function isVisibleInViewport(element: Element): boolean {
-    const rect = element.getBoundingClientRect();
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-
-    return rect.bottom > 0
-        && rect.right > 0
-        && rect.top < viewportHeight
-        && rect.left < viewportWidth
-        && rect.width > 0
-        && rect.height > 0;
-}
 
 function isTerminalTransferStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
@@ -66,6 +58,8 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
     const observedAnchorMedia = new WeakSet<MediaElement>();
     const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
     const anchorCheckSequenceByMedia = new WeakMap<MediaElement, number>();
+    const referrerCheckStateByMedia = new WeakMap<MediaElement, { key: string; phase: 'pending' | 'settled' }>();
+    const localReferrerResultByKey = new Map<string, ReferrerMatchResult>();
     let isPaused = false;
     let pauseSequence = 0;
     let anchorCheckSequence = 0;
@@ -160,6 +154,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         const anchor = media.closest('a[href]');
         if (!(anchor instanceof HTMLAnchorElement)) {
             anchorReferrerKeyByMedia.delete(media);
+            referrerCheckStateByMedia.delete(media);
             clearAnchorMatchDecoration(media);
             clearAnchorMediaAttributes(media);
             return;
@@ -170,25 +165,44 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         const anchorHref = resolveEligibleAnchorReferrerUrl(anchor, referrerCleanerQueryParams);
         if (anchorHref === null) {
             anchorReferrerKeyByMedia.delete(media);
+            referrerCheckStateByMedia.delete(media);
             clearAnchorMatchDecoration(media);
             clearAnchorMediaAttributes(media);
             return;
         }
 
         const referrerKey = anchorHref;
-        const currentPauseSequence = pauseSequence;
-        anchorCheckSequence += 1;
-        const currentAnchorCheckSequence = anchorCheckSequence;
-        anchorReferrerKeyByMedia.set(media, referrerKey);
-        anchorCheckSequenceByMedia.set(media, currentAnchorCheckSequence);
         if (isCurrentPageAnchor(anchor)) {
+            anchorCheckSequence += 1;
+            anchorReferrerKeyByMedia.set(media, referrerKey);
+            anchorCheckSequenceByMedia.set(media, anchorCheckSequence);
             applyAnchorMediaSamePage(media);
             return;
         }
 
         const isCacheOnly = optionsOverride?.referrerMatchFromCacheOnly === true;
-        const cachedResult = getCachedReferrerCheck(anchorHref, referrerCleanerQueryParams);
+        const localResult = localReferrerResultByKey.get(referrerKey) ?? null;
+        const cachedResult = localResult ?? getCachedReferrerCheck(anchorHref, referrerCleanerQueryParams);
+        const previousCheckState = referrerCheckStateByMedia.get(media);
+        if (
+            !isCacheOnly
+            && previousCheckState?.key === referrerKey
+            && (
+                previousCheckState.phase === 'pending'
+                || (previousCheckState.phase === 'settled' && cachedResult?.exists !== true)
+            )
+        ) {
+            return;
+        }
+
+        const currentPauseSequence = pauseSequence;
+        anchorCheckSequence += 1;
+        const currentAnchorCheckSequence = anchorCheckSequence;
+        anchorReferrerKeyByMedia.set(media, referrerKey);
+        anchorCheckSequenceByMedia.set(media, currentAnchorCheckSequence);
+
         if (!isCacheOnly && cachedResult === null) {
+            referrerCheckStateByMedia.set(media, { key: referrerKey, phase: 'pending' });
             applyAnchorCheckingDecoration(media);
             media.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
             media.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
@@ -204,6 +218,11 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             : enqueueReferrerCheck(anchorHref, referrerCleanerQueryParams).then((result) => result);
 
         void referrerResultPromise.then((result) => {
+            if (!isCacheOnly && result !== null) {
+                localReferrerResultByKey.set(referrerKey, result);
+                referrerCheckStateByMedia.set(media, { key: referrerKey, phase: 'settled' });
+            }
+
             if (
                 isPaused
                 || currentPauseSequence !== pauseSequence
@@ -352,83 +371,16 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         }
     }
 
-    function applyReactionForReferrerUrl(
-        referrerUrl: string,
-        reaction: 'love' | 'like' | 'funny' | null | undefined,
-        downloadedAt: string | null | undefined,
-        blacklistedAt: string | null | undefined,
-    ): void {
-        const referrerCleanerQueryParams = options.getReferrerCleanerQueryParams();
-        const normalizedReferrerUrl = cleanupUrlQueryParams(referrerUrl, referrerCleanerQueryParams);
-        if (normalizedReferrerUrl === null) {
-            return;
-        }
-
-        forEachMatchingReferrerMedia([normalizedReferrerUrl], (mediaElement) => {
-            const reactionForDecoration = reaction === undefined
-                ? parseKnownReaction(mediaElement.getAttribute('data-atlas-anchor-reaction'))
-                : reaction;
-
-            const blacklistedForDecoration = blacklistedAt === undefined
-                ? mediaElement.getAttribute('data-atlas-anchor-blacklisted-at')
-                : blacklistedAt;
-
-            if (blacklistedForDecoration) {
-                applyAnchorBlacklistedDecoration(mediaElement);
-            } else {
-                applyAnchorMatchDecoration(mediaElement, reactionForDecoration);
-            }
-            mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-            mediaElement.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '1');
-            mediaElement.removeAttribute('data-atlas-anchor-checking');
-            mediaElement.removeAttribute('data-atlas-anchor-opened-elsewhere');
-            mediaElement.removeAttribute(ANCHOR_MEDIA_SAME_PAGE_ATTR);
-
-            if (reaction !== undefined) {
-                if (reaction) {
-                    mediaElement.setAttribute('data-atlas-anchor-reaction', reaction);
-                } else {
-                    mediaElement.removeAttribute('data-atlas-anchor-reaction');
-                }
-            }
-
-            if (downloadedAt !== undefined) {
-                if (downloadedAt) {
-                    mediaElement.setAttribute('data-atlas-anchor-downloaded-at', downloadedAt);
-                } else {
-                    mediaElement.removeAttribute('data-atlas-anchor-downloaded-at');
-                }
-            }
-
-            if (blacklistedAt !== undefined) {
-                if (blacklistedAt) {
-                    mediaElement.setAttribute('data-atlas-anchor-blacklisted-at', blacklistedAt);
-                } else {
-                    mediaElement.removeAttribute('data-atlas-anchor-blacklisted-at');
-                }
-            }
-        });
-    }
-
-    function applyPendingForReferrerUrls(referrerUrls: string[]): void {
-        forEachMatchingReferrerMedia(referrerUrls, (mediaElement) => {
-            applyAnchorCheckingDecoration(mediaElement);
-            mediaElement.setAttribute(ANCHOR_MEDIA_BORDER_ATTR, '1');
-            mediaElement.setAttribute(ANCHOR_MEDIA_MATCH_ATTR, '0');
-            mediaElement.setAttribute('data-atlas-anchor-checking', '1');
-            mediaElement.removeAttribute('data-atlas-anchor-opened-elsewhere');
-            mediaElement.removeAttribute(ANCHOR_MEDIA_SAME_PAGE_ATTR);
-            mediaElement.removeAttribute('data-atlas-anchor-reaction');
-            mediaElement.removeAttribute('data-atlas-anchor-downloaded-at');
-            mediaElement.removeAttribute('data-atlas-anchor-blacklisted-at');
-        });
-    }
-
-    function refreshReferrerUrlsFromCache(referrerUrls: string[]): void {
-        forEachMatchingReferrerMedia(referrerUrls, (mediaElement) => {
+    const syncDecorations = createAnchorReferrerSyncDecorations({
+        getReferrerCleanerQueryParams: options.getReferrerCleanerQueryParams,
+        forEachMatchingReferrerMedia,
+        markReferrerSettled: (mediaElement, referrerKey) => {
+            referrerCheckStateByMedia.set(mediaElement, { key: referrerKey, phase: 'settled' });
+        },
+        applyAnchorMediaBorderFromCache: (mediaElement) => {
             applyAnchorMediaBorder(mediaElement, { referrerMatchFromCacheOnly: true });
-        });
-    }
+        },
+    });
 
     function handleAltRightClick(event: MouseEvent): boolean {
         return handleAltRightClickReferrerBlacklist({
@@ -436,8 +388,8 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             isPaused: () => isPaused,
             resolveEligibleAnchorReferrerUrl,
             getReferrerCleanerQueryParams: options.getReferrerCleanerQueryParams,
-            applyPendingForReferrerUrls,
-            refreshReferrerUrlsFromCache,
+            applyPendingForReferrerUrls: syncDecorations.applyPendingForReferrerUrls,
+            refreshReferrerUrlsFromCache: syncDecorations.refreshReferrerUrlsFromCache,
         });
     }
 
@@ -467,8 +419,15 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
             downloadedAt: event.downloadedAt,
             blacklistedAt: event.blacklistedAt,
         }, referrerCleanerQueryParams);
+        localReferrerResultByKey.set(normalizedReferrer, {
+            exists: true,
+            reaction: event.reaction ?? null,
+            reactedAt: event.reactedAt ?? null,
+            downloadedAt: event.downloadedAt ?? null,
+            blacklistedAt: event.blacklistedAt ?? null,
+        });
 
-        applyReactionForReferrerUrl(normalizedReferrer, event.reaction ?? undefined, event.downloadedAt, event.blacklistedAt);
+        syncDecorations.applyReactionForReferrerUrl(normalizedReferrer, event.reaction ?? undefined, event.downloadedAt, event.blacklistedAt);
     }
 
     function handleTabPresenceChanged(urls: unknown): void {
@@ -520,14 +479,14 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
 
         if (phase === 'pending') {
             if (!isPaused) {
-                applyPendingForReferrerUrls(referrerUrls);
+                syncDecorations.applyPendingForReferrerUrls(referrerUrls);
             }
             return;
         }
 
         if (phase === 'failed') {
             if (!isPaused) {
-                refreshReferrerUrlsFromCache(referrerUrls);
+                syncDecorations.refreshReferrerUrlsFromCache(referrerUrls);
             }
             return;
         }
@@ -536,8 +495,16 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         const reactedAt = stringOrNull(payload.reactedAt);
         const downloadedAt = stringOrNull(payload.downloadedAt);
         const blacklistedAt = stringOrNull(payload.blacklistedAt);
+        const settledResult = {
+            exists: true,
+            reaction,
+            reactedAt,
+            downloadedAt,
+            blacklistedAt,
+        } satisfies ReferrerMatchResult;
 
         referrerUrls.forEach((referrerUrl) => {
+            localReferrerResultByKey.set(referrerUrl, settledResult);
             upsertReferrerCheckCache(referrerUrl, {
                 exists: true,
                 reaction,
@@ -546,7 +513,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
                 blacklistedAt,
             }, referrerCleanerQueryParams);
             if (!isPaused) {
-                applyReactionForReferrerUrl(referrerUrl, reaction, downloadedAt, blacklistedAt);
+                syncDecorations.applyReactionForReferrerUrl(referrerUrl, reaction, downloadedAt, blacklistedAt);
             }
         });
     }
