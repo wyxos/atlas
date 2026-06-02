@@ -40,6 +40,7 @@ describe('DownloadsQueueToolbar', () => {
                 batchIsRestarting: false,
                 batchIsResumingFailed: false,
                 batchIsRestartingFailed: false,
+                failedSourceUrlCount: 2,
                 removeIsDeleting: false,
             },
             global: {
@@ -49,6 +50,7 @@ describe('DownloadsQueueToolbar', () => {
 
         const buttons = wrapper.findAll('button');
         const trigger = buttons.find((button) => button.text().includes('All actions'));
+        const openSourcePagesButton = buttons.find((button) => button.text().includes('Open failed source pages (2)'));
         const resumeButton = buttons.find((button) => button.text().includes('Resume failed (2)'));
         const restartButton = buttons.find((button) => button.text().includes('Restart failed (3)'));
         const removeCompletedButton = buttons.find((button) => button.text().includes('Remove completed (1)'));
@@ -56,15 +58,17 @@ describe('DownloadsQueueToolbar', () => {
 
         expect(trigger?.exists()).toBe(true);
 
-        if (!resumeButton || !restartButton || !removeCompletedButton || !removeFilteredButton) {
+        if (!openSourcePagesButton || !resumeButton || !restartButton || !removeCompletedButton || !removeFilteredButton) {
             throw new Error('All-actions menu items were not rendered.');
         }
 
+        await openSourcePagesButton.trigger('click');
         await resumeButton.trigger('click');
         await restartButton.trigger('click');
         await removeCompletedButton.trigger('click');
         await removeFilteredButton.trigger('click');
 
+        expect(wrapper.emitted('openFailedSourcePages')).toHaveLength(1);
         expect(wrapper.emitted('resumeFailed')).toHaveLength(1);
         expect(wrapper.emitted('restartFailed')).toHaveLength(1);
         expect(wrapper.emitted('removeCompleted')).toHaveLength(1);
@@ -95,6 +99,7 @@ describe('DownloadsQueueToolbar', () => {
                 batchIsRestarting: false,
                 batchIsResumingFailed: false,
                 batchIsRestartingFailed: false,
+                failedSourceUrlCount: 0,
                 removeIsDeleting: false,
             },
             global: {
@@ -155,6 +160,7 @@ describe('DownloadsQueueToolbar', () => {
                 batchIsRestarting: false,
                 batchIsResumingFailed: false,
                 batchIsRestartingFailed: false,
+                failedSourceUrlCount: 0,
                 removeIsDeleting: false,
             },
             global: {

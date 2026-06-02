@@ -58,6 +58,7 @@ const {
     lastSelectedId,
     resumableFailedIds,
     restartableFailedIds,
+    failedSourceUrls,
     completedIds,
     allFilteredSelected,
     someFilteredSelected,
@@ -155,6 +156,12 @@ function handleRemoveFiltered(): void {
     openRemoveDialog('all', filteredIds.value);
 }
 
+function handleOpenFailedSourcePages(): void {
+    failedSourceUrls.value.forEach((url) => {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    });
+}
+
 watch([selectedStatus, searchQuery], () => {
     queueTableRef.value?.resetScroll();
     cancelActiveRequest();
@@ -203,9 +210,11 @@ watch([sortKey, sortDirection], () => {
                 :batch-is-restarting="batchIsRestarting"
                 :batch-is-resuming-failed="batchIsResumingFailed"
                 :batch-is-restarting-failed="batchIsRestartingFailed"
+                :failed-source-url-count="failedSourceUrls.length"
                 :remove-is-deleting="removeIsDeleting"
                 @select-status="handleStatusSelect"
                 @update:search-query="searchQuery = $event"
+                @open-failed-source-pages="handleOpenFailedSourcePages"
                 @resume-failed="resumeFailedDownloads"
                 @restart-failed="restartFailedDownloads"
                 @remove-completed="removeCompletedDownloads"
