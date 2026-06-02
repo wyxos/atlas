@@ -302,7 +302,7 @@ it('opens failed source pages from the toolbar action', async () => {
                 downloadQueueItem({
                     id: 302,
                     status: 'failed',
-                    referrer_url: 'https://www.deviantart.com/artist/art/example',
+                    referrer_url: 'https://www.deviantart.com/artist/art/second-example',
                 }),
                 downloadQueueItem({
                     id: 303,
@@ -339,13 +339,20 @@ it('opens failed source pages from the toolbar action', async () => {
         await flushPromises();
 
         const button = wrapper.get('[data-test="open-failed-source-pages"]');
-        expect(button.text()).toBe('1');
+        expect(button.text()).toBe('2');
 
         await button.trigger('click');
 
-        expect(openSpy).toHaveBeenCalledTimes(1);
-        expect(openSpy).toHaveBeenCalledWith(
+        expect(openSpy).toHaveBeenCalledTimes(2);
+        expect(openSpy).toHaveBeenNthCalledWith(
+            1,
             'https://www.deviantart.com/artist/art/example',
+            '_blank',
+            'noopener,noreferrer',
+        );
+        expect(openSpy).toHaveBeenNthCalledWith(
+            2,
+            'https://www.deviantart.com/artist/art/second-example',
             '_blank',
             'noopener,noreferrer',
         );

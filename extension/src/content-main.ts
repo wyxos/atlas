@@ -28,6 +28,7 @@ import { installPageVisibilityLifecycle, isPageVisible } from './content/page-wo
 import { shouldBypassBadgeCheckCacheForPageStart } from './content/restored-page-badge-check';
 import { isVisibleInViewport } from './content/viewport-visibility';
 import { createAnchorReferrerShortcutListener } from './content/anchor-referrer-shortcut-listener';
+import './content/atlas-source-tab-bridge-install';
 import { mediaHasEligibleWidgetWidth as mediaWidthExceedsThreshold } from './content/widget-media-eligibility';
 
 const OBSERVED_ATTRS = ['src', 'srcset', 'poster'] as const;

@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
     canRestartDownloadQueueItem,
     canResumeDownloadQueueItem,
+    DOWNLOAD_QUEUE_SOURCE_TAB_BRIDGE_ATTR,
+    DOWNLOAD_QUEUE_SOURCE_TAB_MESSAGE_TYPE,
     downloadQueueItemMatchesSearch,
     getFailedDownloadQueueSourceUrls,
+    openDownloadQueueSourceUrls,
 } from '@/utils/downloadQueue';
 import type { DownloadQueueItem } from '@/types/downloadQueue';
 
@@ -83,5 +86,61 @@ describe('downloadQueue failed source URLs', () => {
         ])).toEqual([
             'https://www.deviantart.com/artist/art/example',
         ]);
+    });
+
+    it('falls back to opening every source URL from the page when the extension bridge is unavailable', () => {
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+        try {
+            document.documentElement.removeAttribute(DOWNLOAD_QUEUE_SOURCE_TAB_BRIDGE_ATTR);
+
+            openDownloadQueueSourceUrls([
+                'https://www.deviantart.com/artist/art/first',
+                'https://www.deviantart.com/artist/art/second',
+            ]);
+
+            expect(openSpy).toHaveBeenCalledTimes(2);
+            expect(openSpy).toHaveBeenNthCalledWith(
+                1,
+                'https://www.deviantart.com/artist/art/first',
+                '_blank',
+                'noopener,noreferrer',
+            );
+            expect(openSpy).toHaveBeenNthCalledWith(
+                2,
+                'https://www.deviantart.com/artist/art/second',
+                '_blank',
+                'noopener,noreferrer',
+            );
+        } finally {
+            openSpy.mockRestore();
+        }
+    });
+
+    it('delegates all source URLs to the Atlas extension bridge when it is available', () => {
+        const postMessageSpy = vi.spyOn(window, 'postMessage').mockImplementation(() => {});
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+        try {
+            document.documentElement.setAttribute(DOWNLOAD_QUEUE_SOURCE_TAB_BRIDGE_ATTR, '1');
+
+            openDownloadQueueSourceUrls([
+                'https://www.deviantart.com/artist/art/first',
+                'https://www.deviantart.com/artist/art/second',
+            ]);
+
+            expect(postMessageSpy).toHaveBeenCalledWith({
+                type: DOWNLOAD_QUEUE_SOURCE_TAB_MESSAGE_TYPE,
+                urls: [
+                    'https://www.deviantart.com/artist/art/first',
+                    'https://www.deviantart.com/artist/art/second',
+                ],
+            }, window.location.origin);
+            expect(openSpy).not.toHaveBeenCalled();
+        } finally {
+            document.documentElement.removeAttribute(DOWNLOAD_QUEUE_SOURCE_TAB_BRIDGE_ATTR);
+            postMessageSpy.mockRestore();
+            openSpy.mockRestore();
+        }
     });
 });

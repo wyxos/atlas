@@ -12,6 +12,7 @@ import {
     type DownloadQueueFilterStatus,
     type DownloadQueueItem,
 } from '@/types/downloadQueue';
+import { openDownloadQueueSourceUrls } from '@/utils/downloadQueue';
 
 const ITEM_HEIGHT = 64;
 
@@ -157,9 +158,7 @@ function handleRemoveFiltered(): void {
 }
 
 function handleOpenFailedSourcePages(): void {
-    failedSourceUrls.value.forEach((url) => {
-        window.open(url, '_blank', 'noopener,noreferrer');
-    });
+    openDownloadQueueSourceUrls(failedSourceUrls.value);
 }
 
 watch([selectedStatus, searchQuery], () => {

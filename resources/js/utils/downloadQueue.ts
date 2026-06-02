@@ -33,6 +33,9 @@ const FILTER_LABELS: Record<DownloadQueueStatus, string> = {
     canceled: 'Canceled',
 };
 
+export const DOWNLOAD_QUEUE_SOURCE_TAB_BRIDGE_ATTR = 'data-atlas-extension-source-tab-bridge';
+export const DOWNLOAD_QUEUE_SOURCE_TAB_MESSAGE_TYPE = 'ATLAS_OPEN_SOURCE_TABS';
+
 export function getDownloadQueueStatusClass(status: string): string {
     return STATUS_STYLES[status as DownloadQueueStatus] ?? 'bg-prussian-blue-600 border border-blue-slate-500 text-blue-slate-200';
 }
@@ -155,6 +158,24 @@ export function getFailedDownloadQueueSourceUrls(items: DownloadQueueItem[]): st
     });
 
     return Array.from(urls);
+}
+
+export function openDownloadQueueSourceUrls(urls: string[]): void {
+    if (urls.length === 0) {
+        return;
+    }
+
+    if (document.documentElement.getAttribute(DOWNLOAD_QUEUE_SOURCE_TAB_BRIDGE_ATTR) === '1') {
+        window.postMessage({
+            type: DOWNLOAD_QUEUE_SOURCE_TAB_MESSAGE_TYPE,
+            urls,
+        }, window.location.origin);
+        return;
+    }
+
+    urls.forEach((url) => {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    });
 }
 
 function pad2(value: number): string {
