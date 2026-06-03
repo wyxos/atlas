@@ -21,7 +21,7 @@ type ReverbPingLoad = {
     promise: Promise<ReverbPingResult>;
 };
 
-const REVERB_PING_CACHE_TTL_MS = 30 * 1000;
+const REVERB_PING_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let cacheEntry: ReverbPingCacheEntry | null = null;
 let activeLoad: ReverbPingLoad | null = null;

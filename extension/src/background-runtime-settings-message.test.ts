@@ -12,6 +12,7 @@ describe('background runtime settings message bridge', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.unstubAllGlobals();
+        vi.useRealTimers();
     });
 
     it('relays Atlas extension settings writes through the background fetch path', async () => {
@@ -154,6 +155,58 @@ describe('background runtime settings message bridge', () => {
 
         await sendAtlasApiRequest(getMessage);
         expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps cached extension settings and ping reads across short status polling windows', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+        const settings = {
+            version: 1,
+            siteCustomizations: [],
+            closeTabAfterQueueByDomain: {},
+            reactAllItemsInPostByDomain: {},
+        };
+        const pingPayload = {
+            ok: true,
+            reverb: {
+                enabled: true,
+                key: 'atlas-key',
+                host: 'atlas.wyxos.com',
+                port: 443,
+                scheme: 'https',
+                channel: 'private-extension-downloads.test-hash',
+            },
+        };
+        const fetchMock = vi.fn(async (endpoint: string) => {
+            if (endpoint.endsWith('/api/extension/ping')) {
+                return new Response(JSON.stringify(pingPayload), { status: 200 });
+            }
+
+            return new Response(JSON.stringify({ settings }), { status: 200 });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const settingsMessage = {
+            type: 'ATLAS_API_REQUEST',
+            atlasDomain: 'https://atlas.wyxos.com',
+            apiToken: 'polling-cache-token',
+            endpoint: 'https://atlas.wyxos.com/api/extension/settings',
+            method: 'GET',
+        };
+        const pingMessage = {
+            ...settingsMessage,
+            endpoint: 'https://atlas.wyxos.com/api/extension/ping',
+        };
+
+        await sendAtlasApiRequest(settingsMessage);
+        await sendAtlasApiRequest(pingMessage);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+
+        vi.setSystemTime(new Date('2026-01-01T00:02:00.000Z'));
+        await sendAtlasApiRequest(settingsMessage);
+        await sendAtlasApiRequest(pingMessage);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it('relays extension file deletion through the background fetch path', async () => {

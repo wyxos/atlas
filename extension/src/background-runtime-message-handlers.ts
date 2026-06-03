@@ -84,10 +84,10 @@ type QueueReferrerCheckPayload = {
 
 const ATLAS_CHECK_PRIORITY_NORMAL = 1;
 const ATLAS_CHECK_PRIORITY_ACTIVE = 2;
-const CACHED_ATLAS_GET_REQUEST_TTL_MS = 10 * 1000;
+const CACHED_ATLAS_GET_REQUEST_TTL_MS = 5 * 60 * 1000;
 
-let cachedAtlasApiRequestEntry: CachedAtlasApiRequestEntry | null = null;
-let cachedAtlasApiRequestLoad: CachedAtlasApiRequestLoad | null = null;
+const cachedAtlasApiRequestEntries = new Map<string, CachedAtlasApiRequestEntry>();
+const cachedAtlasApiRequestLoads = new Map<string, CachedAtlasApiRequestLoad>();
 
 type QueueRuntimeOptions = {
     cacheOnly: boolean;
@@ -146,21 +146,21 @@ function atlasGetRequestCacheKey(endpoint: string, apiToken: string): string {
 }
 
 function getCachedAtlasApiResponse(cacheKey: string): AtlasApiRuntimeResponse | null {
-    if (cachedAtlasApiRequestEntry === null
-        || cachedAtlasApiRequestEntry.cacheKey !== cacheKey
-        || Date.now() - cachedAtlasApiRequestEntry.cachedAt >= CACHED_ATLAS_GET_REQUEST_TTL_MS) {
+    const cachedEntry = cachedAtlasApiRequestEntries.get(cacheKey);
+    if (cachedEntry === undefined
+        || Date.now() - cachedEntry.cachedAt >= CACHED_ATLAS_GET_REQUEST_TTL_MS) {
         return null;
     }
 
-    return cachedAtlasApiRequestEntry.response;
+    return cachedEntry.response;
 }
 
 function rememberAtlasApiResponse(cacheKey: string, response: AtlasApiRuntimeResponse): void {
-    cachedAtlasApiRequestEntry = {
+    cachedAtlasApiRequestEntries.set(cacheKey, {
         cacheKey,
         cachedAt: Date.now(),
         response,
-    };
+    });
 }
 
 function resolveQueueRuntimeOptions(payload: { pageVisibility?: unknown }, sender: RuntimeMessageSender): QueueRuntimeOptions {
@@ -457,8 +457,9 @@ export function handleAtlasApiRequestRuntimeMessage(
             return true;
         }
 
-        if (cachedAtlasApiRequestLoad !== null && cachedAtlasApiRequestLoad.cacheKey === cacheKey) {
-            void cachedAtlasApiRequestLoad.promise
+        const cachedLoad = cachedAtlasApiRequestLoads.get(cacheKey);
+        if (cachedLoad !== undefined) {
+            void cachedLoad.promise
                 .then(sendResponse)
                 .catch(() => {
                     sendResponse({ ok: false, status: 0, payload: null });
@@ -476,10 +477,10 @@ export function handleAtlasApiRequestRuntimeMessage(
         }));
 
     if (isCacheableAtlasGetRequest) {
-        cachedAtlasApiRequestLoad = {
+        cachedAtlasApiRequestLoads.set(cacheKey, {
             cacheKey,
             promise: requestPromise,
-        };
+        });
     }
 
     void requestPromise
@@ -494,8 +495,8 @@ export function handleAtlasApiRequestRuntimeMessage(
             sendResponse({ ok: false, status: 0, payload: null });
         })
         .finally(() => {
-            if (cachedAtlasApiRequestLoad?.promise === requestPromise) {
-                cachedAtlasApiRequestLoad = null;
+            if (cachedAtlasApiRequestLoads.get(cacheKey)?.promise === requestPromise) {
+                cachedAtlasApiRequestLoads.delete(cacheKey);
             }
         });
 

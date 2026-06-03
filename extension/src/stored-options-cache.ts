@@ -2,7 +2,6 @@ import type { StoredOptions } from './atlas-options';
 
 type StoredOptionsCacheEntry = {
     cacheKey: string;
-    cachedAt: number;
     options: StoredOptions;
 };
 
@@ -10,8 +9,6 @@ type StoredOptionsLoad = {
     cacheKey: string;
     promise: Promise<StoredOptions>;
 };
-
-const STORED_OPTIONS_CACHE_TTL_MS = 10 * 1000;
 
 let cacheEntry: StoredOptionsCacheEntry | null = null;
 let activeLoad: StoredOptionsLoad | null = null;
@@ -30,9 +27,7 @@ export function getStoredOptionsCacheGeneration(): number {
 }
 
 export function getFreshStoredOptions(cacheKey: string): StoredOptions | null {
-    if (cacheEntry === null
-        || cacheEntry.cacheKey !== cacheKey
-        || Date.now() - cacheEntry.cachedAt >= STORED_OPTIONS_CACHE_TTL_MS) {
+    if (cacheEntry === null || cacheEntry.cacheKey !== cacheKey) {
         return null;
     }
 
@@ -63,7 +58,6 @@ export function forgetStoredOptionsLoad(promise: Promise<StoredOptions>): void {
 export function rememberStoredOptions(cacheKey: string, options: StoredOptions): StoredOptions {
     cacheEntry = {
         cacheKey,
-        cachedAt: Date.now(),
         options,
     };
 
