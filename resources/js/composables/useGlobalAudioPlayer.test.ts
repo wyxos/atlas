@@ -165,6 +165,71 @@ describe('useGlobalAudioPlayer', () => {
         expect(restoredPlayer.queue.value.map((track) => track.id)).toEqual([9]);
     });
 
+    it('persists a queue replacement with one storage write', async () => {
+        vi.resetModules();
+        window.sessionStorage.removeItem(AUDIO_PLAYER_STATE_STORAGE_KEY);
+        let playerStateStringifyCount = 0;
+        const stringify = JSON.stringify.bind(JSON);
+        vi.spyOn(JSON, 'stringify').mockImplementation((value, ...args) => {
+            if (
+                value
+                && typeof value === 'object'
+                && 'version' in value
+                && Array.isArray((value as { queue?: unknown }).queue)
+            ) {
+                playerStateStringifyCount += 1;
+            }
+
+            return stringify(value, ...args);
+        });
+
+        const { useGlobalAudioPlayer } = await import('./useGlobalAudioPlayer');
+        const player = useGlobalAudioPlayer();
+
+        player.queueAndPlay([testTrack(1), testTrack(2)], 1, { queueLabel: 'Likes' });
+
+        expect(playerStateStringifyCount).toBe(1);
+        expect(JSON.parse(window.sessionStorage.getItem(AUDIO_PLAYER_STATE_STORAGE_KEY) ?? '{}')).toMatchObject({
+            currentTrackId: 1,
+            isPlaying: true,
+            queueLabel: 'Likes',
+            queue: [
+                expect.objectContaining({ id: 1 }),
+                expect.objectContaining({ id: 2 }),
+            ],
+        });
+    });
+
+    it('does not persist the full queue when hydrating queued track details', async () => {
+        vi.resetModules();
+        window.sessionStorage.removeItem(AUDIO_PLAYER_STATE_STORAGE_KEY);
+        let playerStateStringifyCount = 0;
+        const stringify = JSON.stringify.bind(JSON);
+        vi.spyOn(JSON, 'stringify').mockImplementation((value, ...args) => {
+            if (
+                value
+                && typeof value === 'object'
+                && 'version' in value
+                && Array.isArray((value as { queue?: unknown }).queue)
+            ) {
+                playerStateStringifyCount += 1;
+            }
+
+            return stringify(value, ...args);
+        });
+
+        const { useGlobalAudioPlayer } = await import('./useGlobalAudioPlayer');
+        const player = useGlobalAudioPlayer();
+
+        player.queueAndPlay([testTrack(1), testTrack(2)], 1, { queueLabel: 'Likes' });
+        playerStateStringifyCount = 0;
+
+        player.updateQueuedTracks([testTrack(1, { title: 'Hydrated Track' })]);
+
+        expect(player.currentTrack.value?.title).toBe('Hydrated Track');
+        expect(playerStateStringifyCount).toBe(0);
+    });
+
     it('removes persisted player state when the queue is cleared', async () => {
         vi.resetModules();
 

@@ -231,11 +231,15 @@ function handlePlaylistSelect(playlist: AudioPlaylist): void {
     });
 }
 
-function audioPlayerTrack(audioId: number): AudioPlayerTrack {
+function audioPlayerTracksById(): Map<number, AudioPlayerTrack> {
+    return new Map(audioPlayer.queue.value.map((track) => [track.id, track]));
+}
+
+function audioPlayerTrack(audioId: number, existingTracksById: Map<number, AudioPlayerTrack>): AudioPlayerTrack {
     const details = detailsById.value[audioId];
 
     if (details === undefined) {
-        const existingTrack = audioPlayer.queue.value.find((track) => track.id === audioId);
+        const existingTrack = existingTracksById.get(audioId);
         if (existingTrack) {
             return existingTrack;
         }
@@ -263,11 +267,24 @@ function audioPlayerTrack(audioId: number): AudioPlayerTrack {
 }
 
 function audioPlayerQueue(): AudioPlayerTrack[] {
-    return filteredAudioIds.value.map(audioPlayerTrack);
+    const existingTracksById = audioPlayerTracksById();
+
+    return filteredAudioIds.value.map((audioId) => audioPlayerTrack(audioId, existingTracksById));
+}
+
+function hasReusableCurrentQueue(): boolean {
+    return playerCurrentTrackId.value !== null
+        && audioPlayer.queue.value.length > 0
+        && filteredAudioIds.value.includes(playerCurrentTrackId.value);
 }
 
 function handleAudioSelect(audioId: number): void {
     selectedAudioId.value = audioId;
+
+    if (hasReusableCurrentQueue()) {
+        return;
+    }
+
     audioPlayer.queueTracks(audioPlayerQueue(), audioId, { queueLabel: activePlaylistLabel.value });
 }
 
@@ -405,8 +422,28 @@ watch(activePlaylistSlug, () => {
     void loadAllAudioIds();
 });
 
-watch(detailsById, () => {
-    audioPlayer.updateQueuedTracks(audioPlayerQueue());
+watch(detailsById, (nextDetails, previousDetails) => {
+    if (!audioPlayer.hasQueue.value) {
+        return;
+    }
+
+    const queuedIds = new Set(audioPlayer.queue.value.map((track) => track.id));
+    const existingTracksById = audioPlayerTracksById();
+    const changedQueuedTracks = Object.keys(nextDetails).flatMap((audioId) => {
+        const id = Number(audioId);
+
+        if (!Number.isInteger(id) || !queuedIds.has(id) || nextDetails[id] === previousDetails?.[id]) {
+            return [];
+        }
+
+        return [audioPlayerTrack(id, existingTracksById)];
+    });
+
+    if (changedQueuedTracks.length === 0) {
+        return;
+    }
+
+    audioPlayer.updateQueuedTracks(changedQueuedTracks);
 });
 
 watch(audioPlayer.trackFocusRequest, (request) => {
