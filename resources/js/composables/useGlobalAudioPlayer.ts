@@ -187,6 +187,9 @@ const unshuffledQueueIds = ref<number[]>(storedState?.unshuffledQueueIds ?? trac
 const trackFocusRequest = ref<AudioTrackFocusRequest | null>(null);
 const isQueueSheetOpen = ref(false);
 let trackFocusRequestSequence = 0;
+let isBatchingAudioPlayerState = false;
+let hasPendingAudioPlayerStateWrite = false;
+let isSkippingAudioPlayerStateWrite = false;
 
 function writeAudioPlayerState(): void {
     if (typeof window === 'undefined' || !('sessionStorage' in window)) {
@@ -215,8 +218,46 @@ function writeAudioPlayerState(): void {
     }
 }
 
-watch([queue, queueLabel, currentTrackId, isShuffleEnabled, isPlaying, playbackPositionSeconds, repeatMode, unshuffledQueueIds], writeAudioPlayerState, {
-    deep: true,
+function persistAudioPlayerState(): void {
+    if (isSkippingAudioPlayerStateWrite) {
+        return;
+    }
+
+    if (isBatchingAudioPlayerState) {
+        hasPendingAudioPlayerStateWrite = true;
+        return;
+    }
+
+    writeAudioPlayerState();
+}
+
+function batchAudioPlayerState(updates: () => void): void {
+    isBatchingAudioPlayerState = true;
+
+    try {
+        updates();
+    } finally {
+        isBatchingAudioPlayerState = false;
+
+        if (hasPendingAudioPlayerStateWrite) {
+            hasPendingAudioPlayerStateWrite = false;
+            writeAudioPlayerState();
+        }
+    }
+}
+
+function withoutAudioPlayerStatePersistence(updates: () => void): void {
+    const wasSkippingAudioPlayerStateWrite = isSkippingAudioPlayerStateWrite;
+    isSkippingAudioPlayerStateWrite = true;
+
+    try {
+        updates();
+    } finally {
+        isSkippingAudioPlayerStateWrite = wasSkippingAudioPlayerStateWrite;
+    }
+}
+
+watch([queue, queueLabel, currentTrackId, isShuffleEnabled, isPlaying, playbackPositionSeconds, repeatMode, unshuffledQueueIds], persistAudioPlayerState, {
     flush: 'sync',
 });
 
@@ -237,13 +278,15 @@ function setQueueLabel(options?: AudioQueueOptions): void {
 function queueAndPlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, trackId: number, options?: AudioQueueOptions): void {
     const nextQueue = tracks.map(withPlaybackUrl);
 
-    queue.value = nextQueue;
-    unshuffledQueueIds.value = trackIds(nextQueue);
-    isShuffleEnabled.value = false;
-    setQueueLabel(options);
-    playbackPositionSeconds.value = 0;
-    currentTrackId.value = trackId;
-    isPlaying.value = true;
+    batchAudioPlayerState(() => {
+        queue.value = nextQueue;
+        unshuffledQueueIds.value = trackIds(nextQueue);
+        isShuffleEnabled.value = false;
+        setQueueLabel(options);
+        playbackPositionSeconds.value = 0;
+        currentTrackId.value = trackId;
+        isPlaying.value = true;
+    });
 }
 
 function queueAndShufflePlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, options?: AudioQueueOptions): void {
@@ -253,26 +296,30 @@ function queueAndShufflePlay(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'>
         return;
     }
 
-    unshuffledQueueIds.value = trackIds(nextQueue);
-    queue.value = nextQueue.length > 1 ? shuffledTracks(nextQueue) : nextQueue;
-    isShuffleEnabled.value = true;
-    setQueueLabel(options);
-    playbackPositionSeconds.value = 0;
-    currentTrackId.value = queue.value[0]?.id ?? null;
-    isPlaying.value = true;
+    batchAudioPlayerState(() => {
+        unshuffledQueueIds.value = trackIds(nextQueue);
+        queue.value = nextQueue.length > 1 ? shuffledTracks(nextQueue) : nextQueue;
+        isShuffleEnabled.value = true;
+        setQueueLabel(options);
+        playbackPositionSeconds.value = 0;
+        currentTrackId.value = queue.value[0]?.id ?? null;
+        isPlaying.value = true;
+    });
 }
 
 function queueTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>, trackId?: number, options?: AudioQueueOptions): void {
     const nextQueue = tracks.map(withPlaybackUrl);
 
     if (nextQueue.length === 0) {
-        queue.value = [];
-        queueLabel.value = null;
-        unshuffledQueueIds.value = [];
-        isShuffleEnabled.value = false;
-        currentTrackId.value = null;
-        playbackPositionSeconds.value = 0;
-        isPlaying.value = false;
+        batchAudioPlayerState(() => {
+            queue.value = [];
+            queueLabel.value = null;
+            unshuffledQueueIds.value = [];
+            isShuffleEnabled.value = false;
+            currentTrackId.value = null;
+            playbackPositionSeconds.value = 0;
+            isPlaying.value = false;
+        });
         return;
     }
 
@@ -280,12 +327,14 @@ function queueTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { pla
         return;
     }
 
-    queue.value = nextQueue;
-    unshuffledQueueIds.value = trackIds(nextQueue);
-    isShuffleEnabled.value = false;
-    setQueueLabel(options);
-    playbackPositionSeconds.value = 0;
-    currentTrackId.value = nextQueue.find((track) => track.id === trackId)?.id ?? nextQueue[0]?.id ?? null;
+    batchAudioPlayerState(() => {
+        queue.value = nextQueue;
+        unshuffledQueueIds.value = trackIds(nextQueue);
+        isShuffleEnabled.value = false;
+        setQueueLabel(options);
+        playbackPositionSeconds.value = 0;
+        currentTrackId.value = nextQueue.find((track) => track.id === trackId)?.id ?? nextQueue[0]?.id ?? null;
+    });
 }
 
 function updateQueuedTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> & { playbackUrl?: string }>): void {
@@ -294,7 +343,10 @@ function updateQueuedTracks(tracks: Array<Omit<AudioPlayerTrack, 'playbackUrl'> 
     }
 
     const updatesById = new Map(tracks.map((track) => [track.id, withPlaybackUrl(track)]));
-    queue.value = queue.value.map((track) => updatesById.get(track.id) ?? track);
+
+    withoutAudioPlayerStatePersistence(() => {
+        queue.value = queue.value.map((track) => updatesById.get(track.id) ?? track);
+    });
 }
 
 function updateCurrentTrack(updates: Partial<AudioPlayerTrack>): void {
@@ -336,16 +388,20 @@ function playQueueTrack(trackId: number): void {
 
 function playPrevious(): void {
     if (currentTrackIndex.value > 0) {
-        playbackPositionSeconds.value = 0;
-        currentTrackId.value = queue.value[currentTrackIndex.value - 1]?.id ?? currentTrackId.value;
-        isPlaying.value = true;
+        batchAudioPlayerState(() => {
+            playbackPositionSeconds.value = 0;
+            currentTrackId.value = queue.value[currentTrackIndex.value - 1]?.id ?? currentTrackId.value;
+            isPlaying.value = true;
+        });
         return;
     }
 
     if (repeatMode.value === 'all' && queue.value.length > 1) {
-        playbackPositionSeconds.value = 0;
-        currentTrackId.value = queue.value[queue.value.length - 1]?.id ?? currentTrackId.value;
-        isPlaying.value = true;
+        batchAudioPlayerState(() => {
+            playbackPositionSeconds.value = 0;
+            currentTrackId.value = queue.value[queue.value.length - 1]?.id ?? currentTrackId.value;
+            isPlaying.value = true;
+        });
         return;
     }
 
@@ -356,16 +412,20 @@ function playPrevious(): void {
 
 function playNext(): void {
     if (currentTrackIndex.value >= 0 && currentTrackIndex.value < queue.value.length - 1) {
-        playbackPositionSeconds.value = 0;
-        currentTrackId.value = queue.value[currentTrackIndex.value + 1]?.id ?? currentTrackId.value;
-        isPlaying.value = true;
+        batchAudioPlayerState(() => {
+            playbackPositionSeconds.value = 0;
+            currentTrackId.value = queue.value[currentTrackIndex.value + 1]?.id ?? currentTrackId.value;
+            isPlaying.value = true;
+        });
         return;
     }
 
     if (repeatMode.value === 'all' && queue.value.length > 0) {
-        playbackPositionSeconds.value = 0;
-        currentTrackId.value = queue.value[0]?.id ?? currentTrackId.value;
-        isPlaying.value = true;
+        batchAudioPlayerState(() => {
+            playbackPositionSeconds.value = 0;
+            currentTrackId.value = queue.value[0]?.id ?? currentTrackId.value;
+            isPlaying.value = true;
+        });
         return;
     }
 
@@ -374,18 +434,20 @@ function playNext(): void {
 
 function shuffleQueue(): void {
     if (queue.value.length === 0) {
-        unshuffledQueueIds.value = trackIds(queue.value);
-        isShuffleEnabled.value = false;
+        batchAudioPlayerState(() => {
+            unshuffledQueueIds.value = trackIds(queue.value);
+            isShuffleEnabled.value = false;
+        });
         return;
     }
 
     if (isShuffleEnabled.value) {
-        queue.value = orderTracksByIds(queue.value, unshuffledQueueIds.value);
-        isShuffleEnabled.value = false;
+        batchAudioPlayerState(() => {
+            queue.value = orderTracksByIds(queue.value, unshuffledQueueIds.value);
+            isShuffleEnabled.value = false;
+        });
         return;
     }
-
-    unshuffledQueueIds.value = trackIds(queue.value);
 
     const activeTrack = currentTrack.value;
     const tracksToShuffle = activeTrack
@@ -393,8 +455,11 @@ function shuffleQueue(): void {
         : [...queue.value];
 
     const shuffled = shuffledTracks(tracksToShuffle);
-    queue.value = activeTrack ? [activeTrack, ...shuffled] : shuffled;
-    isShuffleEnabled.value = true;
+    batchAudioPlayerState(() => {
+        unshuffledQueueIds.value = trackIds(queue.value);
+        queue.value = activeTrack ? [activeTrack, ...shuffled] : shuffled;
+        isShuffleEnabled.value = true;
+    });
 }
 
 function cycleRepeatMode(): void {
@@ -415,20 +480,24 @@ function restartCurrentTrack(): void {
         return;
     }
 
-    playbackPositionSeconds.value = 0;
-    isPlaying.value = true;
+    batchAudioPlayerState(() => {
+        playbackPositionSeconds.value = 0;
+        isPlaying.value = true;
+    });
 }
 
 function clear(): void {
-    queue.value = [];
-    queueLabel.value = null;
-    unshuffledQueueIds.value = [];
-    isShuffleEnabled.value = false;
-    currentTrackId.value = null;
-    playbackPositionSeconds.value = 0;
-    isPlaying.value = false;
-    repeatMode.value = 'none';
-    isQueueSheetOpen.value = false;
+    batchAudioPlayerState(() => {
+        queue.value = [];
+        queueLabel.value = null;
+        unshuffledQueueIds.value = [];
+        isShuffleEnabled.value = false;
+        currentTrackId.value = null;
+        playbackPositionSeconds.value = 0;
+        isPlaying.value = false;
+        repeatMode.value = 'none';
+        isQueueSheetOpen.value = false;
+    });
 }
 
 function updatePlaybackPosition(seconds: number): void {
