@@ -5,6 +5,7 @@ import type { AudioDetailsResponse } from '@/types/audio';
 type GlobalAudioPlayer = ReturnType<typeof useGlobalAudioPlayer>;
 
 const loadingQueueDetailIds = ref<Set<number>>(new Set());
+const refreshedQueueDetailIds = ref<Set<number>>(new Set());
 
 function formatSeconds(value: number): string {
     const seconds = Math.max(0, Math.floor(value));
@@ -20,6 +21,18 @@ function formatOptionalDuration(value: number | null): string {
 
 function needsQueueDetails(track: AudioPlayerTrack): boolean {
     return track.artists === 'Loading metadata...';
+}
+
+function shouldLoadQueueDetails(track: AudioPlayerTrack, force: boolean): boolean {
+    if (loadingQueueDetailIds.value.has(track.id)) {
+        return false;
+    }
+
+    if (needsQueueDetails(track)) {
+        return true;
+    }
+
+    return force && !refreshedQueueDetailIds.value.has(track.id);
 }
 
 function hydratedQueueTrack(
@@ -76,13 +89,15 @@ export function useAudioQueueDetails(audioPlayer: GlobalAudioPlayer) {
             .filter((track): track is AudioPlayerTrack => track !== undefined);
     }
 
-    async function loadQueueDetails(tracks: AudioPlayerTrack[]): Promise<void> {
+    async function loadQueueDetails(tracks: AudioPlayerTrack[], force = false): Promise<void> {
         const tracksById = new Map(tracks.map((track) => [track.id, track]));
-        const tracksNeedingDetails = [...tracksById.values()].filter((track) =>
-            needsQueueDetails(track)
-            && !loadingQueueDetailIds.value.has(track.id));
+        const tracksNeedingDetails = [...tracksById.values()].filter((track) => shouldLoadQueueDetails(track, force));
 
         if (tracksNeedingDetails.length === 0) {
+            return;
+        }
+
+        if (!window.axios?.post) {
             return;
         }
 
@@ -104,6 +119,7 @@ export function useAudioQueueDetails(audioPlayer: GlobalAudioPlayer) {
             });
 
             audioPlayer.updateQueuedTracks(hydratedTracks);
+            refreshedQueueDetailIds.value = new Set([...refreshedQueueDetailIds.value, ...ids]);
         } catch (error) {
             console.error('Failed to load queue audio details:', error);
         } finally {
@@ -117,13 +133,14 @@ export function useAudioQueueDetails(audioPlayer: GlobalAudioPlayer) {
     }
 
     function preloadPlaybackWindow(): void {
-        void loadQueueDetails(playbackWindowTracks());
+        void loadQueueDetails(playbackWindowTracks(), true);
     }
 
     watch(
         () => audioPlayer.queue.value.map((track) => track.id).join(','),
         () => {
             loadingQueueDetailIds.value = new Set();
+            refreshedQueueDetailIds.value = new Set();
             preloadPlaybackWindow();
         },
     );

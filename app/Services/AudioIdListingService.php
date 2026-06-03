@@ -281,7 +281,8 @@ class AudioIdListingService
      */
     private function durationSeconds(File $file, array $payload): ?int
     {
-        $seconds = data_get($payload, 'duration_seconds')
+        $seconds = data_get($payload, 'audio.duration_seconds')
+            ?? data_get($payload, 'duration_seconds')
             ?? data_get($payload, 'duration')
             ?? data_get($payload, 'probe.format.duration')
             ?? data_get($file->listing_metadata, 'duration_seconds');

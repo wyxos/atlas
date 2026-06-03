@@ -21,7 +21,8 @@ class AudioMetadataValueExtractor
      */
     public function durationSeconds(File $file, array $payload): ?int
     {
-        $seconds = data_get($payload, 'duration_seconds')
+        $seconds = data_get($payload, 'audio.duration_seconds')
+            ?? data_get($payload, 'duration_seconds')
             ?? data_get($payload, 'duration')
             ?? data_get($payload, 'probe.format.duration')
             ?? data_get($file->listing_metadata, 'duration_seconds');
@@ -145,7 +146,13 @@ class AudioMetadataValueExtractor
      */
     private function metadataSources(array $payload): array
     {
-        $sources = [$payload];
+        $sources = [];
+        $audio = data_get($payload, 'audio');
+        if (is_array($audio)) {
+            $sources[] = $audio;
+        }
+
+        $sources[] = $payload;
         $formatTags = data_get($payload, 'probe.format.tags');
         if (is_array($formatTags)) {
             $sources[] = $formatTags;

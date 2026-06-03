@@ -150,6 +150,58 @@ describe('useAudioQueueDetails', () => {
         expect(post).toHaveBeenCalledTimes(1);
     });
 
+    it('refreshes persisted current track details even when metadata looks complete', async () => {
+        const post = vi.fn()
+            .mockResolvedValue({
+                data: {
+                    items: [
+                        {
+                            id: 745,
+                            title: 'The Theme From GTO',
+                            source: 'Local',
+                            artists: ['本間勇輔'],
+                            albums: ['TVアニメーション GTO オリジナルサウンドトラック'],
+                            cover_url: '/api/audio/album-covers/4460',
+                            duration_seconds: 201,
+                            reaction: null,
+                            blacklisted_at: null,
+                            previewed_count: 0,
+                            seen_count: 0,
+                        },
+                    ],
+                },
+            });
+        Object.assign(window, {
+            axios: { post },
+        });
+
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(745, {
+                title: 'The Theme From GTO',
+                artists: 'Yusuke Honma',
+                album: 'GTO TV Animation Original Soundtrack',
+                coverUrl: null,
+                duration: '3:21',
+                durationSeconds: 201,
+            }),
+        ], 745);
+
+        scope = effectScope();
+        scope.run(() => useAudioQueueDetails(player));
+        await flushPromises();
+
+        expect(post).toHaveBeenCalledWith('/api/audio/details', {
+            ids: [745],
+        });
+        expect(player.queue.value[0]).toMatchObject({
+            id: 745,
+            artists: '本間勇輔',
+            album: 'TVアニメーション GTO オリジナルサウンドトラック',
+            coverUrl: '/api/audio/album-covers/4460',
+        });
+    });
+
     it('fetches details again when the same queue ids are replaced by placeholders', async () => {
         const post = vi.fn()
             .mockResolvedValue({

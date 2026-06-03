@@ -4,13 +4,10 @@ namespace App\Services\Audio;
 
 use App\Models\Album;
 use App\Models\AlbumCover;
-use App\Models\Artist;
 use App\Models\AudioMetadataProposal;
 use App\Models\File;
-use App\Models\FileMetadata;
 use App\Models\User;
 use App\Support\AtlasStorage;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -40,6 +37,8 @@ class AudioMetadataProposalApplier
 
     public function __construct(
         private readonly AudioMetadataAliasService $aliases,
+        private readonly AudioMetadataRelationshipSynchronizer $relationships,
+        private readonly AudioMetadataCanonicalPayloadWriter $payloads,
     ) {}
 
     /**
@@ -67,6 +66,7 @@ class AudioMetadataProposalApplier
             $this->applyAlbumMetadataFields($file, $proposed, $fields);
             $this->applyTrackPivotFields($file, $proposed, $fields);
             $this->applyMetadataFields($file, $proposed, $fields);
+            $this->payloads->apply($file, $proposed, $fields);
 
             $proposal->forceFill([
                 'status' => 'applied',
@@ -195,7 +195,7 @@ class AudioMetadataProposalApplier
         if (in_array('artists', $fields, true)) {
             $artists = $this->cleanStringList($proposed['artists'] ?? []);
             if ($artists !== []) {
-                $this->syncArtists($file, $artists);
+                $this->relationships->syncArtists($file, $artists);
             }
         }
 
@@ -203,7 +203,7 @@ class AudioMetadataProposalApplier
             $album = $this->cleanString($proposed['album'] ?? null);
             $freshFile = $file->fresh(['artists']);
             if ($album !== null && $freshFile instanceof File) {
-                $this->syncAlbum($freshFile, $album);
+                $this->relationships->syncAlbum($freshFile, $album, $proposed);
                 $file->load('albums');
             }
         }
@@ -239,7 +239,7 @@ class AudioMetadataProposalApplier
             return;
         }
 
-        $this->mergeFileMetadata($file, $metadata);
+        $this->payloads->merge($file, $metadata);
     }
 
     /**
@@ -311,51 +311,6 @@ class AudioMetadataProposalApplier
         return array_values(array_intersect($changes, $fields));
     }
 
-    /**
-     * @param  list<string>  $names
-     */
-    private function syncArtists(File $file, array $names): void
-    {
-        $artistIds = collect($names)
-            ->map(fn (string $name): int => (int) Artist::query()->firstOrCreate([
-                'normalized_name' => $this->normalizeName($name),
-            ], [
-                'name' => $name,
-            ])->id)
-            ->all();
-
-        $file->artists()->sync($artistIds);
-    }
-
-    private function syncAlbum(File $file, string $name): void
-    {
-        $normalizedName = $this->normalizeName($name);
-        $artistIds = $file->artists->pluck('id')->filter()->values();
-        $file->loadMissing('albums');
-        $currentAlbumNames = $file->albums
-            ->map(fn (Album $album): string => trim($album->name))
-            ->filter(fn (string $name): bool => $name !== '')
-            ->values()
-            ->all();
-
-        $album = null;
-        if ($artistIds->isNotEmpty()) {
-            $album = Album::query()
-                ->where('normalized_name', $normalizedName)
-                ->whereHas('files.artists', fn (Builder $query) => $query->whereKey($artistIds->all()))
-                ->orderBy('id')
-                ->first();
-        }
-
-        $album ??= Album::query()->create([
-            'name' => $name,
-            'normalized_name' => $normalizedName,
-        ]);
-
-        $file->albums()->sync([$album->id]);
-        $this->aliases->store($album, 'name', $currentAlbumNames, 'previous_import', 'atlas', null, $album->name);
-    }
-
     private function preserveTitleAlias(File $file, string $canonicalTitle): void
     {
         $payload = is_array($file->metadata?->payload) ? $file->metadata->payload : [];
@@ -390,17 +345,7 @@ class AudioMetadataProposalApplier
         }
 
         $this->aliases->store($file, 'title', array_values($aliases), 'previous_import', 'atlas', null, $canonicalTitle);
-        $this->mergeFileMetadata($file, ['audio' => ['aliases' => ['title' => array_values($aliases)]]]);
-    }
-
-    private function mergeFileMetadata(File $file, array $payload): void
-    {
-        $metadata = FileMetadata::query()->firstOrNew(['file_id' => $file->id]);
-        $current = is_array($metadata->payload) ? $metadata->payload : [];
-
-        $metadata->payload = array_replace_recursive($current, $payload);
-        $metadata->is_extracted = true;
-        $metadata->save();
+        $this->payloads->merge($file, ['audio' => ['aliases' => ['title' => array_values($aliases)]]]);
     }
 
     private function isSpotifyFile(File $file): bool

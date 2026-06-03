@@ -476,7 +476,7 @@ describe('GlobalAudioPlayer', () => {
         await flushPromises();
 
         expect(post).toHaveBeenCalledWith('/api/audio/details', {
-            ids: [742],
+            ids: [41, 742],
         });
         expect(player.queue.value[1]).toMatchObject({
             id: 742,
