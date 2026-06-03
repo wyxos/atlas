@@ -173,6 +173,10 @@ function providerLabel(provider: string): string {
         return 'AcoustID / MusicBrainz / Discogs';
     }
 
+    if (provider === 'acoustid_musicbrainz_ai_discogs') {
+        return 'AcoustID / MusicBrainz / AI / Discogs';
+    }
+
     return provider
         .split(/[_\s-]+/)
         .filter(Boolean)

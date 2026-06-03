@@ -116,9 +116,9 @@ function aliasProposalFixture(): AudioMetadataProposal {
         id: 23,
         file_id: 7,
         run_id: 11,
-        provider: 'discogs_release',
+        provider: 'acoustid_musicbrainz_ai_discogs',
         status: 'pending',
-        confidence: 77,
+        confidence: 96,
         current_values: {
             title: 'Theme from GTO',
             title_aliases: [],
@@ -150,9 +150,19 @@ function aliasProposalFixture(): AudioMetadataProposal {
             },
         },
         evidence: {
-            source: 'discogs_release_search',
+            source: 'acoustid_fingerprint',
+            acoustid_score: 99.6,
+            musicbrainz_recording_id: 'bike-recording-mbid',
+            matched_existing_fields: ['duration', 'title'],
             discogs_release_id: '17124567',
             discogs_release_url: 'https://www.discogs.com/release/17124567',
+            discogs_source: 'discogs_release_search',
+            ai_review: {
+                verdict: 'accept',
+                confidence: 0.88,
+                reason: 'The current title is an English alias.',
+                model: 'qwen-test',
+            },
         },
         created_at: null,
         reviewed_at: null,
@@ -419,6 +429,7 @@ describe('Audio metadata review', () => {
         await wrapper.get('[data-test="audio-track-title"]').trigger('click');
         await flushPromises();
 
+        expect(document.body.textContent).toContain('AcoustID / MusicBrainz / AI / Discogs - 96%');
         expect(document.body.textContent).toContain('Title aliases');
         expect(document.body.textContent).toContain('Theme from GTO');
         expect(document.body.textContent).toContain('Album aliases');

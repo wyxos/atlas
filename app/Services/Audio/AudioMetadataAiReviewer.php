@@ -56,6 +56,33 @@ class AudioMetadataAiReviewer
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @param  array<string, mixed>  $source
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null,title_aliases:list<string>,artist_aliases:list<string>,album_aliases:list<string>}|null
+     */
+    public function resolveAnomaly(File $file, array $currentValues, array $candidate, array $source): ?array
+    {
+        $baseUrl = rtrim((string) config('services.audio_metadata.ai_base_url'), '/');
+        if (! $this->enabled() || $baseUrl === '') {
+            return null;
+        }
+
+        $input = $this->anomalyInput($file, $currentValues, $candidate, $source);
+
+        try {
+            $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
+                'ollama' => $this->reviewWithOllama($baseUrl, $input, $this->anomalyPrompt($input)),
+                default => $this->reviewWithGateway($baseUrl, $input, $this->anomalyPrompt($input), 'atlas-audio-metadata-anomaly-v1'),
+            };
+
+            return $this->normalizeAnomalyResponse($payload);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     public function enabled(): bool
     {
         return (bool) config('services.audio_metadata.ai_enabled', true)
@@ -66,7 +93,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
-    private function reviewWithGateway(string $baseUrl, array $input): array
+    private function reviewWithGateway(string $baseUrl, array $input, ?string $prompt = null, string $schemaVersion = 'atlas-audio-metadata-review-v1'): array
     {
         $request = Http::timeout((int) config('services.audio_metadata.ai_timeout_seconds', 90))
             ->acceptJson()
@@ -79,9 +106,9 @@ class AudioMetadataAiReviewer
 
         $response = $request->post($baseUrl.'/v1/audio/metadata-review', [
             'model' => config('services.audio_metadata.ai_model'),
-            'schemaVersion' => 'atlas-audio-metadata-review-v1',
+            'schemaVersion' => $schemaVersion,
             'input' => $input,
-            'prompt' => $this->prompt($input),
+            'prompt' => $prompt ?? $this->prompt($input),
         ]);
 
         if (! $response->successful()) {
@@ -95,7 +122,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
-    private function reviewWithOllama(string $baseUrl, array $input): array
+    private function reviewWithOllama(string $baseUrl, array $input, ?string $prompt = null): array
     {
         $response = Http::timeout((int) config('services.audio_metadata.ai_timeout_seconds', 90))
             ->acceptJson()
@@ -111,7 +138,7 @@ class AudioMetadataAiReviewer
                     ],
                     [
                         'role' => 'user',
-                        'content' => $this->prompt($input),
+                        'content' => $prompt ?? $this->prompt($input),
                     ],
                 ],
             ]);
@@ -152,6 +179,34 @@ class AudioMetadataAiReviewer
     }
 
     /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @param  array<string, mixed>  $source
+     * @return array<string, mixed>
+     */
+    private function anomalyInput(File $file, array $currentValues, array $candidate, array $source): array
+    {
+        return [
+            'file' => [
+                'title' => $this->cleanString($file->title),
+                'filename' => $this->cleanString($file->filename),
+                'source' => $this->cleanString($file->source),
+                'mime_type' => $this->cleanString($file->mime_type),
+                'url_host' => $this->host((string) $file->url),
+                'referrer_host' => $this->host((string) $file->referrer_url),
+            ],
+            'current_values' => $currentValues,
+            'fingerprint_candidate' => [
+                'provider' => $candidate['provider'],
+                'confidence' => $candidate['confidence'],
+                'values' => $candidate['values'],
+                'evidence' => Arr::except($candidate['evidence'], ['fingerprint', 'raw_fingerprint']),
+            ],
+            'source' => $source,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array{verdict:string,confidence:float|null,reason:string,model:string|null}
      */
@@ -169,6 +224,22 @@ class AudioMetadataAiReviewer
             'confidence' => is_numeric($confidence) ? max(0.0, min(1.0, (float) $confidence)) : null,
             'reason' => mb_substr($this->cleanString($payload['reason'] ?? null) ?? 'No reason returned.', 0, 240),
             'model' => $this->cleanString($payload['model'] ?? config('services.audio_metadata.ai_model')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null,title_aliases:list<string>,artist_aliases:list<string>,album_aliases:list<string>}
+     */
+    private function normalizeAnomalyResponse(array $payload): array
+    {
+        return [
+            ...$this->normalizeResponse($payload),
+            'selected_track_position' => $this->cleanString($payload['selected_track_position'] ?? null),
+            'selected_track_title' => $this->cleanString($payload['selected_track_title'] ?? null),
+            'title_aliases' => $this->cleanStringList($payload['title_aliases'] ?? []),
+            'artist_aliases' => $this->cleanStringList($payload['artist_aliases'] ?? []),
+            'album_aliases' => $this->cleanStringList($payload['album_aliases'] ?? []),
         ];
     }
 
@@ -230,6 +301,24 @@ class AudioMetadataAiReviewer
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function anomalyPrompt(array $input): string
+    {
+        return implode("\n", [
+            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason","selected_track_position":"2","selected_track_title":"source track title","title_aliases":["alias"],"artist_aliases":["alias"],"album_aliases":["alias"]}.',
+            'Allowed verdict values: accept, reject, ambiguous.',
+            'Use accept only when the fingerprint candidate and source release are likely the same recording/release, and one listed source track plausibly represents the current track under another language, romanization, or import/custom title.',
+            'Use reject when the source release or selected track points to a different work.',
+            'Use ambiguous when the listed evidence is plausible but insufficient.',
+            'Do not invent canonical titles, artists, albums, release details, IDs, or track positions. Select one track from the supplied source.tracklist only.',
+            'Canonical/source fields should be original/source values. Current English, romanized, import, or custom names belong in alias arrays.',
+            'Evidence JSON:',
+            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
     private function cleanString(mixed $value): ?string
     {
         if (! is_string($value) && ! is_numeric($value)) {
@@ -239,6 +328,30 @@ class AudioMetadataAiReviewer
         $clean = preg_replace('/\s+/', ' ', trim((string) $value)) ?? '';
 
         return $clean !== '' ? $clean : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function cleanStringList(mixed $value): array
+    {
+        if (is_string($value) || is_numeric($value)) {
+            $value = [$value];
+        }
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $values = [];
+        foreach ($value as $item) {
+            $clean = $this->cleanString($item);
+            if ($clean !== null) {
+                $values[$clean] = $clean;
+            }
+        }
+
+        return array_values($values);
     }
 
     private function host(string $url): ?string
