@@ -17,8 +17,11 @@ type TrackDetails = {
 
 const METADATA_FIELD_ORDER = [
     'title',
+    'title_aliases',
     'artists',
+    'artist_aliases',
     'album',
+    'album_aliases',
     'track_number',
     'disc_number',
     'duration_seconds',
@@ -88,8 +91,11 @@ function metadataActionLabel(): string {
 function fieldLabel(field: string): string {
     return {
         title: 'Title',
+        title_aliases: 'Title aliases',
         artists: 'Artists',
+        artist_aliases: 'Artist aliases',
         album: 'Album',
+        album_aliases: 'Album aliases',
         track_number: 'Track #',
         disc_number: 'Disc #',
         duration_seconds: 'Duration',

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Album extends Model
 {
@@ -41,5 +42,10 @@ class Album extends Model
             ->where('is_default', true)
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+    public function metadataAliases(): MorphMany
+    {
+        return $this->morphMany(MetadataAlias::class, 'aliasable');
     }
 }

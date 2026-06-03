@@ -16,8 +16,11 @@ class AudioMetadataProposalGenerator
 {
     private const REVIEW_FIELDS = [
         'title',
+        'title_aliases',
         'artists',
+        'artist_aliases',
         'album',
+        'album_aliases',
         'duration_seconds',
         'cover_url',
         'spotify_uri',
@@ -35,6 +38,7 @@ class AudioMetadataProposalGenerator
     ];
 
     public function __construct(
+        private readonly AudioMetadataAliasService $aliases,
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
@@ -52,7 +56,7 @@ class AudioMetadataProposalGenerator
             return null;
         }
 
-        $file->loadMissing(['metadata', 'artists', 'albums.defaultCover']);
+        $file->loadMissing(['metadata', 'metadataAliases', 'artists.metadataAliases', 'albums.defaultCover', 'albums.metadataAliases']);
 
         $currentValues = $this->currentValues($file);
         $candidate = $this->isSpotifyFile($file)
@@ -94,9 +98,6 @@ class AudioMetadataProposalGenerator
         ]);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     private function currentValues(File $file): array
     {
         $artists = $file->artists
@@ -116,6 +117,7 @@ class AudioMetadataProposalGenerator
             'title' => $this->values->cleanString($file->title),
             'artists' => $artists,
             'album' => $albums[0] ?? null,
+            ...$this->aliases->currentValues($file),
             'duration_seconds' => $this->values->durationSeconds($file, $payload),
             'cover_url' => $this->coverResolver->forFile($file),
             'spotify_uri' => $this->spotifyUri($file),
@@ -444,9 +446,6 @@ class AudioMetadataProposalGenerator
         return $this->normalizeComparableString($current) === $this->normalizeComparableString($proposed);
     }
 
-    /**
-     * @return list<string>
-     */
     private function normalizeComparableList(mixed $value): array
     {
         return array_values(array_map(

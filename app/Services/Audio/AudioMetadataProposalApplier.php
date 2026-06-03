@@ -38,6 +38,10 @@ class AudioMetadataProposalApplier
         'musicbrainz_recording_id',
     ];
 
+    public function __construct(
+        private readonly AudioMetadataAliasService $aliases,
+    ) {}
+
     /**
      * @param  list<string>  $fields
      */
@@ -59,6 +63,7 @@ class AudioMetadataProposalApplier
             $proposed = is_array($proposal->proposed_values) ? $proposal->proposed_values : [];
             $this->applyFileFields($file, $proposed, $fields);
             $this->applyRelationshipFields($file, $proposed, $fields);
+            $this->aliases->applySelected($file, $proposal, $proposed, $fields);
             $this->applyAlbumMetadataFields($file, $proposed, $fields);
             $this->applyTrackPivotFields($file, $proposed, $fields);
             $this->applyMetadataFields($file, $proposed, $fields);
@@ -326,6 +331,12 @@ class AudioMetadataProposalApplier
     {
         $normalizedName = $this->normalizeName($name);
         $artistIds = $file->artists->pluck('id')->filter()->values();
+        $file->loadMissing('albums');
+        $currentAlbumNames = $file->albums
+            ->map(fn (Album $album): string => trim($album->name))
+            ->filter(fn (string $name): bool => $name !== '')
+            ->values()
+            ->all();
 
         $album = null;
         if ($artistIds->isNotEmpty()) {
@@ -342,6 +353,7 @@ class AudioMetadataProposalApplier
         ]);
 
         $file->albums()->sync([$album->id]);
+        $this->aliases->store($album, 'name', $currentAlbumNames, 'previous_import', 'atlas', null, $album->name);
     }
 
     private function preserveTitleAlias(File $file, string $canonicalTitle): void
@@ -377,12 +389,10 @@ class AudioMetadataProposalApplier
             return;
         }
 
+        $this->aliases->store($file, 'title', array_values($aliases), 'previous_import', 'atlas', null, $canonicalTitle);
         $this->mergeFileMetadata($file, ['audio' => ['aliases' => ['title' => array_values($aliases)]]]);
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
     private function mergeFileMetadata(File $file, array $payload): void
     {
         $metadata = FileMetadata::query()->firstOrNew(['file_id' => $file->id]);
@@ -452,9 +462,6 @@ class AudioMetadataProposalApplier
         };
     }
 
-    /**
-     * @return list<string>
-     */
     private function cleanStringList(mixed $value): array
     {
         if (! is_array($value)) {

@@ -172,9 +172,15 @@ class AudioMetadataDiscogsProvider
     private function valuesFromRelease(array $release, ?array $track, array $matchedFields): array
     {
         $values = [];
+        $releaseTitle = $this->values->cleanString($release['title'] ?? null);
+        $releaseTitleParts = $this->sourceTitleParts($releaseTitle);
+
+        if (in_array('album', $matchedFields, true) || in_array('artists', $matchedFields, true)) {
+            $this->putIfPresent($values, 'album', $releaseTitleParts['canonical']);
+            $this->putIfPresent($values, 'album_aliases', $releaseTitleParts['aliases']);
+        }
 
         if (in_array('artists', $matchedFields, true)) {
-            $this->putIfPresent($values, 'album', $this->values->cleanString($release['title'] ?? null));
             $this->putIfPresent($values, 'artists', $this->trackArtists($track) ?: $this->releaseArtists($release));
         }
 
@@ -187,13 +193,40 @@ class AudioMetadataDiscogsProvider
         $this->putIfPresent($values, 'cover_url', $this->coverUrl($release));
 
         if ($track !== null) {
-            $this->putIfPresent($values, 'title', $this->values->cleanString($track['title'] ?? null));
+            $trackTitleParts = $this->sourceTitleParts($this->values->cleanString($track['title'] ?? null));
+            $this->putIfPresent($values, 'title', $trackTitleParts['canonical']);
+            $this->putIfPresent($values, 'title_aliases', $trackTitleParts['aliases']);
             $this->putIfPresent($values, 'track_number', $this->trackNumber($track));
             $this->putIfPresent($values, 'disc_number', $this->discNumber($track));
             $this->putIfPresent($values, 'duration_seconds', $this->discogsDurationSeconds($track['duration'] ?? null));
         }
 
         return $values;
+    }
+
+    /**
+     * @return array{canonical:string|null,aliases:list<string>}
+     */
+    private function sourceTitleParts(?string $title): array
+    {
+        $title = $this->values->cleanString($title);
+        if ($title === null) {
+            return ['canonical' => null, 'aliases' => []];
+        }
+
+        $parts = array_values(array_filter(
+            array_map(fn (string $part): ?string => $this->values->cleanString($part), preg_split('/\s*=\s*/', $title) ?: []),
+            fn (?string $part): bool => $part !== null
+        ));
+
+        if (count($parts) < 2) {
+            return ['canonical' => $title, 'aliases' => []];
+        }
+
+        return [
+            'canonical' => $parts[0],
+            'aliases' => array_values(array_unique(array_slice($parts, 1))),
+        ];
     }
 
     /**

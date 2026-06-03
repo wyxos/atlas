@@ -111,6 +111,56 @@ function coverProposalFixture(): AudioMetadataProposal {
     };
 }
 
+function aliasProposalFixture(): AudioMetadataProposal {
+    return {
+        id: 23,
+        file_id: 7,
+        run_id: 11,
+        provider: 'discogs_release',
+        status: 'pending',
+        confidence: 77,
+        current_values: {
+            title: 'Theme from GTO',
+            title_aliases: [],
+            album: 'GTO TV Animation Original Soundtrack',
+            album_aliases: [],
+        },
+        proposed_values: {
+            title: 'The Theme From GTO',
+            title_aliases: ['Theme from GTO'],
+            album: 'TVアニメーション GTO オリジナルサウンドトラック',
+            album_aliases: ['TV Animation GTO Original Soundtrack'],
+        },
+        changes: {
+            title: {
+                current: 'Theme from GTO',
+                proposed: 'The Theme From GTO',
+            },
+            title_aliases: {
+                current: [],
+                proposed: ['Theme from GTO'],
+            },
+            album: {
+                current: 'GTO TV Animation Original Soundtrack',
+                proposed: 'TVアニメーション GTO オリジナルサウンドトラック',
+            },
+            album_aliases: {
+                current: [],
+                proposed: ['TV Animation GTO Original Soundtrack'],
+            },
+        },
+        evidence: {
+            source: 'discogs_release_search',
+            discogs_release_id: '17124567',
+            discogs_release_url: 'https://www.discogs.com/release/17124567',
+        },
+        created_at: null,
+        reviewed_at: null,
+        applied_at: null,
+        ignored_at: null,
+    };
+}
+
 beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
@@ -304,5 +354,83 @@ describe('Audio metadata review', () => {
         expect(document.body.textContent).toContain('Discogs release');
         expect(document.body.textContent).toContain('4647572');
         expect(document.body.textContent?.replace(/\s+/g, ' ')).toContain('MusicBrainz release search / Matched artists, album / Release details / Cover Art Archive / Data provided by Discogs');
+    });
+
+    it('renders and applies metadata alias proposals', async () => {
+        mockAxios.get.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/ids') {
+                return {
+                    data: {
+                        ids: [7],
+                        sources: { 7: 'local' },
+                        source_ids: { 7: null },
+                        spotify_uris: { 7: null },
+                        cursor: { after_id: 0, next_after_id: null, has_more: false, max_id: 7 },
+                        pagination: { per_page: 100, total: 1, total_pages: 1 },
+                    } satisfies AudioIdsResponse,
+                };
+            }
+
+            if (url === '/api/audio/7/metadata-proposals/latest') {
+                return { data: { proposal: aliasProposalFixture() } };
+            }
+
+            throw new Error(`Unexpected get URL: ${url}`);
+        });
+
+        mockAxios.post.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/details') {
+                return {
+                    data: {
+                        items: [{
+                            id: 7,
+                            title: 'Theme from GTO',
+                            source: 'local',
+                            source_id: null,
+                            spotify_uri: null,
+                            artists: ['Yusuke Honma'],
+                            albums: ['GTO TV Animation Original Soundtrack'],
+                            cover_url: null,
+                            duration_seconds: 201,
+                            reaction: null,
+                            blacklisted_at: null,
+                            previewed_count: 0,
+                            seen_count: 0,
+                        }],
+                    } satisfies AudioDetailsResponse,
+                };
+            }
+
+            throw new Error(`Unexpected post URL: ${url}`);
+        });
+
+        mockAxios.patch.mockResolvedValue({
+            data: {
+                proposal: { ...aliasProposalFixture(), status: 'applied' },
+            },
+        });
+
+        const wrapper = await mountAudio();
+        await flushPromises();
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        await wrapper.get('[data-test="audio-track-title"]').trigger('click');
+        await flushPromises();
+
+        expect(document.body.textContent).toContain('Title aliases');
+        expect(document.body.textContent).toContain('Theme from GTO');
+        expect(document.body.textContent).toContain('Album aliases');
+        expect(document.body.textContent).toContain('TVアニメーション GTO オリジナルサウンドトラック');
+        expect(document.body.textContent).toContain('TV Animation GTO Original Soundtrack');
+
+        (document.body.querySelector('[data-test="audio-metadata-apply"]') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/audio/metadata-proposals/23', {
+            action: 'apply',
+            fields: ['title', 'title_aliases', 'album', 'album_aliases'],
+        });
     });
 });
