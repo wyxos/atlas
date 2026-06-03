@@ -42,7 +42,7 @@ type DownloadProgressDebugSnapshot = {
 };
 
 const downloadProgressSubscriberTabIds = new Set<number>();
-const DOWNLOAD_PROGRESS_RECONNECT_DELAY_MS = 1500;
+const DOWNLOAD_PROGRESS_RECONNECT_DELAY_MS = 30 * 1000;
 const MAX_DOWNLOAD_PROGRESS_DEBUG_EVENTS = 20;
 
 let downloadProgressConnectPromise: Promise<void> | null = null;
@@ -226,6 +226,10 @@ async function ensureDownloadProgressConnected(): Promise<void> {
 
     if (downloadProgressConnectPromise !== null) {
         return downloadProgressConnectPromise;
+    }
+
+    if (downloadProgressReconnectTimer !== null) {
+        return;
     }
 
     if (downloadProgressClient && downloadProgressEventSubscription && downloadProgressStateSubscription) {

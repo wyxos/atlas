@@ -96,6 +96,7 @@ describe('atlas-options', () => {
         vi.resetModules();
         vi.clearAllMocks();
         vi.unstubAllGlobals();
+        vi.useRealTimers();
 
         for (const key of Object.keys(storageState)) {
             delete storageState[key];
@@ -315,6 +316,48 @@ describe('atlas-options', () => {
         expect(remote.fetchMock).toHaveBeenCalledTimes(1);
 
         storageState[STORAGE_KEYS.settingsUpdatedAt] = 'remote-refresh';
+        await getStoredOptions();
+        expect(remote.fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps remote settings cached until the settings invalidation token changes', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+        const { STORAGE_KEYS, getStoredOptions } = await import('./atlas-options');
+        const remote = installRemoteSettingsFetchMock({
+            ...emptyRemoteSettings(),
+            siteCustomizations: [
+                {
+                    enabled: true,
+                    domain: 'example.com',
+                    matchRules: ['.*\\/gallery\\/.*'],
+                    widget: {
+                        minImageWidth: null,
+                    },
+                    referrerCleaner: {
+                        stripQueryParams: [],
+                    },
+                    mediaCleaner: {
+                        stripQueryParams: [],
+                        rewriteRules: [],
+                        strategies: [],
+                    },
+                },
+            ],
+        });
+        storageState[STORAGE_KEYS.settingsMigrationByDomain] = {
+            'https://atlas.test': true,
+        };
+
+        await getStoredOptions();
+        expect(remote.fetchMock).toHaveBeenCalledTimes(1);
+
+        vi.setSystemTime(new Date('2026-01-01T03:00:00.000Z'));
+        await getStoredOptions();
+        expect(remote.fetchMock).toHaveBeenCalledTimes(1);
+
+        storageState[STORAGE_KEYS.settingsUpdatedAt] = 'manual-refresh';
         await getStoredOptions();
         expect(remote.fetchMock).toHaveBeenCalledTimes(2);
     });

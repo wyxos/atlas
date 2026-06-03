@@ -223,7 +223,7 @@ describe('background-download-progress', () => {
         });
     });
 
-    it('retries offline startup failures while subscribers remain active', async () => {
+    it('retries offline startup failures with a longer backoff while subscribers remain active', async () => {
         vi.useFakeTimers();
         mockConnectBackgroundReverb.mockResolvedValue({ kind: 'offline' });
 
@@ -253,6 +253,9 @@ describe('background-download-progress', () => {
         });
 
         await vi.advanceTimersByTimeAsync(1500);
+        expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(28500);
         expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(2);
 
         expect(
@@ -275,7 +278,26 @@ describe('background-download-progress', () => {
         });
     });
 
-    it('tears down failed live connections and retries them on a timer', async () => {
+    it('does not bypass the reconnect backoff when a subscribed tab refreshes its subscription', async () => {
+        vi.useFakeTimers();
+        mockConnectBackgroundReverb.mockResolvedValue({ kind: 'offline' });
+
+        const module = await import('./background-download-progress');
+        dispatchRuntimeMessage(module, { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 8 } });
+
+        await vi.waitFor(() => {
+            expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(1);
+        });
+
+        await vi.advanceTimersByTimeAsync(15000);
+        dispatchRuntimeMessage(module, { type: 'ATLAS_SUBSCRIBE_DOWNLOAD_PROGRESS' }, { tab: { id: 8 } });
+        expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(15000);
+        expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(2);
+    });
+
+    it('tears down failed live connections and retries them on a longer backoff', async () => {
         vi.useFakeTimers();
         const runtime = createConnectedRuntime('socket refused');
         mockConnectBackgroundReverb
@@ -310,6 +332,9 @@ describe('background-download-progress', () => {
         });
 
         await vi.advanceTimersByTimeAsync(1500);
+        expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(28500);
         expect(mockConnectBackgroundReverb).toHaveBeenCalledTimes(2);
         expect(
             dispatchRuntimeMessage(module, { type: 'ATLAS_GET_DOWNLOAD_PROGRESS_DEBUG_STATE' }).response,
