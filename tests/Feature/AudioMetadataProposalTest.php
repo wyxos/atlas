@@ -59,6 +59,7 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
         'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
         'services.audio_metadata.cover_art_archive_base_url' => 'https://cover.test',
     ]);
 
@@ -85,6 +86,25 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
                         'id' => 'release-mbid',
                         'title' => 'Canonical Album',
                     ]],
+                ]],
+            ]],
+        ]),
+        'https://musicbrainz.test/ws/2/release/release-mbid*' => Http::response([
+            'id' => 'release-mbid',
+            'title' => 'Canonical Album',
+            'date' => '2001-02-03',
+            'country' => 'US',
+            'barcode' => '012345678905',
+            'label-info' => [[
+                'catalog-number' => 'CAT-001',
+                'label' => ['name' => 'Canonical Label'],
+            ]],
+            'media' => [[
+                'position' => 1,
+                'tracks' => [[
+                    'number' => '8',
+                    'position' => 8,
+                    'recording' => ['id' => 'recording-mbid'],
                 ]],
             ]],
         ]),
@@ -128,6 +148,13 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
         ->assertJsonPath('proposal.proposed_values.title', 'Canonical Track')
         ->assertJsonPath('proposal.proposed_values.artists', ['Canonical Artist'])
         ->assertJsonPath('proposal.proposed_values.album', 'Canonical Album')
+        ->assertJsonPath('proposal.proposed_values.track_number', '8')
+        ->assertJsonPath('proposal.proposed_values.disc_number', '1')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Canonical Label')
+        ->assertJsonPath('proposal.proposed_values.catalog_number', 'CAT-001')
+        ->assertJsonPath('proposal.proposed_values.barcode', '012345678905')
+        ->assertJsonPath('proposal.proposed_values.release_date', '2001-02-03')
+        ->assertJsonPath('proposal.proposed_values.release_country', 'US')
         ->assertJsonPath('proposal.proposed_values.duration_seconds', 180)
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/release-mbid/front-500.jpg')
         ->assertJsonPath('proposal.evidence.source', 'acoustid_fingerprint')
@@ -221,6 +248,88 @@ test('metadata proposal can apply selected fields to canonical audio metadata', 
         ->and($file->artists()->pluck('name')->all())->toBe(['Artist A'])
         ->and($file->albums()->pluck('name')->all())->toBe(['Album A'])
         ->and($file->metadata()->first()?->payload['duration_seconds'] ?? null)->toBe(212);
+});
+
+test('metadata proposal can apply release details and track numbers from embedded tags', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => '08-sash_feat_tina_cousins-mysterious_times_remix',
+    ]);
+    $file->metadata()->create([
+        'payload' => [
+            'probe' => [
+                'format' => [
+                    'duration' => '383.2',
+                    'tags' => [
+                        'title' => 'Mysterious Times (Marc Lime & K Bastian Remix)',
+                        'artist' => 'Sash! Feat Tina Cousins',
+                        'album' => 'Mysterious Times (UK-Remixes EP)',
+                        'track' => '08/12',
+                        'disc' => '1/2',
+                        'label' => 'Tokapi Recordings',
+                        'catalog_number' => 'TR011',
+                        'barcode' => '8715576130112',
+                        'date' => '2011-06-23',
+                        'country' => 'GB',
+                        'isrc' => 'GBBKS1100011',
+                        'musicbrainz_recording_id' => 'recording-mbid',
+                        'musicbrainz_release_id' => 'release-mbid',
+                        'discogs_release_id' => '2969820',
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $proposalId = $this->actingAs($user)
+        ->postJson("/api/audio/{$file->id}/metadata-runs")
+        ->assertAccepted()
+        ->assertJsonPath('proposal.proposed_values.album', 'Mysterious Times (UK-Remixes EP)')
+        ->assertJsonPath('proposal.proposed_values.track_number', '08')
+        ->assertJsonPath('proposal.proposed_values.disc_number', '1')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Tokapi Recordings')
+        ->json('proposal.id');
+
+    $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposalId}", [
+        'action' => 'apply',
+        'fields' => [
+            'title',
+            'artists',
+            'album',
+            'track_number',
+            'disc_number',
+            'release_label',
+            'catalog_number',
+            'barcode',
+            'release_date',
+            'release_country',
+            'isrc',
+            'musicbrainz_recording_id',
+            'musicbrainz_release_id',
+            'discogs_release_id',
+        ],
+    ])->assertSuccessful()
+        ->assertJsonPath('proposal.status', 'applied');
+
+    $file = $file->fresh(['artists', 'albums']);
+    $album = $file->albums->first();
+
+    expect($file->title)->toBe('Mysterious Times (Marc Lime & K Bastian Remix)')
+        ->and($file->artists->pluck('name')->all())->toBe(['Sash! Feat Tina Cousins'])
+        ->and($album?->name)->toBe('Mysterious Times (UK-Remixes EP)')
+        ->and($album?->pivot?->track_number)->toBe('08')
+        ->and($album?->pivot?->disc_number)->toBe('1')
+        ->and($album?->release_label)->toBe('Tokapi Recordings')
+        ->and($album?->catalog_number)->toBe('TR011')
+        ->and($album?->barcode)->toBe('8715576130112')
+        ->and($album?->release_date)->toBe('2011-06-23')
+        ->and($album?->release_country)->toBe('GB')
+        ->and($album?->musicbrainz_release_id)->toBe('release-mbid')
+        ->and($album?->discogs_release_id)->toBe('2969820')
+        ->and($file->metadata()->first()?->payload['isrc'] ?? null)->toBe('GBBKS1100011')
+        ->and($file->metadata()->first()?->payload['musicbrainz_recording_id'] ?? null)->toBe('recording-mbid');
 });
 
 test('metadata run returns no proposal after matching metadata has been applied', function () {

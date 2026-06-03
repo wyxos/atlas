@@ -68,11 +68,23 @@ function coverProposalFixture(): AudioMetadataProposal {
         confidence: 82,
         current_values: {
             cover_url: '/api/audio/album-covers/7',
+            release_label: null,
+            catalog_number: null,
         },
         proposed_values: {
             cover_url: 'http://coverartarchive.org/release/release-mbid/front-500.jpg',
+            release_label: 'Universal Republic',
+            catalog_number: 'B0015663-02',
         },
         changes: {
+            release_label: {
+                current: null,
+                proposed: 'Universal Republic',
+            },
+            catalog_number: {
+                current: null,
+                proposed: 'B0015663-02',
+            },
             cover_url: {
                 current: '/api/audio/album-covers/7',
                 proposed: 'http://coverartarchive.org/release/release-mbid/front-500.jpg',
@@ -81,6 +93,7 @@ function coverProposalFixture(): AudioMetadataProposal {
         evidence: {
             source: 'musicbrainz_release_search',
             matched_existing_fields: ['artists', 'album'],
+            release_detail_source: 'musicbrainz_release_lookup',
             cover_source: 'cover_art_archive',
         },
         created_at: null,
@@ -275,7 +288,11 @@ describe('Audio metadata review', () => {
         expect(proposedCover).toBeInstanceOf(HTMLImageElement);
         expect(currentCover?.getAttribute('src')).toBe('/api/audio/album-covers/7');
         expect(proposedCover?.getAttribute('src')).toBe('https://coverartarchive.org/release/release-mbid/front-500.jpg');
-        expect(document.body.textContent).toContain('MusicBrainz Cover Art - 82%');
-        expect(document.body.textContent).toContain('MusicBrainz release search / Matched artists, album / Cover Art Archive');
+        expect(document.body.textContent).toContain('MusicBrainz Release - 82%');
+        expect(document.body.textContent).toContain('Label');
+        expect(document.body.textContent).toContain('Universal Republic');
+        expect(document.body.textContent).toContain('Catalog #');
+        expect(document.body.textContent).toContain('B0015663-02');
+        expect(document.body.textContent).toContain('MusicBrainz release search / Matched artists, album / Release details / Cover Art Archive');
     });
 });

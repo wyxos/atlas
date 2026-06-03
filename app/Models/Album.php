@@ -15,11 +15,19 @@ class Album extends Model
     protected $fillable = [
         'name',
         'normalized_name',
+        'release_label',
+        'catalog_number',
+        'barcode',
+        'release_date',
+        'release_country',
+        'musicbrainz_release_id',
+        'discogs_release_id',
     ];
 
     public function files(): BelongsToMany
     {
-        return $this->belongsToMany(File::class);
+        return $this->belongsToMany(File::class)
+            ->withPivot(['track_number', 'disc_number']);
     }
 
     public function covers(): HasMany

@@ -164,7 +164,8 @@ class File extends Model
 
     public function albums(): BelongsToMany
     {
-        return $this->belongsToMany(Album::class);
+        return $this->belongsToMany(Album::class)
+            ->withPivot(['track_number', 'disc_number']);
     }
 
     /**

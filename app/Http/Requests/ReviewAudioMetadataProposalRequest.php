@@ -23,7 +23,25 @@ class ReviewAudioMetadataProposalRequest extends FormRequest
             'fields.*' => [
                 'string',
                 'distinct',
-                Rule::in(['title', 'artists', 'album', 'duration_seconds', 'cover_url', 'spotify_uri']),
+                Rule::in([
+                    'title',
+                    'artists',
+                    'album',
+                    'duration_seconds',
+                    'cover_url',
+                    'spotify_uri',
+                    'track_number',
+                    'disc_number',
+                    'release_label',
+                    'catalog_number',
+                    'barcode',
+                    'release_date',
+                    'release_country',
+                    'isrc',
+                    'musicbrainz_recording_id',
+                    'musicbrainz_release_id',
+                    'discogs_release_id',
+                ]),
             ],
         ];
     }

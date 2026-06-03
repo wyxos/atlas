@@ -10,6 +10,25 @@ use Throwable;
 
 class AudioMetadataAiReviewer
 {
+    private const REVIEW_FIELDS = [
+        'title',
+        'artists',
+        'album',
+        'duration_seconds',
+        'cover_url',
+        'track_number',
+        'disc_number',
+        'release_label',
+        'catalog_number',
+        'barcode',
+        'release_date',
+        'release_country',
+        'isrc',
+        'musicbrainz_recording_id',
+        'musicbrainz_release_id',
+        'discogs_release_id',
+    ];
+
     /**
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
@@ -121,11 +140,11 @@ class AudioMetadataAiReviewer
                 'url_host' => $this->host((string) $file->url),
                 'referrer_host' => $this->host((string) $file->referrer_url),
             ],
-            'current_values' => Arr::only($currentValues, ['title', 'artists', 'album', 'duration_seconds', 'cover_url']),
+            'current_values' => Arr::only($currentValues, self::REVIEW_FIELDS),
             'candidate' => [
                 'provider' => $candidate['provider'],
                 'confidence' => $candidate['confidence'],
-                'values' => Arr::only($candidate['values'], ['title', 'artists', 'album', 'duration_seconds', 'cover_url', 'musicbrainz_recording_id', 'musicbrainz_release_id']),
+                'values' => Arr::only($candidate['values'], self::REVIEW_FIELDS),
                 'evidence' => Arr::except($candidate['evidence'], ['fingerprint', 'raw_fingerprint']),
             ],
             'changes' => $changes,

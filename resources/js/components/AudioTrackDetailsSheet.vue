@@ -15,6 +15,26 @@ type TrackDetails = {
     duration: string;
 };
 
+const METADATA_FIELD_ORDER = [
+    'title',
+    'artists',
+    'album',
+    'track_number',
+    'disc_number',
+    'duration_seconds',
+    'release_label',
+    'catalog_number',
+    'barcode',
+    'release_date',
+    'release_country',
+    'isrc',
+    'musicbrainz_recording_id',
+    'musicbrainz_release_id',
+    'discogs_release_id',
+    'cover_url',
+    'spotify_uri',
+];
+
 const props = defineProps<{
     open: boolean;
     track: TrackDetails | null;
@@ -47,7 +67,7 @@ const pendingProposal = computed(() => props.proposal?.status === 'pending' ? pr
 const proposalFields = computed(() => {
     const changes = pendingProposal.value?.changes ?? {};
 
-    return Object.keys(changes);
+    return Object.keys(changes).sort((left, right) => fieldOrder(left) - fieldOrder(right));
 });
 
 watch(() => props.proposal?.id, () => {
@@ -70,10 +90,27 @@ function fieldLabel(field: string): string {
         title: 'Title',
         artists: 'Artists',
         album: 'Album',
+        track_number: 'Track #',
+        disc_number: 'Disc #',
         duration_seconds: 'Duration',
+        release_label: 'Label',
+        catalog_number: 'Catalog #',
+        barcode: 'Barcode',
+        release_date: 'Release date',
+        release_country: 'Country',
+        isrc: 'ISRC',
+        musicbrainz_recording_id: 'MusicBrainz recording',
+        musicbrainz_release_id: 'MusicBrainz release',
+        discogs_release_id: 'Discogs release',
         cover_url: 'Cover',
         spotify_uri: 'Spotify URI',
     }[field] ?? field;
+}
+
+function fieldOrder(field: string): number {
+    const index = METADATA_FIELD_ORDER.indexOf(field);
+
+    return index === -1 ? METADATA_FIELD_ORDER.length : index;
 }
 
 function formatValue(value: unknown): string {
@@ -115,7 +152,7 @@ function providerLabel(provider: string): string {
     }
 
     if (provider === 'musicbrainz_cover_art') {
-        return 'MusicBrainz Cover Art';
+        return 'MusicBrainz Release';
     }
 
     return provider
@@ -155,6 +192,10 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
 
     if (durationDelta !== null) {
         items.push(`Duration delta ${durationDelta}s`);
+    }
+
+    if (evidence.release_detail_source === 'musicbrainz_release_lookup') {
+        items.push('Release details');
     }
 
     if (evidence.cover_source === 'cover_art_archive') {

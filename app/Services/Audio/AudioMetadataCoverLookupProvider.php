@@ -8,6 +8,10 @@ use Throwable;
 
 class AudioMetadataCoverLookupProvider
 {
+    public function __construct(
+        private readonly MusicBrainzReleaseMetadata $releaseMetadata,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $currentValues
      * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null
@@ -27,25 +31,37 @@ class AudioMetadataCoverLookupProvider
         }
 
         $releaseId = $this->cleanString($release['id'] ?? null);
+        if ($releaseId === null) {
+            return null;
+        }
+
+        $releaseDetails = $this->releaseMetadata->fetch($releaseId);
+        if ($releaseDetails !== []) {
+            $release = array_replace_recursive($release, $releaseDetails);
+        }
+
         $coverUrl = $this->coverUrlForRelease($releaseId);
-        if ($releaseId === null || $coverUrl === null) {
+        $values = $this->releaseMetadata->values($release);
+        if ($coverUrl !== null) {
+            $values['cover_url'] = $coverUrl;
+        }
+
+        if ($values === []) {
             return null;
         }
 
         return [
             'provider' => 'musicbrainz_cover_art',
-            'confidence' => 82,
-            'values' => [
-                'cover_url' => $coverUrl,
-                'musicbrainz_release_id' => $releaseId,
-            ],
+            'confidence' => $coverUrl !== null ? 82 : 78,
+            'values' => $values,
             'evidence' => [
                 'source' => 'musicbrainz_release_search',
                 'matched_existing_fields' => ['artists', 'album'],
                 'musicbrainz_release_id' => $releaseId,
                 'musicbrainz_release_title' => $this->cleanString($release['title'] ?? null),
                 'musicbrainz_release_artists' => $this->releaseArtists($release),
-                'cover_source' => 'cover_art_archive',
+                'release_detail_source' => $releaseDetails !== [] ? 'musicbrainz_release_lookup' : null,
+                'cover_source' => $coverUrl !== null ? 'cover_art_archive' : null,
             ],
         ];
     }
@@ -61,6 +77,22 @@ class AudioMetadataCoverLookupProvider
             return null;
         }
 
+        foreach ($this->releaseMetadata->releaseSearchTitles($album) as $releaseTitle) {
+            $release = $this->searchRelease($album, $releaseTitle, $artist, $artists);
+            if ($release !== null) {
+                return $release;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $artists
+     * @return array<string, mixed>|null
+     */
+    private function searchRelease(string $album, string $releaseTitle, string $artist, array $artists): ?array
+    {
         try {
             $response = Http::acceptJson()
                 ->withHeaders(['User-Agent' => $this->userAgent()])
@@ -68,7 +100,7 @@ class AudioMetadataCoverLookupProvider
                 ->get(rtrim($this->musicBrainzBaseUrl(), '/').'/ws/2/release', [
                     'fmt' => 'json',
                     'limit' => 10,
-                    'query' => sprintf('artist:"%s" AND release:"%s"', $artist, $album),
+                    'query' => sprintf('artist:"%s" AND release:"%s"', $artist, $releaseTitle),
                 ]);
         } catch (Throwable) {
             return null;

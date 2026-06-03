@@ -14,11 +14,32 @@ use Illuminate\Support\Facades\Http;
 
 class AudioMetadataProposalGenerator
 {
+    private const REVIEW_FIELDS = [
+        'title',
+        'artists',
+        'album',
+        'duration_seconds',
+        'cover_url',
+        'spotify_uri',
+        'track_number',
+        'disc_number',
+        'release_label',
+        'catalog_number',
+        'barcode',
+        'release_date',
+        'release_country',
+        'isrc',
+        'musicbrainz_recording_id',
+        'musicbrainz_release_id',
+        'discogs_release_id',
+    ];
+
     public function __construct(
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
+        private readonly AudioMetadataLocalTagProvider $localTags,
         private readonly AudioMetadataValueExtractor $values,
         private readonly SpotifyOAuthConfig $spotifyConfig,
         private readonly SpotifyOAuthService $spotifyOAuth,
@@ -87,14 +108,27 @@ class AudioMetadataProposalGenerator
             ->filter()
             ->values()
             ->all();
+        $album = $file->albums->first();
+        $payload = $this->values->metadataPayload($file);
 
         return [
             'title' => $this->values->cleanString($file->title),
             'artists' => $artists,
             'album' => $albums[0] ?? null,
-            'duration_seconds' => $this->values->durationSeconds($file, $this->values->metadataPayload($file)),
+            'duration_seconds' => $this->values->durationSeconds($file, $payload),
             'cover_url' => $this->coverResolver->forFile($file),
             'spotify_uri' => $this->spotifyUri($file),
+            'track_number' => $this->values->cleanString($album?->pivot?->track_number ?? data_get($payload, 'audio.track_number')),
+            'disc_number' => $this->values->cleanString($album?->pivot?->disc_number ?? data_get($payload, 'audio.disc_number')),
+            'release_label' => $this->values->cleanString($album?->release_label),
+            'catalog_number' => $this->values->cleanString($album?->catalog_number),
+            'barcode' => $this->values->cleanString($album?->barcode),
+            'release_date' => $this->values->cleanString($album?->release_date),
+            'release_country' => $this->values->cleanString($album?->release_country),
+            'isrc' => $this->values->cleanString(data_get($payload, 'isrc') ?? data_get($payload, 'audio.isrc')),
+            'musicbrainz_recording_id' => $this->values->cleanString(data_get($payload, 'musicbrainz_recording_id') ?? data_get($payload, 'audio.musicbrainz_recording_id')),
+            'musicbrainz_release_id' => $this->values->cleanString($album?->musicbrainz_release_id),
+            'discogs_release_id' => $this->values->cleanString($album?->discogs_release_id),
         ];
     }
 
@@ -119,7 +153,7 @@ class AudioMetadataProposalGenerator
             $candidates[] = $coverCandidate;
         }
 
-        $tagCandidate = $this->localTagCandidate($file);
+        $tagCandidate = $this->localTags->candidate($file);
         if ($tagCandidate['values'] !== []) {
             $candidates[] = $tagCandidate;
         }
@@ -186,81 +220,6 @@ class AudioMetadataProposalGenerator
         };
 
         return $providerPriority + (int) $candidate['confidence'];
-    }
-
-    /**
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
-     */
-    private function localTagCandidate(File $file): array
-    {
-        $payload = $this->values->metadataPayload($file);
-        $values = [];
-        $evidence = ['source' => 'embedded_tags'];
-
-        $title = $this->values->firstStringForKeys($payload, ['title']);
-        $artists = $this->values->extractNames($payload, ['artist', 'artists', 'album_artist', 'albumArtist', 'albumartist', 'performer']);
-        $album = $this->values->firstStringForKeys($payload, ['album', 'albums']);
-        $duration = $this->values->durationSeconds($file, $payload);
-        $coverUrl = $this->values->firstStringForKeys($payload, ['cover_url', 'artwork_url', 'thumbnail_url']);
-
-        if ($title === null && $artists === []) {
-            $filenameCandidate = $this->values->filenameCandidate((string) $file->filename);
-            if ($filenameCandidate !== null) {
-                $title = $filenameCandidate['title'];
-                $artists = [$filenameCandidate['artist']];
-                $evidence['source'] = 'filename';
-            }
-        }
-
-        if ($title !== null) {
-            $values['title'] = $title;
-        }
-
-        if ($artists !== []) {
-            $values['artists'] = $artists;
-        }
-
-        if ($album !== null) {
-            $values['album'] = $album;
-        }
-
-        if ($duration !== null) {
-            $values['duration_seconds'] = $duration;
-        }
-
-        if ($coverUrl !== null) {
-            $values['cover_url'] = $coverUrl;
-        }
-
-        return [
-            'provider' => 'local',
-            'confidence' => $this->localTagConfidence($values, (string) $evidence['source']),
-            'values' => $values,
-            'evidence' => $evidence,
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $values
-     */
-    private function localTagConfidence(array $values, string $source): int
-    {
-        if ($values === []) {
-            return 0;
-        }
-
-        if ($source === 'filename') {
-            return 45;
-        }
-
-        $confidence = 50;
-        $confidence += array_key_exists('title', $values) ? 6 : 0;
-        $confidence += array_key_exists('artists', $values) ? 6 : 0;
-        $confidence += array_key_exists('album', $values) ? 4 : 0;
-        $confidence += array_key_exists('duration_seconds', $values) ? 4 : 0;
-        $confidence += array_key_exists('cover_url', $values) ? 3 : 0;
-
-        return min(70, $confidence);
     }
 
     /**
@@ -333,6 +292,9 @@ class AudioMetadataProposalGenerator
         $this->putIfPresent($values, 'spotify_uri', $this->values->cleanString(data_get($track, 'uri')));
         $this->putIfPresent($values, 'isrc', $this->values->cleanString(data_get($track, 'external_ids.isrc')));
         $this->putIfPresent($values, 'cover_url', $this->bestSpotifyCoverUrl(data_get($track, 'album.images', [])));
+        $this->putIfPresent($values, 'track_number', $this->values->cleanString(data_get($track, 'track_number')));
+        $this->putIfPresent($values, 'disc_number', $this->values->cleanString(data_get($track, 'disc_number')));
+        $this->putIfPresent($values, 'release_date', $this->values->cleanString(data_get($track, 'album.release_date')));
 
         $duration = $this->values->positiveInteger(data_get($track, 'duration_ms'));
         if ($duration !== null) {
@@ -377,7 +339,7 @@ class AudioMetadataProposalGenerator
     {
         $changes = [];
 
-        foreach (['title', 'artists', 'album', 'duration_seconds', 'cover_url', 'spotify_uri'] as $field) {
+        foreach (self::REVIEW_FIELDS as $field) {
             if (! array_key_exists($field, $proposedValues)) {
                 continue;
             }

@@ -159,7 +159,17 @@ test('local metadata run can propose a better cover from musicbrainz release sea
     });
 
     Http::fake([
-        'https://musicbrainz.test/ws/2/release*' => Http::response([
+        'https://musicbrainz.test/ws/2/release/time-of-my-life-release*' => Http::response([
+            'id' => 'time-of-my-life-release',
+            'title' => 'Time of My Life',
+            'date' => '2011-07-19',
+            'country' => 'US',
+            'label-info' => [[
+                'catalog-number' => 'B0015663-02',
+                'label' => ['name' => 'Universal Republic'],
+            ]],
+        ]),
+        'https://musicbrainz.test/ws/2/release?*' => Http::response([
             'releases' => [[
                 'id' => 'time-of-my-life-release',
                 'score' => 100,
@@ -217,7 +227,12 @@ test('local metadata run can propose a better cover from musicbrainz release sea
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'musicbrainz_cover_art')
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/time-of-my-life-release/front-500.jpg')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Universal Republic')
+        ->assertJsonPath('proposal.proposed_values.catalog_number', 'B0015663-02')
+        ->assertJsonPath('proposal.proposed_values.release_date', '2011-07-19')
+        ->assertJsonPath('proposal.proposed_values.release_country', 'US')
         ->assertJsonPath('proposal.evidence.source', 'musicbrainz_release_search')
+        ->assertJsonPath('proposal.evidence.release_detail_source', 'musicbrainz_release_lookup')
         ->assertJsonPath('proposal.evidence.cover_source', 'cover_art_archive');
 });
 

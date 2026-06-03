@@ -10,6 +10,7 @@ class AudioMetadataFingerprintProvider
 {
     public function __construct(
         private readonly AudioFingerprintService $fingerprints,
+        private readonly MusicBrainzReleaseMetadata $releaseMetadata,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
 
@@ -39,6 +40,12 @@ class AudioMetadataFingerprintProvider
         }
 
         $release = $this->bestRelease($recording);
+        $releaseId = $this->cleanString($release['id'] ?? null);
+        $releaseDetails = $releaseId !== null ? $this->releaseMetadata->fetch($releaseId) : [];
+        if ($releaseDetails !== []) {
+            $release = array_replace_recursive($release, $releaseDetails);
+        }
+
         $proposedValues = $this->valuesFromRecording($recording, $release);
         if ($proposedValues === []) {
             return null;
@@ -154,9 +161,11 @@ class AudioMetadataFingerprintProvider
         $values = [];
         $this->putIfPresent($values, 'title', $this->cleanString($recording['title'] ?? null));
         $this->putIfPresent($values, 'artists', $this->recordingArtists($recording));
-        $this->putIfPresent($values, 'album', $this->cleanString($release['title'] ?? null));
         $this->putIfPresent($values, 'musicbrainz_recording_id', $this->cleanString($recording['id'] ?? null));
-        $this->putIfPresent($values, 'musicbrainz_release_id', $this->cleanString($release['id'] ?? null));
+
+        foreach ($this->releaseMetadata->values($release, $this->cleanString($recording['id'] ?? null)) as $key => $value) {
+            $this->putIfPresent($values, $key, $value);
+        }
 
         $duration = $this->metadataDurationSeconds($recording['duration'] ?? $recording['length'] ?? null);
         if ($duration !== null) {

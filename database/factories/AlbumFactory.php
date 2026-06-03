@@ -22,6 +22,13 @@ class AlbumFactory extends Factory
         return [
             'name' => $name,
             'normalized_name' => mb_strtolower($name),
+            'release_label' => null,
+            'catalog_number' => null,
+            'barcode' => null,
+            'release_date' => null,
+            'release_country' => null,
+            'musicbrainz_release_id' => null,
+            'discogs_release_id' => null,
         ];
     }
 }

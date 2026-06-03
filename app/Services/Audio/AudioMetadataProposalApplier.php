@@ -18,6 +18,26 @@ use Throwable;
 
 class AudioMetadataProposalApplier
 {
+    private const RELEASE_FIELDS = [
+        'release_label',
+        'catalog_number',
+        'barcode',
+        'release_date',
+        'release_country',
+        'musicbrainz_release_id',
+        'discogs_release_id',
+    ];
+
+    private const TRACK_PIVOT_FIELDS = [
+        'track_number',
+        'disc_number',
+    ];
+
+    private const FILE_METADATA_FIELDS = [
+        'isrc',
+        'musicbrainz_recording_id',
+    ];
+
     /**
      * @param  list<string>  $fields
      */
@@ -39,6 +59,8 @@ class AudioMetadataProposalApplier
             $proposed = is_array($proposal->proposed_values) ? $proposal->proposed_values : [];
             $this->applyFileFields($file, $proposed, $fields);
             $this->applyRelationshipFields($file, $proposed, $fields);
+            $this->applyAlbumMetadataFields($file, $proposed, $fields);
+            $this->applyTrackPivotFields($file, $proposed, $fields);
             $this->applyMetadataFields($file, $proposed, $fields);
 
             $proposal->forceFill([
@@ -82,7 +104,7 @@ class AudioMetadataProposalApplier
         }
 
         if (in_array('cover_url', $fields, true)) {
-            $coverUrl = $this->cleanString($proposed['cover_url'] ?? null);
+            $coverUrl = $this->normalizeCoverUrl($this->cleanString($proposed['cover_url'] ?? null));
             if ($coverUrl !== null) {
                 if (! $this->applyAlbumCoverUrl($file, $coverUrl)) {
                     $file->forceFill(['preview_url' => $coverUrl]);
@@ -176,6 +198,7 @@ class AudioMetadataProposalApplier
             $freshFile = $file->fresh(['artists']);
             if ($album !== null && $freshFile instanceof File) {
                 $this->syncAlbum($freshFile, $album);
+                $file->load('albums');
             }
         }
     }
@@ -186,13 +209,86 @@ class AudioMetadataProposalApplier
      */
     private function applyMetadataFields(File $file, array $proposed, array $fields): void
     {
-        if (! in_array('duration_seconds', $fields, true)) {
+        $metadata = [];
+
+        if (in_array('duration_seconds', $fields, true)) {
+            $duration = $this->positiveInteger($proposed['duration_seconds'] ?? null);
+            if ($duration !== null) {
+                $metadata['duration_seconds'] = $duration;
+            }
+        }
+
+        foreach (self::FILE_METADATA_FIELDS as $field) {
+            if (! in_array($field, $fields, true)) {
+                continue;
+            }
+
+            $value = $this->cleanString($proposed[$field] ?? null);
+            if ($value !== null) {
+                $metadata[$field] = $value;
+            }
+        }
+
+        if ($metadata === []) {
             return;
         }
 
-        $duration = $this->positiveInteger($proposed['duration_seconds'] ?? null);
-        if ($duration !== null) {
-            $this->mergeFileMetadata($file, ['duration_seconds' => $duration]);
+        $this->mergeFileMetadata($file, $metadata);
+    }
+
+    /**
+     * @param  array<string, mixed>  $proposed
+     * @param  list<string>  $fields
+     */
+    private function applyAlbumMetadataFields(File $file, array $proposed, array $fields): void
+    {
+        $album = $file->albums->first();
+        if (! $album instanceof Album) {
+            return;
+        }
+
+        $updates = [];
+        foreach (self::RELEASE_FIELDS as $field) {
+            if (! in_array($field, $fields, true)) {
+                continue;
+            }
+
+            $value = $this->cleanString($proposed[$field] ?? null);
+            if ($value !== null) {
+                $updates[$field] = $value;
+            }
+        }
+
+        if ($updates !== []) {
+            $album->forceFill($updates)->save();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $proposed
+     * @param  list<string>  $fields
+     */
+    private function applyTrackPivotFields(File $file, array $proposed, array $fields): void
+    {
+        $album = $file->albums->first();
+        if (! $album instanceof Album) {
+            return;
+        }
+
+        $updates = [];
+        foreach (self::TRACK_PIVOT_FIELDS as $field) {
+            if (! in_array($field, $fields, true)) {
+                continue;
+            }
+
+            $value = $this->cleanString($proposed[$field] ?? null);
+            if ($value !== null) {
+                $updates[$field] = $value;
+            }
+        }
+
+        if ($updates !== []) {
+            $file->albums()->updateExistingPivot($album->id, $updates);
         }
     }
 
@@ -277,6 +373,15 @@ class AudioMetadataProposalApplier
         }
 
         return preg_match('/^[A-Za-z0-9]{22}$/', $value) === 1 ? $value : null;
+    }
+
+    private function normalizeCoverUrl(?string $coverUrl): ?string
+    {
+        if ($coverUrl === null) {
+            return null;
+        }
+
+        return preg_replace('/^http:\/\/coverartarchive\.org\//i', 'https://coverartarchive.org/', $coverUrl) ?? $coverUrl;
     }
 
     private function cleanString(mixed $value): ?string
