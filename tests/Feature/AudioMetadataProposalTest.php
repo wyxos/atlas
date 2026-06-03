@@ -247,6 +247,7 @@ test('metadata proposal can apply selected fields to canonical audio metadata', 
     expect($file->title)->toBe('Proposed Title')
         ->and($file->artists()->pluck('name')->all())->toBe(['Artist A'])
         ->and($file->albums()->pluck('name')->all())->toBe(['Album A'])
+        ->and($file->metadata()->first()?->payload['audio']['aliases']['title'] ?? [])->toBe(['Original Title'])
         ->and($file->metadata()->first()?->payload['duration_seconds'] ?? null)->toBe(212);
 });
 

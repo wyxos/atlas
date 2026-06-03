@@ -202,6 +202,32 @@ test('audio details prefer catalog relationships and album cover over metadata f
         ->assertHeader('content-type', 'image/jpeg');
 });
 
+test('audio details prefer canonical title over embedded metadata alias', function () {
+    $user = User::factory()->create();
+    $audio = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Canonical Source Title',
+        'filename' => 'imported-title.mp3',
+    ]);
+    $audio->metadata()->create([
+        'payload' => [
+            'title' => 'Imported Custom Title',
+            'audio' => [
+                'aliases' => [
+                    'title' => ['Imported Custom Title'],
+                ],
+            ],
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/api/audio/details', [
+        'ids' => [$audio->id],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('items.0.title', 'Canonical Source Title');
+});
+
 test('audio details use spotify listing metadata names before container ids', function () {
     $user = User::factory()->create();
     $audio = File::factory()->create([

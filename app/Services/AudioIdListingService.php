@@ -240,7 +240,10 @@ class AudioIdListingService
                 ? array_values(array_unique($relationshipAlbums))
                 : ($albums !== [] ? $albums : array_values(array_unique($containerAlbums)));
 
-            $title = trim((string) (data_get($payload, 'title') ?? $file->title ?? $file->filename ?? ''));
+            $title = trim((string) ($file->title ?? ''));
+            if ($title === '') {
+                $title = trim((string) (data_get($payload, 'title') ?? $file->filename ?? ''));
+            }
             $source = trim((string) ($file->source ?? ''));
             $reaction = $file->reactions->first();
 

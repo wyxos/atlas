@@ -45,6 +45,10 @@ class AudioMetadataLocalTagProvider
             }
         }
 
+        if ($title !== null && $this->matchesStoredTitleAlias($payload, $title)) {
+            $title = null;
+        }
+
         $this->putIfPresent($values, 'title', $title);
         $this->putIfPresent($values, 'artists', $artists);
         $this->putIfPresent($values, 'album', $album);
@@ -94,6 +98,17 @@ class AudioMetadataLocalTagProvider
         $confidence += array_key_exists('catalog_number', $values) ? 2 : 0;
 
         return min(70, $confidence);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function matchesStoredTitleAlias(array $payload, string $title): bool
+    {
+        $title = $this->values->normalizeName($title);
+
+        return collect($this->values->cleanStringList(data_get($payload, 'audio.aliases.title', [])))
+            ->contains(fn (string $alias): bool => $this->values->normalizeName($alias) === $title);
     }
 
     /**
