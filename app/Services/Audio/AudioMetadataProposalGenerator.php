@@ -150,6 +150,8 @@ class AudioMetadataProposalGenerator
         $discogsCandidate = $this->discogsProvider->candidate($file, $currentValues);
 
         if ($fingerprintCandidate !== null) {
+            $fingerprintCandidate = $this->supplementCandidateWithCover($fingerprintCandidate, $coverCandidate);
+
             $candidates[] = $this->supplementCandidateWithDiscogs(
                 $fingerprintCandidate,
                 $discogsCandidate,
@@ -180,6 +182,33 @@ class AudioMetadataProposalGenerator
             ->first();
 
         return is_array($candidate) ? $candidate : null;
+    }
+
+    /**
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null  $coverCandidate
+     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
+     */
+    private function supplementCandidateWithCover(array $candidate, ?array $coverCandidate): array
+    {
+        if ($coverCandidate === null) {
+            return $candidate;
+        }
+
+        $coverUrl = $this->values->cleanString($coverCandidate['values']['cover_url'] ?? null);
+        if ($coverUrl === null) {
+            return $candidate;
+        }
+
+        if (array_key_exists('cover_url', $candidate['values']) && $candidate['values']['cover_url'] !== null) {
+            return $candidate;
+        }
+
+        $candidate['values']['cover_url'] = $coverUrl;
+        $candidate['evidence']['cover_source'] = $coverCandidate['evidence']['cover_source'] ?? null;
+        $candidate['evidence']['musicbrainz_release_id'] ??= $coverCandidate['evidence']['musicbrainz_release_id'] ?? null;
+
+        return $candidate;
     }
 
     /**
