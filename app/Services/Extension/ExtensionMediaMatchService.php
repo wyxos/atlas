@@ -11,7 +11,7 @@ class ExtensionMediaMatchService
 {
     /**
      * @param  array<int, array{request_id: string, referrer_hash: string}>  $items
-     * @return array<int, array{request_id: string, request_index: int, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
+     * @return array<int, array{request_id: string, request_index: int, exists: bool, file_id: int|null, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
     public function referrerChecks(array $items, int $reactionUserId): array
     {
@@ -45,6 +45,7 @@ class ExtensionMediaMatchService
                     'request_id' => (string) $item['request_id'],
                     'request_index' => (int) $item['request_index'],
                     'exists' => false,
+                    'file_id' => null,
                     'reaction' => null,
                     'reacted_at' => null,
                     'downloaded_at' => null,
@@ -58,6 +59,7 @@ class ExtensionMediaMatchService
                 'request_id' => (string) $item['request_id'],
                 'request_index' => (int) $item['request_index'],
                 'exists' => true,
+                'file_id' => (int) $file->id,
                 'reaction' => $reaction['type'] ?? null,
                 'reacted_at' => $reaction['reacted_at'] ?? null,
                 'downloaded_at' => $file->downloaded_at?->toIso8601String(),
@@ -68,7 +70,7 @@ class ExtensionMediaMatchService
 
     /**
      * @param  array<int, array{request_id: string, url_hash: string}>  $items
-     * @return array<int, array{request_id: string, request_index: int, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
+     * @return array<int, array{request_id: string, request_index: int, exists: bool, file_id: int|null, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
     public function badgeChecks(array $items, int $reactionUserId): array
     {
@@ -102,6 +104,7 @@ class ExtensionMediaMatchService
                     'request_id' => (string) $item['request_id'],
                     'request_index' => (int) $item['request_index'],
                     'exists' => false,
+                    'file_id' => null,
                     'reaction' => null,
                     'reacted_at' => null,
                     'downloaded_at' => null,
@@ -115,6 +118,7 @@ class ExtensionMediaMatchService
                 'request_id' => (string) $item['request_id'],
                 'request_index' => (int) $item['request_index'],
                 'exists' => true,
+                'file_id' => (int) $file->id,
                 'reaction' => $reaction['type'] ?? null,
                 'reacted_at' => $reaction['reacted_at'] ?? null,
                 'downloaded_at' => $file->downloaded_at?->toIso8601String(),
@@ -145,7 +149,7 @@ class ExtensionMediaMatchService
 
     /**
      * @param  array<int, array{candidate_id: string, type: string, url: string}>  $items
-     * @return array<int, array{id: string, exists: bool, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
+     * @return array<int, array{id: string, exists: bool, file_id: int|null, reaction: string|null, reacted_at: string|null, downloaded_at: string|null, blacklisted_at: string|null}>
      */
     public function match(array $items, int $reactionUserId): array
     {
@@ -217,6 +221,7 @@ class ExtensionMediaMatchService
             return [
                 'id' => $candidateId,
                 'exists' => true,
+                'file_id' => (int) $file->id,
                 'reaction' => $reaction['type'] ?? null,
                 'reacted_at' => $reaction['reacted_at'] ?? null,
                 'downloaded_at' => $file->downloaded_at?->toIso8601String(),
@@ -399,6 +404,7 @@ class ExtensionMediaMatchService
         return [
             'id' => $id,
             'exists' => false,
+            'file_id' => null,
             'reaction' => null,
             'reacted_at' => null,
             'downloaded_at' => null,

@@ -1,20 +1,14 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Ban, Download } from 'lucide-vue-next';
-import { formatMatchTimestamp } from './match-timestamp';
-import {
-    hasRelatedPostThumbnailsBelowMedia,
-    resolveIdentifiedMediaResolution,
-    type MediaElement,
-} from './media-utils';
+import { hasRelatedPostThumbnailsBelowMedia, resolveIdentifiedMediaResolution, type MediaElement } from './media-utils';
 import { collectDeviantArtBatchReactionItems } from './deviantart-batch-reaction';
-import {
-    collectCivitAiListingMetadataOverrides,
-} from './civitai-reaction-context';
+import { collectCivitAiListingMetadataOverrides } from './civitai-reaction-context';
 import { enqueueReactionCheck, type BadgeMatchResult, type BadgeReactionType } from './reaction-check-queue';
 import { createDownloadedReactionDialog } from './downloaded-reaction-dialog';
+import { useReactionBadgeFileState } from './reaction-badge-file-state';
 import { submitBadgeReaction, type SubmitDownloadBehavior } from './reaction-submit';
 import { subscribeToDownloadProgress } from './download-progress-bus';
 import type { BadgeTimestampDisplay } from './reaction-badge-view';
+import { resolveBadgeTimestampDisplay } from './reaction-badge-timestamp';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
 import { requestCloseCurrentTab, requestTabCount, subscribeToTabCountChanged } from './reaction-badge-tab-runtime';
 import { resolveReactionBadgeProgressState } from './reaction-badge-progress';
@@ -26,10 +20,7 @@ import {
     resolveTrackedMediaUrls,
 } from './reaction-badge-tracking';
 import { queueCloseCurrentTabAfterDownloadComplete } from './reaction-badge-auto-close';
-import {
-    persistBadgeCheckResult, persistBadgeState,
-    persistDownloadProgressEvent, type PersistedBadgeState,
-} from './badge-state-cache';
+import { persistBadgeCheckResult, persistBadgeState, persistDownloadProgressEvent, type PersistedBadgeState } from './badge-state-cache';
 import { useCloseTabAfterQueuePreference } from './close-tab-after-queue-state';
 import { useReactAllItemsInPostPreference } from './react-all-items-in-post-state';
 import { isCivitAiHostname } from '../civitai-domains';
@@ -79,21 +70,21 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     let suppressMediaContextUpdates = false;
     let relatedPostThumbnailRetryTimer: number | null = null;
     let relatedPostThumbnailRetryIndex = 0;
+    const fileState = useReactionBadgeFileState({
+        matchResult,
+        trackedFileId,
+        trackedTransferId,
+        transferStatus,
+        progressPercent,
+        hasSeenActiveTransfer,
+        isActive: () => isActive,
+        persistCurrentBadgeState,
+    });
     const controlsDisabled = computed(() => isChecking.value
-        || submittingReactionType.value !== null || submittingBlacklist.value || isDownloadLocked.value || reactAllItemsInPostPreference.saving.value);
+        || submittingReactionType.value !== null || submittingBlacklist.value || isDownloadLocked.value || fileState.isDeletingFile.value || reactAllItemsInPostPreference.saving.value);
     const isBlacklisted = computed(() => matchResult.value.blacklistedAt !== null);
     const activeReaction = computed(() => (matchResult.value.exists && !isBlacklisted.value ? matchResult.value.reaction : null));
-    const timestampText = computed<BadgeTimestampDisplay>(() => {
-        const blacklistedAt = formatMatchTimestamp(matchResult.value.blacklistedAt);
-        if (blacklistedAt) {
-            return { icon: Ban, text: `- ${blacklistedAt}` };
-        }
-        const downloadedAt = formatMatchTimestamp(matchResult.value.downloadedAt);
-        if (downloadedAt) {
-            return { icon: Download, text: `- ${downloadedAt}` };
-        }
-        return null;
-    });
+    const timestampText = computed<BadgeTimestampDisplay>(() => resolveBadgeTimestampDisplay(matchResult.value));
     const progressState = computed(() => resolveReactionBadgeProgressState({
         progressPercent: progressPercent.value, transferStatus: transferStatus.value, downloadedAt: matchResult.value.downloadedAt,
     }));
@@ -293,6 +284,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
                 applyPersistedState(persistedAfterCheck);
             } else {
                 matchResult.value = result;
+                trackedFileId.value = result.fileId ?? null;
             }
         } catch {
             if (!isActive || currentSequence !== checkSequence) {
@@ -359,6 +351,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             similarDomainTabCount.value = snapshot?.similarDomainCount ?? null;
             openTabCount.value = snapshot?.totalCount ?? null;
         });
+        void fileState.syncAtlasDomain();
         syncRelatedPostThumbnailContext();
         restartRelatedPostThumbnailRetry();
         void refreshMatchForCurrentMedia({
@@ -511,13 +504,17 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
     return {
         activeReaction,
+        atlasFileUrl: fileState.atlasFileUrl,
+        canDeleteFile: fileState.canDeleteFile,
         closeTabAfterQueueMode: closeTabAfterQueuePreference.mode,
         controlsDisabled,
         handleReactAllItemsInPostToggle,
+        handleDeleteFileClick: fileState.handleDeleteFileClick,
         handleReactionClick,
         hoveredReaction,
         isBlacklisted,
         isChecking,
+        isDeletingFile: fileState.isDeletingFile,
         isSavingCloseTabAfterQueuePreference: closeTabAfterQueuePreference.saving,
         mediaResolution,
         openTabCount,
@@ -528,6 +525,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         submittingBlacklist,
         submittingReactionType,
         timestampText,
+        trackedFileId,
         cycleCloseTabAfterQueuePreference: closeTabAfterQueuePreference.cycleMode,
         transferStatus,
     };

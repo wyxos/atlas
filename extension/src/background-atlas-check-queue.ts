@@ -50,6 +50,24 @@ function stringOrNull(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+function numberOrNull(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
 const badgeCheckQueue = createBackgroundAtlasCheckQueue<BadgeMatchResult>({
     batchDelayMs: ATLAS_CHECK_BATCH_DELAY_MS,
     maxBatchSize: ATLAS_CHECK_MAX_BATCH_SIZE,
@@ -64,13 +82,18 @@ const badgeCheckQueue = createBackgroundAtlasCheckQueue<BadgeMatchResult>({
         url_hash: entry.inputHash,
     }),
     emptyPayload: emptyBadgeCheckResult,
-    parsePayloadItem: (row: MatchResponseItem) => ({
-        exists: row.exists === true,
-        reaction: normalizeReaction(row.reaction),
-        reactedAt: stringOrNull(row.reacted_at),
-        downloadedAt: stringOrNull(row.downloaded_at),
-        blacklistedAt: stringOrNull(row.blacklisted_at),
-    }),
+    parsePayloadItem: (row: MatchResponseItem) => {
+        const fileId = numberOrNull(row.fileId ?? row.file_id);
+
+        return {
+            exists: row.exists === true,
+            ...(fileId !== null ? { fileId } : {}),
+            reaction: normalizeReaction(row.reaction),
+            reactedAt: stringOrNull(row.reacted_at),
+            downloadedAt: stringOrNull(row.downloaded_at),
+            blacklistedAt: stringOrNull(row.blacklisted_at),
+        };
+    },
 });
 
 const referrerCheckQueue = createBackgroundAtlasCheckQueue<ReferrerMatchResult>({

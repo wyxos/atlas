@@ -3,6 +3,7 @@ import { Ban, Download, Heart, Layers, Loader2, Smile, ThumbsUp } from 'lucide-v
 import type { BadgeReactionType } from './reaction-check-queue';
 import type { CloseTabAfterQueueMode } from '../atlas-options';
 import { formatTabCountSummary } from '../tab-counts';
+import { renderAtlasFileLink, renderDeleteFileButton } from './reaction-badge-file-actions-view';
 
 export type BadgeTimestampDisplay = {
     icon: typeof Ban | typeof Download;
@@ -28,6 +29,9 @@ type BadgeViewModel = {
     transferStatus: string | null;
     showReactAllItemsInPost: boolean;
     reactAllItemsInPost: boolean;
+    atlasFileUrl: string | null;
+    canDeleteFile: boolean;
+    deletingFile: boolean;
 };
 
 type BadgeViewHandlers = {
@@ -35,6 +39,7 @@ type BadgeViewHandlers = {
     onReactionHover: (type: BadgeReactionType | null) => void;
     onBlacklistClick: () => void;
     onCloseTabAfterQueueToggle: () => void;
+    onDeleteFileClick: () => void;
     onReactAllItemsInPostToggle: () => void;
 };
 
@@ -333,6 +338,8 @@ function renderIconRow(model: BadgeViewModel, handlers: BadgeViewHandlers): VNod
             renderReactionButton('like', model, handlers),
             renderBlacklistButton(model, handlers),
             renderReactionButton('funny', model, handlers),
+            renderAtlasFileLink(model),
+            renderDeleteFileButton(model, handlers),
         ],
     );
 }

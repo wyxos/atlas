@@ -50,6 +50,9 @@ export const AtlasReactionBadge = defineComponent({
                 transferStatus: badge.transferStatus.value,
                 showReactAllItemsInPost: badge.showReactAllItemsInPost.value,
                 reactAllItemsInPost: badge.reactAllItemsInPost.value,
+                atlasFileUrl: badge.atlasFileUrl.value,
+                canDeleteFile: badge.canDeleteFile.value,
+                deletingFile: badge.isDeletingFile.value,
             },
             {
                 onReactionClick: (reactionType) => {
@@ -63,6 +66,9 @@ export const AtlasReactionBadge = defineComponent({
                 },
                 onCloseTabAfterQueueToggle: () => {
                     void badge.cycleCloseTabAfterQueuePreference();
+                },
+                onDeleteFileClick: () => {
+                    void badge.handleDeleteFileClick();
                 },
                 onReactAllItemsInPostToggle: () => {
                     void badge.handleReactAllItemsInPostToggle();

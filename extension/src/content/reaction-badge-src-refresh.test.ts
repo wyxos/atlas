@@ -14,6 +14,7 @@ const mockGetPersistedBadgeState = vi.fn();
 const mockPersistBadgeCheckResult = vi.fn();
 const mockPersistBadgeState = vi.fn();
 const mockPersistDownloadProgressEvent = vi.fn();
+const mockGetStoredConnectionOptions = vi.fn();
 
 vi.mock('./match-timestamp', () => ({
     formatMatchTimestamp: () => null,
@@ -48,11 +49,13 @@ vi.mock('./download-progress-bus', () => ({
 }));
 
 vi.mock('../atlas-options', () => ({
+    DEFAULT_ATLAS_DOMAIN: 'https://atlas.test',
     STORAGE_KEYS: {
         closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
         reactAllItemsInPostByDomain: 'reactAllItemsInPostByDomain',
         reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
     },
+    getStoredConnectionOptions: mockGetStoredConnectionOptions,
     getCloseTabAfterQueuePreferenceForHostname: mockGetCloseTabAfterQueuePreferenceForHostname,
     getReactAllItemsInPostPreferenceForHostname: mockGetReactAllItemsInPostPreferenceForHostname,
     setCloseTabAfterQueuePreferenceForHostname: mockSetCloseTabAfterQueuePreferenceForHostname,
@@ -105,6 +108,10 @@ describe('reaction badge src refresh', () => {
         });
         mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue('completed');
         mockGetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(false);
+        mockGetStoredConnectionOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: '',
+        });
         mockSetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue(undefined);
         mockSetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(undefined);
         mockSubscribeToDownloadProgress.mockImplementation(() => () => undefined);

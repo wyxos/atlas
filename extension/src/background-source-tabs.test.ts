@@ -31,7 +31,7 @@ describe('handleOpenSourceTabsRuntimeMessage', () => {
                 type: 'ATLAS_OPEN_SOURCE_TABS',
                 urls: [
                     ' https://www.deviantart.com/artist/art/first#comments ',
-                    'https://www.deviantart.com/artist/art/first#other',
+                    'https://www.deviantart.com/artist/art/first#comments',
                     'https://www.deviantart.com/artist/art/second',
                     'javascript:alert(1)',
                 ],
@@ -43,7 +43,7 @@ describe('handleOpenSourceTabsRuntimeMessage', () => {
         expect(chromeMock.tabs.create).toHaveBeenCalledTimes(2);
         expect(chromeMock.tabs.create).toHaveBeenNthCalledWith(
             1,
-            { url: 'https://www.deviantart.com/artist/art/first', active: false },
+            { url: 'https://www.deviantart.com/artist/art/first#comments', active: false },
             expect.any(Function),
         );
         expect(chromeMock.tabs.create).toHaveBeenNthCalledWith(
@@ -54,6 +54,48 @@ describe('handleOpenSourceTabsRuntimeMessage', () => {
         expect(response).toEqual({
             ok: true,
             openedCount: 2,
+            failedCount: 0,
+        });
+    });
+
+    it('preserves distinct source page fragments when opening source tabs', async () => {
+        const chromeMock = createChromeMock();
+        vi.stubGlobal('chrome', chromeMock);
+
+        const { handleOpenSourceTabsRuntimeMessage } = await import('./background-source-tabs');
+
+        const response = await new Promise((resolve) => {
+            const handled = handleOpenSourceTabsRuntimeMessage({
+                type: 'ATLAS_OPEN_SOURCE_TABS',
+                urls: [
+                    'https://civitai.com/images/123#comment-1',
+                    'https://civitai.com/images/123#comment-2',
+                    'https://civitai.com/images/123#comment-3',
+                ],
+            }, resolve);
+
+            expect(handled).toBe(true);
+        });
+
+        expect(chromeMock.tabs.create).toHaveBeenCalledTimes(3);
+        expect(chromeMock.tabs.create).toHaveBeenNthCalledWith(
+            1,
+            { url: 'https://civitai.com/images/123#comment-1', active: false },
+            expect.any(Function),
+        );
+        expect(chromeMock.tabs.create).toHaveBeenNthCalledWith(
+            2,
+            { url: 'https://civitai.com/images/123#comment-2', active: false },
+            expect.any(Function),
+        );
+        expect(chromeMock.tabs.create).toHaveBeenNthCalledWith(
+            3,
+            { url: 'https://civitai.com/images/123#comment-3', active: false },
+            expect.any(Function),
+        );
+        expect(response).toEqual({
+            ok: true,
+            openedCount: 3,
             failedCount: 0,
         });
     });
@@ -71,4 +113,5 @@ describe('handleOpenSourceTabsRuntimeMessage', () => {
         expect(sendResponse).not.toHaveBeenCalled();
         expect(chromeMock.tabs.create).not.toHaveBeenCalled();
     });
+
 });

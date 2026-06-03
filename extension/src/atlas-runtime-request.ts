@@ -8,7 +8,7 @@ type RuntimeAtlasRequestOptions = {
     endpoint: string;
     atlasDomain: string;
     apiToken: string;
-    method: 'GET' | 'POST';
+    method: 'DELETE' | 'GET' | 'POST';
     body?: Record<string, unknown>;
 };
 

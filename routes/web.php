@@ -44,6 +44,8 @@ Route::post('/api/extension/reactions', [\App\Http\Controllers\ExtensionApiContr
     ->name('api.extension.reactions');
 Route::post('/api/extension/reactions/batch', [\App\Http\Controllers\ExtensionApiController::class, 'reactBatch'])
     ->name('api.extension.reactions.batch');
+Route::delete('/api/extension/files/{file}', [\App\Http\Controllers\ExtensionFileController::class, 'destroy'])
+    ->name('api.extension.files.destroy');
 Route::post('/api/extension/download-status', [\App\Http\Controllers\ExtensionApiController::class, 'downloadStatus'])
     ->name('api.extension.download-status');
 Route::post('/api/extension/browse-tabs/civitai-model', [\App\Http\Controllers\ExtensionApiController::class, 'openCivitAiModelBrowseTab'])

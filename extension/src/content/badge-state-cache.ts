@@ -128,6 +128,7 @@ export function persistBadgeCheckResult(mediaUrl: string | null, result: BadgeMa
 
     const input: PersistInput = {
         exists: nextExists,
+        fileId: result.fileId ?? (shouldKeepLocalReaction ? existing?.fileId ?? null : null),
         reaction: nextReaction,
         reactedAt: nextReactedAt,
     };

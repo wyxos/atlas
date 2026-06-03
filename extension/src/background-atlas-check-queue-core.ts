@@ -37,6 +37,8 @@ export type PendingQueueItem<Result> = {
 export type MatchResponseItem = {
     request_id?: unknown;
     exists?: unknown;
+    file_id?: unknown;
+    fileId?: unknown;
     reaction?: unknown;
     reacted_at?: unknown;
     downloaded_at?: unknown;

@@ -5,6 +5,7 @@ const mockHasRelatedPostThumbnailsBelowMedia = vi.fn();
 const mockGetCloseTabAfterQueuePreferenceForHostname = vi.fn();
 const mockGetReactAllItemsInPostPreferenceForHostname = vi.fn();
 const mockSubscribeToDownloadProgress = vi.fn();
+const mockGetStoredConnectionOptions = vi.fn();
 
 vi.mock('./match-timestamp', () => ({
     formatMatchTimestamp: () => null,
@@ -35,11 +36,13 @@ vi.mock('./download-progress-bus', () => ({
 }));
 
 vi.mock('../atlas-options', () => ({
+    DEFAULT_ATLAS_DOMAIN: 'https://atlas.test',
     STORAGE_KEYS: {
         closeTabAfterQueueByDomain: 'closeTabAfterQueueByDomain',
         reactAllItemsInPostByDomain: 'reactAllItemsInPostByDomain',
         reactAllItemsInPostEnabled: 'reactAllItemsInPostEnabled',
     },
+    getStoredConnectionOptions: mockGetStoredConnectionOptions,
     getCloseTabAfterQueuePreferenceForHostname: mockGetCloseTabAfterQueuePreferenceForHostname,
     getReactAllItemsInPostPreferenceForHostname: mockGetReactAllItemsInPostPreferenceForHostname,
     setCloseTabAfterQueuePreferenceForHostname: vi.fn(),
@@ -81,6 +84,10 @@ describe('createReactionBadgeHost delayed DeviantArt context', () => {
         });
         mockGetCloseTabAfterQueuePreferenceForHostname.mockResolvedValue('off');
         mockGetReactAllItemsInPostPreferenceForHostname.mockResolvedValue(false);
+        mockGetStoredConnectionOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: '',
+        });
         mockSubscribeToDownloadProgress.mockImplementation(() => () => {});
     });
 
