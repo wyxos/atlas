@@ -38,6 +38,7 @@ class AudioMetadataProposalGenerator
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
+        private readonly AudioMetadataDiscogsProvider $discogsProvider,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
         private readonly AudioMetadataLocalTagProvider $localTags,
         private readonly AudioMetadataValueExtractor $values,
@@ -143,14 +144,29 @@ class AudioMetadataProposalGenerator
         $fingerprintCandidate = $this->fingerprintProvider->candidate($file);
         if ($fingerprintCandidate !== null) {
             $fingerprintCandidate = $this->reviewFingerprintCandidate($file, $currentValues, $fingerprintCandidate);
-            if ($fingerprintCandidate !== null) {
-                $candidates[] = $fingerprintCandidate;
-            }
         }
 
         $coverCandidate = $this->coverLookup->candidate($file, $currentValues);
+        $discogsCandidate = $this->discogsProvider->candidate($file, $currentValues);
+
+        if ($fingerprintCandidate !== null) {
+            $candidates[] = $this->supplementCandidateWithDiscogs(
+                $fingerprintCandidate,
+                $discogsCandidate,
+                'acoustid_musicbrainz_discogs',
+            );
+        }
+
         if ($coverCandidate !== null) {
-            $candidates[] = $coverCandidate;
+            $candidates[] = $this->supplementCandidateWithDiscogs(
+                $coverCandidate,
+                $discogsCandidate,
+                'musicbrainz_discogs',
+            );
+        }
+
+        if ($discogsCandidate !== null) {
+            $candidates[] = $discogsCandidate;
         }
 
         $tagCandidate = $this->localTags->candidate($file);
@@ -164,6 +180,35 @@ class AudioMetadataProposalGenerator
             ->first();
 
         return is_array($candidate) ? $candidate : null;
+    }
+
+    /**
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null  $discogsCandidate
+     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
+     */
+    private function supplementCandidateWithDiscogs(array $candidate, ?array $discogsCandidate, string $provider): array
+    {
+        if ($discogsCandidate === null) {
+            return $candidate;
+        }
+
+        foreach ($discogsCandidate['values'] as $key => $value) {
+            if (array_key_exists($key, $candidate['values']) && $candidate['values'][$key] !== null) {
+                continue;
+            }
+
+            $candidate['values'][$key] = $value;
+        }
+
+        $candidate['provider'] = $provider;
+        $candidate['confidence'] = min(96, max($candidate['confidence'], $discogsCandidate['confidence']) + 2);
+        $candidate['evidence']['discogs_release_id'] = $discogsCandidate['evidence']['discogs_release_id'] ?? null;
+        $candidate['evidence']['discogs_release_title'] = $discogsCandidate['evidence']['discogs_release_title'] ?? null;
+        $candidate['evidence']['discogs_release_url'] = $discogsCandidate['evidence']['discogs_release_url'] ?? null;
+        $candidate['evidence']['discogs_source'] = $discogsCandidate['evidence']['source'] ?? null;
+
+        return $candidate;
     }
 
     /**
@@ -213,7 +258,10 @@ class AudioMetadataProposalGenerator
     private function candidatePriority(array $candidate): int
     {
         $providerPriority = match ($candidate['provider']) {
+            'acoustid_musicbrainz_discogs' => 310,
             'acoustid_musicbrainz' => 300,
+            'musicbrainz_discogs' => 245,
+            'discogs_release' => 235,
             'musicbrainz_cover_art' => 220,
             'spotify' => 250,
             default => 100,

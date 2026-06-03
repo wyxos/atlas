@@ -82,6 +82,8 @@ return [
         'acoustid_min_score' => env('ACOUSTID_MIN_SCORE', 0.65),
         'musicbrainz_api_base_url' => env('MUSICBRAINZ_API_BASE_URL', 'https://musicbrainz.org'),
         'cover_art_archive_base_url' => env('COVER_ART_ARCHIVE_BASE_URL', 'https://coverartarchive.org'),
+        'discogs_user_token' => env('DISCOGS_USER_TOKEN'),
+        'discogs_api_base_url' => env('DISCOGS_API_BASE_URL', 'https://api.discogs.com'),
         'http_timeout_seconds' => env('AUDIO_METADATA_HTTP_TIMEOUT_SECONDS', 15),
         'user_agent' => env('AUDIO_METADATA_USER_AGENT', 'Atlas/1.0 (+'.rtrim((string) env('APP_URL', 'http://localhost'), '/').')'),
         'ai_enabled' => env('AUDIO_METADATA_AI_ENABLED', true),

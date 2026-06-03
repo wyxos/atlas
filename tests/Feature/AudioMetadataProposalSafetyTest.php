@@ -236,6 +236,121 @@ test('local metadata run can propose a better cover from musicbrainz release sea
         ->assertJsonPath('proposal.evidence.cover_source', 'cover_art_archive');
 });
 
+test('discogs details supplement musicbrainz cover proposals', function () {
+    config([
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.cover_art_archive_base_url' => 'https://cover.test',
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('forFile')
+            ->once()
+            ->andReturn(null);
+    });
+
+    Http::fake([
+        'https://musicbrainz.test/ws/2/release/time-of-my-life-release*' => Http::response([
+            'id' => 'time-of-my-life-release',
+            'title' => 'Time of My Life',
+            'date' => '2011-07-19',
+            'country' => 'US',
+        ]),
+        'https://musicbrainz.test/ws/2/release?*' => Http::response([
+            'releases' => [[
+                'id' => 'time-of-my-life-release',
+                'score' => 100,
+                'title' => 'Time of My Life',
+                'artist-credit' => [[
+                    'name' => '3 Doors Down',
+                    'artist' => ['name' => '3 Doors Down'],
+                ]],
+            ]],
+        ]),
+        'https://cover.test/release/time-of-my-life-release' => Http::response([
+            'images' => [[
+                'front' => true,
+                'image' => 'https://cover.test/release/time-of-my-life-release/front.jpg',
+                'thumbnails' => [
+                    'large' => 'https://cover.test/release/time-of-my-life-release/front-500.jpg',
+                ],
+            ]],
+        ]),
+        'https://discogs.test/database/search*' => Http::response([
+            'results' => [
+                ['id' => 4647572],
+            ],
+        ]),
+        'https://discogs.test/releases/4647572' => Http::response([
+            'id' => 4647572,
+            'title' => 'Time Of My Life',
+            'country' => 'US',
+            'released' => '2011-07-19',
+            'artists' => [
+                ['name' => '3 Doors Down'],
+            ],
+            'labels' => [
+                ['name' => 'Universal Republic', 'catno' => 'B0015663-02'],
+            ],
+            'identifiers' => [
+                ['type' => 'Barcode', 'value' => '602527755550'],
+            ],
+            'tracklist' => [
+                [
+                    'position' => '2',
+                    'title' => 'On The Run',
+                    'duration' => '3:08',
+                ],
+            ],
+        ]),
+    ]);
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'On The Run',
+        'filename' => 'on-the-run.mp3',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => '3 Doors Down',
+        'normalized_name' => '3 doors down',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'Time Of My Life',
+        'normalized_name' => 'time of my life',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
+    AlbumCover::factory()->create([
+        'album_id' => $album->id,
+        'file_id' => $file->id,
+        'path' => 'imports/old/cover.jpg',
+        'path_hash' => hash('sha256', 'imports/old/cover.jpg'),
+        'is_default' => true,
+    ]);
+    $file->metadata()->create([
+        'payload' => [
+            'duration' => 187.742,
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal.provider', 'musicbrainz_discogs')
+        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/time-of-my-life-release/front-500.jpg')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Universal Republic')
+        ->assertJsonPath('proposal.proposed_values.catalog_number', 'B0015663-02')
+        ->assertJsonPath('proposal.proposed_values.barcode', '602527755550')
+        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '4647572')
+        ->assertJsonPath('proposal.evidence.source', 'musicbrainz_release_search')
+        ->assertJsonPath('proposal.evidence.cover_source', 'cover_art_archive')
+        ->assertJsonPath('proposal.evidence.discogs_release_id', '4647572')
+        ->assertJsonPath('proposal.evidence.discogs_source', 'discogs_release_search');
+});
+
 test('metadata proposal applies external cover urls as album cover assets', function () {
     Storage::fake(AtlasStorage::DISK);
 

@@ -63,9 +63,9 @@ function coverProposalFixture(): AudioMetadataProposal {
         id: 22,
         file_id: 7,
         run_id: 11,
-        provider: 'musicbrainz_cover_art',
+        provider: 'musicbrainz_discogs',
         status: 'pending',
-        confidence: 82,
+        confidence: 84,
         current_values: {
             cover_url: '/api/audio/album-covers/7',
             release_label: null,
@@ -75,6 +75,7 @@ function coverProposalFixture(): AudioMetadataProposal {
             cover_url: 'http://coverartarchive.org/release/release-mbid/front-500.jpg',
             release_label: 'Universal Republic',
             catalog_number: 'B0015663-02',
+            discogs_release_id: '4647572',
         },
         changes: {
             release_label: {
@@ -84,6 +85,10 @@ function coverProposalFixture(): AudioMetadataProposal {
             catalog_number: {
                 current: null,
                 proposed: 'B0015663-02',
+            },
+            discogs_release_id: {
+                current: null,
+                proposed: '4647572',
             },
             cover_url: {
                 current: '/api/audio/album-covers/7',
@@ -95,6 +100,9 @@ function coverProposalFixture(): AudioMetadataProposal {
             matched_existing_fields: ['artists', 'album'],
             release_detail_source: 'musicbrainz_release_lookup',
             cover_source: 'cover_art_archive',
+            discogs_release_id: '4647572',
+            discogs_release_url: 'https://www.discogs.com/release/4647572',
+            discogs_source: 'discogs_release_search',
         },
         created_at: null,
         reviewed_at: null,
@@ -288,11 +296,13 @@ describe('Audio metadata review', () => {
         expect(proposedCover).toBeInstanceOf(HTMLImageElement);
         expect(currentCover?.getAttribute('src')).toBe('/api/audio/album-covers/7');
         expect(proposedCover?.getAttribute('src')).toBe('https://coverartarchive.org/release/release-mbid/front-500.jpg');
-        expect(document.body.textContent).toContain('MusicBrainz Release - 82%');
+        expect(document.body.textContent).toContain('MusicBrainz / Discogs - 84%');
         expect(document.body.textContent).toContain('Label');
         expect(document.body.textContent).toContain('Universal Republic');
         expect(document.body.textContent).toContain('Catalog #');
         expect(document.body.textContent).toContain('B0015663-02');
-        expect(document.body.textContent).toContain('MusicBrainz release search / Matched artists, album / Release details / Cover Art Archive');
+        expect(document.body.textContent).toContain('Discogs release');
+        expect(document.body.textContent).toContain('4647572');
+        expect(document.body.textContent?.replace(/\s+/g, ' ')).toContain('MusicBrainz release search / Matched artists, album / Release details / Cover Art Archive / Data provided by Discogs');
     });
 });

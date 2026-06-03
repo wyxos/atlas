@@ -155,6 +155,18 @@ function providerLabel(provider: string): string {
         return 'MusicBrainz Release';
     }
 
+    if (provider === 'discogs_release') {
+        return 'Discogs Release';
+    }
+
+    if (provider === 'musicbrainz_discogs') {
+        return 'MusicBrainz / Discogs';
+    }
+
+    if (provider === 'acoustid_musicbrainz_discogs') {
+        return 'AcoustID / MusicBrainz / Discogs';
+    }
+
     return provider
         .split(/[_\s-]+/)
         .filter(Boolean)
@@ -180,6 +192,8 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
         items.push('Filename fallback');
     } else if (source === 'musicbrainz_release_search') {
         items.push('MusicBrainz release search');
+    } else if (source === 'discogs_release_search') {
+        items.push('Discogs release search');
     }
 
     if (matchedFields.length > 0) {
@@ -213,6 +227,12 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
     }
 
     return items;
+}
+
+function discogsAttributionUrl(proposal: AudioMetadataProposal): string | null {
+    const url = proposal.evidence?.discogs_release_url;
+
+    return typeof url === 'string' && url.trim() !== '' ? url : null;
 }
 </script>
 
@@ -293,7 +313,18 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
                             class="rounded border border-twilight-indigo-500/60 bg-prussian-blue-900/40 px-3 py-2 text-xs text-blue-slate-200"
                             data-test="audio-metadata-proposal-evidence"
                         >
-                            {{ evidenceItems(pendingProposal).join(' / ') }}
+                            <span>{{ evidenceItems(pendingProposal).join(' / ') }}</span>
+                            <template v-if="discogsAttributionUrl(pendingProposal)">
+                                <span v-if="evidenceItems(pendingProposal).length > 0"> / </span>
+                                <a
+                                    :href="discogsAttributionUrl(pendingProposal) ?? undefined"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="text-smart-blue-100 underline-offset-2 hover:underline"
+                                >
+                                    Data provided by Discogs
+                                </a>
+                            </template>
                         </div>
 
                         <label
