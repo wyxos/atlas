@@ -44,7 +44,7 @@ type AtlasApiRequestPayload = {
     atlasDomain: string;
     apiToken: string;
     endpoint: string;
-    method: 'GET' | 'POST';
+    method: 'DELETE' | 'GET' | 'POST';
     body?: Record<string, unknown> | null;
 };
 
@@ -114,10 +114,17 @@ function parseJsonResponse(response: Response): Promise<unknown> {
 function isAllowedAtlasApiEndpoint(
     atlasDomain: string,
     endpoint: string,
-    method: 'GET' | 'POST',
+    method: 'DELETE' | 'GET' | 'POST',
 ): boolean {
     if (atlasDomain === '') {
         return false;
+    }
+
+    if (method === 'DELETE') {
+        const prefix = `${atlasDomain}/api/extension/files/`;
+        const fileId = endpoint.startsWith(prefix) ? endpoint.slice(prefix.length) : '';
+
+        return /^\d+$/.test(fileId);
     }
 
     return (method === 'GET' && endpoint === `${atlasDomain}/api/extension/ping`)
@@ -405,15 +412,21 @@ export function handleAtlasApiRequestRuntimeMessage(
     const atlasDomain = typeof requestPayload.atlasDomain === 'string' ? normalizeAtlasDomain(requestPayload.atlasDomain) : '';
     const apiToken = typeof requestPayload.apiToken === 'string' ? requestPayload.apiToken.trim() : '';
     const endpoint = typeof requestPayload.endpoint === 'string' ? requestPayload.endpoint.trim() : '';
-    const method = requestPayload.method === 'POST' ? 'POST' : requestPayload.method === 'GET' ? 'GET' : null;
+    const method = requestPayload.method === 'DELETE'
+        ? 'DELETE'
+        : requestPayload.method === 'POST'
+            ? 'POST'
+            : requestPayload.method === 'GET'
+                ? 'GET'
+                : null;
     const body = requestPayload.body;
-    const requiresBody = method === 'POST';
+    const hasJsonBody = method === 'POST' || method === 'DELETE';
 
     if (
         method === null
         || !hasAtlasApiAuth(atlasDomain, apiToken)
         || !isAllowedAtlasApiEndpoint(atlasDomain, endpoint, method)
-        || (requiresBody && (typeof body !== 'object' || body === null))
+        || (hasJsonBody && (typeof body !== 'object' || body === null))
     ) {
         sendResponse({ ok: false, status: 0, payload: null });
         return false;
@@ -426,7 +439,7 @@ export function handleAtlasApiRequestRuntimeMessage(
         ...createAtlasFetchAuthOptions(apiToken),
     };
 
-    if (method === 'POST') {
+    if (hasJsonBody) {
         headers['Content-Type'] = 'application/json';
         init.body = JSON.stringify(body);
     }

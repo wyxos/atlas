@@ -22,6 +22,7 @@ export function preserveTrackedMatchResult(match: BadgeMatchResult): BadgeMatchR
     return {
         ...emptyMatchResult(),
         exists: match.exists,
+        ...(match.fileId !== undefined ? { fileId: match.fileId } : {}),
         reaction: match.reaction,
         reactedAt: match.reactedAt,
         downloadedAt: match.downloadedAt,

@@ -11,6 +11,7 @@ export type BadgeReactionType = 'love' | 'like' | 'funny';
 
 export type BadgeMatchResult = {
     exists: boolean;
+    fileId?: number | null;
     reaction: BadgeReactionType | null;
     reactedAt: string | null;
     downloadedAt: string | null;
@@ -43,14 +44,35 @@ function stringOrNull(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+function numberOrNull(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
 function parseMatchResult(value: unknown): BadgeMatchResult {
     if (!value || typeof value !== 'object') {
         return emptyResult();
     }
 
     const row = value as Record<string, unknown>;
+    const fileId = numberOrNull(row.fileId ?? row.file_id ?? row.id);
+
     return {
         exists: row.exists === true,
+        ...(fileId !== null ? { fileId } : {}),
         reaction: normalizeReaction(row.reaction),
         reactedAt: stringOrNull(row.reactedAt),
         downloadedAt: stringOrNull(row.downloadedAt),

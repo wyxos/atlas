@@ -155,4 +155,46 @@ describe('background runtime settings message bridge', () => {
         await sendAtlasApiRequest(getMessage);
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+
+    it('relays extension file deletion through the background fetch path', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({
+                deleted: true,
+                file_id: 123,
+            }), { status: 200 }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        const response = await sendAtlasApiRequest({
+            type: 'ATLAS_API_REQUEST',
+            atlasDomain: 'https://atlas.wyxos.com',
+            apiToken: 'test-api-token',
+            endpoint: 'https://atlas.wyxos.com/api/extension/files/123',
+            method: 'DELETE',
+            body: {
+                also_from_disk: true,
+                also_delete_record: true,
+            },
+        });
+
+        expect(fetchMock).toHaveBeenCalledWith('https://atlas.wyxos.com/api/extension/files/123', {
+            method: 'DELETE',
+            headers: {
+                'X-Atlas-Api-Key': 'test-api-token',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                also_from_disk: true,
+                also_delete_record: true,
+            }),
+        });
+        expect(response).toEqual({
+            ok: true,
+            status: 200,
+            payload: {
+                deleted: true,
+                file_id: 123,
+            },
+        });
+    });
 });

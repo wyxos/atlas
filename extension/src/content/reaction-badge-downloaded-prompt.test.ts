@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockEnqueueReactionCheck = vi.fn();
+const mockDeleteBadgeFile = vi.fn();
 const mockSubmitBadgeReaction = vi.fn();
 const mockHasRelatedPostThumbnailsBelowMedia = vi.fn();
 const mockSubscribeToDownloadProgress = vi.fn();
@@ -12,6 +13,7 @@ const mockDownloadedReactionPrompt = vi.fn();
 const mockRequestTabCount = vi.fn();
 const mockSubscribeToTabCountChanged = vi.fn();
 const mockEnsureReactionBadgeRuntimeStyles = vi.fn();
+const mockGetStoredConnectionOptions = vi.fn();
 const mockCloseTabAfterQueuePreference = {
     cycleMode: vi.fn(),
     mode: { value: 'completed' as const },
@@ -42,6 +44,15 @@ vi.mock('./reaction-check-queue', () => ({
 
 vi.mock('./reaction-submit', () => ({
     submitBadgeReaction: mockSubmitBadgeReaction,
+}));
+
+vi.mock('./reaction-file-delete', () => ({
+    deleteBadgeFile: mockDeleteBadgeFile,
+}));
+
+vi.mock('../atlas-options', () => ({
+    DEFAULT_ATLAS_DOMAIN: 'https://atlas.test',
+    getStoredConnectionOptions: mockGetStoredConnectionOptions,
 }));
 
 vi.mock('./download-progress-bus', () => ({
@@ -104,6 +115,10 @@ describe('createReactionBadgeHost downloaded prompt', () => {
         mockRequestTabCount.mockResolvedValue(2);
         mockSubscribeToTabCountChanged.mockImplementation(() => () => {});
         mockEnsureReactionBadgeRuntimeStyles.mockReturnValue(undefined);
+        mockGetStoredConnectionOptions.mockResolvedValue({
+            atlasDomain: 'https://atlas.test',
+            apiToken: '',
+        });
         mockCloseTabAfterQueuePreference.cycleMode.mockReset();
         mockReactAllItemsInPostPreference.refresh.mockResolvedValue(undefined);
         mockReactAllItemsInPostPreference.toggle.mockResolvedValue(undefined);
@@ -145,6 +160,9 @@ describe('createReactionBadgeHost downloaded prompt', () => {
             downloadProgressPercent: null,
             downloadCloseTargets: [],
             reverbConfig: null,
+        });
+        mockDeleteBadgeFile.mockResolvedValue({
+            ok: true,
         });
 
         const { createReactionBadgeHost } = await import('./reaction-badge-app');
@@ -199,6 +217,44 @@ describe('createReactionBadgeHost downloaded prompt', () => {
 
         expect(mockDownloadedReactionPrompt).toHaveBeenCalledTimes(1);
         expect(mockSubmitBadgeReaction).not.toHaveBeenCalled();
+
+        host.unmount();
+    });
+
+    it('shows an Atlas file link and can delete a downloaded file record', async () => {
+        mockEnqueueReactionCheck.mockResolvedValue({
+            exists: true,
+            fileId: 123,
+            reaction: 'like',
+            reactedAt: '2026-03-12T00:00:00Z',
+            downloadedAt: '2026-03-12T00:00:01Z',
+            blacklistedAt: null,
+        });
+
+        const { createReactionBadgeHost } = await import('./reaction-badge-app');
+
+        const image = document.createElement('img');
+        image.src = 'https://images.example.com/already-downloaded-delete.jpg';
+        document.body.appendChild(image);
+
+        const host = createReactionBadgeHost(image);
+        document.body.appendChild(host.element);
+
+        await flushPromises();
+        await flushPromises();
+
+        const atlasLink = host.element.querySelector('a[aria-label="Open file in Atlas"]') as HTMLAnchorElement | null;
+        expect(atlasLink?.getAttribute('href')).toBe('https://atlas.test/browse/file/123');
+        expect(atlasLink?.getAttribute('target')).toBe('_blank');
+
+        const deleteButton = host.element.querySelector('button[aria-label="Delete downloaded file from Atlas"]') as HTMLButtonElement | null;
+        deleteButton?.click();
+        await flushPromises();
+        await flushPromises();
+
+        expect(mockDeleteBadgeFile).toHaveBeenCalledWith(123);
+        expect(host.element.querySelector('a[aria-label="Open file in Atlas"]')).toBeNull();
+        expect(host.element.querySelector('button[aria-label="Delete downloaded file from Atlas"]')).toBeNull();
 
         host.unmount();
     });
