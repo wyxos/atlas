@@ -164,3 +164,121 @@ test('local embedded tags can use ai discogs search expansion to propose release
             'q' => '',
         ]);
 });
+
+test('local ai discogs rejects track-title singles for current soundtrack albums', function () {
+    config([
+        'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'gateway',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_token' => 'ai-token',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('forFile')->once()->andReturn(null);
+    });
+
+    Http::fake(function (Request $request) {
+        $url = $request->url();
+
+        if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
+            return Http::response(['releases' => []]);
+        }
+
+        if (str_starts_with($url, 'https://discogs.test/database/search')) {
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $matchesSingleQuery = ($query['release_title'] ?? null) === 'しずく'
+                && ($query['artist'] ?? null) === 'Miwako Okuda';
+
+            return Http::response([
+                'results' => $matchesSingleQuery ? [['id' => 10059896]] : [],
+            ]);
+        }
+
+        if ($url === 'https://discogs.test/releases/10059896') {
+            return Http::response([
+                'id' => 10059896,
+                'title' => 'しずく',
+                'country' => 'Japan',
+                'released' => '2000-02-02',
+                'artists' => [
+                    ['name' => 'Miwako Okuda'],
+                ],
+                'labels' => [
+                    ['name' => 'Sony Records', 'catno' => 'SRCL-4725'],
+                ],
+                'identifiers' => [
+                    ['type' => 'Barcode', 'value' => '4 988009 472591'],
+                ],
+                'images' => [[
+                    'type' => 'primary',
+                    'uri' => 'https://discogs.test/image/shizuku-single.jpg',
+                ]],
+                'tracklist' => [[
+                    'position' => '1',
+                    'title' => 'しずく',
+                    'duration' => '',
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
+            $schema = $request->data()['schemaVersion'] ?? null;
+
+            return Http::response($schema === 'atlas-audio-metadata-discogs-search-v1'
+                ? [
+                    'queries' => [[
+                        'release_title' => 'しずく',
+                        'artist' => 'Miwako Okuda',
+                        'reason' => 'Track title single search.',
+                    ]],
+                    'model' => 'qwen-test',
+                ]
+                : [
+                    'verdict' => 'accept',
+                    'confidence' => 0.86,
+                    'reason' => 'The single has the same title and artist.',
+                    'model' => 'qwen-test',
+                    'selected_track_position' => '1',
+                    'selected_track_title' => 'しずく',
+                    'title_aliases' => ['Shizuku'],
+                    'album_aliases' => ['GTO TV Animation Original Soundtrack 2'],
+                ]);
+        }
+
+        return Http::response([], 404);
+    });
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Shizuku',
+        'filename' => 'shizuku.mp3',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Miwako Okuda',
+        'normalized_name' => 'miwako okuda',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'GTO TV Animation Original Soundtrack 2',
+        'normalized_name' => 'gto tv animation original soundtrack 2',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
+    $file->metadata()->create([
+        'payload' => [
+            'title' => 'Shizuku',
+            'artist' => 'Miwako Okuda',
+            'album' => 'GTO TV Animation Original Soundtrack 2',
+        ],
+    ]);
+
+    $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs")
+        ->assertAccepted()
+        ->assertJsonPath('proposal', null);
+});

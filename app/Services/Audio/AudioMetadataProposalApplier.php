@@ -37,6 +37,7 @@ class AudioMetadataProposalApplier
 
     public function __construct(
         private readonly AudioMetadataAliasService $aliases,
+        private readonly AudioMetadataAlbumGroupApplier $albumGroups,
         private readonly AudioMetadataRelationshipSynchronizer $relationships,
         private readonly AudioMetadataCanonicalPayloadWriter $payloads,
     ) {}
@@ -60,6 +61,8 @@ class AudioMetadataProposalApplier
             $file->load(['metadata', 'artists', 'albums']);
 
             $proposed = is_array($proposal->proposed_values) ? $proposal->proposed_values : [];
+            $albumGroup = $this->albumGroups->capture($file, $proposal, $fields);
+
             $this->applyFileFields($file, $proposed, $fields);
             $this->applyRelationshipFields($file, $proposed, $fields);
             $this->aliases->applySelected($file, $proposal, $proposed, $fields);
@@ -67,6 +70,7 @@ class AudioMetadataProposalApplier
             $this->applyTrackPivotFields($file, $proposed, $fields);
             $this->applyMetadataFields($file, $proposed, $fields);
             $this->payloads->apply($file, $proposed, $fields);
+            $this->albumGroups->apply($file, $albumGroup, $proposed, $fields);
 
             $proposal->forceFill([
                 'status' => 'applied',

@@ -18,6 +18,7 @@ class AudioMetadataIngestionService
     public function __construct(
         private readonly AtlasStorage $appStorage,
         private readonly MediaProbeService $probe,
+        private readonly AudioAlbumFolderMatcher $albumFolders,
     ) {}
 
     /**
@@ -108,6 +109,11 @@ class AudioMetadataIngestionService
             return $existingAlbum;
         }
 
+        $existingAlbum = $this->albumForSameImportDirectory($file, $name, $normalizedName);
+        if ($existingAlbum instanceof Album) {
+            return $existingAlbum;
+        }
+
         $artistIds = $artists->pluck('id')->filter()->values();
         if ($artistIds->isNotEmpty()) {
             $existingAlbum = Album::query()
@@ -127,6 +133,24 @@ class AudioMetadataIngestionService
             'name' => $name,
             'normalized_name' => $normalizedName,
         ]);
+    }
+
+    private function albumForSameImportDirectory(File $file, string $name, string $normalizedName): ?Album
+    {
+        $directory = $this->albumFolders->directory((string) $file->path);
+        if ($directory === null || ! $this->albumFolders->looksLikeAlbum($directory, $name)) {
+            return null;
+        }
+
+        return Album::query()
+            ->withCount('files')
+            ->where('normalized_name', $normalizedName)
+            ->whereHas('files', fn (Builder $query) => $query
+                ->where('source', $file->source)
+                ->where('path', 'like', $this->albumFolders->likePathPrefix($directory)))
+            ->orderByDesc('files_count')
+            ->orderBy('id')
+            ->first();
     }
 
     /**

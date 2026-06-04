@@ -42,6 +42,7 @@ class AudioMetadataProposalGenerator
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataCandidateEnricher $candidateEnricher,
+        private readonly AudioMetadataCandidateGuard $candidateGuard,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
         private readonly AudioMetadataDiscogsProvider $discogsProvider,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
@@ -190,6 +191,7 @@ class AudioMetadataProposalGenerator
 
         $candidate = collect($candidates)
             ->filter(fn (array $candidate): bool => $this->changes($currentValues, $candidate['values']) !== [])
+            ->filter(fn (array $candidate): bool => $this->candidateGuard->allows($currentValues, $candidate))
             ->sortByDesc(fn (array $candidate): int => $this->candidatePriority($candidate))
             ->first();
 
