@@ -9,14 +9,10 @@ class AudioMetadataCandidateEnricher
     public function __construct(
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataDiscogsClient $discogs,
+        private readonly AudioMetadataDiscogsSearchQueryExpander $searchQueryExpander,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
 
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null  $coverCandidate
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
-     */
     public function supplementWithCover(array $candidate, ?array $coverCandidate): array
     {
         if ($coverCandidate === null) {
@@ -39,11 +35,6 @@ class AudioMetadataCandidateEnricher
         return $candidate;
     }
 
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null  $discogsCandidate
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
-     */
     public function supplementWithDiscogs(array $candidate, ?array $discogsCandidate, string $provider): array
     {
         if ($discogsCandidate === null) {
@@ -105,8 +96,32 @@ class AudioMetadataCandidateEnricher
     }
 
     /**
+     * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
      */
+    public function resolveWithAiDiscogsSearch(File $file, array $currentValues, array $candidate, string $provider): array
+    {
+        if (! $this->discogs->configured() || ! $this->aiReviewer->enabled()) {
+            return $candidate;
+        }
+
+        $searchQueries = $this->aiReviewer->discogsSearchQueries($file, $currentValues, $candidate);
+        if ($searchQueries === []) {
+            return $candidate;
+        }
+
+        $resolved = $this->resolveAgainstDiscogsMatches(
+            $file,
+            $currentValues,
+            $candidate,
+            $this->discogsMatchesForSearchQueries($searchQueries),
+            $provider,
+        );
+
+        return $resolved ?? $candidate;
+    }
+
     private function canResolveAnomaly(array $candidate): bool
     {
         return ($candidate['provider'] ?? null) === 'acoustid_musicbrainz'
@@ -120,8 +135,13 @@ class AudioMetadataCandidateEnricher
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @return array<string, mixed>
      */
-    private function resolveAgainstDiscogsMatches(File $file, array $currentValues, array $candidate, array $matches): ?array
-    {
+    private function resolveAgainstDiscogsMatches(
+        File $file,
+        array $currentValues,
+        array $candidate,
+        array $matches,
+        string $provider = 'acoustid_musicbrainz_ai_discogs',
+    ): ?array {
         foreach ($matches as $match) {
             $release = $match['release'];
             $source = $this->discogsReviewSource($release);
@@ -141,6 +161,7 @@ class AudioMetadataCandidateEnricher
                 $release,
                 $track,
                 $review,
+                $provider,
                 $match['search_query'] ?? null,
             );
         }
@@ -184,7 +205,7 @@ class AudioMetadataCandidateEnricher
         $matches = [];
         $seenReleaseIds = [];
 
-        foreach ($searchQueries as $searchQuery) {
+        foreach ($this->searchQueryExpander->expand($searchQueries) as $searchQuery) {
             $releaseTitle = $this->values->cleanString($searchQuery['release_title'] ?? null);
             $artist = $this->values->cleanString($searchQuery['artist'] ?? null);
             if ($releaseTitle === null || $artist === null) {
@@ -233,28 +254,25 @@ class AudioMetadataCandidateEnricher
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $candidate
-     * @param  array<string, mixed>  $currentValues
-     * @param  array<string, mixed>  $release
-     * @param  array<string, mixed>  $track
-     * @param  array<string, mixed>  $review
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
-     */
     private function applyAnomalyReview(
         array $candidate,
         array $currentValues,
         array $release,
         array $track,
         array $review,
+        string $provider = 'acoustid_musicbrainz_ai_discogs',
         ?array $searchQuery = null,
     ): array {
         $releaseId = $this->values->cleanString($release['id'] ?? null);
         $releaseTitleParts = $this->sourceTitleParts($this->values->cleanString($release['title'] ?? null));
         $trackTitleParts = $this->sourceTitleParts($this->values->cleanString($track['title'] ?? null));
 
-        $candidate['provider'] = 'acoustid_musicbrainz_ai_discogs';
+        $candidate['provider'] = $provider;
         $candidate['confidence'] = min(96, max($candidate['confidence'], (int) round(((float) ($review['confidence'] ?? 0)) * 100)));
+        if ($provider === 'local_ai_discogs') {
+            $this->putIfPresent($candidate['values'], 'artists', $this->releaseArtists($release));
+        }
+
         $candidate['values']['title'] = $trackTitleParts['canonical'];
         $candidate['values']['title_aliases'] = $this->uniqueValues([
             ...$trackTitleParts['aliases'],

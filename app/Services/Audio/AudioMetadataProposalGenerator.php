@@ -178,7 +178,14 @@ class AudioMetadataProposalGenerator
 
         $tagCandidate = $this->localTags->candidate($file);
         if ($tagCandidate['values'] !== []) {
-            $candidates[] = $tagCandidate;
+            $candidates[] = $candidates === []
+                ? $this->candidateEnricher->resolveWithAiDiscogsSearch(
+                    $file,
+                    $currentValues,
+                    $tagCandidate,
+                    'local_ai_discogs',
+                )
+                : $tagCandidate;
         }
 
         $candidate = collect($candidates)
@@ -243,6 +250,7 @@ class AudioMetadataProposalGenerator
             'discogs_release' => 235,
             'musicbrainz_cover_art' => 220,
             'spotify' => 250,
+            'local_ai_discogs' => 240,
             default => 100,
         };
 
