@@ -9,9 +9,7 @@ use Throwable;
 
 class AudioMetadataVgmdbProvider
 {
-    public function __construct(
-        private readonly AudioMetadataValueExtractor $values,
-    ) {}
+    public function __construct(private readonly AudioMetadataValueExtractor $values) {}
 
     /**
      * @param  array<string, mixed>  $currentValues
@@ -26,7 +24,12 @@ class AudioMetadataVgmdbProvider
 
         $best = null;
         foreach ($this->searchQueries($file, $currentValues, $relatedCandidate) as $query) {
-            foreach ($this->searchAlbums($query) as $result) {
+            $albums = $this->searchAlbums($query);
+            if ($albums === null) {
+                break;
+            }
+
+            foreach ($albums as $result) {
                 $album = $this->fetchAlbum($this->albumLink($result));
                 if ($album === []) {
                     continue;
@@ -36,7 +39,6 @@ class AudioMetadataVgmdbProvider
                 if ($scored === null || $scored['confidence'] < 72) {
                     continue;
                 }
-
                 if ($best === null || $scored['confidence'] > $best['confidence']) {
                     $best = $scored;
                 }
@@ -65,9 +67,9 @@ class AudioMetadataVgmdbProvider
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<array<string, mixed>>|null
      */
-    private function searchAlbums(string $query): array
+    private function searchAlbums(string $query): ?array
     {
         try {
             $response = $this->http()
@@ -76,7 +78,7 @@ class AudioMetadataVgmdbProvider
                     'q' => $query,
                 ]);
         } catch (Throwable) {
-            return [];
+            return null;
         }
 
         if (! $response->successful()) {

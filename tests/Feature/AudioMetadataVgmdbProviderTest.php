@@ -6,7 +6,9 @@ use App\Models\File;
 use App\Models\User;
 use App\Services\Audio\AudioFingerprint;
 use App\Services\Audio\AudioFingerprintService;
+use App\Services\Audio\AudioMetadataVgmdbProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 
@@ -191,4 +193,34 @@ test('vgmdb supplements a strong musicbrainz fingerprint release with cover art 
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://vgmdb.test/covers/23849-front.jpg')
         ->assertJsonPath('proposal.evidence.vgmdb_album_id', '23849')
         ->assertJsonPath('proposal.evidence.cover_source', 'vgmdb');
+});
+
+test('vgmdb lookup stops after a transport failure', function () {
+    config([
+        'services.audio_metadata.vgmdb_api_base_url' => 'https://vgmdb.test',
+        'services.audio_metadata.vgmdb_enabled' => true,
+    ]);
+
+    $attempts = 0;
+
+    Http::fake(function () use (&$attempts): never {
+        $attempts++;
+
+        throw new ConnectionException('No route to host');
+    });
+
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Tokitsukasadoru Juuni no Meiyaku',
+        'filename' => 'tokitsukasadoru-juuni-no-meiyaku.mp3',
+    ]);
+
+    $candidate = app(AudioMetadataVgmdbProvider::class)->candidate($file, [
+        'title' => 'Tokitsukasadoru Juuni no Meiyaku',
+        'album' => 'Tokitsukasadoru Juuni no Meiyaku',
+    ]);
+
+    expect($candidate)->toBeNull();
+    expect($attempts)->toBe(1);
 });
