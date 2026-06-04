@@ -29,6 +29,8 @@ vi.mock('./atlas-options', () => ({
     getStoredOptions: mockGetStoredOptions,
 }));
 
+vi.mock('./content/atlas-source-tab-bridge-install', () => ({}));
+
 vi.mock('./site-customizations', () => ({
     DEFAULT_WIDGET_MIN_IMAGE_WIDTH: 200,
     createCustomizationMatchRules: mockCreateCustomizationMatchRules,

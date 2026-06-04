@@ -7,13 +7,25 @@ function setLocation(url: string): void {
     });
 }
 
-function createChromeMock() {
+async function flushBridgeInstall(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+}
+
+function createChromeMock(stored: Record<string, unknown> = {}) {
     return {
         runtime: {
             lastError: null,
             sendMessage: vi.fn((_: unknown, callback?: () => void) => {
                 callback?.();
             }),
+        },
+        storage: {
+            local: {
+                get: vi.fn((_: string[], callback: (stored: Record<string, unknown>) => void) => {
+                    callback(stored);
+                }),
+            },
         },
     };
 }
@@ -37,6 +49,7 @@ describe('installAtlasSourceTabBridge', () => {
         } = await import('./atlas-source-tab-bridge');
 
         const cleanup = installAtlasSourceTabBridge();
+        await flushBridgeInstall();
 
         expect(document.documentElement.getAttribute(ATLAS_SOURCE_TAB_BRIDGE_ATTR)).toBe('1');
 
@@ -67,9 +80,33 @@ describe('installAtlasSourceTabBridge', () => {
         expect(document.documentElement.getAttribute(ATLAS_SOURCE_TAB_BRIDGE_ATTR)).toBeNull();
     });
 
+    it('bridges the configured Atlas app domain instead of a hardcoded host list', async () => {
+        setLocation('https://mydomain.com/downloads');
+        const chromeMock = createChromeMock({
+            atlasDomain: 'https://mydomain.com',
+        });
+        vi.stubGlobal('chrome', chromeMock);
+
+        const {
+            ATLAS_SOURCE_TAB_BRIDGE_ATTR,
+            installAtlasSourceTabBridge,
+        } = await import('./atlas-source-tab-bridge');
+
+        const cleanup = installAtlasSourceTabBridge();
+        await flushBridgeInstall();
+
+        expect(document.documentElement.getAttribute(ATLAS_SOURCE_TAB_BRIDGE_ATTR)).toBe('1');
+
+        cleanup();
+
+        expect(document.documentElement.getAttribute(ATLAS_SOURCE_TAB_BRIDGE_ATTR)).toBeNull();
+    });
+
     it('does not install the bridge outside Atlas app hosts', async () => {
         setLocation('https://www.deviantart.com/');
-        const chromeMock = createChromeMock();
+        const chromeMock = createChromeMock({
+            atlasDomain: 'https://mydomain.com',
+        });
         vi.stubGlobal('chrome', chromeMock);
 
         const {
@@ -78,6 +115,7 @@ describe('installAtlasSourceTabBridge', () => {
         } = await import('./atlas-source-tab-bridge');
 
         installAtlasSourceTabBridge();
+        await flushBridgeInstall();
 
         window.dispatchEvent(new MessageEvent('message', {
             source: window,
