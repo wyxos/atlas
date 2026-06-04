@@ -366,6 +366,106 @@ describe('Audio metadata review', () => {
         expect(document.body.textContent?.replace(/\s+/g, ' ')).toContain('MusicBrainz release search / Matched artists, album / Release details / Cover Art Archive / Data provided by Discogs');
     });
 
+    it('polls queued single metadata runs and updates the sheet with progress', async () => {
+        let runPollRequests = 0;
+
+        mockAxios.get.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/ids') {
+                return {
+                    data: {
+                        ids: [7],
+                        sources: { 7: 'local' },
+                        source_ids: { 7: null },
+                        spotify_uris: { 7: null },
+                        cursor: { after_id: 0, next_after_id: null, has_more: false, max_id: 7 },
+                        pagination: { per_page: 100, total: 1, total_pages: 1 },
+                    } satisfies AudioIdsResponse,
+                };
+            }
+
+            if (url === '/api/audio/7/metadata-proposals/latest') {
+                return { data: { proposal: null } };
+            }
+
+            if (url === '/api/audio/metadata-runs/11') {
+                runPollRequests += 1;
+
+                return runPollRequests === 1
+                    ? { data: { run: { ...runFixture(), status: 'running', processed_files: 0, proposal_count: 0 }, proposals: [] } }
+                    : { data: { run: runFixture(), proposals: [proposalFixture()] } };
+            }
+
+            throw new Error(`Unexpected get URL: ${url}`);
+        });
+
+        mockAxios.post.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/details') {
+                return {
+                    data: {
+                        items: [{
+                            id: 7,
+                            title: 'Original Track',
+                            source: 'local',
+                            source_id: null,
+                            spotify_uri: null,
+                            artists: ['Original Artist'],
+                            albums: ['Original Album'],
+                            cover_url: null,
+                            duration_seconds: null,
+                            reaction: null,
+                            blacklisted_at: null,
+                            previewed_count: 0,
+                            seen_count: 0,
+                        }],
+                    } satisfies AudioDetailsResponse,
+                };
+            }
+
+            if (url === '/api/audio/7/metadata-runs') {
+                return {
+                    data: {
+                        run: {
+                            ...runFixture(),
+                            status: 'pending',
+                            processed_files: 0,
+                            proposal_count: 0,
+                        },
+                        proposal: null,
+                    },
+                };
+            }
+
+            throw new Error(`Unexpected post URL: ${url}`);
+        });
+
+        const wrapper = await mountAudio();
+        await flushPromises();
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        await wrapper.get('[data-test="audio-track-title"]').trigger('click');
+        await flushPromises();
+
+        (document.body.querySelector('[data-test="audio-track-metadata-run"]') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(document.body.textContent).toContain('Metadata scan queued.');
+
+        vi.advanceTimersByTime(1600);
+        await flushPromises();
+
+        expect(runPollRequests).toBe(1);
+        expect(document.body.textContent).toContain('Scanning metadata 0/1');
+
+        vi.advanceTimersByTime(1600);
+        await flushPromises();
+
+        expect(runPollRequests).toBe(2);
+        expect(document.body.textContent).toContain('Metadata proposal ready for review.');
+        expect(document.body.textContent).toContain('Tagged Track');
+    });
+
     it('renders and applies metadata alias proposals', async () => {
         mockAxios.get.mockImplementation(async (url: string) => {
             if (url === '/api/audio/ids') {

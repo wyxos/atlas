@@ -79,23 +79,29 @@ class AudioMetadataCandidateEnricher
             return $candidate;
         }
 
-        $release = $this->discogsRelease($currentValues, $candidate);
-        if ($release === []) {
+        $resolved = $this->resolveAgainstDiscogsMatches(
+            $file,
+            $currentValues,
+            $candidate,
+            $this->discogsMatches($currentValues, $candidate),
+        );
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        $searchQueries = $this->aiReviewer->discogsSearchQueries($file, $currentValues, $candidate);
+        if ($searchQueries === []) {
             return $candidate;
         }
 
-        $source = $this->discogsReviewSource($release);
-        $review = $this->aiReviewer->resolveAnomaly($file, $currentValues, $candidate, $source);
-        if (($review['verdict'] ?? null) !== 'accept') {
-            return $candidate;
-        }
+        $resolved = $this->resolveAgainstDiscogsMatches(
+            $file,
+            $currentValues,
+            $candidate,
+            $this->discogsMatchesForSearchQueries($searchQueries),
+        );
 
-        $track = $this->selectedTrack($release, $review);
-        if ($track === null) {
-            return $candidate;
-        }
-
-        return $this->applyAnomalyReview($candidate, $currentValues, $release, $track, $review);
+        return $resolved ?? $candidate;
     }
 
     /**
@@ -114,7 +120,40 @@ class AudioMetadataCandidateEnricher
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @return array<string, mixed>
      */
-    private function discogsRelease(array $currentValues, array $candidate): array
+    private function resolveAgainstDiscogsMatches(File $file, array $currentValues, array $candidate, array $matches): ?array
+    {
+        foreach ($matches as $match) {
+            $release = $match['release'];
+            $source = $this->discogsReviewSource($release);
+            $review = $this->aiReviewer->resolveAnomaly($file, $currentValues, $candidate, $source);
+            if (($review['verdict'] ?? null) !== 'accept') {
+                continue;
+            }
+
+            $track = $this->selectedTrack($release, $review);
+            if ($track === null) {
+                continue;
+            }
+
+            return $this->applyAnomalyReview(
+                $candidate,
+                $currentValues,
+                $release,
+                $track,
+                $review,
+                $match['search_query'] ?? null,
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @return list<array{release:array<string, mixed>,search_query:array{release_title:string,artist:string,reason:string|null}|null}>
+     */
+    private function discogsMatches(array $currentValues, array $candidate): array
     {
         $album = $this->values->cleanString($currentValues['album'] ?? $candidate['values']['album'] ?? null);
         if ($album === null) {
@@ -126,22 +165,57 @@ class AudioMetadataCandidateEnricher
             ...($candidate['values']['artists'] ?? []),
         ]);
 
-        foreach ($artists as $artist) {
-            foreach (array_slice($this->discogs->searchReleaseIds($album, $artist), 0, 3) as $releaseId) {
+        return $this->discogsMatchesForSearchQueries([[
+            'release_title' => $album,
+            'artist' => $artists[0] ?? '',
+            'reason' => null,
+        ], ...collect($artists)
+            ->skip(1)
+            ->map(fn (string $artist): array => [
+                'release_title' => $album,
+                'artist' => $artist,
+                'reason' => null,
+            ])
+            ->all()]);
+    }
+
+    private function discogsMatchesForSearchQueries(array $searchQueries): array
+    {
+        $matches = [];
+        $seenReleaseIds = [];
+
+        foreach ($searchQueries as $searchQuery) {
+            $releaseTitle = $this->values->cleanString($searchQuery['release_title'] ?? null);
+            $artist = $this->values->cleanString($searchQuery['artist'] ?? null);
+            if ($releaseTitle === null || $artist === null) {
+                continue;
+            }
+
+            foreach (array_slice($this->discogs->searchReleaseIds($releaseTitle, $artist), 0, 3) as $releaseId) {
+                if (isset($seenReleaseIds[$releaseId])) {
+                    continue;
+                }
+
+                $seenReleaseIds[$releaseId] = true;
                 $release = $this->discogs->fetchRelease($releaseId);
-                if ($release !== []) {
-                    return $release;
+                if ($release === []) {
+                    continue;
+                }
+
+                $matches[] = [
+                    'release' => $release,
+                    'search_query' => $searchQuery['reason'] === null ? null : $searchQuery,
+                ];
+
+                if (count($matches) >= 5) {
+                    return $matches;
                 }
             }
         }
 
-        return [];
+        return $matches;
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     * @return array<string, mixed>
-     */
     private function discogsReviewSource(array $release): array
     {
         return [
@@ -167,8 +241,14 @@ class AudioMetadataCandidateEnricher
      * @param  array<string, mixed>  $review
      * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
      */
-    private function applyAnomalyReview(array $candidate, array $currentValues, array $release, array $track, array $review): array
-    {
+    private function applyAnomalyReview(
+        array $candidate,
+        array $currentValues,
+        array $release,
+        array $track,
+        array $review,
+        ?array $searchQuery = null,
+    ): array {
         $releaseId = $this->values->cleanString($release['id'] ?? null);
         $releaseTitleParts = $this->sourceTitleParts($this->values->cleanString($release['title'] ?? null));
         $trackTitleParts = $this->sourceTitleParts($this->values->cleanString($track['title'] ?? null));
@@ -208,15 +288,13 @@ class AudioMetadataCandidateEnricher
         $candidate['evidence']['discogs_release_url'] = $releaseId !== null ? 'https://www.discogs.com/release/'.$releaseId : null;
         $candidate['evidence']['discogs_source'] = 'discogs_release_search';
         $candidate['evidence']['discogs_track_position'] = $this->values->cleanString($track['position'] ?? null);
+        if ($searchQuery !== null) {
+            $candidate['evidence']['ai_search_plan'] = [$searchQuery];
+        }
 
         return $candidate;
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     * @param  array<string, mixed>  $review
-     * @return array<string, mixed>|null
-     */
     private function selectedTrack(array $release, array $review): ?array
     {
         $position = $this->values->cleanString($review['selected_track_position'] ?? null);
@@ -276,19 +354,11 @@ class AudioMetadataCandidateEnricher
         return array_values($unique);
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     * @return list<string>
-     */
     private function releaseArtists(array $release): array
     {
         return $this->values->cleanStringList(data_get($release, 'artists.*.name', []));
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     * @return list<array{name:string|null,catno:string|null}>
-     */
     private function labels(array $release): array
     {
         return collect(data_get($release, 'labels', []))
@@ -301,10 +371,6 @@ class AudioMetadataCandidateEnricher
             ->all();
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     * @return list<array{type:string|null,value:string|null}>
-     */
     private function identifiers(array $release): array
     {
         return collect(data_get($release, 'identifiers', []))
@@ -317,10 +383,6 @@ class AudioMetadataCandidateEnricher
             ->all();
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     * @return list<array{position:string|null,title:string|null,duration:string|null,artists:list<string>}>
-     */
     private function tracklist(array $release): array
     {
         return collect(data_get($release, 'tracklist', []))
@@ -335,9 +397,6 @@ class AudioMetadataCandidateEnricher
             ->all();
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     */
     private function firstLabelName(array $release): ?string
     {
         return collect(data_get($release, 'labels', []))
@@ -346,9 +405,6 @@ class AudioMetadataCandidateEnricher
             ->first();
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     */
     private function firstCatalogNumber(array $release): ?string
     {
         return collect(data_get($release, 'labels', []))
@@ -357,9 +413,6 @@ class AudioMetadataCandidateEnricher
             ->first();
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     */
     private function firstBarcode(array $release): ?string
     {
         return collect(data_get($release, 'identifiers', []))
@@ -370,9 +423,6 @@ class AudioMetadataCandidateEnricher
             ->first();
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     */
     private function coverUrl(array $release): ?string
     {
         $images = collect(data_get($release, 'images', []))
@@ -385,9 +435,6 @@ class AudioMetadataCandidateEnricher
             : null;
     }
 
-    /**
-     * @param  array<string, mixed>  $track
-     */
     private function trackNumber(array $track): ?string
     {
         $position = $this->values->cleanString($track['position'] ?? null);
@@ -402,9 +449,6 @@ class AudioMetadataCandidateEnricher
         return $position;
     }
 
-    /**
-     * @param  array<string, mixed>  $track
-     */
     private function discNumber(array $track): ?string
     {
         $position = $this->values->cleanString($track['position'] ?? null);
@@ -419,9 +463,6 @@ class AudioMetadataCandidateEnricher
         return null;
     }
 
-    /**
-     * @param  array<string, mixed>  $values
-     */
     private function putIfPresent(array &$values, string $key, mixed $value): void
     {
         if ($value === null || $value === []) {

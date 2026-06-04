@@ -1,9 +1,12 @@
-import { computed, ref, type Ref } from 'vue';
+import { computed, onBeforeUnmount, ref, type Ref } from 'vue';
 import type {
     AudioMetadataProposal,
+    AudioMetadataRun,
     AudioMetadataRunResponse,
     AudioSourceFilter,
 } from '@/types/audio';
+
+const METADATA_RUN_POLL_MS = 1500;
 
 type Options = {
     activeFilter: Ref<AudioSourceFilter>;
@@ -18,17 +21,33 @@ type Options = {
     detailDuration: (audioId: number) => string;
 };
 
+type AudioMetadataRunSnapshot = {
+    run: AudioMetadataRun;
+    proposal?: AudioMetadataProposal | null;
+    proposals?: AudioMetadataProposal[];
+};
+
+type EchoChannel = {
+    listen: (event: string, callback: (payload: unknown) => void) => void;
+};
+
 export function useAudioMetadataReview(options: Options) {
     const detailsSheetAudioId = ref<number | null>(null);
     const isTrackDetailsSheetOpen = ref(false);
     const metadataProposalById = ref<Record<number, AudioMetadataProposal | null>>({});
     const isMetadataProposalLoading = ref(false);
     const isMetadataRunStarting = ref(false);
+    const activeMetadataRunId = ref<number | null>(null);
+    const activeMetadataRunAudioId = ref<number | null>(null);
     const isMetadataProposalReviewing = ref(false);
     const metadataReviewMessage = ref<string | null>(null);
     const metadataReviewError = ref<string | null>(null);
     const batchMetadataMessage = ref<string | null>(null);
     const batchMetadataError = ref<string | null>(null);
+    let metadataRunPollTimer: ReturnType<typeof setTimeout> | null = null;
+    let activeMetadataRunChannel: string | null = null;
+
+    const isTrackMetadataRunBusy = computed(() => isMetadataRunStarting.value || activeMetadataRunId.value !== null);
 
     const detailsSheetTrack = computed(() => {
         const audioId = detailsSheetAudioId.value;
@@ -102,11 +121,7 @@ export function useAudioMetadataReview(options: Options) {
         try {
             const { data } = await window.axios.post<AudioMetadataRunResponse>(`/api/audio/${audioId}/metadata-runs`);
             const proposal = pendingProposal(data.proposal);
-            metadataProposalById.value = {
-                ...metadataProposalById.value,
-                [audioId]: proposal,
-            };
-            metadataReviewMessage.value = proposal ? 'Metadata proposal ready for review.' : 'No metadata changes found.';
+            applyMetadataRunSnapshot({ run: data.run, proposal }, audioId);
         } catch (runError) {
             console.error('Failed to start audio metadata run:', runError);
             metadataReviewError.value = 'Failed to start metadata scan.';
@@ -173,6 +188,138 @@ export function useAudioMetadataReview(options: Options) {
         }
     }
 
+    function applyMetadataRunSnapshot(snapshot: AudioMetadataRunSnapshot, audioId: number | null = activeMetadataRunAudioId.value): void {
+        const proposal = pendingProposal(snapshot.proposal ?? snapshot.proposals?.[0] ?? null);
+
+        if (audioId !== null) {
+            metadataProposalById.value = {
+                ...metadataProposalById.value,
+                [audioId]: proposal,
+            };
+        }
+
+        if (isMetadataRunTerminal(snapshot.run)) {
+            stopMetadataRunTracking(snapshot.run.id);
+            metadataReviewMessage.value = snapshot.run.status === 'completed'
+                ? proposal ? 'Metadata proposal ready for review.' : 'No metadata changes found.'
+                : null;
+            metadataReviewError.value = snapshot.run.status === 'failed'
+                ? snapshot.run.error ?? 'Metadata scan failed.'
+                : metadataReviewError.value;
+
+            return;
+        }
+
+        activeMetadataRunId.value = snapshot.run.id;
+        activeMetadataRunAudioId.value = audioId;
+        metadataReviewMessage.value = snapshot.run.status === 'pending'
+            ? 'Metadata scan queued.'
+            : metadataRunProgressMessage(snapshot.run);
+        startMetadataRunEcho(snapshot.run.id);
+        scheduleMetadataRunPoll();
+    }
+
+    function metadataRunProgressMessage(run: AudioMetadataRun): string {
+        const total = Math.max(0, run.total_files);
+        if (total <= 0) {
+            return 'Scanning metadata...';
+        }
+
+        return `Scanning metadata ${run.processed_files}/${total}...`;
+    }
+
+    function isMetadataRunTerminal(run: AudioMetadataRun): boolean {
+        return ['completed', 'failed'].includes(run.status);
+    }
+
+    function startMetadataRunEcho(runId: number): void {
+        const channelName = `audio-metadata-runs.${runId}`;
+        if (activeMetadataRunChannel === channelName) {
+            return;
+        }
+
+        leaveMetadataRunEcho();
+
+        const echo = window.Echo as undefined | {
+            private: (channel: string) => EchoChannel;
+        };
+        if (!echo) {
+            return;
+        }
+
+        activeMetadataRunChannel = channelName;
+        echo.private(channelName).listen('.AudioMetadataRunUpdated', (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const snapshot = payload as AudioMetadataRunSnapshot;
+            if (snapshot.run?.id !== activeMetadataRunId.value) {
+                return;
+            }
+
+            applyMetadataRunSnapshot(snapshot);
+        });
+    }
+
+    function scheduleMetadataRunPoll(): void {
+        if (metadataRunPollTimer) {
+            clearTimeout(metadataRunPollTimer);
+        }
+
+        if (activeMetadataRunId.value === null) {
+            return;
+        }
+
+        metadataRunPollTimer = setTimeout(() => {
+            metadataRunPollTimer = null;
+            void pollMetadataRun();
+        }, METADATA_RUN_POLL_MS);
+    }
+
+    async function pollMetadataRun(): Promise<void> {
+        const runId = activeMetadataRunId.value;
+        if (runId === null) {
+            return;
+        }
+
+        try {
+            const { data } = await window.axios.get<AudioMetadataRunSnapshot>(`/api/audio/metadata-runs/${runId}`);
+            applyMetadataRunSnapshot(data);
+        } catch (runError) {
+            console.error('Failed to poll audio metadata run:', runError);
+            metadataReviewError.value = 'Failed to refresh metadata scan progress.';
+            stopMetadataRunTracking(runId);
+        }
+    }
+
+    function stopMetadataRunTracking(runId: number | null = activeMetadataRunId.value): void {
+        if (runId !== null && activeMetadataRunId.value !== runId) {
+            return;
+        }
+
+        if (metadataRunPollTimer) {
+            clearTimeout(metadataRunPollTimer);
+            metadataRunPollTimer = null;
+        }
+
+        activeMetadataRunId.value = null;
+        activeMetadataRunAudioId.value = null;
+        leaveMetadataRunEcho();
+    }
+
+    function leaveMetadataRunEcho(): void {
+        if (!activeMetadataRunChannel) {
+            return;
+        }
+
+        const echo = window.Echo as undefined | {
+            leave: (channel: string) => void;
+        };
+        echo?.leave(activeMetadataRunChannel);
+        activeMetadataRunChannel = null;
+    }
+
     async function handleBatchMetadataRun(): Promise<void> {
         batchMetadataMessage.value = null;
         batchMetadataError.value = null;
@@ -191,6 +338,10 @@ export function useAudioMetadataReview(options: Options) {
         }
     }
 
+    onBeforeUnmount(() => {
+        stopMetadataRunTracking();
+    });
+
     return {
         batchMetadataError,
         batchMetadataMessage,
@@ -203,7 +354,7 @@ export function useAudioMetadataReview(options: Options) {
         handleTrackMetadataRun,
         isMetadataProposalLoading,
         isMetadataProposalReviewing,
-        isMetadataRunStarting,
+        isMetadataRunStarting: isTrackMetadataRunBusy,
         isTrackDetailsSheetOpen,
         metadataReviewError,
         metadataReviewMessage,

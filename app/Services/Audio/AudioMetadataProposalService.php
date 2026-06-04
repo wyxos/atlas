@@ -2,6 +2,7 @@
 
 namespace App\Services\Audio;
 
+use App\Events\AudioMetadataRunUpdated;
 use App\Jobs\GenerateAudioMetadataRun;
 use App\Models\AudioMetadataProposal;
 use App\Models\AudioMetadataRun;
@@ -51,35 +52,14 @@ class AudioMetadataProposalService
             'user_id' => $user->id,
             'scope' => 'single',
             'source_filter' => $this->isSpotifyFile($file) ? 'spotify' : 'local',
-            'status' => 'running',
+            'status' => 'pending',
             'total_files' => 1,
-            'started_at' => now(),
             'options' => [
                 'file_id' => (int) $file->id,
             ],
         ]);
 
-        try {
-            $proposal = $this->generator->generate($run, $file, $user);
-
-            $run->forceFill([
-                'status' => 'completed',
-                'processed_files' => 1,
-                'proposal_count' => $proposal ? 1 : 0,
-                'finished_at' => now(),
-                'error' => null,
-            ])->save();
-        } catch (\Throwable $exception) {
-            report($exception);
-
-            $run->forceFill([
-                'status' => 'failed',
-                'processed_files' => 1,
-                'failed_files' => 1,
-                'finished_at' => now(),
-                'error' => $exception->getMessage(),
-            ])->save();
-        }
+        GenerateAudioMetadataRun::dispatch($run->id);
 
         return $run->fresh('proposals');
     }
@@ -107,6 +87,7 @@ class AudioMetadataProposalService
             'started_at' => $run->started_at ?? now(),
             'error' => null,
         ])->save();
+        $this->broadcastRun($run);
 
         try {
             $this->processFiles($run, $user);
@@ -115,6 +96,7 @@ class AudioMetadataProposalService
                 'status' => 'completed',
                 'finished_at' => now(),
             ])->save();
+            $this->broadcastRun($run, $this->latestRunProposal($run));
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -123,6 +105,7 @@ class AudioMetadataProposalService
                 'finished_at' => now(),
                 'error' => $exception->getMessage(),
             ])->save();
+            $this->broadcastRun($run);
         }
     }
 
@@ -151,7 +134,7 @@ class AudioMetadataProposalService
 
     private function processFiles(AudioMetadataRun $run, User $user): void
     {
-        $this->audioQuery((string) $run->source_filter, (string) $run->scope)
+        $this->runAudioQuery($run)
             ->select([
                 'id',
                 'source',
@@ -184,12 +167,29 @@ class AudioMetadataProposalService
             if ($proposal) {
                 $run->increment('proposal_count');
             }
+
+            $this->broadcastRun($run->refresh(), $proposal);
         } catch (\Throwable $exception) {
             report($exception);
 
             $run->increment('processed_files');
             $run->increment('failed_files');
+
+            $this->broadcastRun($run->refresh());
         }
+    }
+
+    private function runAudioQuery(AudioMetadataRun $run): Builder
+    {
+        if ((string) $run->scope === 'single') {
+            $fileId = (int) data_get($run->options ?? [], 'file_id');
+
+            return File::query()
+                ->whereKey($fileId)
+                ->where('mime_type', 'like', 'audio/%');
+        }
+
+        return $this->audioQuery((string) $run->source_filter, (string) $run->scope);
     }
 
     private function audioQuery(string $sourceFilter, string $scope): Builder
@@ -235,5 +235,18 @@ class AudioMetadataProposalService
     private function normalizeSourceFilter(mixed $sourceFilter): string
     {
         return in_array($sourceFilter, ['all', 'local', 'spotify'], true) ? $sourceFilter : 'all';
+    }
+
+    private function latestRunProposal(AudioMetadataRun $run): ?AudioMetadataProposal
+    {
+        return $run->proposals()->latest('id')->first();
+    }
+
+    private function broadcastRun(AudioMetadataRun $run, ?AudioMetadataProposal $proposal = null): void
+    {
+        AudioMetadataRunUpdated::dispatch($run->id, [
+            'run' => AudioMetadataProposalPayload::run($run),
+            'proposal' => AudioMetadataProposalPayload::proposal($proposal),
+        ]);
     }
 }
