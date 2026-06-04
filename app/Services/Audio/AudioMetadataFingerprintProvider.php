@@ -10,6 +10,7 @@ class AudioMetadataFingerprintProvider
 {
     public function __construct(
         private readonly AudioFingerprintService $fingerprints,
+        private readonly MusicBrainzRecordingReleaseLookup $recordingReleases,
         private readonly MusicBrainzReleaseMetadata $releaseMetadata,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
@@ -39,7 +40,9 @@ class AudioMetadataFingerprintProvider
             return null;
         }
 
-        $release = $this->bestRelease($recording);
+        $hints = $this->metadataHints($file);
+        $recording = $this->recordingReleases->withReleases($recording);
+        $release = $this->recordingReleases->bestRelease($recording, $hints);
         $releaseId = $this->cleanString($release['id'] ?? null);
         $releaseDetails = $releaseId !== null ? $this->releaseMetadata->fetch($releaseId) : [];
         if ($releaseDetails !== []) {
@@ -56,7 +59,7 @@ class AudioMetadataFingerprintProvider
             $proposedValues['cover_url'] = $coverUrl;
         }
 
-        $score = $this->scoreCandidate($file, $fingerprint, $result, $recording, $release, $coverUrl);
+        $score = $this->scoreCandidate($file, $fingerprint, $result, $recording, $release, $coverUrl, $hints);
 
         return [
             'provider' => 'acoustid_musicbrainz',
@@ -126,29 +129,10 @@ class AudioMetadataFingerprintProvider
 
         $recording = collect($recordings)
             ->filter(fn (mixed $recording): bool => is_array($recording) && $this->cleanString($recording['title'] ?? null) !== null)
-            ->sortByDesc(fn (array $recording): int => $this->bestRelease($recording) !== [] ? 1 : 0)
+            ->sortByDesc(fn (array $recording): int => is_array($recording['releases'] ?? null) ? count($recording['releases']) : 0)
             ->first();
 
         return is_array($recording) ? $recording : null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $recording
-     * @return array<string, mixed>
-     */
-    private function bestRelease(array $recording): array
-    {
-        $releases = $recording['releases'] ?? null;
-        if (! is_array($releases)) {
-            return [];
-        }
-
-        $release = collect($releases)
-            ->filter(fn (mixed $release): bool => is_array($release) && $this->cleanString($release['title'] ?? null) !== null)
-            ->sortByDesc(fn (array $release): int => $this->cleanString($release['id'] ?? null) !== null ? 1 : 0)
-            ->first();
-
-        return is_array($release) ? $release : [];
     }
 
     /**
@@ -248,10 +232,10 @@ class AudioMetadataFingerprintProvider
         array $recording,
         array $release,
         ?string $coverUrl,
+        array $hints,
     ): array {
         $acoustIdScore = $this->acoustIdScore($result);
         $confidence = (int) round($acoustIdScore * 100);
-        $hints = $this->metadataHints($file);
         $duration = $this->metadataDurationSeconds($recording['duration'] ?? $recording['length'] ?? null);
         $durationDelta = $duration !== null ? abs($fingerprint->durationSeconds - $duration) : null;
         $matchedFields = [];
@@ -290,11 +274,13 @@ class AudioMetadataFingerprintProvider
             $confidence += 2;
         }
 
-        $identitySupport = $this->identitySupport($matchedFields, $release, $coverUrl);
+        $identitySupport = $this->identitySupport($matchedFields, $release, $coverUrl, $result, $durationDelta, $recording, $hints);
         if ($identitySupport === 'weak') {
             $confidence = min($confidence, 74);
         } elseif ($identitySupport === 'release_only') {
             $confidence = min($confidence, 84);
+        } elseif ($identitySupport === 'strong_fingerprint_release') {
+            $confidence = max($confidence, 90);
         }
 
         return [
@@ -317,7 +303,7 @@ class AudioMetadataFingerprintProvider
     }
 
     /**
-     * @return array{title:string|null,artists:list<string>,album:string|null,duration_seconds:int|null}
+     * @return array{title:string|null,artists:list<string>,album:string|null,release_date:string|null,duration_seconds:int|null}
      */
     private function metadataHints(File $file): array
     {
@@ -336,6 +322,7 @@ class AudioMetadataFingerprintProvider
             'artists' => $artists,
             'album' => $this->values->firstStringForKeys($payload, ['album', 'albums'])
                 ?? $this->cleanString($file->albums->first()?->name ?? null),
+            'release_date' => $this->values->firstStringForKeys($payload, ['date', 'year', 'originaldate', 'releasedate', 'release_date']),
             'duration_seconds' => $this->values->durationSeconds($file, $payload),
         ];
     }
@@ -374,10 +361,21 @@ class AudioMetadataFingerprintProvider
      * @param  list<string>  $matchedFields
      * @param  array<string, mixed>  $release
      */
-    private function identitySupport(array $matchedFields, array $release, ?string $coverUrl): string
-    {
+    private function identitySupport(
+        array $matchedFields,
+        array $release,
+        ?string $coverUrl,
+        array $result,
+        ?int $durationDelta,
+        array $recording,
+        array $hints,
+    ): string {
         if (array_values(array_intersect($matchedFields, ['title', 'artists', 'album'])) !== []) {
             return 'matched_existing_identity';
+        }
+
+        if ($this->hasStrongFingerprintReleaseSupport($release, $result, $durationDelta, $recording, $hints)) {
+            return 'strong_fingerprint_release';
         }
 
         if ($this->cleanString($release['id'] ?? null) !== null && $coverUrl !== null) {
@@ -389,6 +387,35 @@ class AudioMetadataFingerprintProvider
         }
 
         return 'weak';
+    }
+
+    /**
+     * @param  array<string, mixed>  $release
+     * @param  array<string, mixed>  $result
+     * @param  array<string, mixed>  $recording
+     * @param  array<string, mixed>  $hints
+     */
+    private function hasStrongFingerprintReleaseSupport(
+        array $release,
+        array $result,
+        ?int $durationDelta,
+        array $recording,
+        array $hints,
+    ): bool {
+        if ($this->acoustIdScore($result) < 0.99 || $durationDelta === null || $durationDelta > 2) {
+            return false;
+        }
+
+        if ($this->cleanString($release['id'] ?? null) === null) {
+            return false;
+        }
+
+        $releaseTitle = $this->cleanString($release['title'] ?? null);
+        $recordingTitle = $this->cleanString($recording['title'] ?? null);
+
+        return $this->stringsMatch($releaseTitle, $recordingTitle)
+            || $this->stringsMatch($releaseTitle, $hints['album'] ?? null)
+            || $this->stringsMatch($releaseTitle, $hints['title'] ?? null);
     }
 
     private function stringsMatch(mixed $left, mixed $right): bool

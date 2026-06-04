@@ -47,6 +47,8 @@ class AudioMetadataProposalGenerator
         private readonly AudioMetadataDiscogsProvider $discogsProvider,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
         private readonly AudioMetadataLocalTagProvider $localTags,
+        private readonly AudioMetadataVgmdbCandidateMerger $vgmdbCandidates,
+        private readonly AudioMetadataVgmdbProvider $vgmdbProvider,
         private readonly AudioMetadataValueExtractor $values,
         private readonly SpotifyOAuthConfig $spotifyConfig,
         private readonly SpotifyOAuthService $spotifyOAuth,
@@ -159,6 +161,9 @@ class AudioMetadataProposalGenerator
         $this->reportProgress($progress, 'discogs', 'Searching Discogs release data');
         $discogsCandidate = $this->discogsProvider->candidate($file, $currentValues);
 
+        $this->reportProgress($progress, 'vgmdb', 'Searching VGMdb album metadata');
+        $vgmdbCandidate = $this->vgmdbProvider->candidate($file, $currentValues, $fingerprintCandidate);
+
         if ($fingerprintCandidate !== null) {
             $fingerprintCandidate = $this->candidateEnricher->supplementWithCover($fingerprintCandidate, $coverCandidate);
 
@@ -166,6 +171,14 @@ class AudioMetadataProposalGenerator
                 $fingerprintCandidate,
                 $discogsCandidate,
                 'acoustid_musicbrainz_discogs',
+            );
+
+            $fingerprintCandidate = $this->vgmdbCandidates->merge(
+                $fingerprintCandidate,
+                $vgmdbCandidate,
+                $fingerprintCandidate['provider'] === 'acoustid_musicbrainz_discogs'
+                    ? 'acoustid_musicbrainz_discogs_vgmdb'
+                    : 'acoustid_musicbrainz_vgmdb',
             );
 
             $candidates[] = $this->candidateEnricher->resolveAnomaly($file, $currentValues, $fingerprintCandidate);
@@ -183,6 +196,10 @@ class AudioMetadataProposalGenerator
 
         if ($discogsCandidate !== null) {
             $candidates[] = $discogsCandidate;
+        }
+
+        if ($vgmdbCandidate !== null) {
+            $candidates[] = $vgmdbCandidate;
         }
 
         $tagCandidate = $this->localTags->candidate($file);
@@ -246,7 +263,7 @@ class AudioMetadataProposalGenerator
             return true;
         }
 
-        return in_array($candidate['evidence']['identity_support'] ?? null, ['matched_existing_identity', 'release_with_cover'], true);
+        return in_array($candidate['evidence']['identity_support'] ?? null, ['matched_existing_identity', 'release_with_cover', 'strong_fingerprint_release'], true);
     }
 
     /**
@@ -255,12 +272,15 @@ class AudioMetadataProposalGenerator
     private function candidatePriority(array $candidate): int
     {
         $providerPriority = match ($candidate['provider']) {
+            'acoustid_musicbrainz_discogs_vgmdb' => 325,
             'acoustid_musicbrainz_ai_discogs' => 320,
+            'acoustid_musicbrainz_vgmdb' => 315,
             'acoustid_musicbrainz_discogs' => 310,
             'acoustid_musicbrainz' => 300,
             'musicbrainz_discogs' => 245,
             'discogs_release' => 235,
             'existing_album_cover' => 230,
+            'vgmdb_album' => 225,
             'musicbrainz_cover_art' => 220,
             'spotify' => 250,
             'local_ai_discogs' => 240,
