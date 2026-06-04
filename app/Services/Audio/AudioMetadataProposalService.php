@@ -95,6 +95,7 @@ class AudioMetadataProposalService
             $run->refresh()->forceFill([
                 'status' => 'completed',
                 'finished_at' => now(),
+                'options' => $this->clearProgressOptions($run),
             ])->save();
             $this->broadcastRun($run, $this->latestRunProposal($run));
         } catch (\Throwable $exception) {
@@ -104,6 +105,7 @@ class AudioMetadataProposalService
                 'status' => 'failed',
                 'finished_at' => now(),
                 'error' => $exception->getMessage(),
+                'options' => $this->clearProgressOptions($run),
             ])->save();
             $this->broadcastRun($run);
         }
@@ -161,7 +163,16 @@ class AudioMetadataProposalService
     private function processFile(AudioMetadataRun $run, File $file, User $user): void
     {
         try {
-            $proposal = $this->generator->generate($run, $file, $user);
+            $this->updateRunProgress($run, $file, 'metadata', 'Reading current metadata');
+
+            $proposal = $this->generator->generate(
+                $run,
+                $file,
+                $user,
+                function (string $step, string $label) use ($run, $file): void {
+                    $this->updateRunProgress($run, $file, $step, $label);
+                },
+            );
 
             $run->increment('processed_files');
             if ($proposal) {
@@ -248,5 +259,40 @@ class AudioMetadataProposalService
             'run' => AudioMetadataProposalPayload::run($run),
             'proposal' => AudioMetadataProposalPayload::proposal($proposal),
         ]);
+    }
+
+    private function updateRunProgress(AudioMetadataRun $run, File $file, string $step, string $label): void
+    {
+        $run->forceFill([
+            'options' => $this->progressOptions($run, $file, $step, $label),
+        ])->save();
+
+        $this->broadcastRun($run->refresh());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function progressOptions(AudioMetadataRun $run, File $file, string $step, string $label): array
+    {
+        $options = is_array($run->options) ? $run->options : [];
+        $options['progress'] = [
+            'file_id' => (int) $file->id,
+            'step' => $step,
+            'label' => $label,
+        ];
+
+        return $options;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function clearProgressOptions(AudioMetadataRun $run): array
+    {
+        $options = is_array($run->options) ? $run->options : [];
+        unset($options['progress']);
+
+        return $options;
     }
 }

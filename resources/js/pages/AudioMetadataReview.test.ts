@@ -20,6 +20,9 @@ function runFixture(): AudioMetadataRun {
         processed_files: 1,
         proposal_count: 1,
         failed_files: 0,
+        current_file_id: null,
+        current_step: null,
+        current_step_label: null,
         error: null,
         created_at: null,
         started_at: null,
@@ -391,7 +394,20 @@ describe('Audio metadata review', () => {
                 runPollRequests += 1;
 
                 return runPollRequests === 1
-                    ? { data: { run: { ...runFixture(), status: 'running', processed_files: 0, proposal_count: 0 }, proposals: [] } }
+                    ? {
+                        data: {
+                            run: {
+                                ...runFixture(),
+                                status: 'running',
+                                processed_files: 0,
+                                proposal_count: 0,
+                                current_file_id: 7,
+                                current_step: 'discogs',
+                                current_step_label: 'Searching Discogs release data',
+                            },
+                            proposals: [],
+                        },
+                    }
                     : { data: { run: runFixture(), proposals: [proposalFixture()] } };
             }
 
@@ -456,7 +472,7 @@ describe('Audio metadata review', () => {
         await flushPromises();
 
         expect(runPollRequests).toBe(1);
-        expect(document.body.textContent).toContain('Scanning metadata 0/1');
+        expect(document.body.textContent).toContain('Searching Discogs release data');
 
         vi.advanceTimersByTime(1600);
         await flushPromises();

@@ -95,3 +95,68 @@ test('applying an album proposal moves duplicate current album rows as one album
             ->whereHas('files')
             ->exists())->toBeFalse();
 });
+
+test('applying an album proposal reuses an existing proposed album row with release evidence', function () {
+    $user = User::factory()->create();
+    $sourceAlbum = Album::factory()->create([
+        'name' => 'Above & Beyond - Anjunabeats 100 Cd1',
+        'normalized_name' => 'above & beyond - anjunabeats 100 cd1',
+    ]);
+    $targetAlbum = Album::factory()->create([
+        'name' => 'Anjunabeats100 Disc One',
+        'normalized_name' => 'anjunabeats100 disc one',
+        'discogs_release_id' => null,
+    ]);
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Black Is The Colour',
+    ]);
+    $file->albums()->attach($sourceAlbum->id, ['track_number' => '1']);
+
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'single',
+        'source_filter' => 'all',
+        'status' => 'completed',
+        'total_files' => 1,
+        'processed_files' => 1,
+        'proposal_count' => 1,
+        'started_at' => now(),
+        'finished_at' => now(),
+    ]);
+    $proposal = AudioMetadataProposal::query()->create([
+        'audio_metadata_run_id' => $run->id,
+        'file_id' => $file->id,
+        'provider' => 'discogs',
+        'status' => 'pending',
+        'confidence' => 90,
+        'current_values' => [
+            'album' => 'Above & Beyond - Anjunabeats 100 Cd1',
+        ],
+        'proposed_values' => [
+            'album' => 'Anjunabeats100 Disc One',
+            'discogs_release_id' => '3191676',
+        ],
+        'changes' => [
+            'album' => [
+                'current' => 'Above & Beyond - Anjunabeats 100 Cd1',
+                'proposed' => 'Anjunabeats100 Disc One',
+            ],
+            'discogs_release_id' => [
+                'current' => null,
+                'proposed' => '3191676',
+            ],
+        ],
+        'evidence' => ['source' => 'discogs_release'],
+    ]);
+
+    app(AudioMetadataProposalApplier::class)->apply($proposal, $user, ['album', 'discogs_release_id']);
+
+    $albumAfter = $file->fresh()->albums()->first();
+
+    expect($albumAfter?->is($targetAlbum))->toBeTrue()
+        ->and($albumAfter?->discogs_release_id)->toBe('3191676')
+        ->and($sourceAlbum->fresh()?->name)->toBe('Above & Beyond - Anjunabeats 100 Cd1')
+        ->and(Album::query()->where('normalized_name', 'anjunabeats100 disc one')->count())->toBe(1);
+});

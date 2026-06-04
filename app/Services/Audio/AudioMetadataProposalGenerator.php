@@ -52,7 +52,7 @@ class AudioMetadataProposalGenerator
         private readonly SpotifyOAuthService $spotifyOAuth,
     ) {}
 
-    public function generate(AudioMetadataRun $run, File $file, User $user): ?AudioMetadataProposal
+    public function generate(AudioMetadataRun $run, File $file, User $user, ?callable $progress = null): ?AudioMetadataProposal
     {
         if (! str_starts_with((string) $file->mime_type, 'audio/')) {
             return null;
@@ -60,10 +60,11 @@ class AudioMetadataProposalGenerator
 
         $file->loadMissing(['metadata', 'metadataAliases', 'artists.metadataAliases', 'albums.defaultCover', 'albums.metadataAliases']);
 
+        $this->reportProgress($progress, 'metadata', 'Reading current metadata');
         $currentValues = $this->currentValues($file);
         $candidate = $this->isSpotifyFile($file)
-            ? $this->spotifyCandidate($file, $user)
-            : $this->localCandidate($file, $currentValues);
+            ? $this->spotifyCandidate($file, $user, $progress)
+            : $this->localCandidate($file, $currentValues, $progress);
 
         if ($candidate === null) {
             return null;
@@ -141,16 +142,21 @@ class AudioMetadataProposalGenerator
      * @param  array<string, mixed>  $currentValues
      * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null
      */
-    private function localCandidate(File $file, array $currentValues): ?array
+    private function localCandidate(File $file, array $currentValues, ?callable $progress = null): ?array
     {
         $candidates = [];
 
+        $this->reportProgress($progress, 'fingerprint', 'Fingerprinting audio and checking AcoustID');
         $fingerprintCandidate = $this->fingerprintProvider->candidate($file);
         if ($fingerprintCandidate !== null) {
+            $this->reportProgress($progress, 'ai_review', 'Reviewing fingerprint match');
             $fingerprintCandidate = $this->reviewFingerprintCandidate($file, $currentValues, $fingerprintCandidate);
         }
 
+        $this->reportProgress($progress, 'cover_lookup', 'Searching existing album covers and MusicBrainz cover art');
         $coverCandidate = $this->coverLookup->candidate($file, $currentValues);
+
+        $this->reportProgress($progress, 'discogs', 'Searching Discogs release data');
         $discogsCandidate = $this->discogsProvider->candidate($file, $currentValues);
 
         if ($fingerprintCandidate !== null) {
@@ -166,11 +172,13 @@ class AudioMetadataProposalGenerator
         }
 
         if ($coverCandidate !== null) {
-            $candidates[] = $this->candidateEnricher->supplementWithDiscogs(
-                $coverCandidate,
-                $discogsCandidate,
-                'musicbrainz_discogs',
-            );
+            $candidates[] = $coverCandidate['provider'] === 'existing_album_cover'
+                ? $coverCandidate
+                : $this->candidateEnricher->supplementWithDiscogs(
+                    $coverCandidate,
+                    $discogsCandidate,
+                    'musicbrainz_discogs',
+                );
         }
 
         if ($discogsCandidate !== null) {
@@ -179,6 +187,7 @@ class AudioMetadataProposalGenerator
 
         $tagCandidate = $this->localTags->candidate($file);
         if ($tagCandidate['values'] !== []) {
+            $this->reportProgress($progress, 'embedded_tags', 'Reviewing embedded tags and AI search hints');
             $candidates[] = $candidates === []
                 ? $this->candidateEnricher->resolveWithAiDiscogsSearch(
                     $file,
@@ -189,6 +198,7 @@ class AudioMetadataProposalGenerator
                 : $tagCandidate;
         }
 
+        $this->reportProgress($progress, 'scoring', 'Scoring metadata candidates');
         $candidate = collect($candidates)
             ->filter(fn (array $candidate): bool => $this->changes($currentValues, $candidate['values']) !== [])
             ->filter(fn (array $candidate): bool => $this->candidateGuard->allows($currentValues, $candidate))
@@ -250,6 +260,7 @@ class AudioMetadataProposalGenerator
             'acoustid_musicbrainz' => 300,
             'musicbrainz_discogs' => 245,
             'discogs_release' => 235,
+            'existing_album_cover' => 230,
             'musicbrainz_cover_art' => 220,
             'spotify' => 250,
             'local_ai_discogs' => 240,
@@ -262,7 +273,7 @@ class AudioMetadataProposalGenerator
     /**
      * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
      */
-    private function spotifyCandidate(File $file, User $user): array
+    private function spotifyCandidate(File $file, User $user, ?callable $progress = null): array
     {
         $trackId = $this->spotifyTrackId((string) $file->source_id)
             ?? $this->spotifyTrackId((string) $file->url)
@@ -271,6 +282,7 @@ class AudioMetadataProposalGenerator
         $evidence = ['source' => 'spotify', 'track_id' => $trackId, 'refetched' => false];
 
         if ($trackId !== null) {
+            $this->reportProgress($progress, 'spotify', 'Refreshing Spotify metadata');
             $accessToken = $this->spotifyOAuth->getValidAccessToken($user);
             if ($accessToken !== null) {
                 $track = $this->fetchSpotifyTrack($trackId, $accessToken);
@@ -451,5 +463,14 @@ class AudioMetadataProposalGenerator
         }
 
         return null;
+    }
+
+    private function reportProgress(?callable $progress, string $step, string $label): void
+    {
+        if ($progress === null) {
+            return;
+        }
+
+        $progress($step, $label);
     }
 }

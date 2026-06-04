@@ -5,10 +5,12 @@ use App\Models\AudioMetadataProposal;
 use App\Models\AudioMetadataRun;
 use App\Models\File;
 use App\Models\User;
+use App\Services\Audio\AudioMetadataProposalGenerator;
 use App\Services\Audio\AudioMetadataProposalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
@@ -85,5 +87,54 @@ test('metadata run broadcasts progress snapshots while processing', function () 
         fn (object $event): bool => data_get($event, 'payload.run.status') === 'completed'
             && data_get($event, 'payload.run.processed_files') === 1
             && data_get($event, 'payload.proposal.proposed_values.title') === 'Tagged Title'
+    );
+});
+
+test('metadata run broadcasts current step labels while processing a file', function () {
+    Event::fake();
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'raw filename',
+        'filename' => 'raw-filename.mp3',
+    ]);
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'single',
+        'source_filter' => 'local',
+        'status' => 'pending',
+        'total_files' => 1,
+        'options' => [
+            'file_id' => (int) $file->id,
+        ],
+    ]);
+
+    $this->mock(AudioMetadataProposalGenerator::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('generate')
+            ->once()
+            ->andReturnUsing(function (
+                AudioMetadataRun $run,
+                File $file,
+                User $user,
+                ?callable $progress = null,
+            ): ?AudioMetadataProposal {
+                if ($progress !== null) {
+                    $progress('fingerprint', 'Generating audio fingerprint');
+                }
+
+                return null;
+            });
+    });
+
+    app(AudioMetadataProposalService::class)->processRun($run->id);
+
+    Event::assertDispatched(
+        'App\\Events\\AudioMetadataRunUpdated',
+        fn (object $event): bool => data_get($event, 'payload.run.status') === 'running'
+            && data_get($event, 'payload.run.current_file_id') === $file->id
+            && data_get($event, 'payload.run.current_step') === 'fingerprint'
+            && data_get($event, 'payload.run.current_step_label') === 'Generating audio fingerprint'
     );
 });

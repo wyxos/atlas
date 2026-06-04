@@ -2,7 +2,10 @@
 
 namespace App\Services\Audio;
 
+use App\Models\Album;
+use App\Models\AlbumCover;
 use App\Models\File;
+use App\Support\FileApiPath;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -21,7 +24,16 @@ class AudioMetadataCoverLookupProvider
         $album = $this->cleanString($currentValues['album'] ?? null);
         $artists = $this->cleanStringList($currentValues['artists'] ?? []);
 
-        if ($album === null || $artists === []) {
+        if ($album === null) {
+            return null;
+        }
+
+        $existingCoverCandidate = $this->existingAlbumCoverCandidate($file, $album, $currentValues);
+        if ($existingCoverCandidate !== null) {
+            return $existingCoverCandidate;
+        }
+
+        if ($artists === []) {
             return null;
         }
 
@@ -62,6 +74,65 @@ class AudioMetadataCoverLookupProvider
                 'musicbrainz_release_artists' => $this->releaseArtists($release),
                 'release_detail_source' => $releaseDetails !== [] ? 'musicbrainz_release_lookup' : null,
                 'cover_source' => $coverUrl !== null ? 'cover_art_archive' : null,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null
+     */
+    private function existingAlbumCoverCandidate(File $file, string $album, array $currentValues): ?array
+    {
+        $currentCover = $this->cleanString($currentValues['cover_url'] ?? null);
+        if ($currentCover !== null) {
+            return null;
+        }
+
+        $currentAlbumIds = $file->albums
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+        $normalizedAlbumNames = $file->albums
+            ->pluck('normalized_name')
+            ->push($this->normalizeAlbumName($album))
+            ->map(fn (mixed $name): ?string => $this->cleanString($name))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($normalizedAlbumNames === []) {
+            return null;
+        }
+
+        $matchedAlbum = Album::query()
+            ->whereIn('normalized_name', $normalizedAlbumNames)
+            ->when($currentAlbumIds !== [], fn ($query) => $query->whereNotIn('id', $currentAlbumIds))
+            ->whereHas('defaultCover')
+            ->with('defaultCover')
+            ->withCount('files')
+            ->orderByDesc('files_count')
+            ->orderBy('id')
+            ->first();
+
+        $cover = $matchedAlbum?->defaultCover;
+        if (! $cover instanceof AlbumCover) {
+            return null;
+        }
+
+        return [
+            'provider' => 'existing_album_cover',
+            'confidence' => 88,
+            'values' => [
+                'cover_url' => FileApiPath::albumCover((int) $cover->id),
+            ],
+            'evidence' => [
+                'source' => 'existing_album_cover',
+                'matched_existing_fields' => ['album'],
+                'cover_source' => 'existing_album_cover',
+                'existing_album_id' => (int) $matchedAlbum->id,
+                'existing_album_name' => $this->cleanString($matchedAlbum->name),
+                'existing_album_cover_id' => (int) $cover->id,
             ],
         ];
     }
@@ -239,6 +310,11 @@ class AudioMetadataCoverLookupProvider
     private function normalizeName(string $name): string
     {
         return preg_replace('/[^a-z0-9]+/', '', mb_strtolower($name)) ?? '';
+    }
+
+    private function normalizeAlbumName(string $name): string
+    {
+        return trim(preg_replace('/\s+/', ' ', mb_strtolower(trim($name))) ?? '');
     }
 
     private function normalizeTitle(string $title): string

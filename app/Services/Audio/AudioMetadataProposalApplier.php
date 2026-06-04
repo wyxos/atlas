@@ -139,6 +139,10 @@ class AudioMetadataProposalApplier
             return false;
         }
 
+        if ($this->applyExistingAlbumCover($album, $coverUrl)) {
+            return true;
+        }
+
         try {
             $response = Http::timeout((int) config('services.audio_metadata.http_timeout_seconds', 15))
                 ->get($coverUrl);
@@ -183,6 +187,39 @@ class AudioMetadataProposalApplier
             'size' => strlen($body),
             'mime_type' => $mimeType,
             'picture_type' => 'front',
+            'sort_order' => 0,
+            'is_default' => true,
+        ]);
+
+        return true;
+    }
+
+    private function applyExistingAlbumCover(Album $album, string $coverUrl): bool
+    {
+        $coverId = $this->existingAlbumCoverId($coverUrl);
+        if ($coverId === null) {
+            return false;
+        }
+
+        $sourceCover = AlbumCover::query()->find($coverId);
+        if (! $sourceCover instanceof AlbumCover) {
+            return false;
+        }
+
+        AlbumCover::query()
+            ->where('album_id', $album->id)
+            ->update(['is_default' => false]);
+
+        AlbumCover::query()->updateOrCreate([
+            'album_id' => $album->id,
+            'path_hash' => $sourceCover->path_hash,
+        ], [
+            'file_id' => $sourceCover->file_id,
+            'path' => $sourceCover->path,
+            'hash' => $sourceCover->hash,
+            'size' => $sourceCover->size,
+            'mime_type' => $sourceCover->mime_type,
+            'picture_type' => $sourceCover->picture_type,
             'sort_order' => 0,
             'is_default' => true,
         ]);
@@ -378,6 +415,17 @@ class AudioMetadataProposalApplier
         }
 
         return preg_replace('/^http:\/\/coverartarchive\.org\//i', 'https://coverartarchive.org/', $coverUrl) ?? $coverUrl;
+    }
+
+    private function existingAlbumCoverId(string $coverUrl): ?int
+    {
+        if (preg_match('#^/api/audio/album-covers/(\d+)$#', trim($coverUrl), $matches) !== 1) {
+            return null;
+        }
+
+        $coverId = (int) $matches[1];
+
+        return $coverId > 0 ? $coverId : null;
     }
 
     private function cleanString(mixed $value): ?string

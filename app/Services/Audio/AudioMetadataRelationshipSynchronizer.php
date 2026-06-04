@@ -74,7 +74,8 @@ class AudioMetadataRelationshipSynchronizer
 
         $album = $this->albumForRelease($proposed)
             ?? $this->albumForNameAndArtists($normalizedName, $artistIds->all())
-            ?? $this->albumForAliasAndArtists($normalizedName, $artistIds->all());
+            ?? $this->albumForAliasAndArtists($normalizedName, $artistIds->all())
+            ?? $this->albumForNameWithReleaseEvidence($normalizedName, $proposed);
 
         if (! $album instanceof Album && $currentAlbum instanceof Album) {
             $album = $currentAlbum;
@@ -131,6 +132,34 @@ class AudioMetadataRelationshipSynchronizer
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $proposed
+     */
+    private function albumForNameWithReleaseEvidence(string $normalizedName, array $proposed): ?Album
+    {
+        $discogsReleaseId = $this->cleanString($proposed['discogs_release_id'] ?? null);
+        $musicBrainzReleaseId = $this->cleanString($proposed['musicbrainz_release_id'] ?? null);
+
+        if ($discogsReleaseId === null && $musicBrainzReleaseId === null) {
+            return null;
+        }
+
+        return Album::query()
+            ->withCount('files')
+            ->where('normalized_name', $normalizedName)
+            ->when($discogsReleaseId !== null, fn (Builder $query) => $query
+                ->where(fn (Builder $query) => $query
+                    ->whereNull('discogs_release_id')
+                    ->orWhere('discogs_release_id', $discogsReleaseId)))
+            ->when($musicBrainzReleaseId !== null, fn (Builder $query) => $query
+                ->where(fn (Builder $query) => $query
+                    ->whereNull('musicbrainz_release_id')
+                    ->orWhere('musicbrainz_release_id', $musicBrainzReleaseId)))
+            ->orderByDesc('files_count')
+            ->orderBy('id')
+            ->first();
     }
 
     /**

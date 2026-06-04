@@ -204,6 +204,8 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
         items.push('MusicBrainz release search');
     } else if (source === 'discogs_release_search') {
         items.push('Discogs release search');
+    } else if (source === 'existing_album_cover') {
+        items.push('Existing album cover');
     }
 
     if (matchedFields.length > 0) {
@@ -224,6 +226,8 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
 
     if (evidence.cover_source === 'cover_art_archive') {
         items.push('Cover Art Archive');
+    } else if (evidence.cover_source === 'existing_album_cover') {
+        items.push('Existing Atlas cover');
     }
 
     const aiReview = evidence.ai_review;

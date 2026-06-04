@@ -12,6 +12,9 @@ class AudioMetadataProposalPayload
      */
     public static function run(AudioMetadataRun $run): array
     {
+        $options = is_array($run->options) ? $run->options : [];
+        $progress = is_array($options['progress'] ?? null) ? $options['progress'] : [];
+
         return [
             'id' => (int) $run->id,
             'scope' => (string) $run->scope,
@@ -21,6 +24,9 @@ class AudioMetadataProposalPayload
             'processed_files' => (int) $run->processed_files,
             'proposal_count' => (int) $run->proposal_count,
             'failed_files' => (int) $run->failed_files,
+            'current_file_id' => self::nullableInteger($progress['file_id'] ?? null),
+            'current_step' => self::nullableString($progress['step'] ?? null),
+            'current_step_label' => self::nullableString($progress['label'] ?? null),
             'error' => $run->error,
             'created_at' => $run->created_at?->toIso8601String(),
             'started_at' => $run->started_at?->toIso8601String(),
@@ -53,5 +59,27 @@ class AudioMetadataProposalPayload
             'applied_at' => $proposal->applied_at?->toIso8601String(),
             'ignored_at' => $proposal->ignored_at?->toIso8601String(),
         ];
+    }
+
+    private static function nullableInteger(mixed $value): ?int
+    {
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $value = (int) $value;
+
+        return $value > 0 ? $value : null;
+    }
+
+    private static function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : null;
     }
 }

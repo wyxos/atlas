@@ -220,7 +220,15 @@ export function useAudioMetadataReview(options: Options) {
     }
 
     function metadataRunProgressMessage(run: AudioMetadataRun): string {
+        const label = typeof run.current_step_label === 'string' ? run.current_step_label.trim() : '';
         const total = Math.max(0, run.total_files);
+
+        if (label !== '') {
+            return total > 1
+                ? `${label} (${run.processed_files}/${total})...`
+                : `${label}...`;
+        }
+
         if (total <= 0) {
             return 'Scanning metadata...';
         }

@@ -100,6 +100,9 @@ export type AudioMetadataRun = {
     processed_files: number;
     proposal_count: number;
     failed_files: number;
+    current_file_id: number | null;
+    current_step: string | null;
+    current_step_label: string | null;
     error: string | null;
     created_at: string | null;
     started_at: string | null;
