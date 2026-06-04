@@ -75,6 +75,48 @@ class FileNotFoundService
             : $this->result($fileId, (bool) $file->not_found);
     }
 
+    /**
+     * @return array{file_id: int, not_found: bool, affected_tabs_by_user: array<int, array{user_id: int, tab_ids: array<int, int>}>, supported: bool}
+     */
+    public function reconcileRedownloadSourceCheck(File $file): array
+    {
+        $fileId = (int) $file->id;
+
+        if (! $this->supportsRedownloadSourceCheck($file)) {
+            return $this->result($fileId, (bool) $file->not_found, supported: false);
+        }
+
+        $result = Cache::lock("file-redownload-not-found:{$fileId}", self::CHECK_LOCK_TTL_SECONDS)
+            ->get(function () use ($file, $fileId): array {
+                $file = File::query()->find($file->id);
+
+                if (! $file || ! $this->supportsRedownloadSourceCheck($file)) {
+                    return $this->result($fileId, false, supported: false);
+                }
+
+                if (! $this->redownloadSourceReturnsNotFound($file)) {
+                    return $this->result((int) $file->id, (bool) $file->not_found, supported: true);
+                }
+
+                $wasMarkedNotFound = (bool) $file->not_found;
+                if (! $wasMarkedNotFound) {
+                    $file->forceFill([
+                        'not_found' => true,
+                    ])->save();
+
+                    app(MetricsService::class)->applyNotFoundMark($file, $wasMarkedNotFound);
+                    app(LibraryIndexSyncDispatcher::class)->files([(int) $file->id]);
+                    $file->refresh();
+                }
+
+                return $this->result((int) $file->id, true, supported: true);
+            });
+
+        return is_array($result)
+            ? $result
+            : $this->result($fileId, (bool) $file->not_found, supported: true);
+    }
+
     private function supportsRemoteNotFoundCheck(File $file): bool
     {
         if (strtolower(trim((string) $file->source)) !== 'civitai') {
@@ -89,10 +131,60 @@ class FileNotFoundService
             && CivitAiMediaUrl::isMediaUrl($file->url);
     }
 
+    private function supportsRedownloadSourceCheck(File $file): bool
+    {
+        if (strtolower(trim((string) $file->source)) === 'local') {
+            return false;
+        }
+
+        if (! (bool) $file->downloaded || ! $file->path) {
+            return false;
+        }
+
+        return $this->redownloadSourceCheckUrls($file) !== [];
+    }
+
     private function bothRemoteUrlsReturnNotFound(File $file): bool
     {
         return $this->urlReturnsNotFound($file->preview_url)
             && $this->urlReturnsNotFound($file->url);
+    }
+
+    private function redownloadSourceReturnsNotFound(File $file): bool
+    {
+        $urls = $this->redownloadSourceCheckUrls($file);
+        if ($urls === []) {
+            return false;
+        }
+
+        foreach ($urls as $url) {
+            if (! $this->urlReturnsNotFound($url)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function redownloadSourceCheckUrls(File $file): array
+    {
+        $referrerUrl = $this->validHttpUrl($file->referrer_url);
+        if ($referrerUrl !== null) {
+            return [$referrerUrl];
+        }
+
+        $urls = [];
+        foreach ([$file->preview_url, $file->url] as $url) {
+            $url = $this->validHttpUrl($url);
+            if ($url !== null && ! in_array($url, $urls, true)) {
+                $urls[] = $url;
+            }
+        }
+
+        return $urls;
     }
 
     private function urlReturnsNotFound(?string $url): bool
@@ -127,12 +219,32 @@ class FileNotFoundService
             ->send($method, $url);
     }
 
-    private function result(int $fileId, bool $notFound, array $affectedTabsByUser = []): array
+    private function validHttpUrl(?string $url): ?string
+    {
+        if (! is_string($url)) {
+            return null;
+        }
+
+        $url = trim($url);
+        if ($url === '') {
+            return null;
+        }
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    private function result(int $fileId, bool $notFound, array $affectedTabsByUser = [], bool $supported = true): array
     {
         return [
             'file_id' => $fileId,
             'not_found' => $notFound,
             'affected_tabs_by_user' => $affectedTabsByUser,
+            'supported' => $supported,
         ];
     }
 }

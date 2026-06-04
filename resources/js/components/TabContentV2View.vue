@@ -5,6 +5,7 @@ import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type Vib
 import { PanelRightOpen } from 'lucide-vue-next';
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
+import { useFileRedownloadActions } from '@/composables/useFileRedownloadActions';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useSourceWatchRefresh } from '@/composables/useSourceWatchRefresh';
 import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
@@ -19,6 +20,7 @@ import type { ReactionType } from '@/types/reaction';
 import type { LocalSourceSelection } from '@/utils/localSourceSelection';
 import type { LoadedItemsBulkAction } from '@/lib/tabContentLoadedItemsBulkActions';
 import { createTabContentV2KeydownHandler } from '@/lib/tabContentV2Keyboard';
+import { getContainerPillTargets, getFeedItemFromVibeItem, shouldDimGridItemForContainerDrawer } from '@/lib/tabContentV2ViewHelpers';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -131,6 +133,11 @@ const showGlobalStartPanel = computed(() => Boolean(globalStartPanel?.isOpen.val
 const sourceWatchRefresh = useSourceWatchRefresh({
     setFileData: props.fileViewerData.setFileData,
 });
+const fileRedownloadActions = useFileRedownloadActions({
+    applyFilters: props.applyFilters,
+    closeFileSheet: props.closeFileSheet,
+    setFileData: props.fileViewerData.setFileData,
+});
 const sheetPromptItemId = computed(() => props.promptDialog.data.promptDialogItemId.value);
 const isSheetPromptLoading = computed(() => {
     const itemId = sheetPromptItemId.value;
@@ -166,29 +173,6 @@ function handleGlobalStartPanelOpenChange(value: boolean): void {
 
 function handleVibeRef(instance: unknown): void {
     props.setVibeHandle((instance as VibeHandle | null) ?? null);
-}
-
-function getFeedItemFromVibeItem(item: VibeViewerItem): FeedItem | null {
-    return (item.feedItem as FeedItem | undefined) ?? null;
-}
-
-function getContainerPillTargets(item: VibeViewerItem) {
-    const feedItem = getFeedItemFromVibeItem(item);
-
-    return feedItem
-        ? props.containerInteractions.badges?.getContainersForItem(feedItem) ?? []
-        : [];
-}
-
-function shouldDimGridItemForContainerDrawer(item: VibeViewerItem): boolean {
-    const feedItem = getFeedItemFromVibeItem(item);
-    if (!feedItem) {
-        return false;
-    }
-
-    const highlightedItemIds = props.containerInteractions.drawer.derived.highlightedItemIds.value;
-
-    return highlightedItemIds.size > 0 && !highlightedItemIds.has(feedItem.id);
 }
 
 async function handleBlacklist(item: VibeViewerItem): Promise<void> {
@@ -314,7 +298,7 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         <TabContentV2GridOverlay
                             v-if="getFeedItemFromVibeItem(item as VibeViewerItem)"
                             :active="active" :hovered="hovered" :index="index"
-                            :dimmed="shouldDimGridItemForContainerDrawer(item as VibeViewerItem)"
+                            :dimmed="shouldDimGridItemForContainerDrawer(item as VibeViewerItem, containerInteractions.drawer.derived.highlightedItemIds.value)"
                             :item="getFeedItemFromVibeItem(item as VibeViewerItem)!"
                             :total-items="vibeStatus.itemCount" :vibe-item="item as VibeViewerItem"
                             :containers="containerInteractions" :item-interactions="itemInteractions" :local-file-deletion="localFileDeletion"
@@ -350,12 +334,12 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                     <template #fullscreen-header-actions="{ item }">
                         <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
                             <div
-                                v-if="getContainerPillTargets(item as VibeViewerItem).length > 0"
+                                v-if="getContainerPillTargets(item as VibeViewerItem, containerInteractions).length > 0"
                                 class="flex max-w-[min(34rem,45vw)] flex-row flex-wrap justify-end gap-1"
                                 data-testid="browse-fullscreen-container-pills"
                             >
                                 <div
-                                    v-for="container in getContainerPillTargets(item as VibeViewerItem)"
+                                    v-for="container in getContainerPillTargets(item as VibeViewerItem, containerInteractions)"
                                     :key="container.id"
                                     class="cursor-pointer"
                                     data-container-pill-trigger
@@ -413,6 +397,8 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             :total-items="total"
                             @close="closeFileSheet"
                             @select-preview="props.updateActiveIndex"
+                            @redownload-file="fileRedownloadActions.handleFileRedownload"
+                            @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
                         />
                     </template>
                 </VibeLayout>
@@ -453,6 +439,8 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                                 :show-prompt="showSheetPrompt"
                                 data-test="file-viewer-sheet-panel"
                                 @close="closeFileSheet"
+                                @redownload-file="fileRedownloadActions.handleFileRedownload"
+                                @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
                             />
                         </div>
                     </Transition>
@@ -467,6 +455,8 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         :prompt="promptDialog.data.currentPromptData.value"
                         :show-prompt="showSheetPrompt"
                         @close="closeFileSheet"
+                        @redownload-file="fileRedownloadActions.handleFileRedownload"
+                        @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
                     />
                 </template>
 

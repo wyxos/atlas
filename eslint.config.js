@@ -93,6 +93,7 @@ export default tseslint.config(
             'bootstrap/cache/**',
             'eslint.config.js',
             'resources/js/actions/**',
+            'resources/js/routes/**',
         ],
     }
 );

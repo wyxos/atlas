@@ -230,8 +230,11 @@ class FileReactionAndStateMetricsService
             return;
         }
 
-        $metrics->incrementMetric(MetricsService::KEY_FILES_NOT_FOUND, 1);
-        if ($file->blacklisted_at === null && ! $this->classifier->hasPath($file)) {
+        if (! (bool) $file->downloaded) {
+            $metrics->incrementMetric(MetricsService::KEY_FILES_NOT_FOUND, 1);
+        }
+
+        if (! (bool) $file->downloaded && $file->blacklisted_at === null && ! $this->classifier->hasPath($file)) {
             $metrics->incrementMetric(MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED, 1);
         }
         $this->incrementAvailableSourceMetric($file, -1, $metrics);
@@ -244,8 +247,11 @@ class FileReactionAndStateMetricsService
             return;
         }
 
-        $metrics->incrementMetric(MetricsService::KEY_FILES_NOT_FOUND, -1);
-        if ($file->blacklisted_at === null && ! $this->classifier->hasPath($file)) {
+        if (! (bool) $file->downloaded) {
+            $metrics->incrementMetric(MetricsService::KEY_FILES_NOT_FOUND, -1);
+        }
+
+        if (! (bool) $file->downloaded && $file->blacklisted_at === null && ! $this->classifier->hasPath($file)) {
             $metrics->incrementMetric(MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED, -1);
         }
         $this->incrementAvailableSourceMetric($file, 1, $metrics);

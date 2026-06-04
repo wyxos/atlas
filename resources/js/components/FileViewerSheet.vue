@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
+import { Copy, Loader2, RefreshCw, Trash2, PanelRightClose } from 'lucide-vue-next';
 import { computed, useAttrs } from 'vue';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
 import type { File, FileMetadataRecord } from '@/types/file';
@@ -38,6 +38,8 @@ const attrs = useAttrs();
 const emit = defineEmits<{
     close: [];
     'select-preview': [index: number];
+    'redownload-file': [fileId: number];
+    'mark-corrupted-file': [fileId: number];
 }>();
 
 const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
@@ -67,6 +69,21 @@ const metadataSections = computed(() => {
     ].filter((section): section is { id: string; title: string; data: FileMetadataRecord } => hasMetadata(section.data));
 });
 const hasMetadataSections = computed(() => metadataSections.value.length > 0);
+const isLocalSource = computed(() => props.fileData?.source?.trim().toLowerCase() === 'local');
+const canRedownloadFile = computed(() => Boolean(
+    props.fileData
+    && props.fileData.downloaded
+    && props.fileData.path
+    && !props.fileData.not_found
+    && !isLocalSource.value,
+));
+const canMarkCorruptedFile = computed(() => Boolean(
+    props.fileData
+    && props.fileData.downloaded
+    && props.fileData.path
+    && props.fileData.not_found
+    && !isLocalSource.value,
+));
 
 function hasMetadata(value: FileMetadataRecord | null | undefined): value is FileMetadataRecord {
     return Boolean(value) && Object.keys(value).length > 0;
@@ -186,6 +203,33 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                     <div v-if="fileData.downloaded_at">
                         <div class="font-semibold text-white mb-1">Downloaded At</div>
                         <div>{{ new Date(fileData.downloaded_at).toLocaleString() }}</div>
+                    </div>
+                    <div v-if="canRedownloadFile || canMarkCorruptedFile">
+                        <div class="font-semibold text-white mb-2">Download Actions</div>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                v-if="canRedownloadFile"
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded border border-smart-blue-400/60 bg-smart-blue-500/15 px-3 py-2 text-sm font-semibold text-smart-blue-100 transition hover:border-smart-blue-300 hover:bg-smart-blue-500/25 focus:outline-none focus:ring-2 focus:ring-smart-blue-300"
+                                data-test="file-redownload"
+                                title="Check the remote source and queue a fresh download"
+                                @click="emit('redownload-file', fileData.id)"
+                            >
+                                <RefreshCw :size="16" />
+                                <span>Re-download</span>
+                            </button>
+                            <button
+                                v-if="canMarkCorruptedFile"
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded border border-red-400/70 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-100 transition hover:border-red-300 hover:bg-red-500/25 focus:outline-none focus:ring-2 focus:ring-red-300"
+                                data-test="file-mark-corrupted"
+                                title="Delete the local file and remove this 404 record"
+                                @click="emit('mark-corrupted-file', fileData.id)"
+                            >
+                                <Trash2 :size="16" />
+                                <span>Mark corrupted</span>
+                            </button>
+                        </div>
                     </div>
                     <div v-if="fileData.source_id">
                         <div class="font-semibold text-white mb-1">Source ID</div>
@@ -460,8 +504,6 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
         </div>
     </Transition>
 </template>
-
-
 
 
 

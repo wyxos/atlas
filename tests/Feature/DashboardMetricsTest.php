@@ -244,6 +244,65 @@ test('not found transitions remove unreacted files from the actionable backlog',
     ]);
 });
 
+test('not found metrics exclude downloaded files that keep their disk asset', function () {
+    $downloaded = File::factory()->create([
+        'downloaded' => true,
+        'not_found' => true,
+        'path' => 'downloads/still-on-disk.jpg',
+        'source' => 'CivitAI',
+    ]);
+    $recordsOnly = File::factory()->create([
+        'downloaded' => false,
+        'not_found' => true,
+        'path' => null,
+        'source' => 'CivitAI',
+    ]);
+
+    $metrics = app(MetricsService::class);
+    $metrics->syncAll();
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_NOT_FOUND,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_NOT_FOUND => 1,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED => 1,
+    ]);
+
+    $downloaded->forceFill(['not_found' => false])->save();
+    $metrics->applyNotFoundClear($downloaded->fresh(), true);
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_NOT_FOUND,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_NOT_FOUND => 1,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED => 1,
+    ]);
+
+    $downloaded->forceFill(['not_found' => true])->save();
+    $metrics->applyNotFoundMark($downloaded->fresh(), false);
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_NOT_FOUND,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_NOT_FOUND => 1,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED => 1,
+    ]);
+
+    $recordsOnly->forceFill(['not_found' => false])->save();
+    $metrics->applyNotFoundClear($recordsOnly->fresh(), true);
+
+    expect($metrics->getMetrics([
+        MetricsService::KEY_FILES_NOT_FOUND,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED,
+    ]))->toBe([
+        MetricsService::KEY_FILES_NOT_FOUND => 0,
+        MetricsService::KEY_FILES_NOT_FOUND_RECORDS_ONLY_NOT_BLACKLISTED => 0,
+    ]);
+});
+
 test('preview and reaction dashboard counters follow non-blacklisted transitions', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
