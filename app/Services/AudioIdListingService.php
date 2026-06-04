@@ -6,6 +6,7 @@ use App\Models\File;
 use App\Services\Audio\AudioCoverResolver;
 use App\Services\Audio\AudioPlaybackStatsService;
 use App\Services\Playlists\AudioPlaylistQueryService;
+use App\Support\SpotifyTrack;
 
 class AudioIdListingService
 {
@@ -311,35 +312,7 @@ class AudioIdListingService
 
     private function spotifyTrackUri(string $source, string $sourceId, string ...$urlCandidates): ?string
     {
-        if (strtolower(trim($source)) !== 'spotify') {
-            return null;
-        }
-
-        $sourceId = trim($sourceId);
-        if (preg_match('/^spotify:track:([A-Za-z0-9]{22})$/', $sourceId) === 1) {
-            return $sourceId;
-        }
-
-        if (preg_match('/^[A-Za-z0-9]{22}$/', $sourceId) === 1) {
-            return 'spotify:track:'.$sourceId;
-        }
-
-        foreach ($urlCandidates as $candidate) {
-            $candidate = trim($candidate);
-            if ($candidate === '') {
-                continue;
-            }
-
-            if (preg_match('/spotify:track:([A-Za-z0-9]{22})/', $candidate, $matches) === 1) {
-                return 'spotify:track:'.$matches[1];
-            }
-
-            if (preg_match('#open\.spotify\.com/track/([A-Za-z0-9]{22})#', $candidate, $matches) === 1) {
-                return 'spotify:track:'.$matches[1];
-            }
-        }
-
-        return null;
+        return SpotifyTrack::uri($source, $sourceId, ...$urlCandidates);
     }
 
     /**

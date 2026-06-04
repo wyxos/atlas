@@ -162,6 +162,36 @@ it('falls back to an icon preview for downloaded audio files without covers', fu
     expect($item['original'])->toBe(FileApiPath::downloaded($file->id));
 });
 
+it('formats non-stored spotify tracks with cover previews instead of external page playback urls', function () {
+    $file = formatterFile([
+        'id' => 109,
+        'source' => 'Spotify',
+        'source_id' => '5P97xlvOl6IadKTLVId5ap',
+        'url' => 'https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap',
+        'referrer_url' => 'https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap',
+        'mime_type' => 'audio/spotify',
+        'ext' => 'spotify',
+        'preview_url' => 'https://i.scdn.co/image/ab67616d0000b273cover',
+        'listing_metadata' => [
+            'track' => [
+                'uri' => 'spotify:track:5P97xlvOl6IadKTLVId5ap',
+            ],
+        ],
+    ]);
+
+    $items = FileItemFormatter::format([$file], 1);
+    $item = $items[0];
+
+    expect($item['media_kind'])->toBe('audio');
+    expect($item['type'])->toBe('image');
+    expect($item['src'])->toBe('https://i.scdn.co/image/ab67616d0000b273cover');
+    expect($item['preview'])->toBe('https://i.scdn.co/image/ab67616d0000b273cover');
+    expect($item['url'])->toBe('https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap');
+    expect($item['spotify_uri'])->toBe('spotify:track:5P97xlvOl6IadKTLVId5ap');
+    expect($item['original'])->toBeNull();
+    expect($item['originalUrl'])->toBeNull();
+});
+
 it('uses an icon preview for non-image/video files', function () {
     $file = formatterFile([
         'id' => 104,

@@ -132,6 +132,31 @@ it('includes an audio cover url when an album cover relation is loaded', functio
     expect($data['cover_url'])->toBe(FileApiPath::albumCover(701));
 });
 
+it('does not expose spotify web pages as file urls for non-stored spotify tracks', function () {
+    $file = resourceFile([
+        'id' => 203,
+        'source' => 'Spotify',
+        'source_id' => '5P97xlvOl6IadKTLVId5ap',
+        'url' => 'https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap',
+        'referrer_url' => 'https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap',
+        'mime_type' => 'audio/spotify',
+        'preview_url' => 'https://i.scdn.co/image/ab67616d0000b273cover',
+        'listing_metadata' => [
+            'track' => [
+                'uri' => 'spotify:track:5P97xlvOl6IadKTLVId5ap',
+            ],
+        ],
+    ]);
+
+    $data = FileResource::make($file)->toArray(Request::create('https://atlas.test/files'));
+
+    expect($data['url'])->toBe('https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap');
+    expect($data['file_url'])->toBeNull();
+    expect($data['spotify_uri'])->toBe('spotify:track:5P97xlvOl6IadKTLVId5ap');
+    expect($data['preview_url'])->toBe('https://i.scdn.co/image/ab67616d0000b273cover');
+    expect($data['cover_url'])->toBe('https://i.scdn.co/image/ab67616d0000b273cover');
+});
+
 it('resolves imported local file absolute path from atlas storage', function () {
     $path = 'imports/aa/bb/local-track.mp3';
     Storage::disk('atlas')->put($path, 'atlas-track');

@@ -18,6 +18,8 @@ function previewTestFile(array $attributes = []): File
         'path' => null,
         'preview_path' => null,
         'poster_path' => null,
+        'mime_type' => 'image/jpeg',
+        'ext' => 'jpg',
     ], $attributes));
 }
 
@@ -84,6 +86,34 @@ test('does not auto blacklist local unreacted item on second preview', function 
         ->and($file->auto_blacklisted)->toBeFalse()
         ->and($file->blacklisted_at)->toBeNull();
 });
+
+test('does not auto blacklist non image or video items on second preview', function (string $mimeType, ?string $ext) {
+    $admin = User::factory()->admin()->create();
+    $file = previewTestFile([
+        'previewed_count' => 1,
+        'mime_type' => $mimeType,
+        'ext' => $ext,
+    ]);
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/preview");
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'previewed_count' => 2,
+            'reaction' => null,
+            'auto_blacklisted' => false,
+            'blacklisted_at' => null,
+        ]);
+
+    $file->refresh();
+    expect($file->previewed_count)->toBe(2)
+        ->and($file->auto_blacklisted)->toBeFalse()
+        ->and($file->blacklisted_at)->toBeNull();
+})->with([
+    'spotify audio' => ['audio/spotify', 'spotify'],
+    'local audio type from remote source' => ['audio/mpeg', 'mp3'],
+    'document' => ['application/pdf', 'pdf'],
+]);
 
 test('does not auto blacklist deviantart premium folder item on second preview', function () {
     $admin = User::factory()->admin()->create();

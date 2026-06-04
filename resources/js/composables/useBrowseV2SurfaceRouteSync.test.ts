@@ -78,4 +78,28 @@ describe('mapBrowseV2FileToFeedItem', () => {
         expect(item.preview).toBe('/api/audio/album-covers/501');
         expect(item.original).toBe('/api/files/111/downloaded');
     });
+
+    it('keeps spotify standalone browse items on cover art instead of external page playback urls', () => {
+        const item = mapBrowseV2FileToFeedItem(createFile({
+            filename: 'spotify-track',
+            ext: 'spotify',
+            source: 'Spotify',
+            source_id: '5P97xlvOl6IadKTLVId5ap',
+            spotify_uri: 'spotify:track:5P97xlvOl6IadKTLVId5ap',
+            mime_type: 'audio/spotify',
+            url: 'https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap',
+            file_url: null,
+            disk_url: null,
+            preview_url: 'https://i.scdn.co/image/ab67616d0000b273cover',
+            preview_file_url: null,
+            cover_url: 'https://i.scdn.co/image/ab67616d0000b273cover',
+        }));
+
+        expect(item.media_kind).toBe('audio');
+        expect(item.type).toBe('image');
+        expect(item.preview).toBe('https://i.scdn.co/image/ab67616d0000b273cover');
+        expect(item.original).toBe('https://i.scdn.co/image/ab67616d0000b273cover');
+        expect(item.url).toBe('https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap');
+        expect(item.spotify_uri).toBe('spotify:track:5P97xlvOl6IadKTLVId5ap');
+    });
 });

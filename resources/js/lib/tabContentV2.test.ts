@@ -390,6 +390,31 @@ describe('tabContentV2 resolve', () => {
         expect(videoItem.healthCheck).toBeUndefined();
     });
 
+    it('renders spotify audio as cover art instead of a native audio item', () => {
+        const spotifyItem = mapFeedItemToVibeItem({
+            ...createFeedItem(15),
+            src: 'https://i.scdn.co/image/ab67616d0000b273cover',
+            preview: 'https://i.scdn.co/image/ab67616d0000b273cover',
+            original: null,
+            originalUrl: null,
+            url: 'https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap',
+            media_kind: 'audio',
+            mime_type: 'audio/spotify',
+            source: 'Spotify',
+            source_id: '5P97xlvOl6IadKTLVId5ap',
+            spotify_uri: 'spotify:track:5P97xlvOl6IadKTLVId5ap',
+        } as FeedItem);
+
+        expect(spotifyItem.type).toBe('image');
+        expect(spotifyItem.url).toBe('https://i.scdn.co/image/ab67616d0000b273cover');
+        expect(spotifyItem.preview).toMatchObject({
+            url: 'https://i.scdn.co/image/ab67616d0000b273cover',
+            mediaType: 'image',
+        });
+        expect(spotifyItem.healthCheck).toBeUndefined();
+        expect(spotifyItem.spotifyUri).toBe('spotify:track:5P97xlvOl6IadKTLVId5ap');
+    });
+
     it('uses the backend title as the Vibe title before falling back to filename', () => {
         const titledItem = mapFeedItemToVibeItem({
             ...createFeedItem(13),

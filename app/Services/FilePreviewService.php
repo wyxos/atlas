@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Library\LibraryIndexSyncDispatcher;
+use App\Support\FileMimeType;
 use App\Support\SourceAccessState;
 use Illuminate\Support\Collection;
 
@@ -169,6 +170,13 @@ class FilePreviewService
 
     private function isPreviewAutoBlacklistExempt(File $file): bool
     {
-        return SourceAccessState::isAccessGated($file);
+        return SourceAccessState::isAccessGated($file)
+            || ! $this->isPreviewAutoBlacklistEligibleMedia($file);
+    }
+
+    private function isPreviewAutoBlacklistEligibleMedia(File $file): bool
+    {
+        return FileMimeType::isImage($file->mime_type)
+            || FileMimeType::isVideo($file->mime_type);
     }
 }

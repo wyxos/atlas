@@ -27,16 +27,18 @@ export type FeedItem = {
     key: string; // Combined key from backend: "page-id"
     index: number;
     src: string; // Preview/thumbnail URL for masonry grid
-    preview?: string; // Vibe loader preview URL
-    original?: string; // Vibe loader original URL
+    preview?: string | null; // Vibe loader preview URL
+    original?: string | null; // Vibe loader original URL
     timeoutSeconds?: number; // Vibe loader timeout override (seconds)
-    originalUrl?: string; // Original full-size URL
-    thumbnail?: string; // Thumbnail URL (may be same as src)
+    originalUrl?: string | null; // Original full-size URL
+    thumbnail?: string | null; // Thumbnail URL (may be same as src)
     url?: string | null;
     title?: string | null;
+    description?: string | null;
     filename?: string | null;
     type?: 'image' | 'video';
     media_kind?: 'image' | 'video' | 'audio' | 'file';
+    mime_type?: string | null;
     notFound?: boolean;
     reaction?: { type: string } | null;
     previewed_count?: number;
@@ -49,6 +51,7 @@ export type FeedItem = {
     downloaded?: boolean;
     source?: string | null;
     source_id?: string | null;
+    spotify_uri?: string | null;
     referrer_url?: string | null;
     listing_metadata?: FileMetadataRecord | null;
     detail_metadata?: FileMetadataRecord | null;

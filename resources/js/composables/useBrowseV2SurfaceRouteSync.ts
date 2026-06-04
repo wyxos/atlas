@@ -36,6 +36,8 @@ function resolveFileMediaKind(file: File): FeedItem['media_kind'] {
 
 export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
     const mediaKind = resolveFileMediaKind(file);
+    const isSpotifyAudio = mediaKind === 'audio'
+        && (Boolean(file.spotify_uri) || file.source?.trim().toLowerCase() === 'spotify' || file.mime_type?.trim().toLowerCase() === 'audio/spotify');
     const previewUrl = (mediaKind === 'audio' ? file.cover_url : null)
         ?? file.preview_file_url
         ?? file.preview_url
@@ -44,10 +46,9 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         ?? file.disk_url
         ?? file.url
         ?? '';
-    const originalUrl = file.file_url
-        ?? file.disk_url
-        ?? file.url
-        ?? previewUrl;
+    const originalUrl = isSpotifyAudio
+        ? (file.file_url ?? file.disk_url ?? previewUrl)
+        : (file.file_url ?? file.disk_url ?? file.url ?? previewUrl);
 
     return {
         id: file.id,
@@ -77,6 +78,7 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         filename: file.filename,
         source: file.source,
         source_id: file.source_id,
+        spotify_uri: file.spotify_uri ?? null,
         referrer_url: file.referrer_url,
         listing_metadata: file.listing_metadata,
         detail_metadata: file.detail_metadata,

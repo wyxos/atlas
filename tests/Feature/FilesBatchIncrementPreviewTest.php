@@ -18,6 +18,8 @@ function previewBatchTestFile(array $attributes = []): File
         'path' => null,
         'preview_path' => null,
         'poster_path' => null,
+        'mime_type' => 'image/jpeg',
+        'ext' => 'jpg',
     ], $attributes));
 }
 
@@ -115,6 +117,37 @@ test('batch increment preserves positive reactions without preview moderation', 
     expect($file->previewed_count)->toBe(3)
         ->and($file->blacklisted_at)->toBeNull()
         ->and($file->auto_blacklisted)->toBeFalse();
+});
+
+test('batch increment does not auto blacklist non image or video items', function () {
+    $admin = User::factory()->admin()->create();
+    $spotify = previewBatchTestFile([
+        'previewed_count' => 1,
+        'mime_type' => 'audio/spotify',
+        'ext' => 'spotify',
+    ]);
+    $document = previewBatchTestFile([
+        'previewed_count' => 1,
+        'mime_type' => 'application/pdf',
+        'ext' => 'pdf',
+    ]);
+
+    $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
+        'file_ids' => [$spotify->id, $document->id],
+    ]);
+
+    $response->assertSuccessful();
+    $results = collect($response->json('results'))->keyBy('id');
+
+    foreach ([$spotify, $document] as $file) {
+        $file->refresh();
+
+        expect($file->previewed_count)->toBe(2)
+            ->and($file->auto_blacklisted)->toBeFalse()
+            ->and($file->blacklisted_at)->toBeNull()
+            ->and($results[$file->id]['auto_blacklisted'])->toBeFalse()
+            ->and($results[$file->id]['blacklisted_at'])->toBeNull();
+    }
 });
 
 test('batch increment does not auto blacklist deviantart locked tier items', function () {

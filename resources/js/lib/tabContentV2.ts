@@ -18,6 +18,7 @@ type AtlasVibeViewerItem = VibeViewerItem & {
         kind: 'playback';
         url: string;
     };
+    spotifyUri?: string;
 };
 
 type TabContentV2ResolveArgs = {
@@ -153,6 +154,10 @@ function browseServiceErrorMessage(data: unknown): string | null {
 
 export function resolveOverlayMediaType(item: FeedItem): OverlayMediaType {
     if (item.media_kind === 'audio') {
+        if (isSpotifyFeedAudio(item)) {
+            return 'image';
+        }
+
         return 'audio';
     }
 
@@ -167,11 +172,31 @@ export function resolveOverlayMediaType(item: FeedItem): OverlayMediaType {
     return 'image';
 }
 
+function isNonEmptyText(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+export function isSpotifyFeedAudio(item: FeedItem): boolean {
+    if (item.media_kind !== 'audio') {
+        return false;
+    }
+
+    const source = typeof item.source === 'string' ? item.source.trim().toLowerCase() : '';
+    const mimeType = typeof item.mime_type === 'string' ? item.mime_type.trim().toLowerCase() : '';
+
+    return source === 'spotify'
+        || mimeType === 'audio/spotify'
+        || isNonEmptyText(item.spotify_uri);
+}
+
 export function mapFeedItemToVibeItem(item: FeedItem): AtlasVibeViewerItem {
     const previewUrl = normalizeUrl(item.preview ?? item.src ?? null);
-    const fullUrl = normalizeUrl(item.originalUrl ?? item.original ?? item.url ?? item.preview ?? item.src ?? null) ?? '';
+    const isSpotifyAudio = isSpotifyFeedAudio(item);
+    const fullUrl = isSpotifyAudio
+        ? previewUrl ?? normalizeUrl(item.src ?? item.thumbnail ?? null) ?? ''
+        : normalizeUrl(item.originalUrl ?? item.original ?? item.url ?? item.preview ?? item.src ?? null) ?? '';
     const type = item.media_kind === 'audio'
-        ? 'audio'
+        ? (isSpotifyAudio ? 'image' : 'audio')
         : item.media_kind === 'file'
             ? 'other'
             : (item.type === 'video' || item.media_kind === 'video' ? 'video' : 'image');
@@ -200,6 +225,7 @@ export function mapFeedItemToVibeItem(item: FeedItem): AtlasVibeViewerItem {
         height: item.height,
         feedItem: item,
         fileId: item.id,
+        spotifyUri: isNonEmptyText(item.spotify_uri) ? item.spotify_uri.trim() : undefined,
         page: item.page,
         key: item.key,
     };
