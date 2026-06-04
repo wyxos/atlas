@@ -171,6 +171,7 @@ test('discogs album fallback can propose a cover when artist script differs', fu
         ->assertJsonPath('proposal.proposed_values.album', 'TVアニメーション GTO オリジナルサウンドトラック')
         ->assertJsonPath('proposal.proposed_values.album_aliases', [
             'TV Animation GTO Original Soundtrack',
+            'GTO TV Animation Original Soundtrack',
         ])
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/gto-primary.jpg')
         ->assertJsonPath('proposal.proposed_values.discogs_release_id', '17124567')

@@ -198,6 +198,75 @@ test('metadata proposal applies selected title and album aliases', function () {
             ]);
 });
 
+test('metadata proposal applies mapped aliases to multiple proposed artists', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Tokitsukasadoru Juuni no Meiyaku',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Sakakibara Yui',
+        'normalized_name' => 'sakakibara yui',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'single',
+        'source_filter' => 'local',
+        'status' => 'completed',
+        'total_files' => 1,
+        'processed_files' => 1,
+        'proposal_count' => 1,
+        'options' => ['file_id' => $file->id],
+    ]);
+    $proposal = AudioMetadataProposal::query()->create([
+        'audio_metadata_run_id' => $run->id,
+        'file_id' => $file->id,
+        'provider' => 'acoustid_musicbrainz',
+        'status' => 'pending',
+        'confidence' => 96,
+        'current_values' => [
+            'artists' => ['Sakakibara Yui'],
+            'artist_aliases' => [],
+        ],
+        'proposed_values' => [
+            'artists' => ['ファンタズム', 'FES', '榊原ゆい'],
+            'artist_aliases' => ['Sakakibara Yui'],
+            'artist_alias_map' => [
+                '榊原ゆい' => ['Sakakibara Yui'],
+            ],
+        ],
+        'changes' => [
+            'artists' => [
+                'current' => ['Sakakibara Yui'],
+                'proposed' => ['ファンタズム', 'FES', '榊原ゆい'],
+            ],
+            'artist_aliases' => [
+                'current' => [],
+                'proposed' => ['Sakakibara Yui'],
+            ],
+        ],
+        'evidence' => ['source' => 'musicbrainz_recording'],
+    ]);
+
+    $response = $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposal->id}", [
+        'action' => 'apply',
+        'fields' => ['artists', 'artist_aliases'],
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJsonPath('proposal.status', 'applied');
+
+    $file = $file->fresh('artists.metadataAliases');
+    $artists = $file->artists->keyBy('name');
+
+    expect($artists->keys()->sort()->values()->all())->toBe(['FES', 'ファンタズム', '榊原ゆい'])
+        ->and($artists->get('榊原ゆい')?->metadataAliases->pluck('value')->all())->toBe(['Sakakibara Yui'])
+        ->and($artists->get('FES')?->metadataAliases->pluck('value')->all())->toBe([])
+        ->and($artists->get('ファンタズム')?->metadataAliases->pluck('value')->all())->toBe([]);
+});
+
 test('metadata proposal applies canonical metadata to shared audio entities and payload', function () {
     $user = User::factory()->create();
     $artist = Artist::factory()->create([

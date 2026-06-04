@@ -62,12 +62,60 @@ class AudioMetadataAliasService
             }
         }
 
-        if (in_array('artist_aliases', $fields, true) && $file->artists->count() === 1) {
-            $artist = $file->artists->first();
+        if (in_array('artist_aliases', $fields, true)) {
+            $this->applyArtistAliases($file, $proposal, $proposed, $sourceId);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $proposed
+     */
+    private function applyArtistAliases(File $file, AudioMetadataProposal $proposal, array $proposed, ?string $sourceId): void
+    {
+        $file->load('artists.metadataAliases');
+        $storedMappedAliases = false;
+
+        foreach ($this->artistAliasMap($proposed['artist_alias_map'] ?? []) as $artistName => $aliases) {
+            $artist = $file->artists->firstWhere('name', $artistName);
             if ($artist instanceof Artist) {
-                $this->store($artist, 'name', $proposed['artist_aliases'] ?? [], 'search_alias', $proposal->provider, $sourceId, $artist->name);
+                $this->store($artist, 'name', $aliases, 'search_alias', $proposal->provider, $sourceId, $artist->name);
+                $storedMappedAliases = true;
             }
         }
+
+        if ($storedMappedAliases || $file->artists->count() !== 1) {
+            return;
+        }
+
+        $artist = $file->artists->first();
+        if ($artist instanceof Artist) {
+            $this->store($artist, 'name', $proposed['artist_aliases'] ?? [], 'search_alias', $proposal->provider, $sourceId, $artist->name);
+        }
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function artistAliasMap(mixed $map): array
+    {
+        if (! is_array($map)) {
+            return [];
+        }
+
+        $cleanMap = [];
+        foreach ($map as $artist => $aliases) {
+            $artist = $this->values->cleanString($artist);
+            if ($artist === null) {
+                continue;
+            }
+
+            $aliases = $this->values->cleanStringList($aliases);
+            if ($aliases !== []) {
+                $cleanMap[$artist] = $aliases;
+            }
+        }
+
+        return $cleanMap;
     }
 
     public function store(

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Album;
+use App\Models\Artist;
 use App\Models\File;
 use App\Models\User;
 use App\Services\Audio\AudioFingerprint;
@@ -49,7 +51,16 @@ test('fingerprint metadata follows up musicbrainz recording releases when acoust
             'artist-credit' => [
                 ['name' => 'ファンタズム', 'artist' => ['name' => 'ファンタズム']],
                 ['name' => 'FES', 'artist' => ['name' => 'FES']],
-                ['name' => '榊原ゆい', 'artist' => ['name' => '榊原ゆい']],
+                [
+                    'name' => '榊原ゆい',
+                    'artist' => [
+                        'name' => '榊原ゆい',
+                        'sort-name' => 'Sakakibara, Yui',
+                        'aliases' => [
+                            ['name' => 'Sakakibara Yui'],
+                        ],
+                    ],
+                ],
             ],
             'releases' => [
                 [
@@ -113,6 +124,16 @@ test('fingerprint metadata follows up musicbrainz recording releases when acoust
         'title' => 'Tokitsukasadoru Juuni no Meiyaku',
         'filename' => 'tokitsukasadoru-juuni-no-meiyaku.mp3',
     ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Sakakibara Yui',
+        'normalized_name' => 'sakakibara yui',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'Tokitsukasadoru Juuni no Meiyaku',
+        'normalized_name' => 'tokitsukasadoru juuni no meiyaku',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
     $file->metadata()->create([
         'payload' => [
             'title' => 'Tokitsukasadoru Juuni no Meiyaku',
@@ -129,8 +150,18 @@ test('fingerprint metadata follows up musicbrainz recording releases when acoust
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
         ->assertJsonPath('proposal.proposed_values.title', '刻司ル十二ノ盟約')
+        ->assertJsonPath('proposal.proposed_values.title_aliases', ['Tokitsukasadoru Juuni no Meiyaku'])
         ->assertJsonPath('proposal.proposed_values.artists', ['ファンタズム', 'FES', '榊原ゆい'])
+        ->assertJsonPath('proposal.proposed_values.artist_aliases', [
+            'Sakakibara Yui',
+            'Yui Sakakibara',
+        ])
+        ->assertJsonPath('proposal.proposed_values.artist_alias_map.榊原ゆい', [
+            'Sakakibara Yui',
+            'Yui Sakakibara',
+        ])
         ->assertJsonPath('proposal.proposed_values.album', '刻司ル十二ノ盟約')
+        ->assertJsonPath('proposal.proposed_values.album_aliases', ['Tokitsukasadoru Juuni no Meiyaku'])
         ->assertJsonPath('proposal.proposed_values.track_number', '1')
         ->assertJsonPath('proposal.proposed_values.release_label', '5pb. Records')
         ->assertJsonPath('proposal.proposed_values.catalog_number', 'MFCZ-1008')

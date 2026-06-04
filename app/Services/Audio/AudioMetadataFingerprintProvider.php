@@ -10,6 +10,7 @@ class AudioMetadataFingerprintProvider
 {
     public function __construct(
         private readonly AudioFingerprintService $fingerprints,
+        private readonly MusicBrainzArtistAliasExtractor $artistAliases,
         private readonly MusicBrainzRecordingReleaseLookup $recordingReleases,
         private readonly MusicBrainzReleaseMetadata $releaseMetadata,
         private readonly AudioMetadataValueExtractor $values,
@@ -145,6 +146,7 @@ class AudioMetadataFingerprintProvider
         $values = [];
         $this->putIfPresent($values, 'title', $this->cleanString($recording['title'] ?? null));
         $this->putIfPresent($values, 'artists', $this->recordingArtists($recording));
+        $this->putIfPresent($values, 'artist_alias_map', $this->artistAliases->mapForRecording($recording));
         $this->putIfPresent($values, 'musicbrainz_recording_id', $this->cleanString($recording['id'] ?? null));
 
         foreach ($this->releaseMetadata->values($release, $this->cleanString($recording['id'] ?? null)) as $key => $value) {

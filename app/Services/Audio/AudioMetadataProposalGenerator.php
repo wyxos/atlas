@@ -41,6 +41,7 @@ class AudioMetadataProposalGenerator
         private readonly AudioMetadataAliasService $aliases,
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
+        private readonly AudioMetadataCandidateAliasNormalizer $aliasNormalizer,
         private readonly AudioMetadataCandidateEnricher $candidateEnricher,
         private readonly AudioMetadataCandidateGuard $candidateGuard,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
@@ -72,12 +73,12 @@ class AudioMetadataProposalGenerator
             return null;
         }
 
-        $proposedValues = $candidate['values'];
-        if ($proposedValues === []) {
+        $candidate = $this->aliasNormalizer->normalize($currentValues, $candidate);
+        if ($candidate['values'] === []) {
             return null;
         }
 
-        $changes = $this->changes($currentValues, $proposedValues);
+        $changes = $this->changes($currentValues, $candidate['values']);
         if ($changes === []) {
             return null;
         }
@@ -97,7 +98,7 @@ class AudioMetadataProposalGenerator
             'status' => 'pending',
             'confidence' => $candidate['confidence'],
             'current_values' => $currentValues,
-            'proposed_values' => $proposedValues,
+            'proposed_values' => $candidate['values'],
             'changes' => $changes,
             'evidence' => $candidate['evidence'],
         ]);
