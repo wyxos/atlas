@@ -10,6 +10,7 @@ class AudioMetadataCandidateEnricher
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataDiscogsClient $discogs,
         private readonly AudioMetadataDiscogsSearchQueryExpander $searchQueryExpander,
+        private readonly AudioMetadataSourceReleaseGuard $sourceReleases,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
 
@@ -144,6 +145,10 @@ class AudioMetadataCandidateEnricher
     ): ?array {
         foreach ($matches as $match) {
             $release = $match['release'];
+            if ($this->sourceReleases->isLaterAlternateReleaseForCurrentSoundtrack($currentValues, $candidate['values'] ?? [], $release)) {
+                continue;
+            }
+
             $source = $this->discogsReviewSource($release);
             $review = $this->aiReviewer->resolveAnomaly($file, $currentValues, $candidate, $source);
             if (($review['verdict'] ?? null) !== 'accept') {
