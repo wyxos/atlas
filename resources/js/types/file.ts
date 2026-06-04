@@ -69,6 +69,7 @@ export interface File {
     description: string | null;
     url: string | null;
     file_url?: string | null;
+    spotify_uri?: string | null;
     referrer_url: string | null;
     path: string | null;
     absolute_path: string | null;
@@ -107,4 +108,3 @@ export interface File {
     created_at: string;
     updated_at: string;
 }
-

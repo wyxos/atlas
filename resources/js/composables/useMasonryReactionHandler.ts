@@ -189,7 +189,7 @@ export function useMasonryReactionHandler(
         }
 
         // Queue reaction with countdown toast (pass thumbnail and restore callback for undo/error recovery)
-        const thumbnail = item.preview;
+        const thumbnail = item.preview ?? undefined;
         queueReaction(fileId, type, thumbnail, restoreCallback, options.items, {
             forceDownload,
             updateLocalState: false,

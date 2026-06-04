@@ -11,6 +11,7 @@ use App\Support\ContainerBrowseTabPayload;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
 use App\Support\SourceAccessState;
+use App\Support\SpotifyTrack;
 use Illuminate\Container\Container as IoCContainer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
@@ -232,9 +233,20 @@ class FileItemFormatter
             // For audio/other files, keep the real file URL in `original` for the viewer/actions.
             $mediaKind = $isVideo ? 'video' : ($isImage ? 'image' : ($isAudio ? 'audio' : 'file'));
             $vibeType = $isVideo ? 'video' : 'image';
+            $spotifyUri = SpotifyTrack::uri(
+                $file->source,
+                $file->source_id,
+                $file->url,
+                $file->referrer_url,
+                data_get($listing, 'track.uri'),
+                data_get($listing, 'track.external_urls.spotify'),
+            );
 
             if ($mediaKind === 'audio') {
                 $thumbnailUrl = self::audioCoverUrl($file) ?? FileApiPath::icon($file->id);
+                if ($spotifyUri !== null && ! $isStored) {
+                    $originalUrl = null;
+                }
             } elseif ($mediaKind !== 'image' && $mediaKind !== 'video') {
                 $thumbnailUrl = FileApiPath::icon($file->id);
             }
@@ -257,6 +269,7 @@ class FileItemFormatter
                 'url' => $file->url,
                 'source' => $file->source,
                 'source_id' => $file->source_id,
+                'spotify_uri' => $spotifyUri,
                 'referrer_url' => $file->referrer_url,
                 'type' => $vibeType,
                 'media_kind' => $mediaKind,

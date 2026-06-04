@@ -11,6 +11,7 @@ use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
 use App\Support\SourceAccessState;
+use App\Support\SpotifyTrack;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -100,6 +101,14 @@ class FileResource extends JsonResource
             unset($listingMetadata['auth_context']);
         }
         $detailMetadata = is_array($this->detail_metadata) ? $this->detail_metadata : [];
+        $spotifyUri = SpotifyTrack::uri(
+            $this->source,
+            $this->source_id,
+            $this->url,
+            $this->referrer_url,
+            data_get($listingMetadata, 'track.uri'),
+            data_get($listingMetadata, 'track.external_urls.spotify'),
+        );
 
         $normalizeDimension = function (mixed $value): ?int {
             if (! is_numeric($value)) {
@@ -132,7 +141,7 @@ class FileResource extends JsonResource
         // For downloaded files, always prefer the local downloaded stream URL.
         $fileUrl = $diskUrl;
         if (! $fileUrl) {
-            if ($this->url) {
+            if ($this->url && $spotifyUri === null) {
                 $fileUrl = $this->url;
             } elseif ($this->path) {
                 // Generate URL for stored library files.
@@ -223,6 +232,7 @@ class FileResource extends JsonResource
             'id' => $this->id,
             'source' => $this->source,
             'source_id' => $this->source_id,
+            'spotify_uri' => $spotifyUri,
             'filename' => $this->filename,
             'ext' => $this->ext,
             'size' => $this->size,

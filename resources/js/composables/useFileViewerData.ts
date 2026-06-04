@@ -3,6 +3,12 @@ import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/F
 import type { FeedItem } from '@/composables/useTabs';
 import type { File } from '@/types/file';
 
+function isSpotifyFile(file: File): boolean {
+    return file.source?.trim().toLowerCase() === 'spotify'
+        || file.mime_type?.trim().toLowerCase() === 'audio/spotify'
+        || Boolean(file.spotify_uri?.trim());
+}
+
 export function useFileViewerData(params: {
     items: Ref<FeedItem[]>;
     navigation: {
@@ -94,8 +100,18 @@ export function useFileViewerData(params: {
             return;
         }
 
-        const refreshedUrl = file.file_url ?? file.url ?? item.url ?? item.src;
-        const refreshedPreview = file.preview_url ?? file.file_url ?? file.url ?? item.preview ?? item.src;
+        const spotifyFile = isSpotifyFile(file);
+        const refreshedPreview = (spotifyFile ? file.cover_url : null)
+            ?? file.preview_url
+            ?? file.preview_file_url
+            ?? file.poster_url
+            ?? file.file_url
+            ?? file.url
+            ?? item.preview
+            ?? item.src;
+        const refreshedUrl = spotifyFile
+            ? (file.file_url ?? file.disk_url ?? refreshedPreview)
+            : (file.file_url ?? file.url ?? item.url ?? item.src);
 
         item.url = file.url;
         item.original = refreshedUrl;
@@ -114,7 +130,9 @@ export function useFileViewerData(params: {
         item.notFound = file.not_found;
         item.source = file.source;
         item.source_id = file.source_id;
+        item.spotify_uri = file.spotify_uri ?? null;
         item.referrer_url = file.referrer_url;
+        item.mime_type = file.mime_type;
         item.listing_metadata = file.listing_metadata;
         item.detail_metadata = file.detail_metadata;
         item.containers = file.containers ?? item.containers;
