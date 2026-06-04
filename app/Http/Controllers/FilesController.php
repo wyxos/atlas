@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Listings\FileListing;
 use App\Models\File;
+use App\Services\CorruptedDownloadedFileService;
 use App\Services\DownloadedFileClearService;
 use App\Services\FileBlacklistService;
 use App\Services\FileNotFoundService;
 use App\Services\FilePreviewService;
+use App\Services\FileRedownloadService;
 use App\Services\FileStorageResponseService;
 use App\Services\Library\LibraryIndexSyncDispatcher;
 use App\Services\MetricsService;
@@ -127,6 +129,35 @@ class FilesController extends Controller
             'unwatched' => $result->unwatched,
             'file' => new \App\Http\Resources\FileResource($refreshedFile),
         ], $result->unwatched ? 200 : 422);
+    }
+
+    public function redownload(File $file, FileRedownloadService $fileRedownloadService): JsonResponse
+    {
+        abort_unless(Auth::check(), 403);
+
+        $result = $fileRedownloadService->redownload($file, (int) Auth::id());
+        $resultFile = $result['file'];
+        $this->fileStorageResponses->loadViewerRelations($resultFile);
+        $this->fileStorageResponses->hydrateDiskMetadata($resultFile);
+
+        return response()->json([
+            'message' => $result['queued'] ? 'File re-download queued.' : 'Remote source is 404. Existing disk file was kept.',
+            'queued' => $result['queued'],
+            'not_found' => $result['not_found'],
+            'file' => new \App\Http\Resources\FileResource($resultFile),
+        ]);
+    }
+
+    public function markCorrupted(File $file, CorruptedDownloadedFileService $corruptedDownloadedFileService): JsonResponse
+    {
+        $result = $corruptedDownloadedFileService->markCorrupted($file);
+
+        return response()->json([
+            'message' => 'Corrupted downloaded file removed.',
+            'deleted' => true,
+            'file_id' => $result['deleted_file_id'],
+            'not_found' => $result['not_found'],
+        ]);
     }
 
     /**

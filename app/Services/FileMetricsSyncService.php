@@ -20,7 +20,7 @@ class FileMetricsSyncService
 
         $fileCounts = File::query()
             ->selectRaw('COUNT(*) as total')
-            ->selectRaw('SUM(CASE WHEN not_found = 1 THEN 1 ELSE 0 END) as not_found_total')
+            ->selectRaw('SUM(CASE WHEN not_found = 1 AND downloaded = 0 THEN 1 ELSE 0 END) as not_found_total')
             ->selectRaw('SUM(CASE WHEN downloaded = 1 THEN 1 ELSE 0 END) as downloaded_total')
             ->selectRaw("SUM(CASE WHEN {$hasPathSql} THEN 1 ELSE 0 END) as with_path_total")
             ->selectRaw("SUM(CASE WHEN {$activePathSql} THEN 1 ELSE 0 END) as with_path_not_blacklisted_total")
@@ -28,7 +28,7 @@ class FileMetricsSyncService
             ->selectRaw("SUM(CASE WHEN source IN ('local', 'Local') THEN 1 ELSE 0 END) as local_total")
             ->selectRaw("SUM(CASE WHEN source IN ('local', 'Local') AND not_found = 0 THEN 1 ELSE 0 END) as local_available_total")
             ->selectRaw("SUM(CASE WHEN source NOT IN ('local', 'Local') AND not_found = 0 THEN 1 ELSE 0 END) as non_local_available_total")
-            ->selectRaw("SUM(CASE WHEN {$activeSql} AND {$noPathSql} AND not_found = 1 THEN 1 ELSE 0 END) as not_found_records_only_not_blacklisted_total")
+            ->selectRaw("SUM(CASE WHEN {$activeSql} AND {$noPathSql} AND not_found = 1 AND downloaded = 0 THEN 1 ELSE 0 END) as not_found_records_only_not_blacklisted_total")
             ->selectRaw("SUM(CASE WHEN {$imageSql} THEN 1 ELSE 0 END) as type_image_total")
             ->selectRaw("SUM(CASE WHEN {$activePathSql} AND {$imageSql} THEN 1 ELSE 0 END) as type_image_with_path_not_blacklisted_total")
             ->selectRaw("SUM(CASE WHEN {$videoSql} THEN 1 ELSE 0 END) as type_video_total")
