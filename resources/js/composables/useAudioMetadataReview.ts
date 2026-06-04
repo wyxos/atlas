@@ -37,17 +37,35 @@ export function useAudioMetadataReview(options: Options) {
     const metadataProposalById = ref<Record<number, AudioMetadataProposal | null>>({});
     const isMetadataProposalLoading = ref(false);
     const isMetadataRunStarting = ref(false);
+    const metadataRunStartingAudioId = ref<number | null>(null);
     const activeMetadataRunId = ref<number | null>(null);
     const activeMetadataRunAudioId = ref<number | null>(null);
     const isMetadataProposalReviewing = ref(false);
     const metadataReviewMessage = ref<string | null>(null);
+    const metadataReviewMessageAudioId = ref<number | null>(null);
     const metadataReviewError = ref<string | null>(null);
+    const metadataReviewErrorAudioId = ref<number | null>(null);
     const batchMetadataMessage = ref<string | null>(null);
     const batchMetadataError = ref<string | null>(null);
     let metadataRunPollTimer: ReturnType<typeof setTimeout> | null = null;
     let activeMetadataRunChannel: string | null = null;
 
-    const isTrackMetadataRunBusy = computed(() => isMetadataRunStarting.value || activeMetadataRunId.value !== null);
+    const isTrackMetadataRunBusy = computed(() => {
+        const audioId = detailsSheetAudioId.value;
+
+        return audioId !== null && (
+            (isMetadataRunStarting.value && metadataRunStartingAudioId.value === audioId)
+            || (activeMetadataRunId.value !== null && activeMetadataRunAudioId.value === audioId)
+        );
+    });
+
+    const visibleMetadataReviewMessage = computed(() => (
+        metadataReviewMessageAudioId.value === detailsSheetAudioId.value ? metadataReviewMessage.value : null
+    ));
+
+    const visibleMetadataReviewError = computed(() => (
+        metadataReviewErrorAudioId.value === detailsSheetAudioId.value ? metadataReviewError.value : null
+    ));
 
     const detailsSheetTrack = computed(() => {
         const audioId = detailsSheetAudioId.value;
@@ -76,9 +94,19 @@ export function useAudioMetadataReview(options: Options) {
         return proposal?.status === 'pending' ? proposal : null;
     }
 
+    function setMetadataReviewMessage(audioId: number | null, message: string | null): void {
+        metadataReviewMessageAudioId.value = audioId;
+        metadataReviewMessage.value = message;
+    }
+
+    function setMetadataReviewError(audioId: number | null, error: string | null): void {
+        metadataReviewErrorAudioId.value = audioId;
+        metadataReviewError.value = error;
+    }
+
     async function fetchLatestMetadataProposal(audioId: number): Promise<void> {
         isMetadataProposalLoading.value = true;
-        metadataReviewError.value = null;
+        setMetadataReviewError(audioId, null);
 
         try {
             const { data } = await window.axios.get<{ proposal: AudioMetadataProposal | null }>(`/api/audio/${audioId}/metadata-proposals/latest`);
@@ -88,7 +116,7 @@ export function useAudioMetadataReview(options: Options) {
             };
         } catch (proposalError) {
             console.error('Failed to load audio metadata proposal:', proposalError);
-            metadataReviewError.value = 'Failed to load metadata proposal.';
+            setMetadataReviewError(audioId, 'Failed to load metadata proposal.');
         } finally {
             isMetadataProposalLoading.value = false;
         }
@@ -98,8 +126,8 @@ export function useAudioMetadataReview(options: Options) {
         options.selectedAudioId.value = audioId;
         detailsSheetAudioId.value = audioId;
         isTrackDetailsSheetOpen.value = true;
-        metadataReviewMessage.value = null;
-        metadataReviewError.value = null;
+        setMetadataReviewMessage(audioId, null);
+        setMetadataReviewError(audioId, null);
 
         if (!options.hasDetails(audioId)) {
             await options.fetchAudioDetails([audioId], true);
@@ -110,13 +138,14 @@ export function useAudioMetadataReview(options: Options) {
 
     async function handleTrackMetadataRun(): Promise<void> {
         const audioId = detailsSheetAudioId.value;
-        if (audioId === null) {
+        if (audioId === null || isTrackMetadataRunBusy.value) {
             return;
         }
 
         isMetadataRunStarting.value = true;
-        metadataReviewMessage.value = null;
-        metadataReviewError.value = null;
+        metadataRunStartingAudioId.value = audioId;
+        setMetadataReviewMessage(audioId, null);
+        setMetadataReviewError(audioId, null);
 
         try {
             const { data } = await window.axios.post<AudioMetadataRunResponse>(`/api/audio/${audioId}/metadata-runs`);
@@ -124,9 +153,12 @@ export function useAudioMetadataReview(options: Options) {
             applyMetadataRunSnapshot({ run: data.run, proposal }, audioId);
         } catch (runError) {
             console.error('Failed to start audio metadata run:', runError);
-            metadataReviewError.value = 'Failed to start metadata scan.';
+            setMetadataReviewError(audioId, 'Failed to start metadata scan.');
         } finally {
             isMetadataRunStarting.value = false;
+            if (metadataRunStartingAudioId.value === audioId) {
+                metadataRunStartingAudioId.value = null;
+            }
         }
     }
 
@@ -138,8 +170,8 @@ export function useAudioMetadataReview(options: Options) {
         }
 
         isMetadataProposalReviewing.value = true;
-        metadataReviewMessage.value = null;
-        metadataReviewError.value = null;
+        setMetadataReviewMessage(audioId, null);
+        setMetadataReviewError(audioId, null);
 
         try {
             const { data } = await window.axios.patch<{ proposal: AudioMetadataProposal }>(`/api/audio/metadata-proposals/${proposal.id}`, {
@@ -151,10 +183,10 @@ export function useAudioMetadataReview(options: Options) {
                 [audioId]: pendingProposal(data.proposal),
             };
             await options.fetchAudioDetails([audioId], true);
-            metadataReviewMessage.value = 'Metadata applied.';
+            setMetadataReviewMessage(audioId, 'Metadata applied.');
         } catch (reviewError) {
             console.error('Failed to apply audio metadata proposal:', reviewError);
-            metadataReviewError.value = 'Failed to apply metadata proposal.';
+            setMetadataReviewError(audioId, 'Failed to apply metadata proposal.');
         } finally {
             isMetadataProposalReviewing.value = false;
         }
@@ -168,8 +200,8 @@ export function useAudioMetadataReview(options: Options) {
         }
 
         isMetadataProposalReviewing.value = true;
-        metadataReviewMessage.value = null;
-        metadataReviewError.value = null;
+        setMetadataReviewMessage(audioId, null);
+        setMetadataReviewError(audioId, null);
 
         try {
             const { data } = await window.axios.patch<{ proposal: AudioMetadataProposal }>(`/api/audio/metadata-proposals/${proposal.id}`, {
@@ -179,42 +211,44 @@ export function useAudioMetadataReview(options: Options) {
                 ...metadataProposalById.value,
                 [audioId]: pendingProposal(data.proposal),
             };
-            metadataReviewMessage.value = 'Metadata proposal ignored.';
+            setMetadataReviewMessage(audioId, 'Metadata proposal ignored.');
         } catch (reviewError) {
             console.error('Failed to ignore audio metadata proposal:', reviewError);
-            metadataReviewError.value = 'Failed to ignore metadata proposal.';
+            setMetadataReviewError(audioId, 'Failed to ignore metadata proposal.');
         } finally {
             isMetadataProposalReviewing.value = false;
         }
     }
 
     function applyMetadataRunSnapshot(snapshot: AudioMetadataRunSnapshot, audioId: number | null = activeMetadataRunAudioId.value): void {
+        const snapshotAudioId = audioId ?? snapshot.run.current_file_id ?? null;
         const proposal = pendingProposal(snapshot.proposal ?? snapshot.proposals?.[0] ?? null);
 
-        if (audioId !== null) {
+        if (snapshotAudioId !== null) {
             metadataProposalById.value = {
                 ...metadataProposalById.value,
-                [audioId]: proposal,
+                [snapshotAudioId]: proposal,
             };
         }
 
         if (isMetadataRunTerminal(snapshot.run)) {
             stopMetadataRunTracking(snapshot.run.id);
-            metadataReviewMessage.value = snapshot.run.status === 'completed'
+            setMetadataReviewMessage(snapshotAudioId, snapshot.run.status === 'completed'
                 ? proposal ? 'Metadata proposal ready for review.' : 'No metadata changes found.'
-                : null;
-            metadataReviewError.value = snapshot.run.status === 'failed'
-                ? snapshot.run.error ?? 'Metadata scan failed.'
-                : metadataReviewError.value;
+                : null);
+
+            if (snapshot.run.status === 'failed') {
+                setMetadataReviewError(snapshotAudioId, snapshot.run.error ?? 'Metadata scan failed.');
+            }
 
             return;
         }
 
         activeMetadataRunId.value = snapshot.run.id;
-        activeMetadataRunAudioId.value = audioId;
-        metadataReviewMessage.value = snapshot.run.status === 'pending'
+        activeMetadataRunAudioId.value = snapshotAudioId;
+        setMetadataReviewMessage(snapshotAudioId, snapshot.run.status === 'pending'
             ? 'Metadata scan queued.'
-            : metadataRunProgressMessage(snapshot.run);
+            : metadataRunProgressMessage(snapshot.run));
         startMetadataRunEcho(snapshot.run.id);
         scheduleMetadataRunPoll();
     }
@@ -296,7 +330,7 @@ export function useAudioMetadataReview(options: Options) {
             applyMetadataRunSnapshot(data);
         } catch (runError) {
             console.error('Failed to poll audio metadata run:', runError);
-            metadataReviewError.value = 'Failed to refresh metadata scan progress.';
+            setMetadataReviewError(activeMetadataRunAudioId.value, 'Failed to refresh metadata scan progress.');
             stopMetadataRunTracking(runId);
         }
     }
@@ -364,7 +398,7 @@ export function useAudioMetadataReview(options: Options) {
         isMetadataProposalReviewing,
         isMetadataRunStarting: isTrackMetadataRunBusy,
         isTrackDetailsSheetOpen,
-        metadataReviewError,
-        metadataReviewMessage,
+        metadataReviewError: visibleMetadataReviewError,
+        metadataReviewMessage: visibleMetadataReviewMessage,
     };
 }
