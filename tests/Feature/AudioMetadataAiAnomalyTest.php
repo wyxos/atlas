@@ -13,7 +13,7 @@ use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
-test('local ai can bridge fingerprint identity to discogs original language aliases', function () {
+test('local ai can bridge fingerprint identity to discogs original language metadata', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
         'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
@@ -130,14 +130,8 @@ test('local ai can bridge fingerprint identity to discogs original language alia
         ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz_ai_discogs')
         ->assertJsonPath('proposal.confidence', 96)
         ->assertJsonPath('proposal.proposed_values.title', 'チャリンコ大捜査線')
-        ->assertJsonPath('proposal.proposed_values.title_aliases', ['Bike Investigation'])
         ->assertJsonPath('proposal.proposed_values.artists', ['本間勇輔'])
-        ->assertJsonPath('proposal.proposed_values.artist_aliases', ['Yusuke Honma', 'Yusuke Homma'])
         ->assertJsonPath('proposal.proposed_values.album', 'TVアニメーション GTO オリジナルサウンドトラック')
-        ->assertJsonPath('proposal.proposed_values.album_aliases', [
-            'TV Animation GTO Original Soundtrack',
-            'GTO TV Animation Original Soundtrack',
-        ])
         ->assertJsonPath('proposal.proposed_values.track_number', '2')
         ->assertJsonPath('proposal.proposed_values.release_label', 'SPE Visual Works')
         ->assertJsonPath('proposal.proposed_values.catalog_number', 'SVWC 1405')
@@ -148,7 +142,10 @@ test('local ai can bridge fingerprint identity to discogs original language alia
         ->assertJsonPath('proposal.evidence.ai_review.verdict', 'accept')
         ->assertJsonPath('proposal.evidence.ai_review.model', 'qwen-test')
         ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '2')
-        ->assertJsonPath('proposal.evidence.discogs_release_id', '17124567');
+        ->assertJsonPath('proposal.evidence.discogs_release_id', '17124567')
+        ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
+        ->assertJsonMissingPath('proposal.proposed_values.artist_aliases')
+        ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
 });
 
 test('local ai can expand discogs search queries before reviewing a release anomaly', function () {
@@ -302,9 +299,7 @@ test('local ai can expand discogs search queries before reviewing a release anom
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz_ai_discogs')
         ->assertJsonPath('proposal.proposed_values.title', 'Onizuka暴発へのプロローグ')
-        ->assertJsonPath('proposal.proposed_values.title_aliases', ['Onizuka Bouhatsu E No Prologue'])
         ->assertJsonPath('proposal.proposed_values.album', 'GTO Original Soundtrack 2')
-        ->assertJsonPath('proposal.proposed_values.album_aliases', ['GTO TV Animation Original Soundtrack 2'])
         ->assertJsonPath('proposal.proposed_values.track_number', '10')
         ->assertJsonPath('proposal.proposed_values.release_label', 'Miya Records')
         ->assertJsonPath('proposal.proposed_values.catalog_number', 'MICA-0044')
@@ -314,7 +309,9 @@ test('local ai can expand discogs search queries before reviewing a release anom
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/gto-2-primary.jpg')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.release_title', 'GTO Original Soundtrack 2')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.artist', 'Yusuke Homma')
-        ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '10');
+        ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '10')
+        ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
+        ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
 
     expect($aiCalls)->toBe(2)
         ->and($discogsSearches)->toContain([

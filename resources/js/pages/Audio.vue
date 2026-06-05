@@ -365,9 +365,11 @@ const {
     handleBatchMetadataRun,
     handleMetadataProposalApply,
     handleMetadataProposalIgnore,
+    handleRestoreMetadataFromFile,
     handleTrackMetadataRun,
     isMetadataProposalLoading,
     isMetadataProposalReviewing,
+    isMetadataRestoring,
     isMetadataRunStarting,
     isTrackDetailsSheetOpen,
     metadataReviewError,
@@ -474,15 +476,12 @@ onUnmounted(() => {
             />
             <AudioTrackDetailsSheet
                 v-model:open="isTrackDetailsSheetOpen"
-                :track="detailsSheetTrack"
-                :proposal="detailsSheetProposal"
-                :is-proposal-loading="isMetadataProposalLoading"
-                :is-running="isMetadataRunStarting"
-                :is-reviewing="isMetadataProposalReviewing"
-                :message="metadataReviewMessage"
-                :error="metadataReviewError"
+                :track="detailsSheetTrack" :proposal="detailsSheetProposal"
+                :is-proposal-loading="isMetadataProposalLoading" :is-running="isMetadataRunStarting"
+                :is-reviewing="isMetadataProposalReviewing" :is-restoring="isMetadataRestoring"
+                :message="metadataReviewMessage" :error="metadataReviewError"
                 @run-metadata="handleTrackMetadataRun"
-                @apply-proposal="handleMetadataProposalApply"
+                @restore-from-file="handleRestoreMetadataFromFile" @apply-proposal="handleMetadataProposalApply"
                 @ignore-proposal="handleMetadataProposalIgnore"
             />
 

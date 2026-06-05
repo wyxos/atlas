@@ -56,9 +56,6 @@ test('fingerprint metadata follows up musicbrainz recording releases when acoust
                     'artist' => [
                         'name' => '榊原ゆい',
                         'sort-name' => 'Sakakibara, Yui',
-                        'aliases' => [
-                            ['name' => 'Sakakibara Yui'],
-                        ],
                     ],
                 ],
             ],
@@ -150,18 +147,8 @@ test('fingerprint metadata follows up musicbrainz recording releases when acoust
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
         ->assertJsonPath('proposal.proposed_values.title', '刻司ル十二ノ盟約')
-        ->assertJsonPath('proposal.proposed_values.title_aliases', ['Tokitsukasadoru Juuni no Meiyaku'])
         ->assertJsonPath('proposal.proposed_values.artists', ['ファンタズム', 'FES', '榊原ゆい'])
-        ->assertJsonPath('proposal.proposed_values.artist_aliases', [
-            'Sakakibara Yui',
-            'Yui Sakakibara',
-        ])
-        ->assertJsonPath('proposal.proposed_values.artist_alias_map.榊原ゆい', [
-            'Sakakibara Yui',
-            'Yui Sakakibara',
-        ])
         ->assertJsonPath('proposal.proposed_values.album', '刻司ル十二ノ盟約')
-        ->assertJsonPath('proposal.proposed_values.album_aliases', ['Tokitsukasadoru Juuni no Meiyaku'])
         ->assertJsonPath('proposal.proposed_values.track_number', '1')
         ->assertJsonPath('proposal.proposed_values.release_label', '5pb. Records')
         ->assertJsonPath('proposal.proposed_values.catalog_number', 'MFCZ-1008')
@@ -172,5 +159,9 @@ test('fingerprint metadata follows up musicbrainz recording releases when acoust
         ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'tokitsukasadoru-release')
         ->assertJsonPath('proposal.evidence.identity_support', 'strong_fingerprint_release')
         ->assertJsonPath('proposal.evidence.musicbrainz_release_id', 'tokitsukasadoru-release')
+        ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
+        ->assertJsonMissingPath('proposal.proposed_values.artist_aliases')
+        ->assertJsonMissingPath('proposal.proposed_values.artist_alias_map')
+        ->assertJsonMissingPath('proposal.proposed_values.album_aliases')
         ->assertJsonMissingPath('proposal.proposed_values.cover_url');
 });

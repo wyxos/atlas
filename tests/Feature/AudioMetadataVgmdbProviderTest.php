@@ -176,15 +176,8 @@ test('vgmdb supplements a strong musicbrainz fingerprint release with cover art 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz_vgmdb')
         ->assertJsonPath('proposal.proposed_values.title', '刻司ル十二ノ盟約')
-        ->assertJsonPath('proposal.proposed_values.title_aliases', [
-            'Tokitsukasadoru Juuni no Meiyaku',
-        ])
         ->assertJsonPath('proposal.proposed_values.artists', ['ファンタズム', 'FES', '榊原ゆい'])
         ->assertJsonPath('proposal.proposed_values.album', '刻司ル十二ノ盟約')
-        ->assertJsonPath('proposal.proposed_values.album_aliases', [
-            'Tokitsukasadoru Juuni no Meiyaku',
-            'Toki Tsukasadoru Juuni no Meiyaku',
-        ])
         ->assertJsonPath('proposal.proposed_values.release_label', '5pb. Records')
         ->assertJsonPath('proposal.proposed_values.catalog_number', 'MFCZ-1008')
         ->assertJsonPath('proposal.proposed_values.release_date', '2011-05-25')
@@ -192,7 +185,9 @@ test('vgmdb supplements a strong musicbrainz fingerprint release with cover art 
         ->assertJsonPath('proposal.proposed_values.disc_number', '1')
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://vgmdb.test/covers/23849-front.jpg')
         ->assertJsonPath('proposal.evidence.vgmdb_album_id', '23849')
-        ->assertJsonPath('proposal.evidence.cover_source', 'vgmdb');
+        ->assertJsonPath('proposal.evidence.cover_source', 'vgmdb')
+        ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
+        ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
 });
 
 test('vgmdb lookup stops after a transport failure', function () {

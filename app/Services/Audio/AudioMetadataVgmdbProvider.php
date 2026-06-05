@@ -58,10 +58,8 @@ class AudioMetadataVgmdbProvider
         return $this->uniqueStrings([
             $relatedCandidate['values']['album'] ?? null,
             $currentValues['album'] ?? null,
-            ...$this->values->cleanStringList($currentValues['album_aliases'] ?? []),
             $relatedCandidate['values']['title'] ?? null,
             $currentValues['title'] ?? null,
-            ...$this->values->cleanStringList($currentValues['title_aliases'] ?? []),
             pathinfo($file->filename, PATHINFO_FILENAME),
         ], 6);
     }
@@ -140,9 +138,7 @@ class AudioMetadataVgmdbProvider
 
         if ($this->matchesAny($albumNames, [
             $currentValues['album'] ?? null,
-            ...$this->values->cleanStringList($currentValues['album_aliases'] ?? []),
             $relatedCandidate['values']['album'] ?? null,
-            ...$this->values->cleanStringList($relatedCandidate['values']['album_aliases'] ?? []),
         ])) {
             $confidence += 17;
             $matchedFields[] = 'album';
@@ -210,7 +206,6 @@ class AudioMetadataVgmdbProvider
         $values = [];
         $albumCanonical = $this->canonicalName($albumNames);
         $this->putIfPresent($values, 'album', $albumCanonical);
-        $this->putIfPresent($values, 'album_aliases', $this->aliases($albumNames, $albumCanonical));
         $this->putIfPresent($values, 'release_label', $this->firstNamedItem($album['publisher'] ?? null) ?? $this->firstNamedItem($album['distributor'] ?? null));
         $this->putIfPresent($values, 'catalog_number', $this->values->cleanString($album['catalog'] ?? null));
         $this->putIfPresent($values, 'release_date', $this->values->cleanString($album['release_date'] ?? null));
@@ -221,7 +216,6 @@ class AudioMetadataVgmdbProvider
             $trackNames = $this->names($trackMatch['track']['names'] ?? [], null);
             $trackCanonical = $this->canonicalName($trackNames);
             $this->putIfPresent($values, 'title', $trackCanonical);
-            $this->putIfPresent($values, 'title_aliases', $this->aliases($trackNames, $trackCanonical));
             $this->putIfPresent($values, 'track_number', $trackMatch['track_number']);
             $this->putIfPresent($values, 'disc_number', $trackMatch['disc_number']);
             $this->putIfPresent($values, 'duration_seconds', $this->durationSeconds($trackMatch['track']['track_length'] ?? null));
@@ -240,9 +234,7 @@ class AudioMetadataVgmdbProvider
     {
         $titles = $this->uniqueStrings([
             $currentValues['title'] ?? null,
-            ...$this->values->cleanStringList($currentValues['title_aliases'] ?? []),
             $relatedCandidate['values']['title'] ?? null,
-            ...$this->values->cleanStringList($relatedCandidate['values']['title_aliases'] ?? []),
         ]);
         if ($titles === []) {
             return null;
@@ -361,16 +353,6 @@ class AudioMetadataVgmdbProvider
     private function canonicalName(array $names): ?string
     {
         return $this->values->cleanString($names[0] ?? null);
-    }
-
-    private function aliases(array $names, ?string $canonical): array
-    {
-        $canonicalKey = $canonical !== null ? $this->normalizedIdentity($canonical) : null;
-
-        return array_values(array_filter(
-            $this->uniqueStrings($names),
-            fn (string $name): bool => $canonicalKey === null || $this->normalizedIdentity($name) !== $canonicalKey,
-        ));
     }
 
     /**

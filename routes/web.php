@@ -132,6 +132,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/audio/metadata-runs/{audioMetadataRun}', [\App\Http\Controllers\AudioMetadataController::class, 'showRun'])->name('api.audio.metadata-runs.show');
     Route::patch('/api/audio/metadata-proposals/{audioMetadataProposal}', [\App\Http\Controllers\AudioMetadataController::class, 'review'])->name('api.audio.metadata-proposals.review');
     Route::get('/api/audio/{file}/metadata-proposals/latest', [\App\Http\Controllers\AudioMetadataController::class, 'latestForFile'])->name('api.audio.files.metadata-proposals.latest');
+    Route::post('/api/audio/{file}/metadata/restore-from-file', [\App\Http\Controllers\AudioMetadataController::class, 'restoreFromFile'])->name('api.audio.files.metadata.restore-from-file');
     Route::post('/api/audio/{file}/metadata-runs', [\App\Http\Controllers\AudioMetadataController::class, 'storeForFile'])->name('api.audio.files.metadata-runs.store');
     Route::post('/api/audio/playback-events', [\App\Http\Controllers\AudioPlaybackEventController::class, 'store'])->name('api.audio.playback-events.store');
     Route::get('/api/audio/album-covers/{albumCover}', [\App\Http\Controllers\AlbumCoverController::class, 'show'])->name('api.audio.album-covers.show');

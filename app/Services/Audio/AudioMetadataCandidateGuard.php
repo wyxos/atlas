@@ -76,9 +76,7 @@ class AudioMetadataCandidateGuard
     {
         foreach ([
             $candidate['values']['title'] ?? null,
-            ...$this->stringList($candidate['values']['title_aliases'] ?? []),
             $currentValues['title'] ?? null,
-            ...$this->stringList($currentValues['title_aliases'] ?? []),
         ] as $title) {
             $title = $this->cleanString($title);
             if ($title !== null && $this->sameIdentity($proposedAlbum, $title)) {

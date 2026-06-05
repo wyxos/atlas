@@ -152,7 +152,7 @@ class AudioMetadataProposalService
                 'poster_path',
                 'listing_metadata',
             ])
-            ->with(['metadata', 'metadataAliases', 'artists.metadataAliases', 'albums.defaultCover', 'albums.metadataAliases'])
+            ->with(['metadata', 'artists', 'albums.defaultCover'])
             ->chunkById(self::BATCH_SIZE, function (Collection $files) use ($run, $user): void {
                 foreach ($files as $file) {
                     $this->processFile($run, $file, $user);

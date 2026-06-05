@@ -173,11 +173,10 @@ class AudioMetadataDiscogsProvider
     {
         $values = [];
         $releaseTitle = $this->values->cleanString($release['title'] ?? null);
-        $releaseTitleParts = $this->sourceTitleParts($releaseTitle);
+        $releaseTitle = $this->sourceTitleCanonical($releaseTitle);
 
         if (in_array('album', $matchedFields, true) || in_array('artists', $matchedFields, true)) {
-            $this->putIfPresent($values, 'album', $releaseTitleParts['canonical']);
-            $this->putIfPresent($values, 'album_aliases', $releaseTitleParts['aliases']);
+            $this->putIfPresent($values, 'album', $releaseTitle);
         }
 
         if (in_array('artists', $matchedFields, true)) {
@@ -193,9 +192,8 @@ class AudioMetadataDiscogsProvider
         $this->putIfPresent($values, 'cover_url', $this->coverUrl($release));
 
         if ($track !== null) {
-            $trackTitleParts = $this->sourceTitleParts($this->values->cleanString($track['title'] ?? null));
-            $this->putIfPresent($values, 'title', $trackTitleParts['canonical']);
-            $this->putIfPresent($values, 'title_aliases', $trackTitleParts['aliases']);
+            $trackTitle = $this->sourceTitleCanonical($this->values->cleanString($track['title'] ?? null));
+            $this->putIfPresent($values, 'title', $trackTitle);
             $this->putIfPresent($values, 'track_number', $this->trackNumber($track));
             $this->putIfPresent($values, 'disc_number', $this->discNumber($track));
             $this->putIfPresent($values, 'duration_seconds', $this->discogsDurationSeconds($track['duration'] ?? null));
@@ -204,14 +202,11 @@ class AudioMetadataDiscogsProvider
         return $values;
     }
 
-    /**
-     * @return array{canonical:string|null,aliases:list<string>}
-     */
-    private function sourceTitleParts(?string $title): array
+    private function sourceTitleCanonical(?string $title): ?string
     {
         $title = $this->values->cleanString($title);
         if ($title === null) {
-            return ['canonical' => null, 'aliases' => []];
+            return null;
         }
 
         $parts = array_values(array_filter(
@@ -219,14 +214,7 @@ class AudioMetadataDiscogsProvider
             fn (?string $part): bool => $part !== null
         ));
 
-        if (count($parts) < 2) {
-            return ['canonical' => $title, 'aliases' => []];
-        }
-
-        return [
-            'canonical' => $parts[0],
-            'aliases' => array_values(array_unique(array_slice($parts, 1))),
-        ];
+        return $parts[0] ?? $title;
     }
 
     /**

@@ -269,8 +269,8 @@ class AudioMetadataCandidateEnricher
         ?array $searchQuery = null,
     ): array {
         $releaseId = $this->values->cleanString($release['id'] ?? null);
-        $releaseTitleParts = $this->sourceTitleParts($this->values->cleanString($release['title'] ?? null));
-        $trackTitleParts = $this->sourceTitleParts($this->values->cleanString($track['title'] ?? null));
+        $releaseTitle = $this->sourceTitleCanonical($this->values->cleanString($release['title'] ?? null));
+        $trackTitle = $this->sourceTitleCanonical($this->values->cleanString($track['title'] ?? null));
 
         $candidate['provider'] = $provider;
         $candidate['confidence'] = min(96, max($candidate['confidence'], (int) round(((float) ($review['confidence'] ?? 0)) * 100)));
@@ -278,23 +278,8 @@ class AudioMetadataCandidateEnricher
             $this->putIfPresent($candidate['values'], 'artists', $this->releaseArtists($release));
         }
 
-        $candidate['values']['title'] = $trackTitleParts['canonical'];
-        $candidate['values']['title_aliases'] = $this->uniqueValues([
-            ...$trackTitleParts['aliases'],
-            ...$this->values->cleanStringList($review['title_aliases'] ?? []),
-            $currentValues['title'] ?? null,
-        ], $trackTitleParts['canonical']);
-        $candidate['values']['album'] = $releaseTitleParts['canonical'];
-        $candidate['values']['album_aliases'] = $this->uniqueValues([
-            ...$releaseTitleParts['aliases'],
-            ...$this->values->cleanStringList($review['album_aliases'] ?? []),
-            $currentValues['album'] ?? null,
-        ], $releaseTitleParts['canonical']);
-        $candidate['values']['artist_aliases'] = $this->uniqueValues([
-            ...$this->values->cleanStringList($review['artist_aliases'] ?? []),
-            ...($currentValues['artists'] ?? []),
-            ...$this->releaseArtists($release),
-        ], $candidate['values']['artists'] ?? []);
+        $candidate['values']['title'] = $trackTitle;
+        $candidate['values']['album'] = $releaseTitle;
         $candidate['values']['track_number'] = $this->trackNumber($track);
         $candidate['values']['disc_number'] = $this->discNumber($track);
         $this->putIfPresent($candidate['values'], 'release_label', $this->firstLabelName($release));
@@ -338,14 +323,11 @@ class AudioMetadataCandidateEnricher
         return null;
     }
 
-    /**
-     * @return array{canonical:string|null,aliases:list<string>}
-     */
-    private function sourceTitleParts(?string $title): array
+    private function sourceTitleCanonical(?string $title): ?string
     {
         $title = $this->values->cleanString($title);
         if ($title === null) {
-            return ['canonical' => null, 'aliases' => []];
+            return null;
         }
 
         $parts = array_values(array_filter(
@@ -353,28 +335,7 @@ class AudioMetadataCandidateEnricher
             fn (?string $part): bool => $part !== null
         ));
 
-        return count($parts) < 2
-            ? ['canonical' => $title, 'aliases' => []]
-            : ['canonical' => $parts[0], 'aliases' => array_values(array_unique(array_slice($parts, 1)))];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function uniqueValues(array $values, mixed $exclude = null): array
-    {
-        $excluded = $this->values->cleanStringList($exclude);
-        $unique = [];
-
-        foreach ($this->values->cleanStringList($values) as $value) {
-            if (in_array($value, $excluded, true)) {
-                continue;
-            }
-
-            $unique[$this->values->normalizeName($value)] = $value;
-        }
-
-        return array_values($unique);
+        return $parts[0] ?? $title;
     }
 
     private function releaseArtists(array $release): array

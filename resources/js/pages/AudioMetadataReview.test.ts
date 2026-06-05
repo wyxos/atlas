@@ -482,7 +482,7 @@ describe('Audio metadata review', () => {
         expect(document.body.textContent).toContain('Tagged Track');
     });
 
-    it('renders and applies metadata alias proposals', async () => {
+    it('hides stale metadata alias fields and applies canonical fields only', async () => {
         mockAxios.get.mockImplementation(async (url: string) => {
             if (url === '/api/audio/ids') {
                 return {
@@ -546,18 +546,19 @@ describe('Audio metadata review', () => {
         await flushPromises();
 
         expect(document.body.textContent).toContain('AcoustID / MusicBrainz / AI / Discogs - 96%');
-        expect(document.body.textContent).toContain('Title aliases');
+        expect(document.body.textContent).not.toContain('Title aliases');
         expect(document.body.textContent).toContain('Theme from GTO');
-        expect(document.body.textContent).toContain('Album aliases');
+        expect(document.body.textContent).not.toContain('Album aliases');
         expect(document.body.textContent).toContain('TVアニメーション GTO オリジナルサウンドトラック');
-        expect(document.body.textContent).toContain('TV Animation GTO Original Soundtrack');
+        expect(document.body.textContent).not.toContain('TV Animation GTO Original Soundtrack');
 
         (document.body.querySelector('[data-test="audio-metadata-apply"]') as HTMLButtonElement).click();
         await flushPromises();
 
         expect(mockAxios.patch).toHaveBeenCalledWith('/api/audio/metadata-proposals/23', {
             action: 'apply',
-            fields: ['title', 'title_aliases', 'album', 'album_aliases'],
+            fields: ['title', 'album'],
         });
     });
+
 });

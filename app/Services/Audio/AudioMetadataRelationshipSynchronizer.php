@@ -9,10 +9,6 @@ use Illuminate\Database\Eloquent\Builder;
 
 class AudioMetadataRelationshipSynchronizer
 {
-    public function __construct(
-        private readonly AudioMetadataAliasService $aliases,
-    ) {}
-
     /**
      * @param  list<string>  $names
      */
@@ -27,14 +23,12 @@ class AudioMetadataRelationshipSynchronizer
                 ->first();
 
             if ($existingArtist instanceof Artist && $currentArtist instanceof Artist && $existingArtist->isNot($currentArtist)) {
-                $this->aliases->store($existingArtist, 'name', [$currentArtist->name], 'previous_import', 'atlas', null, $existingArtist->name);
                 $file->artists()->sync([$existingArtist->id]);
 
                 return;
             }
 
             if ($currentArtist instanceof Artist) {
-                $this->aliases->store($currentArtist, 'name', [$currentArtist->name], 'previous_import', 'atlas', null, $name);
                 $currentArtist->forceFill([
                     'name' => $name,
                     'normalized_name' => $normalizedName,
@@ -65,16 +59,10 @@ class AudioMetadataRelationshipSynchronizer
         $normalizedName = $this->normalizeName($name);
         $artistIds = $file->artists->pluck('id')->filter()->values();
         $file->loadMissing('albums');
-        $currentAlbumNames = $file->albums
-            ->map(fn (Album $album): string => trim($album->name))
-            ->filter(fn (string $name): bool => $name !== '')
-            ->values()
-            ->all();
         $currentAlbum = $file->albums->count() === 1 ? $file->albums->first() : null;
 
         $album = $this->albumForRelease($proposed)
             ?? $this->albumForNameAndArtists($normalizedName, $artistIds->all())
-            ?? $this->albumForAliasAndArtists($normalizedName, $artistIds->all())
             ?? $this->albumForNameWithReleaseEvidence($normalizedName, $proposed);
 
         if (! $album instanceof Album && $currentAlbum instanceof Album) {
@@ -87,7 +75,6 @@ class AudioMetadataRelationshipSynchronizer
         ]);
 
         if ($album->name !== $name || $album->normalized_name !== $normalizedName) {
-            $this->aliases->store($album, 'name', [$album->name], 'previous_import', 'atlas', null, $name);
             $album->forceFill([
                 'name' => $name,
                 'normalized_name' => $normalizedName,
@@ -95,7 +82,6 @@ class AudioMetadataRelationshipSynchronizer
         }
 
         $file->albums()->sync([$album->id]);
-        $this->aliases->store($album, 'name', $currentAlbumNames, 'previous_import', 'atlas', null, $album->name);
     }
 
     /**
@@ -174,26 +160,6 @@ class AudioMetadataRelationshipSynchronizer
         return Album::query()
             ->withCount('files')
             ->where('normalized_name', $normalizedName)
-            ->whereHas('files.artists', fn (Builder $query) => $query->whereKey($artistIds))
-            ->orderByDesc('files_count')
-            ->orderBy('id')
-            ->first();
-    }
-
-    /**
-     * @param  list<int>  $artistIds
-     */
-    private function albumForAliasAndArtists(string $normalizedName, array $artistIds): ?Album
-    {
-        if ($artistIds === []) {
-            return null;
-        }
-
-        return Album::query()
-            ->withCount('files')
-            ->whereHas('metadataAliases', fn (Builder $query) => $query
-                ->where('field', 'name')
-                ->where('normalized_value', $normalizedName))
             ->whereHas('files.artists', fn (Builder $query) => $query->whereKey($artistIds))
             ->orderByDesc('files_count')
             ->orderBy('id')

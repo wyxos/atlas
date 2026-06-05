@@ -60,7 +60,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, mixed>  $source
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null,title_aliases:list<string>,artist_aliases:list<string>,album_aliases:list<string>}|null
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null}|null
      */
     public function resolveAnomaly(File $file, array $currentValues, array $candidate, array $source): ?array
     {
@@ -250,9 +250,6 @@ class AudioMetadataAiReviewer
                 'title' => $currentValues['title'] ?? null,
                 'artists' => $currentValues['artists'] ?? [],
                 'album' => $currentValues['album'] ?? null,
-                'title_aliases' => $currentValues['title_aliases'] ?? [],
-                'artist_aliases' => $currentValues['artist_aliases'] ?? [],
-                'album_aliases' => $currentValues['album_aliases'] ?? [],
                 'duration_seconds' => $currentValues['duration_seconds'] ?? null,
             ],
             'fingerprint_candidate' => [
@@ -287,7 +284,7 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null,title_aliases:list<string>,artist_aliases:list<string>,album_aliases:list<string>}
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null}
      */
     private function normalizeAnomalyResponse(array $payload): array
     {
@@ -295,9 +292,6 @@ class AudioMetadataAiReviewer
             ...$this->normalizeResponse($payload),
             'selected_track_position' => $this->cleanString($payload['selected_track_position'] ?? null),
             'selected_track_title' => $this->cleanString($payload['selected_track_title'] ?? null),
-            'title_aliases' => $this->cleanStringList($payload['title_aliases'] ?? []),
-            'artist_aliases' => $this->cleanStringList($payload['artist_aliases'] ?? []),
-            'album_aliases' => $this->cleanStringList($payload['album_aliases'] ?? []),
         ];
     }
 
@@ -399,13 +393,13 @@ class AudioMetadataAiReviewer
     private function anomalyPrompt(array $input): string
     {
         return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason","selected_track_position":"2","selected_track_title":"source track title","title_aliases":["alias"],"artist_aliases":["alias"],"album_aliases":["alias"]}.',
+            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason","selected_track_position":"2","selected_track_title":"source track title"}.',
             'Allowed verdict values: accept, reject, ambiguous.',
             'Use accept only when the fingerprint candidate and source release are likely the same recording/release, and one listed source track plausibly represents the current track under another language, romanization, or import/custom title.',
             'Use reject when the source release or selected track points to a different work.',
             'Use ambiguous when the listed evidence is plausible but insufficient.',
             'Do not invent canonical titles, artists, albums, release details, IDs, or track positions. Select one track from the supplied source.tracklist only.',
-            'Canonical/source fields should be original/source values. Current English, romanized, import, or custom names belong in alias arrays.',
+            'Canonical/source fields should be original/source values from the selected release or track.',
             'Evidence JSON:',
             json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]);
@@ -419,7 +413,7 @@ class AudioMetadataAiReviewer
         return implode("\n", [
             'Return only JSON in this exact shape: {"queries":[{"release_title":"album or release search title","artist":"artist search name","reason":"short reason"}],"model":"model-name"}.',
             'Suggest at most 5 Discogs release searches that could retrieve the source release for this audio track.',
-            'Use current values, aliases, filename hints, and fingerprint candidate values to bridge romanization, translation, alternate spellings, import titles, soundtrack numbering, and source/original language differences.',
+            'Use current values, filename hints, and fingerprint candidate values to bridge romanization, translation, alternate spellings, import titles, soundtrack numbering, and source/original language differences.',
             'Do not invent final metadata. These are search queries only.',
             'Prefer concise release titles and likely Discogs artist spellings.',
             'Evidence JSON:',
@@ -436,30 +430,6 @@ class AudioMetadataAiReviewer
         $clean = preg_replace('/\s+/', ' ', trim((string) $value)) ?? '';
 
         return $clean !== '' ? $clean : null;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function cleanStringList(mixed $value): array
-    {
-        if (is_string($value) || is_numeric($value)) {
-            $value = [$value];
-        }
-
-        if (! is_array($value)) {
-            return [];
-        }
-
-        $values = [];
-        foreach ($value as $item) {
-            $clean = $this->cleanString($item);
-            if ($clean !== null) {
-                $values[$clean] = $clean;
-            }
-        }
-
-        return array_values($values);
     }
 
     private function host(string $url): ?string

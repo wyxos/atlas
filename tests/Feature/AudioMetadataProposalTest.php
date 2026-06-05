@@ -244,11 +244,13 @@ test('metadata proposal can apply selected fields to canonical audio metadata', 
         ->assertJsonPath('proposal.status', 'applied');
 
     $file = $file->fresh();
+    $payload = $file->metadata()->first()?->payload ?? [];
+
     expect($file->title)->toBe('Proposed Title')
         ->and($file->artists()->pluck('name')->all())->toBe(['Artist A'])
         ->and($file->albums()->pluck('name')->all())->toBe(['Album A'])
-        ->and($file->metadata()->first()?->payload['audio']['aliases']['title'] ?? [])->toBe(['Original Title'])
-        ->and($file->metadata()->first()?->payload['duration_seconds'] ?? null)->toBe(212);
+        ->and($payload['audio']['aliases'] ?? null)->toBeNull()
+        ->and($payload['duration_seconds'] ?? null)->toBe(212);
 });
 
 test('metadata proposal can apply release details and track numbers from embedded tags', function () {
@@ -475,12 +477,10 @@ test('latest proposal endpoint returns the current user pending proposal only', 
         'title' => 'Original Title',
     ]);
     $file->metadata()->create(['payload' => ['title' => 'Proposed Title']]);
-
     $this->actingAs($otherUser)->postJson("/api/audio/{$file->id}/metadata-runs");
     $proposalId = $this->actingAs($user)
         ->postJson("/api/audio/{$file->id}/metadata-runs")
         ->json('proposal.id');
-
     $response = $this->actingAs($user)->getJson("/api/audio/{$file->id}/metadata-proposals/latest");
 
     $response->assertSuccessful()

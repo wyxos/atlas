@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { RefreshCw, Tags } from 'lucide-vue-next';
+import { RefreshCw, RotateCcw, Tags } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import type { AudioMetadataProposal } from '@/types/audio';
@@ -17,11 +17,8 @@ type TrackDetails = {
 
 const METADATA_FIELD_ORDER = [
     'title',
-    'title_aliases',
     'artists',
-    'artist_aliases',
     'album',
-    'album_aliases',
     'track_number',
     'disc_number',
     'duration_seconds',
@@ -38,6 +35,13 @@ const METADATA_FIELD_ORDER = [
     'spotify_uri',
 ];
 
+const HIDDEN_METADATA_FIELDS = [
+    'title_aliases',
+    'artist_aliases',
+    'album_aliases',
+    'artist_alias_map',
+];
+
 const props = defineProps<{
     open: boolean;
     track: TrackDetails | null;
@@ -45,6 +49,7 @@ const props = defineProps<{
     isProposalLoading: boolean;
     isRunning: boolean;
     isReviewing: boolean;
+    isRestoring: boolean;
     message: string | null;
     error: string | null;
 }>();
@@ -52,6 +57,7 @@ const props = defineProps<{
 const emit = defineEmits<{
     'update:open': [value: boolean];
     runMetadata: [];
+    restoreFromFile: [];
     applyProposal: [fields: string[]];
     ignoreProposal: [];
 }>();
@@ -70,7 +76,9 @@ const pendingProposal = computed(() => props.proposal?.status === 'pending' ? pr
 const proposalFields = computed(() => {
     const changes = pendingProposal.value?.changes ?? {};
 
-    return Object.keys(changes).sort((left, right) => fieldOrder(left) - fieldOrder(right));
+    return Object.keys(changes)
+        .filter((field) => !HIDDEN_METADATA_FIELDS.includes(field))
+        .sort((left, right) => fieldOrder(left) - fieldOrder(right));
 });
 
 watch(() => props.proposal?.id, () => {
@@ -91,11 +99,8 @@ function metadataActionLabel(): string {
 function fieldLabel(field: string): string {
     return {
         title: 'Title',
-        title_aliases: 'Title aliases',
         artists: 'Artists',
-        artist_aliases: 'Artist aliases',
         album: 'Album',
-        album_aliases: 'Album aliases',
         track_number: 'Track #',
         disc_number: 'Disc #',
         duration_seconds: 'Duration',
@@ -293,16 +298,31 @@ function discogsAttributionUrl(proposal: AudioMetadataProposal): string | null {
                             <p class="text-sm font-semibold text-regal-navy-100">Metadata</p>
                             <p class="text-xs text-blue-slate-300">{{ pendingProposal ? 'Proposal ready' : 'No pending proposal' }}</p>
                         </div>
-                        <Button
-                            type="button"
-                            size="sm"
-                            :disabled="props.isRunning"
-                            data-test="audio-track-metadata-run"
-                            @click="emit('runMetadata')"
-                        >
-                            <RefreshCw class="mr-2 size-4" :class="props.isRunning ? 'animate-spin' : ''" aria-hidden="true" />
-                            {{ metadataActionLabel() }}
-                        </Button>
+                        <div class="flex shrink-0 flex-wrap justify-end gap-2">
+                            <Button
+                                v-if="!isSpotifyTrack"
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                :loading="props.isRestoring"
+                                :disabled="props.isRunning || props.isReviewing || props.isRestoring"
+                                data-test="audio-track-metadata-restore"
+                                @click="emit('restoreFromFile')"
+                            >
+                                <RotateCcw class="size-4" aria-hidden="true" />
+                                Restore from file
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                :disabled="props.isRunning || props.isRestoring"
+                                data-test="audio-track-metadata-run"
+                                @click="emit('runMetadata')"
+                            >
+                                <RefreshCw class="size-4" :class="props.isRunning ? 'animate-spin' : ''" aria-hidden="true" />
+                                {{ metadataActionLabel() }}
+                            </Button>
+                        </div>
                     </div>
 
                     <p v-if="props.message" class="mt-3 rounded border border-smart-blue-400/40 bg-smart-blue-950/40 px-3 py-2 text-xs text-smart-blue-100">

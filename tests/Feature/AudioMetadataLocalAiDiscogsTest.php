@@ -145,10 +145,8 @@ test('local embedded tags can use ai discogs search expansion to propose source 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'local_ai_discogs')
         ->assertJsonPath('proposal.proposed_values.title', 'ONIZUKA暴発へのプロローグ')
-        ->assertJsonPath('proposal.proposed_values.title_aliases', ['Onizuka Bouhatsu E No Prologue'])
         ->assertJsonPath('proposal.proposed_values.artists', ['本間勇輔'])
         ->assertJsonPath('proposal.proposed_values.album', 'TVアニメーション GTO オリジナルサウンドトラック2')
-        ->assertJsonPath('proposal.proposed_values.album_aliases', ['GTO TV Animation Original Soundtrack 2'])
         ->assertJsonPath('proposal.proposed_values.track_number', '10')
         ->assertJsonPath('proposal.proposed_values.release_label', 'SPE Visual Works')
         ->assertJsonPath('proposal.proposed_values.catalog_number', 'SVWC-1309')
@@ -159,7 +157,9 @@ test('local embedded tags can use ai discogs search expansion to propose source 
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/gto-2-official.jpg')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.release_title', 'GTO TV Animation Original Soundtrack 2')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.artist', 'Yusuke Homma')
-        ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '10');
+        ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '10')
+        ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
+        ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
 
     expect($aiCalls)->toBe(2)
         ->and($discogsSearches)->toContain([

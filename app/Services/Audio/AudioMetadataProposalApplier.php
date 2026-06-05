@@ -36,7 +36,6 @@ class AudioMetadataProposalApplier
     ];
 
     public function __construct(
-        private readonly AudioMetadataAliasService $aliases,
         private readonly AudioMetadataAlbumGroupApplier $albumGroups,
         private readonly AudioMetadataRelationshipSynchronizer $relationships,
         private readonly AudioMetadataCanonicalPayloadWriter $payloads,
@@ -65,7 +64,6 @@ class AudioMetadataProposalApplier
 
             $this->applyFileFields($file, $proposed, $fields);
             $this->applyRelationshipFields($file, $proposed, $fields);
-            $this->aliases->applySelected($file, $proposal, $proposed, $fields);
             $this->applyAlbumMetadataFields($file, $proposed, $fields);
             $this->applyTrackPivotFields($file, $proposed, $fields);
             $this->applyMetadataFields($file, $proposed, $fields);
@@ -108,7 +106,6 @@ class AudioMetadataProposalApplier
         if (in_array('title', $fields, true)) {
             $title = $this->cleanString($proposed['title'] ?? null);
             if ($title !== null) {
-                $this->preserveTitleAlias($file, $title);
                 $file->forceFill(['title' => $title]);
             }
         }
@@ -350,43 +347,6 @@ class AudioMetadataProposalApplier
         }
 
         return array_values(array_intersect($changes, $fields));
-    }
-
-    private function preserveTitleAlias(File $file, string $canonicalTitle): void
-    {
-        $payload = is_array($file->metadata?->payload) ? $file->metadata->payload : [];
-        $aliases = [];
-        $canonicalKey = $this->normalizeName($canonicalTitle);
-
-        foreach ($this->cleanStringList(data_get($payload, 'audio.aliases.title', [])) as $alias) {
-            $aliasKey = $this->normalizeName($alias);
-            if ($aliasKey !== $canonicalKey) {
-                $aliases[$aliasKey] = $alias;
-            }
-        }
-
-        foreach ([
-            $file->title,
-            data_get($payload, 'title'),
-            data_get($payload, 'probe.format.tags.title'),
-        ] as $candidate) {
-            $alias = $this->cleanString($candidate);
-            if ($alias === null) {
-                continue;
-            }
-
-            $aliasKey = $this->normalizeName($alias);
-            if ($aliasKey !== $canonicalKey) {
-                $aliases[$aliasKey] = $alias;
-            }
-        }
-
-        if ($aliases === []) {
-            return;
-        }
-
-        $this->aliases->store($file, 'title', array_values($aliases), 'previous_import', 'atlas', null, $canonicalTitle);
-        $this->payloads->merge($file, ['audio' => ['aliases' => ['title' => array_values($aliases)]]]);
     }
 
     private function isSpotifyFile(File $file): bool

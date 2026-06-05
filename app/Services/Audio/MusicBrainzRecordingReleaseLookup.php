@@ -20,7 +20,6 @@ class MusicBrainzRecordingReleaseLookup
         if (
             is_array($recording['releases'] ?? null)
             && $recording['releases'] !== []
-            && $this->hasArtistAliasData($recording)
         ) {
             return $recording;
         }
@@ -46,31 +45,6 @@ class MusicBrainzRecordingReleaseLookup
         }
 
         return $recording;
-    }
-
-    /**
-     * @param  array<string, mixed>  $recording
-     */
-    private function hasArtistAliasData(array $recording): bool
-    {
-        $artistCredits = data_get($recording, 'artist-credit', []);
-        if (! is_array($artistCredits)) {
-            return false;
-        }
-
-        foreach ($artistCredits as $credit) {
-            if (
-                is_array($credit)
-                && (
-                    $this->cleanString(data_get($credit, 'artist.sort-name')) !== null
-                    || is_array(data_get($credit, 'artist.aliases'))
-                )
-            ) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

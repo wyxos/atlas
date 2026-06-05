@@ -41,6 +41,8 @@ export function useAudioMetadataReview(options: Options) {
     const activeMetadataRunId = ref<number | null>(null);
     const activeMetadataRunAudioId = ref<number | null>(null);
     const isMetadataProposalReviewing = ref(false);
+    const isMetadataRestoring = ref(false);
+    const metadataRestoringAudioId = ref<number | null>(null);
     const metadataReviewMessage = ref<string | null>(null);
     const metadataReviewMessageAudioId = ref<number | null>(null);
     const metadataReviewError = ref<string | null>(null);
@@ -57,6 +59,12 @@ export function useAudioMetadataReview(options: Options) {
             (isMetadataRunStarting.value && metadataRunStartingAudioId.value === audioId)
             || (activeMetadataRunId.value !== null && activeMetadataRunAudioId.value === audioId)
         );
+    });
+
+    const isTrackMetadataRestoring = computed(() => {
+        const audioId = detailsSheetAudioId.value;
+
+        return audioId !== null && isMetadataRestoring.value && metadataRestoringAudioId.value === audioId;
     });
 
     const visibleMetadataReviewMessage = computed(() => (
@@ -217,6 +225,36 @@ export function useAudioMetadataReview(options: Options) {
             setMetadataReviewError(audioId, 'Failed to ignore metadata proposal.');
         } finally {
             isMetadataProposalReviewing.value = false;
+        }
+    }
+
+    async function handleRestoreMetadataFromFile(): Promise<void> {
+        const audioId = detailsSheetAudioId.value;
+        if (audioId === null || isTrackMetadataRestoring.value || isTrackMetadataRunBusy.value) {
+            return;
+        }
+
+        isMetadataRestoring.value = true;
+        metadataRestoringAudioId.value = audioId;
+        setMetadataReviewMessage(audioId, null);
+        setMetadataReviewError(audioId, null);
+
+        try {
+            await window.axios.post(`/api/audio/${audioId}/metadata/restore-from-file`);
+            metadataProposalById.value = {
+                ...metadataProposalById.value,
+                [audioId]: null,
+            };
+            await options.fetchAudioDetails([audioId], true);
+            setMetadataReviewMessage(audioId, 'Metadata restored from file.');
+        } catch (restoreError) {
+            console.error('Failed to restore audio metadata from file:', restoreError);
+            setMetadataReviewError(audioId, 'Failed to restore metadata from file.');
+        } finally {
+            isMetadataRestoring.value = false;
+            if (metadataRestoringAudioId.value === audioId) {
+                metadataRestoringAudioId.value = null;
+            }
         }
     }
 
@@ -393,9 +431,11 @@ export function useAudioMetadataReview(options: Options) {
         handleBatchMetadataRun,
         handleMetadataProposalApply,
         handleMetadataProposalIgnore,
+        handleRestoreMetadataFromFile,
         handleTrackMetadataRun,
         isMetadataProposalLoading,
         isMetadataProposalReviewing,
+        isMetadataRestoring: isTrackMetadataRestoring,
         isMetadataRunStarting: isTrackMetadataRunBusy,
         isTrackDetailsSheetOpen,
         metadataReviewError: visibleMetadataReviewError,

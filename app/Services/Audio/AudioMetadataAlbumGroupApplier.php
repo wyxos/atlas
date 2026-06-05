@@ -20,7 +20,6 @@ class AudioMetadataAlbumGroupApplier
     ];
 
     public function __construct(
-        private readonly AudioMetadataAliasService $aliases,
         private readonly AudioMetadataCanonicalPayloadWriter $payloads,
         private readonly AudioAlbumFolderMatcher $albumFolders,
     ) {}
@@ -124,16 +123,6 @@ class AudioMetadataAlbumGroupApplier
                         'disc_number' => $sourceAlbum?->pivot?->disc_number,
                     ], fn (mixed $value): bool => $value !== null),
                 ]);
-
-                $this->aliases->store(
-                    $targetAlbum,
-                    'name',
-                    $peer->albums->pluck('name')->filter()->values()->all(),
-                    'previous_import',
-                    'atlas',
-                    null,
-                    $targetAlbum->name,
-                );
 
                 if ($payloadFields !== []) {
                     $this->payloads->apply($peer, $payload, $payloadFields);

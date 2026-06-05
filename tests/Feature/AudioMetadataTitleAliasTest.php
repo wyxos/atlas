@@ -1,23 +1,21 @@
 <?php
 
 use App\Models\Album;
-use App\Models\Artist;
 use App\Models\AudioMetadataProposal;
 use App\Models\AudioMetadataRun;
 use App\Models\File;
-use App\Models\FileMetadata;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
-test('metadata proposal preserves embedded title as alias when applying canonical title', function () {
+test('metadata proposal applies canonical title without preserving the old title as an alias', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
         'source' => 'local',
         'mime_type' => 'audio/mpeg',
-        'title' => null,
+        'title' => 'Custom Import Title',
         'filename' => 'custom-import-title.mp3',
     ]);
     $file->metadata()->create([
@@ -25,16 +23,7 @@ test('metadata proposal preserves embedded title as alias when applying canonica
             'title' => 'Custom Import Title',
         ],
     ]);
-    $run = AudioMetadataRun::query()->create([
-        'user_id' => $user->id,
-        'scope' => 'single',
-        'source_filter' => 'local',
-        'status' => 'completed',
-        'total_files' => 1,
-        'processed_files' => 1,
-        'proposal_count' => 1,
-        'options' => ['file_id' => $file->id],
-    ]);
+    $run = audioMetadataRun($user);
     $proposal = AudioMetadataProposal::query()->create([
         'audio_metadata_run_id' => $run->id,
         'file_id' => $file->id,
@@ -52,20 +41,20 @@ test('metadata proposal preserves embedded title as alias when applying canonica
         'evidence' => ['source' => 'discogs_release_search'],
     ]);
 
-    $response = $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposal->id}", [
+    $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposal->id}", [
         'action' => 'apply',
         'fields' => ['title'],
-    ]);
-
-    $response->assertSuccessful()
+    ])->assertSuccessful()
         ->assertJsonPath('proposal.status', 'applied');
 
-    $file = $file->fresh();
+    $file->refresh()->load('metadata');
+
     expect($file->title)->toBe('Canonical Source Title')
-        ->and($file->metadata()->first()?->payload['audio']['aliases']['title'] ?? [])->toBe(['Custom Import Title']);
+        ->and(data_get($file->metadata?->payload ?? [], 'audio.aliases'))->toBeNull()
+        ->and(DB::table('metadata_aliases')->count())->toBe(0);
 });
 
-test('metadata proposal does not re-propose an embedded title alias', function () {
+test('stale title alias rows do not suppress embedded tag proposals', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => null,
         'services.audio_metadata.discogs_token' => null,
@@ -83,21 +72,28 @@ test('metadata proposal does not re-propose an embedded title alias', function (
             'title' => 'Custom Import Title',
         ],
     ]);
-    $file->metadataAliases()->create([
+    DB::table('metadata_aliases')->insert([
+        'aliasable_type' => File::class,
+        'aliasable_id' => $file->id,
         'field' => 'title',
         'value' => 'Custom Import Title',
+        'normalized_value' => 'custom import title',
         'kind' => 'previous_import',
         'source' => 'atlas',
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('run.proposal_count', 0)
-        ->assertJsonPath('proposal', null);
+        ->assertJsonPath('run.proposal_count', 1)
+        ->assertJsonPath('proposal.provider', 'local')
+        ->assertJsonPath('proposal.proposed_values.title', 'Custom Import Title')
+        ->assertJsonMissingPath('proposal.proposed_values.title_aliases');
 });
 
-test('metadata proposal applies selected title and album aliases', function () {
+test('metadata proposal ignores stale alias changes when applying canonical fields', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
         'source' => 'local',
@@ -109,16 +105,7 @@ test('metadata proposal applies selected title and album aliases', function () {
         'normalized_name' => 'gto tv animation original soundtrack',
     ]);
     $file->albums()->sync([$album->id]);
-    $run = AudioMetadataRun::query()->create([
-        'user_id' => $user->id,
-        'scope' => 'single',
-        'source_filter' => 'local',
-        'status' => 'completed',
-        'total_files' => 1,
-        'processed_files' => 1,
-        'proposal_count' => 1,
-        'options' => ['file_id' => $file->id],
-    ]);
+    $run = audioMetadataRun($user);
     $proposal = AudioMetadataProposal::query()->create([
         'audio_metadata_run_id' => $run->id,
         'file_id' => $file->id,
@@ -127,9 +114,7 @@ test('metadata proposal applies selected title and album aliases', function () {
         'confidence' => 80,
         'current_values' => [
             'title' => 'Theme from GTO',
-            'title_aliases' => [],
             'album' => 'GTO TV Animation Original Soundtrack',
-            'album_aliases' => [],
         ],
         'proposed_values' => [
             'title' => 'The Theme From GTO',
@@ -167,12 +152,10 @@ test('metadata proposal applies selected title and album aliases', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposal->id}", [
+    $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposal->id}", [
         'action' => 'apply',
-        'fields' => ['title', 'title_aliases', 'album', 'album_aliases'],
-    ]);
-
-    $response->assertSuccessful()
+        'fields' => ['title', 'album'],
+    ])->assertSuccessful()
         ->assertJsonPath('proposal.status', 'applied');
 
     $file = $file->fresh('albums');
@@ -180,37 +163,12 @@ test('metadata proposal applies selected title and album aliases', function () {
 
     expect($file->title)->toBe('The Theme From GTO')
         ->and($canonicalAlbum?->name)->toBe('TVアニメーション GTO オリジナルサウンドトラック')
-        ->and(DB::table('metadata_aliases')
-            ->where('aliasable_type', File::class)
-            ->where('aliasable_id', $file->id)
-            ->where('field', 'title')
-            ->pluck('value')
-            ->all())->toBe(['Theme from GTO'])
-        ->and(DB::table('metadata_aliases')
-            ->where('aliasable_type', Album::class)
-            ->where('aliasable_id', $canonicalAlbum?->id)
-            ->where('field', 'name')
-            ->orderBy('value')
-            ->pluck('value')
-            ->all())->toBe([
-                'GTO TV Animation Original Soundtrack',
-                'TV Animation GTO Original Soundtrack',
-            ]);
+        ->and(DB::table('metadata_aliases')->count())->toBe(0);
 });
 
-test('metadata proposal applies mapped aliases to multiple proposed artists', function () {
-    $user = User::factory()->create();
-    $file = File::factory()->create([
-        'source' => 'local',
-        'mime_type' => 'audio/mpeg',
-        'title' => 'Tokitsukasadoru Juuni no Meiyaku',
-    ]);
-    $artist = Artist::factory()->create([
-        'name' => 'Sakakibara Yui',
-        'normalized_name' => 'sakakibara yui',
-    ]);
-    $file->artists()->sync([$artist->id]);
-    $run = AudioMetadataRun::query()->create([
+function audioMetadataRun(User $user): AudioMetadataRun
+{
+    return AudioMetadataRun::query()->create([
         'user_id' => $user->id,
         'scope' => 'single',
         'source_filter' => 'local',
@@ -218,209 +176,5 @@ test('metadata proposal applies mapped aliases to multiple proposed artists', fu
         'total_files' => 1,
         'processed_files' => 1,
         'proposal_count' => 1,
-        'options' => ['file_id' => $file->id],
     ]);
-    $proposal = AudioMetadataProposal::query()->create([
-        'audio_metadata_run_id' => $run->id,
-        'file_id' => $file->id,
-        'provider' => 'acoustid_musicbrainz',
-        'status' => 'pending',
-        'confidence' => 96,
-        'current_values' => [
-            'artists' => ['Sakakibara Yui'],
-            'artist_aliases' => [],
-        ],
-        'proposed_values' => [
-            'artists' => ['ファンタズム', 'FES', '榊原ゆい'],
-            'artist_aliases' => ['Sakakibara Yui'],
-            'artist_alias_map' => [
-                '榊原ゆい' => ['Sakakibara Yui'],
-            ],
-        ],
-        'changes' => [
-            'artists' => [
-                'current' => ['Sakakibara Yui'],
-                'proposed' => ['ファンタズム', 'FES', '榊原ゆい'],
-            ],
-            'artist_aliases' => [
-                'current' => [],
-                'proposed' => ['Sakakibara Yui'],
-            ],
-        ],
-        'evidence' => ['source' => 'musicbrainz_recording'],
-    ]);
-
-    $response = $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposal->id}", [
-        'action' => 'apply',
-        'fields' => ['artists', 'artist_aliases'],
-    ]);
-
-    $response->assertSuccessful()
-        ->assertJsonPath('proposal.status', 'applied');
-
-    $file = $file->fresh('artists.metadataAliases');
-    $artists = $file->artists->keyBy('name');
-
-    expect($artists->keys()->sort()->values()->all())->toBe(['FES', 'ファンタズム', '榊原ゆい'])
-        ->and($artists->get('榊原ゆい')?->metadataAliases->pluck('value')->all())->toBe(['Sakakibara Yui'])
-        ->and($artists->get('FES')?->metadataAliases->pluck('value')->all())->toBe([])
-        ->and($artists->get('ファンタズム')?->metadataAliases->pluck('value')->all())->toBe([]);
-});
-
-test('metadata proposal applies canonical metadata to shared audio entities and payload', function () {
-    $user = User::factory()->create();
-    $artist = Artist::factory()->create([
-        'name' => 'Yusuke Honma',
-        'normalized_name' => 'yusuke honma',
-    ]);
-    $album = Album::factory()->create([
-        'name' => 'GTO TV Animation Original Soundtrack',
-        'normalized_name' => 'gto tv animation original soundtrack',
-    ]);
-    $firstFile = File::factory()->create([
-        'source' => 'local',
-        'mime_type' => 'audio/mpeg',
-        'title' => 'Theme from GTO',
-    ]);
-    $secondFile = File::factory()->create([
-        'source' => 'local',
-        'mime_type' => 'audio/mpeg',
-        'title' => 'Bike Investigation',
-    ]);
-    foreach ([$firstFile, $secondFile] as $file) {
-        $file->artists()->sync([$artist->id]);
-        $file->albums()->sync([$album->id]);
-        $file->metadata()->create([
-            'payload' => [
-                'title' => $file->title,
-                'artist' => 'Yusuke Honma',
-                'album' => 'GTO TV Animation Original Soundtrack',
-            ],
-        ]);
-    }
-    $run = AudioMetadataRun::query()->create([
-        'user_id' => $user->id,
-        'scope' => 'single',
-        'source_filter' => 'local',
-        'status' => 'completed',
-        'total_files' => 2,
-        'processed_files' => 2,
-        'proposal_count' => 2,
-        'options' => [],
-    ]);
-    $sharedCurrentValues = [
-        'artists' => ['Yusuke Honma'],
-        'artist_aliases' => [],
-        'album' => 'GTO TV Animation Original Soundtrack',
-        'album_aliases' => [],
-        'release_label' => null,
-        'discogs_release_id' => null,
-    ];
-    $sharedProposedValues = [
-        'artists' => ['本間勇輔'],
-        'artist_aliases' => ['Yusuke Honma'],
-        'album' => 'TVアニメーション GTO オリジナルサウンドトラック',
-        'album_aliases' => [
-            'GTO TV Animation Original Soundtrack',
-            'TV Animation GTO Original Soundtrack',
-        ],
-        'release_label' => 'SPE Visual Works',
-        'discogs_release_id' => '17124567',
-    ];
-    $firstProposal = AudioMetadataProposal::query()->create([
-        'audio_metadata_run_id' => $run->id,
-        'file_id' => $firstFile->id,
-        'provider' => 'acoustid_musicbrainz_ai_discogs',
-        'status' => 'pending',
-        'confidence' => 96,
-        'current_values' => [
-            'title' => 'Theme from GTO',
-            ...$sharedCurrentValues,
-        ],
-        'proposed_values' => [
-            'title' => 'The Theme From GTO',
-            'title_aliases' => ['Theme from GTO'],
-            'track_number' => '1',
-            ...$sharedProposedValues,
-        ],
-        'changes' => [
-            'title' => ['current' => 'Theme from GTO', 'proposed' => 'The Theme From GTO'],
-            'title_aliases' => ['current' => [], 'proposed' => ['Theme from GTO']],
-            'artists' => ['current' => ['Yusuke Honma'], 'proposed' => ['本間勇輔']],
-            'artist_aliases' => ['current' => [], 'proposed' => ['Yusuke Honma']],
-            'album' => ['current' => 'GTO TV Animation Original Soundtrack', 'proposed' => 'TVアニメーション GTO オリジナルサウンドトラック'],
-            'album_aliases' => ['current' => [], 'proposed' => ['GTO TV Animation Original Soundtrack', 'TV Animation GTO Original Soundtrack']],
-            'track_number' => ['current' => null, 'proposed' => '1'],
-            'release_label' => ['current' => null, 'proposed' => 'SPE Visual Works'],
-            'discogs_release_id' => ['current' => null, 'proposed' => '17124567'],
-        ],
-        'evidence' => [
-            'source' => 'discogs_release_search',
-            'discogs_release_id' => '17124567',
-        ],
-    ]);
-    $secondProposal = AudioMetadataProposal::query()->create([
-        'audio_metadata_run_id' => $run->id,
-        'file_id' => $secondFile->id,
-        'provider' => 'acoustid_musicbrainz_ai_discogs',
-        'status' => 'pending',
-        'confidence' => 96,
-        'current_values' => [
-            'title' => 'Bike Investigation',
-            ...$sharedCurrentValues,
-        ],
-        'proposed_values' => [
-            'title' => 'チャリンコ大捜査線',
-            'title_aliases' => ['Bike Investigation'],
-            'track_number' => '2',
-            ...$sharedProposedValues,
-        ],
-        'changes' => [
-            'title' => ['current' => 'Bike Investigation', 'proposed' => 'チャリンコ大捜査線'],
-            'title_aliases' => ['current' => [], 'proposed' => ['Bike Investigation']],
-            'artists' => ['current' => ['Yusuke Honma'], 'proposed' => ['本間勇輔']],
-            'artist_aliases' => ['current' => [], 'proposed' => ['Yusuke Honma']],
-            'album' => ['current' => 'GTO TV Animation Original Soundtrack', 'proposed' => 'TVアニメーション GTO オリジナルサウンドトラック'],
-            'album_aliases' => ['current' => [], 'proposed' => ['GTO TV Animation Original Soundtrack', 'TV Animation GTO Original Soundtrack']],
-            'track_number' => ['current' => null, 'proposed' => '2'],
-            'release_label' => ['current' => null, 'proposed' => 'SPE Visual Works'],
-            'discogs_release_id' => ['current' => null, 'proposed' => '17124567'],
-        ],
-        'evidence' => [
-            'source' => 'discogs_release_search',
-            'discogs_release_id' => '17124567',
-        ],
-    ]);
-
-    $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$firstProposal->id}", [
-        'action' => 'apply',
-        'fields' => array_keys($firstProposal->changes),
-    ])->assertSuccessful();
-
-    $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$secondProposal->id}", [
-        'action' => 'apply',
-        'fields' => array_keys($secondProposal->changes),
-    ])->assertSuccessful();
-
-    $firstFile = $firstFile->fresh(['artists', 'albums']);
-    $secondFile = $secondFile->fresh(['artists', 'albums']);
-    $metadata = FileMetadata::query()->whereKey($firstFile->metadata?->id)->first();
-
-    expect(Artist::query()->count())->toBe(1)
-        ->and(Album::query()->count())->toBe(1)
-        ->and($firstFile->artists->first()?->name)->toBe('本間勇輔')
-        ->and($secondFile->artists->first()?->id)->toBe($firstFile->artists->first()?->id)
-        ->and($firstFile->albums->first()?->name)->toBe('TVアニメーション GTO オリジナルサウンドトラック')
-        ->and($secondFile->albums->first()?->id)->toBe($firstFile->albums->first()?->id)
-        ->and($firstFile->albums->first()?->release_label)->toBe('SPE Visual Works')
-        ->and($firstFile->albums->first()?->discogs_release_id)->toBe('17124567')
-        ->and($metadata?->payload['title'] ?? null)->toBe('The Theme From GTO')
-        ->and($metadata?->payload['artists'] ?? null)->toBe(['本間勇輔'])
-        ->and($metadata?->payload['artist'] ?? null)->toBe('本間勇輔')
-        ->and($metadata?->payload['album'] ?? null)->toBe('TVアニメーション GTO オリジナルサウンドトラック')
-        ->and($metadata?->payload['track_number'] ?? null)->toBe('1')
-        ->and($metadata?->payload['audio']['title'] ?? null)->toBe('The Theme From GTO')
-        ->and($metadata?->payload['audio']['artists'] ?? null)->toBe(['本間勇輔'])
-        ->and($metadata?->payload['audio']['album'] ?? null)->toBe('TVアニメーション GTO オリジナルサウンドトラック')
-        ->and($metadata?->payload['audio']['track_number'] ?? null)->toBe('1');
-});
+}

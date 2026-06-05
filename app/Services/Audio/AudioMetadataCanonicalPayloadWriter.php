@@ -78,26 +78,6 @@ class AudioMetadataCanonicalPayloadWriter
             }
         }
 
-        $aliases = [];
-        foreach ([
-            'title_aliases' => 'title',
-            'artist_aliases' => 'artists',
-            'album_aliases' => 'album',
-        ] as $field => $aliasKey) {
-            if (! in_array($field, $fields, true)) {
-                continue;
-            }
-
-            $values = $this->cleanStringList($proposed[$field] ?? []);
-            if ($values !== []) {
-                $aliases[$aliasKey] = $values;
-            }
-        }
-
-        if ($aliases !== []) {
-            $audio['aliases'] = $aliases;
-        }
-
         if ($audio === []) {
             return;
         }

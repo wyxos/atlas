@@ -3,7 +3,6 @@
 namespace App\Services\Audio;
 
 use App\Models\File;
-use App\Models\MetadataAlias;
 
 class AudioMetadataLocalTagProvider
 {
@@ -14,7 +13,7 @@ class AudioMetadataLocalTagProvider
     /**
      * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
      */
-    public function candidate(File $file): array
+    public function candidate(File $file, bool $allowFilenameFallback = true): array
     {
         $payload = $this->values->metadataPayload($file);
         $values = [];
@@ -37,17 +36,13 @@ class AudioMetadataLocalTagProvider
         $musicBrainzReleaseId = $this->values->firstStringForKeys($payload, ['musicbrainz_release_id', 'musicbrainz_albumid']);
         $discogsReleaseId = $this->values->firstStringForKeys($payload, ['discogs_release_id', 'discogs_releaseid']);
 
-        if ($title === null && $artists === []) {
+        if ($allowFilenameFallback && $title === null && $artists === []) {
             $filenameCandidate = $this->values->filenameCandidate((string) $file->filename);
             if ($filenameCandidate !== null) {
                 $title = $filenameCandidate['title'];
                 $artists = [$filenameCandidate['artist']];
                 $evidence['source'] = 'filename';
             }
-        }
-
-        if ($title !== null && $this->matchesStoredTitleAlias($file, $payload, $title)) {
-            $title = null;
         }
 
         $this->putIfPresent($values, 'title', $title);
@@ -99,40 +94,6 @@ class AudioMetadataLocalTagProvider
         $confidence += array_key_exists('catalog_number', $values) ? 2 : 0;
 
         return min(70, $confidence);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function matchesStoredTitleAlias(File $file, array $payload, string $title): bool
-    {
-        $title = $this->values->normalizeName($title);
-        $tableAliases = collect($this->currentFileAliases($file))
-            ->contains(fn (string $alias): bool => $this->values->normalizeName($alias) === $title);
-
-        if ($tableAliases) {
-            return true;
-        }
-
-        return collect($this->values->cleanStringList(data_get($payload, 'audio.aliases.title', [])))
-            ->contains(fn (string $alias): bool => $this->values->normalizeName($alias) === $title);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function currentFileAliases(File $file): array
-    {
-        $aliases = $file->relationLoaded('metadataAliases')
-            ? $file->metadataAliases
-            : $file->metadataAliases()->get();
-
-        return collect($aliases)
-            ->filter(fn (mixed $alias): bool => $alias instanceof MetadataAlias && $alias->field === 'title')
-            ->map(fn (MetadataAlias $alias): string => trim($alias->value))
-            ->filter(fn (string $alias): bool => $alias !== '')
-            ->values()
-            ->all();
     }
 
     /**

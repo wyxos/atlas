@@ -7,6 +7,7 @@ use App\Http\Requests\StartAudioMetadataRunRequest;
 use App\Models\AudioMetadataProposal;
 use App\Models\AudioMetadataRun;
 use App\Models\File;
+use App\Services\Audio\AudioMetadataFileRestorer;
 use App\Services\Audio\AudioMetadataProposalPayload;
 use App\Services\Audio\AudioMetadataProposalService;
 use Illuminate\Http\JsonResponse;
@@ -61,6 +62,19 @@ class AudioMetadataController extends Controller
             'proposal' => AudioMetadataProposalPayload::proposal(
                 $metadata->latestProposalForFile($request->user(), $file)
             ),
+        ]);
+    }
+
+    public function restoreFromFile(Request $request, File $file, AudioMetadataFileRestorer $restorer): JsonResponse
+    {
+        abort_unless(str_starts_with((string) $file->mime_type, 'audio/'), 404);
+
+        $result = $restorer->restore($file);
+
+        return response()->json([
+            'status' => 'restored',
+            'values' => $result['values'],
+            'ingested' => $result['ingested'],
         ]);
     }
 

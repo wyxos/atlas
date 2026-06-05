@@ -16,11 +16,8 @@ class AudioMetadataProposalGenerator
 {
     private const REVIEW_FIELDS = [
         'title',
-        'title_aliases',
         'artists',
-        'artist_aliases',
         'album',
-        'album_aliases',
         'duration_seconds',
         'cover_url',
         'spotify_uri',
@@ -38,10 +35,8 @@ class AudioMetadataProposalGenerator
     ];
 
     public function __construct(
-        private readonly AudioMetadataAliasService $aliases,
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
-        private readonly AudioMetadataCandidateAliasNormalizer $aliasNormalizer,
         private readonly AudioMetadataCandidateEnricher $candidateEnricher,
         private readonly AudioMetadataCandidateGuard $candidateGuard,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
@@ -61,7 +56,7 @@ class AudioMetadataProposalGenerator
             return null;
         }
 
-        $file->loadMissing(['metadata', 'metadataAliases', 'artists.metadataAliases', 'albums.defaultCover', 'albums.metadataAliases']);
+        $file->loadMissing(['metadata', 'artists', 'albums.defaultCover']);
 
         $this->reportProgress($progress, 'metadata', 'Reading current metadata');
         $currentValues = $this->currentValues($file);
@@ -73,7 +68,7 @@ class AudioMetadataProposalGenerator
             return null;
         }
 
-        $candidate = $this->aliasNormalizer->normalize($currentValues, $candidate);
+        $candidate['values'] = $this->withoutAliasValues($candidate['values']);
         if ($candidate['values'] === []) {
             return null;
         }
@@ -123,7 +118,6 @@ class AudioMetadataProposalGenerator
             'title' => $this->values->cleanString($file->title),
             'artists' => $artists,
             'album' => $albums[0] ?? null,
-            ...$this->aliases->currentValues($file),
             'duration_seconds' => $this->values->durationSeconds($file, $payload),
             'cover_url' => $this->coverResolver->forFile($file),
             'spotify_uri' => $this->spotifyUri($file),
@@ -422,6 +416,15 @@ class AudioMetadataProposalGenerator
         }
 
         return $changes;
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    private function withoutAliasValues(array $values): array
+    {
+        return array_diff_key($values, array_flip(['title_aliases', 'artist_aliases', 'album_aliases', 'artist_alias_map']));
     }
 
     private function valuesMatch(mixed $current, mixed $proposed): bool

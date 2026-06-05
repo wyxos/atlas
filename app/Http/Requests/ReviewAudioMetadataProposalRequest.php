@@ -25,11 +25,8 @@ class ReviewAudioMetadataProposalRequest extends FormRequest
                 'distinct',
                 Rule::in([
                     'title',
-                    'title_aliases',
                     'artists',
-                    'artist_aliases',
                     'album',
-                    'album_aliases',
                     'duration_seconds',
                     'cover_url',
                     'spotify_uri',
