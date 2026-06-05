@@ -219,3 +219,74 @@ test('vgmdb lookup stops after a transport failure', function () {
     expect($candidate)->toBeNull();
     expect($attempts)->toBe(1);
 });
+
+test('vgmdb can identify game soundtrack albums from source-prefixed album names', function () {
+    config([
+        'services.audio_metadata.vgmdb_api_base_url' => 'https://vgmdb.test',
+        'services.audio_metadata.vgmdb_enabled' => true,
+    ]);
+
+    Http::fake([
+        'https://vgmdb.test/search/albums*8BitStereo%20-%20Contra%20Force*' => Http::response([
+            'results' => ['albums' => []],
+        ]),
+        'https://vgmdb.test/search/albums*Briefing*' => Http::response([
+            'results' => ['albums' => []],
+        ]),
+        'https://vgmdb.test/search/albums*Contra%20Force*' => Http::response([
+            'results' => [
+                'albums' => [[
+                    'link' => 'album/9001',
+                    'catalog' => 'GF-1992',
+                    'release_date' => '1992-01-01',
+                ]],
+            ],
+        ]),
+        'https://vgmdb.test/album/9001*' => Http::response([
+            'link' => 'album/9001',
+            'name' => 'Contra Force Original Game Soundtrack',
+            'names' => [
+                'en' => 'Contra Force Original Game Soundtrack',
+            ],
+            'catalog' => 'GF-1992',
+            'release_date' => '1992-01-01',
+            'publisher' => [
+                'names' => ['en' => 'Konami'],
+            ],
+            'picture_full' => 'https://vgmdb.test/covers/contra-force-front.jpg',
+            'composers' => [
+                ['names' => ['en' => 'Kenichi Matsubara']],
+                ['names' => ['en' => 'Yasuhiko Manno']],
+            ],
+            'discs' => [[
+                'name' => 'Disc 1',
+                'tracks' => [[
+                    'names' => ['en' => 'Briefing'],
+                    'track_length' => '1:08',
+                ]],
+            ]],
+        ]),
+    ]);
+
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => '09 Briefing (Mission Interlude)',
+        'filename' => '09 Briefing (Mission Interlude).mp3',
+    ]);
+
+    $candidate = app(AudioMetadataVgmdbProvider::class)->candidate($file, [
+        'title' => '09 Briefing (Mission Interlude)',
+        'artists' => ['Kenichi Matsubara', 'Yasuhiko Manno'],
+        'album' => '8BitStereo - Contra Force',
+        'duration_seconds' => 68,
+    ]);
+
+    expect($candidate)->not->toBeNull()
+        ->and($candidate['provider'])->toBe('vgmdb_album')
+        ->and($candidate['values']['album'])->toBe('Contra Force Original Game Soundtrack')
+        ->and($candidate['values']['title'])->toBe('Briefing')
+        ->and($candidate['values']['artists'])->toBe(['Kenichi Matsubara', 'Yasuhiko Manno'])
+        ->and($candidate['values']['cover_url'])->toBe('https://vgmdb.test/covers/contra-force-front.jpg')
+        ->and($candidate['evidence']['matched_existing_fields'])->toContain('album', 'track', 'duration');
+});

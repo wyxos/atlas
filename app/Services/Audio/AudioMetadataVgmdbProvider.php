@@ -9,7 +9,10 @@ use Throwable;
 
 class AudioMetadataVgmdbProvider
 {
-    public function __construct(private readonly AudioMetadataValueExtractor $values) {}
+    public function __construct(
+        private readonly AudioMetadataValueExtractor $values,
+        private readonly AudioMetadataVgmdbSearchQueryExpander $queryExpander,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $currentValues
@@ -39,6 +42,7 @@ class AudioMetadataVgmdbProvider
                 if ($scored === null || $scored['confidence'] < 72) {
                     continue;
                 }
+                $scored['evidence']['vgmdb_search_query'] = $query;
                 if ($best === null || $scored['confidence'] > $best['confidence']) {
                     $best = $scored;
                 }
@@ -55,13 +59,23 @@ class AudioMetadataVgmdbProvider
      */
     private function searchQueries(File $file, array $currentValues, ?array $relatedCandidate): array
     {
-        return $this->uniqueStrings([
+        $seeds = $this->uniqueStrings([
             $relatedCandidate['values']['album'] ?? null,
             $currentValues['album'] ?? null,
             $relatedCandidate['values']['title'] ?? null,
             $currentValues['title'] ?? null,
             pathinfo($file->filename, PATHINFO_FILENAME),
-        ], 6);
+        ]);
+
+        $queries = [];
+        foreach ($seeds as $seed) {
+            $queries = [
+                ...$queries,
+                ...$this->queryExpander->expand([$seed]),
+            ];
+        }
+
+        return $this->uniqueStrings($queries, 10);
     }
 
     /**
@@ -291,7 +305,7 @@ class AudioMetadataVgmdbProvider
 
     private function albumArtists(array $album): array
     {
-        foreach (['vocals', 'performers'] as $key) {
+        foreach (['vocals', 'performers', 'composers', 'arrangers'] as $key) {
             $artists = collect(is_array($album[$key] ?? null) ? $album[$key] : [])
                 ->map(fn (mixed $item): ?string => $this->firstNamedItem($item))
                 ->filter()
@@ -376,8 +390,8 @@ class AudioMetadataVgmdbProvider
 
     private function matchesAny(array $left, array $right): bool
     {
-        $left = array_map(fn (string $value): string => $this->normalizedIdentity($value), $this->values->cleanStringList($left));
-        $right = array_map(fn (string $value): string => $this->normalizedIdentity($value), $this->values->cleanStringList($right));
+        $left = $this->queryExpander->matchIdentities($left);
+        $right = $this->queryExpander->matchIdentities($right);
 
         return array_values(array_intersect($left, $right)) !== [];
     }
@@ -432,11 +446,6 @@ class AudioMetadataVgmdbProvider
         }
 
         return null;
-    }
-
-    private function normalizedIdentity(string $value): string
-    {
-        return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($value)) ?? '';
     }
 
     private function normalizedStringKey(string $value): string
