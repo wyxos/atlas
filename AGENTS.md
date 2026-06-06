@@ -34,6 +34,12 @@ This application is a Laravel application and its main Laravel ecosystems packag
 ## Verification Scripts
 - Do not create verification scripts or tinker when tests cover that functionality and prove it works. Unit and feature tests are more important.
 
+## Browser-Visible UI Verification
+- For Atlas UI work, use local `https://atlas.test` browser verification when feasible; production UI QA requires an explicit user request.
+- If local browser verification reaches login, use the repo-defined seeded local account from `database/seeders/DatabaseSeeder.php` (`demo@atlas.test` / `password`) after confirming it exists and validates locally.
+- Treat that seeded account as local-only non-secret demo data. Never store or print production credentials, real-user credentials, generated secrets, tokens, environment-derived secrets, or session cookies.
+- If authenticated local browser verification cannot be completed, report it as incomplete instead of calling the browser-visible path verified.
+
 ## Application Structure & Architecture
 - Stick to existing directory structure; don't create new base folders without approval.
 - Do not change the application's dependencies without approval.

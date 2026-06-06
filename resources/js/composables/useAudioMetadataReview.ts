@@ -144,6 +144,31 @@ export function useAudioMetadataReview(options: Options) {
         await fetchLatestMetadataProposal(audioId);
     }
 
+    function closeTrackDetailsForAudioIds(audioIds: number[]): void {
+        const audioId = detailsSheetAudioId.value;
+        if (audioId === null || !audioIds.includes(audioId)) {
+            return;
+        }
+
+        isTrackDetailsSheetOpen.value = false;
+        detailsSheetAudioId.value = null;
+        metadataProposalById.value = {
+            ...metadataProposalById.value,
+            [audioId]: null,
+        };
+
+        if (options.selectedAudioId.value === audioId) {
+            options.selectedAudioId.value = null;
+        }
+
+        setMetadataReviewMessage(null, null);
+        setMetadataReviewError(null, null);
+
+        if (activeMetadataRunAudioId.value === audioId) {
+            stopMetadataRunTracking();
+        }
+    }
+
     async function handleTrackMetadataRun(): Promise<void> {
         const audioId = detailsSheetAudioId.value;
         if (audioId === null || isTrackMetadataRunBusy.value) {
@@ -439,6 +464,7 @@ export function useAudioMetadataReview(options: Options) {
     return {
         batchMetadataError,
         batchMetadataMessage,
+        closeTrackDetailsForAudioIds,
         detailsSheetProposal,
         detailsSheetTrack,
         handleAudioDetailsOpen,

@@ -47,9 +47,14 @@ export function useAudioDetailAccessors(
         detailSkipCount: (audioId: number) => detailsById.value[audioId]?.skip_count ?? 0,
         detailSource,
         detailTitle: (audioId: number) => {
-            const title = detailsById.value[audioId]?.title;
+            const details = detailsById.value[audioId];
+            if (details === undefined) {
+                return '';
+            }
 
-            return title && title.trim() !== '' ? title : `Audio #${audioId}`;
+            const title = details.title;
+
+            return title && title.trim() !== '' ? title : 'Untitled track';
         },
         hasDetails: (audioId: number) => detailsById.value[audioId] !== undefined,
     };

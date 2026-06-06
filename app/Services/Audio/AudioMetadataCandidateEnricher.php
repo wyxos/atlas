@@ -10,6 +10,7 @@ class AudioMetadataCandidateEnricher
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataDiscogsClient $discogs,
         private readonly AudioMetadataDiscogsSearchQueryExpander $searchQueryExpander,
+        private readonly AudioMetadataDiscogsSupplementReviewer $discogsSupplementReviewer,
         private readonly AudioMetadataSourceReleaseGuard $sourceReleases,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
@@ -36,9 +37,21 @@ class AudioMetadataCandidateEnricher
         return $candidate;
     }
 
-    public function supplementWithDiscogs(array $candidate, ?array $discogsCandidate, string $provider): array
+    public function supplementWithDiscogs(File $file, array $currentValues, array $candidate, ?array $discogsCandidate, string $provider): array
     {
         if ($discogsCandidate === null) {
+            return $candidate;
+        }
+
+        [$discogsCandidate, $provider] = $this->discogsSupplementReviewer->review(
+            $file,
+            $currentValues,
+            $candidate,
+            $discogsCandidate,
+            $provider,
+        );
+
+        if (($discogsCandidate['values'] ?? []) === []) {
             return $candidate;
         }
 

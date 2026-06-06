@@ -53,8 +53,7 @@ const audioListShellRef = ref<InstanceType<typeof AudioListShell> | null>(null);
 const audioPlayer = useGlobalAudioPlayer();
 const playerCurrentTrackId = audioPlayer.currentTrackId;
 const playerIsPlaying = audioPlayer.isPlaying;
-const route = useRoute();
-const router = useRouter();
+const route = useRoute(), router = useRouter();
 const {
     cancelActiveRequest,
     detailsById,
@@ -359,6 +358,7 @@ function focusAudioTrackInList(audioId: number): void {
 const {
     batchMetadataError,
     batchMetadataMessage,
+    closeTrackDetailsForAudioIds,
     detailsSheetProposal,
     detailsSheetTrack,
     handleAudioDetailsOpen,
@@ -387,7 +387,7 @@ const {
     detailDuration,
 });
 
-useAudioPlaylistMembershipInvalidation({ activePlaylistSlug, audioIds, detailsById, fetchAudioDetails, markPlaylistsStale });
+useAudioPlaylistMembershipInvalidation({ activePlaylistSlug, audioIds, detailsById, fetchAudioDetails, markPlaylistsStale, onRemovedAudioIds: closeTrackDetailsForAudioIds });
 
 onMounted(() => {
     void loadAllAudioIds();

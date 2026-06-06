@@ -149,7 +149,10 @@ describe('Audio player queue metadata', () => {
         await firstRow.trigger('click');
 
         const player = useGlobalAudioPlayer();
-        expect(player.queue.value.find((track) => track.id === 20)?.title).toBe('Audio #20');
+        expect(player.queue.value.find((track) => track.id === 20)).toMatchObject({
+            title: '',
+            artists: 'Loading metadata...',
+        });
 
         player.updateQueuedTracks([
             queuedTrack({

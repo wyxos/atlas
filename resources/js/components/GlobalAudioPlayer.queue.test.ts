@@ -43,6 +43,24 @@ describe('GlobalAudioPlayer queue', () => {
         vi.unstubAllGlobals();
     });
 
+    it('renders current placeholder track details as skeletons instead of dummy audio text', () => {
+        const player = useGlobalAudioPlayer();
+        player.queueTracks([testTrack(742, {
+            title: 'Audio #742',
+            artists: 'Loading metadata...',
+            album: 'Unknown album',
+            duration: '--:--',
+            durationSeconds: null,
+        })], 742);
+
+        const wrapper = mount(GlobalAudioPlayer);
+
+        expect(wrapper.get('[data-test="global-audio-player-title"]').attributes('data-slot')).toBe('skeleton');
+        expect(wrapper.get('[data-test="global-audio-player-subtitle"]').attributes('data-slot')).toBe('skeleton');
+        expect(wrapper.get('[data-test="global-audio-player"]').text()).not.toContain('Audio #742');
+        expect(wrapper.get('[data-test="global-audio-player"]').text()).not.toContain('Loading metadata...');
+    });
+
     it('renders queue skeletons while copied track details are loading', async () => {
         const detailsRequest = createDeferred<{
             data: {

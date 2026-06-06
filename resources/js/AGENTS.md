@@ -32,6 +32,14 @@ npm run test:coverage
 npm run check:js
 ```
 
+### Local Browser QA
+
+- Browser-visible frontend changes should be verified on the local Herd surface (`https://atlas.test`) when feasible; do not use production UI verification unless the user explicitly asks for it.
+- If `https://atlas.test` redirects to login, continue with the repo-defined local seeded account from `database/seeders/DatabaseSeeder.php`: `demo@atlas.test` / `password`.
+- Treat that seeded local account as intentionally non-secret demo data. Do not store or print production credentials, real-user credentials, generated secrets, environment-derived secrets, tokens, or session cookies.
+- Before using the seeded account, confirm the user exists in the current local database and validate the password with Laravel's hasher when practical, because local DB state can drift from seed state.
+- If authenticated local browser QA cannot be completed, report browser verification as incomplete with the concrete blocker instead of treating the local browser check as optional after starting it.
+
 ---
 
 ## Patterns & Conventions

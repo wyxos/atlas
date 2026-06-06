@@ -162,11 +162,7 @@ class AudioMetadataProposalGenerator
         if ($fingerprintCandidate !== null) {
             $fingerprintCandidate = $this->candidateEnricher->supplementWithCover($fingerprintCandidate, $coverCandidate);
 
-            $fingerprintCandidate = $this->candidateEnricher->supplementWithDiscogs(
-                $fingerprintCandidate,
-                $discogsCandidate,
-                'acoustid_musicbrainz_discogs',
-            );
+            $fingerprintCandidate = $this->candidateEnricher->supplementWithDiscogs($file, $currentValues, $fingerprintCandidate, $discogsCandidate, 'acoustid_musicbrainz_discogs');
 
             $fingerprintCandidate = $this->vgmdbCandidates->merge(
                 $fingerprintCandidate,
@@ -182,11 +178,7 @@ class AudioMetadataProposalGenerator
         if ($coverCandidate !== null) {
             $candidates[] = $coverCandidate['provider'] === 'existing_album_cover'
                 ? $coverCandidate
-                : $this->candidateEnricher->supplementWithDiscogs(
-                    $coverCandidate,
-                    $discogsCandidate,
-                    'musicbrainz_discogs',
-                );
+                : $this->candidateEnricher->supplementWithDiscogs($file, $currentValues, $coverCandidate, $discogsCandidate, 'musicbrainz_discogs');
         }
 
         if ($discogsCandidate !== null) {

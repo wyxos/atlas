@@ -24,6 +24,7 @@ type UseAudioPlaylistMembershipInvalidationOptions = {
     detailsById: Ref<Record<number, AudioDetail>>;
     fetchAudioDetails: (ids: number[], force?: boolean) => Promise<void>;
     markPlaylistsStale: () => void;
+    onRemovedAudioIds?: (audioIds: number[]) => void;
 };
 
 export function useAudioPlaylistMembershipInvalidation(options: UseAudioPlaylistMembershipInvalidationOptions) {
@@ -95,6 +96,7 @@ export function useAudioPlaylistMembershipInvalidation(options: UseAudioPlaylist
                     delete nextDetails[id];
                 }
                 options.detailsById.value = nextDetails;
+                options.onRemovedAudioIds?.(removedIds);
             }
 
             if (memberIds.length > 0) {

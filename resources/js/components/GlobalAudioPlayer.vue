@@ -316,7 +316,7 @@ onBeforeUnmount(teardown);
                     <Music v-else class="size-6 max-h-full max-w-full text-smart-blue-100 md:size-10 2xl:size-12" />
                 </button>
                 <div class="min-w-0 self-center text-center md:text-left lg:py-3" data-test="global-audio-player-details">
-                    <template v-if="currentTrack">
+                    <template v-if="currentTrack && currentTrack.artists !== 'Loading metadata...'">
                         <p
                             class="truncate text-sm font-semibold text-regal-navy-100"
                             data-test="global-audio-player-title"
