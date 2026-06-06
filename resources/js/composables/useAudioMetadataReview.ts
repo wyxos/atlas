@@ -271,9 +271,7 @@ export function useAudioMetadataReview(options: Options) {
 
         if (isMetadataRunTerminal(snapshot.run)) {
             stopMetadataRunTracking(snapshot.run.id);
-            setMetadataReviewMessage(snapshotAudioId, snapshot.run.status === 'completed'
-                ? proposal ? 'Metadata proposal ready for review.' : 'No metadata changes found.'
-                : null);
+            setMetadataReviewMessage(snapshotAudioId, metadataRunTerminalMessage(snapshot.run, proposal));
 
             if (snapshot.run.status === 'failed') {
                 setMetadataReviewError(snapshotAudioId, snapshot.run.error ?? 'Metadata scan failed.');
@@ -289,6 +287,22 @@ export function useAudioMetadataReview(options: Options) {
             : metadataRunProgressMessage(snapshot.run));
         startMetadataRunEcho(snapshot.run.id);
         scheduleMetadataRunPoll();
+    }
+
+    function metadataRunTerminalMessage(run: AudioMetadataRun, proposal: AudioMetadataProposal | null): string | null {
+        if (run.status !== 'completed') {
+            return null;
+        }
+
+        if (proposal) {
+            return 'Metadata proposal ready for review.';
+        }
+
+        if (run.failed_files > 0) {
+            return 'Metadata lookup failed.';
+        }
+
+        return 'No metadata changes found.';
     }
 
     function metadataRunProgressMessage(run: AudioMetadataRun): string {

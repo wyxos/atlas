@@ -192,7 +192,8 @@ class AudioMetadataAlbumGroupApplier
 
         return count($tokens) >= 3
             && (str_contains($name, ' - ')
-                || preg_match('/\b(?:cd|disc|vol|volume|ost|soundtrack|remix|remixes|ep)\s*\d*\b/i', $name) === 1);
+                || preg_match('/\b(?:cd|disc|vol|volume|ost|soundtrack|remix|remixes|ep)\s*\d*\b/i', $name) === 1
+                || preg_match('/\bmixed\s+by\b/i', $name) === 1);
     }
 
     private function cleanString(mixed $value): ?string

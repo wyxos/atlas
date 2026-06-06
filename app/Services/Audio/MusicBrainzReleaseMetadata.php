@@ -114,7 +114,7 @@ class MusicBrainzReleaseMetadata
 
         return collect(is_array($catalogNumbers) ? $catalogNumbers : [])
             ->map(fn (mixed $catalogNumber): ?string => $this->cleanString($catalogNumber))
-            ->filter(fn (string $catalogNumber): bool => mb_strtolower($catalogNumber) !== '[none]')
+            ->filter(fn (?string $catalogNumber): bool => $catalogNumber !== null && mb_strtolower($catalogNumber) !== '[none]')
             ->first();
     }
 

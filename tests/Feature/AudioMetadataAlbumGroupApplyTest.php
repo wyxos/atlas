@@ -258,6 +258,86 @@ test('applying a release backed album proposal moves duplicate current album row
             ->exists())->toBeFalse();
 });
 
+test('applying an album proposal moves duplicate mixed-by album rows', function () {
+    $user = User::factory()->create();
+    $currentAlbumName = 'Laser-Kissed Trance (Mixed By Above & Beyond)';
+    $firstAlbum = Album::factory()->create([
+        'name' => $currentAlbumName,
+        'normalized_name' => 'laser-kissed trance (mixed by above & beyond)',
+    ]);
+    $secondAlbum = Album::factory()->create([
+        'name' => $currentAlbumName,
+        'normalized_name' => 'laser-kissed trance (mixed by above & beyond)',
+    ]);
+
+    $first = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'path' => 'imports/2d/ba/midnight.mp3',
+        'title' => 'Midnight',
+    ]);
+    $second = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'path' => 'imports/cf/51/northstar.mp3',
+        'title' => 'Northstar',
+    ]);
+
+    $first->albums()->attach($firstAlbum->id, ['track_number' => '2']);
+    $second->albums()->attach($secondAlbum->id, ['track_number' => '5']);
+
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'single',
+        'source_filter' => 'all',
+        'status' => 'completed',
+        'total_files' => 1,
+        'processed_files' => 1,
+        'proposal_count' => 1,
+        'started_at' => now(),
+        'finished_at' => now(),
+    ]);
+    $proposal = AudioMetadataProposal::query()->create([
+        'audio_metadata_run_id' => $run->id,
+        'file_id' => $first->id,
+        'provider' => 'acoustid_musicbrainz_ai_discogs',
+        'status' => 'pending',
+        'confidence' => 96,
+        'current_values' => [
+            'album' => $currentAlbumName,
+        ],
+        'proposed_values' => [
+            'album' => 'Laser-Kissed Trance',
+            'discogs_release_id' => '335178',
+        ],
+        'changes' => [
+            'album' => [
+                'current' => $currentAlbumName,
+                'proposed' => 'Laser-Kissed Trance',
+            ],
+            'discogs_release_id' => [
+                'current' => null,
+                'proposed' => '335178',
+            ],
+        ],
+        'evidence' => [
+            'source' => 'acoustid_fingerprint',
+            'discogs_release_id' => '335178',
+        ],
+    ]);
+
+    app(AudioMetadataProposalApplier::class)->apply($proposal, $user, ['album', 'discogs_release_id']);
+
+    $firstAlbumAfter = $first->fresh()->albums()->first();
+    $secondAlbumAfter = $second->fresh()->albums()->first();
+
+    expect($firstAlbumAfter?->name)->toBe('Laser-Kissed Trance')
+        ->and($secondAlbumAfter?->name)->toBe('Laser-Kissed Trance')
+        ->and($firstAlbumAfter?->is($secondAlbumAfter))->toBeTrue()
+        ->and($firstAlbumAfter?->discogs_release_id)->toBe('335178')
+        ->and($secondAlbumAfter?->pivot?->track_number)->toBe('5');
+});
+
 test('applying an album group proposal broadcasts every affected audio file id', function () {
     Event::fake();
 
