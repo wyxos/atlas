@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AudioFilesChanged;
 use App\Http\Requests\ReviewAudioMetadataProposalRequest;
 use App\Http\Requests\StartAudioMetadataRunRequest;
 use App\Models\AudioMetadataProposal;
@@ -70,6 +71,7 @@ class AudioMetadataController extends Controller
         abort_unless(str_starts_with((string) $file->mime_type, 'audio/'), 404);
 
         $result = $restorer->restore($file);
+        AudioFilesChanged::dispatch($request->user()->id, [(int) $file->id], 'metadata_restored');
 
         return response()->json([
             'status' => 'restored',

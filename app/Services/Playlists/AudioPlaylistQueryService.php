@@ -85,6 +85,33 @@ class AudioPlaylistQueryService
         return is_numeric($fileId) ? (int) $fileId : null;
     }
 
+    /**
+     * @param  list<int>  $fileIds
+     * @return list<array{id:int,is_member:bool}>
+     */
+    public function membershipsForFileIds(Playlist $playlist, array $fileIds): array
+    {
+        $fileIds = $this->normalizeFileIds($fileIds);
+        if ($fileIds === []) {
+            return [];
+        }
+
+        $memberIds = $this->queryForPlaylist($playlist)
+            ->whereIn('files.id', $fileIds)
+            ->pluck('files.id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+        $memberIdLookup = array_fill_keys($memberIds, true);
+
+        return array_map(
+            static fn (int $fileId): array => [
+                'id' => $fileId,
+                'is_member' => isset($memberIdLookup[$fileId]),
+            ],
+            $fileIds,
+        );
+    }
+
     public function randomFileIdForPlaylist(Playlist $playlist): ?int
     {
         $baseQuery = $this->queryForPlaylist($playlist);
@@ -297,5 +324,17 @@ class AudioPlaylistQueryService
         }
 
         return $query->whereRaw('LOWER(TRIM(source)) = ?', [$sourceKey]);
+    }
+
+    /**
+     * @param  list<int>  $fileIds
+     * @return list<int>
+     */
+    private function normalizeFileIds(array $fileIds): array
+    {
+        return array_values(array_filter(array_unique(array_map(
+            static fn (mixed $id): int => (int) $id,
+            $fileIds,
+        )), static fn (int $id): bool => $id > 0));
     }
 }

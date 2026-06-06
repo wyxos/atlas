@@ -324,6 +324,57 @@ test('audio catalog cleanup playlists expose imported relationship gaps', functi
         ->assertJsonPath('ids', [$missingCover->id]);
 });
 
+test('audio playlist membership check uses current playlist rules for arbitrary file ids', function () {
+    $user = User::factory()->create();
+    $artist = Artist::factory()->create();
+    $coveredAlbum = Album::factory()->create();
+    $uncoveredAlbum = Album::factory()->create();
+
+    $covered = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'source' => 'local',
+        'imported_at' => now(),
+    ]);
+    $missingCover = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'source' => 'local',
+        'imported_at' => now(),
+    ]);
+    $notAudio = File::factory()->create([
+        'mime_type' => 'image/jpeg',
+        'source' => 'local',
+        'imported_at' => now(),
+    ]);
+
+    $covered->artists()->attach($artist);
+    $covered->albums()->attach($coveredAlbum);
+    $missingCover->artists()->attach($artist);
+    $missingCover->albums()->attach($uncoveredAlbum);
+    AlbumCover::factory()->create([
+        'album_id' => $coveredAlbum->id,
+        'file_id' => $covered->id,
+        'is_default' => true,
+    ]);
+
+    $this->actingAs($user)->getJson('/api/audio/playlists')->assertSuccessful();
+
+    $response = $this->actingAs($user)->postJson('/api/audio/playlists/membership', [
+        'playlist' => 'no-album-cover',
+        'file_ids' => [$covered->id, $missingCover->id, $notAudio->id, 999999],
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJsonPath('playlist', 'no-album-cover')
+        ->assertJsonPath('files.0.id', $covered->id)
+        ->assertJsonPath('files.0.is_member', false)
+        ->assertJsonPath('files.1.id', $missingCover->id)
+        ->assertJsonPath('files.1.is_member', true)
+        ->assertJsonPath('files.2.id', $notAudio->id)
+        ->assertJsonPath('files.2.is_member', false)
+        ->assertJsonPath('files.3.id', 999999)
+        ->assertJsonPath('files.3.is_member', false);
+});
+
 test('audio ids can be filtered by system playlist slug', function () {
     $user = User::factory()->create();
     $favorite = File::factory()->create(['mime_type' => 'audio/mpeg', 'source' => 'Spotify']);

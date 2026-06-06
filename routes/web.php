@@ -125,6 +125,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/dashboard/metrics', DashboardMetricsController::class)->name('api.dashboard.metrics');
     Route::get('/api/files', [\App\Http\Controllers\FilesController::class, 'index'])->name('api.files.index');
     Route::get('/api/audio/playlists', [\App\Http\Controllers\AudioPlaylistController::class, 'index'])->name('api.audio.playlists.index');
+    Route::post('/api/audio/playlists/membership', [\App\Http\Controllers\AudioPlaylistController::class, 'membership'])->name('api.audio.playlists.membership');
     Route::patch('/api/audio/playlists/{playlist}/cover', [\App\Http\Controllers\AudioPlaylistController::class, 'updateCover'])->name('api.audio.playlists.cover.update');
     Route::get('/api/audio/ids', [\App\Http\Controllers\AudioController::class, 'ids'])->name('api.audio.ids');
     Route::post('/api/audio/details', [\App\Http\Controllers\AudioController::class, 'details'])->name('api.audio.details');

@@ -11,6 +11,7 @@ import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors'
 import { useAudioPlaylistPanelOpenState } from '../composables/useAudioPlaylistPanelOpenState';
 import { useAudioPlaybackStatsEvents } from '../composables/useAudioPlaybackStatsEvents';
 import { useAudioMetadataReview } from '../composables/useAudioMetadataReview';
+import { useAudioPlaylistMembershipInvalidation } from '../composables/useAudioPlaylistMembershipInvalidation';
 import { useAudioSourceIdentityMaps } from '../composables/useAudioSourceIdentityMaps';
 import { useAudioVisibleDetails } from '../composables/useAudioVisibleDetails';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '../composables/useGlobalAudioPlayer';
@@ -82,13 +83,7 @@ const {
     hasDetails,
 } = useAudioDetailAccessors(detailsById, sourceById);
 
-const progressPercent = computed(() => {
-    if (totalPages.value === 0) {
-        return 100;
-    }
-
-    return Math.round((loadedPages.value / totalPages.value) * 100);
-});
+const progressPercent = computed(() => totalPages.value === 0 ? 100 : Math.round((loadedPages.value / totalPages.value) * 100));
 
 const filteredAudioIds = computed(() => {
     if (activeFilter.value === 'all') {
@@ -197,8 +192,8 @@ async function loadAllAudioIds(): Promise<void> {
     }
 }
 
-async function loadPlaylists(): Promise<void> {
-    if (arePlaylistsLoading.value || playlistsLoaded.value) {
+async function loadPlaylists(force = false): Promise<void> {
+    if (arePlaylistsLoading.value || (!force && playlistsLoaded.value)) {
         return;
     }
 
@@ -215,6 +210,11 @@ async function loadPlaylists(): Promise<void> {
     } finally {
         arePlaylistsLoading.value = false;
     }
+}
+
+function markPlaylistsStale(): void {
+    playlistsLoaded.value = false;
+    if (isPlaylistPanelOpen.value) { void loadPlaylists(true); }
 }
 
 function handlePlaylistSelect(playlist: AudioPlaylist): void {
@@ -386,6 +386,8 @@ const {
     detailSource,
     detailDuration,
 });
+
+useAudioPlaylistMembershipInvalidation({ activePlaylistSlug, audioIds, detailsById, fetchAudioDetails, markPlaylistsStale });
 
 onMounted(() => {
     void loadAllAudioIds();

@@ -2,6 +2,7 @@
 
 namespace App\Services\Audio;
 
+use App\Events\AudioFilesChanged;
 use App\Models\Album;
 use App\Models\AlbumCover;
 use App\Models\AudioMetadataProposal;
@@ -51,8 +52,9 @@ class AudioMetadataProposalApplier
         }
 
         $fields = $this->normalizeApplyFields($proposal, $fields);
+        $affectedFileIds = [];
 
-        return DB::transaction(function () use ($proposal, $user, $fields): AudioMetadataProposal {
+        $appliedProposal = DB::transaction(function () use ($proposal, $user, $fields, &$affectedFileIds): AudioMetadataProposal {
             $file = File::query()
                 ->whereKey($proposal->file_id)
                 ->lockForUpdate()
@@ -61,6 +63,7 @@ class AudioMetadataProposalApplier
 
             $proposed = is_array($proposal->proposed_values) ? $proposal->proposed_values : [];
             $albumGroup = $this->albumGroups->capture($file, $proposal, $fields);
+            $affectedFileIds = $this->affectedFileIds($file, $albumGroup);
 
             $this->applyFileFields($file, $proposed, $fields);
             $this->applyRelationshipFields($file, $proposed, $fields);
@@ -79,6 +82,10 @@ class AudioMetadataProposalApplier
 
             return $proposal->fresh();
         });
+
+        AudioFilesChanged::dispatch($user->id, $affectedFileIds, 'metadata_applied');
+
+        return $appliedProposal;
     }
 
     public function ignore(AudioMetadataProposal $proposal, User $user): AudioMetadataProposal
@@ -450,5 +457,17 @@ class AudioMetadataProposalApplier
     private function normalizeName(string $name): string
     {
         return trim(preg_replace('/\s+/', ' ', mb_strtolower(trim($name))) ?? '');
+    }
+
+    /**
+     * @param  array{peer_ids:list<int>,source_album_ids:list<int>}  $albumGroup
+     * @return list<int>
+     */
+    private function affectedFileIds(File $file, array $albumGroup): array
+    {
+        return array_values(array_filter(array_unique([
+            (int) $file->id,
+            ...$albumGroup['peer_ids'],
+        ]), static fn (int $id): bool => $id > 0));
     }
 }
