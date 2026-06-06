@@ -62,6 +62,8 @@ class AudioMetadataAlbumGroupApplier
             $peerQuery
                 ->where('files.source', $file->source)
                 ->where('files.path', 'like', $this->albumFolders->likePathPrefix($directory));
+        } elseif ($this->canCaptureDuplicateSourceAlbums($file, $proposal, $currentAlbumName)) {
+            $peerQuery->where('files.source', $file->source);
         } else {
             $currentAlbumIds = $file->albums
                 ->pluck('id')
@@ -165,6 +167,32 @@ class AudioMetadataAlbumGroupApplier
         Album::query()
             ->whereIn('id', $deleteIds)
             ->delete();
+    }
+
+    private function canCaptureDuplicateSourceAlbums(File $file, AudioMetadataProposal $proposal, string $currentAlbumName): bool
+    {
+        return str_starts_with((string) $file->mime_type, 'audio/')
+            && mb_strtolower((string) $file->source) === 'local'
+            && $this->hasReleaseEvidence($proposal)
+            && $this->hasDistinctiveAlbumName($currentAlbumName);
+    }
+
+    private function hasReleaseEvidence(AudioMetadataProposal $proposal): bool
+    {
+        return $this->cleanString(data_get($proposal->proposed_values, 'discogs_release_id')) !== null
+            || $this->cleanString(data_get($proposal->proposed_values, 'musicbrainz_release_id')) !== null
+            || $this->cleanString(data_get($proposal->evidence, 'discogs_release_id')) !== null
+            || $this->cleanString(data_get($proposal->evidence, 'musicbrainz_release_id')) !== null;
+    }
+
+    private function hasDistinctiveAlbumName(string $name): bool
+    {
+        $tokens = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($name)) ?: [];
+        $tokens = array_values(array_filter($tokens, fn (string $token): bool => $token !== ''));
+
+        return count($tokens) >= 3
+            && (str_contains($name, ' - ')
+                || preg_match('/\b(?:cd|disc|vol|volume|ost|soundtrack|remix|remixes|ep)\s*\d*\b/i', $name) === 1);
     }
 
     private function cleanString(mixed $value): ?string

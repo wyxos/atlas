@@ -160,3 +160,99 @@ test('applying an album proposal reuses an existing proposed album row with rele
         ->and($sourceAlbum->fresh()?->name)->toBe('Above & Beyond - Anjunabeats 100 Cd1')
         ->and(Album::query()->where('normalized_name', 'anjunabeats100 disc one')->count())->toBe(1);
 });
+
+test('applying a release backed album proposal moves duplicate current album rows from hashed import paths', function () {
+    $user = User::factory()->create();
+    $currentAlbumName = 'Above & Beyond - Anjunadeep 01 Cd1';
+    $firstAlbum = Album::factory()->create([
+        'name' => $currentAlbumName,
+        'normalized_name' => 'above & beyond - anjunadeep 01 cd1',
+    ]);
+    $secondAlbum = Album::factory()->create([
+        'name' => $currentAlbumName,
+        'normalized_name' => 'above & beyond - anjunadeep 01 cd1',
+    ]);
+
+    $first = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'path' => 'imports/97/73/hash-one.mp3',
+        'title' => 'Nobody Seems To Care',
+    ]);
+    $second = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'path' => 'imports/11/22/hash-two.mp3',
+        'title' => 'Need To Feel Loved',
+    ]);
+
+    $first->albums()->attach($firstAlbum->id, ['track_number' => '1']);
+    $second->albums()->attach($secondAlbum->id, ['track_number' => '2']);
+    $first->metadata()->create(['payload' => ['album' => $currentAlbumName]]);
+    $second->metadata()->create(['payload' => ['album' => $currentAlbumName]]);
+
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'single',
+        'source_filter' => 'all',
+        'status' => 'completed',
+        'total_files' => 1,
+        'processed_files' => 1,
+        'proposal_count' => 1,
+        'started_at' => now(),
+        'finished_at' => now(),
+    ]);
+    $proposal = AudioMetadataProposal::query()->create([
+        'audio_metadata_run_id' => $run->id,
+        'file_id' => $first->id,
+        'provider' => 'acoustid_musicbrainz_discogs',
+        'status' => 'pending',
+        'confidence' => 96,
+        'current_values' => [
+            'title' => 'Nobody Seems To Care',
+            'album' => $currentAlbumName,
+        ],
+        'proposed_values' => [
+            'album' => 'Anjunadeep:01',
+            'discogs_release_id' => '1651241',
+            'musicbrainz_release_id' => 'b9dbbe2c-2fd9-4776-afdd-5a7304d71def',
+        ],
+        'changes' => [
+            'album' => [
+                'current' => $currentAlbumName,
+                'proposed' => 'Anjunadeep:01',
+            ],
+            'discogs_release_id' => [
+                'current' => null,
+                'proposed' => '1651241',
+            ],
+            'musicbrainz_release_id' => [
+                'current' => null,
+                'proposed' => 'b9dbbe2c-2fd9-4776-afdd-5a7304d71def',
+            ],
+        ],
+        'evidence' => [
+            'source' => 'discogs_release',
+            'discogs_release_id' => '1651241',
+            'musicbrainz_release_id' => 'b9dbbe2c-2fd9-4776-afdd-5a7304d71def',
+        ],
+    ]);
+
+    app(AudioMetadataProposalApplier::class)->apply($proposal, $user, ['album', 'discogs_release_id', 'musicbrainz_release_id']);
+
+    $firstAlbumAfter = $first->fresh()->albums()->first();
+    $secondAlbumAfter = $second->fresh()->albums()->first();
+
+    expect($firstAlbumAfter?->name)->toBe('Anjunadeep:01')
+        ->and($secondAlbumAfter?->name)->toBe('Anjunadeep:01')
+        ->and($firstAlbumAfter?->is($secondAlbumAfter))->toBeTrue()
+        ->and($firstAlbumAfter?->discogs_release_id)->toBe('1651241')
+        ->and($firstAlbumAfter?->musicbrainz_release_id)->toBe('b9dbbe2c-2fd9-4776-afdd-5a7304d71def')
+        ->and($firstAlbumAfter?->pivot?->track_number)->toBe('1')
+        ->and($secondAlbumAfter?->pivot?->track_number)->toBe('2')
+        ->and($second->fresh()->metadata()->first()?->payload['album'] ?? null)->toBe('Anjunadeep:01')
+        ->and(Album::query()
+            ->where('normalized_name', 'above & beyond - anjunadeep 01 cd1')
+            ->whereHas('files')
+            ->exists())->toBeFalse();
+});
