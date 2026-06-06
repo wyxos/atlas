@@ -165,3 +165,136 @@ test('fingerprint metadata follows up musicbrainz recording releases when acoust
         ->assertJsonMissingPath('proposal.proposed_values.album_aliases')
         ->assertJsonMissingPath('proposal.proposed_values.cover_url');
 });
+
+test('fingerprint metadata prefers a current album release over a same-title single release', function () {
+    config([
+        'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
+        'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.cover_art_archive_base_url' => 'https://cover.test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('forFile')
+            ->once()
+            ->andReturn(new AudioFingerprint('amaranthe-leave-everything-behind', 199, '/tmp/leave-everything-behind.mp3'));
+    });
+
+    Http::fake([
+        'https://acoustid.test/v2/lookup*' => Http::response([
+            'status' => 'ok',
+            'results' => [[
+                'id' => 'acoustid-amaranthe-leave',
+                'score' => 0.998,
+                'recordings' => [[
+                    'id' => 'amaranthe-leave-recording',
+                    'title' => 'Leave Everything Behind',
+                    'duration' => 198000,
+                    'artists' => [
+                        ['name' => 'Amaranthe'],
+                    ],
+                ]],
+            ]],
+        ]),
+        'https://musicbrainz.test/ws/2/recording/amaranthe-leave-recording*' => Http::response([
+            'id' => 'amaranthe-leave-recording',
+            'title' => 'Leave Everything Behind',
+            'length' => 198000,
+            'artist-credit' => [
+                ['name' => 'Amaranthe', 'artist' => ['name' => 'Amaranthe']],
+            ],
+            'releases' => [
+                [
+                    'id' => 'leave-everything-behind-single-release',
+                    'title' => 'Leave Everything Behind',
+                    'status' => 'Official',
+                    'date' => '2009-02-18',
+                    'country' => 'SE',
+                    'barcode' => '7898237387246',
+                    'artist-credit' => [
+                        ['name' => 'Amaranthe', 'artist' => ['name' => 'Amaranthe']],
+                    ],
+                ],
+                [
+                    'id' => 'amaranthe-album-release',
+                    'title' => 'Amaranthe',
+                    'status' => 'Official',
+                    'date' => '2011-04-13',
+                    'country' => 'SE',
+                    'artist-credit' => [
+                        ['name' => 'Amaranthe', 'artist' => ['name' => 'Amaranthe']],
+                    ],
+                ],
+            ],
+        ]),
+        'https://musicbrainz.test/ws/2/release/leave-everything-behind-single-release*' => Http::response([
+            'id' => 'leave-everything-behind-single-release',
+            'title' => 'Leave Everything Behind',
+            'date' => '2009-02-18',
+            'country' => 'SE',
+            'barcode' => '7898237387246',
+            'label-info' => [[
+                'catalog-number' => 'HEL 0724',
+                'label' => ['name' => 'Spinefarm Records'],
+            ]],
+            'media' => [[
+                'position' => 1,
+                'tracks' => [[
+                    'number' => '2',
+                    'position' => 2,
+                    'recording' => ['id' => 'amaranthe-leave-recording'],
+                ]],
+            ]],
+        ]),
+        'https://musicbrainz.test/ws/2/release/amaranthe-album-release*' => Http::response([
+            'id' => 'amaranthe-album-release',
+            'title' => 'Amaranthe',
+            'date' => '2011-04-13',
+            'country' => 'SE',
+            'media' => [[
+                'position' => 1,
+                'tracks' => [[
+                    'number' => '3',
+                    'position' => 3,
+                    'recording' => ['id' => 'amaranthe-leave-recording'],
+                ]],
+            ]],
+        ]),
+        'https://cover.test/release/amaranthe-album-release' => Http::response([], 404),
+        'https://cover.test/release/leave-everything-behind-single-release' => Http::response([], 404),
+    ]);
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Leave Everything Behind',
+        'filename' => '03-leave-everything-behind.mp3',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Amaranthe',
+        'normalized_name' => 'amaranthe',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'Amaranthe',
+        'normalized_name' => 'amaranthe',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
+    $file->metadata()->create([
+        'payload' => [
+            'title' => 'Leave Everything Behind',
+            'artist' => 'Amaranthe',
+            'album' => 'Amaranthe',
+            'duration' => 199,
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal.proposed_values.album', 'Amaranthe')
+        ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'amaranthe-album-release')
+        ->assertJsonPath('proposal.proposed_values.track_number', '3')
+        ->assertJsonMissingPath('proposal.changes.album');
+});

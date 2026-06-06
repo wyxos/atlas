@@ -103,7 +103,14 @@ class MusicBrainzRecordingReleaseLookup
         $score = $this->cleanString($release['id'] ?? null) !== null ? 4 : 0;
         $releaseTitle = $this->cleanString($release['title'] ?? null);
         $recordingTitle = $this->cleanString($recording['title'] ?? null);
+        $albumHint = $this->cleanString($hints['album'] ?? null);
+        $titleHint = $this->cleanString($hints['title'] ?? null);
         $status = mb_strtolower((string) ($release['status'] ?? ''));
+        $matchesAlbumHint = $this->stringsMatch($releaseTitle, $albumHint);
+        $matchesRecordingTitle = $this->stringsMatch($releaseTitle, $recordingTitle);
+        $matchesTitleHint = $this->stringsMatch($releaseTitle, $titleHint);
+        $hasDistinctAlbumHint = $this->hasCredibleAlbumHint($albumHint)
+            && ! $this->stringsMatch($albumHint, $titleHint);
 
         if ($status === 'official') {
             $score += 8;
@@ -115,16 +122,20 @@ class MusicBrainzRecordingReleaseLookup
             $score += 2;
         }
 
-        if ($this->stringsMatch($releaseTitle, $recordingTitle)) {
-            $score += 30;
+        if ($matchesAlbumHint) {
+            $score += 42;
         }
 
-        if ($this->stringsMatch($releaseTitle, $hints['album'] ?? null)) {
-            $score += 18;
+        if ($matchesRecordingTitle) {
+            $score += $hasDistinctAlbumHint && ! $matchesAlbumHint ? 6 : 30;
         }
 
-        if ($this->stringsMatch($releaseTitle, $hints['title'] ?? null)) {
-            $score += 10;
+        if ($matchesTitleHint) {
+            $score += $hasDistinctAlbumHint && ! $matchesAlbumHint ? 2 : 10;
+        }
+
+        if ($hasDistinctAlbumHint && ! $matchesAlbumHint && ($matchesRecordingTitle || $matchesTitleHint)) {
+            $score -= 16;
         }
 
         if ($this->artistsOverlap($this->recordingArtists($recording), $this->releaseArtists($release))) {
@@ -140,6 +151,22 @@ class MusicBrainzRecordingReleaseLookup
         }
 
         return $score;
+    }
+
+    private function hasCredibleAlbumHint(?string $album): bool
+    {
+        if ($album === null) {
+            return false;
+        }
+
+        return ! in_array($this->normalizeComparableString($album), [
+            '',
+            'unknown',
+            'unknown album',
+            'no album',
+            'none',
+            'untitled',
+        ], true);
     }
 
     /**
