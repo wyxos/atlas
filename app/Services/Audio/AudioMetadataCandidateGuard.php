@@ -48,7 +48,7 @@ class AudioMetadataCandidateGuard
             return false;
         }
 
-        if (! $this->looksLikeCollectionAlbum($currentAlbum)) {
+        if (! $this->sourceReleases->looksLikeCollectionAlbum($currentAlbum)) {
             return false;
         }
 
@@ -57,33 +57,6 @@ class AudioMetadataCandidateGuard
         }
 
         return ! $this->hasStrongAlbumEvidence($candidate);
-    }
-
-    private function looksLikeCollectionAlbum(string $album): bool
-    {
-        $normalized = $this->normalizedWords($album);
-
-        foreach ([
-            'soundtrack',
-            'ost',
-            'original soundtrack',
-            'tv animation',
-            'animation',
-            'sound collection',
-            'score',
-            'compilation',
-            'collection',
-            'volume',
-            'vol',
-            'disc',
-            'cd',
-        ] as $marker) {
-            if (str_contains($normalized, $marker)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

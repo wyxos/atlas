@@ -98,7 +98,7 @@ class AudioMetadataSourceReleaseGuard
             || str_contains($normalized, 'サントラ');
     }
 
-    private function looksLikeCollectionAlbum(string $album): bool
+    public function looksLikeCollectionAlbum(string $album): bool
     {
         $normalized = $this->normalizedWords($album);
 
@@ -116,7 +116,11 @@ class AudioMetadataSourceReleaseGuard
             'vol',
             'disc',
             'cd',
+            'edition',
             'mixed by',
+            'remix',
+            'remixed',
+            'remixes',
         ] as $marker) {
             if (str_contains($normalized, $marker)) {
                 return true;

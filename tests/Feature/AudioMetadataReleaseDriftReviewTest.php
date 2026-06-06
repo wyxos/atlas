@@ -151,3 +151,109 @@ test('fingerprint release drift asks ai before replacing a plausible current edi
 
     expect($aiCalls)->toBeGreaterThanOrEqual(1);
 });
+
+test('fingerprint release with cover does not replace a broader remix edition with a different single release', function () {
+    config([
+        'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
+        'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.cover_art_archive_base_url' => 'https://cover.test',
+        'services.audio_metadata.ai_enabled' => false,
+    ]);
+
+    $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('forFile')
+            ->once()
+            ->andReturn(new AudioFingerprint('home-michael-badal-fingerprint', 437, '/tmp/home-michael-badal.mp3'));
+    });
+
+    Http::fake(function (Request $request) {
+        $url = $request->url();
+
+        if (str_starts_with($url, 'https://acoustid.test/v2/lookup')) {
+            return Http::response([
+                'status' => 'ok',
+                'results' => [[
+                    'id' => 'acoustid-home-michael-badal',
+                    'score' => 0.975,
+                    'recordings' => [[
+                        'id' => 'home-michael-badal-recording',
+                        'title' => 'Home (Michael Badal remix)',
+                        'duration' => 437000,
+                        'artists' => [
+                            ['name' => 'Above & Beyond'],
+                        ],
+                        'releases' => [[
+                            'id' => 'home-the-remixes-release',
+                            'title' => 'Home (The Remixes)',
+                            'date' => '2007-10-22',
+                            'country' => 'GB',
+                        ]],
+                    ]],
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://musicbrainz.test/ws/2/release/home-the-remixes-release') {
+            return Http::response([
+                'id' => 'home-the-remixes-release',
+                'title' => 'Home (The Remixes)',
+                'date' => '2007-10-22',
+                'country' => 'GB',
+                'barcode' => '5039060110959',
+                'label-info' => [[
+                    'catalog-number' => 'EA 71465',
+                    'label' => ['name' => 'Anjunabeats'],
+                ]],
+                'media' => [[
+                    'position' => 1,
+                    'tracks' => [[
+                        'position' => 4,
+                        'number' => '4',
+                        'title' => 'Home (Michael Badal remix)',
+                        'recording' => ['id' => 'home-michael-badal-recording'],
+                    ]],
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://cover.test/release/home-the-remixes-release') {
+            return Http::response([
+                'images' => [[
+                    'front' => true,
+                    'image' => 'https://cover.test/release/home-the-remixes-release/front.jpg',
+                ]],
+            ]);
+        }
+
+        return Http::response([], 404);
+    });
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Michael Badal Remix',
+        'filename' => '04-michael-badal-remix.mp3',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Home',
+        'normalized_name' => 'home',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'Tri State 2008 Remix Edition',
+        'normalized_name' => 'tri state 2008 remix edition',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
+    $file->metadata()->create([
+        'payload' => [
+            'duration' => 437,
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal', null);
+});
