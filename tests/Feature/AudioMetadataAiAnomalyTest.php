@@ -320,3 +320,168 @@ test('local ai can expand discogs search queries before reviewing a release anom
             'freeText' => '',
         ]);
 });
+
+test('local ai discogs rejects alternate compilations when current album family is stronger evidence', function () {
+    config([
+        'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
+        'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'ollama',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('forFile')
+            ->once()
+            ->andReturn(new AudioFingerprint('hijack-fingerprint', 325, '/tmp/hijack.mp3'));
+    });
+
+    Http::fake(function (Request $request) {
+        $url = $request->url();
+
+        if (str_starts_with($url, 'https://acoustid.test/v2/lookup')) {
+            return Http::response([
+                'status' => 'ok',
+                'results' => [[
+                    'id' => 'acoustid-hijack',
+                    'score' => 0.996,
+                    'recordings' => [[
+                        'id' => 'hijack-recording-mbid',
+                        'title' => 'Hijack (Original Mix)',
+                        'duration' => 325000,
+                        'artists' => [
+                            ['name' => 'Smith & Pledger'],
+                            ['name' => 'Aspekt'],
+                        ],
+                        'releases' => [[
+                            'id' => 'anjunabeats-volume-three-mbid',
+                            'title' => 'Anjunabeats Volume Three (Mixed By Above & Beyond)',
+                            'status' => 'Official',
+                            'artist-credit' => [[
+                                'name' => 'Above & Beyond',
+                                'artist' => ['name' => 'Above & Beyond'],
+                            ]],
+                        ]],
+                    ]],
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://musicbrainz.test/ws/2/release/anjunabeats-volume-three-mbid') {
+            return Http::response([
+                'id' => 'anjunabeats-volume-three-mbid',
+                'title' => 'Anjunabeats Volume Three (Mixed By Above & Beyond)',
+                'date' => '2005',
+                'country' => 'GB',
+                'media' => [[
+                    'position' => 1,
+                    'tracks' => [[
+                        'position' => '5',
+                        'number' => '5',
+                        'title' => 'Hijack (Original Mix)',
+                        'recording' => ['id' => 'hijack-recording-mbid'],
+                    ]],
+                ]],
+            ]);
+        }
+
+        if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
+            return Http::response(['releases' => []]);
+        }
+
+        if (str_starts_with($url, 'https://coverartarchive.org/release/')) {
+            return Http::response([], 404);
+        }
+
+        if (str_starts_with($url, 'https://discogs.test/database/search')) {
+            return Http::response([
+                'results' => [
+                    ['id' => 51392],
+                ],
+            ]);
+        }
+
+        if ($url === 'https://discogs.test/releases/51392') {
+            return Http::response([
+                'id' => 51392,
+                'title' => 'Anjunabeats Progressive Session',
+                'country' => 'RU',
+                'released' => '2005-08-20',
+                'artists' => [
+                    ['name' => 'Various'],
+                ],
+                'labels' => [
+                    ['name' => 'World Club Music', 'catno' => 'ПРЗ CD51392'],
+                ],
+                'identifiers' => [
+                    ['type' => 'Barcode', 'value' => '6 17465 13212 4'],
+                ],
+                'tracklist' => [[
+                    'position' => '5',
+                    'title' => 'Hijack (Original Mix)',
+                    'duration' => '5:25',
+                    'artists' => [
+                        ['name' => 'Smith & Pledger'],
+                        ['name' => 'Aspekt'],
+                    ],
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://ollama.test/api/chat') {
+            return Http::response([
+                'message' => [
+                    'content' => json_encode([
+                        'verdict' => 'accept',
+                        'confidence' => 0.88,
+                        'reason' => 'The alternate compilation contains the same track and duration.',
+                        'model' => 'qwen-test',
+                        'selected_track_position' => '5',
+                        'selected_track_title' => 'Hijack (Original Mix)',
+                    ]),
+                ],
+            ]);
+        }
+
+        return Http::response([], 404);
+    });
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Hijack (Original Mix)',
+        'filename' => 'hijack-original-mix.mp3',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Smith & Pledger Pres. Aspekt',
+        'normalized_name' => 'smith & pledger pres. aspekt',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'Anjunabeats Volume Three (Mixed By Above & Beyond)',
+        'normalized_name' => 'anjunabeats volume three (mixed by above & beyond)',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
+    $file->metadata()->create([
+        'payload' => [
+            'duration' => 325,
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
+        ->assertJsonPath('proposal.proposed_values.album', 'Anjunabeats Volume Three (Mixed By Above & Beyond)')
+        ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'anjunabeats-volume-three-mbid')
+        ->assertJsonMissingPath('proposal.proposed_values.discogs_release_id')
+        ->assertJsonMissingPath('proposal.proposed_values.release_label')
+        ->assertJsonMissingPath('proposal.proposed_values.catalog_number')
+        ->assertJsonMissingPath('proposal.proposed_values.barcode')
+        ->assertJsonMissingPath('proposal.proposed_values.release_country');
+});

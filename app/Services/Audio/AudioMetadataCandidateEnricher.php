@@ -145,6 +145,10 @@ class AudioMetadataCandidateEnricher
     ): ?array {
         foreach ($matches as $match) {
             $release = $match['release'];
+            if ($this->sourceReleases->isDifferentReleaseFamilyForCurrentCollection($currentValues, $candidate['values'] ?? [], $release)) {
+                continue;
+            }
+
             if ($this->sourceReleases->isLaterAlternateReleaseForCurrentSoundtrack($currentValues, $candidate['values'] ?? [], $release)) {
                 continue;
             }

@@ -4,13 +4,18 @@ namespace App\Services\Audio;
 
 class AudioMetadataCandidateGuard
 {
+    public function __construct(
+        private readonly AudioMetadataSourceReleaseGuard $sourceReleases,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      */
     public function allows(array $currentValues, array $candidate): bool
     {
-        return ! $this->looksLikeTrackTitleSingleForCollection($currentValues, $candidate);
+        return ! $this->looksLikeTrackTitleSingleForCollection($currentValues, $candidate)
+            && ! $this->sourceReleases->isDifferentReleaseFamilyForCurrentCollection($currentValues, $candidate['values'] ?? []);
     }
 
     /**
