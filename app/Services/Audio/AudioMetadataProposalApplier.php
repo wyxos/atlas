@@ -63,15 +63,15 @@ class AudioMetadataProposalApplier
 
             $proposed = is_array($proposal->proposed_values) ? $proposal->proposed_values : [];
             $albumGroup = $this->albumGroups->capture($file, $proposal, $fields);
-            $affectedFileIds = $this->affectedFileIds($file, $albumGroup);
 
-            $this->applyFileFields($file, $proposed, $fields);
+            $coverAlbumIds = $this->applyFileFields($file, $proposed, $fields);
             $this->applyRelationshipFields($file, $proposed, $fields);
             $this->applyAlbumMetadataFields($file, $proposed, $fields);
             $this->applyTrackPivotFields($file, $proposed, $fields);
             $this->applyMetadataFields($file, $proposed, $fields);
             $this->payloads->apply($file, $proposed, $fields);
             $this->albumGroups->apply($file, $albumGroup, $proposed, $fields);
+            $affectedFileIds = $this->affectedFileIds($file, $albumGroup, $coverAlbumIds);
 
             $proposal->forceFill([
                 'status' => 'applied',
@@ -107,9 +107,12 @@ class AudioMetadataProposalApplier
     /**
      * @param  array<string, mixed>  $proposed
      * @param  list<string>  $fields
+     * @return list<int>
      */
-    private function applyFileFields(File $file, array $proposed, array $fields): void
+    private function applyFileFields(File $file, array $proposed, array $fields): array
     {
+        $coverAlbumIds = [];
+
         if (in_array('title', $fields, true)) {
             $title = $this->cleanString($proposed['title'] ?? null);
             if ($title !== null) {
@@ -120,7 +123,10 @@ class AudioMetadataProposalApplier
         if (in_array('cover_url', $fields, true)) {
             $coverUrl = $this->normalizeCoverUrl($this->cleanString($proposed['cover_url'] ?? null));
             if ($coverUrl !== null) {
-                if (! $this->applyAlbumCoverUrl($file, $coverUrl)) {
+                $coverAlbumId = $this->applyAlbumCoverUrl($file, $coverUrl);
+                if ($coverAlbumId !== null) {
+                    $coverAlbumIds[] = $coverAlbumId;
+                } else {
                     $file->forceFill(['preview_url' => $coverUrl]);
                 }
             }
@@ -134,38 +140,40 @@ class AudioMetadataProposalApplier
         }
 
         $file->save();
+
+        return $coverAlbumIds;
     }
 
-    private function applyAlbumCoverUrl(File $file, string $coverUrl): bool
+    private function applyAlbumCoverUrl(File $file, string $coverUrl): ?int
     {
         $album = $file->albums->first();
         if (! $album instanceof Album) {
-            return false;
+            return null;
         }
 
         if ($this->applyExistingAlbumCover($album, $coverUrl)) {
-            return true;
+            return (int) $album->id;
         }
 
         try {
             $response = Http::timeout((int) config('services.audio_metadata.http_timeout_seconds', 15))
                 ->get($coverUrl);
         } catch (Throwable) {
-            return false;
+            return null;
         }
 
         if (! $response->successful()) {
-            return false;
+            return null;
         }
 
         $mimeType = $this->imageMimeType($response->header('content-type'));
         if ($mimeType === null) {
-            return false;
+            return null;
         }
 
         $body = $response->body();
         if ($body === '') {
-            return false;
+            return null;
         }
 
         $hash = hash('sha256', $body);
@@ -195,7 +203,7 @@ class AudioMetadataProposalApplier
             'is_default' => true,
         ]);
 
-        return true;
+        return (int) $album->id;
     }
 
     private function applyExistingAlbumCover(Album $album, string $coverUrl): bool
@@ -461,13 +469,26 @@ class AudioMetadataProposalApplier
 
     /**
      * @param  array{peer_ids:list<int>,source_album_ids:list<int>}  $albumGroup
+     * @param  list<int>  $coverAlbumIds
      * @return list<int>
      */
-    private function affectedFileIds(File $file, array $albumGroup): array
+    private function affectedFileIds(File $file, array $albumGroup, array $coverAlbumIds = []): array
     {
+        $coverFileIds = $coverAlbumIds === []
+            ? []
+            : File::query()
+                ->select('files.id')
+                ->join('album_file', 'files.id', '=', 'album_file.file_id')
+                ->whereIn('album_file.album_id', $coverAlbumIds)
+                ->distinct()
+                ->pluck('files.id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+
         return array_values(array_filter(array_unique([
             (int) $file->id,
             ...$albumGroup['peer_ids'],
+            ...$coverFileIds,
         ]), static fn (int $id): bool => $id > 0));
     }
 }

@@ -22,6 +22,19 @@ class AudioMetadataCandidateGuard
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      */
+    public function requiresAiReviewForFingerprintReleaseDrift(array $currentValues, array $candidate): bool
+    {
+        if (($candidate['provider'] ?? null) !== 'acoustid_musicbrainz') {
+            return false;
+        }
+
+        return $this->sourceReleases->isSameFamilyButDifferentCurrentReleaseContext($currentValues, $candidate['values'] ?? []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     */
     private function looksLikeTrackTitleSingleForCollection(array $currentValues, array $candidate): bool
     {
         $currentAlbum = $this->cleanString($currentValues['album'] ?? null);

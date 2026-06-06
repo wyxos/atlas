@@ -219,7 +219,7 @@ class AudioMetadataProposalGenerator
      */
     private function reviewFingerprintCandidate(File $file, array $currentValues, array $candidate): ?array
     {
-        if ($this->fingerprintCandidateHasIdentitySupport($candidate)) {
+        if ($this->fingerprintCandidateHasIdentitySupport($currentValues, $candidate)) {
             return $candidate;
         }
 
@@ -244,10 +244,14 @@ class AudioMetadataProposalGenerator
     /**
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      */
-    private function fingerprintCandidateHasIdentitySupport(array $candidate): bool
+    private function fingerprintCandidateHasIdentitySupport(array $currentValues, array $candidate): bool
     {
         if (($candidate['provider'] ?? null) !== 'acoustid_musicbrainz') {
             return true;
+        }
+
+        if ($this->candidateGuard->requiresAiReviewForFingerprintReleaseDrift($currentValues, $candidate)) {
+            return false;
         }
 
         return in_array($candidate['evidence']['identity_support'] ?? null, ['matched_existing_identity', 'release_with_cover', 'strong_fingerprint_release'], true);

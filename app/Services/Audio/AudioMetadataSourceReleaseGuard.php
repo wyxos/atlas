@@ -60,6 +60,30 @@ class AudioMetadataSourceReleaseGuard
         return $this->looksLikeCollectionAlbum($currentAlbum);
     }
 
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  array<string, mixed>  $candidateValues
+     */
+    public function isSameFamilyButDifferentCurrentReleaseContext(array $currentValues, array $candidateValues): bool
+    {
+        $currentAlbum = $this->values->cleanString($currentValues['album'] ?? null);
+        $proposedAlbum = $this->values->cleanString($candidateValues['album'] ?? null);
+
+        if ($currentAlbum === null || $proposedAlbum === null) {
+            return false;
+        }
+
+        if ($this->normalizedIdentity($currentAlbum) === $this->normalizedIdentity($proposedAlbum)) {
+            return false;
+        }
+
+        if (! $this->sameAlbumFamily($currentAlbum, $proposedAlbum)) {
+            return false;
+        }
+
+        return $this->hasDistinctiveReleaseContext($currentAlbum, $proposedAlbum);
+    }
+
     private function looksLikeSoundtrackAlbum(?string $album): bool
     {
         if ($album === null) {
@@ -115,6 +139,24 @@ class AudioMetadataSourceReleaseGuard
         }
 
         return count(array_intersect($currentTokens, $proposedTokens)) >= 2;
+    }
+
+    private function hasDistinctiveReleaseContext(string $currentAlbum, string $proposedAlbum): bool
+    {
+        $current = $this->normalizedWords($currentAlbum);
+        $proposed = $this->normalizedWords($proposedAlbum);
+
+        if (preg_match('/\b(19|20)\d{2}\b/', $current, $matches) === 1 && ! str_contains($proposed, $matches[0])) {
+            return true;
+        }
+
+        foreach (['cd', 'disc', 'edition', 'mixed by', 'remix edition', 'volume', 'vol'] as $marker) {
+            if (str_contains($current, $marker) && ! str_contains($proposed, $marker)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
