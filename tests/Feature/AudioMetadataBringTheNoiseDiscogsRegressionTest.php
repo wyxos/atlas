@@ -52,19 +52,29 @@ test('production bring the noise lookup can choose the matching discogs master v
                 $badAlbumSearchedBeforeTitle = true;
             }
 
+            $matchesProductionAlbumRelease = ($query['type'] ?? null) === 'release'
+                && ($query['release_title'] ?? null) === 'Bring the Noise Remix [Pump-Kin Remix]'
+                && ($query['artist'] ?? null) === 'Benny Benassi';
             $matchesMaster = ($query['type'] ?? null) === 'master'
                 && ($query['release_title'] ?? null) === 'Bring the Noise Remix'
                 && ($query['artist'] ?? null) === 'Public Enemy'
                 && $badAlbumSearchedBeforeTitle === false;
 
             return Http::response([
-                'results' => $matchesMaster ? [[
-                    'id' => 2006623,
-                    'type' => 'master',
-                    'master_id' => 2006623,
-                    'master_url' => 'https://discogs.test/masters/2006623',
-                    'title' => 'Public Enemy vs. Benny Benassi - Bring The Noise (Remix)',
-                ]] : [],
+                'results' => [
+                    ...($matchesProductionAlbumRelease ? [[
+                        'id' => 1358093,
+                        'type' => 'release',
+                        'title' => "Benny Benassi - Rock'N'Rave",
+                    ]] : []),
+                    ...($matchesMaster ? [[
+                        'id' => 2006623,
+                        'type' => 'master',
+                        'master_id' => 2006623,
+                        'master_url' => 'https://discogs.test/masters/2006623',
+                        'title' => 'Public Enemy vs. Benny Benassi - Bring The Noise (Remix)',
+                    ]] : []),
+                ],
             ]);
         }
 
@@ -84,6 +94,39 @@ test('production bring the noise lookup can choose the matching discogs master v
                     ['id' => 1047849, 'resource_url' => 'https://discogs.test/releases/1047849'],
                     ['id' => 1120943, 'resource_url' => 'https://discogs.test/releases/1120943'],
                 ],
+            ]);
+        }
+
+        if ($url === 'https://discogs.test/releases/1358093') {
+            return Http::response([
+                'id' => 1358093,
+                'master_id' => 92414,
+                'uri' => 'https://www.discogs.com/release/1358093-Benny-Benassi-RockNRave',
+                'title' => "Rock'N'Rave",
+                'country' => 'US',
+                'released' => '2008-06-03',
+                'artists' => [
+                    ['name' => 'Benny Benassi'],
+                ],
+                'labels' => [
+                    ['name' => 'Ultra Records', 'catno' => 'UL 1695-2'],
+                ],
+                'identifiers' => [
+                    ['type' => 'Barcode', 'value' => '6 17465 16952 6'],
+                ],
+                'images' => [[
+                    'type' => 'primary',
+                    'uri' => 'https://discogs.test/image/rock-n-rave.jpg',
+                ]],
+                'tracklist' => [[
+                    'position' => '2.1',
+                    'title' => 'Bring The Noise Remix (Pump-kin Remix)',
+                    'duration' => '6:38',
+                    'artists' => [
+                        ['name' => 'Benny Benassi'],
+                        ['name' => 'Public Enemy'],
+                    ],
+                ]],
             ]);
         }
 
@@ -175,6 +218,13 @@ test('production bring the noise lookup can choose the matching discogs master v
                     ]],
                     'model' => 'qwen-test',
                 ],
+                'atlas-audio-metadata-field-adjudication-v1' => [
+                    'verdict' => 'ambiguous',
+                    'confidence' => 0.9,
+                    'reason' => 'Title change does not match current evidence.',
+                    'model' => 'qwen-test',
+                    'safe_fields' => [],
+                ],
                 default => [
                     'verdict' => 'accept',
                     'confidence' => 0.93,
@@ -218,7 +268,9 @@ test('production bring the noise lookup can choose the matching discogs master v
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/bring-the-noise-pump-kin.jpg')
         ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/1047849-Public-Enemy-Vs-Benny-Benassi-Bring-The-Noise-Remix')
         ->assertJsonPath('proposal.evidence.discogs_master_id', '2006623')
-        ->assertJsonPath('proposal.evidence.discogs_master_url', 'https://www.discogs.com/master/2006623-Public-Enemy-vs-Benny-Benassi-Bring-The-Noise-Remix');
+        ->assertJsonPath('proposal.evidence.discogs_master_url', 'https://www.discogs.com/master/2006623-Public-Enemy-vs-Benny-Benassi-Bring-The-Noise-Remix')
+        ->assertJsonPath('proposal.evidence.field_review.verdict', 'ambiguous')
+        ->assertJsonPath('proposal.evidence.field_review.deterministic_override', 'strong_discogs_release_match');
 
     expect($discogsSearches)->toContain([
         'type' => 'master',

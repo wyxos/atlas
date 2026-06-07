@@ -470,6 +470,7 @@ class AudioMetadataAiReviewer
             'A strong fingerprint can prove a recording while still failing to prove the correct release, album, edition, disc, cover, label, catalog number, barcode, country, or release date.',
             'Include a field in safe_fields only when that exact field is coherent with the current title, artist, album/group, filename, duration, and provider evidence.',
             'Title is unsafe when the current and proposed titles have different remix, mix, version, update, edit, live, remaster, vinyl, or edition descriptors.',
+            'Title case, bracket-vs-parenthesis style, apostrophes, punctuation, and whitespace alone are safe when normalized title tokens and mix descriptors match.',
             'Album, cover_url, track_number, disc_number, release_label, catalog_number, barcode, release_date, release_country, musicbrainz_release_id, and discogs_release_id require release-level confidence, not only recording confidence.',
             'Use ambiguous with a reduced safe_fields list when the recording likely matches but release-level details may describe a different single, remix package, compilation, edition, or disc.',
             'Use reject with an empty safe_fields list when even recording identity is not coherent.',

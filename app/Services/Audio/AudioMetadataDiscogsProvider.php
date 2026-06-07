@@ -118,6 +118,11 @@ class AudioMetadataDiscogsProvider
             $confidence -= 10;
         }
 
+        if (! in_array('album', $matchedFields, true) && $title !== null && $this->titlesMatch($title, $releaseTitle)) {
+            $confidence += 14;
+            $matchedFields[] = 'release_title';
+        }
+
         if ($this->artistsOverlap($artists, $releaseArtists)) {
             $confidence += 8;
             $matchedFields[] = 'artists';
@@ -156,7 +161,7 @@ class AudioMetadataDiscogsProvider
         $releaseId = $this->values->cleanString($release['id'] ?? null);
 
         return [
-            'confidence' => max(55, min(90, $confidence)),
+            'confidence' => max(55, min($this->confidenceCeiling($matchedFields), $confidence)),
             'track' => $track,
             'evidence' => [
                 'source' => 'discogs_release_search',
@@ -171,6 +176,14 @@ class AudioMetadataDiscogsProvider
                 'cover_source' => $coverUrl !== null ? 'discogs_images' : null,
             ],
         ];
+    }
+
+    /**
+     * @param  list<string>  $matchedFields
+     */
+    private function confidenceCeiling(array $matchedFields): int
+    {
+        return in_array('release_title', $matchedFields, true) ? 94 : 90;
     }
 
     /**

@@ -31,7 +31,18 @@ class AudioMetadataCandidateFieldReviewer
             }
 
             $candidate['evidence']['field_review'] = $review;
-            $candidate['values'] = $this->valuesAllowedByReview($candidate['values'], $review);
+            $originalValues = $candidate['values'];
+            $reviewedValues = $this->valuesAllowedByReview($originalValues, $review);
+            $candidate['values'] = $reviewedValues;
+            if ($candidate['values'] === [] && ($review['verdict'] ?? null) === 'ambiguous') {
+                $deterministicCandidate = $candidate;
+                $deterministicCandidate['values'] = $originalValues;
+                $candidate['values'] = $this->valuesAllowedByDeterministicReview($deterministicCandidate);
+
+                if ($candidate['values'] !== []) {
+                    $candidate['evidence']['field_review']['deterministic_override'] = 'strong_discogs_release_match';
+                }
+            }
 
             return $candidate['values'] === [] ? null : $candidate;
         }
@@ -78,6 +89,35 @@ class AudioMetadataCandidateFieldReviewer
         }
 
         return ($review['verdict'] ?? null) === 'accept' ? $values : [];
+    }
+
+    /**
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @return array<string, mixed>
+     */
+    private function valuesAllowedByDeterministicReview(array $candidate): array
+    {
+        if (($candidate['provider'] ?? null) !== 'discogs_release') {
+            return [];
+        }
+
+        if ($this->values->cleanString($candidate['values']['discogs_release_id'] ?? null) === null) {
+            return [];
+        }
+
+        $durationDelta = $candidate['evidence']['duration_delta_seconds'] ?? null;
+        if (! is_numeric($durationDelta) || (int) $durationDelta > 2) {
+            return [];
+        }
+
+        $matchedFields = $this->stringList($candidate['evidence']['matched_existing_fields'] ?? []);
+        $hasRecordingSupport = in_array('artists', $matchedFields, true)
+            && in_array('track', $matchedFields, true)
+            && in_array('duration', $matchedFields, true);
+        $hasReleaseSupport = in_array('album', $matchedFields, true)
+            || in_array('release_title', $matchedFields, true);
+
+        return $hasRecordingSupport && $hasReleaseSupport ? $candidate['values'] : [];
     }
 
     /**
