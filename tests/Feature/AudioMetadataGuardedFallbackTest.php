@@ -150,6 +150,7 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
                     'confidence' => 0.88,
                     'reason' => 'Same album family, matching remix title, and matching duration.',
                     'model' => 'qwen-test',
+                    'source_identity_supported' => true,
                     'selected_track_position' => '2-1',
                     'selected_track_title' => 'Bring The Noise Remix (Pump-kin Remix)',
                 ],
@@ -221,4 +222,136 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
             'artist' => 'Benny Benassi',
             'q' => '',
         ]);
+});
+
+test('local ai discogs search cannot accept a different release family with only weak album token overlap', function () {
+    config([
+        'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
+        'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'gateway',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_token' => 'ai-token',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('forFile')
+            ->once()
+            ->andReturn(new AudioFingerprint('bring-the-noise-fingerprint', 398, '/tmp/bring-the-noise.mp3'));
+    });
+
+    Http::fake(function (Request $request) {
+        $url = $request->url();
+
+        if (str_starts_with($url, 'https://acoustid.test/v2/lookup')) {
+            return Http::response(['status' => 'ok', 'results' => []]);
+        }
+
+        if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
+            return Http::response(['releases' => []]);
+        }
+
+        if (str_starts_with($url, 'https://coverartarchive.org/release/')) {
+            return Http::response([], 404);
+        }
+
+        if (str_starts_with($url, 'https://discogs.test/database/search')) {
+            return Http::response([
+                'results' => [['id' => 92595]],
+            ]);
+        }
+
+        if ($url === 'https://discogs.test/releases/92595') {
+            return Http::response([
+                'id' => 92595,
+                'title' => "Rant N' Rave",
+                'country' => 'US',
+                'released' => '0',
+                'artists' => [
+                    ['name' => 'Stray Cats'],
+                ],
+                'labels' => [
+                    ['name' => 'EMI America', 'catno' => 'CDP 7 92595 2'],
+                ],
+                'identifiers' => [[
+                    'type' => 'Barcode',
+                    'value' => '0 7777-92595-2 6',
+                ]],
+                'tracklist' => [[
+                    'position' => '2',
+                    'title' => 'Too Hip, Gotta Go',
+                    'duration' => '3:00',
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
+            return Http::response(match ((string) ($request->data()['schemaVersion'] ?? '')) {
+                'atlas-audio-metadata-discogs-search-v1' => [
+                    'queries' => [[
+                        'release_title' => "Rock N' Rave",
+                        'artist' => 'Benny Benassi',
+                        'reason' => 'Search the apparent album title.',
+                    ]],
+                    'model' => 'qwen-test',
+                ],
+                'atlas-audio-metadata-anomaly-v1' => [
+                    'verdict' => 'accept',
+                    'confidence' => 0.96,
+                    'reason' => 'Bad AI response that should not create a wrong proposal.',
+                    'model' => 'qwen-test',
+                    'selected_track_position' => '2',
+                    'selected_track_title' => 'Too Hip, Gotta Go',
+                ],
+                default => [
+                    'verdict' => 'accept',
+                    'confidence' => 0.96,
+                    'reason' => 'Bad AI response that should not create a wrong proposal.',
+                    'model' => 'qwen-test',
+                ],
+            });
+        }
+
+        return Http::response([], 404);
+    });
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Bring the Noise Remix [Pump-Kin Remix]',
+        'filename' => 'bring-the-noise-pump-kin-remix.mp3',
+    ]);
+    $artists = Artist::factory()
+        ->count(2)
+        ->sequence(
+            ['name' => 'Benny Benassi', 'normalized_name' => 'benny benassi'],
+            ['name' => 'Benny Benassi/Public Enemy', 'normalized_name' => 'benny benassi public enemy'],
+        )
+        ->create();
+    $album = Album::factory()->create([
+        'name' => "Rock N' Rave Disc 2",
+        'normalized_name' => "rock n' rave disc 2",
+    ]);
+    $file->artists()->sync($artists->modelKeys());
+    $file->albums()->sync([$album->id]);
+    $file->metadata()->create([
+        'payload' => [
+            'title' => 'Bring the Noise Remix [Pump-Kin Remix]',
+            'artist' => ['Benny Benassi', 'Benny Benassi/Public Enemy'],
+            'album' => "Rock N' Rave Disc 2",
+            'duration' => 398,
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal', null)
+        ->assertJsonPath('run.status', 'completed')
+        ->assertJsonPath('run.proposal_count', 0);
 });

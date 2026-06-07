@@ -158,10 +158,6 @@ class AudioMetadataCandidateEnricher
     ): ?array {
         foreach ($matches as $match) {
             $release = $match['release'];
-            if ($this->sourceReleases->isDifferentReleaseFamilyForCurrentCollection($currentValues, $candidate['values'] ?? [], $release)) {
-                continue;
-            }
-
             if ($this->sourceReleases->isLaterAlternateReleaseForCurrentSoundtrack($currentValues, $candidate['values'] ?? [], $release)) {
                 continue;
             }
@@ -169,6 +165,10 @@ class AudioMetadataCandidateEnricher
             $source = $this->discogsReviewSource($release);
             $review = $this->aiReviewer->resolveAnomaly($file, $currentValues, $candidate, $source);
             if (($review['verdict'] ?? null) !== 'accept') {
+                continue;
+            }
+
+            if (($review['source_identity_supported'] ?? false) !== true) {
                 continue;
             }
 

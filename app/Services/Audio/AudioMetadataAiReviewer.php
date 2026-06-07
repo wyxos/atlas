@@ -60,7 +60,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, mixed>  $source
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null}|null
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,source_identity_supported:bool,selected_track_position:string|null,selected_track_title:string|null}|null
      */
     public function resolveAnomaly(File $file, array $currentValues, array $candidate, array $source): ?array
     {
@@ -307,12 +307,13 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_track_position:string|null,selected_track_title:string|null}
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,source_identity_supported:bool,selected_track_position:string|null,selected_track_title:string|null}
      */
     private function normalizeAnomalyResponse(array $payload): array
     {
         return [
             ...$this->normalizeResponse($payload),
+            'source_identity_supported' => ($payload['source_identity_supported'] ?? null) === true,
             'selected_track_position' => $this->cleanString($payload['selected_track_position'] ?? null),
             'selected_track_title' => $this->cleanString($payload['selected_track_title'] ?? null),
         ];
@@ -433,9 +434,10 @@ class AudioMetadataAiReviewer
     private function anomalyPrompt(array $input): string
     {
         return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason","selected_track_position":"2","selected_track_title":"source track title"}.',
+            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason","source_identity_supported":true,"selected_track_position":"2","selected_track_title":"source track title"}.',
             'Allowed verdict values: accept, reject, ambiguous.',
             'Use accept only when the fingerprint candidate and source release are likely the same recording/release, and one listed source track plausibly represents the current track under another language, romanization, or import/custom title.',
+            'Set source_identity_supported to true only when the supplied release and selected source track are coherent with the current title, artists, album, filename, duration, and fingerprint candidate. Set it to false for merely similar album names, unrelated artists, unrelated selected tracks, or weak search-result matches.',
             'Use reject when the source release or selected track points to a different work.',
             'Use ambiguous when the listed evidence is plausible but insufficient.',
             'Do not invent canonical titles, artists, albums, release details, IDs, or track positions. Select one track from the supplied source.tracklist only.',
