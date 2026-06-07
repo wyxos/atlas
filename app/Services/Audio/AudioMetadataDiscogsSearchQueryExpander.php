@@ -4,7 +4,7 @@ namespace App\Services\Audio;
 
 class AudioMetadataDiscogsSearchQueryExpander
 {
-    private const MAX_QUERIES = 12;
+    private const MAX_QUERIES = 18;
 
     public function __construct(
         private readonly AudioMetadataValueExtractor $values,
@@ -49,8 +49,17 @@ class AudioMetadataDiscogsSearchQueryExpander
      */
     private function releaseTitleVariants(string $releaseTitle): array
     {
+        $withoutSquareBrackets = preg_replace('/\s*\[[^]]+]\s*/', ' ', $releaseTitle) ?? $releaseTitle;
+        $withoutAnyBrackets = preg_replace('/\s*(?:\([^)]*\)|\[[^]]*])\s*/', ' ', $releaseTitle) ?? $releaseTitle;
+        $squareAsParentheses = preg_replace('/\[([^]]+)]/', '($1)', $releaseTitle) ?? $releaseTitle;
+        $withoutTrailingMixDescriptor = preg_replace('/\s+\b(?:remix|mix|edit|version)\b$/i', '', $withoutAnyBrackets) ?? $withoutAnyBrackets;
+
         return $this->uniqueStrings([
             $releaseTitle,
+            $squareAsParentheses,
+            $withoutSquareBrackets,
+            $withoutAnyBrackets,
+            $withoutTrailingMixDescriptor,
             preg_replace('/\b(?:tv|television|anime|animation|animated)\b/i', ' ', $releaseTitle) ?? $releaseTitle,
         ]);
     }
@@ -64,11 +73,34 @@ class AudioMetadataDiscogsSearchQueryExpander
             return [$artist];
         }
 
-        return $this->uniqueStrings([
+        $splitArtists = $this->splitArtists($artist);
+        $variants = [
             $artist,
-            preg_replace('/n(?=[mbp])/i', 'm', $artist) ?? $artist,
-            preg_replace('/m(?=[mbp])/i', 'n', $artist) ?? $artist,
-        ]);
+            ...$splitArtists,
+        ];
+
+        if (count($splitArtists) > 1) {
+            $variants[] = implode(' vs ', $splitArtists);
+            $variants[] = implode(' ', $splitArtists);
+        }
+
+        return $this->uniqueStrings(collect($variants)
+            ->flatMap(fn (string $variant): array => [
+                $variant,
+                preg_replace('/n(?=[mbp])/i', 'm', $variant) ?? $variant,
+                preg_replace('/m(?=[mbp])/i', 'n', $variant) ?? $variant,
+            ])
+            ->all());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function splitArtists(string $artist): array
+    {
+        $parts = preg_split('/\s*(?:\/|,|;|\+|&|\bvs\.?\b|\bfeat(?:uring)?\.?\b)\s*/i', $artist) ?: [];
+
+        return $this->uniqueStrings($parts);
     }
 
     /**

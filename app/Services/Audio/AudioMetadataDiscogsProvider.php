@@ -8,6 +8,8 @@ class AudioMetadataDiscogsProvider
 {
     public function __construct(
         private readonly AudioMetadataDiscogsClient $discogs,
+        private readonly AudioMetadataDiscogsSearchQueryExpander $searchQueryExpander,
+        private readonly AudioMetadataDiscogsTrackMatcher $trackMatcher,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
 
@@ -59,9 +61,15 @@ class AudioMetadataDiscogsProvider
     private function bestReleaseMatch(string $album, array $artists, ?string $title, ?int $duration): ?array
     {
         $best = null;
+        $seenReleaseIds = [];
 
-        foreach ($this->releaseSearchTitles($album) as $releaseTitle) {
-            foreach ($this->discogs->searchReleaseIds($releaseTitle, $artists[0]) as $releaseId) {
+        foreach ($this->releaseSearchQueries($album, $artists, $title) as $searchQuery) {
+            foreach ($this->discogs->searchReleaseIds($searchQuery['release_title'], $searchQuery['artist']) as $releaseId) {
+                if (isset($seenReleaseIds[$releaseId])) {
+                    continue;
+                }
+
+                $seenReleaseIds[$releaseId] = true;
                 $release = $this->discogs->fetchRelease($releaseId);
                 if ($release === []) {
                     continue;
@@ -98,7 +106,7 @@ class AudioMetadataDiscogsProvider
         $matchedFields = [];
         $releaseTitle = $this->values->cleanString($release['title'] ?? null);
         $releaseArtists = $this->releaseArtists($release);
-        $track = $this->bestTrack($release, $title, $duration);
+        $track = $this->trackMatcher->bestTrack($release, $title, $duration);
         $trackDuration = $this->discogsDurationSeconds($track['duration'] ?? null);
         $durationDelta = $duration !== null && $trackDuration !== null ? abs($duration - $trackDuration) : null;
         $coverUrl = $this->coverUrl($release);
@@ -129,7 +137,7 @@ class AudioMetadataDiscogsProvider
             } elseif ($durationDelta <= 5) {
                 $confidence += 2;
             } elseif ($durationDelta > 12) {
-                $confidence -= 6;
+                $confidence -= 18;
             }
         }
 
@@ -219,64 +227,6 @@ class AudioMetadataDiscogsProvider
         return $parts[0] ?? $title;
     }
 
-    /**
-     * @param  array<string, mixed>  $release
-     * @return array<string, mixed>|null
-     */
-    private function bestTrack(array $release, ?string $title, ?int $duration): ?array
-    {
-        if ($title === null) {
-            return null;
-        }
-
-        $tracks = $release['tracklist'] ?? null;
-        if (! is_array($tracks)) {
-            return null;
-        }
-
-        $best = null;
-        $bestScore = 0;
-
-        foreach ($tracks as $track) {
-            if (! is_array($track)) {
-                continue;
-            }
-
-            $trackTitle = $this->values->cleanString($track['title'] ?? null);
-            if ($trackTitle === null) {
-                continue;
-            }
-
-            $score = $this->trackMatchScore($title, $trackTitle);
-            $trackDuration = $this->discogsDurationSeconds($track['duration'] ?? null);
-            if ($duration !== null && $trackDuration !== null && abs($duration - $trackDuration) <= 5) {
-                $score += 2;
-            }
-
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $best = $track;
-            }
-        }
-
-        return $bestScore >= 8 ? $best : null;
-    }
-
-    private function trackMatchScore(string $title, string $trackTitle): int
-    {
-        $left = $this->normalizeTrackTitle($title);
-        $right = $this->normalizeTrackTitle($trackTitle);
-        if ($left === '' || $right === '') {
-            return 0;
-        }
-
-        if ($left === $right) {
-            return 10;
-        }
-
-        return str_contains($left, $right) || str_contains($right, $left) ? 8 : 0;
-    }
-
     private function titlesMatch(string $left, ?string $right): bool
     {
         if ($right === null) {
@@ -291,7 +241,28 @@ class AudioMetadataDiscogsProvider
             && ($left === $right || str_contains($left, $right) || str_contains($right, $left) || $this->titleTokensMatch($left, $right));
     }
 
-    private function releaseSearchTitles(string $album): array
+    /**
+     * @param  list<string>  $artists
+     * @return list<array{release_title:string,artist:string,reason:string|null}>
+     */
+    private function releaseSearchQueries(string $album, array $artists, ?string $title): array
+    {
+        $queries = [];
+
+        foreach ($this->releaseSearchTitles($album, $title) as $releaseTitle) {
+            foreach ($artists as $artist) {
+                $queries[] = [
+                    'release_title' => $releaseTitle,
+                    'artist' => $artist,
+                    'reason' => null,
+                ];
+            }
+        }
+
+        return $this->searchQueryExpander->expand($queries);
+    }
+
+    private function releaseSearchTitles(string $album, ?string $title): array
     {
         $clean = $this->values->cleanString($album);
         if ($clean === null) {
@@ -303,8 +274,8 @@ class AudioMetadataDiscogsProvider
         $spaced = str_replace(['__', '_'], ' ', $withoutFormatSuffix);
         $withoutEpSuffix = preg_replace('/\s+EP$/i', '', $spaced) ?? $spaced;
 
-        return collect([$clean, $withoutSceneSuffix, $withoutFormatSuffix, $spaced, $withoutEpSuffix])
-            ->map(fn (string $candidate): ?string => $this->values->cleanString($candidate))
+        return collect([$clean, $withoutSceneSuffix, $withoutFormatSuffix, $spaced, $withoutEpSuffix, $title])
+            ->map(fn (mixed $candidate): ?string => $this->values->cleanString($candidate))
             ->filter()
             ->unique(fn (string $candidate): string => $this->normalizeTitle($candidate))
             ->values()
@@ -462,13 +433,6 @@ class AudioMetadataDiscogsProvider
     {
         $title = preg_replace('/^\s*\d+\s*[-_.]\s*/', '', $title) ?? $title;
         $title = preg_replace('/\([^)]*\)|\[[^]]*]/', '', $title) ?? $title;
-
-        return trim(preg_replace('/[^a-z0-9]+/', ' ', mb_strtolower($title)) ?? '');
-    }
-
-    private function normalizeTrackTitle(string $title): string
-    {
-        $title = preg_replace('/^\s*\d+\s*[-_.]\s*/', '', $title) ?? $title;
 
         return trim(preg_replace('/[^a-z0-9]+/', ' ', mb_strtolower($title)) ?? '');
     }

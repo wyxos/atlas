@@ -7,6 +7,10 @@ use Throwable;
 
 class AudioMetadataDiscogsClient
 {
+    private const MAX_SEARCH_RELEASE_IDS = 16;
+
+    private const MAX_MASTER_VERSION_RELEASE_IDS = 12;
+
     /**
      * @var array<string, string>
      */
@@ -47,17 +51,25 @@ class AudioMetadataDiscogsClient
             }
 
             foreach ($results as $result) {
-                if (is_array($result) && ($id = $this->releaseIdFromSearchResult($result)) !== null) {
-                    $ids[] = $id;
+                if (! is_array($result)) {
+                    continue;
+                }
+
+                foreach ($this->releaseIdsFromSearchResult($result) as $id) {
+                    $ids[$id] = $id;
+
+                    if (count($ids) >= self::MAX_SEARCH_RELEASE_IDS) {
+                        return array_values($ids);
+                    }
                 }
             }
 
-            if ($ids !== []) {
+            if ($ids !== [] && ($query['type'] ?? null) === 'master') {
                 break;
             }
         }
 
-        return collect($ids)->unique()->values()->all();
+        return array_values($ids);
     }
 
     /**
@@ -95,11 +107,11 @@ class AudioMetadataDiscogsClient
     /**
      * @param  array<string, mixed>  $result
      */
-    private function releaseIdFromSearchResult(array $result): ?string
+    private function releaseIdsFromSearchResult(array $result): array
     {
         $id = $this->values->cleanString($result['id'] ?? null);
         if ($id === null) {
-            return null;
+            return [];
         }
 
         $type = mb_strtolower((string) ($result['type'] ?? ''));
@@ -108,33 +120,41 @@ class AudioMetadataDiscogsClient
         if ($type !== 'master'
             && ! str_contains((string) $resourceUrl, '/masters/')
             && ! str_contains((string) $masterUrl, '/masters/')) {
-            return $id;
+            return [$id];
         }
 
-        return $this->releaseIdFromMasterResult($result);
+        return $this->releaseIdsFromMasterResult($result);
     }
 
     /**
      * @param  array<string, mixed>  $result
      */
-    private function releaseIdFromMasterResult(array $result): ?string
+    private function releaseIdsFromMasterResult(array $result): array
     {
         $masterId = $this->values->cleanString($result['master_id'] ?? $result['id'] ?? null);
         if ($masterId === null) {
-            return null;
+            return [];
         }
 
         $master = $this->fetchMaster($masterId);
-        $releaseId = $this->values->cleanString($master['main_release'] ?? null);
-        if ($releaseId === null) {
-            return null;
-        }
-
         $masterUri = $this->discogsWebUrl($this->values->cleanString($master['uri'] ?? $result['uri'] ?? null))
             ?? 'https://www.discogs.com/master/'.$masterId;
-        $this->masterUrisByReleaseId[$releaseId] = $masterUri;
 
-        return $releaseId;
+        $ids = [];
+        $mainReleaseId = $this->values->cleanString($master['main_release'] ?? null);
+        if ($mainReleaseId !== null) {
+            $ids[$mainReleaseId] = $mainReleaseId;
+        }
+
+        foreach ($this->fetchMasterVersionReleaseIds($masterId) as $versionReleaseId) {
+            $ids[$versionReleaseId] = $versionReleaseId;
+        }
+
+        foreach ($ids as $releaseId) {
+            $this->masterUrisByReleaseId[$releaseId] = $masterUri;
+        }
+
+        return array_values($ids);
     }
 
     /**
@@ -161,6 +181,52 @@ class AudioMetadataDiscogsClient
     }
 
     /**
+     * @return list<string>
+     */
+    private function fetchMasterVersionReleaseIds(string $masterId): array
+    {
+        try {
+            $response = Http::acceptJson()
+                ->withHeaders($this->headers())
+                ->timeout((int) config('services.audio_metadata.http_timeout_seconds', 15))
+                ->get(rtrim($this->baseUrl(), '/').'/masters/'.$masterId.'/versions', [
+                    'per_page' => 25,
+                    'page' => 1,
+                ]);
+        } catch (Throwable) {
+            return [];
+        }
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        $versions = $response->json('versions');
+        if (! is_array($versions)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($versions as $version) {
+            if (! is_array($version)) {
+                continue;
+            }
+
+            $releaseId = $this->values->cleanString($version['id'] ?? null);
+            if ($releaseId === null) {
+                continue;
+            }
+
+            $ids[$releaseId] = $releaseId;
+            if (count($ids) >= self::MAX_MASTER_VERSION_RELEASE_IDS) {
+                break;
+            }
+        }
+
+        return array_values($ids);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function searchQueries(string $releaseTitle, string $artist): array
@@ -174,24 +240,6 @@ class AudioMetadataDiscogsClient
                 'page' => 1,
             ],
             [
-                'type' => 'release',
-                'q' => trim($artist.' '.$releaseTitle),
-                'per_page' => 5,
-                'page' => 1,
-            ],
-            [
-                'type' => 'release',
-                'release_title' => $releaseTitle,
-                'per_page' => 5,
-                'page' => 1,
-            ],
-            [
-                'type' => 'release',
-                'q' => $releaseTitle,
-                'per_page' => 5,
-                'page' => 1,
-            ],
-            [
                 'type' => 'master',
                 'artist' => $artist,
                 'release_title' => $releaseTitle,
@@ -199,14 +247,32 @@ class AudioMetadataDiscogsClient
                 'page' => 1,
             ],
             [
-                'type' => 'master',
+                'type' => 'release',
                 'q' => trim($artist.' '.$releaseTitle),
                 'per_page' => 5,
                 'page' => 1,
             ],
             [
                 'type' => 'master',
+                'q' => trim($artist.' '.$releaseTitle),
+                'per_page' => 5,
+                'page' => 1,
+            ],
+            [
+                'type' => 'release',
                 'release_title' => $releaseTitle,
+                'per_page' => 5,
+                'page' => 1,
+            ],
+            [
+                'type' => 'master',
+                'release_title' => $releaseTitle,
+                'per_page' => 5,
+                'page' => 1,
+            ],
+            [
+                'type' => 'release',
+                'q' => $releaseTitle,
                 'per_page' => 5,
                 'page' => 1,
             ],
