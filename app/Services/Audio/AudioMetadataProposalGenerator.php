@@ -15,23 +15,10 @@ use Illuminate\Support\Facades\Http;
 class AudioMetadataProposalGenerator
 {
     private const REVIEW_FIELDS = [
-        'title',
-        'artists',
-        'album',
-        'duration_seconds',
-        'cover_url',
-        'spotify_uri',
-        'track_number',
-        'disc_number',
-        'release_label',
-        'catalog_number',
-        'barcode',
-        'release_date',
-        'release_country',
-        'isrc',
-        'musicbrainz_recording_id',
-        'musicbrainz_release_id',
-        'discogs_release_id',
+        'title', 'artists', 'album', 'duration_seconds', 'cover_url', 'spotify_uri',
+        'track_number', 'disc_number', 'release_label', 'catalog_number', 'barcode',
+        'release_date', 'release_country', 'isrc', 'musicbrainz_recording_id',
+        'musicbrainz_release_id', 'discogs_release_id',
     ];
 
     public function __construct(
@@ -204,19 +191,26 @@ class AudioMetadataProposalGenerator
         }
 
         $this->reportProgress($progress, 'scoring', 'Scoring metadata candidates');
-        $candidate = collect($candidates)
+        $reviewableCandidates = collect($candidates)
             ->filter(fn (array $candidate): bool => $this->changes($currentValues, $candidate['values']) !== [])
             ->filter(fn (array $candidate): bool => $this->candidateGuard->allows($currentValues, $candidate))
             ->sortByDesc(fn (array $candidate): int => $this->candidatePriority($candidate))
-            ->first();
+            ->values();
 
-        if (! is_array($candidate)) {
+        if ($reviewableCandidates->isEmpty()) {
             return null;
         }
 
         $this->reportProgress($progress, 'ai_review', 'Reviewing field-level metadata safety');
 
-        return $this->fieldReviewer->review($file, $currentValues, $candidate, $this->changes($currentValues, $candidate['values']));
+        foreach ($reviewableCandidates as $candidate) {
+            $reviewedCandidate = $this->fieldReviewer->review($file, $currentValues, $candidate, $this->changes($currentValues, $candidate['values']));
+            if (is_array($reviewedCandidate) && $this->changes($currentValues, $reviewedCandidate['values']) !== []) {
+                return $reviewedCandidate;
+            }
+        }
+
+        return null;
     }
 
     /**
