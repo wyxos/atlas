@@ -87,13 +87,40 @@ class AudioMetadataDiscogsProvider
                     'evidence' => $score['evidence'],
                 ];
 
-                if ($best === null || $candidate['confidence'] > $best['confidence']) {
+                if ($best === null || $this->candidateBeats($candidate, $best)) {
                     $best = $candidate;
                 }
             }
         }
 
         return $best;
+    }
+
+    private function candidateBeats(array $candidate, array $best): bool
+    {
+        $candidatePriority = $this->releaseMatchPriority($candidate['evidence']);
+        $bestPriority = $this->releaseMatchPriority($best['evidence']);
+
+        if ($candidatePriority !== $bestPriority) {
+            return $candidatePriority > $bestPriority;
+        }
+
+        return $candidate['confidence'] > $best['confidence'];
+    }
+
+    private function releaseMatchPriority(array $evidence): int
+    {
+        $matchedFields = $this->values->cleanStringList($evidence['matched_existing_fields'] ?? []);
+        $durationDelta = $evidence['duration_delta_seconds'] ?? null;
+        $hasExactDuration = is_numeric($durationDelta) && (int) $durationDelta <= 2;
+        $hasFields = fn (array $fields): bool => count(array_intersect($fields, $matchedFields)) === count($fields);
+
+        return match (true) {
+            $hasExactDuration && $hasFields(['album', 'artists', 'track', 'duration']) => 30,
+            $hasExactDuration && $hasFields(['release_title', 'artists', 'track', 'duration']) => 20,
+            $hasFields(['album', 'artists']) => 10,
+            default => 0,
+        };
     }
 
     /**

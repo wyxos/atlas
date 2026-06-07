@@ -12,7 +12,7 @@ use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
-test('production bring the noise lookup can choose the matching discogs master version instead of local tags', function () {
+test('production bring the noise lookup prefers an album release with matching track and duration over a standalone remix single', function () {
     config([
         'services.audio_metadata.discogs_user_token' => 'discogs-token',
         'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
@@ -256,19 +256,21 @@ test('production bring the noise lookup can choose the matching discogs master v
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'discogs_release')
-        ->assertJsonPath('proposal.proposed_values.title', 'Bring The Noise (Pump-Kin Remix)')
-        ->assertJsonPath('proposal.proposed_values.artists', ['Public Enemy', 'Benny Benassi'])
-        ->assertJsonPath('proposal.proposed_values.album', 'Bring The Noise (Remix)')
+        ->assertJsonPath('proposal.proposed_values.title', 'Bring The Noise Remix (Pump-kin Remix)')
+        ->assertJsonPath('proposal.proposed_values.artists', ['Benny Benassi', 'Public Enemy'])
+        ->assertJsonPath('proposal.proposed_values.album', "Rock'N'Rave")
         ->assertJsonPath('proposal.proposed_values.track_number', '1')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Data Records')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'DATA DJ 013')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2007')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'UK')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '1047849')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/bring-the-noise-pump-kin.jpg')
-        ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/1047849-Public-Enemy-Vs-Benny-Benassi-Bring-The-Noise-Remix')
-        ->assertJsonPath('proposal.evidence.discogs_master_id', '2006623')
-        ->assertJsonPath('proposal.evidence.discogs_master_url', 'https://www.discogs.com/master/2006623-Public-Enemy-vs-Benny-Benassi-Bring-The-Noise-Remix')
+        ->assertJsonPath('proposal.proposed_values.disc_number', '2')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Ultra Records')
+        ->assertJsonPath('proposal.proposed_values.catalog_number', 'UL 1695-2')
+        ->assertJsonPath('proposal.proposed_values.barcode', '6 17465 16952 6')
+        ->assertJsonPath('proposal.proposed_values.release_date', '2008-06-03')
+        ->assertJsonPath('proposal.proposed_values.release_country', 'US')
+        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '1358093')
+        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/rock-n-rave.jpg')
+        ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/1358093-Benny-Benassi-RockNRave')
+        ->assertJsonPath('proposal.evidence.discogs_master_id', '92414')
+        ->assertJsonPath('proposal.evidence.matched_existing_fields', ['album', 'artists', 'track', 'duration'])
         ->assertJsonPath('proposal.evidence.field_review.verdict', 'ambiguous')
         ->assertJsonPath('proposal.evidence.field_review.deterministic_override', 'strong_discogs_release_match');
 
