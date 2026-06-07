@@ -30,8 +30,9 @@ test('production bring the noise lookup can choose the matching discogs master v
 
     $aiSchemas = [];
     $discogsSearches = [];
+    $badAlbumSearchedBeforeTitle = false;
 
-    Http::fake(function (Request $request) use (&$aiSchemas, &$discogsSearches) {
+    Http::fake(function (Request $request) use (&$aiSchemas, &$badAlbumSearchedBeforeTitle, &$discogsSearches) {
         $url = $request->url();
 
         if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
@@ -47,9 +48,14 @@ test('production bring the noise lookup can choose the matching discogs master v
                 'q' => (string) ($query['q'] ?? ''),
             ];
 
+            if (($query['release_title'] ?? null) === "Rock N' Rave Disc 2") {
+                $badAlbumSearchedBeforeTitle = true;
+            }
+
             $matchesMaster = ($query['type'] ?? null) === 'master'
                 && ($query['release_title'] ?? null) === 'Bring the Noise Remix'
-                && ($query['artist'] ?? null) === 'Public Enemy';
+                && ($query['artist'] ?? null) === 'Public Enemy'
+                && $badAlbumSearchedBeforeTitle === false;
 
             return Http::response([
                 'results' => $matchesMaster ? [[

@@ -274,7 +274,7 @@ class AudioMetadataDiscogsProvider
         $spaced = str_replace(['__', '_'], ' ', $withoutFormatSuffix);
         $withoutEpSuffix = preg_replace('/\s+EP$/i', '', $spaced) ?? $spaced;
 
-        return collect([$clean, $withoutSceneSuffix, $withoutFormatSuffix, $spaced, $withoutEpSuffix, $title])
+        return collect([$title, $clean, $withoutSceneSuffix, $withoutFormatSuffix, $spaced, $withoutEpSuffix])
             ->map(fn (mixed $candidate): ?string => $this->values->cleanString($candidate))
             ->filter()
             ->unique(fn (string $candidate): string => $this->normalizeTitle($candidate))
