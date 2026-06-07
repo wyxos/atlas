@@ -72,6 +72,8 @@ class AudioMetadataCandidateEnricher
         $candidate['evidence']['discogs_release_id'] = $discogsCandidate['evidence']['discogs_release_id'] ?? null;
         $candidate['evidence']['discogs_release_title'] = $discogsCandidate['evidence']['discogs_release_title'] ?? null;
         $candidate['evidence']['discogs_release_url'] = $discogsCandidate['evidence']['discogs_release_url'] ?? null;
+        $candidate['evidence']['discogs_master_id'] = $discogsCandidate['evidence']['discogs_master_id'] ?? null;
+        $candidate['evidence']['discogs_master_url'] = $discogsCandidate['evidence']['discogs_master_url'] ?? null;
         $candidate['evidence']['discogs_source'] = $discogsCandidate['evidence']['source'] ?? null;
 
         return $candidate;
@@ -310,7 +312,9 @@ class AudioMetadataCandidateEnricher
         $candidate['evidence']['ai_review'] = $review;
         $candidate['evidence']['discogs_release_id'] = $releaseId;
         $candidate['evidence']['discogs_release_title'] = $this->values->cleanString($release['title'] ?? null);
-        $candidate['evidence']['discogs_release_url'] = $releaseId !== null ? 'https://www.discogs.com/release/'.$releaseId : null;
+        $candidate['evidence']['discogs_release_url'] = $this->discogsUrl($release, 'uri', 'id', 'release');
+        $candidate['evidence']['discogs_master_id'] = $this->values->cleanString($release['master_id'] ?? null);
+        $candidate['evidence']['discogs_master_url'] = $this->discogsUrl($release, 'discogs_master_uri', 'master_id', 'master');
         $candidate['evidence']['discogs_source'] = 'discogs_release_search';
         $candidate['evidence']['discogs_track_position'] = $this->values->cleanString($track['position'] ?? null);
         if ($searchQuery !== null) {
@@ -434,6 +438,18 @@ class AudioMetadataCandidateEnricher
         return is_array($image)
             ? $this->values->cleanString($image['uri'] ?? $image['resource_url'] ?? $image['uri150'] ?? null)
             : null;
+    }
+
+    private function discogsUrl(array $source, string $uriKey, string $idKey, string $type): ?string
+    {
+        $uri = $this->values->cleanString($source[$uriKey] ?? null);
+        if ($uri !== null) {
+            return str_starts_with($uri, '/') ? 'https://www.discogs.com'.$uri : $uri;
+        }
+
+        $id = $this->values->cleanString($source[$idKey] ?? null);
+
+        return $id !== null ? 'https://www.discogs.com/'.$type.'/'.$id : null;
     }
 
     private function trackNumber(array $track): ?string

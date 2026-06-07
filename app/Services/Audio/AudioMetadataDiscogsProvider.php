@@ -154,7 +154,9 @@ class AudioMetadataDiscogsProvider
                 'source' => 'discogs_release_search',
                 'discogs_release_id' => $releaseId,
                 'discogs_release_title' => $releaseTitle,
-                'discogs_release_url' => $releaseId !== null ? 'https://www.discogs.com/release/'.$releaseId : null,
+                'discogs_release_url' => $this->discogsReleaseUrl($release, $releaseId),
+                'discogs_master_id' => $this->values->cleanString($release['master_id'] ?? null),
+                'discogs_master_url' => $this->discogsMasterUrl($release),
                 'matched_existing_fields' => $matchedFields,
                 'duration_delta_seconds' => $durationDelta,
                 'track_position' => $this->values->cleanString($track['position'] ?? null),
@@ -367,6 +369,34 @@ class AudioMetadataDiscogsProvider
         return is_array($image)
             ? $this->values->cleanString($image['uri'] ?? $image['resource_url'] ?? $image['uri150'] ?? null)
             : null;
+    }
+
+    private function discogsReleaseUrl(array $release, ?string $releaseId): ?string
+    {
+        $uri = $this->values->cleanString($release['uri'] ?? null);
+        if ($uri !== null) {
+            if (str_starts_with($uri, 'https://www.discogs.com/')) {
+                return $uri;
+            }
+
+            if (str_starts_with($uri, '/')) {
+                return 'https://www.discogs.com'.$uri;
+            }
+        }
+
+        return $releaseId !== null ? 'https://www.discogs.com/release/'.$releaseId : null;
+    }
+
+    private function discogsMasterUrl(array $release): ?string
+    {
+        $uri = $this->values->cleanString($release['discogs_master_uri'] ?? null);
+        if ($uri !== null) {
+            return $uri;
+        }
+
+        $masterId = $this->values->cleanString($release['master_id'] ?? null);
+
+        return $masterId !== null ? 'https://www.discogs.com/master/'.$masterId : null;
     }
 
     private function trackNumber(array $track): ?string

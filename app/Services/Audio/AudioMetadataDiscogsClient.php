@@ -7,6 +7,11 @@ use Throwable;
 
 class AudioMetadataDiscogsClient
 {
+    /**
+     * @var array<string, string>
+     */
+    private array $masterUrisByReleaseId = [];
+
     public function __construct(
         private readonly AudioMetadataValueExtractor $values,
     ) {}
@@ -42,7 +47,7 @@ class AudioMetadataDiscogsClient
             }
 
             foreach ($results as $result) {
-                if (is_array($result) && ($id = $this->values->cleanString($result['id'] ?? null)) !== null) {
+                if (is_array($result) && ($id = $this->releaseIdFromSearchResult($result)) !== null) {
                     $ids[] = $id;
                 }
             }
@@ -65,6 +70,83 @@ class AudioMetadataDiscogsClient
                 ->withHeaders($this->headers())
                 ->timeout((int) config('services.audio_metadata.http_timeout_seconds', 15))
                 ->get(rtrim($this->baseUrl(), '/').'/releases/'.$releaseId);
+        } catch (Throwable) {
+            return [];
+        }
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        $payload = $response->json();
+
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        $releaseId = $this->values->cleanString($payload['id'] ?? $releaseId);
+        if ($releaseId !== null && isset($this->masterUrisByReleaseId[$releaseId])) {
+            $payload['discogs_master_uri'] = $this->masterUrisByReleaseId[$releaseId];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function releaseIdFromSearchResult(array $result): ?string
+    {
+        $id = $this->values->cleanString($result['id'] ?? null);
+        if ($id === null) {
+            return null;
+        }
+
+        $type = mb_strtolower((string) ($result['type'] ?? ''));
+        $resourceUrl = $this->values->cleanString($result['resource_url'] ?? null);
+        $masterUrl = $this->values->cleanString($result['master_url'] ?? null);
+        if ($type !== 'master'
+            && ! str_contains((string) $resourceUrl, '/masters/')
+            && ! str_contains((string) $masterUrl, '/masters/')) {
+            return $id;
+        }
+
+        return $this->releaseIdFromMasterResult($result);
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function releaseIdFromMasterResult(array $result): ?string
+    {
+        $masterId = $this->values->cleanString($result['master_id'] ?? $result['id'] ?? null);
+        if ($masterId === null) {
+            return null;
+        }
+
+        $master = $this->fetchMaster($masterId);
+        $releaseId = $this->values->cleanString($master['main_release'] ?? null);
+        if ($releaseId === null) {
+            return null;
+        }
+
+        $masterUri = $this->discogsWebUrl($this->values->cleanString($master['uri'] ?? $result['uri'] ?? null))
+            ?? 'https://www.discogs.com/master/'.$masterId;
+        $this->masterUrisByReleaseId[$releaseId] = $masterUri;
+
+        return $releaseId;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fetchMaster(string $masterId): array
+    {
+        try {
+            $response = Http::acceptJson()
+                ->withHeaders($this->headers())
+                ->timeout((int) config('services.audio_metadata.http_timeout_seconds', 15))
+                ->get(rtrim($this->baseUrl(), '/').'/masters/'.$masterId);
         } catch (Throwable) {
             return [];
         }
@@ -109,7 +191,49 @@ class AudioMetadataDiscogsClient
                 'per_page' => 5,
                 'page' => 1,
             ],
+            [
+                'type' => 'master',
+                'artist' => $artist,
+                'release_title' => $releaseTitle,
+                'per_page' => 5,
+                'page' => 1,
+            ],
+            [
+                'type' => 'master',
+                'q' => trim($artist.' '.$releaseTitle),
+                'per_page' => 5,
+                'page' => 1,
+            ],
+            [
+                'type' => 'master',
+                'release_title' => $releaseTitle,
+                'per_page' => 5,
+                'page' => 1,
+            ],
+            [
+                'type' => 'master',
+                'q' => $releaseTitle,
+                'per_page' => 5,
+                'page' => 1,
+            ],
         ];
+    }
+
+    private function discogsWebUrl(?string $url): ?string
+    {
+        if ($url === null) {
+            return null;
+        }
+
+        if (str_starts_with($url, 'https://www.discogs.com/')) {
+            return $url;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return 'https://www.discogs.com'.$url;
+        }
+
+        return null;
     }
 
     /**

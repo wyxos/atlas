@@ -52,7 +52,8 @@ class AudioMetadataCandidateFieldReviewer
             return false;
         }
 
-        if (($candidate['evidence']['ai_review']['verdict'] ?? null) === 'accept') {
+        if (($candidate['evidence']['ai_review']['verdict'] ?? null) === 'accept'
+            && ($candidate['evidence']['ai_review']['source_identity_supported'] ?? false) === true) {
             return false;
         }
 
