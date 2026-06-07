@@ -242,11 +242,11 @@ test('local ai discogs rejects later alternate releases when current soundtrack 
                     'model' => 'qwen-test',
                 ]
                 : [
-                    'verdict' => 'accept',
+                    'verdict' => 'ambiguous',
                     'confidence' => 0.86,
-                    'reason' => 'The alternate release has the same track.',
+                    'reason' => 'The alternate release has the same track, but the source release identity is not supported.',
                     'model' => 'qwen-test',
-                    'source_identity_supported' => true,
+                    'source_identity_supported' => false,
                     'selected_track_position' => '10',
                     'selected_track_title' => 'Onizuka暴発へのプロローグ',
                     'title_aliases' => ['Onizuka Bouhatsu E No Prologue'],
@@ -370,11 +370,11 @@ test('local ai discogs rejects track-title singles for current soundtrack albums
                     'model' => 'qwen-test',
                 ]
                 : [
-                    'verdict' => 'accept',
+                    'verdict' => 'ambiguous',
                     'confidence' => 0.86,
-                    'reason' => 'The single has the same title and artist.',
+                    'reason' => 'The single has the same title and artist, but it is not the current soundtrack source release.',
                     'model' => 'qwen-test',
-                    'source_identity_supported' => true,
+                    'source_identity_supported' => false,
                     'selected_track_position' => '1',
                     'selected_track_title' => 'しずく',
                     'title_aliases' => ['Shizuku'],

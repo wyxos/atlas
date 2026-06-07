@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
-
 test('single local metadata run stores a reviewable proposal without mutating the track', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
@@ -36,9 +35,7 @@ test('single local metadata run stores a reviewable proposal without mutating th
             ],
         ],
     ]);
-
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
-
     $response->assertAccepted()
         ->assertJsonPath('run.scope', 'single')
         ->assertJsonPath('run.status', 'completed')
@@ -49,26 +46,26 @@ test('single local metadata run stores a reviewable proposal without mutating th
         ->assertJsonPath('proposal.proposed_values.artists', ['Artist A', 'Artist B'])
         ->assertJsonPath('proposal.proposed_values.album', 'Tagged Album')
         ->assertJsonPath('proposal.proposed_values.duration_seconds', 181);
-
     expect($file->fresh()->title)->toBe('raw filename')
         ->and($file->fresh()->artists()->count())->toBe(0)
         ->and($file->fresh()->albums()->count())->toBe(0);
 });
-
 test('single local metadata run prefers high confidence fingerprint metadata over noisy tags', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
         'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
         'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
         'services.audio_metadata.cover_art_archive_base_url' => 'https://cover.test',
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'ollama',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_model' => 'qwen-test',
     ]);
-
     $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
         $mock->shouldReceive('forFile')
             ->once()
             ->andReturn(new AudioFingerprint('fingerprint-body', 180, '/tmp/audio.mp3'));
     });
-
     Http::fake([
         'https://acoustid.test/v2/lookup*' => Http::response([
             'status' => 'ok',
@@ -117,8 +114,17 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
                 ],
             ]],
         ]),
+        'https://ollama.test/api/chat' => Http::response([
+            'message' => [
+                'content' => json_encode([
+                    'verdict' => 'accept',
+                    'confidence' => 0.92,
+                    'reason' => 'The fingerprint candidate is coherent with the supplied source release metadata.',
+                    'model' => 'qwen-test',
+                ]),
+            ],
+        ]),
     ]);
-
     $user = User::factory()->create();
     $file = File::factory()->create([
         'source' => 'local',
@@ -139,9 +145,7 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
             ],
         ],
     ]);
-
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
-
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
         ->assertJsonPath('proposal.confidence', 96)
@@ -163,23 +167,19 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
         ->assertJsonPath('proposal.evidence.musicbrainz_release_id', 'release-mbid')
         ->assertJsonPath('proposal.evidence.duration_delta_seconds', 0)
         ->assertJsonPath('proposal.evidence.cover_source', 'cover_art_archive');
-
     expect($file->fresh()->title)->toBe('Classmate Sauce Title');
 });
-
 test('low confidence fingerprint metadata falls back to local tag proposal', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
         'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
         'services.audio_metadata.cover_art_archive_base_url' => 'https://cover.test',
     ]);
-
     $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
         $mock->shouldReceive('forFile')
             ->once()
             ->andReturn(new AudioFingerprint('weak-fingerprint', 180, '/tmp/audio.mp3'));
     });
-
     Http::fake([
         'https://acoustid.test/v2/lookup*' => Http::response([
             'status' => 'ok',
@@ -192,7 +192,6 @@ test('low confidence fingerprint metadata falls back to local tag proposal', fun
             ]],
         ]),
     ]);
-
     $user = User::factory()->create();
     $file = File::factory()->create([
         'source' => 'local',
@@ -205,9 +204,7 @@ test('low confidence fingerprint metadata falls back to local tag proposal', fun
             'artist' => 'Tagged Artist',
         ],
     ]);
-
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
-
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'local')
         ->assertJsonPath('proposal.proposed_values.title', 'Tagged Title')
@@ -230,11 +227,9 @@ test('metadata proposal can apply selected fields to canonical audio metadata', 
             'duration_seconds' => 212,
         ],
     ]);
-
     $proposalId = $this->actingAs($user)
         ->postJson("/api/audio/{$file->id}/metadata-runs")
         ->json('proposal.id');
-
     $response = $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposalId}", [
         'action' => 'apply',
         'fields' => ['title', 'artists', 'album'],

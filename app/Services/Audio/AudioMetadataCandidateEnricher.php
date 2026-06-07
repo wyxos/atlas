@@ -11,7 +11,6 @@ class AudioMetadataCandidateEnricher
         private readonly AudioMetadataDiscogsClient $discogs,
         private readonly AudioMetadataDiscogsSearchQueryExpander $searchQueryExpander,
         private readonly AudioMetadataDiscogsSupplementReviewer $discogsSupplementReviewer,
-        private readonly AudioMetadataSourceReleaseGuard $sourceReleases,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
 
@@ -33,6 +32,11 @@ class AudioMetadataCandidateEnricher
         $candidate['values']['cover_url'] = $coverUrl;
         $candidate['evidence']['cover_source'] = $coverCandidate['evidence']['cover_source'] ?? null;
         $candidate['evidence']['musicbrainz_release_id'] ??= $coverCandidate['evidence']['musicbrainz_release_id'] ?? null;
+        if (($candidate['provider'] ?? null) === 'acoustid_musicbrainz'
+            && ($candidate['evidence']['musicbrainz_release_id'] ?? null) !== null
+            && $candidate['evidence']['cover_source'] !== null) {
+            $candidate['evidence']['identity_support'] = 'release_with_cover';
+        }
 
         return $candidate;
     }
@@ -158,10 +162,6 @@ class AudioMetadataCandidateEnricher
     ): ?array {
         foreach ($matches as $match) {
             $release = $match['release'];
-            if ($this->sourceReleases->isLaterAlternateReleaseForCurrentSoundtrack($currentValues, $candidate['values'] ?? [], $release)) {
-                continue;
-            }
-
             $source = $this->discogsReviewSource($release);
             $review = $this->aiReviewer->resolveAnomaly($file, $currentValues, $candidate, $source);
             if (($review['verdict'] ?? null) !== 'accept') {

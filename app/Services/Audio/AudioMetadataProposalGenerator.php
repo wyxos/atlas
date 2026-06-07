@@ -26,7 +26,6 @@ class AudioMetadataProposalGenerator
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataCandidateEnricher $candidateEnricher,
         private readonly AudioMetadataCandidateFieldReviewer $fieldReviewer,
-        private readonly AudioMetadataCandidateGuard $candidateGuard,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
         private readonly AudioMetadataDiscogsProvider $discogsProvider,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
@@ -123,10 +122,6 @@ class AudioMetadataProposalGenerator
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $currentValues
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null
-     */
     private function localCandidate(File $file, array $currentValues, ?callable $progress = null): ?array
     {
         $candidates = [];
@@ -182,7 +177,7 @@ class AudioMetadataProposalGenerator
             $this->reportProgress($progress, 'embedded_tags', 'Reviewing embedded tags and AI search hints');
             $hasReviewableSourceCandidate = collect($candidates)
                 ->contains(fn (array $candidate): bool => $this->changes($currentValues, $candidate['values']) !== []
-                    && $this->candidateGuard->allows($currentValues, $candidate));
+                    && $this->candidateHasSourceReleaseSupport($candidate));
 
             $candidates[] = ! $hasReviewableSourceCandidate
                 ? $this->candidateEnricher->resolveWithAiDiscogsSearch(
@@ -197,7 +192,6 @@ class AudioMetadataProposalGenerator
         $this->reportProgress($progress, 'scoring', 'Scoring metadata candidates');
         $reviewableCandidates = collect($candidates)
             ->filter(fn (array $candidate): bool => $this->changes($currentValues, $candidate['values']) !== [])
-            ->filter(fn (array $candidate): bool => $this->candidateGuard->allows($currentValues, $candidate))
             ->sortByDesc(fn (array $candidate): int => $this->candidatePriority($candidate))
             ->values();
 
@@ -217,11 +211,6 @@ class AudioMetadataProposalGenerator
         return null;
     }
 
-    /**
-     * @param  array<string, mixed>  $currentValues
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null
-     */
     private function reviewFingerprintCandidate(File $file, array $currentValues, array $candidate): ?array
     {
         if ($this->fingerprintCandidateHasIdentitySupport($currentValues, $candidate)) {
@@ -246,25 +235,36 @@ class AudioMetadataProposalGenerator
         return $candidate;
     }
 
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     */
     private function fingerprintCandidateHasIdentitySupport(array $currentValues, array $candidate): bool
     {
         if (($candidate['provider'] ?? null) !== 'acoustid_musicbrainz') {
             return true;
         }
 
-        if ($this->candidateGuard->requiresAiReviewForFingerprintReleaseDrift($currentValues, $candidate)) {
-            return false;
-        }
-
         return in_array($candidate['evidence']['identity_support'] ?? null, ['matched_existing_identity', 'release_with_cover', 'strong_fingerprint_release'], true);
     }
 
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     */
+    private function candidateHasSourceReleaseSupport(array $candidate): bool
+    {
+        if (! str_starts_with((string) ($candidate['provider'] ?? ''), 'acoustid_musicbrainz')) {
+            return true;
+        }
+
+        if (($candidate['evidence']['ai_review']['source_identity_supported'] ?? false) === true) {
+            return true;
+        }
+
+        if (($candidate['evidence']['release_consistency_review']['verdict'] ?? null) === 'accept') {
+            return true;
+        }
+
+        if (in_array($candidate['evidence']['identity_support'] ?? null, ['strong_fingerprint_release', 'release_with_cover'], true)) {
+            return true;
+        }
+
+        return in_array('album', $this->values->cleanStringList($candidate['evidence']['matched_existing_fields'] ?? []), true);
+    }
+
     private function candidatePriority(array $candidate): int
     {
         $providerPriority = match ($candidate['provider']) {
@@ -272,23 +272,20 @@ class AudioMetadataProposalGenerator
             'acoustid_musicbrainz_ai_discogs' => 320,
             'acoustid_musicbrainz_vgmdb' => 315,
             'acoustid_musicbrainz_discogs' => 310,
-            'acoustid_musicbrainz' => 300,
+            'acoustid_musicbrainz' => $this->candidateHasSourceReleaseSupport($candidate) ? 300 : 230,
             'musicbrainz_discogs' => 245,
             'discogs_release' => 235,
             'existing_album_cover' => 230,
             'vgmdb_album' => 225,
             'musicbrainz_cover_art' => 220,
             'spotify' => 250,
-            'local_ai_discogs' => 240,
+            'local_ai_discogs' => 310,
             default => 100,
         };
 
         return $providerPriority + (int) $candidate['confidence'];
     }
 
-    /**
-     * @return array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}
-     */
     private function spotifyCandidate(File $file, User $user, ?callable $progress = null): array
     {
         $trackId = $this->spotifyTrackId((string) $file->source_id)
@@ -325,9 +322,6 @@ class AudioMetadataProposalGenerator
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function fetchSpotifyTrack(string $trackId, string $accessToken): ?array
     {
         $response = Http::acceptJson()
@@ -344,10 +338,6 @@ class AudioMetadataProposalGenerator
         return is_array($payload) ? $payload : null;
     }
 
-    /**
-     * @param  array<string, mixed>  $track
-     * @return array<string, mixed>
-     */
     private function spotifyValues(array $track): array
     {
         $values = [];
@@ -369,9 +359,6 @@ class AudioMetadataProposalGenerator
         return $values;
     }
 
-    /**
-     * @param  array<string, mixed>  $values
-     */
     private function putIfPresent(array &$values, string $key, mixed $value): void
     {
         if ($value === null || $value === []) {

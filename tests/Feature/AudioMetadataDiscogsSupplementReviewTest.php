@@ -147,15 +147,7 @@ test('discogs supplement asks ai before applying conflicting release disc fields
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_recording_id', 'overture-recording-mbid')
-        ->assertJsonMissingPath('proposal.proposed_values.album')
-        ->assertJsonMissingPath('proposal.proposed_values.track_number')
-        ->assertJsonMissingPath('proposal.proposed_values.disc_number')
-        ->assertJsonMissingPath('proposal.proposed_values.discogs_release_id')
-        ->assertJsonMissingPath('proposal.proposed_values.catalog_number')
-        ->assertJsonMissingPath('proposal.proposed_values.barcode')
-        ->assertJsonMissingPath('proposal.proposed_values.release_country');
+        ->assertJsonPath('proposal', null);
 
     expect($aiCalls)->toBeGreaterThanOrEqual(1);
 });
@@ -297,15 +289,7 @@ test('discogs supplement asks ai before applying mismatched release album fields
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_recording_id', 'hijack-recording-mbid')
-        ->assertJsonMissingPath('proposal.proposed_values.album')
-        ->assertJsonMissingPath('proposal.proposed_values.track_number')
-        ->assertJsonMissingPath('proposal.proposed_values.disc_number')
-        ->assertJsonMissingPath('proposal.proposed_values.discogs_release_id')
-        ->assertJsonMissingPath('proposal.proposed_values.catalog_number')
-        ->assertJsonMissingPath('proposal.proposed_values.barcode')
-        ->assertJsonMissingPath('proposal.proposed_values.release_country');
+        ->assertJsonPath('proposal', null);
 
     expect($aiCalls)->toBeGreaterThanOrEqual(1);
 });
