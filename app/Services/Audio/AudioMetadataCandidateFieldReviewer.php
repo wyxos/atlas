@@ -3,6 +3,7 @@
 namespace App\Services\Audio;
 
 use App\Models\File;
+use RuntimeException;
 
 class AudioMetadataCandidateFieldReviewer
 {
@@ -39,12 +40,14 @@ class AudioMetadataCandidateFieldReviewer
 
         if ($this->needsAiFieldReview($currentValues, $candidate, $changes)) {
             $review = $this->aiReviewer->reviewFields($file, $currentValues, $candidate, $changes);
-            if ($review !== null) {
-                $candidate['evidence']['field_review'] = $review;
-                $candidate['values'] = $this->valuesAllowedByReview($candidate['values'], $review);
-
-                return $candidate['values'] === [] ? null : $candidate;
+            if ($review === null) {
+                throw new RuntimeException('AI metadata field review returned no usable response.');
             }
+
+            $candidate['evidence']['field_review'] = $review;
+            $candidate['values'] = $this->valuesAllowedByReview($candidate['values'], $review);
+
+            return $candidate['values'] === [] ? null : $candidate;
         }
 
         $candidate['values'] = $this->valuesAllowedByRules($currentValues, $candidate);

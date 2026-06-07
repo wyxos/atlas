@@ -98,16 +98,12 @@ class AudioMetadataAiReviewer
 
         $input = $this->input($file, $currentValues, $candidate, $changes);
 
-        try {
-            $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
-                'ollama' => $this->reviewWithOllama($baseUrl, $input, $this->fieldReviewPrompt($input)),
-                default => $this->reviewWithGateway($baseUrl, $input, $this->fieldReviewPrompt($input), 'atlas-audio-metadata-field-adjudication-v1'),
-            };
+        $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
+            'ollama' => $this->reviewWithOllama($baseUrl, $input, $this->fieldReviewPrompt($input)),
+            default => $this->reviewWithGateway($baseUrl, $input, $this->fieldReviewPrompt($input), 'atlas-audio-metadata-field-adjudication-v1'),
+        };
 
-            return $this->normalizeFieldReviewResponse($payload);
-        } catch (Throwable) {
-            return null;
-        }
+        return $this->normalizeFieldReviewResponse($payload);
     }
 
     /**

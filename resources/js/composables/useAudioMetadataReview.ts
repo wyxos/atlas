@@ -298,7 +298,7 @@ export function useAudioMetadataReview(options: Options) {
             stopMetadataRunTracking(snapshot.run.id);
             setMetadataReviewMessage(snapshotAudioId, metadataRunTerminalMessage(snapshot.run, proposal));
 
-            if (snapshot.run.status === 'failed') {
+            if (snapshot.run.status === 'failed' || (snapshot.run.failed_files > 0 && snapshot.run.error)) {
                 setMetadataReviewError(snapshotAudioId, snapshot.run.error ?? 'Metadata scan failed.');
             }
 

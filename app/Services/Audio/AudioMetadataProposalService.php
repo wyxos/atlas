@@ -183,8 +183,14 @@ class AudioMetadataProposalService
         } catch (\Throwable $exception) {
             report($exception);
 
+            $error = $this->failureMessage($exception);
+
             $run->increment('processed_files');
             $run->increment('failed_files');
+            $run->refresh()->forceFill([
+                'error' => $error,
+                'options' => $this->progressOptions($run, $file, 'failed', $error),
+            ])->save();
 
             $this->broadcastRun($run->refresh());
         }
@@ -294,5 +300,15 @@ class AudioMetadataProposalService
         unset($options['progress']);
 
         return $options;
+    }
+
+    private function failureMessage(\Throwable $exception): string
+    {
+        $message = trim($exception->getMessage());
+        if ($message === '') {
+            return 'Metadata lookup failed.';
+        }
+
+        return mb_substr($message, 0, 240);
     }
 }

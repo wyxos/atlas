@@ -23,7 +23,7 @@ function runFixture(): AudioMetadataRun {
         current_file_id: null,
         current_step: null,
         current_step_label: null,
-        error: null,
+        error: 'AI response JSON could not be decoded.',
         created_at: null,
         started_at: null,
         finished_at: null,
@@ -116,6 +116,7 @@ describe('Audio metadata review failure state', () => {
         await flushPromises();
 
         expect(document.body.textContent).toContain('Metadata lookup failed.');
+        expect(document.body.textContent).toContain('AI response JSON could not be decoded.');
         expect(document.body.textContent).not.toContain('No metadata changes found.');
     });
 });
