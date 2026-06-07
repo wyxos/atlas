@@ -38,6 +38,7 @@ class AudioMetadataProposalGenerator
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataCandidateEnricher $candidateEnricher,
+        private readonly AudioMetadataCandidateFieldReviewer $fieldReviewer,
         private readonly AudioMetadataCandidateGuard $candidateGuard,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
         private readonly AudioMetadataDiscogsProvider $discogsProvider,
@@ -209,7 +210,13 @@ class AudioMetadataProposalGenerator
             ->sortByDesc(fn (array $candidate): int => $this->candidatePriority($candidate))
             ->first();
 
-        return is_array($candidate) ? $candidate : null;
+        if (! is_array($candidate)) {
+            return null;
+        }
+
+        $this->reportProgress($progress, 'ai_review', 'Reviewing field-level metadata safety');
+
+        return $this->fieldReviewer->review($file, $currentValues, $candidate, $this->changes($currentValues, $candidate['values']));
     }
 
     /**
@@ -414,10 +421,6 @@ class AudioMetadataProposalGenerator
         return $changes;
     }
 
-    /**
-     * @param  array<string, mixed>  $values
-     * @return array<string, mixed>
-     */
     private function withoutAliasValues(array $values): array
     {
         return array_diff_key($values, array_flip(['title_aliases', 'artist_aliases', 'album_aliases', 'artist_alias_map']));

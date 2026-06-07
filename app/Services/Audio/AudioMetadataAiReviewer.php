@@ -86,6 +86,33 @@ class AudioMetadataAiReviewer
     /**
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @param  array<string, array{current:mixed,proposed:mixed}>  $changes
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>}|null
+     */
+    public function reviewFields(File $file, array $currentValues, array $candidate, array $changes): ?array
+    {
+        $baseUrl = rtrim((string) config('services.audio_metadata.ai_base_url'), '/');
+        if (! $this->enabled() || $baseUrl === '') {
+            return null;
+        }
+
+        $input = $this->input($file, $currentValues, $candidate, $changes);
+
+        try {
+            $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
+                'ollama' => $this->reviewWithOllama($baseUrl, $input, $this->fieldReviewPrompt($input)),
+                default => $this->reviewWithGateway($baseUrl, $input, $this->fieldReviewPrompt($input), 'atlas-audio-metadata-field-adjudication-v1'),
+            };
+
+            return $this->normalizeFieldReviewResponse($payload);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @return list<array{release_title:string,artist:string,reason:string|null}>
      */
     public function discogsSearchQueries(File $file, array $currentValues, array $candidate): array
@@ -297,6 +324,18 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>}
+     */
+    private function normalizeFieldReviewResponse(array $payload): array
+    {
+        return [
+            ...$this->normalizeResponse($payload),
+            'safe_fields' => $this->safeFields(is_array($payload['safe_fields'] ?? null) ? $payload['safe_fields'] : []),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
      * @return list<array{release_title:string,artist:string,reason:string|null}>
      */
     private function normalizeDiscogsSearchQueries(array $payload): array
@@ -327,6 +366,18 @@ class AudioMetadataAiReviewer
         }
 
         return array_slice(array_values($normalized), 0, 5);
+    }
+
+    /**
+     * @param  list<mixed>  $fields
+     * @return list<string>
+     */
+    private function safeFields(array $fields): array
+    {
+        return array_values(array_filter(
+            array_map(fn (mixed $field): ?string => $this->cleanString($field), $fields),
+            fn (?string $field): bool => $field !== null && in_array($field, self::REVIEW_FIELDS, true),
+        ));
     }
 
     /**
@@ -362,7 +413,6 @@ class AudioMetadataAiReviewer
         }
 
         $decoded = json_decode($content, true);
-
         if (! is_array($decoded)) {
             throw new RuntimeException('AI response JSON could not be decoded.');
         }
@@ -370,9 +420,6 @@ class AudioMetadataAiReviewer
         return $decoded;
     }
 
-    /**
-     * @param  array<string, mixed>  $input
-     */
     private function prompt(array $input): string
     {
         return implode("\n", [
@@ -387,9 +434,6 @@ class AudioMetadataAiReviewer
         ]);
     }
 
-    /**
-     * @param  array<string, mixed>  $input
-     */
     private function anomalyPrompt(array $input): string
     {
         return implode("\n", [
@@ -405,9 +449,6 @@ class AudioMetadataAiReviewer
         ]);
     }
 
-    /**
-     * @param  array<string, mixed>  $input
-     */
     private function discogsSearchPrompt(array $input): string
     {
         return implode("\n", [
@@ -416,6 +457,24 @@ class AudioMetadataAiReviewer
             'Use current values, filename hints, and fingerprint candidate values to bridge romanization, translation, alternate spellings, import titles, soundtrack numbering, and source/original language differences.',
             'Do not invent final metadata. These are search queries only.',
             'Prefer concise release titles and likely Discogs artist spellings.',
+            'Evidence JSON:',
+            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
+    private function fieldReviewPrompt(array $input): string
+    {
+        return implode("\n", [
+            'Return only JSON in this exact shape: {"verdict":"ambiguous","confidence":0.82,"reason":"short reason","safe_fields":["musicbrainz_recording_id"]}.',
+            'Allowed verdict values: accept, reject, ambiguous.',
+            'You are judging field-level safety for an Atlas audio metadata proposal.',
+            'Use only the supplied JSON evidence. Do not invent metadata and do not repair values.',
+            'A strong fingerprint can prove a recording while still failing to prove the correct release, album, edition, disc, cover, label, catalog number, barcode, country, or release date.',
+            'Include a field in safe_fields only when that exact field is coherent with the current title, artist, album/group, filename, duration, and provider evidence.',
+            'Title is unsafe when the current and proposed titles have different remix, mix, version, update, edit, live, remaster, vinyl, or edition descriptors.',
+            'Album, cover_url, track_number, disc_number, release_label, catalog_number, barcode, release_date, release_country, musicbrainz_release_id, and discogs_release_id require release-level confidence, not only recording confidence.',
+            'Use ambiguous with a reduced safe_fields list when the recording likely matches but release-level details may describe a different single, remix package, compilation, edition, or disc.',
+            'Use reject with an empty safe_fields list when even recording identity is not coherent.',
             'Evidence JSON:',
             json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]);
