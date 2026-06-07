@@ -180,7 +180,11 @@ class AudioMetadataProposalGenerator
         $tagCandidate = $this->localTags->candidate($file);
         if ($tagCandidate['values'] !== []) {
             $this->reportProgress($progress, 'embedded_tags', 'Reviewing embedded tags and AI search hints');
-            $candidates[] = $candidates === []
+            $hasReviewableSourceCandidate = collect($candidates)
+                ->contains(fn (array $candidate): bool => $this->changes($currentValues, $candidate['values']) !== []
+                    && $this->candidateGuard->allows($currentValues, $candidate));
+
+            $candidates[] = ! $hasReviewableSourceCandidate
                 ? $this->candidateEnricher->resolveWithAiDiscogsSearch(
                     $file,
                     $currentValues,
