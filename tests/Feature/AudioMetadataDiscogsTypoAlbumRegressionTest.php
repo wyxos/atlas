@@ -6,6 +6,7 @@ use App\Models\File;
 use App\Models\User;
 use App\Services\Audio\AudioFingerprint;
 use App\Services\Audio\AudioFingerprintService;
+use App\Services\Audio\AudioMetadataProposalGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -289,6 +290,39 @@ test('strong discogs release evidence wins over musicbrainz recording id only pr
         ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept');
 
     expect($fieldReviewedProviders)->toBe(['discogs_release']);
+});
+
+test('weak mixed discogs supplement does not outrank exact discogs release evidence', function () {
+    $generator = app(AudioMetadataProposalGenerator::class);
+    $priority = new ReflectionMethod($generator, 'candidatePriority');
+
+    $weakMixedPriority = $priority->invoke($generator, [
+        'provider' => 'acoustid_musicbrainz_ai_discogs',
+        'confidence' => 96,
+        'values' => [
+            'album' => 'All Or Nothing (Remastered)',
+            'title' => 'Saboteur (Dub Remix - Bonus Track)',
+            'discogs_release_id' => '2568225',
+        ],
+        'evidence' => [
+            'discogs_release_id' => 2568225,
+            'discogs_release_url' => 'https://www.discogs.com/release/2568225-Christopher-Lawrence-All-Or-Nothing',
+            'matched_existing_fields' => ['duration', 'artists'],
+            'duration_delta_seconds' => 0,
+        ],
+    ]);
+    $strongDiscogsPriority = $priority->invoke($generator, [
+        'provider' => 'discogs_release',
+        'confidence' => 77,
+        'values' => ['discogs_release_id' => '2568225'],
+        'evidence' => [
+            'track_position' => '15',
+            'matched_existing_fields' => ['artists', 'track', 'duration'],
+            'duration_delta_seconds' => 0,
+        ],
+    ]);
+
+    expect($strongDiscogsPriority)->toBeGreaterThan($weakMixedPriority);
 });
 
 /**

@@ -268,7 +268,7 @@ class AudioMetadataProposalGenerator
     {
         $providerPriority = match ($candidate['provider']) {
             'acoustid_musicbrainz_discogs_vgmdb' => 325,
-            'acoustid_musicbrainz_ai_discogs' => 320,
+            'acoustid_musicbrainz_ai_discogs' => $this->values->cleanString($candidate['evidence']['discogs_track_position'] ?? null) !== null ? 320 : 225,
             'acoustid_musicbrainz_vgmdb' => 315,
             'acoustid_musicbrainz_discogs' => 310,
             'acoustid_musicbrainz' => $this->candidateHasSourceReleaseSupport($candidate) ? 300 : 230,
