@@ -49,6 +49,94 @@ afterEach(() => {
 });
 
 describe('Audio playlist membership invalidation', () => {
+    it('refreshes visible all-audio rows directly when audio files change', async () => {
+        const userMeta = document.createElement('meta');
+        userMeta.setAttribute('name', 'user-id');
+        userMeta.setAttribute('content', '42');
+        document.head.append(userMeta);
+
+        const listeners = new Map<string, (payload: unknown) => void>();
+        const echoChannel = {
+            listen: vi.fn((event: string, callback: (payload: unknown) => void) => {
+                listeners.set(event, callback);
+
+                return echoChannel;
+            }),
+        };
+        const echo = {
+            private: vi.fn(() => echoChannel),
+            leave: vi.fn(),
+        };
+        Object.assign(global.window, {
+            Echo: echo,
+        });
+
+        let changed = false;
+        const detailRequests: number[][] = [];
+
+        mockAxios.get.mockResolvedValue({
+            data: {
+                ids: [7, 8],
+                sources: { 7: 'local', 8: 'local' },
+                source_ids: { 7: null, 8: null },
+                spotify_uris: { 7: null, 8: null },
+                cursor: {
+                    after_id: 0,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 8,
+                },
+                pagination: {
+                    per_page: 100,
+                    total: 2,
+                    total_pages: 1,
+                },
+            } satisfies AudioIdsResponse,
+        });
+
+        mockAxios.post.mockImplementation(async (url: string, payload?: { ids?: number[] }) => {
+            if (url === '/api/audio/details') {
+                const ids = payload?.ids ?? [];
+                detailRequests.push(ids);
+
+                return {
+                    data: {
+                        items: ids.map((id) => audioDetail({
+                            id,
+                            title: id === 7 ? 'Saboteur (Dub Mix)' : 'Freefall',
+                            source: 'local',
+                            artists: ['Christopher Lawrence'],
+                            albums: [changed ? 'All Or Nothing' : 'All Ar Nothing'],
+                            cover_url: changed ? '/api/audio/album-covers/382' : null,
+                        })),
+                    } satisfies AudioDetailsResponse,
+                };
+            }
+
+            throw new Error(`Unexpected post URL: ${url}`);
+        });
+
+        const wrapper = await mountAudio('/playlists/all');
+        await flushPromises();
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('All Ar Nothing');
+
+        changed = true;
+        listeners.get('.AudioFilesChanged')?.({
+            file_ids: [7, 8],
+            reason: 'metadata_applied',
+        });
+        await flushPromises();
+
+        expect(mockAxios.post).not.toHaveBeenCalledWith('/api/audio/playlists/membership', expect.anything());
+        expect(detailRequests.at(-1)).toEqual([7, 8]);
+        expect(wrapper.text()).toContain('All Or Nothing');
+        expect(wrapper.text()).not.toContain('All Ar Nothing');
+    });
+
     it('removes rows that no longer belong to the active playlist when audio files change', async () => {
         const userMeta = document.createElement('meta');
         userMeta.setAttribute('name', 'user-id');

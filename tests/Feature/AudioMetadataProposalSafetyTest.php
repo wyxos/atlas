@@ -423,3 +423,73 @@ test('metadata proposal applies external cover urls as album cover assets', func
 
     Storage::disk(AtlasStorage::DISK)->assertExists((string) $newCover?->path);
 });
+
+test('metadata proposal applies cover urls to albums created by the same proposal', function () {
+    Storage::fake(AtlasStorage::DISK);
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Saboteur (Dub Mix)',
+        'preview_url' => null,
+    ]);
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'single',
+        'source_filter' => 'local',
+        'status' => 'completed',
+        'total_files' => 1,
+        'processed_files' => 1,
+        'proposal_count' => 1,
+        'options' => ['file_id' => $file->id],
+    ]);
+    $proposal = AudioMetadataProposal::query()->create([
+        'audio_metadata_run_id' => $run->id,
+        'file_id' => $file->id,
+        'provider' => 'discogs_release',
+        'status' => 'pending',
+        'confidence' => 82,
+        'current_values' => [
+            'album' => null,
+            'cover_url' => null,
+        ],
+        'proposed_values' => [
+            'album' => 'All Or Nothing',
+            'cover_url' => 'https://discogs.test/image/all-or-nothing.jpg',
+        ],
+        'changes' => [
+            'album' => [
+                'current' => null,
+                'proposed' => 'All Or Nothing',
+            ],
+            'cover_url' => [
+                'current' => null,
+                'proposed' => 'https://discogs.test/image/all-or-nothing.jpg',
+            ],
+        ],
+        'evidence' => ['source' => 'discogs_release_search'],
+    ]);
+
+    Http::fake([
+        'https://discogs.test/image/all-or-nothing.jpg' => Http::response('cover-bytes', 200, ['content-type' => 'image/jpeg']),
+    ]);
+
+    $response = $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposal->id}", [
+        'action' => 'apply',
+        'fields' => ['album', 'cover_url'],
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJsonPath('proposal.status', 'applied');
+
+    $album = $file->fresh()->albums()->first();
+    $cover = $album?->covers()->where('is_default', true)->first();
+
+    expect($album?->name)->toBe('All Or Nothing')
+        ->and($file->fresh()?->preview_url)->toBeNull()
+        ->and($cover)->not->toBeNull()
+        ->and($cover?->mime_type)->toBe('image/jpeg');
+
+    Storage::disk(AtlasStorage::DISK)->assertExists((string) $cover?->path);
+});

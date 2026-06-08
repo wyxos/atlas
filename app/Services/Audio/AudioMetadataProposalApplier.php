@@ -64,8 +64,8 @@ class AudioMetadataProposalApplier
             $proposed = is_array($proposal->proposed_values) ? $proposal->proposed_values : [];
             $albumGroup = $this->albumGroups->capture($file, $proposal, $fields);
 
-            $coverAlbumIds = $this->applyFileFields($file, $proposed, $fields);
             $this->applyRelationshipFields($file, $proposed, $fields);
+            $coverAlbumIds = $this->applyFileFields($file, $proposed, $fields);
             $this->applyAlbumMetadataFields($file, $proposed, $fields);
             $this->applyTrackPivotFields($file, $proposed, $fields);
             $this->applyMetadataFields($file, $proposed, $fields);

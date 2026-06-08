@@ -71,6 +71,16 @@ export function useAudioPlaylistMembershipInvalidation(options: UseAudioPlaylist
         const requestToken = ++membershipRequestToken;
         const playlistSlug = options.activePlaylistSlug.value;
 
+        if (playlistSlug === 'all') {
+            try {
+                await options.fetchAudioDetails(visibleChangedIds, true);
+            } catch (error) {
+                console.error('Failed to refresh changed audio rows:', error);
+            }
+
+            return;
+        }
+
         try {
             const { data } = await window.axios.post<AudioPlaylistMembershipResponse>('/api/audio/playlists/membership', {
                 playlist: playlistSlug,
