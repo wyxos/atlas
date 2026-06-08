@@ -20,6 +20,8 @@ class ReviewAudioMetadataProposalRequest extends FormRequest
         return [
             'action' => ['required', Rule::in(['apply', 'ignore'])],
             'fields' => ['nullable', 'array'],
+            'field_options' => ['nullable', 'array'],
+            'field_options.*' => ['string', 'max:64'],
             'fields.*' => [
                 'string',
                 'distinct',

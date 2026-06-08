@@ -74,6 +74,16 @@ export type AudioMetadataChange = {
     proposed: unknown;
 };
 
+export type AudioMetadataFieldOption = {
+    id: string;
+    provider: string;
+    confidence: number;
+    value: unknown;
+    recommended: boolean;
+    reason: string | null;
+    review_verdict: string | null;
+};
+
 export type AudioMetadataProposal = {
     id: number;
     file_id: number;
@@ -84,6 +94,7 @@ export type AudioMetadataProposal = {
     current_values: Record<string, unknown>;
     proposed_values: Record<string, unknown>;
     changes: Record<string, AudioMetadataChange>;
+    field_options?: Record<string, AudioMetadataFieldOption[]>;
     evidence: Record<string, unknown>;
     created_at: string | null;
     reviewed_at: string | null;

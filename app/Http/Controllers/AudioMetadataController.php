@@ -90,7 +90,7 @@ class AudioMetadataController extends Controller
         $validated = $request->validated();
         $proposal = $validated['action'] === 'ignore'
             ? $metadata->ignore($audioMetadataProposal, $request->user())
-            : $metadata->apply($audioMetadataProposal, $request->user(), $validated['fields'] ?? []);
+            : $metadata->apply($audioMetadataProposal, $request->user(), $validated['fields'] ?? [], $validated['field_options'] ?? []);
 
         return response()->json([
             'proposal' => AudioMetadataProposalPayload::proposal($proposal),

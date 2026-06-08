@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { RefreshCw, RotateCcw, Tags } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
-import type { AudioMetadataProposal } from '@/types/audio';
+import type { AudioMetadataFieldOption, AudioMetadataProposal } from '@/types/audio';
 
 type TrackDetails = {
     id: number;
@@ -58,11 +58,12 @@ const emit = defineEmits<{
     'update:open': [value: boolean];
     runMetadata: [];
     restoreFromFile: [];
-    applyProposal: [fields: string[]];
+    applyProposal: [fields: string[], fieldOptions: Record<string, string>];
     ignoreProposal: [];
 }>();
 
 const selectedFields = ref<string[]>([]);
+const selectedFieldOptions = ref<Record<string, string>>({});
 
 const isOpen = computed({
     get: () => props.open,
@@ -75,20 +76,22 @@ const pendingProposal = computed(() => props.proposal?.status === 'pending' ? pr
 
 const proposalFields = computed(() => {
     const changes = pendingProposal.value?.changes ?? {};
+    const fieldOptions = pendingProposal.value?.field_options ?? {};
 
-    return Object.keys(changes)
+    return [...Object.keys(changes), ...Object.keys(fieldOptions)]
         .filter((field) => !HIDDEN_METADATA_FIELDS.includes(field))
+        .filter((field, index, fields) => fields.indexOf(field) === index)
         .sort((left, right) => fieldOrder(left) - fieldOrder(right));
 });
 
 watch(() => props.proposal?.id, () => {
-    selectedFields.value = [...proposalFields.value];
+    resetFieldSelections();
 });
 
 watch(proposalFields, (fields) => {
     selectedFields.value = selectedFields.value.filter((field) => fields.includes(field));
     if (selectedFields.value.length === 0) {
-        selectedFields.value = [...fields];
+        selectedFields.value = defaultSelectedFields();
     }
 });
 
@@ -158,6 +161,10 @@ function coverPreviewUrl(value: unknown): string | null {
 }
 
 function providerLabel(provider: string): string {
+    if (provider === 'multi_source_review') {
+        return 'Multi-source review';
+    }
+
     if (provider === 'acoustid_musicbrainz') {
         return 'AcoustID / MusicBrainz';
     }
@@ -189,6 +196,66 @@ function providerLabel(provider: string): string {
         .join(' ');
 }
 
+function fieldOptions(field: string): AudioMetadataFieldOption[] {
+    return pendingProposal.value?.field_options?.[field] ?? [];
+}
+
+function hasFieldOptions(field: string): boolean {
+    return fieldOptions(field).length > 0;
+}
+
+function recommendedOption(field: string): AudioMetadataFieldOption | null {
+    return fieldOptions(field).find((option) => option.recommended) ?? null;
+}
+
+function defaultSelectedFields(): string[] {
+    return proposalFields.value.filter((field) => {
+        if (pendingProposal.value?.changes?.[field]) {
+            return true;
+        }
+
+        return recommendedOption(field) !== null;
+    });
+}
+
+function resetFieldSelections(): void {
+    const nextOptions: Record<string, string> = {};
+
+    for (const field of proposalFields.value) {
+        const recommended = recommendedOption(field);
+        if (recommended) {
+            nextOptions[field] = recommended.id;
+        }
+    }
+
+    selectedFieldOptions.value = nextOptions;
+    selectedFields.value = defaultSelectedFields();
+}
+
+function selectFieldOption(field: string, optionId: string): void {
+    selectedFieldOptions.value = {
+        ...selectedFieldOptions.value,
+        [field]: optionId,
+    };
+
+    if (!selectedFields.value.includes(field)) {
+        selectedFields.value = [...selectedFields.value, field];
+    }
+}
+
+function applyFieldOptions(): Record<string, string> {
+    return Object.fromEntries(
+        selectedFields.value
+            .filter((field) => selectedFieldOptions.value[field])
+            .map((field) => [field, selectedFieldOptions.value[field]]),
+    );
+}
+
+function canApplySelected(): boolean {
+    return selectedFields.value.length > 0
+        && selectedFields.value.every((field) => !hasFieldOptions(field) || Boolean(selectedFieldOptions.value[field]));
+}
+
 function evidenceItems(proposal: AudioMetadataProposal): string[] {
     const evidence = proposal.evidence ?? {};
     const items: string[] = [];
@@ -203,6 +270,8 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
         items.push(`Fingerprint ${acoustidScore}%`);
     } else if (source === 'embedded_tags') {
         items.push('Embedded tags');
+    } else if (source === 'multi_source_metadata_review') {
+        items.push('Multiple metadata candidates');
     } else if (source === 'filename') {
         items.push('Filename fallback');
     } else if (source === 'musicbrainz_release_search') {
@@ -361,7 +430,7 @@ function discogsAttributionUrl(proposal: AudioMetadataProposal): string | null {
                             </template>
                         </div>
 
-                        <label
+                        <div
                             v-for="field in proposalFields"
                             :key="field"
                             class="grid gap-2 border-b border-twilight-indigo-500/50 pb-3"
@@ -376,7 +445,48 @@ function discogsAttributionUrl(proposal: AudioMetadataProposal): string | null {
                                 >
                                 {{ fieldLabel(field) }}
                             </span>
-                            <span v-if="isCoverField(field)" class="grid grid-cols-2 gap-3 pl-6 text-xs sm:max-w-sm">
+                            <span
+                                v-if="hasFieldOptions(field)"
+                                class="grid gap-2 pl-6 text-xs"
+                                :data-test="`audio-metadata-field-options-${field}`"
+                            >
+                                <span class="text-blue-slate-300">Current: {{ formatValue(pendingProposal.current_values[field] ?? pendingProposal.changes[field]?.current) }}</span>
+                                <label
+                                    v-for="option in fieldOptions(field)"
+                                    :key="option.id"
+                                    class="grid gap-2 rounded border border-twilight-indigo-500/60 bg-prussian-blue-900/30 px-3 py-2"
+                                    :class="selectedFieldOptions[field] === option.id ? 'border-smart-blue-400/70 bg-smart-blue-950/30' : ''"
+                                    :data-test="`audio-metadata-field-option-${field}`"
+                                >
+                                    <span class="flex min-w-0 items-center gap-2">
+                                        <input
+                                            type="radio"
+                                            :name="`audio-metadata-option-${field}`"
+                                            :value="option.id"
+                                            :checked="selectedFieldOptions[field] === option.id"
+                                            class="size-4 shrink-0 accent-smart-blue-500"
+                                            @change="selectFieldOption(field, option.id)"
+                                        >
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate font-medium text-smart-blue-100">{{ providerLabel(option.provider) }} - {{ option.confidence }}%</span>
+                                            <span v-if="option.recommended" class="block text-blue-slate-300">Recommended</span>
+                                            <span v-else-if="option.review_verdict" class="block text-blue-slate-300">AI {{ option.review_verdict }}</span>
+                                        </span>
+                                    </span>
+                                    <span v-if="isCoverField(field)" class="flex aspect-square w-20 items-center justify-center overflow-hidden rounded border border-smart-blue-400/60 bg-prussian-blue-900 sm:w-24">
+                                        <img
+                                            v-if="coverPreviewUrl(option.value)"
+                                            :src="coverPreviewUrl(option.value) ?? ''"
+                                            alt="Provider cover"
+                                            class="h-full w-full object-cover"
+                                            data-test="audio-metadata-cover-option"
+                                        >
+                                        <Tags v-else class="size-5 text-blue-slate-400" aria-hidden="true" />
+                                    </span>
+                                    <span v-else class="text-regal-navy-100">{{ formatValue(option.value) }}</span>
+                                </label>
+                            </span>
+                            <span v-else-if="isCoverField(field)" class="grid grid-cols-2 gap-3 pl-6 text-xs sm:max-w-sm">
                                 <span class="grid gap-1">
                                     <span class="text-blue-slate-300">Current</span>
                                     <span class="flex aspect-square w-20 items-center justify-center overflow-hidden rounded border border-twilight-indigo-500 bg-prussian-blue-900 sm:w-24">
@@ -408,7 +518,7 @@ function discogsAttributionUrl(proposal: AudioMetadataProposal): string | null {
                                 <span class="text-blue-slate-300">Current: {{ formatValue(pendingProposal.changes[field]?.current) }}</span>
                                 <span class="text-smart-blue-100">Proposed: {{ formatValue(pendingProposal.changes[field]?.proposed) }}</span>
                             </span>
-                        </label>
+                        </div>
                     </div>
                 </div>
 
@@ -426,9 +536,9 @@ function discogsAttributionUrl(proposal: AudioMetadataProposal): string | null {
                     <Button
                         v-if="pendingProposal"
                         type="button"
-                        :disabled="props.isReviewing || selectedFields.length === 0"
+                        :disabled="props.isReviewing || !canApplySelected()"
                         data-test="audio-metadata-apply"
-                        @click="emit('applyProposal', selectedFields)"
+                        @click="emit('applyProposal', selectedFields, applyFieldOptions())"
                     >
                         Apply selected
                     </Button>

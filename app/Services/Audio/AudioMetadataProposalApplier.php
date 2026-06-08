@@ -38,6 +38,7 @@ class AudioMetadataProposalApplier
 
     public function __construct(
         private readonly AudioMetadataAlbumGroupApplier $albumGroups,
+        private readonly AudioMetadataProposalOptionResolver $options,
         private readonly AudioMetadataRelationshipSynchronizer $relationships,
         private readonly AudioMetadataCanonicalPayloadWriter $payloads,
     ) {}
@@ -45,23 +46,28 @@ class AudioMetadataProposalApplier
     /**
      * @param  list<string>  $fields
      */
-    public function apply(AudioMetadataProposal $proposal, User $user, array $fields = []): AudioMetadataProposal
+    public function apply(AudioMetadataProposal $proposal, User $user, array $fields = [], array $fieldOptions = []): AudioMetadataProposal
     {
         if ($proposal->status !== 'pending') {
             abort(409, 'This metadata proposal has already been reviewed.');
         }
 
-        $fields = $this->normalizeApplyFields($proposal, $fields);
         $affectedFileIds = [];
 
-        $appliedProposal = DB::transaction(function () use ($proposal, $user, $fields, &$affectedFileIds): AudioMetadataProposal {
+        $appliedProposal = DB::transaction(function () use ($proposal, $user, $fields, $fieldOptions, &$affectedFileIds): AudioMetadataProposal {
             $file = File::query()
                 ->whereKey($proposal->file_id)
                 ->lockForUpdate()
                 ->firstOrFail();
             $file->load(['metadata', 'artists', 'albums']);
 
-            $proposed = is_array($proposal->proposed_values) ? $proposal->proposed_values : [];
+            $proposed = $this->options->selectedProposedValues($proposal, $fields, $fieldOptions);
+            $fields = $this->options->normalizeApplyFields($proposal, $fields, $proposed);
+            $proposal->forceFill([
+                'proposed_values' => $proposed,
+                'changes' => $this->options->changesForProposal($proposal, $proposed),
+            ]);
+
             $albumGroup = $this->albumGroups->capture($file, $proposal, $fields);
 
             $this->applyRelationshipFields($file, $proposed, $fields);
@@ -349,19 +355,6 @@ class AudioMetadataProposalApplier
         if ($updates !== []) {
             $file->albums()->updateExistingPivot($album->id, $updates);
         }
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function normalizeApplyFields(AudioMetadataProposal $proposal, array $fields): array
-    {
-        $changes = is_array($proposal->changes) ? array_keys($proposal->changes) : [];
-        if ($fields === []) {
-            return $changes;
-        }
-
-        return array_values(array_intersect($changes, $fields));
     }
 
     private function isSpotifyFile(File $file): bool

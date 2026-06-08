@@ -147,7 +147,12 @@ test('fingerprint release drift asks ai before replacing a plausible current edi
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal', null);
+        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Tri-State Remixed')
+        ->assertJsonPath('proposal.field_options.album.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/tri-state-remixed-release/front.jpg')
+        ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false);
 
     expect($aiCalls)->toBeGreaterThanOrEqual(1);
 });
@@ -255,7 +260,12 @@ test('fingerprint release with cover does not replace a broader remix edition wi
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal', null);
+        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Home (The Remixes)')
+        ->assertJsonPath('proposal.field_options.album.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/home-the-remixes-release/front.jpg')
+        ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false);
 });
 
 test('fingerprint metadata lets ai restrict unsafe release fields per field', function () {

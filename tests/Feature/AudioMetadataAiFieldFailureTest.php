@@ -15,7 +15,7 @@ use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
-test('fingerprint metadata fails visibly when required ai field review is unusable', function () {
+test('fingerprint metadata surfaces manual options when required ai field review is unusable', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
         'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
@@ -135,17 +135,23 @@ test('fingerprint metadata fails visibly when required ai field review is unusab
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal', null)
+        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Air for Life (The Remixes)')
+        ->assertJsonPath('proposal.field_options.album.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.album.0.reason', 'AI response JSON could not be decoded.')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/air-for-life-remixes-release/front.jpg')
+        ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false)
         ->assertJsonPath('run.status', 'completed')
         ->assertJsonPath('run.processed_files', 1)
-        ->assertJsonPath('run.failed_files', 1)
-        ->assertJsonPath('run.proposal_count', 0)
-        ->assertJsonPath('run.error', 'AI response JSON could not be decoded.');
+        ->assertJsonPath('run.failed_files', 0)
+        ->assertJsonPath('run.proposal_count', 1)
+        ->assertJsonPath('run.error', null);
 
     $run = AudioMetadataRun::query()->findOrFail($response->json('run.id'));
 
-    expect($run->failed_files)->toBe(1)
-        ->and(AudioMetadataProposal::query()->where('file_id', $file->id)->exists())->toBeFalse()
+    expect($run->failed_files)->toBe(0)
+        ->and(AudioMetadataProposal::query()->where('file_id', $file->id)->exists())->toBeTrue()
         ->and($aiCalls)->toBe(1);
 });
 

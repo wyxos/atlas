@@ -147,7 +147,12 @@ test('discogs supplement asks ai before applying conflicting release disc fields
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal', null);
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'TRON: Legacy: MetroTokyo Edition Complete Motion Picture Soundtrack')
+        ->assertJsonPath('proposal.field_options.album.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.disc_number.0.value', '3')
+        ->assertJsonPath('proposal.field_options.disc_number.0.recommended', false);
 
     expect($aiCalls)->toBeGreaterThanOrEqual(1);
 });
@@ -289,7 +294,12 @@ test('discogs supplement asks ai before applying mismatched release album fields
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal', null);
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Anjunabeats Progressive Session')
+        ->assertJsonPath('proposal.field_options.album.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '5')
+        ->assertJsonPath('proposal.field_options.track_number.0.recommended', false);
 
     expect($aiCalls)->toBeGreaterThanOrEqual(1);
 });

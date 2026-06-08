@@ -23,8 +23,8 @@ class AudioMetadataProposalGenerator
     public function __construct(
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
+        private readonly AudioMetadataCandidateAggregator $candidateAggregator,
         private readonly AudioMetadataCandidateEnricher $candidateEnricher,
-        private readonly AudioMetadataCandidateFieldReviewer $fieldReviewer,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
         private readonly AudioMetadataDiscogsProvider $discogsProvider,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
@@ -55,12 +55,14 @@ class AudioMetadataProposalGenerator
         }
 
         $candidate['values'] = $this->withoutAliasValues($candidate['values']);
-        if ($candidate['values'] === []) {
+        $fieldOptions = data_get($candidate, 'evidence.field_options');
+        $hasFieldOptions = is_array($fieldOptions) && $fieldOptions !== [];
+        if ($candidate['values'] === [] && ! $hasFieldOptions) {
             return null;
         }
 
         $changes = $this->changes($currentValues, $candidate['values']);
-        if ($changes === []) {
+        if ($changes === [] && ! $hasFieldOptions) {
             return null;
         }
 
@@ -200,14 +202,12 @@ class AudioMetadataProposalGenerator
 
         $this->reportProgress($progress, 'ai_review', 'Reviewing field-level metadata safety');
 
-        foreach ($reviewableCandidates as $candidate) {
-            $reviewedCandidate = $this->fieldReviewer->review($file, $currentValues, $candidate, $this->changes($currentValues, $candidate['values']));
-            if (is_array($reviewedCandidate) && $this->changes($currentValues, $reviewedCandidate['values']) !== []) {
-                return $reviewedCandidate;
-            }
-        }
-
-        return null;
+        return $this->candidateAggregator->aggregate(
+            $file,
+            $currentValues,
+            $reviewableCandidates->all(),
+            fn (array $values): array => $this->changes($currentValues, $values),
+        );
     }
 
     private function reviewFingerprintCandidate(File $file, array $currentValues, array $candidate): ?array

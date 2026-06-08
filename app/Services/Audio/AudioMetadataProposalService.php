@@ -114,9 +114,9 @@ class AudioMetadataProposalService
     /**
      * @param  list<string>  $fields
      */
-    public function apply(AudioMetadataProposal $proposal, User $user, array $fields = []): AudioMetadataProposal
+    public function apply(AudioMetadataProposal $proposal, User $user, array $fields = [], array $fieldOptions = []): AudioMetadataProposal
     {
-        return $this->applier->apply($proposal, $user, $fields);
+        return $this->applier->apply($proposal, $user, $fields, $fieldOptions);
     }
 
     public function ignore(AudioMetadataProposal $proposal, User $user): AudioMetadataProposal

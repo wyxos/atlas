@@ -53,6 +53,9 @@ class AudioMetadataProposalPayload
             'current_values' => $proposal->current_values ?? [],
             'proposed_values' => $proposal->proposed_values ?? [],
             'changes' => $proposal->changes ?? [],
+            'field_options' => is_array(data_get($proposal->evidence, 'field_options'))
+                ? data_get($proposal->evidence, 'field_options')
+                : [],
             'evidence' => $proposal->evidence ?? [],
             'created_at' => $proposal->created_at?->toIso8601String(),
             'reviewed_at' => $proposal->reviewed_at?->toIso8601String(),

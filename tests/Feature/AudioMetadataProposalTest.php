@@ -169,6 +169,7 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
         ->assertJsonPath('proposal.evidence.cover_source', 'cover_art_archive');
     expect($file->fresh()->title)->toBe('Classmate Sauce Title');
 });
+
 test('low confidence fingerprint metadata falls back to local tag proposal', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',

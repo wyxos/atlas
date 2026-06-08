@@ -195,7 +195,7 @@ export function useAudioMetadataReview(options: Options) {
         }
     }
 
-    async function handleMetadataProposalApply(fields: string[]): Promise<void> {
+    async function handleMetadataProposalApply(fields: string[], fieldOptions: Record<string, string> = {}): Promise<void> {
         const audioId = detailsSheetAudioId.value;
         const proposal = detailsSheetProposal.value;
         if (audioId === null || !proposal) {
@@ -207,9 +207,16 @@ export function useAudioMetadataReview(options: Options) {
         setMetadataReviewError(audioId, null);
 
         try {
-            const { data } = await window.axios.patch<{ proposal: AudioMetadataProposal }>(`/api/audio/metadata-proposals/${proposal.id}`, {
+            const payload: { action: 'apply'; fields: string[]; field_options?: Record<string, string> } = {
                 action: 'apply',
                 fields,
+            };
+            if (Object.keys(fieldOptions).length > 0) {
+                payload.field_options = fieldOptions;
+            }
+
+            const { data } = await window.axios.patch<{ proposal: AudioMetadataProposal }>(`/api/audio/metadata-proposals/${proposal.id}`, {
+                ...payload,
             });
             metadataProposalById.value = {
                 ...metadataProposalById.value,

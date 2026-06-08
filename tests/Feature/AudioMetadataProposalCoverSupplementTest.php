@@ -100,12 +100,11 @@ test('fingerprint proposal keeps musicbrainz release search cover when fingerpri
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/chain-release/front-500.jpg')
+        ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'chain-release')
         ->assertJsonPath('proposal.evidence.cover_source', 'cover_art_archive')
         ->assertJsonPath('proposal.evidence.musicbrainz_release_id', 'chain-release');
-
-    expect($response->json('proposal.proposed_values'))->not->toHaveKey('musicbrainz_release_id');
 });
 
 test('cover lookup proposes an existing sibling album cover for duplicate album rows', function () {
