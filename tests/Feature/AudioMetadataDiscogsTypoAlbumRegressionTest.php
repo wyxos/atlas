@@ -4,6 +4,7 @@ use App\Models\Album;
 use App\Models\Artist;
 use App\Models\File;
 use App\Models\User;
+use App\Services\Audio\AudioFingerprint;
 use App\Services\Audio\AudioFingerprintService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -114,6 +115,179 @@ test('ai field review accepts exact track evidence when it judges the current al
     expect($fieldReviewPrompt)
         ->toContain('Do not compare the track title to the album title.')
         ->toContain('decide whether a differing current album is likely a typo or transcription variant of the Discogs release title');
+});
+
+test('strong discogs release evidence wins over musicbrainz recording id only proposal', function () {
+    config([
+        'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
+        'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
+        'services.audio_metadata.cover_art_archive_base_url' => 'https://cover.test',
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.vgmdb_enabled' => false,
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'gateway',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_token' => 'ai-token',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, fn (MockInterface $mock) => $mock
+        ->shouldReceive('forFile')
+        ->once()
+        ->andReturn(new AudioFingerprint('saboteur-fingerprint', 474, '/tmp/saboteur.mp3')));
+
+    $fieldReviewedProviders = [];
+    Http::fake(function (Request $request) use (&$fieldReviewedProviders) {
+        $url = $request->url();
+
+        if (str_starts_with($url, 'https://acoustid.test/v2/lookup')) {
+            return Http::response([
+                'status' => 'ok',
+                'results' => [[
+                    'id' => 'acoustid-saboteur',
+                    'score' => 0.997,
+                    'recordings' => [[
+                        'id' => 'saboteur-recording-mbid',
+                        'title' => 'Saboteur (Dub Mix)',
+                        'duration' => 474000,
+                        'artists' => [
+                            ['name' => 'Christopher Lawrence'],
+                        ],
+                        'releases' => [[
+                            'id' => 'all-or-nothing-remastered-mbid',
+                            'title' => 'All Or Nothing (Remastered)',
+                            'date' => '2010-09-28',
+                            'country' => 'AU',
+                        ]],
+                    ]],
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://musicbrainz.test/ws/2/release/all-or-nothing-remastered-mbid') {
+            return Http::response([
+                'id' => 'all-or-nothing-remastered-mbid',
+                'title' => 'All Or Nothing (Remastered)',
+                'date' => '2010-09-28',
+                'country' => 'AU',
+                'label-info' => [[
+                    'catalog-number' => 'MB-REM',
+                    'label' => ['name' => 'MusicBrainz Label'],
+                ]],
+                'media' => [[
+                    'position' => 1,
+                    'tracks' => [[
+                        'number' => '15',
+                        'position' => 15,
+                        'recording' => ['id' => 'saboteur-recording-mbid'],
+                    ]],
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://cover.test/release/all-or-nothing-remastered-mbid') {
+            return Http::response([], 404);
+        }
+
+        if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
+            return Http::response(['releases' => []]);
+        }
+
+        if (str_starts_with($url, 'https://discogs.test/database/search')) {
+            return Http::response([
+                'results' => [
+                    ['id' => 2568225, 'type' => 'release'],
+                ],
+            ]);
+        }
+
+        if ($url === 'https://discogs.test/releases/2568225') {
+            return Http::response([
+                'id' => 2568225,
+                'master_id' => 39320,
+                'uri' => 'https://www.discogs.com/release/2568225-Christopher-Lawrence-All-Or-Nothing',
+                'title' => 'All Or Nothing',
+                'country' => 'Australia',
+                'released' => '2010-09-28',
+                'artists' => [
+                    ['name' => 'Christopher Lawrence'],
+                ],
+                'labels' => [
+                    ['name' => 'Pharmacy Music', 'catno' => 'PHARMACY1001'],
+                ],
+                'images' => [[
+                    'type' => 'primary',
+                    'uri' => 'https://discogs.test/image/all-or-nothing.jpg',
+                ]],
+                'tracklist' => [[
+                    'position' => '15',
+                    'title' => 'Saboteur (Dub Mix)',
+                    'duration' => '7:54',
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
+            $data = $request->data();
+            $schema = (string) ($data['schemaVersion'] ?? '');
+            $provider = (string) data_get($data, 'input.candidate.provider');
+            if ($schema === 'atlas-audio-metadata-field-adjudication-v1') {
+                $fieldReviewedProviders[] = $provider;
+            }
+
+            return Http::response(match ($provider) {
+                'discogs_release' => [
+                    'verdict' => 'accept',
+                    'confidence' => 0.93,
+                    'reason' => 'Discogs release has matching artist, track, and duration; current album is a typo.',
+                    'model' => 'qwen-test',
+                    'safe_fields' => [
+                        'album',
+                        'cover_url',
+                        'track_number',
+                        'release_label',
+                        'catalog_number',
+                        'release_date',
+                        'release_country',
+                        'discogs_release_id',
+                    ],
+                ],
+                default => [
+                    'verdict' => 'ambiguous',
+                    'confidence' => 0.96,
+                    'reason' => 'The fingerprint supports the recording only; the MusicBrainz release package is not safe.',
+                    'model' => 'qwen-test',
+                    'safe_fields' => ['musicbrainz_recording_id'],
+                ],
+            });
+        }
+
+        return Http::response([], 404);
+    });
+
+    $user = User::factory()->create();
+    $file = christopherLawrenceDiscogsTypoFile();
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal.provider', 'discogs_release')
+        ->assertJsonPath('proposal.proposed_values.album', 'All Or Nothing')
+        ->assertJsonPath('proposal.proposed_values.track_number', '15')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Pharmacy Music')
+        ->assertJsonPath('proposal.proposed_values.catalog_number', 'PHARMACY1001')
+        ->assertJsonPath('proposal.proposed_values.release_date', '2010-09-28')
+        ->assertJsonPath('proposal.proposed_values.release_country', 'Australia')
+        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '2568225')
+        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/all-or-nothing.jpg')
+        ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/2568225-Christopher-Lawrence-All-Or-Nothing')
+        ->assertJsonPath('proposal.evidence.matched_existing_fields', ['artists', 'track', 'duration'])
+        ->assertJsonPath('proposal.evidence.duration_delta_seconds', 0)
+        ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept');
+
+    expect($fieldReviewedProviders)->toBe(['discogs_release']);
 });
 
 /**

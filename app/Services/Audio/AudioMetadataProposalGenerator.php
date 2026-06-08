@@ -17,8 +17,7 @@ class AudioMetadataProposalGenerator
     private const REVIEW_FIELDS = [
         'title', 'artists', 'album', 'duration_seconds', 'cover_url', 'spotify_uri',
         'track_number', 'disc_number', 'release_label', 'catalog_number', 'barcode',
-        'release_date', 'release_country', 'isrc', 'musicbrainz_recording_id',
-        'musicbrainz_release_id', 'discogs_release_id',
+        'release_date', 'release_country', 'isrc', 'musicbrainz_recording_id', 'musicbrainz_release_id', 'discogs_release_id',
     ];
 
     public function __construct(
@@ -274,7 +273,7 @@ class AudioMetadataProposalGenerator
             'acoustid_musicbrainz_discogs' => 310,
             'acoustid_musicbrainz' => $this->candidateHasSourceReleaseSupport($candidate) ? 300 : 230,
             'musicbrainz_discogs' => 245,
-            'discogs_release' => 235,
+            'discogs_release' => $this->candidateHasStrongDiscogsReleaseSupport($candidate) ? 330 : 235,
             'existing_album_cover' => 230,
             'vgmdb_album' => 225,
             'musicbrainz_cover_art' => 220,
@@ -284,6 +283,23 @@ class AudioMetadataProposalGenerator
         };
 
         return $providerPriority + (int) $candidate['confidence'];
+    }
+
+    private function candidateHasStrongDiscogsReleaseSupport(array $candidate): bool
+    {
+        $durationDelta = $candidate['evidence']['duration_delta_seconds'] ?? null;
+        $matchedFields = $this->values->cleanStringList($candidate['evidence']['matched_existing_fields'] ?? []);
+
+        return ($candidate['provider'] ?? null) === 'discogs_release'
+            && $this->values->cleanString($candidate['values']['discogs_release_id'] ?? null) !== null
+            && $this->values->cleanString($candidate['evidence']['track_position'] ?? null) !== null
+            && is_numeric($durationDelta)
+            && (float) $durationDelta <= 2.0
+            && ! in_array('album', $matchedFields, true)
+            && ! in_array('release_title', $matchedFields, true)
+            && in_array('artists', $matchedFields, true)
+            && in_array('track', $matchedFields, true)
+            && in_array('duration', $matchedFields, true);
     }
 
     private function spotifyCandidate(File $file, User $user, ?callable $progress = null): array
