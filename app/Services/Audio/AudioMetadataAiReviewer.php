@@ -29,6 +29,10 @@ class AudioMetadataAiReviewer
         'discogs_release_id',
     ];
 
+    public function __construct(
+        private readonly AudioMetadataDiscogsAiReviewPayloads $discogsPayloads,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
@@ -118,17 +122,45 @@ class AudioMetadataAiReviewer
             return [];
         }
 
-        $input = $this->discogsSearchInput($file, $currentValues, $candidate);
+        $input = $this->discogsPayloads->searchInput($file, $currentValues, $candidate);
+        $prompt = $this->discogsPayloads->searchPrompt($input);
 
         try {
             $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
-                'ollama' => $this->reviewWithOllama($baseUrl, $input, $this->discogsSearchPrompt($input)),
-                default => $this->reviewWithGateway($baseUrl, $input, $this->discogsSearchPrompt($input), 'atlas-audio-metadata-discogs-search-v1'),
+                'ollama' => $this->reviewWithOllama($baseUrl, $input, $prompt),
+                default => $this->reviewWithGateway($baseUrl, $input, $prompt, 'atlas-audio-metadata-discogs-search-v1'),
             };
 
-            return $this->normalizeDiscogsSearchQueries($payload);
+            return $this->discogsPayloads->normalizeSearchQueries($payload);
         } catch (Throwable) {
             return [];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  list<array<string, mixed>>  $candidates
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_release_id:string|null,selected_track_position:string|null,safe_fields:list<string>,rejected_candidates:list<array{release_id:string|null,reason:string|null}>}|null
+     */
+    public function adjudicateDiscogsRelease(File $file, array $currentValues, array $candidates): ?array
+    {
+        $baseUrl = rtrim((string) config('services.audio_metadata.ai_base_url'), '/');
+        if (! $this->enabled() || $baseUrl === '' || $candidates === []) {
+            return null;
+        }
+
+        $input = $this->discogsPayloads->releaseAdjudicationInput($file, $currentValues, $candidates);
+        $prompt = $this->discogsPayloads->releaseAdjudicationPrompt($input);
+
+        try {
+            $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
+                'ollama' => $this->reviewWithOllama($baseUrl, $input, $prompt),
+                default => $this->reviewWithGateway($baseUrl, $input, $prompt, 'atlas-audio-metadata-discogs-release-adjudication-v1'),
+            };
+
+            return $this->discogsPayloads->normalizeReleaseAdjudicationResponse($payload, $candidates);
+        } catch (Throwable) {
+            return null;
         }
     }
 
@@ -256,35 +288,6 @@ class AudioMetadataAiReviewer
     }
 
     /**
-     * @param  array<string, mixed>  $currentValues
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @return array<string, mixed>
-     */
-    private function discogsSearchInput(File $file, array $currentValues, array $candidate): array
-    {
-        return [
-            'file' => [
-                'title' => $this->cleanString($file->title),
-                'filename' => $this->cleanString($file->filename),
-                'source' => $this->cleanString($file->source),
-                'mime_type' => $this->cleanString($file->mime_type),
-            ],
-            'current_values' => [
-                'title' => $currentValues['title'] ?? null,
-                'artists' => $currentValues['artists'] ?? [],
-                'album' => $currentValues['album'] ?? null,
-                'duration_seconds' => $currentValues['duration_seconds'] ?? null,
-            ],
-            'fingerprint_candidate' => [
-                'provider' => $candidate['provider'],
-                'confidence' => $candidate['confidence'],
-                'values' => Arr::only($candidate['values'], self::REVIEW_FIELDS),
-                'evidence' => Arr::except($candidate['evidence'], ['fingerprint', 'raw_fingerprint']),
-            ],
-        ];
-    }
-
-    /**
      * @param  array<string, mixed>  $payload
      * @return array{verdict:string,confidence:float|null,reason:string,model:string|null}
      */
@@ -329,40 +332,6 @@ class AudioMetadataAiReviewer
             ...$this->normalizeResponse($payload),
             'safe_fields' => $this->safeFields(is_array($payload['safe_fields'] ?? null) ? $payload['safe_fields'] : []),
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return list<array{release_title:string,artist:string,reason:string|null}>
-     */
-    private function normalizeDiscogsSearchQueries(array $payload): array
-    {
-        $queries = $payload['queries'] ?? $payload['search_queries'] ?? [];
-        if (! is_array($queries)) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($queries as $query) {
-            if (! is_array($query)) {
-                continue;
-            }
-
-            $releaseTitle = $this->cleanString($query['release_title'] ?? $query['album'] ?? null);
-            $artist = $this->cleanString($query['artist'] ?? null);
-            if ($releaseTitle === null || $artist === null) {
-                continue;
-            }
-
-            $key = mb_strtolower($releaseTitle).'|'.mb_strtolower($artist);
-            $normalized[$key] = [
-                'release_title' => $releaseTitle,
-                'artist' => $artist,
-                'reason' => $this->cleanString($query['reason'] ?? null),
-            ];
-        }
-
-        return array_slice(array_values($normalized), 0, 5);
     }
 
     /**
@@ -442,19 +411,6 @@ class AudioMetadataAiReviewer
             'Use ambiguous when the listed evidence is plausible but insufficient.',
             'Do not invent canonical titles, artists, albums, release details, IDs, or track positions. Select one track from the supplied source.tracklist only.',
             'Canonical/source fields should be original/source values from the selected release or track.',
-            'Evidence JSON:',
-            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-        ]);
-    }
-
-    private function discogsSearchPrompt(array $input): string
-    {
-        return implode("\n", [
-            'Return only JSON in this exact shape: {"queries":[{"release_title":"album or release search title","artist":"artist search name","reason":"short reason"}],"model":"model-name"}.',
-            'Suggest at most 5 Discogs release searches that could retrieve the source release for this audio track.',
-            'Use current values, filename hints, and fingerprint candidate values to bridge romanization, translation, alternate spellings, import titles, soundtrack numbering, and source/original language differences.',
-            'Do not invent final metadata. These are search queries only.',
-            'Prefer concise release titles and likely Discogs artist spellings.',
             'Evidence JSON:',
             json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]);

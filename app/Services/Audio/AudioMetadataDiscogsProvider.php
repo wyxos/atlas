@@ -7,7 +7,9 @@ use App\Models\File;
 class AudioMetadataDiscogsProvider
 {
     public function __construct(
+        private readonly AudioMetadataAiReviewer $aiReviewer,
         private readonly AudioMetadataDiscogsClient $discogs,
+        private readonly AudioMetadataDiscogsReleaseMetadataExtractor $releaseMetadata,
         private readonly AudioMetadataDiscogsSearchQueryExpander $searchQueryExpander,
         private readonly AudioMetadataDiscogsTrackMatcher $trackMatcher,
         private readonly AudioMetadataValueExtractor $values,
@@ -32,16 +34,17 @@ class AudioMetadataDiscogsProvider
             return null;
         }
 
-        $match = $this->bestReleaseMatch($album, $artists, $title, $duration);
+        $match = $this->bestReleaseMatch($file, $currentValues, $album, $artists, $title, $duration);
         if ($match === null) {
             return null;
         }
 
-        $values = $this->valuesFromRelease(
+        $values = $this->releaseMetadata->valuesFromRelease(
             $match['release'],
             $match['track'],
             $match['evidence']['matched_existing_fields'] ?? [],
         );
+        $values = $this->releaseMetadata->valuesAllowedByReleaseAdjudication($values, $match['evidence']['release_adjudication'] ?? null);
         if ($values === []) {
             return null;
         }
@@ -58,9 +61,9 @@ class AudioMetadataDiscogsProvider
      * @param  list<string>  $artists
      * @return array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}|null
      */
-    private function bestReleaseMatch(string $album, array $artists, ?string $title, ?int $duration): ?array
+    private function bestReleaseMatch(File $file, array $currentValues, string $album, array $artists, ?string $title, ?int $duration): ?array
     {
-        $best = null;
+        $candidates = [];
         $seenReleaseIds = [];
 
         foreach ($this->releaseSearchQueries($album, $artists, $title) as $searchQuery) {
@@ -87,13 +90,82 @@ class AudioMetadataDiscogsProvider
                     'evidence' => $score['evidence'],
                 ];
 
-                if ($best === null || $this->candidateBeats($candidate, $best)) {
-                    $best = $candidate;
-                }
+                $candidates[] = $candidate;
+            }
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        $best = $this->bestDeterministicCandidate($candidates);
+        if (count($candidates) < 2 || ! $this->aiReviewer->enabled()) {
+            return $best;
+        }
+
+        return $this->aiSelectedReleaseMatch($file, $currentValues, $candidates);
+    }
+
+    /**
+     * @param  list<array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}>  $candidates
+     * @return array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}
+     */
+    private function bestDeterministicCandidate(array $candidates): array
+    {
+        $best = $candidates[0];
+
+        foreach (array_slice($candidates, 1) as $candidate) {
+            if ($this->candidateBeats($candidate, $best)) {
+                $best = $candidate;
             }
         }
 
         return $best;
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @param  list<array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}>  $candidates
+     * @return array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}|null
+     */
+    private function aiSelectedReleaseMatch(File $file, array $currentValues, array $candidates): ?array
+    {
+        $review = $this->aiReviewer->adjudicateDiscogsRelease(
+            $file,
+            $currentValues,
+            $this->releaseMetadata->adjudicationCandidates($candidates),
+        );
+
+        if (($review['verdict'] ?? null) !== 'accept') {
+            return null;
+        }
+
+        $selectedReleaseId = $this->values->cleanString($review['selected_release_id'] ?? null);
+        if ($selectedReleaseId === null) {
+            return null;
+        }
+
+        foreach ($candidates as $candidate) {
+            $candidateReleaseId = $this->values->cleanString($candidate['evidence']['discogs_release_id'] ?? null);
+            if ($candidateReleaseId !== $selectedReleaseId) {
+                continue;
+            }
+
+            $selectedTrackPosition = $this->values->cleanString($review['selected_track_position'] ?? null);
+            $candidateTrackPosition = $this->values->cleanString($candidate['evidence']['track_position'] ?? null);
+            if ($selectedTrackPosition !== null && $candidateTrackPosition !== null && $selectedTrackPosition !== $candidateTrackPosition) {
+                return null;
+            }
+
+            $candidate['evidence']['release_adjudication'] = $review;
+            if (is_numeric($review['confidence'] ?? null)) {
+                $candidate['confidence'] = max(72, min(96, (int) round(((float) $review['confidence']) * 100)));
+            }
+
+            return $candidate;
+        }
+
+        return null;
     }
 
     private function candidateBeats(array $candidate, array $best): bool
@@ -132,11 +204,11 @@ class AudioMetadataDiscogsProvider
         $confidence = 62;
         $matchedFields = [];
         $releaseTitle = $this->values->cleanString($release['title'] ?? null);
-        $releaseArtists = $this->releaseArtists($release);
+        $releaseArtists = $this->releaseMetadata->releaseArtists($release);
         $track = $this->trackMatcher->bestTrack($release, $title, $duration);
-        $trackDuration = $this->discogsDurationSeconds($track['duration'] ?? null);
+        $trackDuration = $this->releaseMetadata->durationSeconds($track['duration'] ?? null);
         $durationDelta = $duration !== null && $trackDuration !== null ? abs($duration - $trackDuration) : null;
-        $coverUrl = $this->coverUrl($release);
+        $coverUrl = $this->releaseMetadata->coverUrl($release);
 
         if ($this->titlesMatch($album, $releaseTitle)) {
             $confidence += 10;
@@ -173,11 +245,11 @@ class AudioMetadataDiscogsProvider
             }
         }
 
-        if ($this->firstBarcode($release) !== null) {
+        if ($this->releaseMetadata->firstBarcode($release) !== null) {
             $confidence += 2;
         }
 
-        if ($this->firstCatalogNumber($release) !== null) {
+        if ($this->releaseMetadata->firstCatalogNumber($release) !== null) {
             $confidence += 2;
         }
 
@@ -194,9 +266,9 @@ class AudioMetadataDiscogsProvider
                 'source' => 'discogs_release_search',
                 'discogs_release_id' => $releaseId,
                 'discogs_release_title' => $releaseTitle,
-                'discogs_release_url' => $this->discogsReleaseUrl($release, $releaseId),
+                'discogs_release_url' => $this->releaseMetadata->discogsReleaseUrl($release, $releaseId),
                 'discogs_master_id' => $this->values->cleanString($release['master_id'] ?? null),
-                'discogs_master_url' => $this->discogsMasterUrl($release),
+                'discogs_master_url' => $this->releaseMetadata->discogsMasterUrl($release),
                 'matched_existing_fields' => $matchedFields,
                 'duration_delta_seconds' => $durationDelta,
                 'track_position' => $this->values->cleanString($track['position'] ?? null),
@@ -211,60 +283,6 @@ class AudioMetadataDiscogsProvider
     private function confidenceCeiling(array $matchedFields): int
     {
         return in_array('release_title', $matchedFields, true) ? 94 : 90;
-    }
-
-    /**
-     * @param  array<string, mixed>  $release
-     * @param  array<string, mixed>|null  $track
-     * @param  list<string>  $matchedFields
-     * @return array<string, mixed>
-     */
-    private function valuesFromRelease(array $release, ?array $track, array $matchedFields): array
-    {
-        $values = [];
-        $releaseTitle = $this->values->cleanString($release['title'] ?? null);
-        $releaseTitle = $this->sourceTitleCanonical($releaseTitle);
-
-        if (in_array('album', $matchedFields, true) || in_array('artists', $matchedFields, true)) {
-            $this->putIfPresent($values, 'album', $releaseTitle);
-        }
-
-        if (in_array('artists', $matchedFields, true)) {
-            $this->putIfPresent($values, 'artists', $this->trackArtists($track) ?: $this->releaseArtists($release));
-        }
-
-        $this->putIfPresent($values, 'release_label', $this->firstLabelName($release));
-        $this->putIfPresent($values, 'catalog_number', $this->firstCatalogNumber($release));
-        $this->putIfPresent($values, 'barcode', $this->firstBarcode($release));
-        $this->putIfPresent($values, 'release_date', $this->values->cleanString($release['released'] ?? $release['year'] ?? null));
-        $this->putIfPresent($values, 'release_country', $this->values->cleanString($release['country'] ?? null));
-        $this->putIfPresent($values, 'discogs_release_id', $this->values->cleanString($release['id'] ?? null));
-        $this->putIfPresent($values, 'cover_url', $this->coverUrl($release));
-
-        if ($track !== null) {
-            $trackTitle = $this->sourceTitleCanonical($this->values->cleanString($track['title'] ?? null));
-            $this->putIfPresent($values, 'title', $trackTitle);
-            $this->putIfPresent($values, 'track_number', $this->trackNumber($track));
-            $this->putIfPresent($values, 'disc_number', $this->discNumber($track));
-            $this->putIfPresent($values, 'duration_seconds', $this->discogsDurationSeconds($track['duration'] ?? null));
-        }
-
-        return $values;
-    }
-
-    private function sourceTitleCanonical(?string $title): ?string
-    {
-        $title = $this->values->cleanString($title);
-        if ($title === null) {
-            return null;
-        }
-
-        $parts = array_values(array_filter(
-            array_map(fn (string $part): ?string => $this->values->cleanString($part), preg_split('/\s*=\s*/', $title) ?: []),
-            fn (?string $part): bool => $part !== null
-        ));
-
-        return $parts[0] ?? $title;
     }
 
     private function titlesMatch(string $left, ?string $right): bool
@@ -322,151 +340,12 @@ class AudioMetadataDiscogsProvider
             ->all();
     }
 
-    private function releaseArtists(array $release): array
-    {
-        return $this->values->cleanStringList(data_get($release, 'artists.*.name', []));
-    }
-
-    private function trackArtists(?array $track): array
-    {
-        if ($track === null) {
-            return [];
-        }
-
-        return $this->values->cleanStringList(data_get($track, 'artists.*.name', []));
-    }
-
     private function artistsOverlap(array $left, array $right): bool
     {
         $left = array_map(fn (string $name): string => $this->normalizeName($name), $left);
         $right = array_map(fn (string $name): string => $this->normalizeName($name), $right);
 
         return array_values(array_intersect($left, $right)) !== [];
-    }
-
-    private function firstLabelName(array $release): ?string
-    {
-        return collect(data_get($release, 'labels', []))
-            ->map(fn (mixed $label): ?string => is_array($label) ? $this->values->cleanString($label['name'] ?? null) : null)
-            ->filter(fn (?string $label): bool => $label !== null && mb_strtolower($label) !== 'not on label')
-            ->first();
-    }
-
-    private function firstCatalogNumber(array $release): ?string
-    {
-        return collect(data_get($release, 'labels', []))
-            ->map(fn (mixed $label): ?string => is_array($label) ? $this->values->cleanString($label['catno'] ?? null) : null)
-            ->filter(fn (?string $catno): bool => $catno !== null && ! in_array(mb_strtolower($catno), ['none', '[none]'], true))
-            ->first();
-    }
-
-    private function firstBarcode(array $release): ?string
-    {
-        return collect(data_get($release, 'identifiers', []))
-            ->filter(fn (mixed $identifier): bool => is_array($identifier)
-                && str_contains(mb_strtolower((string) ($identifier['type'] ?? '')), 'barcode'))
-            ->map(fn (array $identifier): ?string => $this->values->cleanString($identifier['value'] ?? null))
-            ->filter()
-            ->first();
-    }
-
-    private function coverUrl(array $release): ?string
-    {
-        $images = collect(data_get($release, 'images', []))
-            ->filter(fn (mixed $image): bool => is_array($image));
-        $image = $images->first(fn (array $image): bool => mb_strtolower((string) ($image['type'] ?? '')) === 'primary')
-            ?? $images->first();
-
-        return is_array($image)
-            ? $this->values->cleanString($image['uri'] ?? $image['resource_url'] ?? $image['uri150'] ?? null)
-            : null;
-    }
-
-    private function discogsReleaseUrl(array $release, ?string $releaseId): ?string
-    {
-        $uri = $this->values->cleanString($release['uri'] ?? null);
-        if ($uri !== null) {
-            if (str_starts_with($uri, 'https://www.discogs.com/')) {
-                return $uri;
-            }
-
-            if (str_starts_with($uri, '/')) {
-                return 'https://www.discogs.com'.$uri;
-            }
-        }
-
-        return $releaseId !== null ? 'https://www.discogs.com/release/'.$releaseId : null;
-    }
-
-    private function discogsMasterUrl(array $release): ?string
-    {
-        $uri = $this->values->cleanString($release['discogs_master_uri'] ?? null);
-        if ($uri !== null) {
-            return $uri;
-        }
-
-        $masterId = $this->values->cleanString($release['master_id'] ?? null);
-
-        return $masterId !== null ? 'https://www.discogs.com/master/'.$masterId : null;
-    }
-
-    private function trackNumber(array $track): ?string
-    {
-        $position = $this->values->cleanString($track['position'] ?? null);
-        if ($position === null) {
-            return null;
-        }
-
-        if (preg_match('/^(?:CD|Disc)?\s*(\d+)[-.](\d+)$/i', $position, $matches) === 1) {
-            return $matches[2];
-        }
-
-        return $position;
-    }
-
-    private function discNumber(array $track): ?string
-    {
-        $position = $this->values->cleanString($track['position'] ?? null);
-        if ($position === null) {
-            return null;
-        }
-
-        if (preg_match('/^(?:CD|Disc)?\s*(\d+)[-.]\d+$/i', $position, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return null;
-    }
-
-    private function discogsDurationSeconds(mixed $duration): ?int
-    {
-        $duration = $this->values->cleanString($duration);
-        if ($duration === null || ! str_contains($duration, ':')) {
-            return null;
-        }
-
-        $parts = array_map('intval', explode(':', $duration));
-        if (count($parts) === 2) {
-            return ($parts[0] * 60) + $parts[1];
-        }
-
-        if (count($parts) === 3) {
-            return ($parts[0] * 3600) + ($parts[1] * 60) + $parts[2];
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $values
-     */
-    private function putIfPresent(array &$values, string $key, mixed $value): void
-    {
-        if ($value === null || $value === []) {
-            return;
-        }
-
-        $values[$key] = $value;
     }
 
     private function normalizeTitle(string $title): string

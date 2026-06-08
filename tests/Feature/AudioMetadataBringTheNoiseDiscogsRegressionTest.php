@@ -218,6 +218,32 @@ test('production bring the noise lookup prefers an album release with matching t
                     ]],
                     'model' => 'qwen-test',
                 ],
+                'atlas-audio-metadata-discogs-release-adjudication-v1' => [
+                    'verdict' => 'accept',
+                    'confidence' => 0.95,
+                    'reason' => "Rock'N'Rave matches the current album group and exposes the 6:38 Pump-Kin remix as disc 2 track 1.",
+                    'model' => 'qwen-test',
+                    'selected_release_id' => '1358093',
+                    'selected_track_position' => '2.1',
+                    'safe_fields' => [
+                        'title',
+                        'artists',
+                        'album',
+                        'track_number',
+                        'disc_number',
+                        'release_label',
+                        'catalog_number',
+                        'barcode',
+                        'release_date',
+                        'release_country',
+                        'discogs_release_id',
+                        'cover_url',
+                    ],
+                    'rejected_candidates' => [[
+                        'release_id' => '1047849',
+                        'reason' => 'Standalone remix release does not match the current Rock N Rave Disc 2 album context.',
+                    ]],
+                ],
                 'atlas-audio-metadata-field-adjudication-v1' => [
                     'verdict' => 'accept',
                     'confidence' => 0.93,
@@ -291,7 +317,8 @@ test('production bring the noise lookup prefers an album release with matching t
         'release_title' => 'Bring the Noise Remix',
         'artist' => 'Public Enemy',
         'q' => '',
-    ])->and($aiSchemas)->toContain('atlas-audio-metadata-field-adjudication-v1');
+    ])->and($aiSchemas)->toContain('atlas-audio-metadata-discogs-release-adjudication-v1')
+        ->and($aiSchemas)->toContain('atlas-audio-metadata-field-adjudication-v1');
 });
 
 function bringTheNoiseDiscogsRegressionFile(): File
