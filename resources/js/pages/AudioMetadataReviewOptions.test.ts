@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { mountAudio } from './audioTestUtils';
 import { useGlobalAudioPlayer } from '../composables/useGlobalAudioPlayer';
-import type { AudioDetailsResponse, AudioIdsResponse, AudioMetadataProposal } from '@/types/audio';
+import type { AudioDetailsResponse, AudioIdsResponse, AudioMetadataProposal, AudioMetadataRun } from '@/types/audio';
 
 const mockAxios = {
     get: vi.fn(),
@@ -86,6 +86,27 @@ function coverProposalFixture(): AudioMetadataProposal {
     };
 }
 
+function runFixture(overrides: Partial<AudioMetadataRun> = {}): AudioMetadataRun {
+    return {
+        id: 11,
+        scope: 'single',
+        source_filter: 'local',
+        status: 'pending',
+        total_files: 1,
+        processed_files: 0,
+        proposal_count: 0,
+        failed_files: 0,
+        current_file_id: 7,
+        current_step: null,
+        current_step_label: null,
+        error: null,
+        created_at: null,
+        started_at: null,
+        finished_at: null,
+        ...overrides,
+    };
+}
+
 function manualOptionsProposalFixture(): AudioMetadataProposal {
     return {
         id: 24,
@@ -139,6 +160,17 @@ function manualOptionsProposalFixture(): AudioMetadataProposal {
         reviewed_at: null,
         applied_at: null,
         ignored_at: null,
+    };
+}
+
+function compactProposalFixture(): AudioMetadataProposal {
+    return {
+        ...manualOptionsProposalFixture(),
+        field_options: {},
+        evidence: {
+            source: 'multi_source_metadata_review',
+        },
+        is_compact: true,
     };
 }
 
@@ -265,5 +297,82 @@ describe('Audio metadata review options', () => {
                 cover_url: 'cover-discovery',
             },
         });
+    });
+
+    it('fetches full proposal details after a compact completed run snapshot', async () => {
+        let latestProposalRequests = 0;
+        let runPollRequests = 0;
+
+        mockAxios.get.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/ids') {
+                return { data: idsResponse() };
+            }
+
+            if (url === '/api/audio/7/metadata-proposals/latest') {
+                latestProposalRequests += 1;
+
+                return latestProposalRequests === 1
+                    ? { data: { proposal: null } }
+                    : { data: { proposal: manualOptionsProposalFixture() } };
+            }
+
+            if (url === '/api/audio/metadata-runs/11') {
+                runPollRequests += 1;
+
+                return {
+                    data: {
+                        run: runFixture({
+                            status: 'completed',
+                            processed_files: 1,
+                            proposal_count: 1,
+                            finished_at: '2026-06-08T15:45:00Z',
+                        }),
+                        proposal: compactProposalFixture(),
+                    },
+                };
+            }
+
+            throw new Error(`Unexpected get URL: ${url}`);
+        });
+
+        mockAxios.post.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/details') {
+                return { data: detailsResponse() };
+            }
+
+            if (url === '/api/audio/7/metadata-runs') {
+                return {
+                    data: {
+                        run: runFixture(),
+                        proposal: null,
+                    },
+                };
+            }
+
+            throw new Error(`Unexpected post URL: ${url}`);
+        });
+
+        const wrapper = await mountAudio();
+        await flushPromises();
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        await wrapper.get('[data-test="audio-track-title"]').trigger('click');
+        await flushPromises();
+
+        const runButton = document.body.querySelector<HTMLButtonElement>('[data-test="audio-track-metadata-run"]');
+        expect(runButton).not.toBeNull();
+        runButton?.click();
+        await flushPromises();
+
+        vi.advanceTimersByTime(1600);
+        await flushPromises();
+
+        expect(runPollRequests).toBe(1);
+        expect(latestProposalRequests).toBe(2);
+        expect(document.body.textContent).toContain('Metadata proposal ready for review.');
+        expect(document.body.textContent).toContain('NRJ Story');
+        expect(document.body.textContent).toContain('Discovery');
+        expect(document.body.querySelector('[data-test="audio-metadata-field-options-cover_url"]')).not.toBeNull();
     });
 });

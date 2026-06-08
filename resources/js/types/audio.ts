@@ -96,6 +96,7 @@ export type AudioMetadataProposal = {
     changes: Record<string, AudioMetadataChange>;
     field_options?: Record<string, AudioMetadataFieldOption[]>;
     evidence: Record<string, unknown>;
+    is_compact?: boolean;
     created_at: string | null;
     reviewed_at: string | null;
     applied_at: string | null;

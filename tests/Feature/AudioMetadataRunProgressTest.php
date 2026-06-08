@@ -7,6 +7,7 @@ use App\Models\File;
 use App\Models\User;
 use App\Services\Audio\AudioMetadataProposalGenerator;
 use App\Services\Audio\AudioMetadataProposalService;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -87,7 +88,51 @@ test('metadata run broadcasts progress snapshots while processing', function () 
         fn (object $event): bool => data_get($event, 'payload.run.status') === 'completed'
             && data_get($event, 'payload.run.processed_files') === 1
             && data_get($event, 'payload.proposal.proposed_values.title') === 'Tagged Title'
+            && data_get($event, 'payload.proposal.is_compact') === true
+            && data_get($event, 'payload.proposal.field_options') === []
+            && data_get($event, 'payload.proposal.evidence.field_options') === null
     );
+});
+
+test('metadata run broadcast failures do not fail proposal generation', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'raw filename',
+        'filename' => 'raw-filename.mp3',
+    ]);
+    $file->metadata()->create([
+        'payload' => [
+            'title' => 'Tagged Title',
+            'artist' => 'Tagged Artist',
+        ],
+    ]);
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'single',
+        'source_filter' => 'local',
+        'status' => 'pending',
+        'total_files' => 1,
+        'options' => [
+            'file_id' => (int) $file->id,
+        ],
+    ]);
+
+    $dispatcher = Mockery::mock(Dispatcher::class);
+    $dispatcher->shouldReceive('dispatch')->andThrow(new RuntimeException('Pusher error: Payload too large.'));
+    $this->app->instance('events', $dispatcher);
+    $this->app->instance(Dispatcher::class, $dispatcher);
+
+    app(AudioMetadataProposalService::class)->processRun($run->id);
+
+    $run->refresh();
+
+    expect($run->status)->toBe('completed')
+        ->and($run->processed_files)->toBe(1)
+        ->and($run->proposal_count)->toBe(1)
+        ->and($run->failed_files)->toBe(0)
+        ->and($run->error)->toBeNull();
 });
 
 test('metadata run broadcasts current step labels while processing a file', function () {

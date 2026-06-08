@@ -293,12 +293,17 @@ export function useAudioMetadataReview(options: Options) {
     function applyMetadataRunSnapshot(snapshot: AudioMetadataRunSnapshot, audioId: number | null = activeMetadataRunAudioId.value): void {
         const snapshotAudioId = audioId ?? snapshot.run.current_file_id ?? null;
         const proposal = pendingProposal(snapshot.proposal ?? snapshot.proposals?.[0] ?? null);
+        const shouldRefreshCompactProposal = snapshotAudioId !== null && proposal?.is_compact === true;
 
         if (snapshotAudioId !== null) {
             metadataProposalById.value = {
                 ...metadataProposalById.value,
                 [snapshotAudioId]: proposal,
             };
+        }
+
+        if (shouldRefreshCompactProposal) {
+            void fetchLatestMetadataProposal(snapshotAudioId);
         }
 
         if (isMetadataRunTerminal(snapshot.run)) {

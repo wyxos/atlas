@@ -261,10 +261,18 @@ class AudioMetadataProposalService
 
     private function broadcastRun(AudioMetadataRun $run, ?AudioMetadataProposal $proposal = null): void
     {
-        AudioMetadataRunUpdated::dispatch($run->id, [
-            'run' => AudioMetadataProposalPayload::run($run),
-            'proposal' => AudioMetadataProposalPayload::proposal($proposal),
-        ]);
+        try {
+            AudioMetadataRunUpdated::dispatch($run->id, [
+                'run' => AudioMetadataProposalPayload::run($run),
+                'proposal' => AudioMetadataProposalPayload::proposal($proposal, compact: true),
+            ]);
+        } catch (\Throwable $exception) {
+            try {
+                report($exception);
+            } catch (\Throwable) {
+                return;
+            }
+        }
     }
 
     private function updateRunProgress(AudioMetadataRun $run, File $file, string $step, string $label): void

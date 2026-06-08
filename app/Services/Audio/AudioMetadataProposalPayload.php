@@ -37,13 +37,13 @@ class AudioMetadataProposalPayload
     /**
      * @return array<string, mixed>|null
      */
-    public static function proposal(?AudioMetadataProposal $proposal): ?array
+    public static function proposal(?AudioMetadataProposal $proposal, bool $compact = false): ?array
     {
         if (! $proposal) {
             return null;
         }
 
-        return [
+        $payload = [
             'id' => (int) $proposal->id,
             'file_id' => (int) $proposal->file_id,
             'run_id' => (int) $proposal->audio_metadata_run_id,
@@ -62,6 +62,37 @@ class AudioMetadataProposalPayload
             'applied_at' => $proposal->applied_at?->toIso8601String(),
             'ignored_at' => $proposal->ignored_at?->toIso8601String(),
         ];
+
+        if (! $compact) {
+            return $payload;
+        }
+
+        $payload['field_options'] = [];
+        $payload['evidence'] = self::compactEvidence($proposal->evidence ?? []);
+        $payload['is_compact'] = true;
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $evidence
+     * @return array<string, mixed>
+     */
+    private static function compactEvidence(array $evidence): array
+    {
+        return array_filter([
+            'source' => self::nullableString($evidence['source'] ?? null),
+            'acoustid_score' => is_numeric($evidence['acoustid_score'] ?? null)
+                ? (int) $evidence['acoustid_score']
+                : null,
+            'duration_delta_seconds' => is_numeric($evidence['duration_delta_seconds'] ?? null)
+                ? (int) $evidence['duration_delta_seconds']
+                : null,
+            'matched_existing_fields' => is_array($evidence['matched_existing_fields'] ?? null)
+                ? array_values($evidence['matched_existing_fields'])
+                : null,
+            'discogs_release_url' => self::nullableString($evidence['discogs_release_url'] ?? null),
+        ], fn (mixed $value): bool => $value !== null && $value !== []);
     }
 
     private static function nullableInteger(mixed $value): ?int
