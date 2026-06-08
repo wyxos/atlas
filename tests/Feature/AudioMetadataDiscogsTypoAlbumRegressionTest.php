@@ -114,7 +114,8 @@ test('ai field review accepts exact track evidence when it judges the current al
 
     expect($fieldReviewPrompt)
         ->toContain('Do not compare the track title to the album title.')
-        ->toContain('decide whether a differing current album is likely a typo or transcription variant of the Discogs release title');
+        ->toContain('safe_fields must be a subset of candidate.values keys.')
+        ->toContain('treat the release as release-level evidence');
 });
 
 test('strong discogs release evidence wins over musicbrainz recording id only proposal', function () {

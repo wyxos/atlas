@@ -463,16 +463,16 @@ class AudioMetadataAiReviewer
     private function fieldReviewPrompt(array $input): string
     {
         return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"ambiguous","confidence":0.82,"reason":"short reason","safe_fields":["musicbrainz_recording_id"]}.',
+            'Return only JSON in this exact shape: {"verdict":"ambiguous","confidence":0.82,"reason":"short reason","safe_fields":[]}.',
             'Allowed verdict values: accept, reject, ambiguous.',
             'You are judging field-level safety for an Atlas audio metadata proposal.',
             'Use only the supplied JSON evidence. Do not invent metadata and do not repair values.',
+            'safe_fields must be a subset of candidate.values keys. Never include a field that is absent from candidate.values, even if it is shown in examples or current_values.',
             'A strong fingerprint can prove a recording while still failing to prove the correct release, album, edition, disc, cover, label, catalog number, barcode, country, or release date.',
             'Include a field in safe_fields only when that exact field is coherent with the current title, artist, album/group, filename, duration, and provider evidence.',
-            'Title is unsafe when the current and proposed titles have different remix, mix, version, update, edit, live, remaster, vinyl, or edition descriptors.',
-            'Title case, bracket-vs-parenthesis style, apostrophes, punctuation, and whitespace alone are safe when normalized title tokens and mix descriptors match.',
+            'Title is unsafe when the current and proposed titles have different remix, mix, version, update, edit, live, remaster, vinyl, or edition descriptors. Title case, bracket-vs-parenthesis style, apostrophes, punctuation, and whitespace alone are safe when normalized title tokens and mix descriptors match.',
             'Album, cover_url, track_number, disc_number, release_label, catalog_number, barcode, release_date, release_country, musicbrainz_release_id, and discogs_release_id require release-level confidence, not only recording confidence.',
-            'Compare track title only to candidate title. Compare current album only to candidate album or source release title. Do not compare the track title to the album title. If a Discogs release candidate has a concrete discogs_release_id, matched artist/track/duration evidence, duration_delta_seconds <= 2, and a track position, decide whether a differing current album is likely a typo or transcription variant of the Discogs release title. When that release-level evidence is coherent and the album difference looks like a typo/transcription variant, use accept and include only safe Discogs release fields supplied in candidate.values.',
+            'Compare track title only to candidate title. Compare current album only to candidate album or source release title. Do not compare the track title to the album title. For a Discogs release candidate with concrete discogs_release_id, matched artist/track/duration evidence, duration_delta_seconds <= 2, and track_position, treat the release as release-level evidence. If the only album difference is a likely typo/transcription variant, use accept and include safe Discogs release fields from candidate.values such as album, cover_url, track_number, release_label, catalog_number, release_date, release_country, and discogs_release_id.',
             'Use ambiguous with a reduced safe_fields list when the recording likely matches but release-level details may describe a different single, remix package, compilation, edition, or disc.',
             'Use reject with an empty safe_fields list when even recording identity is not coherent.',
             'Evidence JSON:',
