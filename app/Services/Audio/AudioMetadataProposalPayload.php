@@ -92,6 +92,15 @@ class AudioMetadataProposalPayload
                 ? array_values($evidence['matched_existing_fields'])
                 : null,
             'discogs_release_url' => self::nullableString($evidence['discogs_release_url'] ?? null),
+            'discogs_master_url' => self::nullableString($evidence['discogs_master_url'] ?? null),
+            'discogs_release_id' => self::nullableString($evidence['discogs_release_id'] ?? null),
+            'discogs_master_id' => self::nullableString($evidence['discogs_master_id'] ?? null),
+            'musicbrainz_release_id' => self::nullableString($evidence['musicbrainz_release_id'] ?? null),
+            'musicbrainz_recording_id' => self::nullableString($evidence['musicbrainz_recording_id'] ?? null),
+            'acoustid_id' => self::nullableString($evidence['acoustid_id'] ?? null),
+            'vgmdb_album_id' => self::nullableString($evidence['vgmdb_album_id'] ?? null),
+            'vgmdb_album_link' => self::nullableString($evidence['vgmdb_album_link'] ?? null),
+            'cover_source' => self::nullableString($evidence['cover_source'] ?? null),
         ], fn (mixed $value): bool => $value !== null && $value !== []);
     }
 

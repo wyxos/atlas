@@ -173,12 +173,18 @@ test('partial fingerprint review does not hide later album cover candidates', fu
         ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'discovery-release-mbid')
         ->assertJsonPath('proposal.field_options.album.0.value', 'NRJ Story')
         ->assertJsonPath('proposal.field_options.album.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.album.0.source_label', 'MusicBrainz release')
+        ->assertJsonPath('proposal.field_options.album.0.source_url', 'https://musicbrainz.org/release/nrj-story-release-mbid')
         ->assertJsonPath('proposal.field_options.album.1.value', 'Discovery')
         ->assertJsonPath('proposal.field_options.album.1.recommended', true)
+        ->assertJsonPath('proposal.field_options.album.1.source_label', 'MusicBrainz release')
+        ->assertJsonPath('proposal.field_options.album.1.source_url', 'https://musicbrainz.org/release/discovery-release-mbid')
         ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/nrj-story/front.jpg')
         ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.cover_url.0.source_url', 'https://musicbrainz.org/release/nrj-story-release-mbid')
         ->assertJsonPath('proposal.field_options.cover_url.1.value', 'https://cover.test/release/discovery/front-500.jpg')
         ->assertJsonPath('proposal.field_options.cover_url.1.recommended', true)
+        ->assertJsonPath('proposal.field_options.cover_url.1.source_url', 'https://musicbrainz.org/release/discovery-release-mbid')
         ->assertJsonPath('run.proposal_count', 1)
         ->assertJsonPath('run.failed_files', 0);
 });

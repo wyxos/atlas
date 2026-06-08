@@ -82,6 +82,8 @@ export type AudioMetadataFieldOption = {
     recommended: boolean;
     reason: string | null;
     review_verdict: string | null;
+    source_label?: string | null;
+    source_url?: string | null;
 };
 
 export type AudioMetadataProposal = {

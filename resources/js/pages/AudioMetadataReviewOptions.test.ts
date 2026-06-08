@@ -75,9 +75,11 @@ function coverProposalFixture(): AudioMetadataProposal {
             matched_existing_fields: ['artists', 'album'],
             release_detail_source: 'musicbrainz_release_lookup',
             cover_source: 'cover_art_archive',
+            musicbrainz_release_id: 'release-mbid',
             discogs_release_id: '4647572',
             discogs_release_url: 'https://www.discogs.com/release/4647572',
             discogs_source: 'discogs_release_search',
+            vgmdb_album_id: '23849',
         },
         created_at: null,
         reviewed_at: null,
@@ -131,6 +133,8 @@ function manualOptionsProposalFixture(): AudioMetadataProposal {
                     recommended: false,
                     reason: 'The attached MusicBrainz release is ambiguous.',
                     review_verdict: 'ambiguous',
+                    source_label: 'MusicBrainz release',
+                    source_url: 'https://musicbrainz.org/release/nrj-story-release-mbid',
                 },
                 {
                     id: 'album-discovery',
@@ -140,6 +144,8 @@ function manualOptionsProposalFixture(): AudioMetadataProposal {
                     recommended: true,
                     reason: null,
                     review_verdict: null,
+                    source_label: 'MusicBrainz release',
+                    source_url: 'https://musicbrainz.org/release/discovery-release-mbid',
                 },
             ],
             cover_url: [{
@@ -150,6 +156,8 @@ function manualOptionsProposalFixture(): AudioMetadataProposal {
                 recommended: true,
                 reason: null,
                 review_verdict: null,
+                source_label: 'MusicBrainz release',
+                source_url: 'https://musicbrainz.org/release/discovery-release-mbid',
             }],
         },
         evidence: {
@@ -231,7 +239,10 @@ describe('Audio metadata review options', () => {
         expect(document.body.textContent).toContain('B0015663-02');
         expect(document.body.textContent).toContain('Discogs release');
         expect(document.body.textContent).toContain('4647572');
-        expect(document.body.textContent?.replace(/\s+/g, ' ')).toContain('MusicBrainz release search / Matched artists, album / Release details / Cover Art Archive / Data provided by Discogs');
+        expect(document.body.textContent?.replace(/\s+/g, ' ')).toContain('MusicBrainz release search / Matched artists, album / Release details / Cover Art Archive');
+        expect(document.body.querySelector<HTMLAnchorElement>('[data-test="audio-metadata-source-link-musicbrainz-release"]')?.href).toBe('https://musicbrainz.org/release/release-mbid');
+        expect(document.body.querySelector<HTMLAnchorElement>('[data-test="audio-metadata-source-link-discogs-release"]')?.href).toBe('https://www.discogs.com/release/4647572');
+        expect(document.body.querySelector<HTMLAnchorElement>('[data-test="audio-metadata-source-link-vgmdb-album"]')?.href).toBe('https://vgmdb.net/album/23849');
     });
 
     it('renders manual provider options and applies the selected option ids', async () => {
@@ -280,9 +291,23 @@ describe('Audio metadata review options', () => {
         expect(document.body.textContent).toContain('Multiple metadata candidates');
         expect(document.body.textContent).toContain('NRJ Story');
         expect(document.body.textContent).toContain('Discovery');
+        const proposalTable = document.body.querySelector('[data-test="audio-metadata-proposal-table"]');
+        expect(proposalTable).not.toBeNull();
+        expect(Array.from(proposalTable?.querySelectorAll('th') ?? []).map((header) => header.textContent?.trim()).slice(0, 7)).toEqual([
+            'Use',
+            'Field',
+            'Current',
+            'Proposed',
+            'Source',
+            'Confidence',
+            'Notes',
+        ]);
 
         const albumOptions = document.body.querySelectorAll<HTMLInputElement>('[data-test="audio-metadata-field-option-album"] input[type="radio"]');
         expect(albumOptions).toHaveLength(2);
+        expect(albumOptions[1].checked).toBe(true);
+        const albumSourceLinks = Array.from(document.body.querySelectorAll<HTMLAnchorElement>('[data-test="audio-metadata-option-source-link"]'));
+        expect(albumSourceLinks.map((link) => link.href)).toContain('https://musicbrainz.org/release/discovery-release-mbid');
         albumOptions[0].click();
         await flushPromises();
 
@@ -374,5 +399,24 @@ describe('Audio metadata review options', () => {
         expect(document.body.textContent).toContain('NRJ Story');
         expect(document.body.textContent).toContain('Discovery');
         expect(document.body.querySelector('[data-test="audio-metadata-field-options-cover_url"]')).not.toBeNull();
+
+        const albumOptions = document.body.querySelectorAll<HTMLInputElement>('[data-test="audio-metadata-field-option-album"] input[type="radio"]');
+        const coverOptions = document.body.querySelectorAll<HTMLInputElement>('[data-test="audio-metadata-field-option-cover_url"] input[type="radio"]');
+        expect(albumOptions).toHaveLength(2);
+        expect(coverOptions).toHaveLength(1);
+        expect(albumOptions[1].checked).toBe(true);
+        expect(coverOptions[0].checked).toBe(true);
+
+        (document.body.querySelector('[data-test="audio-metadata-apply"]') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/audio/metadata-proposals/24', {
+            action: 'apply',
+            fields: ['album', 'cover_url'],
+            field_options: {
+                album: 'album-discovery',
+                cover_url: 'cover-discovery',
+            },
+        });
     });
 });

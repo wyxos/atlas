@@ -268,10 +268,12 @@ class AudioMetadataCandidateAggregator
     /**
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, mixed>|null  $review
-     * @return array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null}
+     * @return array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}
      */
     private function fieldOption(array $candidate, string $field, mixed $value, int $index, bool $recommended, ?array $review, ?string $reviewError): array
     {
+        $sourceLink = $this->sourceLink($candidate);
+
         return [
             'id' => $this->optionId($candidate, $field, $value, $index),
             'provider' => (string) $candidate['provider'],
@@ -280,6 +282,8 @@ class AudioMetadataCandidateAggregator
             'recommended' => $recommended,
             'reason' => $reviewError ?? $this->values->cleanString($review['reason'] ?? null),
             'review_verdict' => $this->values->cleanString($review['verdict'] ?? null),
+            'source_label' => $sourceLink['label'],
+            'source_url' => $sourceLink['url'],
         ];
     }
 
@@ -303,8 +307,8 @@ class AudioMetadataCandidateAggregator
     }
 
     /**
-     * @param  list<array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null}>  $options
-     * @param  array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null}  $option
+     * @param  list<array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}>  $options
+     * @param  array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}  $option
      */
     private function hasEquivalentOption(array $options, array $option): bool
     {
@@ -325,6 +329,59 @@ class AudioMetadataCandidateAggregator
         }
 
         return mb_strtolower(trim((string) $value));
+    }
+
+    /**
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @return array{label:string|null,url:string|null}
+     */
+    private function sourceLink(array $candidate): array
+    {
+        $evidence = $candidate['evidence'] ?? [];
+
+        if (($url = $this->sourceUrl($evidence['discogs_release_url'] ?? null)) !== null) {
+            return ['label' => 'Discogs release', 'url' => $url];
+        }
+
+        if (($releaseId = $this->values->cleanString($evidence['discogs_release_id'] ?? null)) !== null) {
+            return ['label' => 'Discogs release', 'url' => 'https://www.discogs.com/release/'.$releaseId];
+        }
+
+        if (($url = $this->sourceUrl($evidence['discogs_master_url'] ?? null)) !== null) {
+            return ['label' => 'Discogs master', 'url' => $url];
+        }
+
+        if (($releaseId = $this->values->cleanString($evidence['musicbrainz_release_id'] ?? null)) !== null) {
+            return ['label' => 'MusicBrainz release', 'url' => 'https://musicbrainz.org/release/'.$releaseId];
+        }
+
+        if (($recordingId = $this->values->cleanString($evidence['musicbrainz_recording_id'] ?? null)) !== null) {
+            return ['label' => 'MusicBrainz recording', 'url' => 'https://musicbrainz.org/recording/'.$recordingId];
+        }
+
+        if (($acoustId = $this->values->cleanString($evidence['acoustid_id'] ?? null)) !== null) {
+            return ['label' => 'AcoustID', 'url' => 'https://acoustid.org/track/'.$acoustId];
+        }
+
+        if (($url = $this->sourceUrl($evidence['vgmdb_album_link'] ?? null)) !== null) {
+            return ['label' => 'VGMdb album', 'url' => $url];
+        }
+
+        if (($albumId = $this->values->cleanString($evidence['vgmdb_album_id'] ?? null)) !== null) {
+            return ['label' => 'VGMdb album', 'url' => 'https://vgmdb.net/album/'.$albumId];
+        }
+
+        return ['label' => null, 'url' => null];
+    }
+
+    private function sourceUrl(mixed $value): ?string
+    {
+        $url = $this->values->cleanString($value);
+        if ($url === null || ! str_starts_with($url, 'http')) {
+            return null;
+        }
+
+        return $url;
     }
 
     /**
