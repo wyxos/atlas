@@ -134,6 +134,28 @@ test('partial fingerprint review does not hide later album cover candidates', fu
                         'reason' => 'The recording is right, but the attached MusicBrainz release is a compilation.',
                         'model' => 'qwen-test',
                         'safe_fields' => ['artists', 'duration_seconds'],
+                        'field_reviews' => [
+                            'artists' => [
+                                'verdict' => 'accept',
+                                'confidence' => 0.92,
+                                'reason' => 'The artist credit matches the current recording identity.',
+                            ],
+                            'duration_seconds' => [
+                                'verdict' => 'accept',
+                                'confidence' => 0.9,
+                                'reason' => 'The duration delta is small enough for the same recording.',
+                            ],
+                            'album' => [
+                                'verdict' => 'ambiguous',
+                                'confidence' => 0.35,
+                                'reason' => 'The MusicBrainz release is a compilation and should not replace the current album automatically.',
+                            ],
+                            'cover_url' => [
+                                'verdict' => 'ambiguous',
+                                'confidence' => 0.35,
+                                'reason' => 'The cover belongs to the compilation release, not the current album.',
+                            ],
+                        ],
                     ]),
                 ],
             ]);
@@ -173,6 +195,8 @@ test('partial fingerprint review does not hide later album cover candidates', fu
         ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'discovery-release-mbid')
         ->assertJsonPath('proposal.field_options.album.0.value', 'NRJ Story')
         ->assertJsonPath('proposal.field_options.album.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.album.0.reason', 'The MusicBrainz release is a compilation and should not replace the current album automatically.')
+        ->assertJsonPath('proposal.field_options.album.0.review_verdict', 'ambiguous')
         ->assertJsonPath('proposal.field_options.album.0.source_label', 'MusicBrainz release')
         ->assertJsonPath('proposal.field_options.album.0.source_url', 'https://musicbrainz.org/release/nrj-story-release-mbid')
         ->assertJsonPath('proposal.field_options.album.1.value', 'Discovery')
@@ -181,6 +205,8 @@ test('partial fingerprint review does not hide later album cover candidates', fu
         ->assertJsonPath('proposal.field_options.album.1.source_url', 'https://musicbrainz.org/release/discovery-release-mbid')
         ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/nrj-story/front.jpg')
         ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false)
+        ->assertJsonPath('proposal.field_options.cover_url.0.reason', 'The cover belongs to the compilation release, not the current album.')
+        ->assertJsonPath('proposal.evidence.field_review.field_reviews.album.reason', 'The MusicBrainz release is a compilation and should not replace the current album automatically.')
         ->assertJsonPath('proposal.field_options.cover_url.0.source_url', 'https://musicbrainz.org/release/nrj-story-release-mbid')
         ->assertJsonPath('proposal.field_options.cover_url.1.value', 'https://cover.test/release/discovery/front-500.jpg')
         ->assertJsonPath('proposal.field_options.cover_url.1.recommended', true)

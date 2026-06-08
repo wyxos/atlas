@@ -280,11 +280,45 @@ class AudioMetadataCandidateAggregator
             'confidence' => (int) $candidate['confidence'],
             'value' => $value,
             'recommended' => $recommended,
-            'reason' => $reviewError ?? $this->values->cleanString($review['reason'] ?? null),
-            'review_verdict' => $this->values->cleanString($review['verdict'] ?? null),
+            'reason' => $reviewError ?? $this->reviewReason($review, $field),
+            'review_verdict' => $this->reviewVerdict($review, $field),
             'source_label' => $sourceLink['label'],
             'source_url' => $sourceLink['url'],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $review
+     */
+    private function reviewReason(?array $review, string $field): ?string
+    {
+        $fieldReview = $this->fieldReviewFor($review, $field);
+
+        return $this->values->cleanString($fieldReview['reason'] ?? $review['reason'] ?? null);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $review
+     */
+    private function reviewVerdict(?array $review, string $field): ?string
+    {
+        $fieldReview = $this->fieldReviewFor($review, $field);
+
+        return $this->values->cleanString($fieldReview['verdict'] ?? $review['verdict'] ?? null);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $review
+     * @return array<string, mixed>|null
+     */
+    private function fieldReviewFor(?array $review, string $field): ?array
+    {
+        $fieldReviews = $review['field_reviews'] ?? null;
+        if (! is_array($fieldReviews) || ! is_array($fieldReviews[$field] ?? null)) {
+            return null;
+        }
+
+        return $fieldReviews[$field];
     }
 
     /**

@@ -269,6 +269,44 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
 function evidenceSourceLinks(proposal: AudioMetadataProposal) {
     return audioMetadataSourceLinks(proposal.evidence);
 }
+
+function proposalAiReviewNotes(proposal: AudioMetadataProposal): string[] {
+    const notes = new Set<string>();
+    const fieldReview = proposal.evidence.field_review;
+
+    if (
+        fieldReview !== null
+        && typeof fieldReview === 'object'
+        && 'reason' in fieldReview
+        && typeof fieldReview.reason === 'string'
+        && fieldReview.reason.trim() !== ''
+    ) {
+        notes.add(fieldReview.reason.trim());
+    }
+
+    for (const reason of repeatedOptionReasons(proposal)) {
+        notes.add(reason);
+    }
+
+    return [...notes];
+}
+
+function repeatedOptionReasons(proposal: AudioMetadataProposal): string[] {
+    const counts = new Map<string, number>();
+    const fieldOptions = proposal.field_options ?? {};
+
+    for (const options of Object.values(fieldOptions)) {
+        for (const option of options) {
+            if (option.reason) {
+                counts.set(option.reason, (counts.get(option.reason) ?? 0) + 1);
+            }
+        }
+    }
+
+    return [...counts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([reason]) => reason);
+}
 </script>
 
 <template>
@@ -379,6 +417,20 @@ function evidenceSourceLinks(proposal: AudioMetadataProposal) {
                                     {{ link.label }}
                                 </a>
                             </template>
+                        </div>
+                        <div
+                            v-if="proposalAiReviewNotes(pendingProposal).length > 0"
+                            class="rounded border border-twilight-indigo-500/60 bg-prussian-blue-900/30 px-3 py-2 text-xs text-blue-slate-200"
+                            data-test="audio-metadata-proposal-ai-review"
+                        >
+                            <p class="font-semibold text-regal-navy-100">AI review</p>
+                            <p
+                                v-for="note in proposalAiReviewNotes(pendingProposal)"
+                                :key="note"
+                                class="mt-1"
+                            >
+                                {{ note }}
+                            </p>
                         </div>
 
                         <AudioMetadataProposalTable

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Tags } from 'lucide-vue-next';
 import {
     audioMetadataCoverPreviewUrl,
@@ -24,6 +25,22 @@ const emit = defineEmits<{
     selectFieldOption: [field: string, optionId: string];
 }>();
 
+const repeatedOptionReasons = computed(() => {
+    const counts = new Map<string, number>();
+
+    for (const field of props.fields) {
+        for (const option of fieldOptions(field)) {
+            if (option.reason) {
+                counts.set(option.reason, (counts.get(option.reason) ?? 0) + 1);
+            }
+        }
+    }
+
+    return new Set([...counts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([reason]) => reason));
+});
+
 function fieldOptions(field: string): AudioMetadataFieldOption[] {
     return props.proposal.field_options?.[field] ?? [];
 }
@@ -45,15 +62,11 @@ function proposedValueForField(field: string): unknown {
 }
 
 function optionNote(option: AudioMetadataFieldOption): string | null {
-    if (option.reason) {
+    if (option.reason && !repeatedOptionReasons.value.has(option.reason)) {
         return option.reason;
     }
 
-    if (option.recommended) {
-        return 'Recommended';
-    }
-
-    if (option.review_verdict) {
+    if (option.review_verdict && !option.recommended) {
         return `AI ${option.review_verdict}`;
     }
 
@@ -199,7 +212,7 @@ function eventChecked(event: Event): boolean {
                             <span v-if="option.recommended" class="mb-1 inline-flex rounded border border-smart-blue-400/50 px-2 py-0.5 text-[0.68rem] font-semibold uppercase text-smart-blue-100">
                                 Recommended
                             </span>
-                            <span v-if="optionNote(option)" class="block break-words">{{ optionNote(option) }}</span>
+                            <span v-if="optionNote(option)" class="block break-words" data-test="audio-metadata-option-note">{{ optionNote(option) }}</span>
                         </td>
                     </tr>
                 </tbody>

@@ -31,6 +31,7 @@ class AudioMetadataAiReviewer
 
     public function __construct(
         private readonly AudioMetadataDiscogsAiReviewPayloads $discogsPayloads,
+        private readonly AudioMetadataAiReviewPrompts $prompts,
     ) {}
 
     /**
@@ -74,11 +75,12 @@ class AudioMetadataAiReviewer
         }
 
         $input = $this->anomalyInput($file, $currentValues, $candidate, $source);
+        $prompt = $this->prompts->anomaly($input);
 
         try {
             $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
-                'ollama' => $this->reviewWithOllama($baseUrl, $input, $this->anomalyPrompt($input)),
-                default => $this->reviewWithGateway($baseUrl, $input, $this->anomalyPrompt($input), 'atlas-audio-metadata-anomaly-v1'),
+                'ollama' => $this->reviewWithOllama($baseUrl, $input, $prompt),
+                default => $this->reviewWithGateway($baseUrl, $input, $prompt, 'atlas-audio-metadata-anomaly-v1'),
             };
 
             return $this->normalizeAnomalyResponse($payload);
@@ -91,7 +93,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, array{current:mixed,proposed:mixed}>  $changes
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>}|null
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>,field_reviews:array<string, array{verdict:string,confidence:float|null,reason:string}>}|null
      */
     public function reviewFields(File $file, array $currentValues, array $candidate, array $changes): ?array
     {
@@ -101,10 +103,11 @@ class AudioMetadataAiReviewer
         }
 
         $input = $this->input($file, $currentValues, $candidate, $changes);
+        $prompt = $this->prompts->fieldReview($input);
 
         $payload = match ((string) config('services.audio_metadata.ai_driver', 'gateway')) {
-            'ollama' => $this->reviewWithOllama($baseUrl, $input, $this->fieldReviewPrompt($input)),
-            default => $this->reviewWithGateway($baseUrl, $input, $this->fieldReviewPrompt($input), 'atlas-audio-metadata-field-adjudication-v1'),
+            'ollama' => $this->reviewWithOllama($baseUrl, $input, $prompt),
+            default => $this->reviewWithGateway($baseUrl, $input, $prompt, 'atlas-audio-metadata-field-adjudication-v1'),
         };
 
         return $this->normalizeFieldReviewResponse($payload);
@@ -189,7 +192,7 @@ class AudioMetadataAiReviewer
             'model' => config('services.audio_metadata.ai_model'),
             'schemaVersion' => $schemaVersion,
             'input' => $input,
-            'prompt' => $prompt ?? $this->prompt($input),
+            'prompt' => $prompt ?? $this->prompts->review($input),
         ]);
 
         if (! $response->successful()) {
@@ -219,7 +222,7 @@ class AudioMetadataAiReviewer
                     ],
                     [
                         'role' => 'user',
-                        'content' => $prompt ?? $this->prompt($input),
+                        'content' => $prompt ?? $this->prompts->review($input),
                     ],
                 ],
             ]);
@@ -293,16 +296,9 @@ class AudioMetadataAiReviewer
      */
     private function normalizeResponse(array $payload): array
     {
-        $verdict = mb_strtolower($this->cleanString($payload['verdict'] ?? null) ?? 'ambiguous');
-        if (! in_array($verdict, ['accept', 'reject', 'ambiguous'], true)) {
-            $verdict = 'ambiguous';
-        }
-
-        $confidence = $payload['confidence'] ?? null;
-
         return [
-            'verdict' => $verdict,
-            'confidence' => is_numeric($confidence) ? max(0.0, min(1.0, (float) $confidence)) : null,
+            'verdict' => $this->verdict($payload['verdict'] ?? null),
+            'confidence' => $this->confidence($payload['confidence'] ?? null),
             'reason' => mb_substr($this->cleanString($payload['reason'] ?? null) ?? 'No reason returned.', 0, 240),
             'model' => $this->cleanString($payload['model'] ?? config('services.audio_metadata.ai_model')),
         ];
@@ -324,13 +320,16 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>}
+     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>,field_reviews:array<string, array{verdict:string,confidence:float|null,reason:string}>}
      */
     private function normalizeFieldReviewResponse(array $payload): array
     {
+        $fieldReviews = $this->fieldReviews($payload['field_reviews'] ?? []);
+
         return [
             ...$this->normalizeResponse($payload),
-            'safe_fields' => $this->safeFields(is_array($payload['safe_fields'] ?? null) ? $payload['safe_fields'] : []),
+            'safe_fields' => $this->safeFieldsForReview($payload, $fieldReviews),
+            'field_reviews' => $fieldReviews,
         ];
     }
 
@@ -344,6 +343,56 @@ class AudioMetadataAiReviewer
             array_map(fn (mixed $field): ?string => $this->cleanString($field), $fields),
             fn (?string $field): bool => $field !== null && in_array($field, self::REVIEW_FIELDS, true),
         ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, array{verdict:string,confidence:float|null,reason:string}>  $fieldReviews
+     * @return list<string>
+     */
+    private function safeFieldsForReview(array $payload, array $fieldReviews): array
+    {
+        $safeFields = $this->safeFields(is_array($payload['safe_fields'] ?? null) ? $payload['safe_fields'] : []);
+        if ($fieldReviews === []) {
+            return $safeFields;
+        }
+
+        $acceptedFields = array_keys(array_filter(
+            $fieldReviews,
+            fn (array $review): bool => $review['verdict'] === 'accept',
+        ));
+        $uncontradictedSafeFields = array_values(array_filter(
+            $safeFields,
+            fn (string $field): bool => ! isset($fieldReviews[$field]) || $fieldReviews[$field]['verdict'] === 'accept',
+        ));
+
+        return array_values(array_unique([...$acceptedFields, ...$uncontradictedSafeFields]));
+    }
+
+    /**
+     * @return array<string, array{verdict:string,confidence:float|null,reason:string}>
+     */
+    private function fieldReviews(mixed $reviews): array
+    {
+        if (! is_array($reviews)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($reviews as $field => $review) {
+            $field = $this->cleanString($field);
+            if ($field === null || ! in_array($field, self::REVIEW_FIELDS, true) || ! is_array($review)) {
+                continue;
+            }
+
+            $normalized[$field] = [
+                'verdict' => $this->verdict($review['verdict'] ?? null),
+                'confidence' => $this->confidence($review['confidence'] ?? null),
+                'reason' => mb_substr($this->cleanString($review['reason'] ?? null) ?? 'No field reason returned.', 0, 240),
+            ];
+        }
+
+        return $normalized;
     }
 
     /**
@@ -386,56 +435,6 @@ class AudioMetadataAiReviewer
         return $decoded;
     }
 
-    private function prompt(array $input): string
-    {
-        return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason"}.',
-            'Allowed verdict values: accept, reject, ambiguous.',
-            'Use accept only when the candidate is very likely the same recording or a clearly better cover for the same album.',
-            'Use reject when the only supporting evidence is duration, or when title/artist/album/source hints point to a different work.',
-            'Use ambiguous when evidence is plausible but insufficient for a reviewable proposal.',
-            'Do not invent new metadata. Judge only the candidate values already supplied.',
-            'Evidence JSON:',
-            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-        ]);
-    }
-
-    private function anomalyPrompt(array $input): string
-    {
-        return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason","source_identity_supported":true,"selected_track_position":"2","selected_track_title":"source track title"}.',
-            'Allowed verdict values: accept, reject, ambiguous.',
-            'Use accept only when the fingerprint candidate and source release are likely the same recording/release, and one listed source track plausibly represents the current track under another language, romanization, or import/custom title.',
-            'Set source_identity_supported to true only when the supplied release and selected source track are coherent with the current title, artists, album, filename, duration, and fingerprint candidate. Set it to false for merely similar album names, unrelated artists, unrelated selected tracks, or weak search-result matches.',
-            'Use reject when the source release or selected track points to a different work.',
-            'Use ambiguous when the listed evidence is plausible but insufficient.',
-            'Do not invent canonical titles, artists, albums, release details, IDs, or track positions. Select one track from the supplied source.tracklist only.',
-            'Canonical/source fields should be original/source values from the selected release or track.',
-            'Evidence JSON:',
-            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-        ]);
-    }
-
-    private function fieldReviewPrompt(array $input): string
-    {
-        return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"ambiguous","confidence":0.82,"reason":"short reason","safe_fields":[]}.',
-            'Allowed verdict values: accept, reject, ambiguous.',
-            'You are judging field-level safety for an Atlas audio metadata proposal.',
-            'Use only the supplied JSON evidence. Do not invent metadata and do not repair values.',
-            'safe_fields must be a subset of candidate.values keys. Never include a field that is absent from candidate.values, even if it is shown in examples or current_values.',
-            'A strong fingerprint can prove a recording while still failing to prove the correct release, album, edition, disc, cover, label, catalog number, barcode, country, or release date.',
-            'Include a field in safe_fields only when that exact field is coherent with the current title, artist, album/group, filename, duration, and provider evidence.',
-            'Title is unsafe when the current and proposed titles have different remix, mix, version, update, edit, live, remaster, vinyl, or edition descriptors. Title case, bracket-vs-parenthesis style, apostrophes, punctuation, and whitespace alone are safe when normalized title tokens and mix descriptors match.',
-            'Album, cover_url, track_number, disc_number, release_label, catalog_number, barcode, release_date, release_country, musicbrainz_release_id, and discogs_release_id require release-level confidence, not only recording confidence.',
-            'Compare track title only to candidate title. Compare current album only to candidate album or source release title. Do not compare the track title to the album title.',
-            'Use ambiguous with a reduced safe_fields list when the recording likely matches but release-level details may describe a different single, remix package, compilation, edition, or disc.',
-            'Use reject with an empty safe_fields list when even recording identity is not coherent.',
-            'Evidence JSON:',
-            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n".'Hard rule: For provider discogs_release with discogs_release_id, track_position, duration_delta_seconds <= 2, and matched_existing_fields containing artists, track, and duration, return accept unless current title, current artists, or current duration contradict candidate.values. Missing or different release-only current fields such as album, cover_url, track_number, release_label, catalog_number, barcode, release_date, release_country, and discogs_release_id are proposed corrections, not conflict evidence. Under this hard Discogs rule, safe_fields must include every one of these candidate.values keys when present: album, cover_url, track_number, release_label, catalog_number, release_date, release_country, discogs_release_id.',
-        ]);
-    }
-
     private function cleanString(mixed $value): ?string
     {
         if (! is_string($value) && ! is_numeric($value)) {
@@ -445,6 +444,18 @@ class AudioMetadataAiReviewer
         $clean = preg_replace('/\s+/', ' ', trim((string) $value)) ?? '';
 
         return $clean !== '' ? $clean : null;
+    }
+
+    private function verdict(mixed $value): string
+    {
+        $verdict = mb_strtolower($this->cleanString($value) ?? 'ambiguous');
+
+        return in_array($verdict, ['accept', 'reject', 'ambiguous'], true) ? $verdict : 'ambiguous';
+    }
+
+    private function confidence(mixed $value): ?float
+    {
+        return is_numeric($value) ? max(0.0, min(1.0, (float) $value)) : null;
     }
 
     private function host(string $url): ?string
