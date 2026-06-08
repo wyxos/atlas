@@ -111,7 +111,9 @@ test('ai field review accepts exact track evidence when it judges the current al
         ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept')
         ->assertJsonPath('proposal.evidence.field_review.reason', 'Discogs release has the same artist, exact track, and duration; current album appears misspelled.');
 
-    expect($fieldReviewPrompt)->toContain('If the provider evidence identifies a concrete Discogs release, exact track, matching artist, and matching duration, decide whether a differing current album is likely a typo or transcription error for the same release');
+    expect($fieldReviewPrompt)
+        ->toContain('Do not compare the track title to the album title.')
+        ->toContain('decide whether a differing current album is likely a typo or transcription variant of the Discogs release title');
 });
 
 /**
