@@ -472,6 +472,7 @@ class AudioMetadataAiReviewer
             'Title is unsafe when the current and proposed titles have different remix, mix, version, update, edit, live, remaster, vinyl, or edition descriptors.',
             'Title case, bracket-vs-parenthesis style, apostrophes, punctuation, and whitespace alone are safe when normalized title tokens and mix descriptors match.',
             'Album, cover_url, track_number, disc_number, release_label, catalog_number, barcode, release_date, release_country, musicbrainz_release_id, and discogs_release_id require release-level confidence, not only recording confidence.',
+            'If the provider evidence identifies a concrete Discogs release, exact track, matching artist, and matching duration, decide whether a differing current album is likely a typo or transcription error for the same release; include release-level Discogs fields in safe_fields only when it is.',
             'Use ambiguous with a reduced safe_fields list when the recording likely matches but release-level details may describe a different single, remix package, compilation, edition, or disc.',
             'Use reject with an empty safe_fields list when even recording identity is not coherent.',
             'Evidence JSON:',

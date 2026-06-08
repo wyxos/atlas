@@ -219,11 +219,24 @@ test('production bring the noise lookup prefers an album release with matching t
                     'model' => 'qwen-test',
                 ],
                 'atlas-audio-metadata-field-adjudication-v1' => [
-                    'verdict' => 'ambiguous',
-                    'confidence' => 0.9,
-                    'reason' => 'Title change does not match current evidence.',
+                    'verdict' => 'accept',
+                    'confidence' => 0.93,
+                    'reason' => 'Discogs release has matching album, artists, track, and duration evidence.',
                     'model' => 'qwen-test',
-                    'safe_fields' => [],
+                    'safe_fields' => [
+                        'title',
+                        'artists',
+                        'album',
+                        'track_number',
+                        'disc_number',
+                        'release_label',
+                        'catalog_number',
+                        'barcode',
+                        'release_date',
+                        'release_country',
+                        'discogs_release_id',
+                        'cover_url',
+                    ],
                 ],
                 default => [
                     'verdict' => 'accept',
@@ -271,8 +284,7 @@ test('production bring the noise lookup prefers an album release with matching t
         ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/1358093-Benny-Benassi-RockNRave')
         ->assertJsonPath('proposal.evidence.discogs_master_id', '92414')
         ->assertJsonPath('proposal.evidence.matched_existing_fields', ['album', 'artists', 'track', 'duration'])
-        ->assertJsonPath('proposal.evidence.field_review.verdict', 'ambiguous')
-        ->assertJsonPath('proposal.evidence.field_review.deterministic_override', 'strong_discogs_release_match');
+        ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept');
 
     expect($discogsSearches)->toContain([
         'type' => 'master',

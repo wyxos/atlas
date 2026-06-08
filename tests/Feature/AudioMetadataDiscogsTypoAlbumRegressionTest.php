@@ -1,0 +1,204 @@
+<?php
+
+use App\Models\Album;
+use App\Models\Artist;
+use App\Models\File;
+use App\Models\User;
+use App\Services\Audio\AudioFingerprintService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+use Mockery\MockInterface;
+
+uses(RefreshDatabase::class);
+
+test('ambiguous ai field review is not overridden by album typo matching', function () {
+    config([
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'gateway',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_token' => 'ai-token',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, fn (MockInterface $mock) => $mock
+        ->shouldReceive('forFile')
+        ->once()
+        ->andReturn(null));
+
+    fakeChristopherLawrenceDiscogsResponses(fieldReviewResponse: [
+        'verdict' => 'ambiguous',
+        'confidence' => 0.72,
+        'reason' => 'The album title differs from the current value.',
+        'model' => 'qwen-test',
+        'safe_fields' => [],
+    ]);
+
+    $user = User::factory()->create();
+    $file = christopherLawrenceDiscogsTypoFile();
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal.provider', 'local')
+        ->assertJsonPath('proposal.proposed_values.track_number', '2')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'System Recordings')
+        ->assertJsonPath('proposal.proposed_values.release_date', '2008');
+});
+
+test('ai field review accepts exact track evidence when it judges the current album as a typo', function () {
+    config([
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'gateway',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_token' => 'ai-token',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, fn (MockInterface $mock) => $mock
+        ->shouldReceive('forFile')
+        ->once()
+        ->andReturn(null));
+
+    $fieldReviewPrompt = null;
+    fakeChristopherLawrenceDiscogsResponses(
+        fieldReviewResponse: [
+            'verdict' => 'accept',
+            'confidence' => 0.93,
+            'reason' => 'Discogs release has the same artist, exact track, and duration; current album appears misspelled.',
+            'model' => 'qwen-test',
+            'safe_fields' => [
+                'title',
+                'artists',
+                'album',
+                'track_number',
+                'release_label',
+                'catalog_number',
+                'release_date',
+                'release_country',
+                'discogs_release_id',
+                'cover_url',
+            ],
+        ],
+        fieldReviewPrompt: $fieldReviewPrompt,
+    );
+
+    $user = User::factory()->create();
+    $file = christopherLawrenceDiscogsTypoFile();
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal.provider', 'discogs_release')
+        ->assertJsonPath('proposal.proposed_values.title', 'Saboteur (Dub Mix)')
+        ->assertJsonPath('proposal.proposed_values.artists', ['Christopher Lawrence'])
+        ->assertJsonPath('proposal.proposed_values.album', 'All Or Nothing')
+        ->assertJsonPath('proposal.proposed_values.track_number', '15')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Pharmacy Music')
+        ->assertJsonPath('proposal.proposed_values.catalog_number', 'PHARMACY1001')
+        ->assertJsonPath('proposal.proposed_values.release_date', '2010-09-28')
+        ->assertJsonPath('proposal.proposed_values.release_country', 'Australia')
+        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '2568225')
+        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/all-or-nothing.jpg')
+        ->assertJsonPath('proposal.evidence.matched_existing_fields', ['artists', 'track', 'duration'])
+        ->assertJsonPath('proposal.evidence.duration_delta_seconds', 0)
+        ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept')
+        ->assertJsonPath('proposal.evidence.field_review.reason', 'Discogs release has the same artist, exact track, and duration; current album appears misspelled.');
+
+    expect($fieldReviewPrompt)->toContain('If the provider evidence identifies a concrete Discogs release, exact track, matching artist, and matching duration, decide whether a differing current album is likely a typo or transcription error for the same release');
+});
+
+/**
+ * @param  array<string, mixed>  $fieldReviewResponse
+ */
+function fakeChristopherLawrenceDiscogsResponses(array $fieldReviewResponse, ?string &$fieldReviewPrompt = null): void
+{
+    Http::fake(function (Request $request) use ($fieldReviewResponse, &$fieldReviewPrompt) {
+        $url = $request->url();
+
+        if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
+            return Http::response(['releases' => []]);
+        }
+
+        if (str_starts_with($url, 'https://discogs.test/database/search')) {
+            return Http::response([
+                'results' => [
+                    ['id' => 2568225, 'type' => 'release'],
+                ],
+            ]);
+        }
+
+        if ($url === 'https://discogs.test/releases/2568225') {
+            return Http::response([
+                'id' => 2568225,
+                'master_id' => 39320,
+                'uri' => 'https://www.discogs.com/release/2568225-Christopher-Lawrence-All-Or-Nothing',
+                'title' => 'All Or Nothing',
+                'country' => 'Australia',
+                'released' => '2010-09-28',
+                'artists' => [
+                    ['name' => 'Christopher Lawrence'],
+                ],
+                'labels' => [
+                    ['name' => 'Pharmacy Music', 'catno' => 'PHARMACY1001'],
+                ],
+                'images' => [[
+                    'type' => 'primary',
+                    'uri' => 'https://discogs.test/image/all-or-nothing.jpg',
+                ]],
+                'tracklist' => [[
+                    'position' => '15',
+                    'title' => 'Saboteur (Dub Mix)',
+                    'duration' => '7:54',
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
+            $fieldReviewPrompt = (string) ($request->data()['prompt'] ?? '');
+
+            return Http::response($fieldReviewResponse);
+        }
+
+        return Http::response([], 404);
+    });
+}
+
+function christopherLawrenceDiscogsTypoFile(): File
+{
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Saboteur (Dub Mix)',
+        'filename' => 'saboteur-dub-mix.mp3',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Christopher Lawrence',
+        'normalized_name' => 'christopher lawrence',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'All Ar Nothing',
+        'normalized_name' => 'all ar nothing',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
+    $file->metadata()->create([
+        'payload' => [
+            'title' => 'Saboteur (Dub Mix)',
+            'artist' => 'Christopher Lawrence',
+            'album' => 'All Ar Nothing',
+            'duration' => 474,
+            'track' => '2',
+            'label' => 'System Recordings',
+            'year' => '2008',
+        ],
+    ]);
+
+    return $file;
+}
