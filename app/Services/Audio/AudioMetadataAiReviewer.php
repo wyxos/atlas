@@ -179,7 +179,7 @@ class AudioMetadataAiReviewer
             ->post($baseUrl.'/api/chat', [
                 'model' => config('services.audio_metadata.ai_model'),
                 'stream' => false,
-                'format' => 'json',
+                'format' => 'json', 'options' => ['temperature' => 0, 'seed' => 1],
                 'messages' => [
                     [
                         'role' => 'system',
@@ -472,11 +472,11 @@ class AudioMetadataAiReviewer
             'Include a field in safe_fields only when that exact field is coherent with the current title, artist, album/group, filename, duration, and provider evidence.',
             'Title is unsafe when the current and proposed titles have different remix, mix, version, update, edit, live, remaster, vinyl, or edition descriptors. Title case, bracket-vs-parenthesis style, apostrophes, punctuation, and whitespace alone are safe when normalized title tokens and mix descriptors match.',
             'Album, cover_url, track_number, disc_number, release_label, catalog_number, barcode, release_date, release_country, musicbrainz_release_id, and discogs_release_id require release-level confidence, not only recording confidence.',
-            'Compare track title only to candidate title. Compare current album only to candidate album or source release title. Do not compare the track title to the album title. For a Discogs release candidate with concrete discogs_release_id, matched artist/track/duration evidence, duration_delta_seconds <= 2, and track_position, treat the release as release-level evidence. If the only album difference is a likely typo/transcription variant, use accept and include safe Discogs release fields from candidate.values such as album, cover_url, track_number, release_label, catalog_number, release_date, release_country, and discogs_release_id.',
+            'Compare track title only to candidate title. Compare current album only to candidate album or source release title. Do not compare the track title to the album title.',
             'Use ambiguous with a reduced safe_fields list when the recording likely matches but release-level details may describe a different single, remix package, compilation, edition, or disc.',
             'Use reject with an empty safe_fields list when even recording identity is not coherent.',
             'Evidence JSON:',
-            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n".'Hard rule: For provider discogs_release with discogs_release_id, track_position, duration_delta_seconds <= 2, and matched_existing_fields containing artists, track, and duration, return accept unless current title, current artists, or current duration contradict candidate.values. Missing or different release-only current fields such as album, cover_url, track_number, release_label, catalog_number, barcode, release_date, release_country, and discogs_release_id are proposed corrections, not conflict evidence. Under this hard Discogs rule, safe_fields must include every one of these candidate.values keys when present: album, cover_url, track_number, release_label, catalog_number, release_date, release_country, discogs_release_id.',
         ]);
     }
 
