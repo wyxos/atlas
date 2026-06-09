@@ -299,7 +299,7 @@ class AudioMetadataAiReviewer
         return [
             'verdict' => $this->verdict($payload['verdict'] ?? null),
             'confidence' => $this->confidence($payload['confidence'] ?? null),
-            'reason' => mb_substr($this->cleanString($payload['reason'] ?? null) ?? 'No reason returned.', 0, 240),
+            'reason' => mb_substr($this->usableReason($payload['reason'] ?? null) ?? 'AI did not return a usable review summary.', 0, 240),
             'model' => $this->cleanString($payload['model'] ?? config('services.audio_metadata.ai_model')),
         ];
     }
@@ -385,10 +385,11 @@ class AudioMetadataAiReviewer
                 continue;
             }
 
+            $verdict = $this->verdict($review['verdict'] ?? null);
             $normalized[$field] = [
-                'verdict' => $this->verdict($review['verdict'] ?? null),
+                'verdict' => $verdict,
                 'confidence' => $this->confidence($review['confidence'] ?? null),
-                'reason' => mb_substr($this->cleanString($review['reason'] ?? null) ?? 'No field reason returned.', 0, 240),
+                'reason' => mb_substr($this->usableReason($review['reason'] ?? null) ?? $this->missingFieldReason($verdict), 0, 240),
             ];
         }
 
@@ -444,6 +445,27 @@ class AudioMetadataAiReviewer
         $clean = preg_replace('/\s+/', ' ', trim((string) $value)) ?? '';
 
         return $clean !== '' ? $clean : null;
+    }
+
+    private function usableReason(mixed $value): ?string
+    {
+        $reason = $this->cleanString($value);
+        if ($reason === null) {
+            return null;
+        }
+
+        $placeholder = preg_replace('/[^a-z]+/', ' ', mb_strtolower($reason)) ?? '';
+
+        return in_array(trim($placeholder), ['short reason', 'short summary', 'field specific reason'], true) ? null : $reason;
+    }
+
+    private function missingFieldReason(string $verdict): string
+    {
+        return match ($verdict) {
+            'accept' => 'AI accepted this field but did not return a field-specific reason.',
+            'reject' => 'AI rejected this field but did not return a field-specific reason.',
+            default => 'AI marked this field ambiguous but did not return a field-specific reason.',
+        };
     }
 
     private function verdict(mixed $value): string

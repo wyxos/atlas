@@ -111,4 +111,35 @@ describe('AudioMetadataProposalTable', () => {
             repeatedReason,
         ]);
     });
+
+    it('explains ambiguous AI verdicts when no field-specific reason was returned', () => {
+        const proposal = proposalFixture() as unknown as AudioMetadataProposal;
+
+        proposal.field_options = {
+            disc_number: [{
+                id: 'disc-discogs',
+                provider: 'discogs_release',
+                confidence: 96,
+                value: '1',
+                recommended: false,
+                reason: null,
+                review_verdict: 'ambiguous',
+                source_label: 'Discogs release',
+                source_url: 'https://www.discogs.com/release/3473080',
+            }],
+        };
+
+        const wrapper = mount(AudioMetadataProposalTable, {
+            props: {
+                proposal,
+                fields: ['disc_number'],
+                selectedFields: [],
+                selectedFieldOptions: {},
+            },
+        });
+
+        expect(wrapper.find('[data-test="audio-metadata-option-note"]').text()).toBe(
+            'AI marked this field ambiguous but did not return a field-specific reason.',
+        );
+    });
 });

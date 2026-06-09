@@ -6,6 +6,7 @@ use App\Models\File;
 use App\Models\User;
 use App\Services\Audio\AudioFingerprint;
 use App\Services\Audio\AudioFingerprintService;
+use App\Services\Audio\AudioMetadataAiReviewer;
 use App\Services\Audio\AudioMetadataCandidateAggregator;
 use App\Services\Audio\AudioMetadataCandidateFieldReviewer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -384,6 +385,76 @@ test('metadata proposal can apply manually selected provider option values', fun
 
     expect($album?->name)->toBe('Selected Album')
         ->and($album?->defaultCover?->path)->not->toBeNull();
+});
+
+test('ai field review replaces placeholder and missing field reasons with explicit fallback text', function () {
+    config([
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'gateway',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_token' => 'ai-token',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    Http::fake([
+        'https://ollama.test/v1/audio/metadata-review' => Http::response([
+            'verdict' => 'ambiguous',
+            'confidence' => 0.82,
+            'reason' => 'short summary',
+            'model' => 'qwen-test',
+            'safe_fields' => ['album'],
+            'field_reviews' => [
+                'album' => [
+                    'verdict' => 'accept',
+                    'confidence' => 0.95,
+                    'reason' => 'The release title matches the current album.',
+                ],
+                'disc_number' => [
+                    'verdict' => 'ambiguous',
+                    'confidence' => 0.55,
+                    'reason' => 'field-specific reason',
+                ],
+                'musicbrainz_recording_id' => [
+                    'verdict' => 'ambiguous',
+                    'confidence' => 0.55,
+                    'reason' => null,
+                ],
+            ],
+        ]),
+    ]);
+
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'The Nighttime Is Our Time',
+    ]);
+
+    $review = app(AudioMetadataAiReviewer::class)->reviewFields($file, [
+        'title' => 'The Nighttime Is Our Time',
+        'album' => 'Before Their Eyes',
+        'disc_number' => null,
+        'musicbrainz_recording_id' => null,
+    ], [
+        'provider' => 'discogs_release',
+        'confidence' => 96,
+        'values' => [
+            'album' => 'Before Their Eyes',
+            'disc_number' => '1',
+            'musicbrainz_recording_id' => '1604f439-ecc4-4c1e-a669-5b6eea204fc9',
+        ],
+        'evidence' => [
+            'source' => 'discogs_release_search',
+            'discogs_release_id' => '3473080',
+        ],
+    ], [
+        'disc_number' => ['current' => null, 'proposed' => '1'],
+        'musicbrainz_recording_id' => ['current' => null, 'proposed' => '1604f439-ecc4-4c1e-a669-5b6eea204fc9'],
+    ]);
+
+    expect($review)->not->toBeNull()
+        ->and($review['reason'])->toBe('AI did not return a usable review summary.')
+        ->and($review['field_reviews']['disc_number']['reason'])->toBe('AI marked this field ambiguous but did not return a field-specific reason.')
+        ->and($review['field_reviews']['musicbrainz_recording_id']['reason'])->toBe('AI marked this field ambiguous but did not return a field-specific reason.');
 });
 
 function metadataOptionChanges(array $currentValues, array $proposedValues): array

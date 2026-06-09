@@ -533,9 +533,9 @@ describe('Audio metadata review options', () => {
         expect(document.body.querySelector('[data-test="audio-metadata-proposal-ai-review"]')?.textContent).toContain(candidateReason);
         expect(countOccurrences(document.body.textContent ?? '', candidateReason)).toBe(1);
         expect(Array.from(document.body.querySelectorAll('[data-test="audio-metadata-option-note"]')).map((note) => note.textContent?.trim())).toEqual([
-            'AI ambiguous',
-            'AI ambiguous',
-            'AI ambiguous',
+            'AI marked this field ambiguous but did not return a field-specific reason.',
+            'AI marked this field ambiguous but did not return a field-specific reason.',
+            'AI marked this field ambiguous but did not return a field-specific reason.',
         ]);
     });
 

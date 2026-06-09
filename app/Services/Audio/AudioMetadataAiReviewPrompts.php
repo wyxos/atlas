@@ -46,10 +46,11 @@ class AudioMetadataAiReviewPrompts
     public function fieldReview(array $input): string
     {
         return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"ambiguous","confidence":0.82,"reason":"short summary","safe_fields":[],"field_reviews":{"album":{"verdict":"ambiguous","confidence":0.62,"reason":"field-specific reason"}}}.',
+            'Return only JSON in this shape: {"verdict":"ambiguous","confidence":0.82,"reason":"one concrete overall judgement","safe_fields":[],"field_reviews":{"album":{"verdict":"ambiguous","confidence":0.62,"reason":"one concrete reason for this field"}}}.',
             'Allowed verdict values: accept, reject, ambiguous.',
             'You are judging field-level safety for an Atlas audio metadata proposal.',
             'Use only the supplied JSON evidence. Do not invent metadata and do not repair values.',
+            'Never return placeholder reason text such as "short summary", "short reason", or "field-specific reason".',
             'safe_fields must be a subset of candidate.values keys. Never include a field that is absent from candidate.values, even if it is shown in examples or current_values.',
             'field_reviews must include one entry for every candidate.values key you judged, with that field-specific verdict, confidence, and reason.',
             'safe_fields should contain exactly the field_reviews keys whose verdict is accept.',

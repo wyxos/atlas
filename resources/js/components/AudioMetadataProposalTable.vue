@@ -67,10 +67,22 @@ function optionNote(option: AudioMetadataFieldOption): string | null {
     }
 
     if (option.review_verdict && !option.recommended) {
-        return `AI ${option.review_verdict}`;
+        return missingFieldReason(option.review_verdict);
     }
 
     return null;
+}
+
+function missingFieldReason(verdict: string): string {
+    if (verdict === 'accept') {
+        return 'AI accepted this field but did not return a field-specific reason.';
+    }
+
+    if (verdict === 'reject') {
+        return 'AI rejected this field but did not return a field-specific reason.';
+    }
+
+    return 'AI marked this field ambiguous but did not return a field-specific reason.';
 }
 
 function proposalSourceLink(): { label: string; url: string } | null {
