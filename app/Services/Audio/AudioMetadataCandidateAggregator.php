@@ -43,6 +43,7 @@ class AudioMetadataCandidateAggregator
 
     public function __construct(
         private readonly AudioMetadataCandidateFieldReviewer $fieldReviewer,
+        private readonly AudioMetadataCandidateOptionMerger $optionMerger,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
 
@@ -120,15 +121,20 @@ class AudioMetadataCandidateAggregator
 
                 $recommended = in_array($field, $recommendedFields, true);
                 $option = $this->fieldOption($candidate, $field, $candidateValues[$field], $index, $recommended, $review, $reviewError);
-                if ($this->hasEquivalentOption($fieldOptions[$field] ?? [], $option)) {
-                    continue;
-                }
-
-                $fieldOptions[$field][] = $option;
+                $fieldOptions[$field] = $this->optionMerger->add($fieldOptions[$field] ?? [], $option);
             }
 
             $candidateSummaries[] = $this->candidateSummary($candidate, $review, $reviewError, $recommendedFields);
         }
+
+        $this->optionMerger->promoteConsensusTrackFields(
+            $currentValues,
+            $fieldOptions,
+            $recommendedValues,
+            $recommendedProvider,
+            $recommendedProviders,
+            $recommendedConfidence,
+        );
 
         $fieldOptions = array_filter($fieldOptions, fn (array $options): bool => $options !== []);
         if ($recommendedValues === [] && $fieldOptions === []) {
@@ -268,11 +274,12 @@ class AudioMetadataCandidateAggregator
     /**
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, mixed>|null  $review
-     * @return array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}
+     * @return array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,reason_scope:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}
      */
     private function fieldOption(array $candidate, string $field, mixed $value, int $index, bool $recommended, ?array $review, ?string $reviewError): array
     {
         $sourceLink = $this->sourceLink($candidate);
+        $reason = $this->reviewReason($review, $field, $reviewError);
 
         return [
             'id' => $this->optionId($candidate, $field, $value, $index),
@@ -280,7 +287,8 @@ class AudioMetadataCandidateAggregator
             'confidence' => (int) $candidate['confidence'],
             'value' => $value,
             'recommended' => $recommended,
-            'reason' => $reviewError ?? $this->reviewReason($review, $field),
+            'reason' => $reason['reason'],
+            'reason_scope' => $reason['scope'],
             'review_verdict' => $this->reviewVerdict($review, $field),
             'source_label' => $sourceLink['label'],
             'source_url' => $sourceLink['url'],
@@ -289,12 +297,23 @@ class AudioMetadataCandidateAggregator
 
     /**
      * @param  array<string, mixed>|null  $review
+     * @return array{reason:string|null,scope:string|null}
      */
-    private function reviewReason(?array $review, string $field): ?string
+    private function reviewReason(?array $review, string $field, ?string $reviewError): array
     {
-        $fieldReview = $this->fieldReviewFor($review, $field);
+        if ($reviewError !== null) {
+            return ['reason' => $reviewError, 'scope' => 'error'];
+        }
 
-        return $this->values->cleanString($fieldReview['reason'] ?? $review['reason'] ?? null);
+        $fieldReview = $this->fieldReviewFor($review, $field);
+        $fieldReason = $this->values->cleanString($fieldReview['reason'] ?? null);
+        if ($fieldReason !== null) {
+            return ['reason' => $fieldReason, 'scope' => 'field'];
+        }
+
+        $candidateReason = $this->values->cleanString($review['reason'] ?? null);
+
+        return ['reason' => $candidateReason, 'scope' => $candidateReason !== null ? 'candidate' : null];
     }
 
     /**
@@ -338,31 +357,6 @@ class AudioMetadataCandidateAggregator
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         return substr(sha1((string) $payload), 0, 16);
-    }
-
-    /**
-     * @param  list<array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}>  $options
-     * @param  array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}  $option
-     */
-    private function hasEquivalentOption(array $options, array $option): bool
-    {
-        foreach ($options as $existing) {
-            if (($existing['provider'] ?? null) === $option['provider']
-                && $this->comparableValue($existing['value'] ?? null) === $this->comparableValue($option['value'])) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function comparableValue(mixed $value): string
-    {
-        if (is_array($value)) {
-            return implode('|', array_map(fn (mixed $entry): string => $this->comparableValue($entry), $value));
-        }
-
-        return mb_strtolower(trim((string) $value));
     }
 
     /**

@@ -6,11 +6,110 @@ use App\Models\File;
 use App\Models\User;
 use App\Services\Audio\AudioFingerprint;
 use App\Services\Audio\AudioFingerprintService;
+use App\Services\Audio\AudioMetadataCandidateAggregator;
+use App\Services\Audio\AudioMetadataCandidateFieldReviewer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
+
+test('metadata proposal collapses duplicate options and recommends consensus track and disc values', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => '01 Life Was All A Dream',
+    ]);
+
+    $currentValues = [
+        'album' => 'The Dawn Of My Death',
+        'cover_url' => null,
+        'track_number' => null,
+        'disc_number' => null,
+        'release_label' => null,
+        'release_date' => null,
+        'release_country' => null,
+        'musicbrainz_release_id' => null,
+    ];
+    $releaseId = 'c4d17ca3-4f85-45c0-a13e-471bc88e4ab0';
+    $coverUrl = 'https://cover.test/release/dawn-of-my-death/front.jpg';
+    $candidates = [
+        [
+            'provider' => 'acoustid_musicbrainz',
+            'confidence' => 96,
+            'values' => [
+                'track_number' => '1',
+                'disc_number' => '1',
+                'cover_url' => $coverUrl,
+                'musicbrainz_release_id' => $releaseId,
+            ],
+            'evidence' => [
+                'source' => 'acoustid_fingerprint',
+                'musicbrainz_release_id' => $releaseId,
+                'musicbrainz_recording_id' => '496d2447-f598-4f40-8caf-11603baa0ca1',
+                'manual_review_required' => true,
+            ],
+        ],
+        [
+            'provider' => 'musicbrainz_cover_art',
+            'confidence' => 82,
+            'values' => [
+                'album' => 'The Dawn Of My Death',
+                'cover_url' => $coverUrl,
+                'release_label' => 'Rise Records',
+                'release_date' => '2008-10-28',
+                'release_country' => 'US',
+                'musicbrainz_release_id' => $releaseId,
+            ],
+            'evidence' => [
+                'source' => 'musicbrainz_release_search',
+                'musicbrainz_release_id' => $releaseId,
+                'release_detail_source' => 'musicbrainz_release_lookup',
+                'cover_source' => 'cover_art_archive',
+            ],
+        ],
+        [
+            'provider' => 'local',
+            'confidence' => 70,
+            'values' => [
+                'track_number' => '1',
+                'disc_number' => '1',
+            ],
+            'evidence' => [
+                'source' => 'embedded_tags',
+            ],
+        ],
+    ];
+
+    $this->mock(AudioMetadataCandidateFieldReviewer::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('review')
+            ->times(3)
+            ->andReturnUsing(fn (File $file, array $currentValues, array $candidate): ?array => ($candidate['evidence']['manual_review_required'] ?? false) === true
+                ? null
+                : $candidate);
+    });
+
+    $candidate = app(AudioMetadataCandidateAggregator::class)->aggregate(
+        $file,
+        $currentValues,
+        $candidates,
+        fn (array $values): array => metadataOptionChanges($currentValues, $values),
+    );
+
+    expect($candidate)->not->toBeNull()
+        ->and(data_get($candidate, 'values.track_number'))->toBe('1')
+        ->and(data_get($candidate, 'values.disc_number'))->toBe('1')
+        ->and(data_get($candidate, 'evidence.field_options.track_number'))->toHaveCount(1)
+        ->and(data_get($candidate, 'evidence.field_options.track_number.0.recommended'))->toBeTrue()
+        ->and(data_get($candidate, 'evidence.field_options.disc_number'))->toHaveCount(1)
+        ->and(data_get($candidate, 'evidence.field_options.disc_number.0.recommended'))->toBeTrue()
+        ->and(data_get($candidate, 'evidence.field_options.cover_url'))->toHaveCount(1)
+        ->and(data_get($candidate, 'evidence.field_options.cover_url.0.confidence'))->toBe(96)
+        ->and(data_get($candidate, 'evidence.field_options.cover_url.0.recommended'))->toBeTrue()
+        ->and(data_get($candidate, 'evidence.field_options.musicbrainz_release_id'))->toHaveCount(1)
+        ->and(data_get($candidate, 'evidence.field_options.musicbrainz_release_id.0.recommended'))->toBeTrue();
+});
 
 test('partial fingerprint review does not hide later album cover candidates', function () {
     config([
@@ -286,3 +385,31 @@ test('metadata proposal can apply manually selected provider option values', fun
     expect($album?->name)->toBe('Selected Album')
         ->and($album?->defaultCover?->path)->not->toBeNull();
 });
+
+function metadataOptionChanges(array $currentValues, array $proposedValues): array
+{
+    $changes = [];
+
+    foreach ($proposedValues as $field => $proposed) {
+        $current = $currentValues[$field] ?? null;
+        if (metadataOptionComparableValue($current) === metadataOptionComparableValue($proposed)) {
+            continue;
+        }
+
+        $changes[$field] = [
+            'current' => $current,
+            'proposed' => $proposed,
+        ];
+    }
+
+    return $changes;
+}
+
+function metadataOptionComparableValue(mixed $value): string
+{
+    if (is_array($value)) {
+        return implode('|', array_map(fn (mixed $entry): string => metadataOptionComparableValue($entry), $value));
+    }
+
+    return preg_replace('/\s+/', ' ', mb_strtolower(trim((string) $value))) ?? '';
+}

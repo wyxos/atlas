@@ -297,7 +297,7 @@ function repeatedOptionReasons(proposal: AudioMetadataProposal): string[] {
 
     for (const options of Object.values(fieldOptions)) {
         for (const option of options) {
-            if (option.reason) {
+            if (option.reason && option.reason_scope !== 'field') {
                 counts.set(option.reason, (counts.get(option.reason) ?? 0) + 1);
             }
         }

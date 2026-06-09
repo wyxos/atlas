@@ -30,7 +30,7 @@ const repeatedOptionReasons = computed(() => {
 
     for (const field of props.fields) {
         for (const option of fieldOptions(field)) {
-            if (option.reason) {
+            if (option.reason && option.reason_scope !== 'field') {
                 counts.set(option.reason, (counts.get(option.reason) ?? 0) + 1);
             }
         }
@@ -62,7 +62,7 @@ function proposedValueForField(field: string): unknown {
 }
 
 function optionNote(option: AudioMetadataFieldOption): string | null {
-    if (option.reason && !repeatedOptionReasons.value.has(option.reason)) {
+    if (option.reason && (option.reason_scope === 'field' || !repeatedOptionReasons.value.has(option.reason))) {
         return option.reason;
     }
 

@@ -81,6 +81,7 @@ export type AudioMetadataFieldOption = {
     value: unknown;
     recommended: boolean;
     reason: string | null;
+    reason_scope?: 'candidate' | 'field' | 'error' | string | null;
     review_verdict: string | null;
     source_label?: string | null;
     source_url?: string | null;

@@ -65,4 +65,50 @@ describe('AudioMetadataProposalTable', () => {
             'Track number depends on the unresolved release edition.',
         ]);
     });
+
+    it('does not hide repeated field-level AI review notes', () => {
+        const proposal = proposalFixture() as unknown as AudioMetadataProposal;
+        const repeatedReason = 'The field value is safe for this exact track even though the release package needs review.';
+
+        proposal.field_options = {
+            track_number: [{
+                id: 'track-musicbrainz',
+                provider: 'acoustid_musicbrainz',
+                confidence: 96,
+                value: '1',
+                recommended: false,
+                reason: repeatedReason,
+                reason_scope: 'field',
+                review_verdict: 'accept',
+                source_label: 'MusicBrainz release',
+                source_url: 'https://musicbrainz.org/release/dawn-of-my-death',
+            }],
+            disc_number: [{
+                id: 'disc-musicbrainz',
+                provider: 'acoustid_musicbrainz',
+                confidence: 96,
+                value: '1',
+                recommended: false,
+                reason: repeatedReason,
+                reason_scope: 'field',
+                review_verdict: 'accept',
+                source_label: 'MusicBrainz release',
+                source_url: 'https://musicbrainz.org/release/dawn-of-my-death',
+            }],
+        };
+
+        const wrapper = mount(AudioMetadataProposalTable, {
+            props: {
+                proposal,
+                fields: ['track_number', 'disc_number'],
+                selectedFields: [],
+                selectedFieldOptions: {},
+            },
+        });
+
+        expect(wrapper.findAll('[data-test="audio-metadata-option-note"]').map((note) => note.text())).toEqual([
+            repeatedReason,
+            repeatedReason,
+        ]);
+    });
 });
