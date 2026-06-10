@@ -262,6 +262,17 @@ test('local ai can expand discogs search queries before reviewing a release anom
                             'source_identity_supported' => true,
                             'selected_track_position' => '10',
                             'selected_track_title' => 'Onizuka暴発へのプロローグ',
+                            'safe_fields' => [
+                                'title',
+                                'album',
+                                'track_number',
+                                'release_label',
+                                'catalog_number',
+                                'release_date',
+                                'release_country',
+                                'discogs_release_id',
+                                'cover_url',
+                            ],
                             'title_aliases' => ['Onizuka Bouhatsu E No Prologue'],
                             'artist_aliases' => ['Yusuke Honma', 'Yusuke Homma'],
                             'album_aliases' => ['GTO TV Animation Original Soundtrack 2'],
@@ -299,8 +310,8 @@ test('local ai can expand discogs search queries before reviewing a release anom
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz_ai_discogs')
-        ->assertJsonPath('proposal.proposed_values.title', 'Onizuka暴発へのプロローグ')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values.title', 'ONIZUKA暴発へのプロローグ')
         ->assertJsonPath('proposal.proposed_values.album', 'GTO Original Soundtrack 2')
         ->assertJsonPath('proposal.proposed_values.track_number', '10')
         ->assertJsonPath('proposal.proposed_values.release_label', 'Miya Records')
@@ -309,13 +320,12 @@ test('local ai can expand discogs search queries before reviewing a release anom
         ->assertJsonPath('proposal.proposed_values.release_country', 'Taiwan')
         ->assertJsonPath('proposal.proposed_values.discogs_release_id', '14651911')
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/gto-2-primary.jpg')
-        ->assertJsonPath('proposal.evidence.ai_search_plan.0.release_title', 'GTO Original Soundtrack 2')
-        ->assertJsonPath('proposal.evidence.ai_search_plan.0.artist', 'Yusuke Homma')
-        ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '10')
+        ->assertJsonPath('proposal.field_options.album.0.source_url', 'https://www.discogs.com/release/14651911')
+        ->assertJsonPath('proposal.evidence.provider_candidates.1.discogs_release_id', '14651911')
         ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
         ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
 
-    expect($aiCalls)->toBe(2)
+    expect($aiCalls)->toBeGreaterThanOrEqual(3)
         ->and($discogsSearches)->toContain([
             'releaseTitle' => 'GTO Original Soundtrack 2',
             'artist' => 'Yusuke Homma',

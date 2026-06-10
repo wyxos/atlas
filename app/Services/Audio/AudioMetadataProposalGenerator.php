@@ -138,14 +138,16 @@ class AudioMetadataProposalGenerator
         $coverCandidate = $this->coverLookup->candidate($file, $currentValues);
 
         $this->reportProgress($progress, 'discogs', 'Searching Discogs release data');
-        $discogsCandidate = $this->discogsProvider->candidate($file, $currentValues);
+        $discogsCandidates = $this->discogsProvider->candidates($file, $currentValues);
+        $discogsCandidate = collect($discogsCandidates)
+            ->first(fn (array $candidate): bool => ($candidate['evidence']['ai_search_plan'] ?? null) === null
+                && (count($discogsCandidates) === 1 || ($candidate['evidence']['release_adjudication']['verdict'] ?? null) === 'accept'));
 
         $this->reportProgress($progress, 'vgmdb', 'Searching VGMdb album metadata');
         $vgmdbCandidate = $this->vgmdbProvider->candidate($file, $currentValues, $fingerprintCandidate);
 
         if ($fingerprintCandidate !== null) {
             $fingerprintCandidate = $this->candidateEnricher->supplementWithCover($fingerprintCandidate, $coverCandidate);
-
             $fingerprintCandidate = $this->candidateEnricher->supplementWithDiscogs($file, $currentValues, $fingerprintCandidate, $discogsCandidate, 'acoustid_musicbrainz_discogs');
 
             $fingerprintCandidate = $this->vgmdbCandidates->merge(
@@ -165,9 +167,7 @@ class AudioMetadataProposalGenerator
                 : $this->candidateEnricher->supplementWithDiscogs($file, $currentValues, $coverCandidate, $discogsCandidate, 'musicbrainz_discogs');
         }
 
-        if ($discogsCandidate !== null) {
-            $candidates[] = $discogsCandidate;
-        }
+        array_push($candidates, ...$discogsCandidates);
 
         if ($vgmdbCandidate !== null) {
             $candidates[] = $vgmdbCandidate;

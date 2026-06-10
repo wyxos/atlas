@@ -134,6 +134,7 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
 
         if ($url === 'https://ollama.test/v1/audio/metadata-review') {
             $schema = (string) ($request->data()['schemaVersion'] ?? '');
+            $provider = (string) data_get($request->data(), 'input.candidate.provider');
             $aiSchemas[] = $schema;
 
             return Http::response(match ($schema) {
@@ -154,6 +155,33 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
                     'selected_track_position' => '2-1',
                     'selected_track_title' => 'Bring The Noise Remix (Pump-kin Remix)',
                 ],
+                'atlas-audio-metadata-field-adjudication-v1' => $provider === 'discogs_release'
+                    ? [
+                        'verdict' => 'accept',
+                        'confidence' => 0.94,
+                        'reason' => 'Discogs release matches the current album family, track title, and duration.',
+                        'model' => 'qwen-test',
+                        'safe_fields' => [
+                            'title',
+                            'artists',
+                            'album',
+                            'track_number',
+                            'disc_number',
+                            'release_label',
+                            'catalog_number',
+                            'release_date',
+                            'release_country',
+                            'discogs_release_id',
+                            'cover_url',
+                        ],
+                    ]
+                    : [
+                        'verdict' => 'accept',
+                        'confidence' => 0.84,
+                        'reason' => 'Fingerprint proves recording only; source-album validation is still required.',
+                        'model' => 'qwen-test',
+                        'safe_fields' => ['musicbrainz_recording_id'],
+                    ],
                 default => [
                     'verdict' => 'accept',
                     'confidence' => 0.84,
@@ -199,7 +227,7 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'local_ai_discogs')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
         ->assertJsonPath('proposal.proposed_values.title', 'Bring The Noise Remix (Pump-kin Remix)')
         ->assertJsonPath('proposal.proposed_values.artists', ['Benny Benassi'])
         ->assertJsonPath('proposal.proposed_values.album', "Rock'N'Rave")
@@ -212,11 +240,11 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
         ->assertJsonPath('proposal.proposed_values.discogs_release_id', '14839269')
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/rock-n-rave-primary.jpg')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.release_title', "Rock N' Rave")
-        ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '2-1')
+        ->assertJsonPath('proposal.evidence.track_position', '2-1')
         ->assertJsonMissingPath('proposal.proposed_values.musicbrainz_release_id');
 
     expect($aiSchemas)->toContain('atlas-audio-metadata-discogs-search-v1')
-        ->and($aiSchemas)->toContain('atlas-audio-metadata-anomaly-v1')
+        ->and($aiSchemas)->toContain('atlas-audio-metadata-field-adjudication-v1')
         ->and($discogsSearches)->toContain([
             'release_title' => "Rock N' Rave",
             'artist' => 'Benny Benassi',

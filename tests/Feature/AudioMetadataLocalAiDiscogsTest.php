@@ -144,7 +144,7 @@ test('local embedded tags can use ai discogs search expansion to propose source 
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'local_ai_discogs')
+        ->assertJsonPath('proposal.provider', 'discogs_release')
         ->assertJsonPath('proposal.proposed_values.title', 'ONIZUKA暴発へのプロローグ')
         ->assertJsonPath('proposal.proposed_values.artists', ['本間勇輔'])
         ->assertJsonPath('proposal.proposed_values.album', 'TVアニメーション GTO オリジナルサウンドトラック2')
@@ -158,7 +158,7 @@ test('local embedded tags can use ai discogs search expansion to propose source 
         ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/gto-2-official.jpg')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.release_title', 'GTO TV Animation Original Soundtrack 2')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.artist', 'Yusuke Homma')
-        ->assertJsonPath('proposal.evidence.ai_review.selected_track_position', '10')
+        ->assertJsonPath('proposal.evidence.track_position', '10')
         ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
         ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
 

@@ -239,7 +239,11 @@ test('ambiguous discogs release adjudication does not fall back to deterministic
     $this->actingAs($user)
         ->postJson("/api/audio/{$file->id}/metadata-runs")
         ->assertAccepted()
-        ->assertJsonPath('proposal', null);
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.evidence.field_options.discogs_release_id.0.value', '13466177')
+        ->assertJsonPath('proposal.evidence.field_options.discogs_release_id.1.value', '2588959')
+        ->assertJsonPath('proposal.evidence.field_options.track_number.0.value', '27')
+        ->assertJsonPath('proposal.evidence.field_options.track_number.1.value', '4');
 });
 
 /**

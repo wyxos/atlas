@@ -21,8 +21,17 @@ class AudioMetadataDiscogsProvider
      */
     public function candidate(File $file, array $currentValues): ?array
     {
+        return $this->candidates($file, $currentValues)[0] ?? null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentValues
+     * @return list<array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}>
+     */
+    public function candidates(File $file, array $currentValues): array
+    {
         if (! $this->discogs->configured()) {
-            return null;
+            return [];
         }
 
         $album = $this->values->cleanString($currentValues['album'] ?? null);
@@ -31,42 +40,48 @@ class AudioMetadataDiscogsProvider
         $duration = $this->values->positiveInteger($currentValues['duration_seconds'] ?? null);
 
         if ($album === null || $artists === []) {
-            return null;
+            return [];
         }
 
-        $match = $this->bestReleaseMatch($file, $currentValues, $album, $artists, $title, $duration);
-        if ($match === null) {
-            return null;
-        }
-
-        $values = $this->releaseMetadata->valuesFromRelease(
-            $match['release'],
-            $match['track'],
-            $match['evidence']['matched_existing_fields'] ?? [],
-        );
-        $values = $this->releaseMetadata->valuesAllowedByReleaseAdjudication($values, $match['evidence']['release_adjudication'] ?? null);
-        if ($values === []) {
-            return null;
-        }
-
-        return [
-            'provider' => 'discogs_release',
-            'confidence' => $match['confidence'],
-            'values' => $values,
-            'evidence' => $match['evidence'],
-        ];
+        return array_values(array_filter(array_map(
+            fn (array $match): ?array => $this->candidateFromMatch($match),
+            $this->releaseMatches($file, $currentValues, $album, $artists, $title, $duration),
+        )));
     }
 
     /**
      * @param  list<string>  $artists
-     * @return array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}|null
+     * @return list<array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}>
      */
-    private function bestReleaseMatch(File $file, array $currentValues, string $album, array $artists, ?string $title, ?int $duration): ?array
+    private function releaseMatches(File $file, array $currentValues, string $album, array $artists, ?string $title, ?int $duration): array
+    {
+        $candidates = $this->releaseCandidatesForQueries($this->releaseSearchQueries($album, $artists, $title), $album, $artists, $title, $duration);
+        if ($candidates === []) {
+            $candidates = $this->releaseCandidatesForQueries($this->aiReleaseSearchQueries($file, $currentValues, $album, $artists, $title, $duration), $album, $artists, $title, $duration);
+        }
+
+        if ($candidates === []) {
+            return [];
+        }
+
+        $best = $this->bestDeterministicCandidate($candidates);
+        if (count($candidates) < 2 || ! $this->aiReviewer->enabled()) {
+            return [$best];
+        }
+
+        return $this->aiSelectedReleaseMatches($file, $currentValues, $candidates);
+    }
+
+    /**
+     * @param  list<array{release_title:string,artist:string,reason:string|null}>  $queries
+     * @return list<array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}>
+     */
+    private function releaseCandidatesForQueries(array $queries, string $album, array $artists, ?string $title, ?int $duration): array
     {
         $candidates = [];
         $seenReleaseIds = [];
 
-        foreach ($this->releaseSearchQueries($album, $artists, $title) as $searchQuery) {
+        foreach ($queries as $searchQuery) {
             foreach ($this->discogs->searchReleaseIds($searchQuery['release_title'], $searchQuery['artist']) as $releaseId) {
                 if (isset($seenReleaseIds[$releaseId])) {
                     continue;
@@ -87,23 +102,17 @@ class AudioMetadataDiscogsProvider
                     'release' => $release,
                     'track' => $score['track'],
                     'confidence' => $score['confidence'],
-                    'evidence' => $score['evidence'],
+                    'evidence' => [
+                        ...$score['evidence'],
+                        'ai_search_plan' => ($searchQuery['reason'] ?? null) === null ? null : [$searchQuery],
+                    ],
                 ];
 
                 $candidates[] = $candidate;
             }
         }
 
-        if ($candidates === []) {
-            return null;
-        }
-
-        $best = $this->bestDeterministicCandidate($candidates);
-        if (count($candidates) < 2 || ! $this->aiReviewer->enabled()) {
-            return $best;
-        }
-
-        return $this->aiSelectedReleaseMatch($file, $currentValues, $candidates);
+        return $candidates;
     }
 
     /**
@@ -128,7 +137,7 @@ class AudioMetadataDiscogsProvider
      * @param  list<array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}>  $candidates
      * @return array{release:array<string, mixed>,track:array<string, mixed>|null,confidence:int,evidence:array<string, mixed>}|null
      */
-    private function aiSelectedReleaseMatch(File $file, array $currentValues, array $candidates): ?array
+    private function aiSelectedReleaseMatches(File $file, array $currentValues, array $candidates): array
     {
         $review = $this->aiReviewer->adjudicateDiscogsRelease(
             $file,
@@ -137,12 +146,18 @@ class AudioMetadataDiscogsProvider
         );
 
         if (($review['verdict'] ?? null) !== 'accept') {
-            return null;
+            return array_map(
+                fn (array $candidate): array => $this->withManualReview($candidate, $review),
+                $candidates,
+            );
         }
 
         $selectedReleaseId = $this->values->cleanString($review['selected_release_id'] ?? null);
         if ($selectedReleaseId === null) {
-            return null;
+            return array_map(
+                fn (array $candidate): array => $this->withManualReview($candidate, $review),
+                $candidates,
+            );
         }
 
         foreach ($candidates as $candidate) {
@@ -154,7 +169,10 @@ class AudioMetadataDiscogsProvider
             $selectedTrackPosition = $this->values->cleanString($review['selected_track_position'] ?? null);
             $candidateTrackPosition = $this->values->cleanString($candidate['evidence']['track_position'] ?? null);
             if ($selectedTrackPosition !== null && $candidateTrackPosition !== null && $selectedTrackPosition !== $candidateTrackPosition) {
-                return null;
+                return array_map(
+                    fn (array $candidate): array => $this->withManualReview($candidate, $review),
+                    $candidates,
+                );
             }
 
             $candidate['evidence']['release_adjudication'] = $review;
@@ -162,10 +180,41 @@ class AudioMetadataDiscogsProvider
                 $candidate['confidence'] = max(72, min(96, (int) round(((float) $review['confidence']) * 100)));
             }
 
-            return $candidate;
+            return [$candidate];
         }
 
-        return null;
+        return array_map(
+            fn (array $candidate): array => $this->withManualReview($candidate, $review),
+            $candidates,
+        );
+    }
+
+    private function withManualReview(array $candidate, ?array $review): array
+    {
+        $candidate['evidence']['release_adjudication'] = $review;
+        $candidate['evidence']['manual_review_required'] = true;
+
+        return $candidate;
+    }
+
+    private function candidateFromMatch(array $match): ?array
+    {
+        $values = $this->releaseMetadata->valuesFromRelease(
+            $match['release'],
+            $match['track'],
+            $match['evidence']['matched_existing_fields'] ?? [],
+        );
+        $values = $this->releaseMetadata->valuesAllowedByReleaseAdjudication($values, $match['evidence']['release_adjudication'] ?? null);
+        if ($values === []) {
+            return null;
+        }
+
+        return [
+            'provider' => 'discogs_release',
+            'confidence' => $match['confidence'],
+            'values' => $values,
+            'evidence' => $match['evidence'],
+        ];
     }
 
     private function candidateBeats(array $candidate, array $best): bool
@@ -318,6 +367,27 @@ class AudioMetadataDiscogsProvider
         }
 
         return $this->searchQueryExpander->expand($queries);
+    }
+
+    private function aiReleaseSearchQueries(File $file, array $currentValues, string $album, array $artists, ?string $title, ?int $duration): array
+    {
+        if (! $this->aiReviewer->enabled()) {
+            return [];
+        }
+
+        $values = array_filter([
+            'title' => $title,
+            'artists' => $artists,
+            'album' => $album,
+            'duration_seconds' => $duration,
+        ], fn (mixed $value): bool => $value !== null && $value !== []);
+
+        return $this->searchQueryExpander->expand($this->aiReviewer->discogsSearchQueries($file, $currentValues, [
+            'provider' => 'current_metadata',
+            'confidence' => 70,
+            'values' => $values,
+            'evidence' => ['source' => 'current_metadata'],
+        ]));
     }
 
     private function releaseSearchTitles(string $album, ?string $title): array

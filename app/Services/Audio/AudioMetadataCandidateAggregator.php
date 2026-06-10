@@ -60,18 +60,14 @@ class AudioMetadataCandidateAggregator
         $recommendedProvider = null;
         $recommendedProviders = [];
         $recommendedConfidence = 0;
+        $recommendedFieldRanks = [];
         $primaryCandidate = null;
         $hasSourceRecommendation = false;
-        $hasConclusiveSourceRecommendation = false;
         $candidateSummaries = [];
 
         foreach ($candidates as $index => $candidate) {
             $candidateValues = $this->reviewableValues($candidate['values'] ?? []);
             if ($candidateValues === []) {
-                continue;
-            }
-
-            if ($hasConclusiveSourceRecommendation && $this->requiresAiFieldReview($candidate)) {
                 continue;
             }
 
@@ -97,11 +93,18 @@ class AudioMetadataCandidateAggregator
             $optionFields = $this->optionFields($candidateValues, $changes);
 
             foreach ($recommendedFields as $field) {
-                if (! array_key_exists($field, $candidateValues) || array_key_exists($field, $recommendedValues)) {
+                if (! array_key_exists($field, $candidateValues)) {
+                    continue;
+                }
+
+                $fieldRank = $this->fieldRecommendationRank($candidate, $review, $field);
+                if (array_key_exists($field, $recommendedValues)
+                    && $fieldRank <= ($recommendedFieldRanks[$field] ?? 0)) {
                     continue;
                 }
 
                 $recommendedValues[$field] = $candidateValues[$field];
+                $recommendedFieldRanks[$field] = $fieldRank;
                 $recommendedProvider ??= (string) $candidate['provider'];
                 $recommendedProviders[(string) $candidate['provider']] = true;
                 $recommendedConfidence = max($recommendedConfidence, (int) $candidate['confidence']);
@@ -110,8 +113,6 @@ class AudioMetadataCandidateAggregator
 
             if ($this->isSourceCandidate($candidate) && $recommendedFields !== []) {
                 $hasSourceRecommendation = true;
-                $hasConclusiveSourceRecommendation = $hasConclusiveSourceRecommendation
-                    || $this->hasReleaseLevelRecommendation($recommendedFields);
             }
 
             foreach ($optionFields as $field) {
@@ -135,6 +136,8 @@ class AudioMetadataCandidateAggregator
             $recommendedProviders,
             $recommendedConfidence,
         );
+
+        $this->syncRecommendedOptions($fieldOptions, $recommendedValues);
 
         $fieldOptions = array_filter($fieldOptions, fn (array $options): bool => $options !== []);
         if ($recommendedValues === [] && $fieldOptions === []) {
@@ -229,14 +232,6 @@ class AudioMetadataCandidateAggregator
     }
 
     /**
-     * @param  list<string>  $fields
-     */
-    private function hasReleaseLevelRecommendation(array $fields): bool
-    {
-        return array_intersect($fields, self::RELEASE_LEVEL_FIELDS) !== [];
-    }
-
-    /**
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null  $candidate
      * @return array<string, mixed>|null
      */
@@ -269,6 +264,69 @@ class AudioMetadataCandidateAggregator
             'ambiguous' => array_values(array_diff($fields, self::RELEASE_LEVEL_FIELDS)),
             default => [],
         };
+    }
+
+    /**
+     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
+     * @param  array<string, mixed>|null  $review
+     */
+    private function fieldRecommendationRank(array $candidate, ?array $review, string $field): int
+    {
+        $rank = (int) $candidate['confidence'];
+
+        if ($this->reviewAcceptsFieldExplicitly($review, $field)) {
+            return $rank + 600;
+        }
+
+        if (($review['verdict'] ?? null) === 'accept') {
+            return $rank + 300;
+        }
+
+        if (($candidate['evidence']['ai_review']['verdict'] ?? null) === 'accept'
+            && ($candidate['evidence']['ai_review']['source_identity_supported'] ?? false) === true) {
+            return $rank + 250;
+        }
+
+        return $this->isSourceCandidate($candidate) ? $rank + 100 : $rank;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $review
+     */
+    private function reviewAcceptsFieldExplicitly(?array $review, string $field): bool
+    {
+        if (in_array($field, $this->values->cleanStringList($review['safe_fields'] ?? []), true)) {
+            return true;
+        }
+
+        return ($this->fieldReviewFor($review, $field)['verdict'] ?? null) === 'accept';
+    }
+
+    /**
+     * @param  array<string, list<array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,reason_scope:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}>>  $fieldOptions
+     * @param  array<string, mixed>  $recommendedValues
+     */
+    private function syncRecommendedOptions(array &$fieldOptions, array $recommendedValues): void
+    {
+        foreach ($fieldOptions as $field => &$options) {
+            $recommendedValue = array_key_exists($field, $recommendedValues)
+                ? $this->comparableValue($recommendedValues[$field])
+                : null;
+
+            foreach ($options as &$option) {
+                $option['recommended'] = $recommendedValue !== null
+                    && $this->comparableValue($option['value']) === $recommendedValue;
+            }
+        }
+    }
+
+    private function comparableValue(mixed $value): string
+    {
+        if (is_array($value)) {
+            return implode('|', array_map(fn (mixed $entry): string => $this->comparableValue($entry), $value));
+        }
+
+        return mb_strtolower(trim((string) $value));
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Models\File;
 use App\Models\User;
 use App\Services\Audio\AudioFingerprintService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 
@@ -174,4 +175,143 @@ test('discogs album fallback can propose a cover when artist script differs', fu
         ->assertJsonPath('proposal.evidence.discogs_release_id', '17124567')
         ->assertJsonPath('proposal.evidence.cover_source', 'discogs_images')
         ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
+});
+
+test('discogs lookup uses ai search terms from current metadata before local fallback', function () {
+    config([
+        'services.audio_metadata.discogs_user_token' => 'discogs-token',
+        'services.audio_metadata.discogs_api_base_url' => 'https://discogs.test',
+        'services.audio_metadata.musicbrainz_api_base_url' => 'https://musicbrainz.test',
+        'services.audio_metadata.ai_enabled' => true,
+        'services.audio_metadata.ai_driver' => 'gateway',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_token' => 'ai-token',
+        'services.audio_metadata.ai_model' => 'qwen-test',
+    ]);
+
+    $this->mock(AudioFingerprintService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('forFile')->once()->andReturn(null);
+    });
+
+    $aiSchemas = [];
+    $discogsSearches = [];
+
+    Http::fake(function (Request $request) use (&$aiSchemas, &$discogsSearches) {
+        $url = $request->url();
+
+        if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
+            return Http::response(['releases' => []]);
+        }
+
+        if (str_starts_with($url, 'https://discogs.test/database/search')) {
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $discogsSearches[] = [
+                'release_title' => (string) ($query['release_title'] ?? ''),
+                'artist' => (string) ($query['artist'] ?? ''),
+            ];
+
+            $matchesAiQuery = ($query['release_title'] ?? null) === 'Floating World'
+                && ($query['artist'] ?? null) === 'Fast Distance & Static Blue';
+
+            return Http::response([
+                'results' => $matchesAiQuery ? [['id' => 1423078, 'type' => 'release']] : [],
+            ]);
+        }
+
+        if ($url === 'https://discogs.test/releases/1423078') {
+            return Http::response([
+                'id' => 1423078,
+                'title' => 'Floating World',
+                'country' => 'UK',
+                'released' => '2008',
+                'artists' => [
+                    ['name' => 'Fast Distance & Static Blue'],
+                ],
+                'labels' => [
+                    ['name' => 'Alter Ego Records', 'catno' => 'AER012'],
+                ],
+                'images' => [[
+                    'type' => 'primary',
+                    'uri' => 'https://discogs.test/image/floating-world.jpg',
+                ]],
+                'tracklist' => [[
+                    'position' => '4',
+                    'title' => 'Floating World (Haris C Remix)',
+                    'duration' => '7:52',
+                ]],
+            ]);
+        }
+
+        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
+            $schema = (string) ($request->data()['schemaVersion'] ?? '');
+            $aiSchemas[] = $schema;
+
+            return Http::response($schema === 'atlas-audio-metadata-discogs-search-v1'
+                ? [
+                    'queries' => [[
+                        'release_title' => 'Floating World',
+                        'artist' => 'Fast Distance & Static Blue',
+                        'reason' => 'Discogs uses ampersand artist credit for this collaboration.',
+                    ]],
+                    'model' => 'qwen-test',
+                ]
+                : [
+                    'verdict' => 'accept',
+                    'confidence' => 0.94,
+                    'reason' => 'Discogs release matches the current title, album, artist collaboration, and duration.',
+                    'model' => 'qwen-test',
+                    'safe_fields' => [
+                        'cover_url',
+                        'track_number',
+                        'release_label',
+                        'catalog_number',
+                        'release_date',
+                        'release_country',
+                        'discogs_release_id',
+                    ],
+                ]);
+        }
+
+        return Http::response([], 404);
+    });
+
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'Floating World (Haris C Remix)',
+    ]);
+    $artist = Artist::factory()->create([
+        'name' => 'Fast Distance And Static Blue',
+        'normalized_name' => 'fast distance and static blue',
+    ]);
+    $album = Album::factory()->create([
+        'name' => 'Floating World',
+        'normalized_name' => 'floating world',
+    ]);
+    $file->artists()->sync([$artist->id]);
+    $file->albums()->sync([$album->id]);
+    $file->metadata()->create([
+        'payload' => [
+            'duration_seconds' => 472,
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
+
+    $response->assertAccepted()
+        ->assertJsonPath('proposal.provider', 'discogs_release')
+        ->assertJsonPath('proposal.proposed_values.track_number', '4')
+        ->assertJsonPath('proposal.proposed_values.release_label', 'Alter Ego Records')
+        ->assertJsonPath('proposal.proposed_values.catalog_number', 'AER012')
+        ->assertJsonPath('proposal.proposed_values.release_date', '2008')
+        ->assertJsonPath('proposal.proposed_values.release_country', 'UK')
+        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '1423078')
+        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/floating-world.jpg');
+
+    expect($aiSchemas)->toContain('atlas-audio-metadata-discogs-search-v1')
+        ->and($discogsSearches)->toContain([
+            'release_title' => 'Floating World',
+            'artist' => 'Fast Distance & Static Blue',
+        ]);
 });

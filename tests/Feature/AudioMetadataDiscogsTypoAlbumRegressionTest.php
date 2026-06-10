@@ -275,7 +275,7 @@ test('strong discogs release evidence wins over musicbrainz recording id only pr
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'discogs_release')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
         ->assertJsonPath('proposal.proposed_values.album', 'All Or Nothing')
         ->assertJsonPath('proposal.proposed_values.track_number', '15')
         ->assertJsonPath('proposal.proposed_values.release_label', 'Pharmacy Music')
@@ -289,7 +289,7 @@ test('strong discogs release evidence wins over musicbrainz recording id only pr
         ->assertJsonPath('proposal.evidence.duration_delta_seconds', 0)
         ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept');
 
-    expect($fieldReviewedProviders)->toBe(['discogs_release']);
+    expect($fieldReviewedProviders)->toBe(['discogs_release', 'acoustid_musicbrainz']);
 });
 
 test('weak mixed discogs supplement does not outrank exact discogs release evidence', function () {
