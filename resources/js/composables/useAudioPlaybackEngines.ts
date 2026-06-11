@@ -93,30 +93,31 @@ export function useAudioPlaybackEngines(
         spotifyEndHandled = false;
     }
 
-    async function stopSpotifyPlayback(): Promise<void> {
+    async function stopSpotifyPlayback(controller: SpotifyPlaybackController | null = spotifyPlayback, options: { destroy?: boolean } = {}): Promise<void> {
         clearSpotifyTimers();
         resetSpotifyTracking();
 
+        if (!controller) { return; }
         try {
-            await spotifyPlayback?.pause();
+            await controller.pause();
         } catch (error) {
             console.error('Failed to pause Spotify playback:', error);
+        } finally {
+            if (options.destroy) { controller.destroy(); if (spotifyPlayback === controller) { spotifyPlayback = null; } }
         }
     }
 
-    async function stopAllPlaybackEngines(): Promise<void> {
-        activeEngine = null;
-        audioRef.value?.pause();
-        await stopSpotifyPlayback();
+    async function stopAllPlaybackEngines(options: { destroySpotify?: boolean } = {}): Promise<void> {
+        activeEngine = null; audioRef.value?.pause();
+        await stopSpotifyPlayback(spotifyPlayback, { destroy: options.destroySpotify });
     }
 
-    async function stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(): Promise<void> {
-        if (!canTrackOwnSpotifyPlayback(audioPlayer.isPlaying.value, audioPlayer.currentTrack.value)) { await stopSpotifyPlayback(); }
+    async function stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(controller: SpotifyPlaybackController | null = spotifyPlayback): Promise<void> {
+        if (!canTrackOwnSpotifyPlayback(audioPlayer.isPlaying.value, audioPlayer.currentTrack.value)) { await stopSpotifyPlayback(controller, { destroy: true }); }
     }
 
     function handlePageHide(): void {
-        void stopSpotifyPlayback();
-        spotifyPlayback?.destroy();
+        void stopSpotifyPlayback(spotifyPlayback, { destroy: true });
     }
 
     function playbackPositionFromPlayer(): number {
@@ -446,11 +447,11 @@ export function useAudioPlaybackEngines(
         syncPlaybackPositionFromPlayer();
 
         if (!track || !audioPlayer.isPlaying.value) {
-            await stopAllPlaybackEngines();
+            await stopAllPlaybackEngines({ destroySpotify: !isSpotifyAudioTrack(track) });
             return;
         }
 
-        await stopAllPlaybackEngines();
+        await stopAllPlaybackEngines({ destroySpotify: !isSpotifyAudioTrack(track) });
         if (token !== playbackToken) {
             return;
         }
@@ -459,6 +460,7 @@ export function useAudioPlaybackEngines(
             activeEngine = 'spotify';
             resetSpotifyTracking();
             const spotifyUri = track.spotifyUri!;
+            const spotifyPlaybackController = spotifyController();
             const startPositionSeconds = playbackPositionFromPlayer();
             const isCurrentSpotifyStart = (): boolean => token === playbackToken
                 && activeEngine === 'spotify'
@@ -474,11 +476,11 @@ export function useAudioPlaybackEngines(
             };
 
             try {
-                const confirmedSnapshot = await spotifyController().play(spotifyUri, startPositionSeconds, {
+                const confirmedSnapshot = await spotifyPlaybackController.play(spotifyUri, startPositionSeconds, {
                     shouldContinue: isCurrentSpotifyStart,
                 });
                 if (!isCurrentSpotifyStart()) {
-                    await stopSpotifyPlaybackIfCurrentTrackCannotOwnIt();
+                    await stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(spotifyPlaybackController);
                     return;
                 }
 
@@ -500,7 +502,7 @@ export function useAudioPlaybackEngines(
                 startSpotifyPolling(token);
             } catch (error) {
                 if (!isCurrentSpotifyStart() || isSpotifyPlaybackSuperseded(error)) {
-                    await stopSpotifyPlaybackIfCurrentTrackCannotOwnIt();
+                    await stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(spotifyPlaybackController);
                     return;
                 }
 
@@ -583,8 +585,7 @@ export function useAudioPlaybackEngines(
 
     function teardown(): void {
         window.removeEventListener('pagehide', handlePageHide);
-        void stopAllPlaybackEngines();
-        spotifyPlayback?.destroy();
+        void stopAllPlaybackEngines({ destroySpotify: true });
     }
 
     window.addEventListener('pagehide', handlePageHide);

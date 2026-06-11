@@ -136,7 +136,7 @@ describe('useAudioPlaybackEngines', () => {
         }
     });
 
-    it('pauses a stale Spotify start that completes after switching to local playback', async () => {
+    it('hard tears down a stale Spotify start before switching to local playback', async () => {
         const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
         const spotifyStart = createDeferred<{
             durationMs: number;
@@ -174,6 +174,7 @@ describe('useAudioPlaybackEngines', () => {
             await playbackEngines.startCurrentPlayback();
 
             const pauseCallsAfterLocalStart = spotifyPlaybackMocks.pause.mock.calls.length;
+            expect(spotifyPlaybackMocks.destroy).toHaveBeenCalledTimes(1);
             expect(audioElement.play).toHaveBeenCalledTimes(1);
             expect(player.currentTrackId.value).toBe(41);
 
