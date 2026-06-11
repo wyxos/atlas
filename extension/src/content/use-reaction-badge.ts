@@ -10,7 +10,7 @@ import { subscribeToDownloadProgress } from './download-progress-bus';
 import type { BadgeTimestampDisplay } from './reaction-badge-view';
 import { resolveBadgeTimestampDisplay } from './reaction-badge-timestamp';
 import { ensureReactionBadgeRuntimeStyles } from './reaction-badge-runtime-style';
-import { requestCloseCurrentTab, requestTabCount, subscribeToTabCountChanged } from './reaction-badge-tab-runtime';
+import { requestTabCount, subscribeToTabCountChanged } from './reaction-badge-tab-runtime';
 import { resolveReactionBadgeProgressState } from './reaction-badge-progress';
 import { emptyMatchResult, isTerminalStatus, preserveTrackedMatchResult, shouldPreserveTrackedTransfer } from './reaction-badge-utils';
 import {
@@ -24,6 +24,7 @@ import { persistBadgeCheckResult, persistBadgeState, persistDownloadProgressEven
 import { useCloseTabAfterQueuePreference } from './close-tab-after-queue-state';
 import { useReactAllItemsInPostPreference } from './react-all-items-in-post-state';
 import { isCivitAiHostname } from '../civitai-domains';
+import { createCloseTabRequestState } from './reaction-badge-close-tab-request';
 
 type UseReactionBadgeProps = {
     media: MediaElement;
@@ -80,6 +81,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
         isActive: () => isActive,
         persistCurrentBadgeState,
     });
+    const closeTabRequest = createCloseTabRequestState(() => isActive, isDownloadLocked, submittingReactionType, submittingBlacklist);
     const controlsDisabled = computed(() => isChecking.value
         || submittingReactionType.value !== null || submittingBlacklist.value || isDownloadLocked.value || fileState.isDeletingFile.value || reactAllItemsInPostPreference.saving.value);
     const isBlacklisted = computed(() => matchResult.value.blacklistedAt !== null);
@@ -153,7 +155,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
     }
     function handleTerminalUnlock(): void {
         isDownloadLocked.value = false;
-        submittingReactionType.value = null;
+        closeTabRequest.clearSubmittingUnlessPending();
         hasSeenActiveTransfer.value = false;
         persistCurrentBadgeState(false);
     }
@@ -451,7 +453,7 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
             // belongs to the successful submit, even if this component instance is now stale.
             if (shouldAutoCloseCurrentTab) {
                 if (isBlacklist || closeTabAfterQueueMode === 'queued') {
-                    void requestCloseCurrentTab();
+                    closeTabRequest.request();
                 } else {
                     queueCloseCurrentTabAfterDownloadComplete(result.downloadCloseTargets);
                 }
@@ -485,10 +487,10 @@ export function useReactionBadge(props: UseReactionBadgeProps) {
 
             handleTerminalUnlock();
         } finally {
-            if (isActive && !isDownloadLocked.value) {
+            if (isActive && !isDownloadLocked.value && !closeTabRequest.isPending()) {
                 submittingReactionType.value = null;
             }
-            if (isActive) {
+            if (isActive && !closeTabRequest.isPending()) {
                 submittingBlacklist.value = false;
             }
         }
