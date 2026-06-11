@@ -99,6 +99,32 @@ function recommendedOption(field: string): AudioMetadataFieldOption | null {
     return fieldOptions(field).find((option) => option.recommended) ?? null;
 }
 
+function optionSourceKey(option: AudioMetadataFieldOption): string | null {
+    const sourceUrl = typeof option.source_url === 'string' ? option.source_url.trim() : '';
+
+    return sourceUrl !== '' ? sourceUrl : null;
+}
+
+function sourceLinkedFieldOptions(option: AudioMetadataFieldOption): Record<string, string> {
+    const sourceKey = optionSourceKey(option);
+    const selections: Record<string, string> = {};
+
+    if (sourceKey === null) {
+        return selections;
+    }
+
+    for (const linkedField of proposalFields.value) {
+        const matches = fieldOptions(linkedField)
+            .filter((fieldOption) => optionSourceKey(fieldOption) === sourceKey);
+
+        if (matches.length === 1) {
+            selections[linkedField] = matches[0].id;
+        }
+    }
+
+    return selections;
+}
+
 function defaultSelectedFields(): string[] {
     return proposalFields.value.filter((field) => {
         if (pendingProposal.value?.changes?.[field]) {
@@ -182,14 +208,17 @@ function toggleFieldSelection(field: string, checked: boolean): void {
 
 function selectFieldOption(field: string, optionId: string): void {
     selectionTouched.value = true;
+    const selectedOption = fieldOptions(field).find((option) => option.id === optionId);
+    const linkedOptions = selectedOption ? sourceLinkedFieldOptions(selectedOption) : {};
+
     selectedFieldOptions.value = {
         ...selectedFieldOptions.value,
+        ...linkedOptions,
         [field]: optionId,
     };
 
-    if (!selectedFields.value.includes(field)) {
-        selectedFields.value = [...selectedFields.value, field];
-    }
+    const nextFields = new Set([...selectedFields.value, field, ...Object.keys(linkedOptions)]);
+    selectedFields.value = proposalFields.value.filter((proposalField) => nextFields.has(proposalField));
 }
 
 function applyFieldOptions(): Record<string, string> {
