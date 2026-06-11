@@ -25,6 +25,16 @@ class AudioMetadataController extends Controller
         ], 202);
     }
 
+    public function activeBatch(Request $request, AudioMetadataProposalService $metadata): JsonResponse
+    {
+        $run = $metadata->activeBatchRun($request->user());
+
+        return response()->json([
+            'run' => $run ? AudioMetadataProposalPayload::run($run) : null,
+            'proposals' => [],
+        ]);
+    }
+
     public function storeForFile(Request $request, File $file, AudioMetadataProposalService $metadata): JsonResponse
     {
         abort_unless(str_starts_with((string) $file->mime_type, 'audio/'), 404);
@@ -52,6 +62,33 @@ class AudioMetadataController extends Controller
         return response()->json([
             'run' => AudioMetadataProposalPayload::run($audioMetadataRun),
             'proposals' => $proposals,
+        ]);
+    }
+
+    public function pause(Request $request, AudioMetadataRun $audioMetadataRun, AudioMetadataProposalService $metadata): JsonResponse
+    {
+        $this->authorizeRun($request, $audioMetadataRun);
+
+        return response()->json([
+            'run' => AudioMetadataProposalPayload::run($metadata->pause($audioMetadataRun)),
+        ]);
+    }
+
+    public function resume(Request $request, AudioMetadataRun $audioMetadataRun, AudioMetadataProposalService $metadata): JsonResponse
+    {
+        $this->authorizeRun($request, $audioMetadataRun);
+
+        return response()->json([
+            'run' => AudioMetadataProposalPayload::run($metadata->resume($audioMetadataRun)),
+        ], 202);
+    }
+
+    public function cancel(Request $request, AudioMetadataRun $audioMetadataRun, AudioMetadataProposalService $metadata): JsonResponse
+    {
+        $this->authorizeRun($request, $audioMetadataRun);
+
+        return response()->json([
+            'run' => AudioMetadataProposalPayload::run($metadata->cancel($audioMetadataRun)),
         ]);
     }
 

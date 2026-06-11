@@ -44,6 +44,7 @@ class AudioMetadataCandidateAggregator
     public function __construct(
         private readonly AudioMetadataCandidateFieldReviewer $fieldReviewer,
         private readonly AudioMetadataCandidateOptionMerger $optionMerger,
+        private readonly AudioMetadataCandidateSourceLinkResolver $sourceLinks,
         private readonly AudioMetadataValueExtractor $values,
     ) {}
 
@@ -336,7 +337,7 @@ class AudioMetadataCandidateAggregator
      */
     private function fieldOption(array $candidate, string $field, mixed $value, int $index, bool $recommended, ?array $review, ?string $reviewError): array
     {
-        $sourceLink = $this->sourceLink($candidate);
+        $sourceLink = $this->sourceLinks->forCandidate($candidate);
         $reason = $this->reviewReason($review, $field, $reviewError);
 
         return [
@@ -419,69 +420,20 @@ class AudioMetadataCandidateAggregator
 
     /**
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @return array{label:string|null,url:string|null}
-     */
-    private function sourceLink(array $candidate): array
-    {
-        $evidence = $candidate['evidence'] ?? [];
-
-        if (($url = $this->sourceUrl($evidence['discogs_release_url'] ?? null)) !== null) {
-            return ['label' => 'Discogs release', 'url' => $url];
-        }
-
-        if (($releaseId = $this->values->cleanString($evidence['discogs_release_id'] ?? null)) !== null) {
-            return ['label' => 'Discogs release', 'url' => 'https://www.discogs.com/release/'.$releaseId];
-        }
-
-        if (($url = $this->sourceUrl($evidence['discogs_master_url'] ?? null)) !== null) {
-            return ['label' => 'Discogs master', 'url' => $url];
-        }
-
-        if (($releaseId = $this->values->cleanString($evidence['musicbrainz_release_id'] ?? null)) !== null) {
-            return ['label' => 'MusicBrainz release', 'url' => 'https://musicbrainz.org/release/'.$releaseId];
-        }
-
-        if (($recordingId = $this->values->cleanString($evidence['musicbrainz_recording_id'] ?? null)) !== null) {
-            return ['label' => 'MusicBrainz recording', 'url' => 'https://musicbrainz.org/recording/'.$recordingId];
-        }
-
-        if (($acoustId = $this->values->cleanString($evidence['acoustid_id'] ?? null)) !== null) {
-            return ['label' => 'AcoustID', 'url' => 'https://acoustid.org/track/'.$acoustId];
-        }
-
-        if (($url = $this->sourceUrl($evidence['vgmdb_album_link'] ?? null)) !== null) {
-            return ['label' => 'VGMdb album', 'url' => $url];
-        }
-
-        if (($albumId = $this->values->cleanString($evidence['vgmdb_album_id'] ?? null)) !== null) {
-            return ['label' => 'VGMdb album', 'url' => 'https://vgmdb.net/album/'.$albumId];
-        }
-
-        return ['label' => null, 'url' => null];
-    }
-
-    private function sourceUrl(mixed $value): ?string
-    {
-        $url = $this->values->cleanString($value);
-        if ($url === null || ! str_starts_with($url, 'http')) {
-            return null;
-        }
-
-        return $url;
-    }
-
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, mixed>|null  $review
      * @param  list<string>  $recommendedFields
      * @return array<string, mixed>
      */
     private function candidateSummary(array $candidate, ?array $review, ?string $reviewError, array $recommendedFields): array
     {
+        $sourceLink = $this->sourceLinks->forCandidate($candidate);
+
         return [
             'provider' => (string) $candidate['provider'],
             'confidence' => (int) $candidate['confidence'],
             'source' => $this->values->cleanString($candidate['evidence']['source'] ?? null),
+            'source_label' => $sourceLink['label'],
+            'source_url' => $sourceLink['url'],
             'discogs_release_id' => $this->values->cleanString($candidate['evidence']['discogs_release_id'] ?? null),
             'musicbrainz_release_id' => $this->values->cleanString($candidate['evidence']['musicbrainz_release_id'] ?? null),
             'matched_existing_fields' => $this->values->cleanStringList($candidate['evidence']['matched_existing_fields'] ?? []),

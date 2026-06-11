@@ -130,6 +130,11 @@ export function audioMetadataSourceLinks(evidence: Record<string, unknown>): Aud
     pushSourceLink(links, 'musicbrainz-recording', 'MusicBrainz recording', musicBrainzRecordingUrl(evidence.musicbrainz_recording_id));
     pushSourceLink(links, 'acoustid', 'AcoustID', acoustIdUrl(evidence.acoustid_id));
     pushSourceLink(links, 'vgmdb-album', 'VGMdb album', stringValue(evidence.vgmdb_album_link) ?? vgmdbAlbumUrl(evidence.vgmdb_album_id));
+    pushSourceLink(links, 'spotify-track', 'Spotify track', stringValue(evidence.spotify_track_url) ?? spotifyTrackUrl(evidence.spotify_track_id));
+    pushSourceLink(links, 'apple-track', 'Apple Music track', stringValue(evidence.apple_track_url));
+    pushSourceLink(links, 'apple-album', 'Apple Music album', stringValue(evidence.apple_collection_url));
+    pushSourceLink(links, 'deezer-track', 'Deezer track', stringValue(evidence.deezer_track_url) ?? deezerTrackUrl(evidence.deezer_track_id));
+    pushSourceLink(links, 'deezer-album', 'Deezer album', deezerAlbumUrl(evidence.deezer_album_id));
 
     if (evidence.cover_source === 'cover_art_archive') {
         pushSourceLink(links, 'cover-art-archive', 'Cover Art Archive', coverArtArchiveReleaseUrl(evidence.musicbrainz_release_id));
@@ -204,4 +209,22 @@ function vgmdbAlbumUrl(value: unknown): string | null {
     const albumId = stringValue(value);
 
     return albumId !== null ? `https://vgmdb.net/album/${encodeURIComponent(albumId)}` : null;
+}
+
+function spotifyTrackUrl(value: unknown): string | null {
+    const trackId = stringValue(value);
+
+    return trackId !== null ? `https://open.spotify.com/track/${encodeURIComponent(trackId)}` : null;
+}
+
+function deezerTrackUrl(value: unknown): string | null {
+    const trackId = stringValue(value);
+
+    return trackId !== null ? `https://www.deezer.com/track/${encodeURIComponent(trackId)}` : null;
+}
+
+function deezerAlbumUrl(value: unknown): string | null {
+    const albumId = stringValue(value);
+
+    return albumId !== null ? `https://www.deezer.com/album/${encodeURIComponent(albumId)}` : null;
 }

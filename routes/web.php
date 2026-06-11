@@ -130,7 +130,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/audio/ids', [\App\Http\Controllers\AudioController::class, 'ids'])->name('api.audio.ids');
     Route::post('/api/audio/details', [\App\Http\Controllers\AudioController::class, 'details'])->name('api.audio.details');
     Route::post('/api/audio/metadata-runs', [\App\Http\Controllers\AudioMetadataController::class, 'store'])->name('api.audio.metadata-runs.store');
+    Route::get('/api/audio/metadata-runs/active', [\App\Http\Controllers\AudioMetadataController::class, 'activeBatch'])->name('api.audio.metadata-runs.active');
     Route::get('/api/audio/metadata-runs/{audioMetadataRun}', [\App\Http\Controllers\AudioMetadataController::class, 'showRun'])->name('api.audio.metadata-runs.show');
+    Route::post('/api/audio/metadata-runs/{audioMetadataRun}/pause', [\App\Http\Controllers\AudioMetadataController::class, 'pause'])->name('api.audio.metadata-runs.pause');
+    Route::post('/api/audio/metadata-runs/{audioMetadataRun}/resume', [\App\Http\Controllers\AudioMetadataController::class, 'resume'])->name('api.audio.metadata-runs.resume');
+    Route::post('/api/audio/metadata-runs/{audioMetadataRun}/cancel', [\App\Http\Controllers\AudioMetadataController::class, 'cancel'])->name('api.audio.metadata-runs.cancel');
     Route::patch('/api/audio/metadata-proposals/{audioMetadataProposal}', [\App\Http\Controllers\AudioMetadataController::class, 'review'])->name('api.audio.metadata-proposals.review');
     Route::get('/api/audio/{file}/metadata-proposals/latest', [\App\Http\Controllers\AudioMetadataController::class, 'latestForFile'])->name('api.audio.files.metadata-proposals.latest');
     Route::post('/api/audio/{file}/metadata/restore-from-file', [\App\Http\Controllers\AudioMetadataController::class, 'restoreFromFile'])->name('api.audio.files.metadata.restore-from-file');

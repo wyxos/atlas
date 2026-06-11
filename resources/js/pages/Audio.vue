@@ -361,16 +361,19 @@ const {
     batchMetadataMessage,
     batchMetadataProgressLabel,
     batchMetadataProgressPercent,
+    canCancelBatchMetadataRun, canPauseBatchMetadataRun, canResumeBatchMetadataRun,
     closeTrackDetailsForAudioIds,
     detailsSheetProposal,
     detailsSheetTrack,
     handleAudioDetailsOpen,
     handleBatchMetadataRun,
+    handleBatchMetadataRunCancel, handleBatchMetadataRunPause, handleBatchMetadataRunResume,
     handleLibraryMetadataRun,
     handleMetadataProposalApply,
     handleMetadataProposalIgnore,
     handleRestoreMetadataFromFile,
     handleTrackMetadataRun,
+    isBatchMetadataActionBusy,
     isMetadataProposalLoading,
     isMetadataProposalReviewing,
     isMetadataRestoring,
@@ -378,6 +381,7 @@ const {
     isTrackDetailsSheetOpen,
     metadataReviewError,
     metadataReviewMessage,
+    restoreActiveBatchMetadataRun,
 } = useAudioMetadataReview({
     activeFilter,
     selectedAudioId,
@@ -393,9 +397,7 @@ const {
 
 useAudioPlaylistMembershipInvalidation({ activePlaylistSlug, audioIds, detailsById, fetchAudioDetails, markPlaylistsStale, onRemovedAudioIds: closeTrackDetailsForAudioIds });
 
-onMounted(() => {
-    void loadAllAudioIds();
-});
+onMounted(() => { void loadAllAudioIds(); void restoreActiveBatchMetadataRun(); });
 
 watch([isLoading, progressPercent], ([loading, percent]) => {
     if (loading || percent < 100) {
@@ -500,7 +502,7 @@ onUnmounted(() => {
             >
                 <AudioLoadProgressPanel v-if="showProgressPanel" :loaded-pages="loadedPages" :total-pages="totalPages" :progress-percent="progressPercent" :loaded-ids="audioIds.length" :total-audio-files="totalAudioFiles" :is-loading="isLoading" />
             </Transition>
-            <AudioMetadataRunStatus :message="batchMetadataMessage" :error="batchMetadataError" :progress-label="batchMetadataProgressLabel" :progress-percent="batchMetadataProgressPercent" />
+            <AudioMetadataRunStatus :message="batchMetadataMessage" :error="batchMetadataError" :progress-label="batchMetadataProgressLabel" :progress-percent="batchMetadataProgressPercent" :can-pause="canPauseBatchMetadataRun" :can-resume="canResumeBatchMetadataRun" :can-cancel="canCancelBatchMetadataRun" :is-action-busy="isBatchMetadataActionBusy" @pause="handleBatchMetadataRunPause" @resume="handleBatchMetadataRunResume" @cancel="handleBatchMetadataRunCancel" />
             <div v-if="error" class="rounded-lg border border-danger-500 bg-prussian-blue-700 p-4 text-danger-200">
                 {{ error }}
             </div>

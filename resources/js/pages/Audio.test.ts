@@ -95,8 +95,7 @@ afterEach(() => {
 
 describe('Audio', () => {
     it('loads ids with cursor pagination and renders list only after all chunks are loaded', async () => {
-        const pageTwo = createDeferred<{ data: AudioIdsResponse }>();
-        const pageThree = createDeferred<{ data: AudioIdsResponse }>();
+        const pageTwo = createDeferred<{ data: AudioIdsResponse }>(), pageThree = createDeferred<{ data: AudioIdsResponse }>();
 
         mockAxios.get.mockImplementation((_url: string, config?: { params?: { after_id?: number; max_id?: number } }) => {
             const afterId = config?.params?.after_id;
@@ -147,19 +146,21 @@ describe('Audio', () => {
         const wrapper = await mountAudio();
         await flushPromises();
 
-        expect(mockAxios.get).toHaveBeenNthCalledWith(1, '/api/audio/ids', {
+        const audioIdGetCalls = () => mockAxios.get.mock.calls.filter(([url]) => url === '/api/audio/ids');
+
+        expect(audioIdGetCalls()[0]).toEqual(['/api/audio/ids', {
             params: {
                 after_id: 0,
                 per_page: 100,
             },
-        });
-        expect(mockAxios.get).toHaveBeenNthCalledWith(2, '/api/audio/ids', {
+        }]);
+        expect(audioIdGetCalls()[1]).toEqual(['/api/audio/ids', {
             params: {
                 after_id: 101,
                 max_id: 303,
                 per_page: 100,
             },
-        });
+        }]);
         expect(wrapper.text()).toContain('Pages: 1 / 3');
         expect(wrapper.text()).toContain('IDs loaded: 1 / 3');
         expect(wrapper.findAll('li')).toHaveLength(0);
@@ -186,13 +187,13 @@ describe('Audio', () => {
         });
         await flushPromises();
 
-        expect(mockAxios.get).toHaveBeenNthCalledWith(3, '/api/audio/ids', {
+        expect(audioIdGetCalls()[2]).toEqual(['/api/audio/ids', {
             params: {
                 after_id: 202,
                 max_id: 303,
                 per_page: 100,
             },
-        });
+        }]);
         expect(wrapper.text()).toContain('Pages: 2 / 3');
         expect(wrapper.text()).toContain('IDs loaded: 2 / 3');
         expect(wrapper.findAll('li')).toHaveLength(0);

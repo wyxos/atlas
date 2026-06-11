@@ -15,6 +15,16 @@ class AudioMetadataProposalService
 {
     private const int BATCH_SIZE = 200;
 
+    /**
+     * @var list<string>
+     */
+    private const array TERMINAL_STATUSES = ['completed', 'failed', 'canceled'];
+
+    /**
+     * @var list<string>
+     */
+    private const array STOPPED_STATUSES = ['paused', 'canceled'];
+
     public function __construct(
         private readonly AudioMetadataProposalApplier $applier,
         private readonly AudioMetadataProposalGenerator $generator,
@@ -25,6 +35,11 @@ class AudioMetadataProposalService
      */
     public function startBatch(User $user, array $options): AudioMetadataRun
     {
+        $activeRun = $this->activeBatchRun($user);
+        if ($activeRun !== null) {
+            return $activeRun;
+        }
+
         $requestedScope = $options['scope'] ?? 'all';
         $scope = $this->normalizeScope($requestedScope);
         $sourceFilter = $this->isWholeLibraryScope($requestedScope)
@@ -49,6 +64,70 @@ class AudioMetadataProposalService
         return $run->fresh();
     }
 
+    public function activeBatchRun(User $user): ?AudioMetadataRun
+    {
+        return AudioMetadataRun::query()
+            ->where('user_id', $user->id)
+            ->where('scope', '<>', 'single')
+            ->whereNotIn('status', self::TERMINAL_STATUSES)
+            ->latest('id')
+            ->first();
+    }
+
+    public function pause(AudioMetadataRun $run): AudioMetadataRun
+    {
+        if (! in_array((string) $run->status, ['pending', 'running'], true)) {
+            return $run->fresh();
+        }
+
+        $run->forceFill([
+            'status' => 'paused',
+        ])->save();
+
+        $run = $run->fresh();
+        $this->broadcastRun($run);
+
+        return $run;
+    }
+
+    public function resume(AudioMetadataRun $run): AudioMetadataRun
+    {
+        if ((string) $run->status !== 'paused') {
+            return $run->fresh();
+        }
+
+        $run->forceFill([
+            'status' => 'pending',
+            'finished_at' => null,
+            'error' => null,
+        ])->save();
+
+        GenerateAudioMetadataRun::dispatch($run->id);
+
+        $run = $run->fresh();
+        $this->broadcastRun($run);
+
+        return $run;
+    }
+
+    public function cancel(AudioMetadataRun $run): AudioMetadataRun
+    {
+        if (in_array((string) $run->status, self::TERMINAL_STATUSES, true)) {
+            return $run->fresh();
+        }
+
+        $run->forceFill([
+            'status' => 'canceled',
+            'finished_at' => now(),
+            'options' => $this->clearProgressOptions($run),
+        ])->save();
+
+        $run = $run->fresh();
+        $this->broadcastRun($run);
+
+        return $run;
+    }
+
     public function startSingle(User $user, File $file): AudioMetadataRun
     {
         $run = AudioMetadataRun::query()->create([
@@ -70,7 +149,7 @@ class AudioMetadataProposalService
     public function processRun(int $runId): void
     {
         $run = AudioMetadataRun::query()->find($runId);
-        if (! $run || in_array($run->status, ['running', 'completed', 'failed'], true)) {
+        if (! $run || in_array($run->status, ['running', ...self::TERMINAL_STATUSES, 'paused'], true)) {
             return;
         }
 
@@ -94,6 +173,13 @@ class AudioMetadataProposalService
 
         try {
             $this->processFiles($run, $user);
+
+            $run->refresh();
+            if (in_array((string) $run->status, self::STOPPED_STATUSES, true)) {
+                $this->broadcastRun($run);
+
+                return;
+            }
 
             $run->refresh()->forceFill([
                 'status' => 'completed',
@@ -156,10 +242,16 @@ class AudioMetadataProposalService
                 'listing_metadata',
             ])
             ->with(['metadata', 'artists', 'albums.defaultCover'])
-            ->chunkById(self::BATCH_SIZE, function (Collection $files) use ($run, $user): void {
+            ->chunkById(self::BATCH_SIZE, function (Collection $files) use ($run, $user): bool {
                 foreach ($files as $file) {
+                    if ($this->shouldStopProcessing($run)) {
+                        return false;
+                    }
+
                     $this->processFile($run, $file, $user);
                 }
+
+                return ! $this->shouldStopProcessing($run);
             });
     }
 
@@ -182,6 +274,10 @@ class AudioMetadataProposalService
                 $run->increment('proposal_count');
             }
 
+            $run->refresh()->forceFill([
+                'options' => $this->markFileProcessedOptions($run, $file),
+            ])->save();
+
             $this->broadcastRun($run->refresh(), $proposal);
         } catch (\Throwable $exception) {
             report($exception);
@@ -192,7 +288,7 @@ class AudioMetadataProposalService
             $run->increment('failed_files');
             $run->refresh()->forceFill([
                 'error' => $error,
-                'options' => $this->progressOptions($run, $file, 'failed', $error),
+                'options' => $this->markFileProcessedOptions($run, $file, 'failed', $error),
             ])->save();
 
             $this->broadcastRun($run->refresh());
@@ -209,7 +305,21 @@ class AudioMetadataProposalService
                 ->where('mime_type', 'like', 'audio/%');
         }
 
-        return $this->audioQuery((string) $run->source_filter, (string) $run->scope);
+        $query = $this->audioQuery((string) $run->source_filter, (string) $run->scope);
+        $lastProcessedFileId = (int) data_get($run->options ?? [], 'last_processed_file_id', 0);
+
+        if ($lastProcessedFileId > 0) {
+            $query->where('id', '>', $lastProcessedFileId);
+        }
+
+        return $query;
+    }
+
+    private function shouldStopProcessing(AudioMetadataRun $run): bool
+    {
+        $run->refresh();
+
+        return in_array((string) $run->status, self::STOPPED_STATUSES, true);
     }
 
     private function audioQuery(string $sourceFilter, string $scope): Builder
@@ -305,6 +415,25 @@ class AudioMetadataProposalService
             'step' => $step,
             'label' => $label,
         ];
+
+        return $options;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function markFileProcessedOptions(AudioMetadataRun $run, File $file, ?string $step = null, ?string $label = null): array
+    {
+        $options = is_array($run->options) ? $run->options : [];
+        $options['last_processed_file_id'] = (int) $file->id;
+
+        if ($step !== null && $label !== null) {
+            $options['progress'] = [
+                'file_id' => (int) $file->id,
+                'step' => $step,
+                'label' => $label,
+            ];
+        }
 
         return $options;
     }
