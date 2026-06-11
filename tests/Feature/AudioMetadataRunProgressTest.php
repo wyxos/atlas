@@ -76,6 +76,40 @@ test('metadata run broadcasts progress snapshots while processing', function () 
         ],
     ]);
 
+    $this->mock(AudioMetadataProposalGenerator::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('generate')
+            ->once()
+            ->andReturnUsing(function (
+                AudioMetadataRun $run,
+                File $file,
+                User $user,
+                ?callable $progress = null,
+            ): AudioMetadataProposal {
+                return AudioMetadataProposal::query()->create([
+                    'audio_metadata_run_id' => $run->id,
+                    'file_id' => $file->id,
+                    'provider' => 'local',
+                    'status' => 'pending',
+                    'confidence' => 80,
+                    'current_values' => [
+                        'title' => 'raw filename',
+                    ],
+                    'proposed_values' => [
+                        'title' => 'Tagged Title',
+                    ],
+                    'changes' => [
+                        'title' => [
+                            'current' => 'raw filename',
+                            'proposed' => 'Tagged Title',
+                        ],
+                    ],
+                    'evidence' => [
+                        'source' => 'embedded_tags',
+                    ],
+                ]);
+            });
+    });
+
     app(AudioMetadataProposalService::class)->processRun($run->id);
 
     Event::assertDispatched(
@@ -118,6 +152,40 @@ test('metadata run broadcast failures do not fail proposal generation', function
             'file_id' => (int) $file->id,
         ],
     ]);
+
+    $this->mock(AudioMetadataProposalGenerator::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('generate')
+            ->once()
+            ->andReturnUsing(function (
+                AudioMetadataRun $run,
+                File $file,
+                User $user,
+                ?callable $progress = null,
+            ): AudioMetadataProposal {
+                return AudioMetadataProposal::query()->create([
+                    'audio_metadata_run_id' => $run->id,
+                    'file_id' => $file->id,
+                    'provider' => 'local',
+                    'status' => 'pending',
+                    'confidence' => 80,
+                    'current_values' => [
+                        'title' => 'raw filename',
+                    ],
+                    'proposed_values' => [
+                        'title' => 'Tagged Title',
+                    ],
+                    'changes' => [
+                        'title' => [
+                            'current' => 'raw filename',
+                            'proposed' => 'Tagged Title',
+                        ],
+                    ],
+                    'evidence' => [
+                        'source' => 'embedded_tags',
+                    ],
+                ]);
+            });
+    });
 
     $dispatcher = Mockery::mock(Dispatcher::class);
     $dispatcher->shouldReceive('dispatch')->andThrow(new RuntimeException('Pusher error: Payload too large.'));
@@ -181,5 +249,90 @@ test('metadata run broadcasts current step labels while processing a file', func
             && data_get($event, 'payload.run.current_file_id') === $file->id
             && data_get($event, 'payload.run.current_step') === 'fingerprint'
             && data_get($event, 'payload.run.current_step_label') === 'Generating audio fingerprint'
+    );
+});
+
+test('whole library metadata run request queues every audio source', function () {
+    Queue::fake([GenerateAudioMetadataRun::class]);
+
+    $user = User::factory()->create();
+    File::factory()->create(['mime_type' => 'audio/mpeg', 'source' => 'local']);
+    File::factory()->create(['mime_type' => 'audio/ogg', 'source' => 'spotify']);
+    File::factory()->create(['mime_type' => 'image/jpeg', 'source' => 'local']);
+
+    $response = $this->actingAs($user)->postJson('/api/audio/metadata-runs', [
+        'scope' => 'whole_library',
+        'source_filter' => 'local',
+    ]);
+
+    $response->assertAccepted()
+        ->assertJsonPath('run.scope', 'all')
+        ->assertJsonPath('run.source_filter', 'all')
+        ->assertJsonPath('run.total_files', 2)
+        ->assertJsonPath('run.processed_files', 0)
+        ->assertJsonPath('run.progress_percent', 0)
+        ->assertJsonPath('run.status', 'pending');
+
+    Queue::assertPushed(
+        GenerateAudioMetadataRun::class,
+        fn (GenerateAudioMetadataRun $job): bool => $job->queue === 'library-scans'
+    );
+});
+
+test('metadata run broadcasts percentage progress while processing multiple files', function () {
+    Event::fake();
+
+    $user = User::factory()->create();
+    File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'first track',
+        'filename' => 'first-track.mp3',
+    ]);
+    File::factory()->create([
+        'source' => 'spotify',
+        'mime_type' => 'audio/ogg',
+        'title' => 'second track',
+        'filename' => 'second-track.ogg',
+    ]);
+    File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'image/jpeg',
+        'title' => 'cover',
+        'filename' => 'cover.jpg',
+    ]);
+    $run = AudioMetadataRun::query()->create([
+        'user_id' => $user->id,
+        'scope' => 'all',
+        'source_filter' => 'all',
+        'status' => 'pending',
+        'total_files' => 2,
+        'options' => [
+            'scope' => 'all',
+            'source_filter' => 'all',
+        ],
+    ]);
+
+    $this->mock(AudioMetadataProposalGenerator::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('generate')
+            ->twice()
+            ->andReturnNull();
+    });
+
+    app(AudioMetadataProposalService::class)->processRun($run->id);
+
+    Event::assertDispatched(
+        'App\\Events\\AudioMetadataRunUpdated',
+        fn (object $event): bool => data_get($event, 'payload.run.status') === 'running'
+            && data_get($event, 'payload.run.total_files') === 2
+            && data_get($event, 'payload.run.processed_files') === 1
+            && data_get($event, 'payload.run.progress_percent') === 50
+    );
+    Event::assertDispatched(
+        'App\\Events\\AudioMetadataRunUpdated',
+        fn (object $event): bool => data_get($event, 'payload.run.status') === 'completed'
+            && data_get($event, 'payload.run.total_files') === 2
+            && data_get($event, 'payload.run.processed_files') === 2
+            && data_get($event, 'payload.run.progress_percent') === 100
     );
 });

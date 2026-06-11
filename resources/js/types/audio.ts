@@ -113,6 +113,7 @@ export type AudioMetadataRun = {
     status: string;
     total_files: number;
     processed_files: number;
+    progress_percent?: number;
     proposal_count: number;
     failed_files: number;
     current_file_id: number | null;

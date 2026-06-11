@@ -14,6 +14,67 @@ use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
+test('vgmdb participates in local metadata lookup by default', function () {
+    config([
+        'services.audio_metadata.vgmdb_enabled' => true,
+        'services.audio_metadata.vgmdb_api_base_url' => 'https://vgmdb.test',
+    ]);
+
+    Http::fake([
+        'https://vgmdb.test/search/albums*' => Http::response([
+            'results' => [
+                'albums' => [[
+                    'link' => 'album/63806',
+                    'catalog' => 'VICL-60728',
+                    'release_date' => '2001-04-21',
+                ]],
+            ],
+        ]),
+        'https://vgmdb.test/album/63806*' => Http::response([
+            'link' => 'album/63806',
+            'name' => 'The SoulTaker Original Soundtrack',
+            'names' => [
+                'en' => 'The SoulTaker Original Soundtrack',
+            ],
+            'catalog' => 'VICL-60728',
+            'release_date' => '2001-04-21',
+            'publisher' => [
+                'names' => ['en' => 'Victor Entertainment'],
+            ],
+            'picture_full' => 'https://vgmdb.test/covers/63806-front.jpg',
+            'vocals' => [[
+                'names' => ['en' => 'JAM Project'],
+            ]],
+            'discs' => [[
+                'name' => 'Disc 1',
+                'tracks' => [[
+                    'names' => ['en' => 'SOULTAKER'],
+                    'track_length' => '4:26',
+                ]],
+            ]],
+        ]),
+    ]);
+
+    $file = File::factory()->create([
+        'source' => 'local',
+        'mime_type' => 'audio/mpeg',
+        'title' => 'The Soultaker',
+        'filename' => 'The Soultaker.mp3',
+    ]);
+
+    $candidate = app(AudioMetadataVgmdbProvider::class)->candidate($file, [
+        'title' => 'The Soultaker',
+        'duration_seconds' => 266,
+    ]);
+
+    expect($candidate)->not->toBeNull()
+        ->and($candidate['provider'])->toBe('vgmdb_album')
+        ->and($candidate['values']['title'])->toBe('SOULTAKER')
+        ->and($candidate['values']['album'])->toBe('The SoulTaker Original Soundtrack')
+        ->and($candidate['values']['release_label'])->toBe('Victor Entertainment')
+        ->and($candidate['values']['catalog_number'])->toBe('VICL-60728');
+});
+
 test('vgmdb supplements a strong musicbrainz fingerprint release with cover art and catalog details', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',

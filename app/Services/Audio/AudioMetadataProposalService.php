@@ -25,8 +25,11 @@ class AudioMetadataProposalService
      */
     public function startBatch(User $user, array $options): AudioMetadataRun
     {
-        $scope = $this->normalizeScope($options['scope'] ?? 'all');
-        $sourceFilter = $this->normalizeSourceFilter($options['source_filter'] ?? 'all');
+        $requestedScope = $options['scope'] ?? 'all';
+        $scope = $this->normalizeScope($requestedScope);
+        $sourceFilter = $this->isWholeLibraryScope($requestedScope)
+            ? 'all'
+            : $this->normalizeSourceFilter($options['source_filter'] ?? 'all');
         $totalFiles = (int) $this->audioQuery($sourceFilter, $scope)->count();
 
         $run = AudioMetadataRun::query()->create([
@@ -246,12 +249,19 @@ class AudioMetadataProposalService
 
     private function normalizeScope(mixed $scope): string
     {
-        return in_array($scope, ['all', 'missing_metadata', 'missing_covers'], true) ? $scope : 'all';
+        return in_array($scope, ['all', 'whole_library', 'missing_metadata', 'missing_covers'], true)
+            ? ($scope === 'whole_library' ? 'all' : $scope)
+            : 'all';
     }
 
     private function normalizeSourceFilter(mixed $sourceFilter): string
     {
         return in_array($sourceFilter, ['all', 'local', 'spotify'], true) ? $sourceFilter : 'all';
+    }
+
+    private function isWholeLibraryScope(mixed $scope): bool
+    {
+        return $scope === 'whole_library';
     }
 
     private function latestRunProposal(AudioMetadataRun $run): ?AudioMetadataProposal

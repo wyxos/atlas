@@ -5,6 +5,7 @@ import PageLayout from '../components/PageLayout.vue';
 import AudioFilterSheet from '../components/AudioFilterSheet.vue';
 import AudioListShell from '../components/AudioListShell.vue';
 import AudioLoadProgressPanel from '../components/AudioLoadProgressPanel.vue';
+import AudioMetadataRunStatus from '../components/AudioMetadataRunStatus.vue';
 import AudioPlaylistPanelFrame from '../components/AudioPlaylistPanelFrame.vue';
 import AudioTrackDetailsSheet from '../components/AudioTrackDetailsSheet.vue';
 import { useAudioDetailAccessors } from '../composables/useAudioDetailAccessors';
@@ -358,11 +359,14 @@ function focusAudioTrackInList(audioId: number): void {
 const {
     batchMetadataError,
     batchMetadataMessage,
+    batchMetadataProgressLabel,
+    batchMetadataProgressPercent,
     closeTrackDetailsForAudioIds,
     detailsSheetProposal,
     detailsSheetTrack,
     handleAudioDetailsOpen,
     handleBatchMetadataRun,
+    handleLibraryMetadataRun,
     handleMetadataProposalApply,
     handleMetadataProposalIgnore,
     handleRestoreMetadataFromFile,
@@ -486,7 +490,6 @@ onUnmounted(() => {
                 @restore-from-file="handleRestoreMetadataFromFile" @apply-proposal="handleMetadataProposalApply"
                 @ignore-proposal="handleMetadataProposalIgnore"
             />
-
             <Transition
                 enter-active-class="transition-all duration-250 ease-out"
                 enter-from-class="-translate-y-2 opacity-0"
@@ -495,22 +498,9 @@ onUnmounted(() => {
                 leave-from-class="translate-y-0 opacity-100 max-h-32"
                 leave-to-class="-translate-y-3 opacity-0 max-h-0"
             >
-                <AudioLoadProgressPanel
-                    v-if="showProgressPanel"
-                    :loaded-pages="loadedPages"
-                    :total-pages="totalPages"
-                    :progress-percent="progressPercent"
-                    :loaded-ids="audioIds.length"
-                    :total-audio-files="totalAudioFiles"
-                    :is-loading="isLoading"
-                />
+                <AudioLoadProgressPanel v-if="showProgressPanel" :loaded-pages="loadedPages" :total-pages="totalPages" :progress-percent="progressPercent" :loaded-ids="audioIds.length" :total-audio-files="totalAudioFiles" :is-loading="isLoading" />
             </Transition>
-
-            <div v-if="batchMetadataMessage || batchMetadataError" class="border-x border-twilight-indigo-500 bg-prussian-blue-800 px-4 py-2 text-xs">
-                <p v-if="batchMetadataMessage" class="text-smart-blue-100">{{ batchMetadataMessage }}</p>
-                <p v-if="batchMetadataError" class="text-danger-100">{{ batchMetadataError }}</p>
-            </div>
-
+            <AudioMetadataRunStatus :message="batchMetadataMessage" :error="batchMetadataError" :progress-label="batchMetadataProgressLabel" :progress-percent="batchMetadataProgressPercent" />
             <div v-if="error" class="rounded-lg border border-danger-500 bg-prussian-blue-700 p-4 text-danger-200">
                 {{ error }}
             </div>
@@ -555,6 +545,7 @@ onUnmounted(() => {
                     @toggle-playlists="isPlaylistPanelOpen = !isPlaylistPanelOpen"
                     @shuffle-play="audioPlayer.queueAndShufflePlay(audioPlayerQueue(), { queueLabel: activePlaylistLabel })"
                     @scan-metadata="handleBatchMetadataRun"
+                    @scan-library-metadata="handleLibraryMetadataRun"
                     @open-filter="isFilterSheetOpen = true"
                     @scroll="handleVirtualListScroll"
                     @visible-items-change="handleVisibleItemsChange"

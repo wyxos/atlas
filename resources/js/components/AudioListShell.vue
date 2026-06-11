@@ -34,6 +34,7 @@ const emit = defineEmits<{
     togglePlaylists: [];
     shufflePlay: [];
     scanMetadata: [];
+    scanLibraryMetadata: [];
     openFilter: [];
     scroll: [];
     visibleItemsChange: [items: unknown[]];
@@ -76,6 +77,7 @@ defineExpose({
             @toggle-playlists="emit('togglePlaylists')"
             @shuffle-play="emit('shufflePlay')"
             @scan-metadata="emit('scanMetadata')"
+            @scan-library-metadata="emit('scanLibraryMetadata')"
             @open-filter="emit('openFilter')"
         />
         <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>

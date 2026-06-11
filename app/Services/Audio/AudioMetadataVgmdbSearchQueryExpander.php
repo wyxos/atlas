@@ -56,9 +56,18 @@ class AudioMetadataVgmdbSearchQueryExpander
 
         $variants = [$clean];
 
+        $withoutLeadingArticle = $this->withoutLeadingArticle($clean);
+        if ($withoutLeadingArticle !== null) {
+            $variants[] = $withoutLeadingArticle;
+        }
+
         $withoutTrackNumber = $this->withoutLeadingTrackNumber($clean);
         if ($withoutTrackNumber !== null) {
             $variants[] = $withoutTrackNumber;
+            $withoutTrackNumberLeadingArticle = $this->withoutLeadingArticle($withoutTrackNumber);
+            if ($withoutTrackNumberLeadingArticle !== null) {
+                $variants[] = $withoutTrackNumberLeadingArticle;
+            }
         }
 
         $withoutBracketedText = $this->withoutBracketedText($clean);
@@ -84,6 +93,11 @@ class AudioMetadataVgmdbSearchQueryExpander
         }
 
         return $this->uniqueStrings($variants);
+    }
+
+    private function withoutLeadingArticle(string $value): ?string
+    {
+        return $this->values->cleanString(preg_replace('/^\s*(?:the|a|an)\s+/iu', '', $value) ?? $value);
     }
 
     private function withoutLeadingTrackNumber(string $value): ?string

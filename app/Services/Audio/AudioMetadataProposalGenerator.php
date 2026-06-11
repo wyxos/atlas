@@ -8,9 +8,6 @@ use App\Models\AudioMetadataProposal;
 use App\Models\AudioMetadataRun;
 use App\Models\File;
 use App\Models\User;
-use App\Services\Spotify\SpotifyOAuthConfig;
-use App\Services\Spotify\SpotifyOAuthService;
-use Illuminate\Support\Facades\Http;
 
 class AudioMetadataProposalGenerator
 {
@@ -23,17 +20,19 @@ class AudioMetadataProposalGenerator
     public function __construct(
         private readonly AudioCoverResolver $coverResolver,
         private readonly AudioMetadataAiReviewer $aiReviewer,
+        private readonly AudioMetadataAppleProvider $appleProvider,
         private readonly AudioMetadataCandidateAggregator $candidateAggregator,
         private readonly AudioMetadataCandidateEnricher $candidateEnricher,
         private readonly AudioMetadataCoverLookupProvider $coverLookup,
+        private readonly AudioMetadataDeezerProvider $deezerProvider,
         private readonly AudioMetadataDiscogsProvider $discogsProvider,
         private readonly AudioMetadataFingerprintProvider $fingerprintProvider,
         private readonly AudioMetadataLocalTagProvider $localTags,
+        private readonly AudioMetadataSpotifyCatalogProvider $spotifyCatalogProvider,
+        private readonly AudioMetadataSpotifySourceProvider $spotifySourceProvider,
         private readonly AudioMetadataVgmdbCandidateMerger $vgmdbCandidates,
         private readonly AudioMetadataVgmdbProvider $vgmdbProvider,
         private readonly AudioMetadataValueExtractor $values,
-        private readonly SpotifyOAuthConfig $spotifyConfig,
-        private readonly SpotifyOAuthService $spotifyOAuth,
     ) {}
 
     public function generate(AudioMetadataRun $run, File $file, User $user, ?callable $progress = null): ?AudioMetadataProposal
@@ -47,8 +46,8 @@ class AudioMetadataProposalGenerator
         $this->reportProgress($progress, 'metadata', 'Reading current metadata');
         $currentValues = $this->currentValues($file);
         $candidate = $this->isSpotifyFile($file)
-            ? $this->spotifyCandidate($file, $user, $progress)
-            : $this->localCandidate($file, $currentValues, $progress);
+            ? $this->spotifySourceProvider->candidate($file, $user, $progress)
+            : $this->localCandidate($file, $user, $currentValues, $progress);
 
         if ($candidate === null) {
             return null;
@@ -108,7 +107,7 @@ class AudioMetadataProposalGenerator
             'album' => $albums[0] ?? null,
             'duration_seconds' => $this->values->durationSeconds($file, $payload),
             'cover_url' => $this->coverResolver->forFile($file),
-            'spotify_uri' => $this->spotifyUri($file),
+            'spotify_uri' => $this->spotifySourceProvider->uriForFile($file),
             'track_number' => $this->values->cleanString($album?->pivot?->track_number ?? data_get($payload, 'audio.track_number')),
             'disc_number' => $this->values->cleanString($album?->pivot?->disc_number ?? data_get($payload, 'audio.disc_number')),
             'release_label' => $this->values->cleanString($album?->release_label),
@@ -123,7 +122,7 @@ class AudioMetadataProposalGenerator
         ];
     }
 
-    private function localCandidate(File $file, array $currentValues, ?callable $progress = null): ?array
+    private function localCandidate(File $file, User $user, array $currentValues, ?callable $progress = null): ?array
     {
         $candidates = [];
 
@@ -145,6 +144,15 @@ class AudioMetadataProposalGenerator
 
         $this->reportProgress($progress, 'vgmdb', 'Searching VGMdb album metadata');
         $vgmdbCandidate = $this->vgmdbProvider->candidate($file, $currentValues, $fingerprintCandidate);
+
+        $this->reportProgress($progress, 'spotify', 'Searching Spotify catalog metadata');
+        $spotifyCatalogCandidate = $this->spotifyCatalogProvider->candidate($file, $currentValues, $user);
+
+        $this->reportProgress($progress, 'apple_music', 'Searching Apple Music catalog metadata');
+        $appleCandidate = $this->appleProvider->candidate($file, $currentValues);
+
+        $this->reportProgress($progress, 'deezer', 'Searching Deezer catalog metadata');
+        $deezerCandidate = $this->deezerProvider->candidate($file, $currentValues);
 
         if ($fingerprintCandidate !== null) {
             $fingerprintCandidate = $this->candidateEnricher->supplementWithCover($fingerprintCandidate, $coverCandidate);
@@ -171,6 +179,18 @@ class AudioMetadataProposalGenerator
 
         if ($vgmdbCandidate !== null) {
             $candidates[] = $vgmdbCandidate;
+        }
+
+        if ($spotifyCatalogCandidate !== null) {
+            $candidates[] = $spotifyCatalogCandidate;
+        }
+
+        if ($appleCandidate !== null) {
+            $candidates[] = $appleCandidate;
+        }
+
+        if ($deezerCandidate !== null) {
+            $candidates[] = $deezerCandidate;
         }
 
         $tagCandidate = $this->localTags->candidate($file);
@@ -274,6 +294,9 @@ class AudioMetadataProposalGenerator
             'acoustid_musicbrainz' => $this->candidateHasSourceReleaseSupport($candidate) ? 300 : 230,
             'musicbrainz_discogs' => 245,
             'discogs_release' => $this->candidateHasStrongDiscogsReleaseSupport($candidate) ? 330 : 235,
+            'spotify_catalog' => 240,
+            'apple_music' => 236,
+            'deezer' => 236,
             'existing_album_cover' => 230,
             'vgmdb_album' => 225,
             'musicbrainz_cover_art' => 220,
@@ -300,102 +323,6 @@ class AudioMetadataProposalGenerator
             && in_array('artists', $matchedFields, true)
             && in_array('track', $matchedFields, true)
             && in_array('duration', $matchedFields, true);
-    }
-
-    private function spotifyCandidate(File $file, User $user, ?callable $progress = null): array
-    {
-        $trackId = $this->spotifyTrackId((string) $file->source_id)
-            ?? $this->spotifyTrackId((string) $file->url)
-            ?? $this->spotifyTrackId((string) $file->referrer_url);
-        $track = null;
-        $evidence = ['source' => 'spotify', 'track_id' => $trackId, 'refetched' => false];
-
-        if ($trackId !== null) {
-            $this->reportProgress($progress, 'spotify', 'Refreshing Spotify metadata');
-            $accessToken = $this->spotifyOAuth->getValidAccessToken($user);
-            if ($accessToken !== null) {
-                $track = $this->fetchSpotifyTrack($trackId, $accessToken);
-                $evidence['refetched'] = $track !== null;
-            }
-        }
-
-        if ($track === null) {
-            $listingTrack = data_get($file->listing_metadata, 'track');
-            $track = is_array($listingTrack) ? $listingTrack : [];
-            $evidence['source'] = 'spotify_listing_metadata';
-        }
-
-        $values = $this->spotifyValues($track);
-        if (($values['spotify_uri'] ?? null) === null && $trackId !== null) {
-            $values['spotify_uri'] = 'spotify:track:'.$trackId;
-        }
-
-        return [
-            'provider' => 'spotify',
-            'confidence' => $evidence['refetched'] ? 98 : 70,
-            'values' => $values,
-            'evidence' => $evidence,
-        ];
-    }
-
-    private function fetchSpotifyTrack(string $trackId, string $accessToken): ?array
-    {
-        $response = Http::acceptJson()
-            ->withToken($accessToken)
-            ->timeout(15)
-            ->get(rtrim($this->spotifyConfig->apiBaseUrl(), '/').'/tracks/'.$trackId);
-
-        if (! $response->successful()) {
-            return null;
-        }
-
-        $payload = $response->json();
-
-        return is_array($payload) ? $payload : null;
-    }
-
-    private function spotifyValues(array $track): array
-    {
-        $values = [];
-        $this->putIfPresent($values, 'title', $this->values->cleanString(data_get($track, 'name')));
-        $this->putIfPresent($values, 'artists', $this->values->cleanStringList(data_get($track, 'artists.*.name', [])));
-        $this->putIfPresent($values, 'album', $this->values->cleanString(data_get($track, 'album.name')));
-        $this->putIfPresent($values, 'spotify_uri', $this->values->cleanString(data_get($track, 'uri')));
-        $this->putIfPresent($values, 'isrc', $this->values->cleanString(data_get($track, 'external_ids.isrc')));
-        $this->putIfPresent($values, 'cover_url', $this->bestSpotifyCoverUrl(data_get($track, 'album.images', [])));
-        $this->putIfPresent($values, 'track_number', $this->values->cleanString(data_get($track, 'track_number')));
-        $this->putIfPresent($values, 'disc_number', $this->values->cleanString(data_get($track, 'disc_number')));
-        $this->putIfPresent($values, 'release_date', $this->values->cleanString(data_get($track, 'album.release_date')));
-
-        $duration = $this->values->positiveInteger(data_get($track, 'duration_ms'));
-        if ($duration !== null) {
-            $values['duration_seconds'] = (int) round($duration / 1000);
-        }
-
-        return $values;
-    }
-
-    private function putIfPresent(array &$values, string $key, mixed $value): void
-    {
-        if ($value === null || $value === []) {
-            return;
-        }
-
-        $values[$key] = $value;
-    }
-
-    private function bestSpotifyCoverUrl(mixed $images): ?string
-    {
-        if (! is_array($images)) {
-            return null;
-        }
-
-        $sortedImages = collect($images)
-            ->filter(fn (mixed $image): bool => is_array($image) && $this->values->cleanString($image['url'] ?? null) !== null)
-            ->sortByDesc(fn (array $image): int => (int) ($image['width'] ?? 0))
-            ->values();
-
-        return $this->values->cleanString($sortedImages->first()['url'] ?? null);
     }
 
     /**
@@ -456,37 +383,6 @@ class AudioMetadataProposalGenerator
     private function isSpotifyFile(File $file): bool
     {
         return mb_strtolower(trim((string) $file->source)) === 'spotify';
-    }
-
-    private function spotifyUri(File $file): ?string
-    {
-        $trackId = $this->spotifyTrackId((string) $file->source_id)
-            ?? $this->spotifyTrackId((string) $file->url)
-            ?? $this->spotifyTrackId((string) $file->referrer_url);
-
-        return $trackId !== null ? 'spotify:track:'.$trackId : null;
-    }
-
-    private function spotifyTrackId(string $value): ?string
-    {
-        $value = trim($value);
-        if ($value === '') {
-            return null;
-        }
-
-        if (preg_match('/^spotify:track:([A-Za-z0-9]{22})$/', $value, $matches) === 1) {
-            return $matches[1];
-        }
-
-        if (preg_match('/^[A-Za-z0-9]{22}$/', $value) === 1) {
-            return $value;
-        }
-
-        if (preg_match('#open\.spotify\.com/track/([A-Za-z0-9]{22})#', $value, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return null;
     }
 
     private function reportProgress(?callable $progress, string $step, string $label): void
