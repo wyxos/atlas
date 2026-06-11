@@ -27,6 +27,8 @@ type AudioMetadataRunSnapshot = {
     proposals?: AudioMetadataProposal[];
 };
 
+type MetadataRunKind = 'track' | 'batch';
+
 type EchoChannel = {
     listen: (event: string, callback: (payload: unknown) => void) => void;
 };
@@ -40,6 +42,8 @@ export function useAudioMetadataReview(options: Options) {
     const metadataRunStartingAudioId = ref<number | null>(null);
     const activeMetadataRunId = ref<number | null>(null);
     const activeMetadataRunAudioId = ref<number | null>(null);
+    const activeMetadataRunKind = ref<MetadataRunKind | null>(null);
+    const batchMetadataRun = ref<AudioMetadataRun | null>(null);
     const isMetadataProposalReviewing = ref(false);
     const isMetadataRestoring = ref(false);
     const metadataRestoringAudioId = ref<number | null>(null);
@@ -51,6 +55,18 @@ export function useAudioMetadataReview(options: Options) {
     const batchMetadataError = ref<string | null>(null);
     let metadataRunPollTimer: ReturnType<typeof setTimeout> | null = null;
     let activeMetadataRunChannel: string | null = null;
+
+    const batchMetadataProgressPercent = computed(() => (
+        batchMetadataRun.value ? metadataRunProgressPercent(batchMetadataRun.value) : null
+    ));
+
+    const batchMetadataProgressLabel = computed(() => (
+        batchMetadataRun.value ? metadataRunFilesProgressLabel(batchMetadataRun.value) : null
+    ));
+
+    const isBatchMetadataRunActive = computed(() => (
+        batchMetadataRun.value !== null && !isMetadataRunTerminal(batchMetadataRun.value)
+    ));
 
     const isTrackMetadataRunBusy = computed(() => {
         const audioId = detailsSheetAudioId.value;
@@ -183,7 +199,7 @@ export function useAudioMetadataReview(options: Options) {
         try {
             const { data } = await window.axios.post<AudioMetadataRunResponse>(`/api/audio/${audioId}/metadata-runs`);
             const proposal = pendingProposal(data.proposal);
-            applyMetadataRunSnapshot({ run: data.run, proposal }, audioId);
+            applyMetadataRunSnapshot({ run: data.run, proposal }, audioId, 'track');
         } catch (runError) {
             console.error('Failed to start audio metadata run:', runError);
             setMetadataReviewError(audioId, 'Failed to start metadata scan.');
@@ -290,24 +306,46 @@ export function useAudioMetadataReview(options: Options) {
         }
     }
 
-    function applyMetadataRunSnapshot(snapshot: AudioMetadataRunSnapshot, audioId: number | null = activeMetadataRunAudioId.value): void {
+    function applyMetadataRunSnapshot(
+        snapshot: AudioMetadataRunSnapshot,
+        audioId: number | null = activeMetadataRunAudioId.value,
+        runKind: MetadataRunKind = activeMetadataRunKind.value ?? 'track',
+    ): void {
         const snapshotAudioId = audioId ?? snapshot.run.current_file_id ?? null;
         const proposal = pendingProposal(snapshot.proposal ?? snapshot.proposals?.[0] ?? null);
-        const shouldRefreshCompactProposal = snapshotAudioId !== null && proposal?.is_compact === true;
+        const proposalAudioId = proposal?.file_id ?? snapshotAudioId;
+        const shouldRefreshCompactProposal = proposalAudioId !== null && proposal?.is_compact === true;
 
-        if (snapshotAudioId !== null) {
+        if (proposalAudioId !== null) {
             metadataProposalById.value = {
                 ...metadataProposalById.value,
-                [snapshotAudioId]: proposal,
+                [proposalAudioId]: proposal,
             };
         }
 
         if (shouldRefreshCompactProposal) {
-            void fetchLatestMetadataProposal(snapshotAudioId);
+            void fetchLatestMetadataProposal(proposalAudioId);
+        }
+
+        if (runKind === 'batch') {
+            batchMetadataRun.value = snapshot.run;
+            batchMetadataMessage.value = batchMetadataRunMessage(snapshot.run);
         }
 
         if (isMetadataRunTerminal(snapshot.run)) {
             stopMetadataRunTracking(snapshot.run.id);
+
+            if (runKind === 'batch') {
+                batchMetadataRun.value = snapshot.run;
+                batchMetadataMessage.value = batchMetadataRunMessage(snapshot.run);
+
+                if (snapshot.run.status === 'failed') {
+                    batchMetadataError.value = snapshot.run.error ?? 'Metadata scan failed.';
+                }
+
+                return;
+            }
+
             setMetadataReviewMessage(snapshotAudioId, metadataRunTerminalMessage(snapshot.run, proposal));
 
             if (snapshot.run.status === 'failed' || (snapshot.run.failed_files > 0 && snapshot.run.error)) {
@@ -318,10 +356,15 @@ export function useAudioMetadataReview(options: Options) {
         }
 
         activeMetadataRunId.value = snapshot.run.id;
-        activeMetadataRunAudioId.value = snapshotAudioId;
-        setMetadataReviewMessage(snapshotAudioId, snapshot.run.status === 'pending'
-            ? 'Metadata scan queued.'
-            : metadataRunProgressMessage(snapshot.run));
+        activeMetadataRunAudioId.value = runKind === 'track' ? snapshotAudioId : null;
+        activeMetadataRunKind.value = runKind;
+
+        if (runKind === 'track') {
+            setMetadataReviewMessage(snapshotAudioId, snapshot.run.status === 'pending'
+                ? 'Metadata scan queued.'
+                : metadataRunProgressMessage(snapshot.run));
+        }
+
         startMetadataRunEcho(snapshot.run.id);
         scheduleMetadataRunPoll();
     }
@@ -357,6 +400,47 @@ export function useAudioMetadataReview(options: Options) {
         }
 
         return `Scanning metadata ${run.processed_files}/${total}...`;
+    }
+
+    function batchMetadataRunMessage(run: AudioMetadataRun): string {
+        const progressLabel = metadataRunFilesProgressLabel(run);
+
+        if (run.status === 'completed') {
+            const proposalSummary = run.proposal_count === 1
+                ? ' 1 proposal ready.'
+                : run.proposal_count > 1
+                    ? ` ${run.proposal_count} proposals ready.`
+                    : '';
+
+            return `Metadata scan completed: ${progressLabel}.${proposalSummary}`;
+        }
+
+        if (run.status === 'failed') {
+            return `Metadata scan failed: ${progressLabel}.`;
+        }
+
+        if (run.status === 'pending') {
+            return `Metadata scan queued: ${progressLabel}.`;
+        }
+
+        return `Metadata scan running: ${progressLabel}.`;
+    }
+
+    function metadataRunFilesProgressLabel(run: AudioMetadataRun): string {
+        const processed = Math.max(0, run.processed_files);
+        const total = Math.max(0, run.total_files);
+
+        return `${processed}/${total} files (${metadataRunProgressPercent(run)}%)`;
+    }
+
+    function metadataRunProgressPercent(run: AudioMetadataRun): number {
+        const total = Math.max(0, run.total_files);
+
+        if (total === 0) {
+            return isMetadataRunTerminal(run) ? 100 : 0;
+        }
+
+        return Math.min(100, Math.max(0, Math.round((Math.max(0, run.processed_files) / total) * 100)));
     }
 
     function isMetadataRunTerminal(run: AudioMetadataRun): boolean {
@@ -436,6 +520,7 @@ export function useAudioMetadataReview(options: Options) {
 
         activeMetadataRunId.value = null;
         activeMetadataRunAudioId.value = null;
+        activeMetadataRunKind.value = null;
         leaveMetadataRunEcho();
     }
 
@@ -451,22 +536,32 @@ export function useAudioMetadataReview(options: Options) {
         activeMetadataRunChannel = null;
     }
 
-    async function handleBatchMetadataRun(): Promise<void> {
+    async function startBatchMetadataRun(sourceFilter: AudioSourceFilter): Promise<void> {
         batchMetadataMessage.value = null;
         batchMetadataError.value = null;
+        batchMetadataRun.value = null;
 
         try {
-            const sourceFilter = options.activeFilter.value === 'all' ? 'all' : options.activeFilter.value;
             const { data } = await window.axios.post<AudioMetadataRunResponse>('/api/audio/metadata-runs', {
                 scope: 'all',
                 source_filter: sourceFilter,
             });
 
-            batchMetadataMessage.value = `Metadata scan queued for ${data.run.total_files} tracks.`;
+            applyMetadataRunSnapshot({ run: data.run, proposal: data.proposal ?? null }, null, 'batch');
         } catch (runError) {
             console.error('Failed to queue audio metadata run:', runError);
             batchMetadataError.value = 'Failed to queue metadata scan.';
         }
+    }
+
+    async function handleBatchMetadataRun(): Promise<void> {
+        const sourceFilter = options.activeFilter.value === 'all' ? 'all' : options.activeFilter.value;
+
+        await startBatchMetadataRun(sourceFilter);
+    }
+
+    async function handleLibraryMetadataRun(): Promise<void> {
+        await startBatchMetadataRun('all');
     }
 
     onBeforeUnmount(() => {
@@ -476,11 +571,14 @@ export function useAudioMetadataReview(options: Options) {
     return {
         batchMetadataError,
         batchMetadataMessage,
+        batchMetadataProgressLabel,
+        batchMetadataProgressPercent,
         closeTrackDetailsForAudioIds,
         detailsSheetProposal,
         detailsSheetTrack,
         handleAudioDetailsOpen,
         handleBatchMetadataRun,
+        handleLibraryMetadataRun,
         handleMetadataProposalApply,
         handleMetadataProposalIgnore,
         handleRestoreMetadataFromFile,
@@ -489,6 +587,7 @@ export function useAudioMetadataReview(options: Options) {
         isMetadataProposalReviewing,
         isMetadataRestoring: isTrackMetadataRestoring,
         isMetadataRunStarting: isTrackMetadataRunBusy,
+        isBatchMetadataRunActive,
         isTrackDetailsSheetOpen,
         metadataReviewError: visibleMetadataReviewError,
         metadataReviewMessage: visibleMetadataReviewMessage,

@@ -11,7 +11,16 @@
 |
 */
 
-uses(Tests\TestCase::class)->in('Feature', 'Browser');
+uses(Tests\TestCase::class)
+    ->beforeEach(function (): void {
+        config([
+            'services.audio_metadata.vgmdb_enabled' => false,
+            'services.audio_metadata.spotify_catalog_enabled' => false,
+            'services.audio_metadata.apple_enabled' => false,
+            'services.audio_metadata.deezer_enabled' => false,
+        ]);
+    })
+    ->in('Feature', 'Browser');
 
 /*
 |--------------------------------------------------------------------------

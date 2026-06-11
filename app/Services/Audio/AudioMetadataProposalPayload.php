@@ -22,6 +22,7 @@ class AudioMetadataProposalPayload
             'status' => (string) $run->status,
             'total_files' => (int) $run->total_files,
             'processed_files' => (int) $run->processed_files,
+            'progress_percent' => self::progressPercent($run),
             'proposal_count' => (int) $run->proposal_count,
             'failed_files' => (int) $run->failed_files,
             'current_file_id' => self::nullableInteger($progress['file_id'] ?? null),
@@ -100,6 +101,15 @@ class AudioMetadataProposalPayload
             'acoustid_id' => self::nullableString($evidence['acoustid_id'] ?? null),
             'vgmdb_album_id' => self::nullableString($evidence['vgmdb_album_id'] ?? null),
             'vgmdb_album_link' => self::nullableString($evidence['vgmdb_album_link'] ?? null),
+            'spotify_track_id' => self::nullableString($evidence['spotify_track_id'] ?? null),
+            'spotify_track_url' => self::nullableString($evidence['spotify_track_url'] ?? null),
+            'apple_track_id' => self::nullableString($evidence['apple_track_id'] ?? null),
+            'apple_collection_id' => self::nullableString($evidence['apple_collection_id'] ?? null),
+            'apple_track_url' => self::nullableString($evidence['apple_track_url'] ?? null),
+            'apple_collection_url' => self::nullableString($evidence['apple_collection_url'] ?? null),
+            'deezer_track_id' => self::nullableString($evidence['deezer_track_id'] ?? null),
+            'deezer_album_id' => self::nullableString($evidence['deezer_album_id'] ?? null),
+            'deezer_track_url' => self::nullableString($evidence['deezer_track_url'] ?? null),
             'cover_source' => self::nullableString($evidence['cover_source'] ?? null),
         ], fn (mixed $value): bool => $value !== null && $value !== []);
     }
@@ -124,5 +134,18 @@ class AudioMetadataProposalPayload
         $value = trim((string) $value);
 
         return $value !== '' ? $value : null;
+    }
+
+    private static function progressPercent(AudioMetadataRun $run): int
+    {
+        $total = max(0, (int) $run->total_files);
+        if ($total === 0) {
+            return (string) $run->status === 'completed' ? 100 : 0;
+        }
+
+        $processed = max(0, (int) $run->processed_files);
+        $percent = (int) floor(($processed / $total) * 100);
+
+        return max(0, min(100, $percent));
     }
 }

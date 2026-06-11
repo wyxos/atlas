@@ -18,7 +18,7 @@ class StartAudioMetadataRunRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'scope' => ['nullable', Rule::in(['all', 'missing_metadata', 'missing_covers'])],
+            'scope' => ['nullable', Rule::in(['all', 'whole_library', 'missing_metadata', 'missing_covers'])],
             'source_filter' => ['nullable', Rule::in(['all', 'local', 'spotify'])],
         ];
     }
