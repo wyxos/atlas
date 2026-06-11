@@ -43,7 +43,7 @@ test('single local metadata run queues work without blocking the request when th
 
     Queue::assertPushed(
         GenerateAudioMetadataRun::class,
-        fn (GenerateAudioMetadataRun $job): bool => $job->queue === 'library-scans'
+        fn (GenerateAudioMetadataRun $job): bool => $job->queue === 'audio-metadata'
     );
 
     expect(AudioMetadataProposal::query()->where('file_id', $file->id)->count())->toBe(0);
@@ -275,7 +275,7 @@ test('whole library metadata run request queues every audio source', function ()
 
     Queue::assertPushed(
         GenerateAudioMetadataRun::class,
-        fn (GenerateAudioMetadataRun $job): bool => $job->queue === 'library-scans'
+        fn (GenerateAudioMetadataRun $job): bool => $job->queue === 'audio-metadata'
     );
 });
 

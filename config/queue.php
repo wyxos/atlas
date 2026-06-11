@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\GenerateAudioMetadataRun;
+
 return [
 
     /*
@@ -87,6 +89,18 @@ return [
             'retry_after' => (int) env(
                 'REDIS_LIBRARY_SCAN_RETRY_AFTER',
                 (int) env('LIBRARY_SCAN_IMPORT_TIMEOUT_SECONDS', 1800) + 120,
+            ),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
+        'redis-audio-metadata' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => env('REDIS_AUDIO_METADATA_QUEUE', GenerateAudioMetadataRun::QUEUE),
+            'retry_after' => (int) env(
+                'REDIS_AUDIO_METADATA_RETRY_AFTER',
+                (int) env('AUDIO_METADATA_QUEUE_TIMEOUT_SECONDS', GenerateAudioMetadataRun::DEFAULT_TIMEOUT_SECONDS) + 120,
             ),
             'block_for' => null,
             'after_commit' => false,

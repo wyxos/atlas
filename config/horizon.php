@@ -1,7 +1,10 @@
 <?php
 
+use App\Jobs\GenerateAudioMetadataRun;
 use Illuminate\Support\Str;
 
+$audioMetadataQueue = env('REDIS_AUDIO_METADATA_QUEUE', GenerateAudioMetadataRun::QUEUE);
+$audioMetadataTimeout = (int) env('AUDIO_METADATA_QUEUE_TIMEOUT_SECONDS', GenerateAudioMetadataRun::DEFAULT_TIMEOUT_SECONDS);
 $librarySyncQueue = env('LIBRARY_SYNC_QUEUE', 'library-sync');
 $libraryFileSyncQueue = env('LIBRARY_FILE_SYNC_QUEUE', 'library-file-sync');
 $libraryReactionSyncQueue = env('LIBRARY_REACTION_SYNC_QUEUE', 'library-reaction-sync');
@@ -72,6 +75,7 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        GenerateAudioMetadataRun::CONNECTION.':'.$audioMetadataQueue => 600,
         'redis:downloads' => 600,
         'redis:library-scans' => 600,
         'redis:maintenance' => 600,
@@ -221,6 +225,10 @@ return [
             'tries' => 3,
             'timeout' => (int) env('LIBRARY_SCAN_IMPORT_TIMEOUT_SECONDS', 1800),
             'nice' => 0,
+        ],
+        'supervisor-audio-metadata' => [
+            'connection' => env('HORIZON_AUDIO_METADATA_CONNECTION', GenerateAudioMetadataRun::CONNECTION), 'queue' => [$audioMetadataQueue], 'balance' => 'auto', 'autoScalingStrategy' => 'time', 'maxProcesses' => (int) env('HORIZON_AUDIO_METADATA_MAX_PROCESSES', 1), 'maxTime' => 0,
+            'maxJobs' => 0, 'memory' => 384, 'tries' => 3, 'timeout' => $audioMetadataTimeout, 'nice' => 0,
         ],
         'supervisor-library-scan-parsers' => [
             'connection' => env('HORIZON_LIBRARY_SCAN_PARSER_CONNECTION', 'redis-library-scan-parsers'),

@@ -461,7 +461,7 @@ test('batch metadata run is queued and scoped to audio', function () {
 
     Queue::assertPushed(
         GenerateAudioMetadataRun::class,
-        fn (GenerateAudioMetadataRun $job): bool => $job->queue === 'library-scans'
+        fn (GenerateAudioMetadataRun $job): bool => $job->queue === 'audio-metadata'
     );
 });
 

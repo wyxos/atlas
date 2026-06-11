@@ -4,6 +4,7 @@ use App\Enums\LibraryScanItemStatus;
 use App\Enums\LibraryScanMediaTask as MediaTask;
 use App\Enums\LibraryScanRunMode;
 use App\Enums\LibraryScanRunStatus;
+use App\Jobs\GenerateAudioMetadataRun;
 use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Jobs\LibraryScans\ProcessLibraryScanItem;
 use App\Models\File;
@@ -165,11 +166,23 @@ it('uses separate horizon queues for library scan media previews and conversions
 
         ->and(config('horizon.defaults.supervisor-library-scans.timeout'))->toBe(1800)
 
+        ->and(config('horizon.defaults.supervisor-audio-metadata.connection'))->toBe('redis-audio-metadata')
+
+        ->and(config('horizon.defaults.supervisor-audio-metadata.queue'))->toBe([GenerateAudioMetadataRun::QUEUE])
+
+        ->and(config('horizon.defaults.supervisor-audio-metadata.timeout'))->toBe(1800)
+
+        ->and(config('horizon.waits.'.GenerateAudioMetadataRun::CONNECTION.':'.GenerateAudioMetadataRun::QUEUE))->toBe(600)
+
         ->and(config('horizon.defaults.supervisor-library-scan-parsers.connection'))->toBe('redis-library-scan-parsers')
 
         ->and(config('horizon.defaults.supervisor-library-scan-parsers.queue'))->toBe([ProcessLibraryScanItem::QUEUE])
 
         ->and(config('queue.connections.redis-library-scans.retry_after'))->toBe(1920)
+
+        ->and(config('queue.connections.redis-audio-metadata.queue'))->toBe(GenerateAudioMetadataRun::QUEUE)
+
+        ->and(config('queue.connections.redis-audio-metadata.retry_after'))->toBe(1920)
 
         ->and(config('queue.connections.redis-library-scan-parsers.retry_after'))->toBe(420);
 

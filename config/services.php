@@ -95,6 +95,7 @@ return [
         'deezer_api_base_url' => env('AUDIO_METADATA_DEEZER_API_BASE_URL', 'https://api.deezer.com'),
         'deezer_access_token' => env('AUDIO_METADATA_DEEZER_ACCESS_TOKEN'),
         'http_timeout_seconds' => env('AUDIO_METADATA_HTTP_TIMEOUT_SECONDS', 15),
+        'queue_timeout_seconds' => env('AUDIO_METADATA_QUEUE_TIMEOUT_SECONDS', 1800),
         'user_agent' => env('AUDIO_METADATA_USER_AGENT', 'Atlas/1.0 (+'.rtrim((string) env('APP_URL', 'http://localhost'), '/').')'),
         'ai_enabled' => env('AUDIO_METADATA_AI_ENABLED', true),
         'ai_driver' => env('AUDIO_METADATA_AI_DRIVER', 'gateway'),

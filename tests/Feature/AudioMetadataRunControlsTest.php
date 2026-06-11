@@ -91,7 +91,10 @@ test('batch metadata run can be paused resumed and canceled', function () {
         ->assertJsonPath('run.status', 'pending')
         ->assertJsonPath('run.processed_files', 4);
 
-    Queue::assertPushed(GenerateAudioMetadataRun::class);
+    Queue::assertPushed(
+        GenerateAudioMetadataRun::class,
+        fn (GenerateAudioMetadataRun $job): bool => $job->queue === GenerateAudioMetadataRun::QUEUE
+    );
 
     $this->actingAs($user)
         ->postJson("/api/audio/metadata-runs/{$run->id}/cancel")
