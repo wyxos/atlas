@@ -8,15 +8,13 @@ use App\Services\Audio\AudioFingerprint;
 use App\Services\Audio\AudioFingerprintService;
 use App\Services\Audio\AudioMetadataAiReviewer;
 use App\Services\Audio\AudioMetadataCandidateAggregator;
-use App\Services\Audio\AudioMetadataCandidateFieldReviewer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
-test('metadata proposal collapses duplicate options and recommends consensus track and disc values', function () {
-    $user = User::factory()->create();
+test('metadata proposal collapses duplicate options without recommending values', function () {
     $file = File::factory()->create([
         'source' => 'local',
         'mime_type' => 'audio/mpeg',
@@ -83,14 +81,6 @@ test('metadata proposal collapses duplicate options and recommends consensus tra
         ],
     ];
 
-    $this->mock(AudioMetadataCandidateFieldReviewer::class, function (MockInterface $mock): void {
-        $mock->shouldReceive('review')
-            ->times(3)
-            ->andReturnUsing(fn (File $file, array $currentValues, array $candidate): ?array => ($candidate['evidence']['manual_review_required'] ?? false) === true
-                ? null
-                : $candidate);
-    });
-
     $candidate = app(AudioMetadataCandidateAggregator::class)->aggregate(
         $file,
         $currentValues,
@@ -99,17 +89,16 @@ test('metadata proposal collapses duplicate options and recommends consensus tra
     );
 
     expect($candidate)->not->toBeNull()
-        ->and(data_get($candidate, 'values.track_number'))->toBe('1')
-        ->and(data_get($candidate, 'values.disc_number'))->toBe('1')
+        ->and(data_get($candidate, 'values'))->toBe([])
         ->and(data_get($candidate, 'evidence.field_options.track_number'))->toHaveCount(1)
-        ->and(data_get($candidate, 'evidence.field_options.track_number.0.recommended'))->toBeTrue()
+        ->and(data_get($candidate, 'evidence.field_options.track_number.0.recommended'))->toBeFalse()
         ->and(data_get($candidate, 'evidence.field_options.disc_number'))->toHaveCount(1)
-        ->and(data_get($candidate, 'evidence.field_options.disc_number.0.recommended'))->toBeTrue()
+        ->and(data_get($candidate, 'evidence.field_options.disc_number.0.recommended'))->toBeFalse()
         ->and(data_get($candidate, 'evidence.field_options.cover_url'))->toHaveCount(1)
         ->and(data_get($candidate, 'evidence.field_options.cover_url.0.confidence'))->toBe(96)
-        ->and(data_get($candidate, 'evidence.field_options.cover_url.0.recommended'))->toBeTrue()
+        ->and(data_get($candidate, 'evidence.field_options.cover_url.0.recommended'))->toBeFalse()
         ->and(data_get($candidate, 'evidence.field_options.musicbrainz_release_id'))->toHaveCount(1)
-        ->and(data_get($candidate, 'evidence.field_options.musicbrainz_release_id.0.recommended'))->toBeTrue();
+        ->and(data_get($candidate, 'evidence.field_options.musicbrainz_release_id.0.recommended'))->toBeFalse();
 });
 
 test('partial fingerprint review does not hide later album cover candidates', function () {
@@ -291,25 +280,24 @@ test('partial fingerprint review does not hide later album cover candidates', fu
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'multi_source_review')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/discovery/front-500.jpg')
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'discovery-release-mbid')
+        ->assertJsonPath('proposal.proposed_values', [])
         ->assertJsonPath('proposal.field_options.album.0.value', 'NRJ Story')
         ->assertJsonPath('proposal.field_options.album.0.recommended', false)
-        ->assertJsonPath('proposal.field_options.album.0.reason', 'The MusicBrainz release is a compilation and should not replace the current album automatically.')
-        ->assertJsonPath('proposal.field_options.album.0.review_verdict', 'ambiguous')
+        ->assertJsonPath('proposal.field_options.album.0.reason', null)
+        ->assertJsonPath('proposal.field_options.album.0.review_verdict', null)
         ->assertJsonPath('proposal.field_options.album.0.source_label', 'MusicBrainz release')
         ->assertJsonPath('proposal.field_options.album.0.source_url', 'https://musicbrainz.org/release/nrj-story-release-mbid')
         ->assertJsonPath('proposal.field_options.album.1.value', 'Discovery')
-        ->assertJsonPath('proposal.field_options.album.1.recommended', true)
+        ->assertJsonPath('proposal.field_options.album.1.recommended', false)
         ->assertJsonPath('proposal.field_options.album.1.source_label', 'MusicBrainz release')
         ->assertJsonPath('proposal.field_options.album.1.source_url', 'https://musicbrainz.org/release/discovery-release-mbid')
         ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/nrj-story/front.jpg')
         ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false)
-        ->assertJsonPath('proposal.field_options.cover_url.0.reason', 'The cover belongs to the compilation release, not the current album.')
-        ->assertJsonPath('proposal.evidence.field_review.field_reviews.album.reason', 'The MusicBrainz release is a compilation and should not replace the current album automatically.')
+        ->assertJsonPath('proposal.field_options.cover_url.0.reason', null)
+        ->assertJsonPath('proposal.evidence.field_review', null)
         ->assertJsonPath('proposal.field_options.cover_url.0.source_url', 'https://musicbrainz.org/release/nrj-story-release-mbid')
         ->assertJsonPath('proposal.field_options.cover_url.1.value', 'https://cover.test/release/discovery/front-500.jpg')
-        ->assertJsonPath('proposal.field_options.cover_url.1.recommended', true)
+        ->assertJsonPath('proposal.field_options.cover_url.1.recommended', false)
         ->assertJsonPath('proposal.field_options.cover_url.1.source_url', 'https://musicbrainz.org/release/discovery-release-mbid')
         ->assertJsonPath('run.proposal_count', 1)
         ->assertJsonPath('run.failed_files', 0);

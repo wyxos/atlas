@@ -294,23 +294,24 @@ test('production bring the noise lookup prefers an album release with matching t
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'discogs_release')
-        ->assertJsonPath('proposal.proposed_values.title', 'Bring The Noise Remix (Pump-kin Remix)')
-        ->assertJsonPath('proposal.proposed_values.artists', ['Benny Benassi', 'Public Enemy'])
-        ->assertJsonPath('proposal.proposed_values.album', "Rock'N'Rave")
-        ->assertJsonPath('proposal.proposed_values.track_number', '1')
-        ->assertJsonPath('proposal.proposed_values.disc_number', '2')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Ultra Records')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'UL 1695-2')
-        ->assertJsonPath('proposal.proposed_values.barcode', '6 17465 16952 6')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2008-06-03')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'US')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '1358093')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/rock-n-rave.jpg')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.title.0.value', 'Bring The Noise Remix (Pump-kin Remix)')
+        ->assertJsonPath('proposal.field_options.artists.0.value', ['Benny Benassi', 'Public Enemy'])
+        ->assertJsonPath('proposal.field_options.album.0.value', "Rock'N'Rave")
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '1')
+        ->assertJsonPath('proposal.field_options.disc_number.0.value', '2')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Ultra Records')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'UL 1695-2')
+        ->assertJsonPath('proposal.field_options.barcode.0.value', '6 17465 16952 6')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2008-06-03')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'US')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '1358093')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/rock-n-rave.jpg')
         ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/1358093-Benny-Benassi-RockNRave')
         ->assertJsonPath('proposal.evidence.discogs_master_id', '92414')
         ->assertJsonPath('proposal.evidence.matched_existing_fields', ['album', 'artists', 'track', 'duration'])
-        ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept');
+        ->assertJsonPath('proposal.evidence.field_review', null);
 
     expect($discogsSearches)->toContain([
         'type' => 'master',
@@ -318,7 +319,7 @@ test('production bring the noise lookup prefers an album release with matching t
         'artist' => 'Public Enemy',
         'q' => '',
     ])->and($aiSchemas)->toContain('atlas-audio-metadata-discogs-release-adjudication-v1')
-        ->and($aiSchemas)->toContain('atlas-audio-metadata-field-adjudication-v1');
+        ->and($aiSchemas)->not->toContain('atlas-audio-metadata-field-adjudication-v1');
 });
 
 function bringTheNoiseDiscogsRegressionFile(): File

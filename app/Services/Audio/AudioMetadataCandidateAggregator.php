@@ -3,7 +3,6 @@
 namespace App\Services\Audio;
 
 use App\Models\File;
-use Throwable;
 
 class AudioMetadataCandidateAggregator
 {
@@ -27,22 +26,7 @@ class AudioMetadataCandidateAggregator
         'discogs_release_id',
     ];
 
-    private const RELEASE_LEVEL_FIELDS = [
-        'album',
-        'cover_url',
-        'track_number',
-        'disc_number',
-        'release_label',
-        'catalog_number',
-        'barcode',
-        'release_date',
-        'release_country',
-        'musicbrainz_release_id',
-        'discogs_release_id',
-    ];
-
     public function __construct(
-        private readonly AudioMetadataCandidateFieldReviewer $fieldReviewer,
         private readonly AudioMetadataCandidateOptionMerger $optionMerger,
         private readonly AudioMetadataCandidateSourceLinkResolver $sourceLinks,
         private readonly AudioMetadataValueExtractor $values,
@@ -57,13 +41,6 @@ class AudioMetadataCandidateAggregator
     public function aggregate(File $file, array $currentValues, array $candidates, callable $changesFor): ?array
     {
         $fieldOptions = [];
-        $recommendedValues = [];
-        $recommendedProvider = null;
-        $recommendedProviders = [];
-        $recommendedConfidence = 0;
-        $recommendedFieldRanks = [];
-        $primaryCandidate = null;
-        $hasSourceRecommendation = false;
         $candidateSummaries = [];
 
         foreach ($candidates as $index => $candidate) {
@@ -73,93 +50,37 @@ class AudioMetadataCandidateAggregator
             }
 
             $changes = $changesFor($candidateValues);
-            $reviewedCandidate = null;
-            $reviewError = null;
-
-            try {
-                $reviewedCandidate = $this->fieldReviewer->review($file, $currentValues, [
-                    ...$candidate,
-                    'values' => $candidateValues,
-                ], $changes);
-            } catch (Throwable $throwable) {
-                $reviewError = $throwable->getMessage();
-            }
-
-            $review = $this->fieldReview($reviewedCandidate);
-            $recommendedFields = $this->recommendedFields($candidate, $reviewedCandidate, $review, $reviewError);
-            if ($hasSourceRecommendation && $this->isLocalCandidate($candidate)) {
-                $recommendedFields = [];
-            }
-
             $optionFields = $this->optionFields($candidateValues, $changes);
-
-            foreach ($recommendedFields as $field) {
-                if (! array_key_exists($field, $candidateValues)) {
-                    continue;
-                }
-
-                $fieldRank = $this->fieldRecommendationRank($candidate, $review, $field);
-                if (array_key_exists($field, $recommendedValues)
-                    && $fieldRank <= ($recommendedFieldRanks[$field] ?? 0)) {
-                    continue;
-                }
-
-                $recommendedValues[$field] = $candidateValues[$field];
-                $recommendedFieldRanks[$field] = $fieldRank;
-                $recommendedProvider ??= (string) $candidate['provider'];
-                $recommendedProviders[(string) $candidate['provider']] = true;
-                $recommendedConfidence = max($recommendedConfidence, (int) $candidate['confidence']);
-                $primaryCandidate ??= $reviewedCandidate;
-            }
-
-            if ($this->isSourceCandidate($candidate) && $recommendedFields !== []) {
-                $hasSourceRecommendation = true;
-            }
 
             foreach ($optionFields as $field) {
                 if (! array_key_exists($field, $candidateValues)) {
                     continue;
                 }
 
-                $recommended = in_array($field, $recommendedFields, true);
-                $option = $this->fieldOption($candidate, $field, $candidateValues[$field], $index, $recommended, $review, $reviewError);
+                $option = $this->fieldOption($candidate, $field, $candidateValues[$field], $index);
                 $fieldOptions[$field] = $this->optionMerger->add($fieldOptions[$field] ?? [], $option);
             }
 
-            $candidateSummaries[] = $this->candidateSummary($candidate, $review, $reviewError, $recommendedFields);
+            $candidateSummaries[] = $this->candidateSummary($candidate);
         }
 
-        $this->optionMerger->promoteConsensusTrackFields(
-            $currentValues,
-            $fieldOptions,
-            $recommendedValues,
-            $recommendedProvider,
-            $recommendedProviders,
-            $recommendedConfidence,
-        );
-
-        $this->syncRecommendedOptions($fieldOptions, $recommendedValues);
-
         $fieldOptions = array_filter($fieldOptions, fn (array $options): bool => $options !== []);
-        if ($recommendedValues === [] && $fieldOptions === []) {
+        if ($fieldOptions === []) {
             return null;
         }
 
-        $confidence = $recommendedConfidence > 0
-            ? $recommendedConfidence
-            : max(array_map(fn (array $candidate): int => (int) $candidate['confidence'], $candidates) ?: [0]);
+        $confidence = max(array_map(fn (array $candidate): int => (int) $candidate['confidence'], $candidates) ?: [0]);
         $fallbackCandidate = $candidates[0] ?? null;
-        $evidenceCandidate = $primaryCandidate ?? $fallbackCandidate;
-        $baseEvidence = is_array($evidenceCandidate['evidence'] ?? null) ? $evidenceCandidate['evidence'] : [];
+        $baseEvidence = is_array($fallbackCandidate['evidence'] ?? null) ? $fallbackCandidate['evidence'] : [];
         $source = $this->values->cleanString($baseEvidence['source'] ?? null)
             ?? (count($candidateSummaries) > 1 ? 'multi_source_metadata_review' : ($candidateSummaries[0]['source'] ?? 'metadata_review'));
 
         return [
-            'provider' => count($recommendedProviders) > 1
+            'provider' => count($candidateSummaries) > 1
                 ? 'multi_source_review'
-                : ($recommendedProvider ?? (count($candidateSummaries) > 1 ? 'multi_source_review' : (string) ($fallbackCandidate['provider'] ?? 'metadata_review'))),
+                : (string) ($fallbackCandidate['provider'] ?? 'metadata_review'),
             'confidence' => max(0, min(96, $confidence)),
-            'values' => $recommendedValues,
+            'values' => [],
             'evidence' => [
                 ...$baseEvidence,
                 'source' => $source,
@@ -209,194 +130,24 @@ class AudioMetadataCandidateAggregator
 
     /**
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     */
-    private function isLocalCandidate(array $candidate): bool
-    {
-        return ($candidate['provider'] ?? null) === 'local';
-    }
-
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     */
-    private function isSourceCandidate(array $candidate): bool
-    {
-        return ! $this->isLocalCandidate($candidate);
-    }
-
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     */
-    private function requiresAiFieldReview(array $candidate): bool
-    {
-        return str_starts_with((string) ($candidate['provider'] ?? ''), 'acoustid_musicbrainz')
-            || ($candidate['provider'] ?? null) === 'discogs_release';
-    }
-
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null  $candidate
-     * @return array<string, mixed>|null
-     */
-    private function fieldReview(?array $candidate): ?array
-    {
-        $review = $candidate['evidence']['field_review'] ?? null;
-
-        return is_array($review) ? $review : null;
-    }
-
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $originalCandidate
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}|null  $reviewedCandidate
-     * @param  array<string, mixed>|null  $review
-     * @return list<string>
-     */
-    private function recommendedFields(array $originalCandidate, ?array $reviewedCandidate, ?array $review, ?string $reviewError): array
-    {
-        if ($reviewError !== null || $reviewedCandidate === null || ($originalCandidate['evidence']['manual_review_required'] ?? false) === true) {
-            return [];
-        }
-
-        $fields = array_keys($this->reviewableValues($reviewedCandidate['values'] ?? []));
-        if ($review === null) {
-            return $fields;
-        }
-
-        return match ($review['verdict'] ?? null) {
-            'accept' => $fields,
-            'ambiguous' => array_values(array_diff($fields, self::RELEASE_LEVEL_FIELDS)),
-            default => [],
-        };
-    }
-
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @param  array<string, mixed>|null  $review
-     */
-    private function fieldRecommendationRank(array $candidate, ?array $review, string $field): int
-    {
-        $rank = (int) $candidate['confidence'];
-
-        if ($this->reviewAcceptsFieldExplicitly($review, $field)) {
-            return $rank + 600;
-        }
-
-        if (($review['verdict'] ?? null) === 'accept') {
-            return $rank + 300;
-        }
-
-        if (($candidate['evidence']['ai_review']['verdict'] ?? null) === 'accept'
-            && ($candidate['evidence']['ai_review']['source_identity_supported'] ?? false) === true) {
-            return $rank + 250;
-        }
-
-        return $this->isSourceCandidate($candidate) ? $rank + 100 : $rank;
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $review
-     */
-    private function reviewAcceptsFieldExplicitly(?array $review, string $field): bool
-    {
-        if (in_array($field, $this->values->cleanStringList($review['safe_fields'] ?? []), true)) {
-            return true;
-        }
-
-        return ($this->fieldReviewFor($review, $field)['verdict'] ?? null) === 'accept';
-    }
-
-    /**
-     * @param  array<string, list<array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,reason_scope:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}>>  $fieldOptions
-     * @param  array<string, mixed>  $recommendedValues
-     */
-    private function syncRecommendedOptions(array &$fieldOptions, array $recommendedValues): void
-    {
-        foreach ($fieldOptions as $field => &$options) {
-            $recommendedValue = array_key_exists($field, $recommendedValues)
-                ? $this->comparableValue($recommendedValues[$field])
-                : null;
-
-            foreach ($options as &$option) {
-                $option['recommended'] = $recommendedValue !== null
-                    && $this->comparableValue($option['value']) === $recommendedValue;
-            }
-        }
-    }
-
-    private function comparableValue(mixed $value): string
-    {
-        if (is_array($value)) {
-            return implode('|', array_map(fn (mixed $entry): string => $this->comparableValue($entry), $value));
-        }
-
-        return mb_strtolower(trim((string) $value));
-    }
-
-    /**
-     * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @param  array<string, mixed>|null  $review
      * @return array{id:string,provider:string,confidence:int,value:mixed,recommended:bool,reason:string|null,reason_scope:string|null,review_verdict:string|null,source_label:string|null,source_url:string|null}
      */
-    private function fieldOption(array $candidate, string $field, mixed $value, int $index, bool $recommended, ?array $review, ?string $reviewError): array
+    private function fieldOption(array $candidate, string $field, mixed $value, int $index): array
     {
         $sourceLink = $this->sourceLinks->forCandidate($candidate);
-        $reason = $this->reviewReason($review, $field, $reviewError);
 
         return [
             'id' => $this->optionId($candidate, $field, $value, $index),
             'provider' => (string) $candidate['provider'],
             'confidence' => (int) $candidate['confidence'],
             'value' => $value,
-            'recommended' => $recommended,
-            'reason' => $reason['reason'],
-            'reason_scope' => $reason['scope'],
-            'review_verdict' => $this->reviewVerdict($review, $field),
+            'recommended' => false,
+            'reason' => null,
+            'reason_scope' => null,
+            'review_verdict' => null,
             'source_label' => $sourceLink['label'],
             'source_url' => $sourceLink['url'],
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $review
-     * @return array{reason:string|null,scope:string|null}
-     */
-    private function reviewReason(?array $review, string $field, ?string $reviewError): array
-    {
-        if ($reviewError !== null) {
-            return ['reason' => $reviewError, 'scope' => 'error'];
-        }
-
-        $fieldReview = $this->fieldReviewFor($review, $field);
-        $fieldReason = $this->values->cleanString($fieldReview['reason'] ?? null);
-        if ($fieldReason !== null) {
-            return ['reason' => $fieldReason, 'scope' => 'field'];
-        }
-
-        $candidateReason = $this->values->cleanString($review['reason'] ?? null);
-
-        return ['reason' => $candidateReason, 'scope' => $candidateReason !== null ? 'candidate' : null];
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $review
-     */
-    private function reviewVerdict(?array $review, string $field): ?string
-    {
-        $fieldReview = $this->fieldReviewFor($review, $field);
-
-        return $this->values->cleanString($fieldReview['verdict'] ?? $review['verdict'] ?? null);
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $review
-     * @return array<string, mixed>|null
-     */
-    private function fieldReviewFor(?array $review, string $field): ?array
-    {
-        $fieldReviews = $review['field_reviews'] ?? null;
-        if (! is_array($fieldReviews) || ! is_array($fieldReviews[$field] ?? null)) {
-            return null;
-        }
-
-        return $fieldReviews[$field];
     }
 
     /**
@@ -420,11 +171,9 @@ class AudioMetadataCandidateAggregator
 
     /**
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
-     * @param  array<string, mixed>|null  $review
-     * @param  list<string>  $recommendedFields
      * @return array<string, mixed>
      */
-    private function candidateSummary(array $candidate, ?array $review, ?string $reviewError, array $recommendedFields): array
+    private function candidateSummary(array $candidate): array
     {
         $sourceLink = $this->sourceLinks->forCandidate($candidate);
 
@@ -437,9 +186,9 @@ class AudioMetadataCandidateAggregator
             'discogs_release_id' => $this->values->cleanString($candidate['evidence']['discogs_release_id'] ?? null),
             'musicbrainz_release_id' => $this->values->cleanString($candidate['evidence']['musicbrainz_release_id'] ?? null),
             'matched_existing_fields' => $this->values->cleanStringList($candidate['evidence']['matched_existing_fields'] ?? []),
-            'review_verdict' => $this->values->cleanString($review['verdict'] ?? null),
-            'review_error' => $reviewError,
-            'recommended_fields' => $recommendedFields,
+            'review_verdict' => null,
+            'review_error' => null,
+            'recommended_fields' => [],
         ];
     }
 }

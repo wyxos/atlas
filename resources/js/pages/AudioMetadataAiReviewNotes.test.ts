@@ -127,7 +127,7 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
-it('shows repeated AI candidate reasoning once instead of on every field row', async () => {
+it('does not show removed AI candidate reasoning from stale proposal payloads', async () => {
     const proposal = repeatedCandidateReasonProposalFixture();
     const candidateReason = String((proposal.evidence.field_review as { reason: string }).reason);
 
@@ -166,11 +166,10 @@ it('shows repeated AI candidate reasoning once instead of on every field row', a
     await wrapper.get('[data-test="audio-track-title"]').trigger('click');
     await flushPromises();
 
-    expect(document.body.querySelector('[data-test="audio-metadata-proposal-ai-review"]')?.textContent).toContain(candidateReason);
-    expect(countOccurrences(document.body.textContent ?? '', candidateReason)).toBe(1);
-    expect(Array.from(document.body.querySelectorAll('[data-test="audio-metadata-option-note"]')).map((note) => note.textContent?.trim())).toEqual([
-        'AI marked this field ambiguous but did not return a field-specific reason.',
-        'AI marked this field ambiguous but did not return a field-specific reason.',
-        'AI marked this field ambiguous but did not return a field-specific reason.',
-    ]);
+    expect(document.body.querySelector('[data-test="audio-metadata-proposal-ai-review"]')).toBeNull();
+    expect(countOccurrences(document.body.textContent ?? '', candidateReason)).toBe(0);
+    expect(document.body.querySelectorAll('[data-test="audio-metadata-option-note"]')).toHaveLength(0);
+    expect(document.body.textContent).toContain('232');
+    expect(document.body.textContent).toContain('2012');
+    expect(document.body.textContent).toContain('XW');
 });

@@ -45,10 +45,11 @@ test('ambiguous ai field review is not overridden by album typo matching', funct
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'local')
-        ->assertJsonPath('proposal.proposed_values.track_number', '2')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'System Recordings')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2008');
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '15')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Pharmacy Music')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2010-09-28');
 });
 
 test('ai field review accepts exact track evidence when it judges the current album as a typo', function () {
@@ -97,26 +98,21 @@ test('ai field review accepts exact track evidence when it judges the current al
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'discogs_release')
-        ->assertJsonPath('proposal.proposed_values.title', 'Saboteur (Dub Mix)')
-        ->assertJsonPath('proposal.proposed_values.artists', ['Christopher Lawrence'])
-        ->assertJsonPath('proposal.proposed_values.album', 'All Or Nothing')
-        ->assertJsonPath('proposal.proposed_values.track_number', '15')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Pharmacy Music')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'PHARMACY1001')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2010-09-28')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'Australia')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '2568225')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/all-or-nothing.jpg')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'All Or Nothing')
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '15')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Pharmacy Music')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'PHARMACY1001')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2010-09-28')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'Australia')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '2568225')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/all-or-nothing.jpg')
         ->assertJsonPath('proposal.evidence.matched_existing_fields', ['artists', 'track', 'duration'])
         ->assertJsonPath('proposal.evidence.duration_delta_seconds', 0)
-        ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept')
-        ->assertJsonPath('proposal.evidence.field_review.reason', 'Discogs release has the same artist, exact track, and duration; current album appears misspelled.');
+        ->assertJsonPath('proposal.evidence.field_review', null);
 
-    expect($fieldReviewPrompt)
-        ->toContain('Do not compare the track title to the album title.')
-        ->toContain('safe_fields must be a subset of candidate.values keys.')
-        ->toContain('Missing or different release-only current fields');
+    expect($fieldReviewPrompt)->toBeNull();
 });
 
 test('strong discogs release evidence wins over musicbrainz recording id only proposal', function () {
@@ -276,20 +272,21 @@ test('strong discogs release evidence wins over musicbrainz recording id only pr
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'multi_source_review')
-        ->assertJsonPath('proposal.proposed_values.album', 'All Or Nothing')
-        ->assertJsonPath('proposal.proposed_values.track_number', '15')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Pharmacy Music')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'PHARMACY1001')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2010-09-28')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'Australia')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '2568225')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/all-or-nothing.jpg')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'All Or Nothing')
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '15')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Pharmacy Music')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'PHARMACY1001')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2010-09-28')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'Australia')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '2568225')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/all-or-nothing.jpg')
         ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/2568225-Christopher-Lawrence-All-Or-Nothing')
         ->assertJsonPath('proposal.evidence.matched_existing_fields', ['artists', 'track', 'duration'])
         ->assertJsonPath('proposal.evidence.duration_delta_seconds', 0)
-        ->assertJsonPath('proposal.evidence.field_review.verdict', 'accept');
+        ->assertJsonPath('proposal.evidence.field_review', null);
 
-    expect($fieldReviewedProviders)->toBe(['discogs_release', 'acoustid_musicbrainz']);
+    expect($fieldReviewedProviders)->toBe([]);
 });
 
 test('weak mixed discogs supplement does not outrank exact discogs release evidence', function () {

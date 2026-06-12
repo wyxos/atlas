@@ -42,10 +42,10 @@ test('single local metadata run stores a reviewable proposal without mutating th
         ->assertJsonPath('run.proposal_count', 1)
         ->assertJsonPath('proposal.provider', 'local')
         ->assertJsonPath('proposal.status', 'pending')
-        ->assertJsonPath('proposal.proposed_values.title', 'Tagged Title')
-        ->assertJsonPath('proposal.proposed_values.artists', ['Artist A', 'Artist B'])
-        ->assertJsonPath('proposal.proposed_values.album', 'Tagged Album')
-        ->assertJsonPath('proposal.proposed_values.duration_seconds', 181);
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.title.0.value', 'Tagged Title')
+        ->assertJsonPath('proposal.field_options.artists.0.value', ['Artist A', 'Artist B'])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Tagged Album');
     expect($file->fresh()->title)->toBe('raw filename')
         ->and($file->fresh()->artists()->count())->toBe(0)
         ->and($file->fresh()->albums()->count())->toBe(0);
@@ -147,20 +147,21 @@ test('single local metadata run prefers high confidence fingerprint metadata ove
     ]);
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
         ->assertJsonPath('proposal.confidence', 96)
-        ->assertJsonPath('proposal.proposed_values.title', 'Canonical Track')
-        ->assertJsonPath('proposal.proposed_values.artists', ['Canonical Artist'])
-        ->assertJsonPath('proposal.proposed_values.album', 'Canonical Album')
-        ->assertJsonPath('proposal.proposed_values.track_number', '8')
-        ->assertJsonPath('proposal.proposed_values.disc_number', '1')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Canonical Label')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'CAT-001')
-        ->assertJsonPath('proposal.proposed_values.barcode', '012345678905')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2001-02-03')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'US')
-        ->assertJsonPath('proposal.proposed_values.duration_seconds', 180)
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/release-mbid/front-500.jpg')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.title.0.value', 'Canonical Track')
+        ->assertJsonPath('proposal.field_options.artists.0.value', ['Canonical Artist'])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Canonical Album')
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '8')
+        ->assertJsonPath('proposal.field_options.disc_number.0.value', '1')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Canonical Label')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'CAT-001')
+        ->assertJsonPath('proposal.field_options.barcode.0.value', '012345678905')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2001-02-03')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'US')
+        ->assertJsonPath('proposal.field_options.duration_seconds.0.value', 180)
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/release-mbid/front-500.jpg')
         ->assertJsonPath('proposal.evidence.source', 'acoustid_fingerprint')
         ->assertJsonPath('proposal.evidence.acoustid_score', 91)
         ->assertJsonPath('proposal.evidence.musicbrainz_recording_id', 'recording-mbid')
@@ -208,8 +209,9 @@ test('low confidence fingerprint metadata falls back to local tag proposal', fun
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'local')
-        ->assertJsonPath('proposal.proposed_values.title', 'Tagged Title')
-        ->assertJsonPath('proposal.proposed_values.artists', ['Tagged Artist'])
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.title.0.value', 'Tagged Title')
+        ->assertJsonPath('proposal.field_options.artists.0.value', ['Tagged Artist'])
         ->assertJsonPath('proposal.evidence.source', 'embedded_tags');
 });
 
@@ -285,10 +287,11 @@ test('metadata proposal can apply release details and track numbers from embedde
     $proposalId = $this->actingAs($user)
         ->postJson("/api/audio/{$file->id}/metadata-runs")
         ->assertAccepted()
-        ->assertJsonPath('proposal.proposed_values.album', 'Mysterious Times (UK-Remixes EP)')
-        ->assertJsonPath('proposal.proposed_values.track_number', '08')
-        ->assertJsonPath('proposal.proposed_values.disc_number', '1')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Tokapi Recordings')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Mysterious Times (UK-Remixes EP)')
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '08')
+        ->assertJsonPath('proposal.field_options.disc_number.0.value', '1')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Tokapi Recordings')
         ->json('proposal.id');
 
     $this->actingAs($user)->patchJson("/api/audio/metadata-proposals/{$proposalId}", [

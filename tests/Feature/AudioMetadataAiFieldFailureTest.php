@@ -15,7 +15,7 @@ use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
-test('fingerprint metadata surfaces manual options when required ai field review is unusable', function () {
+test('fingerprint metadata surfaces raw options without final ai field review', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
         'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
@@ -139,7 +139,7 @@ test('fingerprint metadata surfaces manual options when required ai field review
         ->assertJsonPath('proposal.proposed_values', [])
         ->assertJsonPath('proposal.field_options.album.0.value', 'Air for Life (The Remixes)')
         ->assertJsonPath('proposal.field_options.album.0.recommended', false)
-        ->assertJsonPath('proposal.field_options.album.0.reason', 'AI response JSON could not be decoded.')
+        ->assertJsonPath('proposal.field_options.album.0.reason', null)
         ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/air-for-life-remixes-release/front.jpg')
         ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false)
         ->assertJsonPath('run.status', 'completed')
@@ -152,10 +152,10 @@ test('fingerprint metadata surfaces manual options when required ai field review
 
     expect($run->failed_files)->toBe(0)
         ->and(AudioMetadataProposal::query()->where('file_id', $file->id)->exists())->toBeTrue()
-        ->and($aiCalls)->toBe(1);
+        ->and($aiCalls)->toBe(0);
 });
 
-test('metadata lookup falls back when top fingerprint candidate is rejected by field review', function () {
+test('metadata lookup keeps fingerprint and cover candidates as raw options without field review rejection', function () {
     config([
         'services.audio_metadata.acoustid_client_key' => 'acoustid-client',
         'services.audio_metadata.acoustid_api_base_url' => 'https://acoustid.test/v2',
@@ -300,14 +300,15 @@ test('metadata lookup falls back when top fingerprint candidate is rejected by f
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'musicbrainz_cover_art')
-        ->assertJsonPath('proposal.proposed_values.album', 'Untouchable')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2010-03-09')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'US')
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'untouchable-release-mbid')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/untouchable-release-mbid/front-500.jpg')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Untouchable')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2010-03-09')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'US')
+        ->assertJsonPath('proposal.field_options.musicbrainz_release_id.0.value', 'untouchable-release-mbid')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/untouchable-release-mbid/front-500.jpg')
         ->assertJsonPath('run.proposal_count', 1)
         ->assertJsonPath('run.failed_files', 0);
 
-    expect($aiFieldReviewCalls)->toBe(1);
+    expect($aiFieldReviewCalls)->toBe(0);
 });

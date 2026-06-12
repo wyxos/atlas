@@ -89,7 +89,9 @@ test('stale title alias rows do not suppress embedded tag proposals', function (
     $response->assertAccepted()
         ->assertJsonPath('run.proposal_count', 1)
         ->assertJsonPath('proposal.provider', 'local')
-        ->assertJsonPath('proposal.proposed_values.title', 'Custom Import Title')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.title.0.value', 'Custom Import Title')
+        ->assertJsonPath('proposal.field_options.title.0.recommended', false)
         ->assertJsonMissingPath('proposal.proposed_values.title_aliases');
 });
 

@@ -69,7 +69,7 @@ const proposalFields = computed(() => {
 
 const proposalOptionSignature = computed(() => proposalFields.value.map((field) => {
     const options = fieldOptions(field)
-        .map((option) => `${option.id}:${option.recommended ? '1' : '0'}`)
+        .map((option) => option.id)
         .join(',');
 
     return `${field}:${options}`;
@@ -89,14 +89,6 @@ function metadataActionLabel(): string {
 
 function fieldOptions(field: string): AudioMetadataFieldOption[] {
     return pendingProposal.value?.field_options?.[field] ?? [];
-}
-
-function hasFieldOptions(field: string): boolean {
-    return fieldOptions(field).length > 0;
-}
-
-function recommendedOption(field: string): AudioMetadataFieldOption | null {
-    return fieldOptions(field).find((option) => option.recommended) ?? null;
 }
 
 function optionSourceKey(option: AudioMetadataFieldOption): string | null {
@@ -126,26 +118,11 @@ function sourceLinkedFieldOptions(option: AudioMetadataFieldOption): Record<stri
 }
 
 function defaultSelectedFields(): string[] {
-    return proposalFields.value.filter((field) => {
-        if (pendingProposal.value?.changes?.[field]) {
-            return true;
-        }
-
-        return recommendedOption(field) !== null;
-    });
+    return proposalFields.value.filter((field) => Boolean(pendingProposal.value?.changes?.[field]));
 }
 
 function resetFieldSelections(): void {
-    const nextOptions: Record<string, string> = {};
-
-    for (const field of proposalFields.value) {
-        const recommended = recommendedOption(field);
-        if (recommended) {
-            nextOptions[field] = recommended.id;
-        }
-    }
-
-    selectedFieldOptions.value = nextOptions;
+    selectedFieldOptions.value = {};
     selectedFields.value = defaultSelectedFields();
     selectionTouched.value = false;
 }
@@ -154,14 +131,14 @@ function syncSelectionsWithProposalFields(): void {
     const validFields = new Set(proposalFields.value);
 
     selectedFields.value = selectedFields.value.filter((field) => validFields.has(field));
-    seedRecommendedFieldOptions(validFields);
+    syncSelectedFieldOptions(validFields);
 
     if (!selectionTouched.value) {
         selectedFields.value = defaultSelectedFields();
     }
 }
 
-function seedRecommendedFieldOptions(validFields = new Set(proposalFields.value)): void {
+function syncSelectedFieldOptions(validFields = new Set(proposalFields.value)): void {
     const nextOptions: Record<string, string> = {};
     let changed = false;
 
@@ -172,19 +149,12 @@ function seedRecommendedFieldOptions(validFields = new Set(proposalFields.value)
             continue;
         }
 
-        nextOptions[field] = optionId;
-    }
-
-    for (const field of proposalFields.value) {
-        if (nextOptions[field]) {
+        if (fieldOptions(field).some((option) => option.id === optionId)) {
+            nextOptions[field] = optionId;
             continue;
         }
 
-        const recommended = recommendedOption(field);
-        if (recommended) {
-            nextOptions[field] = recommended.id;
-            changed = true;
-        }
+        changed = true;
     }
 
     if (changed) {
@@ -231,7 +201,11 @@ function applyFieldOptions(): Record<string, string> {
 
 function canApplySelected(): boolean {
     return selectedFields.value.length > 0
-        && selectedFields.value.every((field) => !hasFieldOptions(field) || Boolean(selectedFieldOptions.value[field]));
+        && selectedFields.value.every((field) => {
+            const options = fieldOptions(field);
+
+            return options.length === 0 || options.length === 1 || Boolean(selectedFieldOptions.value[field]);
+        });
 }
 
 function evidenceItems(proposal: AudioMetadataProposal): string[] {
@@ -297,44 +271,6 @@ function evidenceItems(proposal: AudioMetadataProposal): string[] {
 
 function evidenceSourceLinks(proposal: AudioMetadataProposal) {
     return audioMetadataSourceLinks(proposal.evidence);
-}
-
-function proposalAiReviewNotes(proposal: AudioMetadataProposal): string[] {
-    const notes = new Set<string>();
-    const fieldReview = proposal.evidence.field_review;
-
-    if (
-        fieldReview !== null
-        && typeof fieldReview === 'object'
-        && 'reason' in fieldReview
-        && typeof fieldReview.reason === 'string'
-        && fieldReview.reason.trim() !== ''
-    ) {
-        notes.add(fieldReview.reason.trim());
-    }
-
-    for (const reason of repeatedOptionReasons(proposal)) {
-        notes.add(reason);
-    }
-
-    return [...notes];
-}
-
-function repeatedOptionReasons(proposal: AudioMetadataProposal): string[] {
-    const counts = new Map<string, number>();
-    const fieldOptions = proposal.field_options ?? {};
-
-    for (const options of Object.values(fieldOptions)) {
-        for (const option of options) {
-            if (option.reason && option.reason_scope !== 'field') {
-                counts.set(option.reason, (counts.get(option.reason) ?? 0) + 1);
-            }
-        }
-    }
-
-    return [...counts.entries()]
-        .filter(([, count]) => count > 1)
-        .map(([reason]) => reason);
 }
 </script>
 
@@ -447,21 +383,6 @@ function repeatedOptionReasons(proposal: AudioMetadataProposal): string[] {
                                 </a>
                             </template>
                         </div>
-                        <div
-                            v-if="proposalAiReviewNotes(pendingProposal).length > 0"
-                            class="rounded border border-twilight-indigo-500/60 bg-prussian-blue-900/30 px-3 py-2 text-xs text-blue-slate-200"
-                            data-test="audio-metadata-proposal-ai-review"
-                        >
-                            <p class="font-semibold text-regal-navy-100">AI review</p>
-                            <p
-                                v-for="note in proposalAiReviewNotes(pendingProposal)"
-                                :key="note"
-                                class="mt-1"
-                            >
-                                {{ note }}
-                            </p>
-                        </div>
-
                         <AudioMetadataProposalTable
                             :proposal="pendingProposal"
                             :fields="proposalFields"

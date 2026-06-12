@@ -50,7 +50,7 @@ function proposalFixture(): AudioMetadataProposal {
 }
 
 describe('AudioMetadataProposalTable', () => {
-    it('keeps field-specific AI review reasons on their option rows', () => {
+    it('renders raw provider options without AI review notes', () => {
         const wrapper = mount(AudioMetadataProposalTable, {
             props: {
                 proposal: proposalFixture(),
@@ -60,86 +60,40 @@ describe('AudioMetadataProposalTable', () => {
             },
         });
 
-        expect(wrapper.findAll('[data-test="audio-metadata-option-note"]').map((note) => note.text())).toEqual([
-            'The source release has different edition context, so keep it manual.',
-            'Track number depends on the unresolved release edition.',
-        ]);
+        expect(wrapper.text()).toContain('TRON: Legacy: Original Motion Picture Score: Recording Sessions');
+        expect(wrapper.text()).toContain('MusicBrainz release');
+        expect(wrapper.text()).not.toContain('Recommended');
+        expect(wrapper.text()).not.toContain('AI marked this field ambiguous');
+        expect(wrapper.find('[data-test="audio-metadata-option-note"]').exists()).toBe(false);
     });
 
-    it('does not hide repeated field-level AI review notes', () => {
-        const proposal = proposalFixture() as unknown as AudioMetadataProposal;
-        const repeatedReason = 'The field value is safe for this exact track even though the release package needs review.';
-
-        proposal.field_options = {
-            track_number: [{
-                id: 'track-musicbrainz',
-                provider: 'acoustid_musicbrainz',
-                confidence: 96,
-                value: '1',
-                recommended: false,
-                reason: repeatedReason,
-                reason_scope: 'field',
-                review_verdict: 'accept',
-                source_label: 'MusicBrainz release',
-                source_url: 'https://musicbrainz.org/release/dawn-of-my-death',
-            }],
-            disc_number: [{
-                id: 'disc-musicbrainz',
-                provider: 'acoustid_musicbrainz',
-                confidence: 96,
-                value: '1',
-                recommended: false,
-                reason: repeatedReason,
-                reason_scope: 'field',
-                review_verdict: 'accept',
-                source_label: 'MusicBrainz release',
-                source_url: 'https://musicbrainz.org/release/dawn-of-my-death',
-            }],
-        };
-
-        const wrapper = mount(AudioMetadataProposalTable, {
-            props: {
-                proposal,
-                fields: ['track_number', 'disc_number'],
-                selectedFields: [],
-                selectedFieldOptions: {},
-            },
-        });
-
-        expect(wrapper.findAll('[data-test="audio-metadata-option-note"]').map((note) => note.text())).toEqual([
-            repeatedReason,
-            repeatedReason,
-        ]);
-    });
-
-    it('explains ambiguous AI verdicts when no field-specific reason was returned', () => {
+    it('does not show old recommendation flags as badges', () => {
         const proposal = proposalFixture() as unknown as AudioMetadataProposal;
 
         proposal.field_options = {
-            disc_number: [{
-                id: 'disc-discogs',
-                provider: 'discogs_release',
+            album: [{
+                id: 'album-musicbrainz',
+                provider: 'acoustid_musicbrainz',
                 confidence: 96,
-                value: '1',
-                recommended: false,
+                value: 'Discovery',
+                recommended: true,
                 reason: null,
-                review_verdict: 'ambiguous',
-                source_label: 'Discogs release',
-                source_url: 'https://www.discogs.com/release/3473080',
+                review_verdict: null,
+                source_label: 'MusicBrainz release',
+                source_url: 'https://musicbrainz.org/release/discovery',
             }],
         };
 
         const wrapper = mount(AudioMetadataProposalTable, {
             props: {
                 proposal,
-                fields: ['disc_number'],
+                fields: ['album'],
                 selectedFields: [],
                 selectedFieldOptions: {},
             },
         });
 
-        expect(wrapper.find('[data-test="audio-metadata-option-note"]').text()).toBe(
-            'AI marked this field ambiguous but did not return a field-specific reason.',
-        );
+        expect(wrapper.text()).toContain('Discovery');
+        expect(wrapper.text()).not.toContain('Recommended');
     });
 });

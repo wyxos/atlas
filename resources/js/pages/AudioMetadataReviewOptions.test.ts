@@ -141,7 +141,7 @@ function manualOptionsProposalFixture(): AudioMetadataProposal {
                     provider: 'musicbrainz_cover_art',
                     confidence: 82,
                     value: 'Discovery',
-                    recommended: true,
+                    recommended: false,
                     reason: null,
                     review_verdict: null,
                     source_label: 'MusicBrainz release',
@@ -153,7 +153,7 @@ function manualOptionsProposalFixture(): AudioMetadataProposal {
                 provider: 'musicbrainz_cover_art',
                 confidence: 82,
                 value: 'http://coverartarchive.org/release/discovery/front-500.jpg',
-                recommended: true,
+                recommended: false,
                 reason: null,
                 review_verdict: null,
                 source_label: 'MusicBrainz release',
@@ -293,21 +293,25 @@ describe('Audio metadata review options', () => {
         expect(document.body.textContent).toContain('Discovery');
         const proposalTable = document.body.querySelector('[data-test="audio-metadata-proposal-table"]');
         expect(proposalTable).not.toBeNull();
-        expect(Array.from(proposalTable?.querySelectorAll('th') ?? []).map((header) => header.textContent?.trim()).slice(0, 7)).toEqual([
+        expect(Array.from(proposalTable?.querySelectorAll('th') ?? []).map((header) => header.textContent?.trim()).slice(0, 6)).toEqual([
             'Use',
             'Field',
             'Current',
             'Proposed',
             'Source',
             'Confidence',
-            'Notes',
         ]);
 
         const albumOptions = document.body.querySelectorAll<HTMLInputElement>('[data-test="audio-metadata-field-option-album"] input[type="radio"]');
+        const coverOptions = document.body.querySelectorAll<HTMLInputElement>('[data-test="audio-metadata-field-option-cover_url"] input[type="radio"]');
         expect(albumOptions).toHaveLength(2);
-        expect(albumOptions[1].checked).toBe(true);
+        expect(coverOptions).toHaveLength(1);
+        expect(albumOptions[0].checked).toBe(false);
+        expect(albumOptions[1].checked).toBe(false);
+        expect(coverOptions[0].checked).toBe(false);
         const albumSourceLinks = Array.from(document.body.querySelectorAll<HTMLAnchorElement>('[data-test="audio-metadata-option-source-link"]'));
         expect(albumSourceLinks.map((link) => link.href)).toContain('https://musicbrainz.org/release/discovery-release-mbid');
+        coverOptions[0].click();
         albumOptions[0].click();
         await flushPromises();
 
@@ -404,8 +408,12 @@ describe('Audio metadata review options', () => {
         const coverOptions = document.body.querySelectorAll<HTMLInputElement>('[data-test="audio-metadata-field-option-cover_url"] input[type="radio"]');
         expect(albumOptions).toHaveLength(2);
         expect(coverOptions).toHaveLength(1);
-        expect(albumOptions[1].checked).toBe(true);
-        expect(coverOptions[0].checked).toBe(true);
+        expect(albumOptions[1].checked).toBe(false);
+        expect(coverOptions[0].checked).toBe(false);
+
+        albumOptions[1].click();
+        coverOptions[0].click();
+        await flushPromises();
 
         (document.body.querySelector('[data-test="audio-metadata-apply"]') as HTMLButtonElement).click();
         await flushPromises();

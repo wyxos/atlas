@@ -24,6 +24,13 @@ class AudioMetadataProposalOptionResolver
 
             $selectedOptionId = $this->cleanString($fieldOptions[$field] ?? null);
             if ($selectedOptionId === null) {
+                $singleOption = $this->singleFieldOption($availableOptions[$field] ?? []);
+                if ($singleOption !== null && array_key_exists('value', $singleOption)) {
+                    $proposed[$field] = $singleOption['value'];
+
+                    continue;
+                }
+
                 if (! array_key_exists($field, $proposed) && isset($availableOptions[$field])) {
                     abort(422, "No metadata option was selected for {$field}.");
                 }
@@ -98,6 +105,15 @@ class AudioMetadataProposalOptionResolver
             ->filter(fn (mixed $options): bool => is_array($options))
             ->map(fn (array $options): array => array_values(array_filter($options, 'is_array')))
             ->all();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $options
+     * @return array<string, mixed>|null
+     */
+    private function singleFieldOption(array $options): ?array
+    {
+        return count($options) === 1 ? $options[0] : null;
     }
 
     private function valuesMatch(mixed $current, mixed $proposed): bool

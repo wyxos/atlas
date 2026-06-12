@@ -144,25 +144,25 @@ test('local embedded tags can use ai discogs search expansion to propose source 
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'discogs_release')
-        ->assertJsonPath('proposal.proposed_values.title', 'ONIZUKA暴発へのプロローグ')
-        ->assertJsonPath('proposal.proposed_values.artists', ['本間勇輔'])
-        ->assertJsonPath('proposal.proposed_values.album', 'TVアニメーション GTO オリジナルサウンドトラック2')
-        ->assertJsonPath('proposal.proposed_values.track_number', '10')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'SPE Visual Works')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'SVWC-1309')
-        ->assertJsonPath('proposal.proposed_values.barcode', '4534530130945')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2000-07-05')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'Japan')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '19442')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/gto-2-official.jpg')
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.title.0.value', 'ONIZUKA暴発へのプロローグ')
+        ->assertJsonPath('proposal.field_options.album.0.value', 'TVアニメーション GTO オリジナルサウンドトラック2')
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '10')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'SPE Visual Works')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'SVWC-1309')
+        ->assertJsonPath('proposal.field_options.barcode.0.value', '4534530130945')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2000-07-05')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'Japan')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '19442')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/gto-2-official.jpg')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.release_title', 'GTO TV Animation Original Soundtrack 2')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.artist', 'Yusuke Homma')
         ->assertJsonPath('proposal.evidence.track_position', '10')
         ->assertJsonMissingPath('proposal.proposed_values.title_aliases')
         ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
 
-    expect($aiCalls)->toBe(2)
+    expect($aiCalls)->toBe(1)
         ->and($discogsSearches)->toContain([
             'release_title' => 'GTO TV Animation Original Soundtrack 2',
             'artist' => 'Yusuke Homma',
@@ -288,12 +288,9 @@ test('local ai discogs rejects later alternate releases when current soundtrack 
 
     $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs")
         ->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'local')
-        ->assertJsonPath('proposal.proposed_values.album', 'GTO TV Animation Original Soundtrack 2')
-        ->assertJsonMissingPath('proposal.proposed_values.discogs_release_id')
-        ->assertJsonMissingPath('proposal.proposed_values.release_label')
-        ->assertJsonMissingPath('proposal.proposed_values.catalog_number')
-        ->assertJsonMissingPath('proposal.proposed_values.cover_url');
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'GTO Original Soundtrack 2');
 });
 
 test('local ai discogs rejects track-title singles for current soundtrack albums', function () {

@@ -83,13 +83,14 @@ test('discogs release lookup proposes release packaging details when musicbrainz
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'discogs_release')
         ->assertJsonPath('proposal.confidence', 90)
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Tokapi Recordings')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'TR011')
-        ->assertJsonPath('proposal.proposed_values.barcode', '8715576130112')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2011-06-23')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'UK')
-        ->assertJsonPath('proposal.proposed_values.track_number', '8')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '2969820')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Tokapi Recordings')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'TR011')
+        ->assertJsonPath('proposal.field_options.barcode.0.value', '8715576130112')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2011-06-23')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'UK')
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '8')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '2969820')
         ->assertJsonPath('proposal.evidence.source', 'discogs_release_search')
         ->assertJsonPath('proposal.evidence.discogs_release_id', '2969820')
         ->assertJsonPath('proposal.evidence.track_position', '8');
@@ -169,9 +170,10 @@ test('discogs album fallback can propose a cover when artist script differs', fu
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'discogs_release')
-        ->assertJsonPath('proposal.proposed_values.album', 'TVアニメーション GTO オリジナルサウンドトラック')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/gto-primary.jpg')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '17124567')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'TVアニメーション GTO オリジナルサウンドトラック')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/gto-primary.jpg')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '17124567')
         ->assertJsonPath('proposal.evidence.discogs_release_id', '17124567')
         ->assertJsonPath('proposal.evidence.cover_source', 'discogs_images')
         ->assertJsonMissingPath('proposal.proposed_values.album_aliases');
@@ -301,13 +303,14 @@ test('discogs lookup uses ai search terms from current metadata before local fal
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'discogs_release')
-        ->assertJsonPath('proposal.proposed_values.track_number', '4')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Alter Ego Records')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'AER012')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2008')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'UK')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '1423078')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/floating-world.jpg');
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '4')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Alter Ego Records')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'AER012')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2008')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'UK')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '1423078')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/floating-world.jpg');
 
     expect($aiSchemas)->toContain('atlas-audio-metadata-discogs-search-v1')
         ->and($discogsSearches)->toContain([

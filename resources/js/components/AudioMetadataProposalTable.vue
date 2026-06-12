@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Tags } from 'lucide-vue-next';
 import {
     audioMetadataCoverPreviewUrl,
@@ -25,22 +24,6 @@ const emit = defineEmits<{
     selectFieldOption: [field: string, optionId: string];
 }>();
 
-const repeatedOptionReasons = computed(() => {
-    const counts = new Map<string, number>();
-
-    for (const field of props.fields) {
-        for (const option of fieldOptions(field)) {
-            if (option.reason && option.reason_scope !== 'field') {
-                counts.set(option.reason, (counts.get(option.reason) ?? 0) + 1);
-            }
-        }
-    }
-
-    return new Set([...counts.entries()]
-        .filter(([, count]) => count > 1)
-        .map(([reason]) => reason));
-});
-
 function fieldOptions(field: string): AudioMetadataFieldOption[] {
     return props.proposal.field_options?.[field] ?? [];
 }
@@ -61,30 +44,6 @@ function proposedValueForField(field: string): unknown {
     return props.proposal.changes[field]?.proposed ?? props.proposal.proposed_values[field] ?? null;
 }
 
-function optionNote(option: AudioMetadataFieldOption): string | null {
-    if (option.reason && (option.reason_scope === 'field' || !repeatedOptionReasons.value.has(option.reason))) {
-        return option.reason;
-    }
-
-    if (option.review_verdict && !option.recommended) {
-        return missingFieldReason(option.review_verdict);
-    }
-
-    return null;
-}
-
-function missingFieldReason(verdict: string): string {
-    if (verdict === 'accept') {
-        return 'AI accepted this field but did not return a field-specific reason.';
-    }
-
-    if (verdict === 'reject') {
-        return 'AI rejected this field but did not return a field-specific reason.';
-    }
-
-    return 'AI marked this field ambiguous but did not return a field-specific reason.';
-}
-
 function proposalSourceLink(): { label: string; url: string } | null {
     return audioMetadataSourceLinks(props.proposal.evidence)[0] ?? null;
 }
@@ -96,7 +55,7 @@ function eventChecked(event: Event): boolean {
 
 <template>
     <div class="overflow-x-auto rounded border border-twilight-indigo-500/60">
-        <table class="min-w-[58rem] w-full table-fixed border-collapse text-left text-xs" data-test="audio-metadata-proposal-table">
+        <table class="min-w-[50rem] w-full table-fixed border-collapse text-left text-xs" data-test="audio-metadata-proposal-table">
             <colgroup>
                 <col class="w-12">
                 <col class="w-36">
@@ -104,7 +63,6 @@ function eventChecked(event: Event): boolean {
                 <col>
                 <col class="w-44">
                 <col class="w-24">
-                <col class="w-56">
             </colgroup>
             <thead class="bg-prussian-blue-900/70 text-[0.68rem] uppercase text-blue-slate-300">
                 <tr>
@@ -114,7 +72,6 @@ function eventChecked(event: Event): boolean {
                     <th scope="col" class="px-3 py-2 font-semibold">Proposed</th>
                     <th scope="col" class="px-3 py-2 font-semibold">Source</th>
                     <th scope="col" class="px-3 py-2 font-semibold">Confidence</th>
-                    <th scope="col" class="px-3 py-2 font-semibold">Notes</th>
                 </tr>
             </thead>
             <template
@@ -217,14 +174,8 @@ function eventChecked(event: Event): boolean {
                             </a>
                             <span v-else>{{ audioMetadataOptionSourceLabel(option) }}</span>
                         </td>
-                        <td class="border-r border-twilight-indigo-500/40 px-3 py-3 text-smart-blue-100">
+                        <td class="px-3 py-3 text-smart-blue-100">
                             {{ option.confidence }}%
-                        </td>
-                        <td class="px-3 py-3 text-blue-slate-300">
-                            <span v-if="option.recommended" class="mb-1 inline-flex rounded border border-smart-blue-400/50 px-2 py-0.5 text-[0.68rem] font-semibold uppercase text-smart-blue-100">
-                                Recommended
-                            </span>
-                            <span v-if="optionNote(option)" class="block break-words" data-test="audio-metadata-option-note">{{ optionNote(option) }}</span>
                         </td>
                     </tr>
                 </tbody>
@@ -294,10 +245,9 @@ function eventChecked(event: Event): boolean {
                             </a>
                             <span v-else>{{ audioMetadataProviderLabel(props.proposal.provider) }}</span>
                         </td>
-                        <td class="border-r border-twilight-indigo-500/40 px-3 py-3 text-smart-blue-100">
+                        <td class="px-3 py-3 text-smart-blue-100">
                             {{ props.proposal.confidence }}%
                         </td>
-                        <td class="px-3 py-3 text-blue-slate-300">Recommended</td>
                     </tr>
                 </tbody>
             </template>

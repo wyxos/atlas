@@ -228,23 +228,23 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'multi_source_review')
-        ->assertJsonPath('proposal.proposed_values.title', 'Bring The Noise Remix (Pump-kin Remix)')
-        ->assertJsonPath('proposal.proposed_values.artists', ['Benny Benassi'])
-        ->assertJsonPath('proposal.proposed_values.album', "Rock'N'Rave")
-        ->assertJsonPath('proposal.proposed_values.track_number', '1')
-        ->assertJsonPath('proposal.proposed_values.disc_number', '2')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Ultra Records (16)')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', 'UL 1695-2')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2008')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'Russia')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '14839269')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/rock-n-rave-primary.jpg')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.title.0.value', 'Bring The Noise Remix (Pump-kin Remix)')
+        ->assertJsonPath('proposal.field_options.album.0.value', "Rock'N'Rave")
+        ->assertJsonPath('proposal.field_options.track_number.0.value', '1')
+        ->assertJsonPath('proposal.field_options.disc_number.0.value', '2')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Ultra Records (16)')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', 'UL 1695-2')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2008')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'Russia')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '14839269')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/rock-n-rave-primary.jpg')
         ->assertJsonPath('proposal.evidence.ai_search_plan.0.release_title', "Rock N' Rave")
         ->assertJsonPath('proposal.evidence.track_position', '2-1')
         ->assertJsonMissingPath('proposal.proposed_values.musicbrainz_release_id');
 
     expect($aiSchemas)->toContain('atlas-audio-metadata-discogs-search-v1')
-        ->and($aiSchemas)->toContain('atlas-audio-metadata-field-adjudication-v1')
+        ->and($aiSchemas)->not->toContain('atlas-audio-metadata-field-adjudication-v1')
         ->and($discogsSearches)->toContain([
             'release_title' => "Rock N' Rave",
             'artist' => 'Benny Benassi',

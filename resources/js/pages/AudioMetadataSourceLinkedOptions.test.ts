@@ -76,7 +76,7 @@ function sourceLinkedOptionsProposalFixture(): AudioMetadataProposal {
                     provider: 'musicbrainz_cover_art',
                     confidence: 82,
                     value: 'Discovery',
-                    recommended: true,
+                    recommended: false,
                     reason: null,
                     review_verdict: null,
                     source_label: 'MusicBrainz release',
@@ -100,7 +100,7 @@ function sourceLinkedOptionsProposalFixture(): AudioMetadataProposal {
                     provider: 'musicbrainz_cover_art',
                     confidence: 82,
                     value: 'http://coverartarchive.org/release/discovery/front-500.jpg',
-                    recommended: true,
+                    recommended: false,
                     reason: null,
                     review_verdict: null,
                     source_label: 'MusicBrainz release',
@@ -202,7 +202,7 @@ it('selects unique field options from the same source link', async () => {
 
     const coverOptions = document.body.querySelectorAll<HTMLInputElement>('[data-test="audio-metadata-field-option-cover_url"] input[type="radio"]');
     expect(coverOptions).toHaveLength(3);
-    expect(coverOptions[0].checked).toBe(true);
+    expect(coverOptions[0].checked).toBe(false);
 
     coverOptions[2].click();
     await flushPromises();

@@ -220,7 +220,7 @@ class AudioMetadataProposalGenerator
             return null;
         }
 
-        $this->reportProgress($progress, 'ai_review', 'Reviewing field-level metadata safety');
+        $this->reportProgress($progress, 'results', 'Preparing metadata lookup results');
 
         return $this->candidateAggregator->aggregate(
             $file,

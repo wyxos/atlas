@@ -101,8 +101,9 @@ test('fingerprint proposal keeps musicbrainz release search cover when fingerpri
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'multi_source_review')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://cover.test/release/chain-release/front-500.jpg')
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_release_id', 'chain-release')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/chain-release/front-500.jpg')
+        ->assertJsonPath('proposal.field_options.musicbrainz_release_id.0.value', 'chain-release')
         ->assertJsonPath('proposal.evidence.cover_source', 'cover_art_archive')
         ->assertJsonPath('proposal.evidence.musicbrainz_release_id', 'chain-release');
 });
@@ -153,7 +154,8 @@ test('cover lookup proposes an existing sibling album cover for duplicate album 
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'existing_album_cover')
-        ->assertJsonPath('proposal.proposed_values.cover_url', FileApiPath::albumCover($cover->id))
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', FileApiPath::albumCover($cover->id))
         ->assertJsonPath('proposal.evidence.source', 'existing_album_cover')
         ->assertJsonPath('proposal.evidence.existing_album_id', $albumWithCover->id)
         ->assertJsonPath('proposal.evidence.existing_album_cover_id', $cover->id);

@@ -117,24 +117,14 @@ test('production bring the noise row still field reviews release fields after ge
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_recording_id', 'bring-noise-recording-mbid')
-        ->assertJsonPath('proposal.evidence.field_review.safe_fields', ['musicbrainz_recording_id'])
-        ->assertJsonMissingPath('proposal.proposed_values.title')
-        ->assertJsonMissingPath('proposal.proposed_values.artists')
-        ->assertJsonMissingPath('proposal.proposed_values.album')
-        ->assertJsonMissingPath('proposal.proposed_values.track_number')
-        ->assertJsonMissingPath('proposal.proposed_values.disc_number')
-        ->assertJsonMissingPath('proposal.proposed_values.release_label')
-        ->assertJsonMissingPath('proposal.proposed_values.catalog_number')
-        ->assertJsonMissingPath('proposal.proposed_values.barcode')
-        ->assertJsonMissingPath('proposal.proposed_values.release_date')
-        ->assertJsonMissingPath('proposal.proposed_values.release_country')
-        ->assertJsonMissingPath('proposal.proposed_values.musicbrainz_release_id')
-        ->assertJsonMissingPath('proposal.proposed_values.cover_url');
+        ->assertJsonPath('proposal.provider', 'multi_source_review')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.musicbrainz_recording_id.0.value', 'bring-noise-recording-mbid')
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Bring the Noise (remix) / Give It Up')
+        ->assertJsonPath('proposal.evidence.field_review', null);
 
     expect($aiSchemas)->toContain('atlas-audio-metadata-review-v1')
-        ->and($aiSchemas)->toContain('atlas-audio-metadata-field-adjudication-v1');
+        ->and($aiSchemas)->not->toContain('atlas-audio-metadata-field-adjudication-v1');
 });
 
 test('production audio sample matrix keeps release fields behind field review after generic fingerprint ai accept', function (array $fixture) {
@@ -238,20 +228,10 @@ test('production audio sample matrix keeps release fields behind field review af
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_recording_id', $recordingId)
-        ->assertJsonPath('proposal.evidence.field_review.safe_fields', ['musicbrainz_recording_id'])
-        ->assertJsonMissingPath('proposal.proposed_values.title')
-        ->assertJsonMissingPath('proposal.proposed_values.artists')
-        ->assertJsonMissingPath('proposal.proposed_values.album')
-        ->assertJsonMissingPath('proposal.proposed_values.track_number')
-        ->assertJsonMissingPath('proposal.proposed_values.disc_number')
-        ->assertJsonMissingPath('proposal.proposed_values.release_label')
-        ->assertJsonMissingPath('proposal.proposed_values.catalog_number')
-        ->assertJsonMissingPath('proposal.proposed_values.barcode')
-        ->assertJsonMissingPath('proposal.proposed_values.release_date')
-        ->assertJsonMissingPath('proposal.proposed_values.release_country')
-        ->assertJsonMissingPath('proposal.proposed_values.musicbrainz_release_id')
-        ->assertJsonMissingPath('proposal.proposed_values.cover_url');
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.musicbrainz_recording_id.0.value', $recordingId)
+        ->assertJsonPath('proposal.field_options.album.0.value', $wrongAlbum)
+        ->assertJsonPath('proposal.evidence.field_review', null);
 })->with('production audio matrix');
 
 test('discogs master search can provide cover and attribution when release search misses production shape', function () {
@@ -372,14 +352,15 @@ test('discogs master search can provide cover and attribution when release searc
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'discogs_release')
-        ->assertJsonPath('proposal.proposed_values.album', 'Bring The Noise (Remix)')
-        ->assertJsonPath('proposal.proposed_values.release_label', 'Sony BMG Music Entertainment')
-        ->assertJsonPath('proposal.proposed_values.catalog_number', '297750 0247 1')
-        ->assertJsonPath('proposal.proposed_values.barcode', '3297750024715')
-        ->assertJsonPath('proposal.proposed_values.release_date', '2007')
-        ->assertJsonPath('proposal.proposed_values.release_country', 'France')
-        ->assertJsonPath('proposal.proposed_values.discogs_release_id', '3259171')
-        ->assertJsonPath('proposal.proposed_values.cover_url', 'https://discogs.test/image/bring-the-noise-primary.jpg')
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.album.0.value', 'Bring The Noise (Remix)')
+        ->assertJsonPath('proposal.field_options.release_label.0.value', 'Sony BMG Music Entertainment')
+        ->assertJsonPath('proposal.field_options.catalog_number.0.value', '297750 0247 1')
+        ->assertJsonPath('proposal.field_options.barcode.0.value', '3297750024715')
+        ->assertJsonPath('proposal.field_options.release_date.0.value', '2007')
+        ->assertJsonPath('proposal.field_options.release_country.0.value', 'France')
+        ->assertJsonPath('proposal.field_options.discogs_release_id.0.value', '3259171')
+        ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://discogs.test/image/bring-the-noise-primary.jpg')
         ->assertJsonPath('proposal.evidence.discogs_release_url', 'https://www.discogs.com/release/3259171-Public-Enemy-vs-Benny-Benassi-Bring-The-Noise-Remix')
         ->assertJsonPath('proposal.evidence.discogs_master_id', '2006623')
         ->assertJsonPath('proposal.evidence.discogs_master_url', 'https://www.discogs.com/master/2006623-Public-Enemy-vs-Benny-Benassi-Bring-The-Noise-Remix');

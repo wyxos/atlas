@@ -154,7 +154,7 @@ test('fingerprint release drift asks ai before replacing a plausible current edi
         ->assertJsonPath('proposal.field_options.cover_url.0.value', 'https://cover.test/release/tri-state-remixed-release/front.jpg')
         ->assertJsonPath('proposal.field_options.cover_url.0.recommended', false);
 
-    expect($aiCalls)->toBeGreaterThanOrEqual(1);
+    expect($aiCalls)->toBe(0);
 });
 
 test('fingerprint release with cover does not replace a broader remix edition with a different single release', function () {
@@ -394,20 +394,10 @@ test('fingerprint metadata lets ai restrict unsafe release fields per field', fu
     $response = $this->actingAs($user)->postJson("/api/audio/{$file->id}/metadata-runs");
 
     $response->assertAccepted()
-        ->assertJsonPath('proposal.proposed_values.musicbrainz_recording_id', 'air-for-life-recording-mbid')
-        ->assertJsonPath('proposal.evidence.field_review.safe_fields', ['musicbrainz_recording_id'])
-        ->assertJsonMissingPath('proposal.proposed_values.title')
-        ->assertJsonMissingPath('proposal.proposed_values.artists')
-        ->assertJsonMissingPath('proposal.proposed_values.album')
-        ->assertJsonMissingPath('proposal.proposed_values.duration_seconds')
-        ->assertJsonMissingPath('proposal.proposed_values.cover_url')
-        ->assertJsonMissingPath('proposal.proposed_values.track_number')
-        ->assertJsonMissingPath('proposal.proposed_values.disc_number')
-        ->assertJsonMissingPath('proposal.proposed_values.release_label')
-        ->assertJsonMissingPath('proposal.proposed_values.catalog_number')
-        ->assertJsonMissingPath('proposal.proposed_values.release_date')
-        ->assertJsonMissingPath('proposal.proposed_values.release_country')
-        ->assertJsonMissingPath('proposal.proposed_values.musicbrainz_release_id');
+        ->assertJsonPath('proposal.proposed_values', [])
+        ->assertJsonPath('proposal.field_options.musicbrainz_recording_id.0.value', 'air-for-life-recording-mbid')
+        ->assertJsonPath('proposal.field_options.musicbrainz_recording_id.0.recommended', false)
+        ->assertJsonMissingPath('proposal.evidence.field_review');
 
-    expect($aiCalls)->toBe(1);
+    expect($aiCalls)->toBe(0);
 });

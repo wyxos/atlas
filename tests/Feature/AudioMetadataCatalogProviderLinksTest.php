@@ -2,9 +2,7 @@
 
 use App\Models\File;
 use App\Services\Audio\AudioMetadataCandidateAggregator;
-use App\Services\Audio\AudioMetadataCandidateFieldReviewer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
@@ -19,12 +17,6 @@ test('catalog provider options carry source links', function () {
         'release_date' => null,
         'isrc' => null,
     ];
-
-    $this->mock(AudioMetadataCandidateFieldReviewer::class, function (MockInterface $mock): void {
-        $mock->shouldReceive('review')
-            ->times(3)
-            ->andReturnUsing(fn (File $file, array $currentValues, array $candidate): array => $candidate);
-    });
 
     $candidate = app(AudioMetadataCandidateAggregator::class)->aggregate(
         $file,
