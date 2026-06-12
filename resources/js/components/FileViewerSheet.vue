@@ -5,8 +5,9 @@ import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
 import type { File, FileMetadataRecord } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
 import FullscreenSheetPreviewStrip from './FullscreenSheetPreviewStrip.vue';
+import FileSourceMetadataRefreshAction from './FileSourceMetadataRefreshAction.vue';
 import FileViewerMetadataTree from './FileViewerMetadataTree.vue';
-import FilePromptModerationCard from './FilePromptModerationCard.vue';
+import FileViewerPromptSection from './FileViewerPromptSection.vue';
 
 interface Props {
     embedded?: boolean;
@@ -15,6 +16,8 @@ interface Props {
     fileData: File | null;
     isLoading: boolean;
     isPromptLoading?: boolean;
+    isRefreshingSourceMetadata?: boolean;
+    sourceMetadataRefreshError?: string | null;
     nextPreviews?: VibeFullscreenPreviewItem[];
     prompt?: string | null;
     showPrompt?: boolean;
@@ -22,11 +25,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    isPromptLoading: false,
-    nextPreviews: () => [],
-    prompt: null,
-    showPrompt: false,
-    totalItems: 0,
+    isPromptLoading: false, isRefreshingSourceMetadata: false, sourceMetadataRefreshError: null,
+    nextPreviews: () => [], prompt: null, showPrompt: false, totalItems: 0,
 });
 
 defineOptions({
@@ -40,6 +40,8 @@ const emit = defineEmits<{
     'select-preview': [index: number];
     'redownload-file': [fileId: number];
     'mark-corrupted-file': [fileId: number];
+    'test-prompt': [prompt: string];
+    'refresh-source-metadata': [fileId: number];
 }>();
 
 const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
@@ -166,6 +168,12 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                     <PanelRightClose :size="20" />
                 </button>
             </div>
+            <FileSourceMetadataRefreshAction
+                :file-data="fileData"
+                :is-refreshing="isRefreshingSourceMetadata"
+                :error="sourceMetadataRefreshError"
+                @refresh="emit('refresh-source-metadata', $event)"
+            />
             <div
                 class="flex-1 min-h-0 overflow-y-auto overscroll-y-contain p-4 min-w-0"
                 :class="[isOpen ? '' : 'opacity-0 pointer-events-none', hasNextPreviews ? 'pb-[11.75rem]' : '']"
@@ -243,32 +251,13 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                         <div class="font-semibold text-white mb-1">Description</div>
                         <div class="wrap-break-word">{{ fileData.description }}</div>
                     </div>
-                    <div v-if="shouldShowPrompt" class="space-y-2" data-test="file-prompt">
-                        <div class="flex items-center justify-between gap-3">
-                            <div class="font-semibold text-white">Prompt</div>
-                            <button
-                                v-if="prompt"
-                                type="button"
-                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white"
-                                aria-label="Copy prompt"
-                                data-test="copy-prompt"
-                                @click="handleCopyText(prompt, 'Prompt')"
-                            >
-                                <Copy :size="16" />
-                            </button>
-                        </div>
-                        <FilePromptModerationCard :file-data="fileData" />
-                        <div v-if="isPromptLoading" class="flex items-center gap-2 text-sm text-twilight-indigo-100">
-                            <Loader2 :size="16" class="animate-spin" />
-                            <span>Loading prompt...</span>
-                        </div>
-                        <div v-else-if="prompt" class="max-h-[28rem] overflow-y-auto whitespace-pre-wrap wrap-break-word rounded border border-twilight-indigo-500/45 bg-prussian-blue-900/45 p-3 text-sm text-twilight-indigo-100">
-                            {{ prompt }}
-                        </div>
-                        <div v-else class="text-sm text-twilight-indigo-300">
-                            No prompt data available
-                        </div>
-                    </div>
+                    <FileViewerPromptSection
+                        v-if="shouldShowPrompt"
+                        :file-data="fileData"
+                        :prompt="prompt"
+                        :is-prompt-loading="isPromptLoading"
+                        @test-prompt="emit('test-prompt', $event)"
+                    />
                     <div v-if="fileData.url">
                         <div class="font-semibold text-white mb-1">URL</div>
                         <div class="mt-1 flex min-w-0 items-center gap-2">
@@ -504,6 +493,3 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
         </div>
     </Transition>
 </template>
-
-
-

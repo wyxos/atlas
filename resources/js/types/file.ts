@@ -33,6 +33,8 @@ export interface FileMetadata {
 
 export interface FileCapabilities {
     refresh_source_media: boolean;
+    restore_listing_metadata?: boolean;
+    restore_detail_metadata?: boolean;
     watch_source_and_refresh: boolean;
     unwatch_source_account: boolean;
 }

@@ -1,26 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useEventListener } from '@vueuse/core';
-import { VibeLayout, type VibeAssetErrorEvent, type VibeAssetLoadEvent, type VibeHandle, type VibeInitialState, type VibeResolveResult, type VibeViewerItem, type VibeStatus } from '@wyxos/vibe';
+import { VibeLayout, type VibeHandle, type VibeViewerItem } from '@wyxos/vibe';
 import { PanelRightOpen } from 'lucide-vue-next';
-import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import { useBrowseGlobalStartPanel } from '@/composables/useBrowseGlobalStartPanel';
 import { useFileRedownloadActions } from '@/composables/useFileRedownloadActions';
-import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import { useSourceWatchRefresh } from '@/composables/useSourceWatchRefresh';
-import type { TabContentContainerInteractions } from '@/composables/useTabContentContainerInteractions';
-import type { TabContentItemInteractions } from '@/composables/useTabContentItemInteractions';
-import type { TabContentPromptDialog as TabContentPromptDialogHandle } from '@/composables/useTabContentPromptDialog';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import type { FeedItem, TabData } from '@/composables/useTabs';
-import type { ServiceOption } from '@/lib/browseCatalog';
-import type { BrowseFeedHandle } from '@/types/browse';
-import type { File } from '@/types/file';
-import type { ReactionType } from '@/types/reaction';
-import type { LocalSourceSelection } from '@/utils/localSourceSelection';
-import type { LoadedItemsBulkAction } from '@/lib/tabContentLoadedItemsBulkActions';
 import { createTabContentV2KeydownHandler } from '@/lib/tabContentV2Keyboard';
 import { getContainerPillTargets, getFeedItemFromVibeItem, shouldDimGridItemForContainerDrawer } from '@/lib/tabContentV2ViewHelpers';
+import type { TabContentV2ViewProps } from '@/types/tabContentV2View';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -38,96 +27,10 @@ import TabContentV2FullscreenPageLoadingLock from './TabContentV2FullscreenPageL
 import TabContentV2FullscreenReactions from './TabContentV2FullscreenReactions.vue';
 import TabContentV2GridOverlay from './TabContentV2GridOverlay.vue';
 
-type FileSheetState = { isOpen: boolean };
-type FileSheetPresentation = 'inline' | 'overlay';
-type FileViewerDataShape = { fileData: { value: File | null }; isLoadingFileData: { value: boolean }; setFileData: (file: File) => void };
+type TabContentServiceHeaderHandle = { openModerationRuleTester: (prompt: string) => void };
+const props = defineProps<TabContentV2ViewProps>();
 
-type DownloadedReactionPromptShape = {
-    data: { open: { value: boolean } };
-    chooseReact: () => void;
-    chooseRedownload: () => void;
-    close: () => void; setOpen: (value: boolean) => void;
-};
-
-type MouseShortcutHandlers = ReturnType<typeof import('@/lib/tabContentV2MouseShortcuts').createBrowseV2MouseShortcutHandlers>;
-
-const props = defineProps<{
-    activeIndex: number;
-    autoScrollActive?: boolean;
-    autoScrollMax?: number;
-    autoScrollMin?: number;
-    autoScrollSpeed?: number;
-    availableServices: ServiceOption[];
-    availableSources: string[];
-    applyFilters: () => Promise<void>;
-    applyService: () => Promise<void>;
-    cancelFill: () => void;
-    closeFileSheet: () => void;
-    confirmBatchAction?: () => void;
-    containerInteractions: TabContentContainerInteractions;
-    currentVisibleItem: FeedItem | null;
-    cancelBatchAction?: () => void;
-    cancelRemoveLoadedItems?: () => void;
-    canRemoveLoadedItems?: boolean;
-    downloadedReactionPrompt: DownloadedReactionPromptShape;
-    fileSheetState: FileSheetState;
-    fileSheetItem: FeedItem | null;
-    fileViewerData: FileViewerDataShape;
-    form: BrowseFormInstance;
-    fillActionsDisabled?: boolean;
-    fillCallCount?: number;
-    fillCallCountMax?: number;
-    fillCallCountMin?: number;
-    fillUntilCount?: () => void;
-    fillUntilEnd?: () => void;
-    goToFirstPage: () => Promise<void>;
-    confirmRemoveLoadedItems?: () => void | Promise<void>;
-    handleAssetErrors: (errors: VibeAssetErrorEvent[]) => void;
-    handleAssetLoads: (loads: VibeAssetLoadEvent[]) => void;
-    handleContainerBlacklistChange: (change: { action: 'created' | 'deleted'; blacklist: import('@/types/container-blacklist').ContainerBlacklist }) => void;
-    handleItemsChange: (items: VibeViewerItem[]) => void;
-    handleReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
-    headerMasonry: BrowseFeedHandle | null;
-    isFilterSheetOpen: boolean;
-    itemInteractions: TabContentItemInteractions;
-    localFileDeletion: LocalFileDeletion;
-    localService: ServiceOption | null | undefined;
-    loadNext: () => void | Promise<void>;
-    loadedItemsRemovalCount?: number;
-    loadedItemsRemovalOpen?: boolean;
-    masonryRenderKey: number;
-    mouseShortcuts: MouseShortcutHandlers;
-    openFileSheet: () => void;
-    openFileSheetForItem: (item: FeedItem, index: number) => void;
-    removeItemFromTab?: (item: FeedItem) => void | Promise<void>;
-    removeLoadedItems?: () => void;
-    removingLoadedItems?: boolean;
-    pendingBatchAction?: LoadedItemsBulkAction | null;
-    promptDialog: TabContentPromptDialogHandle;
-    fileSheetPresentation: FileSheetPresentation;
-    resolve: (params: { cursor: string | null; pageSize: number; signal?: AbortSignal }) => Promise<VibeResolveResult>;
-    setAutoScrollSpeed?: (value: number) => void;
-    setFillCallCount?: (value: number) => void;
-    setFilterSheetOpen: (value: boolean) => void;
-    setLocalMode: (value: boolean) => void;
-    setVibeHandle: (value: VibeHandle | null) => void;
-    isRemovingItemFromTab?: (item: FeedItem) => boolean;
-    shouldShowForm: boolean;
-    tab: TabData | null;
-    totalAvailable: number | null;
-    updateFeed: (value: 'local' | 'online') => void;
-    updateActiveIndex: (value: number) => void;
-    updateSource: (value: LocalSourceSelection) => void;
-    updateSurfaceMode: (value: 'fullscreen' | 'list') => void;
-    updateService: (value: string) => void | Promise<void>;
-    surfaceMode: 'fullscreen' | 'list';
-    toggleAutoScroll?: () => void;
-    vibeInitialCursor: string | null;
-    vibeInitialState: VibeInitialState | undefined;
-    vibeStatus: VibeStatus;
-    viewerKey: string;
-}>();
-
+const serviceHeaderRef = ref<TabContentServiceHeaderHandle | null>(null);
 const globalStartPanel = useBrowseGlobalStartPanel();
 const showGlobalStartPanel = computed(() => Boolean(globalStartPanel?.isOpen.value) && !props.shouldShowForm);
 const sourceWatchRefresh = useSourceWatchRefresh({
@@ -156,6 +59,8 @@ const fileSheetFileId = computed(() => props.fileSheetItem?.id
     ?? props.fileViewerData.fileData.value?.id
     ?? props.currentVisibleItem?.id
     ?? null);
+const isRefreshingSourceMetadata = computed(() => props.fileViewerData.isRefreshingSourceMetadata?.value ?? false);
+const sourceMetadataRefreshError = computed(() => props.fileViewerData.sourceMetadataRefreshError?.value ?? null);
 const canTogglePageLoadingLock = computed(() => Boolean(props.headerMasonry?.lockPageLoading && props.headerMasonry?.unlockPageLoading));
 const pageLoadingLocked = computed(() => Boolean(props.vibeStatus.pageLoadingLocked || props.headerMasonry?.pageLoadingLocked));
 const showFullscreenPageLoadingLock = computed(() => props.surfaceMode === 'fullscreen'
@@ -173,6 +78,12 @@ function handleGlobalStartPanelOpenChange(value: boolean): void {
 
 function handleVibeRef(instance: unknown): void {
     props.setVibeHandle((instance as VibeHandle | null) ?? null);
+}
+
+function handlePromptTest(prompt: string): void { serviceHeaderRef.value?.openModerationRuleTester(prompt); }
+
+async function handleSourceMetadataRefresh(fileId: number): Promise<void> {
+    await props.fileViewerData.refreshSourceMetadata?.(fileId);
 }
 
 async function handleBlacklist(item: VibeViewerItem): Promise<void> {
@@ -247,6 +158,7 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
         @keydown.capture="handleRootKeydown"
     >
         <TabContentServiceHeader
+            ref="serviceHeaderRef"
             v-if="!shouldShowForm"
             :form="form" :available-services="availableServices" :available-sources="availableSources"
             :local-service="localService ?? null" :masonry="headerMasonry"
@@ -391,6 +303,8 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             :file-data="fileViewerData.fileData.value"
                             :is-loading="fileViewerData.isLoadingFileData.value"
                             :is-prompt-loading="isSheetPromptLoading"
+                            :is-refreshing-source-metadata="isRefreshingSourceMetadata"
+                            :source-metadata-refresh-error="sourceMetadataRefreshError"
                             :next-previews="nextPreviews"
                             :prompt="promptDialog.data.currentPromptData.value"
                             :show-prompt="showSheetPrompt"
@@ -399,6 +313,8 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             @select-preview="props.updateActiveIndex"
                             @redownload-file="fileRedownloadActions.handleFileRedownload"
                             @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
+                            @test-prompt="handlePromptTest"
+                            @refresh-source-metadata="handleSourceMetadataRefresh"
                         />
                     </template>
                 </VibeLayout>
@@ -435,12 +351,16 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                                 :file-data="fileViewerData.fileData.value"
                                 :is-loading="fileViewerData.isLoadingFileData.value"
                                 :is-prompt-loading="isSheetPromptLoading"
+                                :is-refreshing-source-metadata="isRefreshingSourceMetadata"
+                                :source-metadata-refresh-error="sourceMetadataRefreshError"
                                 :prompt="promptDialog.data.currentPromptData.value"
                                 :show-prompt="showSheetPrompt"
                                 data-test="file-viewer-sheet-panel"
                                 @close="closeFileSheet"
                                 @redownload-file="fileRedownloadActions.handleFileRedownload"
                                 @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
+                                @test-prompt="handlePromptTest"
+                                @refresh-source-metadata="handleSourceMetadataRefresh"
                             />
                         </div>
                     </Transition>
@@ -452,11 +372,15 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         :file-data="fileViewerData.fileData.value"
                         :is-loading="fileViewerData.isLoadingFileData.value"
                         :is-prompt-loading="isSheetPromptLoading"
+                        :is-refreshing-source-metadata="isRefreshingSourceMetadata"
+                        :source-metadata-refresh-error="sourceMetadataRefreshError"
                         :prompt="promptDialog.data.currentPromptData.value"
                         :show-prompt="showSheetPrompt"
                         @close="closeFileSheet"
                         @redownload-file="fileRedownloadActions.handleFileRedownload"
                         @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
+                        @test-prompt="handlePromptTest"
+                        @refresh-source-metadata="handleSourceMetadataRefresh"
                     />
                 </template>
 

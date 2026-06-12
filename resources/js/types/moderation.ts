@@ -59,6 +59,12 @@ export interface ModerationRule {
     updated_at: string;
 }
 
+export interface ModerationRuleTestResult {
+    matches: boolean;
+    hits: string[];
+    rule: ModerationRule;
+}
+
 /**
  * Payload for creating a new moderation rule.
  */

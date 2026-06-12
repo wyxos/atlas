@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { ChevronDown, ChevronsUp, ListChecks, Loader2, Play, Unlink, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { queueManager } from '@/composables/useQueue';
@@ -49,6 +49,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const globalStartPanel = useBrowseGlobalStartPanel();
+const moderationRulesManager = ref<InstanceType<typeof ModerationRulesManager> | null>(null);
 const queuedReactionCount = queueManager.collection.getAllComputed();
 const localSourceOptions = computed(() => createLocalSourceOptions(props.availableSources));
 const queuedReactionTotal = computed(() => queuedReactionCount.value.length);
@@ -70,6 +71,14 @@ const feedOptions = [
     { label: 'Library', value: 'local' },
 ];
 const onlineServiceOptions = computed(() => serviceDropdownOptions(props.availableServices.filter((entry) => entry.key !== 'local')));
+
+function openModerationRuleTester(prompt: string): void {
+    void moderationRulesManager.value?.openWithTestText(prompt);
+}
+
+defineExpose({
+    openModerationRuleTester,
+});
 </script>
 
 <template>
@@ -114,7 +123,7 @@ const onlineServiceOptions = computed(() => serviceDropdownOptions(props.availab
             <TabFilter :open="filterSheetOpen" :available-services="availableServices" :local-def="localService"
                 :masonry="masonry" @update:open="updateFilterSheetOpen" @reset="resetFilters" @apply="applyFilters" />
 
-            <ModerationRulesManager :disabled="masonry?.isLoading" />
+            <ModerationRulesManager ref="moderationRulesManager" :disabled="masonry?.isLoading" />
             <slot />
 
             <Button

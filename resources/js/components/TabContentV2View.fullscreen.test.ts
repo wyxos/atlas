@@ -169,7 +169,7 @@ function createProps() {
         openFileSheetForItem: vi.fn(),
         removeItemFromTab: undefined as ((item: unknown) => void) | undefined,
         isRemovingItemFromTab: undefined as ((item: unknown) => boolean) | undefined,
-        promptDialog: { data: { promptDialogOpen: ref(false), promptDialogItemId: ref(null), promptDataLoading: ref(false), currentPromptData: ref(null) }, clear: vi.fn(), setOpen: vi.fn(), select: vi.fn(), copy: vi.fn(), openTestPage: vi.fn(), close: vi.fn() },
+        promptDialog: { data: { promptDialogOpen: ref(false), promptDialogItemId: ref(null), promptDataLoading: ref(false), currentPromptData: ref(null) }, clear: vi.fn(), setOpen: vi.fn(), select: vi.fn(), copy: vi.fn(), close: vi.fn() },
         resolve: vi.fn(),
         setFilterSheetOpen: vi.fn(),
         setLocalMode: vi.fn(),

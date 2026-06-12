@@ -3,10 +3,12 @@
 namespace App\Http\Resources;
 
 use App\Enums\ActionType;
+use App\Enums\SourceMetadataRestoreTarget;
 use App\Models\File;
 use App\Services\FileModerationService;
 use App\Services\SourceMedia\SourceMediaRefreshService;
 use App\Services\SourceMedia\SourceWatchRefreshService;
+use App\Services\SourceMetadataRestoreService;
 use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
@@ -76,8 +78,12 @@ class FileResource extends JsonResource
 
     private static function capabilities(File $file): array
     {
+        $metadataRestore = app(SourceMetadataRestoreService::class);
+
         return [
             'refresh_source_media' => app(SourceMediaRefreshService::class)->supports($file),
+            'restore_listing_metadata' => $metadataRestore->supports($file, SourceMetadataRestoreTarget::LISTING),
+            'restore_detail_metadata' => $metadataRestore->supports($file, SourceMetadataRestoreTarget::DETAIL),
             'watch_source_and_refresh' => app(SourceWatchRefreshService::class)->supports($file),
             'unwatch_source_account' => app(SourceWatchRefreshService::class)->supportsUnwatch($file),
         ];

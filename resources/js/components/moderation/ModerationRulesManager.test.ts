@@ -1,5 +1,5 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import ModerationRulesManager from './ModerationRulesManager.vue';
 import type { ModerationRule } from '@/types/moderation';
@@ -26,6 +26,15 @@ vi.mock('@/components/ui/input', () => ({
         props: ['modelValue', 'placeholder'],
         emits: ['update:modelValue'],
         template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    },
+}));
+
+vi.mock('@/components/ui/Textarea.vue', () => ({
+    default: {
+        name: 'Textarea',
+        props: ['modelValue', 'placeholder', 'id', 'rows'],
+        emits: ['update:modelValue'],
+        template: '<textarea :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
     },
 }));
 
@@ -93,6 +102,7 @@ vi.mock('lucide-vue-next', () => ({
     AlertTriangle: { template: '<span />' },
     Loader2: { template: '<span />' },
     Plus: { template: '<span />' },
+    SearchCheck: { template: '<span />' },
     Shield: { template: '<span />' },
     Trash2: { template: '<span />' },
 }));
@@ -116,10 +126,13 @@ function createRule(overrides: Partial<ModerationRule> = {}): ModerationRule {
     };
 }
 
-function installAxios(rules: ModerationRule[]): void {
+function installAxios(
+    rules: ModerationRule[],
+    testResults: Array<{ matches: boolean; hits: string[]; rule: ModerationRule }> = [],
+): void {
     (window as unknown as { axios: Record<string, ReturnType<typeof vi.fn>> }).axios = {
         get: vi.fn().mockResolvedValue({ data: rules }),
-        post: vi.fn(),
+        post: vi.fn().mockResolvedValue({ data: { results: testResults } }),
         put: vi.fn(),
         delete: vi.fn(),
     };
@@ -148,6 +161,10 @@ async function openDialog(wrapper: VueWrapper): Promise<void> {
 describe('ModerationRulesManager', () => {
     beforeEach(() => {
         installAxios([createRule()]);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('uses danger styling for the browse header toolbar trigger', () => {
@@ -202,5 +219,55 @@ describe('ModerationRulesManager', () => {
 
         expect(rule.text()).toContain('99,999');
         expect(rule.text()).not.toContain('feed_removed');
+    });
+
+    it('tests pasted prompt text against all rules and renders match badges', async () => {
+        vi.useFakeTimers();
+
+        const buzzRule = createRule({ id: 1, name: 'Buzz', terms: [{ term: 'buzz', allow_digit_prefix: false }] });
+        const maleRule = createRule({ id: 2, name: 'Male', terms: [{ term: 'male', allow_digit_prefix: false }] });
+        installAxios([
+            buzzRule,
+            maleRule,
+        ], [
+            { matches: true, hits: ['buzz'], rule: buzzRule },
+            { matches: false, hits: [], rule: maleRule },
+        ]);
+
+        const wrapper = mountManager();
+
+        await openDialog(wrapper);
+        await wrapper.get('[data-test="moderation-rule-test-textarea"]').setValue('buzz cut character');
+        await vi.advanceTimersByTimeAsync(350);
+        await flushPromises();
+
+        const axios = (window as unknown as { axios: Record<string, ReturnType<typeof vi.fn>> }).axios;
+
+        expect(axios.post).toHaveBeenCalledWith('/api/moderation-rules/test', {
+            text: 'buzz cut character',
+        });
+        expect(wrapper.get('[data-test="moderation-rule-match-badge-1"]').text()).toContain('matched');
+        expect(wrapper.find('[data-test="moderation-rule-match-badge-2"]').exists()).toBe(false);
+    });
+
+    it('highlights a matching rule hit after its badge is clicked', async () => {
+        vi.useFakeTimers();
+
+        const buzzRule = createRule({ id: 1, name: 'Buzz', terms: [{ term: 'buzz', allow_digit_prefix: false }] });
+        installAxios([buzzRule], [
+            { matches: true, hits: ['buzz'], rule: buzzRule },
+        ]);
+
+        const wrapper = mountManager();
+
+        await openDialog(wrapper);
+        await wrapper.get('[data-test="moderation-rule-test-textarea"]').setValue('A buzz cut prompt');
+        await vi.advanceTimersByTimeAsync(350);
+        await flushPromises();
+        await wrapper.get('[data-test="moderation-rule-match-badge-1"]').trigger('click');
+
+        const highlight = wrapper.get('[data-test="moderation-rule-highlight"]');
+
+        expect(highlight.text()).toBe('buzz');
     });
 });
