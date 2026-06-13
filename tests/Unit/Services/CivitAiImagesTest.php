@@ -2,6 +2,92 @@
 
 use App\Services\CivitAiImages;
 
+uses(Tests\TestCase::class);
+
+it('requests full flat metadata from civitai listings', function () {
+    $service = new CivitAiImages([
+        'limit' => 25,
+        'page' => '2|1781279460000',
+    ]);
+
+    expect($service->formatParams())->toMatchArray([
+        'limit' => 25,
+        'cursor' => '2|1781279460000',
+        'withMeta' => 'true',
+        'flatMeta' => 'true',
+    ]);
+});
+
+it('stores flat civitai metadata in the metadata payload', function () {
+    $service = new CivitAiImages;
+
+    $result = $service->transform([
+        'items' => [
+            [
+                'id' => 133523267,
+                'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d406b89a-0c27-474c-891a-62a599ea58eb/original=true/d406b89a-0c27-474c-891a-62a599ea58eb.jpeg',
+                'type' => 'image',
+                'nsfw' => false,
+                'width' => 832,
+                'height' => 1216,
+                'meta' => [
+                    'prompt' => 'flat prompt',
+                    'negativePrompt' => 'flat negative prompt',
+                ],
+            ],
+        ],
+        'metadata' => [
+            'nextCursor' => null,
+        ],
+    ]);
+
+    $payload = json_decode($result['files'][0]['metadata']['payload'], true);
+
+    expect($payload)->toMatchArray([
+        'prompt' => 'flat prompt',
+        'negativePrompt' => 'flat negative prompt',
+        'width' => 832,
+        'height' => 1216,
+    ]);
+});
+
+it('stores nested civitai image-id metadata in the metadata payload', function () {
+    $service = new CivitAiImages;
+
+    $result = $service->transform([
+        'items' => [
+            [
+                'id' => 133523267,
+                'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d406b89a-0c27-474c-891a-62a599ea58eb/original=true/d406b89a-0c27-474c-891a-62a599ea58eb.jpeg',
+                'type' => 'image',
+                'nsfw' => false,
+                'width' => 832,
+                'height' => 1216,
+                'meta' => [
+                    'id' => 133523267,
+                    'meta' => [
+                        'prompt' => 'nested prompt',
+                        'negativePrompt' => 'nested negative prompt',
+                    ],
+                ],
+            ],
+        ],
+        'metadata' => [
+            'nextCursor' => null,
+        ],
+    ]);
+
+    $payload = json_decode($result['files'][0]['metadata']['payload'], true);
+
+    expect($payload)->toMatchArray([
+        'id' => 133523267,
+        'prompt' => 'nested prompt',
+        'negativePrompt' => 'nested negative prompt',
+        'width' => 832,
+        'height' => 1216,
+    ]);
+});
+
 it('uses civitai red page referrers for nsfw image rows', function () {
     $service = new CivitAiImages;
 

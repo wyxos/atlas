@@ -33,17 +33,6 @@ export function useTabContentPromptDialog(items: ShallowRef<FeedItem[]>) {
         }
     }
 
-    function openTestPage(): void {
-        if (!data.currentPromptData.value) {
-            return;
-        }
-
-        const params = new URLSearchParams();
-        params.set('text', data.currentPromptData.value);
-
-        window.open(`/moderation/test?${params.toString()}`, '_blank', 'noopener,noreferrer');
-    }
-
     return {
         data,
         open,
@@ -52,7 +41,6 @@ export function useTabContentPromptDialog(items: ShallowRef<FeedItem[]>) {
         clear,
         setOpen,
         copy,
-        openTestPage,
     };
 }
 

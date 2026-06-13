@@ -210,7 +210,6 @@ vi.mock('@/composables/useTabContentPromptDialog', () => ({
         clear: vi.fn(),
         close: vi.fn(),
         copy: vi.fn(),
-        openTestPage: vi.fn(),
         select: vi.fn(),
         setOpen: vi.fn(),
     }),

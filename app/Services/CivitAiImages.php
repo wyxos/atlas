@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\File;
 use App\Support\CivitAiImagesFilterSchema;
 use App\Support\CivitAiMediaUrl;
 use App\Support\CivitAiPageUrls;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class CivitAiImages extends BaseService
+class CivitAiImages extends BaseService implements RestoresSourceMetadata
 {
     public const string KEY = 'civit-ai-images';
 
@@ -97,6 +98,16 @@ class CivitAiImages extends BaseService
         return $containers;
     }
 
+    public function supportsListingMetadataRestore(File $file): bool
+    {
+        return $this->supportsMetadataRestore($file);
+    }
+
+    public function supportsDetailMetadataRestore(File $file): bool
+    {
+        return $this->supportsMetadataRestore($file);
+    }
+
     public function formatParams(): array
     {
         $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 20;
@@ -140,6 +151,8 @@ class CivitAiImages extends BaseService
             'limit' => $limit,
             'cursor' => $cursor,
             'sort' => $sort,
+            'withMeta' => 'true',
+            'flatMeta' => 'true',
         ];
 
         if (config('services.civitai.key')) {
@@ -422,6 +435,15 @@ class CivitAiImages extends BaseService
                 'nextCursor' => null,
             ],
         ];
+    }
+
+    private function supportsMetadataRestore(File $file): bool
+    {
+        $source = is_scalar($file->source) ? trim((string) $file->source) : '';
+        $sourceId = is_scalar($file->source_id) ? trim((string) $file->source_id) : '';
+
+        return strtolower($source) === strtolower(self::SOURCE)
+            && preg_match('/^[0-9]+$/', $sourceId) === 1;
     }
 
     public function getBlacklistableContainerTypes(): array

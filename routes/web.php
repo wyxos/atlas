@@ -142,6 +142,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/audio/playback-events', [\App\Http\Controllers\AudioPlaybackEventController::class, 'store'])->name('api.audio.playback-events.store');
     Route::get('/api/audio/album-covers/{albumCover}', [\App\Http\Controllers\AlbumCoverController::class, 'show'])->name('api.audio.album-covers.show');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
+    Route::post('/api/files/{file}/source-metadata/{target}', \App\Http\Controllers\FileSourceMetadataController::class)
+        ->whereIn('target', \App\Enums\SourceMetadataRestoreTarget::values())
+        ->name('api.files.source-metadata.refresh');
+    Route::post('/api/files/{file}/civitai-metadata', \App\Http\Controllers\CivitAiFileMetadataController::class)->name('api.files.civitai-metadata.restore');
     Route::post('/api/files/{file}/refresh-source-media', [\App\Http\Controllers\FilesController::class, 'refreshSourceMedia'])->name('api.files.refresh-source-media');
     Route::post('/api/files/{file}/source-watch-refresh', [\App\Http\Controllers\FilesController::class, 'watchSourceAndRefreshMedia'])->name('api.files.source-watch-refresh');
     Route::post('/api/files/{file}/source-unwatch', [\App\Http\Controllers\FilesController::class, 'unwatchSourceAccount'])->name('api.files.source-unwatch');

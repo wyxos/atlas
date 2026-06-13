@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Shield, Plus, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
+import { ref, computed, watch } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
+import { Shield, Plus, Loader2, AlertTriangle, Trash2, SearchCheck } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
@@ -21,8 +22,11 @@ import type {
     ModerationRuleActionType,
     ModerationRuleTerm,
     ModerationRuleBlacklistPreviewedCountMode,
+    ModerationRuleTestResult,
     CreateModerationRulePayload,
 } from '@/types/moderation';
+import { previewedCountModeBadgeLabel, previewedCountModeSelectLabel, summarizeRule } from '@/lib/moderationRuleDisplay';
+import ModerationRulePromptTester from './ModerationRulePromptTester.vue';
 
 interface Props {
     disabled?: boolean;
@@ -48,6 +52,12 @@ const {
 
 // Dialog state
 const isDialogOpen = ref(false);
+const testText = ref('');
+const testResults = ref<ModerationRuleTestResult[]>([]);
+const testError = ref<string | null>(null);
+const isTestingRules = ref(false);
+const highlightedRuleId = ref<number | null>(null);
+let testRequestSequence = 0;
 
 // Selection and form state
 const selectedRule = ref<ModerationRule | null>(null);
@@ -103,12 +113,39 @@ function ruleToForm(rule: ModerationRule): ModerationRuleForm {
     };
 }
 
+const testTextHasContent = computed(() => testText.value.trim().length > 0);
+const testResultByRuleId = computed(() => new Map(testResults.value.map((result) => [result.rule.id, result])));
+const selectedHighlightResult = computed(() => {
+    if (highlightedRuleId.value === null) {
+        return null;
+    }
+
+    const result = testResultByRuleId.value.get(highlightedRuleId.value);
+
+    return result?.matches ? result : null;
+});
+const selectedHighlightHits = computed(() => selectedHighlightResult.value?.hits ?? []);
+
+const debouncedRunRuleTest = useDebounceFn(() => {
+    void runRuleTest();
+}, 300);
+
 // Open dialog and fetch rules
 async function openDialog(): Promise<void> {
     isDialogOpen.value = true;
     selectedRule.value = null;
     ruleForm.value = null;
     await fetchRules();
+
+    if (testTextHasContent.value) {
+        await runRuleTest();
+    }
+}
+
+async function openWithTestText(text: string): Promise<void> {
+    testText.value = text;
+    highlightedRuleId.value = null;
+    await openDialog();
 }
 
 // Select a rule from the list
@@ -195,6 +232,10 @@ async function saveRule(): Promise<void> {
         }
 
         emit('rules-changed');
+
+        if (testTextHasContent.value) {
+            await runRuleTest();
+        }
     } finally {
         isSaving.value = false;
     }
@@ -213,54 +254,88 @@ async function confirmDeleteRule(): Promise<void> {
             selectedRule.value = null;
             ruleForm.value = null;
             emit('rules-changed');
+
+            if (testTextHasContent.value) {
+                await runRuleTest();
+            }
         }
     } finally {
         isDeleting.value = false;
     }
 }
 
-// Summarize rule for display
-function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
-    const op = rule.op;
-    const terms = rule.terms ?? [];
-    const min = rule.min;
-    const children = rule.children ?? [];
+async function runRuleTest(): Promise<void> {
+    const text = testText.value;
 
-    // Extract term strings from term objects or strings
-    const extractTermString = (term: string | { term: string; allow_digit_prefix?: boolean }): string => {
-        return typeof term === 'string' ? term : term.term;
-    };
+    if (!text.trim()) {
+        testResults.value = [];
+        testError.value = null;
+        highlightedRuleId.value = null;
+        return;
+    }
 
-    const joinTerms = (termList: (string | { term: string; allow_digit_prefix?: boolean })[]) => {
-        const termStrings = termList.map(extractTermString);
-        return termStrings.slice(0, 3).join(', ') + (termStrings.length > 3 ? '...' : '');
-    };
+    const requestId = ++testRequestSequence;
+    isTestingRules.value = true;
+    testError.value = null;
 
-    switch (op) {
-        case 'any':
-            return `any of: ${joinTerms(terms)}`;
-        case 'all':
-            return `all of: ${joinTerms(terms)}`;
-        case 'not_any':
-            return `none of: ${joinTerms(terms)}`;
-        case 'at_least':
-            return `≥${min ?? 0} of: ${joinTerms(terms)}`;
-        case 'and':
-            return `AND (${children.length} rules)`;
-        case 'or':
-            return `OR (${children.length} rules)`;
-        default:
-            return op;
+    try {
+        const { data } = await window.axios.post<{ results?: ModerationRuleTestResult[] }>('/api/moderation-rules/test', {
+            text,
+        });
+
+        if (requestId !== testRequestSequence) {
+            return;
+        }
+
+        testResults.value = Array.isArray(data.results) ? data.results : [];
+
+        if (
+            highlightedRuleId.value !== null
+            && !testResults.value.some((result) => result.rule.id === highlightedRuleId.value && result.matches)
+        ) {
+            highlightedRuleId.value = null;
+        }
+    } catch (error: unknown) {
+        if (requestId !== testRequestSequence) {
+            return;
+        }
+
+        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+        testError.value = axiosError.response?.data?.message || axiosError.message || 'Failed to test moderation rules';
+        testResults.value = [];
+        highlightedRuleId.value = null;
+    } finally {
+        if (requestId === testRequestSequence) {
+            isTestingRules.value = false;
+        }
     }
 }
 
-function previewedCountModeBadgeLabel(mode?: ModerationRuleBlacklistPreviewedCountMode): string {
-    return mode === 'feed_removed' ? '99,999' : 'keep count';
+function matchingResultForRule(rule: ModerationRule): ModerationRuleTestResult | null {
+    const result = testResultByRuleId.value.get(rule.id);
+
+    return result?.matches ? result : null;
 }
 
-function previewedCountModeSelectLabel(mode?: ModerationRuleBlacklistPreviewedCountMode): string {
-    return mode === 'feed_removed' ? 'Blacklist, set to 99,999' : 'Blacklist, keep current count';
+function selectHighlightedRule(ruleId: number): void {
+    highlightedRuleId.value = highlightedRuleId.value === ruleId ? null : ruleId;
 }
+
+watch(testText, () => {
+    if (!testTextHasContent.value) {
+        testResults.value = [];
+        testError.value = null;
+        highlightedRuleId.value = null;
+        return;
+    }
+
+    void debouncedRunRuleTest();
+});
+
+defineExpose({
+    openDialog,
+    openWithTestText,
+});
 </script>
 
 <template>
@@ -297,6 +372,12 @@ function previewedCountModeSelectLabel(mode?: ModerationRuleBlacklistPreviewedCo
                 <div class="flex h-[65vh]">
                     <!-- Left Panel: Rule Editor -->
                     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto border-r border-twilight-indigo-500/30">
+                        <ModerationRulePromptTester
+                            v-model="testText"
+                            :is-testing="isTestingRules"
+                            :error="testError"
+                            :highlight-hits="selectedHighlightHits"
+                        />
                         <template v-if="ruleForm">
                             <div class="flex-1 space-y-5 p-6 pb-4">
                                 <!-- Name -->
@@ -365,7 +446,7 @@ function previewedCountModeSelectLabel(mode?: ModerationRuleBlacklistPreviewedCo
                             </div>
                         </template>
                         <template v-else>
-                            <div class="flex flex-col items-center justify-center h-full text-center">
+                            <div class="flex flex-1 flex-col items-center justify-center text-center">
                                 <Shield :size="48" class="text-twilight-indigo-400 mb-3 opacity-50" />
                                 <p class="text-sm text-twilight-indigo-300">
                                     Select a rule from the list<br />or click "Add New" to create one.
@@ -432,6 +513,18 @@ function previewedCountModeSelectLabel(mode?: ModerationRuleBlacklistPreviewedCo
                                             {{ rule.name || 'Untitled' }}
                                         </span>
                                         <div class="flex items-center gap-1.5 shrink-0 ml-2">
+                                            <button
+                                                v-if="matchingResultForRule(rule)"
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded bg-amber-300/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200 transition hover:bg-amber-300/30 focus:outline-none focus:ring-2 focus:ring-amber-300/50"
+                                                :class="highlightedRuleId === rule.id ? 'bg-amber-300/35 text-amber-100' : ''"
+                                                :data-test="`moderation-rule-match-badge-${rule.id}`"
+                                                :title="`Highlight matched terms: ${matchingResultForRule(rule)?.hits.join(', ')}`"
+                                                @click.stop="selectHighlightedRule(rule.id)"
+                                            >
+                                                <SearchCheck :size="10" />
+                                                <span>matched</span>
+                                            </button>
                                             <span v-if="rule.active"
                                                 class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/20 text-emerald-400">
                                                 active

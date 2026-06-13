@@ -1,4 +1,5 @@
 import { ref, watch, toRefs, computed, type Ref } from 'vue';
+import FileSourceMetadataController from '@/actions/App/Http/Controllers/FileSourceMetadataController';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { FeedItem } from '@/composables/useTabs';
 import type { File } from '@/types/file';
@@ -27,7 +28,10 @@ export function useFileViewerData(params: {
     const { isOpen } = toRefs(params.sheet);
     const fileData = ref<File | null>(null);
     const isLoadingFileData = ref(false);
+    const isRefreshingSourceMetadata = ref(false);
+    const sourceMetadataRefreshError = ref<string | null>(null);
     const lastFetchedFileId = ref<number | null>(null);
+    const lastAutoSourceMetadataRefreshFileId = ref<number | null>(null);
     const fetchSequence = ref(0);
 
     const currentItemId = computed(() => {
@@ -76,6 +80,7 @@ export function useFileViewerData(params: {
 
             fileData.value = data.file;
             lastFetchedFileId.value = fileId;
+            autoRefreshSourceMetadata(data.file);
         } catch (error) {
             console.error('Failed to fetch file data:', error);
             if (sequence !== fetchSequence.value) {
@@ -133,11 +138,53 @@ export function useFileViewerData(params: {
         item.spotify_uri = file.spotify_uri ?? null;
         item.referrer_url = file.referrer_url;
         item.mime_type = file.mime_type;
+        item.metadata = file.metadata?.payload ?? null;
         item.listing_metadata = file.listing_metadata;
         item.detail_metadata = file.detail_metadata;
         item.containers = file.containers ?? item.containers;
         item.source_access = file.source_access ?? null;
         item.capabilities = file.capabilities;
+    }
+
+    async function refreshSourceMetadata(fileId: number, options: { automatic?: boolean } = {}): Promise<File | null> {
+        if (!fileId || isRefreshingSourceMetadata.value) {
+            return null;
+        }
+
+        isRefreshingSourceMetadata.value = true;
+        sourceMetadataRefreshError.value = null;
+
+        try {
+            const { data } = await window.axios.post<{ file?: File; message?: string }>(
+                FileSourceMetadataController.url({ file: fileId, target: 'detail' })
+            );
+            const refreshedFile = data.file ?? null;
+            if (refreshedFile) {
+                setFileData(refreshedFile);
+            }
+
+            return refreshedFile;
+        } catch (error) {
+            const message = responseMessage(error) ?? 'Failed to fetch source metadata.';
+            const status = responseStatus(error);
+            if (!options.automatic || status !== 'unsupported_provider') {
+                sourceMetadataRefreshError.value = message;
+                console.error('Failed to refresh source metadata:', error);
+            }
+
+            return null;
+        } finally {
+            isRefreshingSourceMetadata.value = false;
+        }
+    }
+
+    function autoRefreshSourceMetadata(file: File | null): void {
+        if (!canRefreshSourceMetadata(file) || lastAutoSourceMetadataRefreshFileId.value === file.id) {
+            return;
+        }
+
+        lastAutoSourceMetadataRefreshFileId.value = file.id;
+        void refreshSourceMetadata(file.id, { automatic: true });
     }
 
     // Keep sheet data in sync with either navigation or an explicitly pinned grid item.
@@ -149,6 +196,8 @@ export function useFileViewerData(params: {
                 fileData.value = null;
                 isLoadingFileData.value = false;
                 lastFetchedFileId.value = null;
+                lastAutoSourceMetadataRefreshFileId.value = null;
+                sourceMetadataRefreshError.value = null;
                 return;
             }
 
@@ -156,6 +205,7 @@ export function useFileViewerData(params: {
                 fileData.value = null;
                 isLoadingFileData.value = false;
                 lastFetchedFileId.value = null;
+                lastAutoSourceMetadataRefreshFileId.value = null;
                 return;
             }
 
@@ -177,8 +227,29 @@ export function useFileViewerData(params: {
     return {
         fileData,
         isLoadingFileData,
+        isRefreshingSourceMetadata,
+        sourceMetadataRefreshError,
         fetchFileData,
         setFileData,
+        refreshSourceMetadata,
         handleItemSeen,
     };
+}
+
+function canRefreshSourceMetadata(file: File | null): file is File {
+    return file?.capabilities?.restore_detail_metadata === true;
+}
+
+function responseMessage(error: unknown): string | null {
+    const response = (error as { response?: { data?: { message?: unknown } } })?.response;
+    const message = response?.data?.message;
+
+    return typeof message === 'string' && message.trim() !== '' ? message : null;
+}
+
+function responseStatus(error: unknown): string | null {
+    const response = (error as { response?: { data?: { status?: unknown } } })?.response;
+    const status = response?.data?.status;
+
+    return typeof status === 'string' && status.trim() !== '' ? status : null;
 }

@@ -251,7 +251,6 @@ function createProps() {
             setOpen: vi.fn(),
             select: vi.fn(),
             copy: vi.fn(),
-            openTestPage: vi.fn(),
             close: vi.fn(),
         },
         resolve: vi.fn(async () => ({ items: [], nextPage: null })),

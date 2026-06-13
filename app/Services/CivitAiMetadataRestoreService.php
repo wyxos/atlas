@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\SourceMetadataRestoreTarget;
 use App\Models\File;
-use App\Models\FileMetadata;
+use App\Services\Library\LibraryIndexSyncDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -14,6 +15,7 @@ class CivitAiMetadataRestoreService
     public function __construct(
         private readonly CivitAiImages $civitAiImages,
         private readonly BrowsePersister $browsePersister,
+        private readonly LibraryIndexSyncDispatcher $libraryIndexSyncDispatcher,
     ) {}
 
     public function missingContainerQuery(?int $fileId = null, int $startId = 0): Builder
@@ -39,21 +41,29 @@ class CivitAiMetadataRestoreService
             ->orderBy('id');
     }
 
-    public function restore(File $file): array
+    public function restore(File $file, string $target = SourceMetadataRestoreTarget::LISTING): array
     {
+        if (! SourceMetadataRestoreTarget::isValid($target)) {
+            return $this->result($file, 'unsupported_target', $target);
+        }
+
+        if ($this->normalizeSource($file->source) !== CivitAiImages::SOURCE) {
+            return $this->result($file, 'unsupported_source', $target);
+        }
+
         $sourceId = $this->normalizeSourceId($file->source_id);
         if ($sourceId === null) {
-            return $this->result($file, 'invalid_source_id');
+            return $this->result($file, 'invalid_source_id', $target);
         }
 
         try {
             $row = $this->fetchImageRow($sourceId);
         } catch (\Throwable) {
-            return $this->result($file, 'api_error');
+            return $this->result($file, 'api_error', $target);
         }
 
         if ($row === null) {
-            return $this->result($file, 'not_found');
+            return $this->result($file, 'not_found', $target);
         }
 
         $transformed = $this->civitAiImages->transform([
@@ -66,10 +76,10 @@ class CivitAiMetadataRestoreService
 
         $item = $transformed['files'][0] ?? null;
         if (! is_array($item)) {
-            return $this->result($file, 'invalid_response');
+            return $this->result($file, 'invalid_response', $target);
         }
 
-        return $this->applyTransformedItem($file, $sourceId, $item);
+        return $this->applyTransformedItem($file, $item, $target);
     }
 
     private function fetchImageRow(string $sourceId): ?array
@@ -95,35 +105,33 @@ class CivitAiMetadataRestoreService
         return null;
     }
 
-    private function applyTransformedItem(File $file, string $sourceId, array $item): array
+    private function applyTransformedItem(File $file, array $item, string $target): array
     {
         $fileRow = is_array($item['file'] ?? null) ? $item['file'] : [];
-        $metadataRow = is_array($item['metadata'] ?? null) ? $item['metadata'] : [];
-        $listingMetadata = $this->decodeListingMetadata($fileRow['listing_metadata'] ?? null);
+        $incomingMetadata = $this->decodeListingMetadata($fileRow['listing_metadata'] ?? null);
+        $targetColumn = SourceMetadataRestoreTarget::column($target);
+        $existingMetadata = is_array($file->{$targetColumn}) ? $file->{$targetColumn} : [];
+        $mergedMetadata = $incomingMetadata !== null
+            ? $this->mergeMetadata($existingMetadata, $incomingMetadata)
+            : null;
 
         $containersBefore = $file->containers()->count();
 
         $file->forceFill(array_filter([
-            'source' => CivitAiImages::SOURCE,
-            'source_id' => $sourceId,
-            'url' => $this->filledString($fileRow['url'] ?? null),
-            'referrer_url' => $this->filledString($fileRow['referrer_url'] ?? null),
-            'preview_url' => $this->filledString($fileRow['preview_url'] ?? null),
-            'ext' => $this->filledString($fileRow['ext'] ?? null),
-            'mime_type' => $this->filledString($fileRow['mime_type'] ?? null),
-            'hash' => $this->filledString($fileRow['hash'] ?? null),
-            'listing_metadata' => $listingMetadata,
+            $targetColumn => $mergedMetadata,
         ], static fn (mixed $value): bool => $value !== null))->save();
 
-        $this->restoreMetadata($file, $metadataRow);
+        if ($target === SourceMetadataRestoreTarget::LISTING) {
+            $fileForContainers = File::query()
+                ->select(['id', 'source', 'source_id', 'listing_metadata', 'detail_metadata', 'downloaded', 'blacklisted_at'])
+                ->find($file->id);
 
-        $fileForContainers = File::query()
-            ->select(['id', 'source', 'source_id', 'listing_metadata', 'detail_metadata', 'downloaded', 'blacklisted_at'])
-            ->find($file->id);
-
-        if ($fileForContainers) {
-            $this->browsePersister->attachContainersForFiles(new Collection([$fileForContainers]));
+            if ($fileForContainers) {
+                $this->browsePersister->attachContainersForFiles(new Collection([$fileForContainers]));
+            }
         }
+
+        $this->libraryIndexSyncDispatcher->files([(int) $file->id]);
 
         $containerIds = $file->containers()
             ->orderBy('containers.id')
@@ -132,28 +140,44 @@ class CivitAiMetadataRestoreService
             ->all();
 
         return [
-            ...$this->result($file, 'restored'),
+            ...$this->result($file, 'restored', $target),
             'containers_before' => $containersBefore,
             'containers_after' => count($containerIds),
             'container_ids' => $containerIds,
         ];
     }
 
-    private function restoreMetadata(File $file, array $metadataRow): void
+    private function mergeMetadata(array $existing, array $incoming): array
     {
-        $payload = $metadataRow['payload'] ?? null;
-        if (is_array($payload)) {
-            $payload = json_encode($payload);
+        foreach ($incoming as $key => $value) {
+            if (
+                is_array($value)
+                && isset($existing[$key])
+                && is_array($existing[$key])
+                && ! array_is_list($value)
+                && ! array_is_list($existing[$key])
+            ) {
+                $existing[$key] = $this->mergeMetadata($existing[$key], $value);
+
+                continue;
+            }
+
+            $existing[$key] = $value;
         }
 
-        if (! is_string($payload) || trim($payload) === '') {
-            return;
+        return $existing;
+    }
+
+    private function normalizeSource(mixed $value): ?string
+    {
+        $source = $this->filledString(is_scalar($value) ? (string) $value : null);
+        if ($source === null) {
+            return null;
         }
 
-        FileMetadata::query()->updateOrCreate(
-            ['file_id' => $file->id],
-            ['payload' => $payload],
-        );
+        return strtolower($source) === strtolower(CivitAiImages::SOURCE)
+            ? CivitAiImages::SOURCE
+            : $source;
     }
 
     private function decodeListingMetadata(mixed $value): ?array
@@ -189,12 +213,13 @@ class CivitAiMetadataRestoreService
         return $sourceId !== null && preg_match('/^[0-9]+$/', $sourceId) === 1 ? $sourceId : null;
     }
 
-    private function result(File $file, string $status): array
+    private function result(File $file, string $status, string $target): array
     {
         return [
             'file_id' => (int) $file->id,
             'source_id' => is_scalar($file->source_id) ? (string) $file->source_id : null,
             'status' => $status,
+            'target' => $target,
         ];
     }
 }

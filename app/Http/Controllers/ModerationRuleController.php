@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\ActionType;
 use App\Enums\BlacklistPreviewedCountMode;
 use App\Models\ModerationRule;
+use App\Services\Moderation\Moderator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -107,24 +108,41 @@ class ModerationRuleController extends Controller
      */
     public function testRule(Request $request): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'text' => ['required', 'string'],
-            'rule_id' => ['required', 'integer', 'exists:moderation_rules,id'],
+            'rule_id' => ['nullable', 'integer', 'exists:moderation_rules,id'],
         ]);
 
         $text = $request->string('text')->toString();
-        $rule = ModerationRule::findOrFail($request->integer('rule_id'));
 
-        $moderator = new \App\Services\Moderation\Moderator;
-        $moderator->loadRule($rule);
+        if (isset($validated['rule_id'])) {
+            $result = $this->testRuleAgainstText(ModerationRule::findOrFail($validated['rule_id']), $text);
 
-        $matches = $moderator->check($text);
-        $hits = $moderator->collectMatches($text);
+            return response()->json($result);
+        }
+
+        $results = ModerationRule::orderBy('name')
+            ->get()
+            ->map(fn (ModerationRule $rule): array => $this->testRuleAgainstText($rule, $text))
+            ->values();
 
         return response()->json([
-            'matches' => $matches,
-            'hits' => $hits,
-            'rule' => $rule,
+            'results' => $results,
         ]);
+    }
+
+    /**
+     * @return array{matches: bool, hits: list<string>, rule: ModerationRule}
+     */
+    private function testRuleAgainstText(ModerationRule $rule, string $text): array
+    {
+        $moderator = new Moderator;
+        $moderator->loadRule($rule);
+
+        return [
+            'matches' => $moderator->check($text),
+            'hits' => $moderator->collectMatches($text),
+            'rule' => $rule,
+        ];
     }
 }

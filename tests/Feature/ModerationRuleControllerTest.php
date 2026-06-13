@@ -257,3 +257,24 @@ test('rules are ordered by name', function () {
         ->and($data[1]['name'])->toBe('Middle rule')
         ->and($data[2]['name'])->toBe('Zebra rule');
 });
+
+test('can test text against all moderation rules', function () {
+    $buzzRule = ModerationRule::factory()->any(['buzz'])->create(['name' => 'Buzz']);
+    $maleRule = ModerationRule::factory()->any(['male'])->create(['name' => 'Male']);
+    $catRule = ModerationRule::factory()->any(['cat'])->create(['name' => 'Cat']);
+
+    $response = $this->postJson('/api/moderation-rules/test', [
+        'text' => 'portrait of a buzz cut male character',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('results.0.rule.id', $buzzRule->id)
+        ->assertJsonPath('results.0.matches', true)
+        ->assertJsonPath('results.0.hits', ['buzz'])
+        ->assertJsonPath('results.1.rule.id', $catRule->id)
+        ->assertJsonPath('results.1.matches', false)
+        ->assertJsonPath('results.1.hits', [])
+        ->assertJsonPath('results.2.rule.id', $maleRule->id)
+        ->assertJsonPath('results.2.matches', true)
+        ->assertJsonPath('results.2.hits', ['male']);
+});

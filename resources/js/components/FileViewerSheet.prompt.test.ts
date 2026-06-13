@@ -50,6 +50,8 @@ function makeFile(overrides: Partial<File> = {}): File {
         containers: [],
         capabilities: {
             refresh_source_media: false,
+            restore_listing_metadata: false,
+            restore_detail_metadata: false,
             watch_source_and_refresh: false,
             unwatch_source_account: false,
         },
@@ -231,5 +233,111 @@ describe('FileViewerSheet prompt state', () => {
         });
 
         expect(wrapper.get('[data-test="file-prompt"]').text()).toContain('Loading prompt...');
+    });
+
+    it('emits a prompt test request from the prompt section', async () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile(),
+                prompt: 'buzz cut character',
+                showPrompt: true,
+            },
+        });
+
+        await wrapper.get('[data-test="file-prompt-test"]').trigger('click');
+
+        expect(wrapper.emitted('test-prompt')).toEqual([['buzz cut character']]);
+    });
+
+    it('shows source metadata refresh at the top when detail restore is supported', async () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 133523267,
+                isLoading: false,
+                fileData: makeFile({
+                    id: 133523267,
+                    source: 'CivitAI',
+                    source_id: '133523267',
+                    metadata: null,
+                    listing_metadata: {
+                        id: 133523267,
+                        meta: null,
+                    },
+                    capabilities: {
+                        refresh_source_media: false,
+                        restore_listing_metadata: true,
+                        restore_detail_metadata: true,
+                        watch_source_and_refresh: false,
+                        unwatch_source_account: false,
+                    },
+                }),
+                prompt: 'already cached prompt',
+            },
+        });
+
+        const refreshButton = wrapper.get('[data-test="file-source-metadata-refresh"]');
+        const sheetText = wrapper.text();
+
+        expect(refreshButton.text()).toContain('Fetch metadata');
+        expect(sheetText.indexOf('Fetch metadata')).toBeLessThan(sheetText.indexOf('Source'));
+
+        await refreshButton.trigger('click');
+
+        expect(wrapper.emitted('refresh-source-metadata')).toEqual([[133523267]]);
+    });
+
+    it('shows source metadata refresh progress at the top', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 133523267,
+                isLoading: false,
+                isRefreshingSourceMetadata: true,
+                fileData: makeFile({
+                    id: 133523267,
+                    source: 'CivitAI',
+                    source_id: '133523267',
+                    capabilities: {
+                        refresh_source_media: false,
+                        restore_listing_metadata: true,
+                        restore_detail_metadata: true,
+                        watch_source_and_refresh: false,
+                        unwatch_source_account: false,
+                    },
+                }),
+            },
+        });
+
+        expect(wrapper.get('[data-test="file-source-metadata-refresh"]').text()).toContain('Fetching metadata...');
+    });
+
+    it('does not show source metadata refresh when detail restore is not supported', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile({
+                    source: 'CivitAI',
+                    source_id: '133523267',
+                    metadata: null,
+                    listing_metadata: null,
+                    capabilities: {
+                        refresh_source_media: false,
+                        restore_listing_metadata: true,
+                        restore_detail_metadata: false,
+                        watch_source_and_refresh: false,
+                        unwatch_source_account: false,
+                    },
+                }),
+                showPrompt: true,
+            },
+        });
+
+        expect(wrapper.find('[data-test="file-source-metadata-refresh"]').exists()).toBe(false);
     });
 });

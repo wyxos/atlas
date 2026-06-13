@@ -24,6 +24,18 @@ vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
     },
 }));
 
+vi.mock('@/actions/App/Http/Controllers/FileSourceMetadataController', () => ({
+    default: {
+        url: (args: number | { file: number; target: string }) => {
+            if (typeof args === 'number') {
+                return `/api/files/${args}/source-metadata/detail`;
+            }
+
+            return `/api/files/${args.file}/source-metadata/${args.target}`;
+        },
+    },
+}));
+
 Object.defineProperty(window, 'axios', {
     value: mockAxios,
     writable: true,
@@ -121,6 +133,230 @@ describe('useFileViewerData', () => {
         expect(items.value[0].originalUrl).toBe('https://images.example.test/fresh-original.png');
         expect(items.value[0].previewed_count).toBe(3);
         expect(items.value[0].seen_count).toBe(4);
+    });
+
+    it('refreshes source metadata and updates the sheet and feed item metadata cache', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                file: {
+                    id: 1,
+                    source: 'CivitAI',
+                    source_id: '133523267',
+                    url: 'https://image.civitai.com/fresh.jpeg',
+                    file_url: 'https://image.civitai.com/fresh.jpeg',
+                    preview_url: 'https://image.civitai.com/fresh-preview.jpeg',
+                    previewed_count: 3,
+                    seen_count: 4,
+                    auto_blacklisted: false,
+                    blacklisted_at: null,
+                    downloaded: false,
+                    not_found: false,
+                    metadata: {
+                        payload: {
+                            prompt: 'restored prompt',
+                        },
+                    },
+                    listing_metadata: {
+                        id: 133523267,
+                        meta: {
+                            prompt: 'restored prompt',
+                        },
+                    },
+                    detail_metadata: null,
+                    containers: [],
+                    capabilities: {
+                        refresh_source_media: false,
+                        restore_listing_metadata: true,
+                        restore_detail_metadata: true,
+                        watch_source_and_refresh: false,
+                        unwatch_source_account: false,
+                    },
+                },
+            },
+        });
+
+        const items = ref([{
+            id: 1,
+            src: 'https://image.civitai.com/stale-preview.jpeg',
+            preview: 'https://image.civitai.com/stale-preview.jpeg',
+            original: 'https://image.civitai.com/stale.jpeg',
+            url: 'https://image.civitai.com/stale.jpeg',
+            metadata: null,
+        }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: false });
+
+        const {
+            fileData,
+            isRefreshingSourceMetadata,
+            sourceMetadataRefreshError,
+            refreshSourceMetadata,
+        } = useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+        });
+
+        const restored = await refreshSourceMetadata(1);
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/source-metadata/detail');
+        expect(restored?.id).toBe(1);
+        expect(isRefreshingSourceMetadata.value).toBe(false);
+        expect(sourceMetadataRefreshError.value).toBeNull();
+        expect(fileData.value?.metadata?.payload.prompt).toBe('restored prompt');
+        expect(items.value[0].metadata).toEqual({ prompt: 'restored prompt' });
+        expect(items.value[0].listing_metadata.meta.prompt).toBe('restored prompt');
+        expect(items.value[0].src).toBe('https://image.civitai.com/fresh-preview.jpeg');
+    });
+
+    it('automatically refreshes source metadata after a detail-capable sheet file loads', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                file: {
+                    id: 1,
+                    source: 'CivitAI',
+                    source_id: '133523267',
+                    filename: 'one.jpg',
+                    metadata: null,
+                    capabilities: {
+                        refresh_source_media: false,
+                        restore_listing_metadata: true,
+                        restore_detail_metadata: true,
+                        watch_source_and_refresh: false,
+                        unwatch_source_account: false,
+                    },
+                },
+            },
+        });
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                file: {
+                    id: 1,
+                    source: 'CivitAI',
+                    source_id: '133523267',
+                    filename: 'one.jpg',
+                    preview_url: 'https://image.civitai.com/fresh-preview.jpeg',
+                    previewed_count: 3,
+                    seen_count: 4,
+                    auto_blacklisted: false,
+                    blacklisted_at: null,
+                    downloaded: false,
+                    not_found: false,
+                    metadata: {
+                        payload: {
+                            prompt: 'auto restored prompt',
+                        },
+                    },
+                    listing_metadata: {
+                        id: 133523267,
+                        meta: {
+                            prompt: 'auto restored prompt',
+                        },
+                    },
+                    detail_metadata: null,
+                    containers: [],
+                    capabilities: {
+                        refresh_source_media: false,
+                        restore_listing_metadata: true,
+                        restore_detail_metadata: true,
+                        watch_source_and_refresh: false,
+                        unwatch_source_account: false,
+                    },
+                },
+            },
+        });
+
+        const items = ref([{
+            id: 1,
+            src: 'https://image.civitai.com/stale-preview.jpeg',
+            preview: 'https://image.civitai.com/stale-preview.jpeg',
+            metadata: null,
+        }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: true });
+
+        const { fileData, isRefreshingSourceMetadata } = useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+        });
+
+        await flushPromises();
+
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/files/1');
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/source-metadata/detail');
+        expect(isRefreshingSourceMetadata.value).toBe(false);
+        expect(fileData.value?.metadata?.payload.prompt).toBe('auto restored prompt');
+        expect(items.value[0].metadata).toEqual({ prompt: 'auto restored prompt' });
+    });
+
+    it('does not automatically refresh source metadata when the file lacks detail restore capability', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                file: {
+                    id: 1,
+                    source: 'CivitAI',
+                    source_id: '133523267',
+                    filename: 'one.jpg',
+                    capabilities: {
+                        refresh_source_media: false,
+                        restore_listing_metadata: true,
+                        restore_detail_metadata: false,
+                        watch_source_and_refresh: false,
+                        unwatch_source_account: false,
+                    },
+                },
+            },
+        });
+
+        const items = ref([{ id: 1 }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: true });
+
+        useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+        });
+
+        await flushPromises();
+
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/files/1');
+        expect(mockAxios.post).not.toHaveBeenCalled();
+    });
+
+    it('keeps source metadata refresh errors visible without changing the current sheet file', async () => {
+        mockAxios.post.mockRejectedValueOnce({
+            response: {
+                data: {
+                    message: 'Source metadata refresh failed.',
+                },
+            },
+        });
+
+        const items = ref([{ id: 1 }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: false });
+
+        const { fileData, sourceMetadataRefreshError, refreshSourceMetadata } = useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+        });
+
+        const restored = await refreshSourceMetadata(1);
+
+        expect(restored).toBeNull();
+        expect(fileData.value).toBeNull();
+        expect(sourceMetadataRefreshError.value).toBe('Source metadata refresh failed.');
     });
 
     it('refreshes spotify sheet data without assigning the spotify page as native playback', () => {

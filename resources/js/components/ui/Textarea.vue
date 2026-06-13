@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, useAttrs } from 'vue';
+
+defineOptions({
+    inheritAttrs: false,
+});
 
 interface Props {
     modelValue?: string;
@@ -24,6 +28,8 @@ const emit = defineEmits<{
     focus: [event: FocusEvent];
 }>();
 
+const attrs = useAttrs();
+
 const textareaClasses = computed(() => {
     const baseClasses =
         'w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors resize-none bg-prussian-blue-600 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-400 focus:ring-smart-blue-400/20';
@@ -47,6 +53,7 @@ function handleFocus(event: FocusEvent): void {
             <slot name="label" />
         </label>
         <textarea
+            v-bind="attrs"
             :id="id"
             :value="modelValue"
             :placeholder="placeholder"
@@ -61,4 +68,3 @@ function handleFocus(event: FocusEvent): void {
         </p>
     </div>
 </template>
-

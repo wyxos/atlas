@@ -13,4 +13,8 @@ describe('Atlas routes', () => {
 
         expect(browseFileRoute?.name).toBe('browse-file');
     });
+
+    it('does not register the retired standalone moderation test route', () => {
+        expect(routes.some((route) => route.path === '/moderation/test')).toBe(false);
+    });
 });
