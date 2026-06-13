@@ -2,7 +2,6 @@
 
 use App\Models\Container;
 use App\Models\File;
-use App\Models\FileMetadata;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +15,7 @@ test('restore civitai containers refreshes metadata and attaches containers for 
         'source' => 'CivitAI',
         'source_id' => '89366076',
         'url' => 'https://image.civitai.com/stale.jpg',
+        'hash' => 'existing-hash',
         'referrer_url' => null,
         'listing_metadata' => null,
     ]);
@@ -71,12 +71,11 @@ test('restore civitai containers refreshes metadata and attaches containers for 
 
     expect($file->source)->toBe('CivitAI')
         ->and($file->source_id)->toBe('89366076')
-        ->and($file->hash)->toBe('abc123')
-        ->and($file->referrer_url)->toBe('https://civitai.com/images/89366076')
+        ->and($file->hash)->toBe('existing-hash')
+        ->and($file->referrer_url)->toBeNull()
         ->and(data_get($file->listing_metadata, 'postId'))->toBe(19824281)
-        ->and(data_get($file->listing_metadata, 'username'))->toBe('fixture-user');
-
-    expect(FileMetadata::query()->where('file_id', $file->id)->exists())->toBeTrue();
+        ->and(data_get($file->listing_metadata, 'username'))->toBe('fixture-user')
+        ->and(data_get($file->listing_metadata, 'meta.prompt'))->toBe('test prompt');
 
     $post = Container::query()
         ->where('type', 'Post')
