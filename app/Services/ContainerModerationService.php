@@ -85,4 +85,9 @@ final class ContainerModerationService extends BaseModerationService
             ? FilePreviewService::FEED_REMOVED_PREVIEW_COUNT
             : null;
     }
+
+    protected function shouldQueueContainerAutoBlacklistEvaluation(): bool
+    {
+        return false;
+    }
 }

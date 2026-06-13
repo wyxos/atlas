@@ -160,6 +160,7 @@ abstract class BaseModerationService
                     is_int($userId) ? $userId : null,
                     minimumPreviewedCount: $group['minimum_previewed_count'],
                     autoBlacklisted: true,
+                    queueContainerAutoBlacklistEvaluation: $this->shouldQueueContainerAutoBlacklistEvaluation(),
                 );
             }
         }
@@ -329,6 +330,11 @@ abstract class BaseModerationService
     protected function getBlacklistMinimumPreviewedCount(object $match): ?int
     {
         return null;
+    }
+
+    protected function shouldQueueContainerAutoBlacklistEvaluation(): bool
+    {
+        return true;
     }
 
     /**

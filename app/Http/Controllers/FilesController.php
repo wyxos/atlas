@@ -349,6 +349,7 @@ SVG;
             is_int($userId) ? $userId : null,
             minimumPreviewedCount: FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
             autoBlacklisted: false,
+            queueContainerAutoBlacklistEvaluation: true,
         );
 
         if ($processedIds === []) {

@@ -122,6 +122,7 @@ class ExtensionReactionProcessor
             (int) $user->id,
             minimumPreviewedCount: FilePreviewService::FEED_REMOVED_PREVIEW_COUNT,
             autoBlacklisted: false,
+            queueContainerAutoBlacklistEvaluation: true,
         );
         $file->refresh();
         $activeTransfer = $loadActiveTransfer ? $this->activeTransferLookup->forFileId((int) $file->id) : null;

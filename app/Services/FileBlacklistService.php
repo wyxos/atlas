@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\EvaluateContainerAutoBlacklist;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Library\LibraryIndexSyncDispatcher;
@@ -28,6 +29,7 @@ class FileBlacklistService
         bool $queueDelete = true,
         ?int $minimumPreviewedCount = null,
         bool $autoBlacklisted = false,
+        bool $queueContainerAutoBlacklistEvaluation = false,
     ): array {
         $files = collect($files)
             ->filter(fn (mixed $file): bool => $file instanceof File)
@@ -43,8 +45,9 @@ class FileBlacklistService
             ->map(fn (mixed $fileId): int => (int) $fileId)
             ->all();
         $blacklistedAt = now();
+        $newBlacklistIds = [];
 
-        DB::transaction(function () use ($files, $fileIds, $blacklistedAt, $minimumPreviewedCount, $autoBlacklisted): void {
+        DB::transaction(function () use ($files, $fileIds, $blacklistedAt, $minimumPreviewedCount, $autoBlacklisted, &$newBlacklistIds): void {
             $newBlacklistIds = $files
                 ->filter(fn (File $file): bool => $file->blacklisted_at === null)
                 ->pluck('id')
@@ -120,6 +123,10 @@ class FileBlacklistService
 
         $this->libraryIndexSyncDispatcher->filesAndReactions($fileIds);
 
+        if ($queueContainerAutoBlacklistEvaluation) {
+            $this->dispatchContainerAutoBlacklistEvaluation($newBlacklistIds, $userId);
+        }
+
         return $fileIds;
     }
 
@@ -181,5 +188,27 @@ class FileBlacklistService
         return Reaction::query()
             ->where('file_id', $file->id)
             ->get();
+    }
+
+    /**
+     * @param  array<int>  $fileIds
+     */
+    private function dispatchContainerAutoBlacklistEvaluation(array $fileIds, ?int $userId): void
+    {
+        if ($fileIds === []) {
+            return;
+        }
+
+        $containerIds = DB::table('container_file')
+            ->whereIn('file_id', $fileIds)
+            ->distinct()
+            ->pluck('container_id')
+            ->map(fn (mixed $containerId): int => (int) $containerId)
+            ->filter(fn (int $containerId): bool => $containerId > 0)
+            ->values();
+
+        foreach ($containerIds as $containerId) {
+            EvaluateContainerAutoBlacklist::dispatch((int) $containerId, $userId);
+        }
     }
 }
