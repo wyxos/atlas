@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { RefreshCw, RotateCcw, Tags } from 'lucide-vue-next';
+import { RefreshCw, RotateCcw, Square, Tags } from 'lucide-vue-next';
 import AudioMetadataProposalTable from '@/components/AudioMetadataProposalTable.vue';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
@@ -191,6 +191,11 @@ function selectFieldOption(field: string, optionId: string): void {
     selectedFields.value = proposalFields.value.filter((proposalField) => nextFields.has(proposalField));
 }
 
+function clearFieldSelections(): void {
+    selectionTouched.value = true;
+    selectedFields.value = [];
+}
+
 function applyFieldOptions(): Record<string, string> {
     return Object.fromEntries(
         selectedFields.value
@@ -356,10 +361,21 @@ function evidenceSourceLinks(proposal: AudioMetadataProposal) {
                     </div>
 
                     <div v-else-if="pendingProposal" class="mt-5 space-y-3" data-test="audio-metadata-proposal">
-                        <div class="flex items-center justify-between border-b border-twilight-indigo-500/70 pb-3">
+                        <div class="flex items-center justify-between gap-3 border-b border-twilight-indigo-500/70 pb-3">
                             <span class="text-xs font-semibold uppercase text-twilight-indigo-200">
                                 {{ audioMetadataProviderLabel(pendingProposal.provider) }} - {{ pendingProposal.confidence }}%
                             </span>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                :disabled="props.isReviewing || selectedFields.length === 0"
+                                data-test="audio-metadata-uncheck-all"
+                                @click="clearFieldSelections"
+                            >
+                                <Square class="size-4" aria-hidden="true" />
+                                Uncheck all
+                            </Button>
                         </div>
                         <div
                             v-if="evidenceItems(pendingProposal).length > 0 || evidenceSourceLinks(pendingProposal).length > 0"

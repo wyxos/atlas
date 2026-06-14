@@ -69,7 +69,7 @@ class AudioMetadataCandidateFieldReviewer
 
     /**
      * @param  array<string, mixed>  $values
-     * @param  array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>,field_reviews?:array<string, array{verdict:string,confidence:float|null,reason:string}>}  $review
+     * @param  array{verdict:string,reason:string,model:string|null,safe_fields:list<string>,field_reviews?:array<string, array{verdict:string,reason:string}>}  $review
      * @return array<string, mixed>
      */
     private function valuesAllowedByReview(array $values, array $review): array

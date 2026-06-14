@@ -176,9 +176,6 @@ class AudioMetadataDiscogsProvider
             }
 
             $candidate['evidence']['release_adjudication'] = $review;
-            if (is_numeric($review['confidence'] ?? null)) {
-                $candidate['confidence'] = max(72, min(96, (int) round(((float) $review['confidence']) * 100)));
-            }
 
             return [$candidate];
         }

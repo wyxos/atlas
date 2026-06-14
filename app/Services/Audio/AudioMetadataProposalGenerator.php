@@ -247,9 +247,6 @@ class AudioMetadataProposalGenerator
         }
 
         $candidate['evidence']['ai_review'] = $review;
-        if (is_numeric($review['confidence'] ?? null)) {
-            $candidate['confidence'] = max(60, min(92, (int) round(((float) $review['confidence']) * 100)));
-        }
 
         return $candidate;
     }
@@ -341,7 +338,7 @@ class AudioMetadataProposalGenerator
 
             $current = $currentValues[$field] ?? null;
             $proposed = $proposedValues[$field];
-            if (! $this->valuesMatch($current, $proposed)) {
+            if (! $this->valuesMatch($field, $current, $proposed)) {
                 $changes[$field] = ['current' => $current, 'proposed' => $proposed];
             }
         }
@@ -354,7 +351,7 @@ class AudioMetadataProposalGenerator
         return array_diff_key($values, array_flip(['title_aliases', 'artist_aliases', 'album_aliases', 'artist_alias_map']));
     }
 
-    private function valuesMatch(mixed $current, mixed $proposed): bool
+    private function valuesMatch(string $field, mixed $current, mixed $proposed): bool
     {
         if (is_array($current) || is_array($proposed)) {
             return $this->normalizeComparableList($current) === $this->normalizeComparableList($proposed);
@@ -364,7 +361,8 @@ class AudioMetadataProposalGenerator
             return (string) $current === (string) $proposed;
         }
 
-        return $this->normalizeComparableString($current) === $this->normalizeComparableString($proposed);
+        return $this->normalizeComparableString($current, ignoreCase: $field !== 'title')
+            === $this->normalizeComparableString($proposed, ignoreCase: $field !== 'title');
     }
 
     private function normalizeComparableList(mixed $value): array
@@ -375,9 +373,11 @@ class AudioMetadataProposalGenerator
         ));
     }
 
-    private function normalizeComparableString(mixed $value): string
+    private function normalizeComparableString(mixed $value, bool $ignoreCase = true): string
     {
-        return preg_replace('/\s+/', ' ', mb_strtolower(trim((string) $value))) ?? '';
+        $normalized = preg_replace('/\s+/', ' ', trim((string) $value)) ?? '';
+
+        return $ignoreCase ? mb_strtolower($normalized) : $normalized;
     }
 
     private function isSpotifyFile(File $file): bool

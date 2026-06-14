@@ -9,6 +9,7 @@
         "test:extension:automation": "npm run build:extension && node scripts/restart-extension-automation.mjs",
         "package:extension": "npm run build:extension && php scripts/package-extension.php",
         "package:extension:local": "npm run build:extension && php scripts/package-extension.php --bump=codex",
+        "audit:recovered-downloads": "node scripts/audit-recovered-downloads.mjs",
         "verify:vibe-dependency": "node scripts/verify-vibe-dependency.mjs",
         "dev": "vite",
         "dev:extension": "vite --config extension/vite.config.ts",

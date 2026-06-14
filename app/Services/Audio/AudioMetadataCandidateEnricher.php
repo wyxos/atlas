@@ -292,7 +292,6 @@ class AudioMetadataCandidateEnricher
         $trackTitle = $this->sourceTitleCanonical($this->values->cleanString($track['title'] ?? null));
 
         $candidate['provider'] = $provider;
-        $candidate['confidence'] = min(96, max($candidate['confidence'], (int) round(((float) ($review['confidence'] ?? 0)) * 100)));
         if ($provider === 'local_ai_discogs') {
             $this->putIfPresent($candidate['values'], 'artists', $this->releaseArtists($release));
         }

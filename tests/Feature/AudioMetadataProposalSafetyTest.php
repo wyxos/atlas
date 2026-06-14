@@ -138,13 +138,14 @@ test('local ai can accept a weak fingerprint candidate when source hints support
 
     $response->assertAccepted()
         ->assertJsonPath('proposal.provider', 'acoustid_musicbrainz')
-        ->assertJsonPath('proposal.confidence', 82)
+        ->assertJsonPath('proposal.confidence', 74)
         ->assertJsonPath('proposal.proposed_values', [])
         ->assertJsonPath('proposal.field_options.title.0.value', 'the executioner')
         ->assertJsonPath('proposal.field_options.artists.0.value', ['zts'])
         ->assertJsonPath('proposal.evidence.identity_support', 'weak')
         ->assertJsonPath('proposal.evidence.ai_review.verdict', 'accept')
-        ->assertJsonPath('proposal.evidence.ai_review.model', 'qwen-test');
+        ->assertJsonPath('proposal.evidence.ai_review.model', 'qwen-test')
+        ->assertJsonMissingPath('proposal.evidence.ai_review.confidence');
 });
 
 test('local metadata run can propose a better cover from musicbrainz release search', function () {

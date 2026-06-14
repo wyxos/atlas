@@ -48,7 +48,6 @@ class AudioMetadataDiscogsAiReviewPayloads
             ],
             'fingerprint_candidate' => [
                 'provider' => $candidate['provider'],
-                'confidence' => $candidate['confidence'],
                 'values' => Arr::only($candidate['values'], self::REVIEW_FIELDS),
                 'evidence' => Arr::except($candidate['evidence'], ['fingerprint', 'raw_fingerprint']),
             ],
@@ -126,7 +125,7 @@ class AudioMetadataDiscogsAiReviewPayloads
     public function releaseAdjudicationPrompt(array $input): string
     {
         return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"ambiguous","confidence":0.82,"reason":"short reason","selected_release_id":null,"selected_track_position":null,"safe_fields":[],"rejected_candidates":[{"release_id":"456","reason":"short reason"}],"model":"model-name"}.',
+            'Return only JSON in this exact shape: {"verdict":"ambiguous","reason":"short reason","selected_release_id":null,"selected_track_position":null,"safe_fields":[],"rejected_candidates":[{"release_id":"456","reason":"short reason"}],"model":"model-name"}.',
             'Allowed verdict values: accept, reject, ambiguous.',
             'You are choosing the correct Discogs release and matched track for an Atlas audio metadata proposal.',
             'Use only the supplied JSON evidence. Do not invent releases, tracks, labels, dates, countries, IDs, covers, or safe fields.',
@@ -148,7 +147,7 @@ class AudioMetadataDiscogsAiReviewPayloads
     /**
      * @param  array<string, mixed>  $payload
      * @param  list<array<string, mixed>>  $candidates
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_release_id:string|null,selected_track_position:string|null,safe_fields:list<string>,rejected_candidates:list<array{release_id:string|null,reason:string|null}>}
+     * @return array{verdict:string,reason:string,model:string|null,selected_release_id:string|null,selected_track_position:string|null,safe_fields:list<string>,rejected_candidates:list<array{release_id:string|null,reason:string|null}>}
      */
     public function normalizeReleaseAdjudicationResponse(array $payload, array $candidates): array
     {
@@ -189,7 +188,7 @@ class AudioMetadataDiscogsAiReviewPayloads
     private function candidateSummaries(array $candidates): array
     {
         return array_values(array_map(
-            fn (array $candidate): array => Arr::except($candidate, ['fingerprint', 'raw_fingerprint']),
+            fn (array $candidate): array => Arr::except($candidate, ['confidence', 'fingerprint', 'raw_fingerprint']),
             $candidates,
         ));
     }
@@ -312,7 +311,7 @@ class AudioMetadataDiscogsAiReviewPayloads
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null}
+     * @return array{verdict:string,reason:string,model:string|null}
      */
     private function normalizeResponse(array $payload): array
     {
@@ -321,11 +320,8 @@ class AudioMetadataDiscogsAiReviewPayloads
             $verdict = 'ambiguous';
         }
 
-        $confidence = $payload['confidence'] ?? null;
-
         return [
             'verdict' => $verdict,
-            'confidence' => is_numeric($confidence) ? max(0.0, min(1.0, (float) $confidence)) : null,
             'reason' => mb_substr($this->cleanString($payload['reason'] ?? null) ?? 'No reason returned.', 0, 240),
             'model' => $this->cleanString($payload['model'] ?? config('services.audio_metadata.ai_model')),
         ];

@@ -328,6 +328,52 @@ describe('Audio metadata review options', () => {
         });
     });
 
+    it('can uncheck all selected metadata fields at once', async () => {
+        mockAxios.get.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/ids') {
+                return { data: idsResponse() };
+            }
+
+            if (url === '/api/audio/7/metadata-proposals/latest') {
+                return { data: { proposal: manualOptionsProposalFixture() } };
+            }
+
+            throw new Error(`Unexpected get URL: ${url}`);
+        });
+
+        mockAxios.post.mockImplementation(async (url: string) => {
+            if (url === '/api/audio/details') {
+                return { data: detailsResponse() };
+            }
+
+            throw new Error(`Unexpected post URL: ${url}`);
+        });
+
+        const wrapper = await mountAudio();
+        await flushPromises();
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        await wrapper.get('[data-test="audio-track-title"]').trigger('click');
+        await flushPromises();
+
+        const albumOption = document.body.querySelector<HTMLInputElement>('[data-test="audio-metadata-field-option-album"] input[type="radio"]');
+        const coverOption = document.body.querySelector<HTMLInputElement>('[data-test="audio-metadata-field-option-cover_url"] input[type="radio"]');
+        albumOption?.click();
+        coverOption?.click();
+        await flushPromises();
+
+        expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Use Album"]')?.checked).toBe(true);
+        expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Use Cover"]')?.checked).toBe(true);
+
+        document.body.querySelector<HTMLButtonElement>('[data-test="audio-metadata-uncheck-all"]')?.click();
+        await flushPromises();
+
+        expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Use Album"]')?.checked).toBe(false);
+        expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Use Cover"]')?.checked).toBe(false);
+        expect(document.body.querySelector<HTMLButtonElement>('[data-test="audio-metadata-apply"]')?.disabled).toBe(true);
+    });
+
     it('fetches full proposal details after a compact completed run snapshot', async () => {
         let latestProposalRequests = 0;
         let runPollRequests = 0;

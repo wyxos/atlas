@@ -38,7 +38,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, array{current:mixed,proposed:mixed}>  $changes
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null}|null
+     * @return array{verdict:string,reason:string,model:string|null}|null
      */
     public function review(File $file, array $currentValues, array $candidate, array $changes): ?array
     {
@@ -65,7 +65,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, mixed>  $source
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,source_identity_supported:bool,selected_track_position:string|null,selected_track_title:string|null}|null
+     * @return array{verdict:string,reason:string,model:string|null,source_identity_supported:bool,selected_track_position:string|null,selected_track_title:string|null}|null
      */
     public function resolveAnomaly(File $file, array $currentValues, array $candidate, array $source): ?array
     {
@@ -93,7 +93,7 @@ class AudioMetadataAiReviewer
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array<string, array{current:mixed,proposed:mixed}>  $changes
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>,field_reviews:array<string, array{verdict:string,confidence:float|null,reason:string}>}|null
+     * @return array{verdict:string,reason:string,model:string|null,safe_fields:list<string>,field_reviews:array<string, array{verdict:string,reason:string}>}|null
      */
     public function reviewFields(File $file, array $currentValues, array $candidate, array $changes): ?array
     {
@@ -143,7 +143,7 @@ class AudioMetadataAiReviewer
     /**
      * @param  array<string, mixed>  $currentValues
      * @param  list<array<string, mixed>>  $candidates
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,selected_release_id:string|null,selected_track_position:string|null,safe_fields:list<string>,rejected_candidates:list<array{release_id:string|null,reason:string|null}>}|null
+     * @return array{verdict:string,reason:string,model:string|null,selected_release_id:string|null,selected_track_position:string|null,safe_fields:list<string>,rejected_candidates:list<array{release_id:string|null,reason:string|null}>}|null
      */
     public function adjudicateDiscogsRelease(File $file, array $currentValues, array $candidates): ?array
     {
@@ -254,7 +254,6 @@ class AudioMetadataAiReviewer
             'current_values' => Arr::only($currentValues, self::REVIEW_FIELDS),
             'candidate' => [
                 'provider' => $candidate['provider'],
-                'confidence' => $candidate['confidence'],
                 'values' => Arr::only($candidate['values'], self::REVIEW_FIELDS),
                 'evidence' => Arr::except($candidate['evidence'], ['fingerprint', 'raw_fingerprint']),
             ],
@@ -282,7 +281,6 @@ class AudioMetadataAiReviewer
             'current_values' => $currentValues,
             'fingerprint_candidate' => [
                 'provider' => $candidate['provider'],
-                'confidence' => $candidate['confidence'],
                 'values' => $candidate['values'],
                 'evidence' => Arr::except($candidate['evidence'], ['fingerprint', 'raw_fingerprint']),
             ],
@@ -292,13 +290,12 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null}
+     * @return array{verdict:string,reason:string,model:string|null}
      */
     private function normalizeResponse(array $payload): array
     {
         return [
             'verdict' => $this->verdict($payload['verdict'] ?? null),
-            'confidence' => $this->confidence($payload['confidence'] ?? null),
             'reason' => mb_substr($this->usableReason($payload['reason'] ?? null) ?? 'AI did not return a usable review summary.', 0, 240),
             'model' => $this->cleanString($payload['model'] ?? config('services.audio_metadata.ai_model')),
         ];
@@ -306,7 +303,7 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,source_identity_supported:bool,selected_track_position:string|null,selected_track_title:string|null}
+     * @return array{verdict:string,reason:string,model:string|null,source_identity_supported:bool,selected_track_position:string|null,selected_track_title:string|null}
      */
     private function normalizeAnomalyResponse(array $payload): array
     {
@@ -320,7 +317,7 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>,field_reviews:array<string, array{verdict:string,confidence:float|null,reason:string}>}
+     * @return array{verdict:string,reason:string,model:string|null,safe_fields:list<string>,field_reviews:array<string, array{verdict:string,reason:string}>}
      */
     private function normalizeFieldReviewResponse(array $payload): array
     {
@@ -347,7 +344,7 @@ class AudioMetadataAiReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @param  array<string, array{verdict:string,confidence:float|null,reason:string}>  $fieldReviews
+     * @param  array<string, array{verdict:string,reason:string}>  $fieldReviews
      * @return list<string>
      */
     private function safeFieldsForReview(array $payload, array $fieldReviews): array
@@ -370,7 +367,7 @@ class AudioMetadataAiReviewer
     }
 
     /**
-     * @return array<string, array{verdict:string,confidence:float|null,reason:string}>
+     * @return array<string, array{verdict:string,reason:string}>
      */
     private function fieldReviews(mixed $reviews): array
     {
@@ -388,7 +385,6 @@ class AudioMetadataAiReviewer
             $verdict = $this->verdict($review['verdict'] ?? null);
             $normalized[$field] = [
                 'verdict' => $verdict,
-                'confidence' => $this->confidence($review['confidence'] ?? null),
                 'reason' => mb_substr($this->usableReason($review['reason'] ?? null) ?? $this->missingFieldReason($verdict), 0, 240),
             ];
         }
@@ -473,11 +469,6 @@ class AudioMetadataAiReviewer
         $verdict = mb_strtolower($this->cleanString($value) ?? 'ambiguous');
 
         return in_array($verdict, ['accept', 'reject', 'ambiguous'], true) ? $verdict : 'ambiguous';
-    }
-
-    private function confidence(mixed $value): ?float
-    {
-        return is_numeric($value) ? max(0.0, min(1.0, (float) $value)) : null;
     }
 
     private function host(string $url): ?string

@@ -98,7 +98,7 @@ class AudioMetadataDiscogsSupplementReviewer
      * @param  array<string, mixed>  $currentValues
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $candidate
      * @param  array{provider:string,confidence:int,values:array<string, mixed>,evidence:array<string, mixed>}  $discogsCandidate
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>}|null
+     * @return array{verdict:string,reason:string,model:string|null,safe_fields:list<string>}|null
      */
     private function reviewWithAi(File $file, array $currentValues, array $candidate, array $discogsCandidate): ?array
     {
@@ -193,13 +193,11 @@ class AudioMetadataDiscogsSupplementReviewer
             'current_values' => Arr::only($currentValues, self::REVIEW_FIELDS),
             'fingerprint_candidate' => [
                 'provider' => $candidate['provider'],
-                'confidence' => $candidate['confidence'],
                 'values' => Arr::only($candidate['values'], self::REVIEW_FIELDS),
                 'evidence' => Arr::except($candidate['evidence'], ['fingerprint', 'raw_fingerprint']),
             ],
             'discogs_candidate' => [
                 'provider' => $discogsCandidate['provider'],
-                'confidence' => $discogsCandidate['confidence'],
                 'values' => Arr::only($discogsCandidate['values'], self::REVIEW_FIELDS),
                 'evidence' => $discogsCandidate['evidence'],
             ],
@@ -208,7 +206,7 @@ class AudioMetadataDiscogsSupplementReviewer
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{verdict:string,confidence:float|null,reason:string,model:string|null,safe_fields:list<string>}
+     * @return array{verdict:string,reason:string,model:string|null,safe_fields:list<string>}
      */
     private function normalizeResponse(array $payload): array
     {
@@ -219,7 +217,6 @@ class AudioMetadataDiscogsSupplementReviewer
 
         return [
             'verdict' => $verdict,
-            'confidence' => is_numeric($payload['confidence'] ?? null) ? max(0.0, min(1.0, (float) $payload['confidence'])) : null,
             'reason' => mb_substr($this->values->cleanString($payload['reason'] ?? null) ?? 'No reason returned.', 0, 240),
             'model' => $this->values->cleanString($payload['model'] ?? config('services.audio_metadata.ai_model')),
             'safe_fields' => $this->safeFields(is_array($payload['safe_fields'] ?? null) ? $payload['safe_fields'] : []),
@@ -283,7 +280,7 @@ class AudioMetadataDiscogsSupplementReviewer
     private function prompt(array $input): string
     {
         return implode("\n", [
-            'Return only JSON in this exact shape: {"verdict":"accept","confidence":0.82,"reason":"short reason","safe_fields":["title"]}.',
+            'Return only JSON in this exact shape: {"verdict":"accept","reason":"short reason","safe_fields":["title"]}.',
             'Allowed verdict values: accept, reject, ambiguous.',
             'Decide whether the Discogs release package is consistent with the current album, edition, disc, and collection context.',
             'Use accept only when release-level fields such as album, disc number, track number, label, barcode, country, cover, and Discogs release ID can safely describe this file.',

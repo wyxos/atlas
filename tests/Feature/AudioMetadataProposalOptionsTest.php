@@ -375,6 +375,26 @@ test('metadata proposal can apply manually selected provider option values', fun
         ->and($album?->defaultCover?->path)->not->toBeNull();
 });
 
+test('metadata proposal treats title casing corrections as reviewable changes', function () {
+    $generator = app(\App\Services\Audio\AudioMetadataProposalGenerator::class);
+    $changes = new ReflectionMethod($generator, 'changes');
+
+    $result = $changes->invoke($generator, [
+        'title' => 'nexus',
+        'album' => 'nexus',
+    ], [
+        'title' => 'Nexus',
+        'album' => 'Nexus',
+    ]);
+
+    expect($result)->toHaveKey('title')
+        ->and($result['title'])->toBe([
+            'current' => 'nexus',
+            'proposed' => 'Nexus',
+        ])
+        ->and($result)->not->toHaveKey('album');
+});
+
 test('ai field review replaces placeholder and missing field reasons with explicit fallback text', function () {
     config([
         'services.audio_metadata.ai_enabled' => true,
@@ -440,6 +460,9 @@ test('ai field review replaces placeholder and missing field reasons with explic
     ]);
 
     expect($review)->not->toBeNull()
+        ->and($review)->not->toHaveKey('confidence')
+        ->and($review['field_reviews']['album'])->not->toHaveKey('confidence')
+        ->and($review['field_reviews']['disc_number'])->not->toHaveKey('confidence')
         ->and($review['reason'])->toBe('AI did not return a usable review summary.')
         ->and($review['field_reviews']['disc_number']['reason'])->toBe('AI marked this field ambiguous but did not return a field-specific reason.')
         ->and($review['field_reviews']['musicbrainz_recording_id']['reason'])->toBe('AI marked this field ambiguous but did not return a field-specific reason.');
