@@ -19,14 +19,14 @@ export const CUSTOMIZATION_TAB_META: Record<CustomizationTab, { title: string; d
     },
     mediaCleaner: {
         title: 'Media cleaner',
-        description: 'Normalize media URLs with named strategies, query stripping, and optional rewrite rules.',
+        description: 'Atlas compares and saves media by URL. For example, if width is removed, image.jpg?width=450 and image.jpg?width=900 both compare as image.jpg, so duplicate checks, reactions, and saved records stay together.',
     },
 };
 
 export const MEDIA_CLEANER_STRATEGY_META: Record<MediaCleanerStrategy, { title: string; description: string }> = {
     civitaiCanonical: {
         title: 'Civitai canonical',
-        description: 'Normalize Civitai asset variants to the stable URL Atlas stores for matching and reactions.',
+        description: 'Use on CivitAI pages so image and model variants save as one stable URL.',
     },
 };
 

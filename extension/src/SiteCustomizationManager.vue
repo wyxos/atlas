@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Trash2 } from 'lucide-vue-next';
+import { Ban, Check, Trash2 } from 'lucide-vue-next';
 import {
     CUSTOMIZATION_TABS,
     type CustomizationTab,
@@ -8,11 +8,12 @@ import {
 } from './options-site-customization-form';
 import {
     CUSTOMIZATION_TAB_META,
-    describeCustomization,
-    MEDIA_CLEANER_STRATEGY_META,
 } from './site-customization-manager-meta';
 import type { MediaCleanerStrategy } from './site-customizations';
+import SiteCustomizationMediaCleanerPanel from './SiteCustomizationMediaCleanerPanel.vue';
 import SiteCustomizationWidgetPanel from './SiteCustomizationWidgetPanel.vue';
+
+type ProfileStatusFilter = 'all' | 'enabled' | 'disabled';
 
 const props = defineProps<{
     customizations: SiteCustomizationForm[];
@@ -40,20 +41,47 @@ const emit = defineEmits<{
 }>();
 
 const importFileInput = ref<HTMLInputElement | null>(null);
+const profileSearchQuery = ref('');
+const profileStatusFilter = ref<ProfileStatusFilter>('all');
 const selectedCustomization = computed<SiteCustomizationForm | null>(() =>
     props.customizations[props.selectedCustomizationIndex] ?? null);
 const activeTabMeta = computed(() => CUSTOMIZATION_TAB_META[props.activeCustomizationTab]);
-const selectedCustomizationSummary = computed(() =>
-    selectedCustomization.value === null ? [] : describeCustomization(selectedCustomization.value));
-const enabledCustomizationCount = computed(() => props.customizations.filter((customization) => customization.enabled).length);
-const disabledCustomizationCount = computed(() => props.customizations.length - enabledCustomizationCount.value);
+const normalizedProfileSearchQuery = computed(() => profileSearchQuery.value.trim().toLowerCase());
+const profileStatusFilters: Array<{ id: ProfileStatusFilter; label: string }> = [
+    { id: 'all', label: 'All' },
+    { id: 'enabled', label: 'Enabled' },
+    { id: 'disabled', label: 'Disabled' },
+];
+const filteredProfileEntries = computed(() => props.customizations
+    .map((customization, index) => ({ customization, index }))
+    .filter(({ customization }) => {
+        const matchesSearch = normalizedProfileSearchQuery.value === ''
+            || customization.domain.toLowerCase().includes(normalizedProfileSearchQuery.value);
+        const matchesStatus = profileStatusFilter.value === 'all'
+            || (profileStatusFilter.value === 'enabled' && customization.enabled)
+            || (profileStatusFilter.value === 'disabled' && !customization.enabled);
 
+        return matchesSearch && matchesStatus;
+    }));
 function triggerImportCustomizations(): void {
     importFileInput.value?.click();
 }
 
 function handleImportCustomizations(event: Event): void {
     emit('import-customizations', event);
+}
+
+function updateMediaCleanerRewriteRule(
+    index: number,
+    field: 'pattern' | 'replace',
+    value: string,
+): void {
+    const rewriteRule = selectedCustomization.value?.mediaCleanerRewriteRules[index];
+    if (!rewriteRule) {
+        return;
+    }
+
+    rewriteRule[field] = value;
 }
 </script>
 
@@ -72,7 +100,7 @@ function handleImportCustomizations(event: Event): void {
                 <div class="flex flex-wrap items-center gap-2">
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/15 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/25"
+                        class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/15 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/25"
                         data-test-copy-customizations
                         @click="emit('copy-customizations')"
                     >
@@ -80,7 +108,7 @@ function handleImportCustomizations(event: Event): void {
                     </button>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/15 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/25"
+                        class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/15 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/25"
                         data-test-export-customizations
                         @click="emit('export-customizations')"
                     >
@@ -88,7 +116,7 @@ function handleImportCustomizations(event: Event): void {
                     </button>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/15 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/25"
+                        class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/15 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/25"
                         data-test-import-customizations
                         @click="triggerImportCustomizations"
                     >
@@ -109,7 +137,7 @@ function handleImportCustomizations(event: Event): void {
             </div>
         </div>
 
-        <div class="rounded-2xl border border-smart-blue-500/25 bg-prussian-blue-800/35 p-4 shadow-lg shadow-prussian-blue-950/10">
+        <div class="flex flex-col gap-3">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
                 <label class="block grow space-y-2">
                     <span class="text-xs font-semibold uppercase tracking-[0.24em] text-smart-blue-200">Add Domain</span>
@@ -118,45 +146,69 @@ function handleImportCustomizations(event: Event): void {
                         type="text"
                         placeholder="example.com"
                         data-test-new-customization-domain
-                        class="w-full rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
+                        class="w-full rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
                         @input="emit('update:newCustomizationDomain', ($event.target as HTMLInputElement).value)"
                     />
                 </label>
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-3 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
+                    class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-3 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
                     data-test-add-customization-domain
                     @click="emit('add-customization-domain')"
                 >
                     Add Profile
                 </button>
             </div>
-            <p class="mt-3 text-xs text-twilight-indigo-300">
+            <p class="text-xs text-twilight-indigo-300">
                 Use the page hostname that owns the widget context, such as
                 <span class="font-mono text-smart-blue-100">civitai.com</span>.
             </p>
         </div>
 
         <div class="grid gap-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]">
-            <aside class="space-y-3 rounded-2xl border border-smart-blue-500/25 bg-prussian-blue-800/35 p-4 shadow-lg shadow-prussian-blue-950/10">
-                <div class="border-b border-smart-blue-500/20 pb-3">
+            <aside class="flex max-h-[36rem] min-h-0 flex-col gap-3 rounded-sm border border-smart-blue-500/25 bg-prussian-blue-800/35 p-4 shadow-lg shadow-prussian-blue-950/10">
+                <div class="flex flex-col gap-3 border-b border-smart-blue-500/20 pb-3">
                     <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-smart-blue-200">Profiles</h3>
-                    <p class="mt-1 text-xs text-twilight-indigo-300">
-                        {{ enabledCustomizationCount }} enabled · {{ disabledCustomizationCount }} disabled
-                    </p>
+
+                    <label class="block">
+                        <span class="sr-only">Search profiles</span>
+                        <input
+                            v-model="profileSearchQuery"
+                            type="search"
+                            placeholder="Search profiles"
+                            data-test-profile-search
+                            class="w-full rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/55 px-3 py-2 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
+                        />
+                    </label>
+
+                    <div class="grid grid-cols-3 gap-1" data-test-profile-status-filters>
+                        <button
+                            v-for="filter in profileStatusFilters"
+                            :key="filter.id"
+                            type="button"
+                            class="rounded-sm border px-2 py-1.5 text-xs font-medium transition"
+                            :class="profileStatusFilter === filter.id
+                                ? 'border-smart-blue-300 bg-smart-blue-500/16 text-smart-blue-100'
+                                : 'border-smart-blue-500/20 bg-prussian-blue-900/35 text-twilight-indigo-200 hover:border-smart-blue-400/45 hover:bg-prussian-blue-900/50'"
+                            :data-test-profile-status-filter="filter.id"
+                            @click="profileStatusFilter = filter.id"
+                        >
+                            {{ filter.label }}
+                        </button>
+                    </div>
                 </div>
 
-                <div class="space-y-2">
+                <div class="min-h-0 flex-1 overflow-y-auto pr-1" data-test-profile-list-scroll>
                     <div
-                        v-if="customizations.length > 0"
-                        class="space-y-2"
+                        v-if="filteredProfileEntries.length > 0"
+                        class="flex flex-col gap-2"
                         data-test-customization-domain-list
                     >
                         <button
-                            v-for="(customization, index) in customizations"
+                            v-for="{ customization, index } in filteredProfileEntries"
                             :key="customization.domain || `customization-${index}`"
                             type="button"
-                            class="w-full rounded-2xl border p-3 text-left transition"
+                            class="w-full rounded-sm border p-3 text-left transition"
                             :class="index === selectedCustomizationIndex
                                 ? 'border-smart-blue-300 bg-smart-blue-500/16 shadow-lg shadow-smart-blue-900/15'
                                 : 'border-smart-blue-500/20 bg-prussian-blue-900/35 hover:border-smart-blue-400/45 hover:bg-prussian-blue-900/50'"
@@ -164,22 +216,13 @@ function handleImportCustomizations(event: Event): void {
                             @click="emit('update:selectedCustomizationIndex', index)"
                         >
                             <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0 space-y-2">
+                                <div class="min-w-0">
                                     <p class="truncate text-sm font-semibold text-regal-navy-100">
                                         {{ customization.domain }}
                                     </p>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <span
-                                            v-for="summary in describeCustomization(customization)"
-                                            :key="`${customization.domain}-${summary}`"
-                                            class="rounded-full border border-smart-blue-500/25 bg-prussian-blue-800/60 px-2.5 py-1 text-[11px] text-blue-slate-200"
-                                        >
-                                            {{ summary }}
-                                        </span>
-                                    </div>
                                 </div>
                                 <span
-                                    class="mt-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                    class="mt-0.5 inline-flex size-5 items-center justify-center rounded-sm border"
                                     :class="customization.enabled
                                         ? index === selectedCustomizationIndex
                                             ? 'border-emerald-300/70 text-emerald-100'
@@ -187,25 +230,43 @@ function handleImportCustomizations(event: Event): void {
                                         : index === selectedCustomizationIndex
                                             ? 'border-danger-300/70 text-danger-100'
                                             : 'border-danger-500/25 text-red-200'"
+                                    :aria-label="customization.enabled ? 'Enabled profile' : 'Disabled profile'"
+                                    :data-test-profile-status-icon="customization.domain"
                                 >
-                                    {{ customization.enabled ? 'Enabled' : 'Disabled' }}
+                                    <Check
+                                        v-if="customization.enabled"
+                                        class="size-3"
+                                        aria-hidden="true"
+                                    />
+                                    <Ban
+                                        v-else
+                                        class="size-3"
+                                        aria-hidden="true"
+                                    />
                                 </span>
                             </div>
                         </button>
                     </div>
 
                     <p
-                        v-else
-                        class="rounded-2xl border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/25 px-4 py-6 text-sm text-twilight-indigo-300"
+                        v-else-if="customizations.length === 0"
+                        class="rounded-sm border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/25 px-4 py-6 text-sm text-twilight-indigo-300"
                     >
                         Add a domain to start building a site profile.
+                    </p>
+
+                    <p
+                        v-else
+                        class="rounded-sm border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/25 px-4 py-6 text-sm text-twilight-indigo-300"
+                    >
+                        No profiles match the current filter.
                     </p>
                 </div>
             </aside>
 
             <section
                 v-if="selectedCustomization"
-                class="space-y-5 rounded-2xl border border-smart-blue-500/25 bg-prussian-blue-800/35 p-4 shadow-lg shadow-prussian-blue-950/10"
+                class="space-y-5 rounded-sm border border-smart-blue-500/25 bg-prussian-blue-800/35 p-4 shadow-lg shadow-prussian-blue-950/10"
                 data-test-customization-editor
             >
                 <div class="flex flex-col gap-4 border-b border-smart-blue-500/20 pb-4 xl:flex-row xl:items-start xl:justify-between">
@@ -215,37 +276,37 @@ function handleImportCustomizations(event: Event): void {
                             v-model="selectedCustomization.domain"
                             type="text"
                             data-test-selected-customization-domain
-                            class="w-full rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
+                            class="w-full rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
                         />
                     </label>
 
-                    <div class="flex flex-col gap-3 xl:items-end">
+                    <div
+                        class="flex flex-wrap items-center justify-end gap-2"
+                        data-test-profile-actions
+                    >
                         <button
                             type="button"
-                            class="inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-medium transition"
+                            role="switch"
+                            class="inline-flex h-8 w-14 items-center rounded-sm border p-1 transition"
                             :class="selectedCustomization.enabled
-                                ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/22'
-                                : 'border-danger-500/55 bg-danger-500/12 text-danger-100 hover:bg-danger-500/20'"
+                                ? 'border-emerald-300/60 bg-emerald-500/25'
+                                : 'border-danger-400/50 bg-danger-500/20'"
+                            :aria-checked="String(selectedCustomization.enabled)"
+                            :aria-label="selectedCustomization.enabled ? 'Disable profile' : 'Enable profile'"
+                            :title="selectedCustomization.enabled ? 'Disable profile' : 'Enable profile'"
                             data-test-toggle-customization-enabled
                             @click="selectedCustomization.enabled = !selectedCustomization.enabled"
                         >
-                            {{ selectedCustomization.enabled ? 'Disable Profile' : 'Enable Profile' }}
-                        </button>
-                        <div class="flex flex-wrap justify-end gap-1.5">
                             <span
-                                v-for="summary in selectedCustomizationSummary"
-                                :key="`selected-${summary}`"
-                                class="rounded-full border border-smart-blue-500/25 bg-prussian-blue-900/45 px-2.5 py-1 text-[11px] text-blue-slate-200"
-                            >
-                                {{ summary }}
-                            </span>
-                        </div>
-                        <p class="text-right text-xs text-twilight-indigo-300">
-                            Disabled profiles stay saved, but Atlas ignores them until you turn them back on.
-                        </p>
+                                class="block size-5 rounded-sm bg-regal-navy-100 transition"
+                                :class="selectedCustomization.enabled ? 'translate-x-6' : 'translate-x-0'"
+                                aria-hidden="true"
+                            />
+                        </button>
+
                         <button
                             type="button"
-                            class="inline-flex size-11 items-center justify-center rounded-xl border border-danger-500/55 bg-danger-500/15 text-danger-100 transition hover:bg-danger-500/25"
+                            class="inline-flex size-11 items-center justify-center rounded-sm border border-danger-500/55 bg-danger-500/15 text-danger-100 transition hover:bg-danger-500/25"
                             :data-test-remove-customization-domain="selectedCustomization.domain"
                             aria-label="Delete profile"
                             title="Delete profile"
@@ -262,7 +323,7 @@ function handleImportCustomizations(event: Event): void {
                         v-for="tab in CUSTOMIZATION_TABS"
                         :key="tab.id"
                         type="button"
-                        class="rounded-full border px-4 py-2 text-sm font-medium transition"
+                        class="rounded-sm border px-4 py-2 text-sm font-medium transition"
                         :class="activeCustomizationTab === tab.id
                             ? 'border-smart-blue-300 bg-smart-blue-500/16 text-smart-blue-100'
                             : 'border-smart-blue-500/20 bg-prussian-blue-900/35 text-twilight-indigo-200 hover:border-smart-blue-400/45 hover:bg-prussian-blue-900/50'"
@@ -273,19 +334,19 @@ function handleImportCustomizations(event: Event): void {
                     </button>
                 </div>
 
-                <div class="rounded-2xl border border-smart-blue-500/20 bg-prussian-blue-900/25 p-4">
+                <div
+                    class="flex flex-col gap-4"
+                    data-test-customization-active-panel
+                >
                     <div class="border-b border-smart-blue-500/20 pb-4">
-                        <h4 class="text-base font-semibold text-regal-navy-100">
-                            {{ activeTabMeta.title }}
-                        </h4>
-                        <p class="mt-1 text-sm text-blue-slate-300">
+                        <p class="text-sm text-blue-slate-300">
                             {{ activeTabMeta.description }}
                         </p>
                     </div>
 
                     <div
                         v-if="activeCustomizationTab === 'matchRules'"
-                        class="space-y-4 pt-4"
+                        class="space-y-4"
                         data-test-customization-panel="matchRules"
                     >
                         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -294,7 +355,7 @@ function handleImportCustomizations(event: Event): void {
                             </p>
                             <button
                                 type="button"
-                                class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
+                                class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
                                 data-test-add-match-rule
                                 @click="emit('add-match-rule')"
                             >
@@ -304,38 +365,41 @@ function handleImportCustomizations(event: Event): void {
 
                         <div
                             v-if="selectedCustomization.matchRules.length === 0"
-                            class="rounded-2xl border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/20 px-4 py-6 text-sm text-twilight-indigo-300"
+                            class="rounded-sm border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/20 px-4 py-6 text-sm text-twilight-indigo-300"
                         >
                             No match rules yet. This profile stays permissive until you add one.
                         </div>
 
                         <div v-else class="space-y-3">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200"
+                                data-test-match-rule-list-label
+                            >
+                                Regex pattern
+                            </p>
                             <div
                                 v-for="(_, regexIndex) in selectedCustomization.matchRules"
                                 :key="`regex-${regexIndex}`"
-                                class="rounded-2xl border border-smart-blue-500/20 bg-prussian-blue-900/30 p-3"
+                                class="flex flex-col gap-3 lg:flex-row lg:items-start"
+                                data-test-match-rule-row
                             >
-                                <div class="flex flex-col gap-3 lg:flex-row lg:items-start">
-                                    <label class="block grow space-y-2">
-                                        <span class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Regex Pattern</span>
-                                        <input
-                                            v-model="selectedCustomization.matchRules[regexIndex]"
-                                            type="text"
-                                            placeholder=".*\\/art\\/.*"
-                                            class="w-full rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/60 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
-                                        />
-                                    </label>
-                                    <button
-                                        type="button"
-                                        class="inline-flex size-12 items-center justify-center rounded-xl border border-danger-500/55 bg-danger-500/15 text-danger-100 transition hover:bg-danger-500/25"
-                                        aria-label="Delete match rule"
-                                        title="Delete match rule"
-                                        @click="emit('remove-match-rule', regexIndex)"
-                                    >
-                                        <Trash2 class="size-4" aria-hidden="true" />
-                                        <span class="sr-only">Delete match rule</span>
-                                    </button>
-                                </div>
+                                <input
+                                    v-model="selectedCustomization.matchRules[regexIndex]"
+                                    type="text"
+                                    placeholder=".*\\/art\\/.*"
+                                    aria-label="Regex pattern"
+                                    class="w-full grow rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/60 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
+                                />
+                                <button
+                                    type="button"
+                                    class="inline-flex size-12 items-center justify-center rounded-sm border border-danger-500/55 bg-danger-500/15 text-danger-100 transition hover:bg-danger-500/25"
+                                    aria-label="Delete match rule"
+                                    title="Delete match rule"
+                                    @click="emit('remove-match-rule', regexIndex)"
+                                >
+                                    <Trash2 class="size-4" aria-hidden="true" />
+                                    <span class="sr-only">Delete match rule</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -347,7 +411,7 @@ function handleImportCustomizations(event: Event): void {
 
                     <div
                         v-else-if="activeCustomizationTab === 'referrerCleaner'"
-                        class="space-y-4 pt-4"
+                        class="space-y-4"
                         data-test-customization-panel="referrerCleaner"
                     >
                         <label class="block space-y-2">
@@ -357,159 +421,35 @@ function handleImportCustomizations(event: Event): void {
                                 rows="6"
                                 placeholder='Comma or newline separated query params, for example tag, tags, or "*"'
                                 data-test-referrer-cleaner-query-params
-                                class="w-full rounded-2xl border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
+                                class="w-full rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
                             />
                         </label>
 
-                        <div class="rounded-2xl border border-smart-blue-500/20 bg-prussian-blue-900/25 px-4 py-3 text-sm text-twilight-indigo-300">
+                        <div class="rounded-sm border border-smart-blue-500/20 bg-prussian-blue-900/25 px-4 py-3 text-sm text-twilight-indigo-300">
                             These params are stripped from page and anchor referrers on this site before Atlas checks or stores them.
                             Use <span class="font-mono text-smart-blue-100">*</span> to remove every query param.
                         </div>
                     </div>
 
-                    <div
+                    <SiteCustomizationMediaCleanerPanel
                         v-else
-                        class="space-y-5 pt-4"
-                        data-test-customization-panel="mediaCleaner"
-                    >
-                        <section class="space-y-3">
-                            <div class="space-y-1">
-                                <h5 class="text-sm font-semibold text-regal-navy-100">Named Strategies</h5>
-                                <p class="text-sm text-twilight-indigo-300">
-                                    Use built-in strategies when a site needs contextual normalization that a plain regex cannot express.
-                                </p>
-                            </div>
-
-                            <div class="grid gap-3 md:grid-cols-2">
-                                <button
-                                    v-for="strategy in mediaCleanerStrategies"
-                                    :key="strategy"
-                                    type="button"
-                                    class="rounded-2xl border p-4 text-left transition"
-                                    :class="selectedCustomization.mediaCleanerStrategies.includes(strategy)
-                                        ? 'border-smart-blue-300 bg-smart-blue-500/16'
-                                        : 'border-smart-blue-500/20 bg-prussian-blue-900/30 hover:border-smart-blue-400/45 hover:bg-prussian-blue-900/45'"
-                                    :data-test-media-cleaner-strategy="strategy"
-                                    @click="emit('toggle-media-cleaner-strategy', strategy)"
-                                >
-                                    <div class="flex items-start justify-between gap-3">
-                                        <div class="space-y-1">
-                                            <p class="text-sm font-semibold text-regal-navy-100">
-                                                {{ MEDIA_CLEANER_STRATEGY_META[strategy]?.title ?? strategy }}
-                                            </p>
-                                            <p class="text-xs text-twilight-indigo-300">
-                                                {{ MEDIA_CLEANER_STRATEGY_META[strategy]?.description }}
-                                            </p>
-                                            <p class="font-mono text-[11px] text-smart-blue-100">
-                                                {{ strategy }}
-                                            </p>
-                                        </div>
-                                        <span
-                                            class="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                            :class="selectedCustomization.mediaCleanerStrategies.includes(strategy)
-                                                ? 'border-smart-blue-300/70 text-smart-blue-100'
-                                                : 'border-smart-blue-500/25 text-twilight-indigo-300'"
-                                        >
-                                            {{ selectedCustomization.mediaCleanerStrategies.includes(strategy) ? 'Enabled' : 'Off' }}
-                                        </span>
-                                    </div>
-                                </button>
-                            </div>
-                        </section>
-
-                        <section class="space-y-2">
-                            <div class="space-y-1">
-                                <h5 class="text-sm font-semibold text-regal-navy-100">Query Param Stripping</h5>
-                                <p class="text-sm text-twilight-indigo-300">
-                                    Remove unstable media query params before Atlas runs rewrite rules.
-                                </p>
-                            </div>
-                            <textarea
-                                v-model="selectedCustomization.mediaCleanerQueryParamsText"
-                                rows="4"
-                                placeholder='Comma or newline separated params, for example width, quality, or "*"'
-                                data-test-media-cleaner-query-params
-                                class="w-full rounded-2xl border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
-                            />
-                        </section>
-
-                        <section class="space-y-3">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div class="space-y-1">
-                                    <h5 class="text-sm font-semibold text-regal-navy-100">Rewrite Rules</h5>
-                                    <p class="text-sm text-twilight-indigo-300">
-                                        Atlas applies the first matching rewrite after strategies and query stripping.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center justify-center rounded-xl border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-2 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
-                                    data-test-add-media-rewrite-rule
-                                    @click="emit('add-media-rewrite-rule')"
-                                >
-                                    Add Rewrite
-                                </button>
-                            </div>
-
-                            <div
-                                v-if="selectedCustomization.mediaCleanerRewriteRules.length === 0"
-                                class="rounded-2xl border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/20 px-4 py-6 text-sm text-twilight-indigo-300"
-                            >
-                                No rewrite rules yet. Atlas will stop after strategies and query stripping.
-                            </div>
-
-                            <div v-else class="space-y-3">
-                                <div
-                                    v-for="(rewriteRule, rewriteIndex) in selectedCustomization.mediaCleanerRewriteRules"
-                                    :key="`rewrite-${rewriteIndex}`"
-                                    class="rounded-2xl border border-smart-blue-500/20 bg-prussian-blue-900/30 p-4"
-                                >
-                                    <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
-                                        <label class="block space-y-2">
-                                            <span class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Pattern</span>
-                                            <input
-                                                v-model="rewriteRule.pattern"
-                                                type="text"
-                                                placeholder="Regex pattern"
-                                                class="w-full rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/60 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
-                                            />
-                                        </label>
-
-                                        <label class="block space-y-2">
-                                            <span class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Replace</span>
-                                            <input
-                                                v-model="rewriteRule.replace"
-                                                type="text"
-                                                placeholder="Replacement string"
-                                                class="w-full rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/60 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
-                                            />
-                                        </label>
-
-                                        <button
-                                            type="button"
-                                            class="inline-flex size-12 items-center justify-center rounded-xl border border-danger-500/55 bg-danger-500/15 text-danger-100 transition hover:bg-danger-500/25"
-                                            aria-label="Delete rewrite rule"
-                                            title="Delete rewrite rule"
-                                            @click="emit('remove-media-rewrite-rule', rewriteIndex)"
-                                        >
-                                            <Trash2 class="size-4" aria-hidden="true" />
-                                            <span class="sr-only">Delete rewrite rule</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <div class="rounded-2xl border border-smart-blue-500/20 bg-prussian-blue-900/25 px-4 py-3 text-sm text-twilight-indigo-300">
-                            Cleaner order is strategy, then query stripping, then the first matching rewrite rule.
-                        </div>
-                    </div>
+                        :active-media-cleaner-strategies="selectedCustomization.mediaCleanerStrategies"
+                        :domain="selectedCustomization.domain"
+                        :media-cleaner-query-params-text="selectedCustomization.mediaCleanerQueryParamsText"
+                        :media-cleaner-rewrite-rules="selectedCustomization.mediaCleanerRewriteRules"
+                        :media-cleaner-strategies="mediaCleanerStrategies"
+                        @add-media-rewrite-rule="emit('add-media-rewrite-rule')"
+                        @remove-media-rewrite-rule="emit('remove-media-rewrite-rule', $event)"
+                        @toggle-media-cleaner-strategy="emit('toggle-media-cleaner-strategy', $event)"
+                        @update-media-cleaner-query-params-text="selectedCustomization.mediaCleanerQueryParamsText = $event"
+                        @update-media-rewrite-rule="updateMediaCleanerRewriteRule"
+                    />
                 </div>
             </section>
 
             <section
                 v-else
-                class="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/20 px-6 py-10 text-center text-sm text-twilight-indigo-300"
+                class="flex min-h-72 items-center justify-center rounded-sm border border-dashed border-smart-blue-500/25 bg-prussian-blue-900/20 px-6 py-10 text-center text-sm text-twilight-indigo-300"
             >
                 Select a domain to edit its customization tabs.
             </section>

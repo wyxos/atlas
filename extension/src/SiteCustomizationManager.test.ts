@@ -62,7 +62,8 @@ describe('SiteCustomizationManager', () => {
 
         expect(wrapper.text()).toContain('Add a domain to start building a site profile.');
         expect(wrapper.text()).toContain('Copied to clipboard.');
-        expect(wrapper.text()).toContain('0 enabled');
+        expect(wrapper.findAll('[data-test-profile-status-filter]')).toHaveLength(3);
+        expect(wrapper.get('[data-test-profile-search]').exists()).toBe(true);
 
         const fileInput = wrapper.get('[data-test-import-file-input]');
         const clickSpy = vi.fn();
@@ -116,7 +117,8 @@ describe('SiteCustomizationManager', () => {
         expect(wrapper.emitted('update:activeCustomizationTab')?.at(-1)).toEqual(['referrerCleaner']);
         expect(wrapper.emitted('add-match-rule')).toHaveLength(1);
         expect(wrapper.emitted('remove-customization')?.at(-1)).toEqual([0]);
-        expect(wrapper.text()).toContain('Disabled profiles stay saved');
+        expect(wrapper.get('[data-test-toggle-customization-enabled]').attributes('role')).toBe('switch');
+        expect(wrapper.text()).not.toContain('Disabled profiles stay saved');
     });
 
     it('shows the widget editor state', async () => {
@@ -133,7 +135,31 @@ describe('SiteCustomizationManager', () => {
         expect((wrapper.get('[data-test-widget-min-image-width]').element as HTMLInputElement).value)
             .toBe('120');
         expect(wrapper.text()).toContain('Leave blank to use the global 200px image threshold.');
-        expect(wrapper.text()).toContain('Min 120px');
+        expect(wrapper.get('[data-test-customization-domain-button="example.com"]').text()).not.toContain('Min 120px');
+    });
+
+    it('renders match rules as unframed rows with one shared label', async () => {
+        const wrapper = await mountManager({
+            customizations: [
+                createCustomization({
+                    matchRules: [
+                        '.*\\/images\\/.*',
+                        '.*\\/models\\/.*',
+                    ],
+                }),
+            ],
+        });
+
+        const label = wrapper.get('[data-test-match-rule-list-label]');
+        const rows = wrapper.findAll('[data-test-match-rule-row]');
+
+        expect(label.text()).toBe('Regex pattern');
+        expect(wrapper.text().match(/Regex pattern/g)).toHaveLength(1);
+        expect(rows).toHaveLength(2);
+        rows.forEach((row) => {
+            expect(row.classes()).not.toContain('rounded-sm');
+            expect(row.classes()).not.toContain('border');
+        });
     });
 
     it('keeps profiles visible while typing or stepping the widget minimum width', async () => {
@@ -177,7 +203,10 @@ describe('SiteCustomizationManager', () => {
             ],
         });
 
-        expect(wrapper.text()).toContain('No rewrite rules yet. Atlas will stop after strategies and query stripping.');
+        expect(wrapper.text()).toContain('No rewrite rules.');
+        expect(wrapper.text()).toContain('width=450');
+        expect(wrapper.text()).toContain('width=900');
+        expect(wrapper.text()).toContain('both compare as');
         expect(wrapper.get('[data-test-media-cleaner-strategy="civitaiCanonical"]').text()).toContain('Enabled');
 
         await wrapper.get('[data-test-media-cleaner-strategy="civitaiCanonical"]').trigger('click');
@@ -202,6 +231,8 @@ describe('SiteCustomizationManager', () => {
 
         expect(wrapperWithRule.text()).toContain('Pattern');
         expect(wrapperWithRule.text()).toContain('Replace');
+        expect(wrapperWithRule.get('[data-test-media-rewrite-rule-row]').classes()).not.toContain('rounded-sm');
+        expect(wrapperWithRule.get('[data-test-media-rewrite-rule-row]').classes()).not.toContain('border');
         await wrapperWithRule.findAll('button')
             .find((button) => button.attributes('title') === 'Delete rewrite rule')!
             .trigger('click');

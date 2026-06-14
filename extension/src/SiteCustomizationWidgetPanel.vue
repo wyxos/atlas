@@ -32,7 +32,7 @@ function stepMinImageWidth(delta: number): void {
     <div class="space-y-4 pt-4" data-test-customization-panel="widget">
         <label class="block max-w-md space-y-2">
             <span class="text-xs font-semibold uppercase tracking-[0.24em] text-smart-blue-200">Min Image Width</span>
-            <div class="flex w-full items-stretch overflow-hidden rounded-xl border border-smart-blue-500/35 bg-prussian-blue-900/55 focus-within:border-smart-blue-300">
+            <div class="flex w-full items-stretch overflow-hidden rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/55 focus-within:border-smart-blue-300">
                 <button
                     type="button"
                     class="inline-flex size-12 shrink-0 items-center justify-center border-r border-smart-blue-500/25 text-smart-blue-100 transition hover:bg-smart-blue-500/15 disabled:cursor-not-allowed disabled:text-twilight-indigo-500 disabled:hover:bg-transparent"
@@ -67,7 +67,7 @@ function stepMinImageWidth(delta: number): void {
             </div>
         </label>
 
-        <div class="rounded-2xl border border-smart-blue-500/20 bg-prussian-blue-900/25 px-4 py-3 text-sm text-twilight-indigo-300">
+        <div class="rounded-sm border border-smart-blue-500/20 bg-prussian-blue-900/25 px-4 py-3 text-sm text-twilight-indigo-300">
             Leave blank to use the global 200px image threshold. Use 0 when this profile should allow widgets on every loaded image size.
         </div>
     </div>

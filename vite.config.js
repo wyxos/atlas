@@ -17,7 +17,11 @@ export default defineConfig(({ command }) => {
         plugins: [
             wayfinder(),
             laravel({
-                input: ['resources/css/app.css', 'resources/js/app.ts'],
+                input: [
+                    'resources/css/app.css',
+                    'resources/js/app.ts',
+                    'resources/js/extension-options-preview.ts',
+                ],
                 refresh: true,
             }),
             vue({

@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <section class="rounded-md border border-smart-blue-500/30 bg-prussian-blue-800/40 p-3 space-y-3">
+    <section class="flex flex-col gap-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="space-y-1">
                 <div class="flex items-center gap-2">
@@ -221,14 +221,14 @@ onBeforeUnmount(() => {
                 </Badge>
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
+                    class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
                     @click="void refreshReverbMonitor()"
                 >
                     {{ hasStartedReverbMonitor ? 'Reconnect Reverb' : 'Connect Reverb' }}
                 </button>
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
+                    class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/20 px-3 py-2 text-xs font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/30"
                     @click="clearReverbEvents"
                 >
                     Clear Events
@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
 
         <p
             v-if="reverbEvents.length === 0"
-            class="rounded-md border border-dashed border-smart-blue-500/30 bg-prussian-blue-800/30 px-3 py-4 text-sm text-twilight-indigo-300"
+            class="rounded-sm border border-dashed border-smart-blue-500/30 bg-prussian-blue-800/30 px-3 py-4 text-sm text-twilight-indigo-300"
         >
             No Reverb events received yet.
         </p>
@@ -247,7 +247,7 @@ onBeforeUnmount(() => {
             <article
                 v-for="event in reverbEvents"
                 :key="event.id"
-                class="rounded-md border border-smart-blue-500/30 bg-prussian-blue-800/55 p-3"
+                class="rounded-sm border border-smart-blue-500/30 bg-prussian-blue-800/55 p-3"
             >
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-sm font-medium text-regal-navy-100">{{ event.event }}</p>
@@ -261,7 +261,7 @@ onBeforeUnmount(() => {
                 </p>
                 <details class="mt-2">
                     <summary class="cursor-pointer text-xs text-twilight-indigo-200">Payload</summary>
-                    <pre class="mt-2 overflow-x-auto rounded-md bg-prussian-blue-900/70 p-3 text-xs text-smart-blue-100">{{ formatJson(event.payload) }}</pre>
+                    <pre class="mt-2 overflow-x-auto rounded-sm bg-prussian-blue-900/70 p-3 text-xs text-smart-blue-100">{{ formatJson(event.payload) }}</pre>
                 </details>
             </article>
         </div>

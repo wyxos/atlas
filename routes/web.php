@@ -27,6 +27,15 @@ Route::get('/api/csrf', function () {
     return response()->noContent();
 })->name('api.csrf');
 
+if (app()->environment(['local', 'testing'])) {
+    Route::get('/__dev/extension-options', function () {
+        return response()
+            ->view('extension-options-preview')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
+    })->name('dev.extension-options');
+}
+
 // Public extension API endpoints. Kept in web.php with SPA-style /api prefix; no api middleware throttling is applied.
 Route::get('/api/extension/ping', [\App\Http\Controllers\ExtensionApiController::class, 'ping'])
     ->name('api.extension.ping');
