@@ -8,6 +8,7 @@ use App\Models\Reaction;
 use App\Models\User;
 use App\Services\CivitAiImages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
 require_once __DIR__.'/ExtensionReactionsTestSupport.php';
@@ -108,6 +109,113 @@ test('companion civitai status reports downloaded media and Atlas filter reasons
     $response->assertJsonPath('items.2.filter_reasons.0.type', 'moderation_rule');
     $response->assertJsonPath('items.2.filter_reasons.0.name', 'Blocked prompt term');
     expect(File::query()->where('source_id', '9103003')->exists())->toBeFalse();
+});
+
+test('companion civitai feed uses Atlas status and moderation to omit already handled media', function () {
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $downloadedUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/55555555-5555-4555-8555-555555555555/original=true/55555555-5555-4555-8555-555555555555.jpeg';
+    $ruleMatchedUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/66666666-6666-4666-8666-666666666666/original=true/66666666-6666-4666-8666-666666666666.jpeg';
+    $candidateUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/77777777-7777-4777-8777-777777777777/original=true/77777777-7777-4777-8777-777777777777.jpeg';
+
+    $downloadedFile = File::factory()->create([
+        'source' => CivitAiImages::SOURCE,
+        'source_id' => '9103020',
+        'url' => $downloadedUrl,
+        'downloaded' => true,
+        'downloaded_at' => now()->subHour(),
+    ]);
+
+    Reaction::query()->create([
+        'file_id' => $downloadedFile->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+
+    ModerationRule::factory()->any(['blockedterm'])->create([
+        'name' => 'Blocked prompt term',
+        'action_type' => ActionType::BLACKLIST,
+    ]);
+
+    Http::fake([
+        'https://civitai.com/api/v1/images*' => Http::response([
+            'items' => [
+                [
+                    'id' => 9103020,
+                    'url' => $downloadedUrl,
+                    'type' => 'image',
+                    'nsfw' => false,
+                    'nsfwLevel' => 1,
+                    'width' => 768,
+                    'height' => 1024,
+                    'meta' => ['prompt' => 'already downloaded'],
+                ],
+                [
+                    'id' => 9103021,
+                    'url' => $ruleMatchedUrl,
+                    'type' => 'image',
+                    'nsfwLevel' => 4,
+                    'width' => 768,
+                    'height' => 1024,
+                    'meta' => ['prompt' => 'contains blockedterm'],
+                ],
+                [
+                    'id' => 9103022,
+                    'url' => $candidateUrl,
+                    'type' => 'image',
+                    'nsfwLevel' => 2,
+                    'width' => 768,
+                    'height' => 1024,
+                    'meta' => ['prompt' => 'visible candidate'],
+                ],
+            ],
+            'metadata' => [
+                'nextCursor' => 'next-cursor',
+            ],
+        ], 200),
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/civitai/feed', [
+        'model_id' => 9303001,
+        'model_version_id' => 9404001,
+        'model_type' => 'Checkpoint',
+        'limit' => 20,
+        'cursor' => 'cursor-1',
+        'nsfw' => true,
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonCount(1, 'items');
+    $response->assertJsonPath('items.0.id', 9103022);
+    $response->assertJsonPath('items.0.nsfwLevel', 2);
+    $response->assertJsonPath('items.0.modelId', 9303001);
+    $response->assertJsonPath('items.0.modelVersionId', 9404001);
+    $response->assertJsonPath('items.0.resource_containers.0.modelVersionId', 9404001);
+    $response->assertJsonPath('items.0.atlasStatus.exists', false);
+    $response->assertJsonPath('items.0.atlasStatus.filtered', false);
+    $response->assertJsonPath('metadata.nextCursor', 'next-cursor');
+
+    Http::assertSent(function ($request): bool {
+        $parts = parse_url($request->url());
+        parse_str((string) ($parts['query'] ?? ''), $query);
+
+        return ($parts['scheme'] ?? '') === 'https'
+            && ($parts['host'] ?? '') === 'civitai.com'
+            && ($parts['path'] ?? '') === '/api/v1/images'
+            && ($query['limit'] ?? null) === '20'
+            && ($query['cursor'] ?? null) === 'cursor-1'
+            && ($query['sort'] ?? null) === 'Newest'
+            && ($query['withMeta'] ?? null) === 'true'
+            && ($query['flatMeta'] ?? null) === 'true'
+            && in_array($query['nsfw'] ?? null, ['true', '1'], true)
+            && ($query['modelId'] ?? null) === '9303001'
+            && ($query['modelVersionId'] ?? null) === '9404001';
+    });
+    expect(File::query()->where('source_id', '9103021')->exists())->toBeFalse()
+        ->and(File::query()->where('source_id', '9103022')->exists())->toBeFalse();
 });
 
 test('companion civitai reactions persist browse metadata and queue the Atlas download path', function () {

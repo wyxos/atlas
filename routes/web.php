@@ -51,6 +51,8 @@ Route::post('/api/extension/referrer-checks', [\App\Http\Controllers\ExtensionAp
     ->name('api.extension.referrer-checks');
 Route::post('/api/extension/civitai/status', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'status'])
     ->name('api.extension.civitai.status');
+Route::post('/api/extension/civitai/feed', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'feed'])
+    ->name('api.extension.civitai.feed');
 Route::post('/api/extension/civitai/reactions', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'react'])
     ->name('api.extension.civitai.reactions');
 Route::post('/api/extension/reactions', [\App\Http\Controllers\ExtensionApiController::class, 'react'])
