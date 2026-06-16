@@ -49,6 +49,10 @@ Route::post('/api/extension/badges/checks', [\App\Http\Controllers\ExtensionApiC
     ->name('api.extension.badges.checks');
 Route::post('/api/extension/referrer-checks', [\App\Http\Controllers\ExtensionApiController::class, 'referrerChecks'])
     ->name('api.extension.referrer-checks');
+Route::post('/api/extension/civitai/status', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'status'])
+    ->name('api.extension.civitai.status');
+Route::post('/api/extension/civitai/reactions', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'react'])
+    ->name('api.extension.civitai.reactions');
 Route::post('/api/extension/reactions', [\App\Http\Controllers\ExtensionApiController::class, 'react'])
     ->name('api.extension.reactions');
 Route::post('/api/extension/reactions/batch', [\App\Http\Controllers\ExtensionApiController::class, 'reactBatch'])
