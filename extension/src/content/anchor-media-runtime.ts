@@ -40,6 +40,12 @@ type AnchorMediaRuntimeOptions = {
     getPageHostname: () => string;
 };
 
+type ReferrerCheckState = {
+    key: string;
+    phase: 'pending' | 'settled';
+    settledWhilePaused?: boolean;
+};
+
 function isTerminalTransferStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
 }
@@ -54,11 +60,22 @@ function stringOrNull(value: unknown): string | null {
     return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+function hasReferrerState(result: ReferrerMatchResult | null): boolean {
+    return result !== null
+        && (
+            result.exists
+            || result.reaction !== null
+            || result.reactedAt !== null
+            || result.downloadedAt !== null
+            || result.blacklistedAt !== null
+        );
+}
+
 export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
     const observedAnchorMedia = new WeakSet<MediaElement>();
     const anchorReferrerKeyByMedia = new WeakMap<MediaElement, string>();
     const anchorCheckSequenceByMedia = new WeakMap<MediaElement, number>();
-    const referrerCheckStateByMedia = new WeakMap<MediaElement, { key: string; phase: 'pending' | 'settled' }>();
+    const referrerCheckStateByMedia = new WeakMap<MediaElement, ReferrerCheckState>();
     const localReferrerResultByKey = new Map<string, ReferrerMatchResult>();
     let isPaused = false;
     let pauseSequence = 0;
@@ -181,15 +198,24 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         }
 
         const isCacheOnly = optionsOverride?.referrerMatchFromCacheOnly === true;
-        const localResult = localReferrerResultByKey.get(referrerKey) ?? null;
-        const cachedResult = localResult ?? getCachedReferrerCheck(anchorHref, referrerCleanerQueryParams);
         const previousCheckState = referrerCheckStateByMedia.get(media);
+        const localResult = localReferrerResultByKey.get(referrerKey) ?? null;
+        const shouldIgnoreStaleLocalMiss = previousCheckState?.key === referrerKey
+            && previousCheckState.settledWhilePaused === true
+            && !hasReferrerState(localResult);
+        const cachedResult = shouldIgnoreStaleLocalMiss
+            ? getCachedReferrerCheck(anchorHref, referrerCleanerQueryParams)
+            : (localResult ?? getCachedReferrerCheck(anchorHref, referrerCleanerQueryParams));
         if (
             !isCacheOnly
             && previousCheckState?.key === referrerKey
             && (
                 previousCheckState.phase === 'pending'
-                || (previousCheckState.phase === 'settled' && cachedResult?.exists !== true)
+                || (
+                    previousCheckState.phase === 'settled'
+                    && !previousCheckState.settledWhilePaused
+                    && !hasReferrerState(cachedResult)
+                )
             )
         ) {
             return;
@@ -220,7 +246,11 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         void referrerResultPromise.then((result) => {
             if (!isCacheOnly && result !== null) {
                 localReferrerResultByKey.set(referrerKey, result);
-                referrerCheckStateByMedia.set(media, { key: referrerKey, phase: 'settled' });
+                referrerCheckStateByMedia.set(media, {
+                    key: referrerKey,
+                    phase: 'settled',
+                    ...(isPaused && !hasReferrerState(result) ? { settledWhilePaused: true } : {}),
+                });
             }
 
             if (
