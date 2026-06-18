@@ -128,6 +128,38 @@ test('spotify refresh endpoint refreshes token and returns updated status', func
     expect($token->refresh_token)->toBe('new-refresh-token');
 });
 
+test('spotify refresh invalid grant discards the stored token before reporting status', function () {
+    $user = User::factory()->create();
+
+    SpotifyToken::query()->create([
+        'user_id' => $user->id,
+        'access_token' => 'old-access-token',
+        'refresh_token' => 'expired-refresh-token',
+        'scope' => 'playlist-read-private',
+        'expires_at' => now()->subMinute(),
+    ]);
+
+    Http::fake([
+        'https://accounts.spotify.com/api/token' => Http::response([
+            'error' => 'invalid_grant',
+            'error_description' => 'Refresh token expired.',
+        ], 400),
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/api/settings/services/spotify/refresh');
+
+    $response->assertConflict();
+    $response->assertJsonPath('spotify.connected', false);
+    $response->assertJsonPath('spotify.needs_reconnect', true);
+    $response->assertJsonPath('spotify.can_refresh', false);
+    $response->assertJsonPath('spotify.last_error', 'Refresh token expired.');
+    $response->assertJsonPath('message', 'Refresh token expired.');
+
+    expect(SpotifyToken::query()->where('user_id', $user->id)->exists())->toBeFalse();
+
+    Http::assertSentCount(1);
+});
+
 test('spotify playback token endpoint returns an access token for connected user', function () {
     $user = User::factory()->create();
 

@@ -173,7 +173,15 @@ class SpotifyOAuthService
             return $token;
         }
 
-        return $this->refreshStoredToken($token, true);
+        try {
+            return $this->refreshStoredToken($token, true);
+        } catch (SpotifyOAuthException $exception) {
+            if ($exception->requiresReconnect) {
+                $this->disconnect($user);
+            }
+
+            throw $exception;
+        }
     }
 
     public function getValidAccessToken(User $user): ?string

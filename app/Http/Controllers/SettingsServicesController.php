@@ -113,9 +113,15 @@ class SettingsServicesController extends Controller
             ]);
         } catch (SpotifyOAuthException $exception) {
             $statusCode = $exception->requiresReconnect ? 409 : 422;
+            $spotifyStatus = $spotify->statusForUser($request->user());
+
+            if ($exception->requiresReconnect) {
+                $spotifyStatus['needs_reconnect'] = true;
+                $spotifyStatus['last_error'] = $exception->getMessage();
+            }
 
             return response()->json([
-                'spotify' => $spotify->statusForUser($request->user()),
+                'spotify' => $spotifyStatus,
                 'message' => $exception->getMessage(),
             ], $statusCode);
         }
