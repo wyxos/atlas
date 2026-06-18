@@ -73,6 +73,9 @@ it('creates and activates a civitai browse tab for the requested model filter', 
         : "CivitAI Images: Model 9303101 @ {$modelVersionId} - 1");
     $response->assertJsonPath('tab.params.feed', 'online');
     $response->assertJsonPath('tab.params.service', 'civit-ai-images');
+    $response->assertJsonPath('tab.params.type', 'all');
+    $response->assertJsonPath('tab.params.sort', 'Newest');
+    $response->assertJsonPath('tab.params.period', 'AllTime');
     $response->assertJsonPath('tab.params.modelId', 9303101);
     $response->assertJsonPath('browse_url', url('/browse'));
 
@@ -88,6 +91,9 @@ it('creates and activates a civitai browse tab for the requested model filter', 
     expect($createdTab?->is_active)->toBeTrue();
     expect($existingActiveTab->fresh()?->is_active)->toBeFalse();
     expect($createdTab?->params['modelId'] ?? null)->toBe(9303101);
+    expect($createdTab?->params['type'] ?? null)->toBe('all');
+    expect($createdTab?->params['sort'] ?? null)->toBe('Newest');
+    expect($createdTab?->params['period'] ?? null)->toBe('AllTime');
 
     if ($modelVersionId === null) {
         expect(array_key_exists('modelVersionId', $createdTab?->params ?? []))->toBeFalse();
