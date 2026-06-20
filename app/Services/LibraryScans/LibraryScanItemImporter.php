@@ -166,7 +166,7 @@ class LibraryScanItemImporter
                 $scans->broadcastRun($run->fresh());
             });
 
-            $this->deleteEmptyDirectParent($sourceParent, $atlasRoot);
+            $this->deleteEmptyParentsUpToRoot($sourceParent, $atlasRoot);
         } catch (\Throwable $e) {
             $scans->markItemFailed($item, 'import_failed', $e->getMessage(), [
                 'path' => $item->original_path,
@@ -265,27 +265,41 @@ class LibraryScanItemImporter
         @unlink($sourcePath);
     }
 
-    private function deleteEmptyDirectParent(string $directory, string $atlasRoot): void
+    private function deleteEmptyParentsUpToRoot(string $directory, string $atlasRoot): void
     {
-        if (! is_dir($directory)) {
-            return;
-        }
-
-        $parent = $this->normalizePath($directory);
         $root = $this->normalizePath($atlasRoot);
-        if ($parent === $root || ! str_starts_with($parent, $root)) {
-            return;
-        }
+        $current = $directory;
 
+        while (is_dir($current)) {
+            $parent = $this->normalizePath($current);
+            if ($parent === $root || ! str_starts_with($parent, $root)) {
+                return;
+            }
+
+            if (! $this->deleteDirectoryIfEmptyOrRemovable($current)) {
+                return;
+            }
+
+            $parentDirectory = dirname($current);
+            if ($parentDirectory === $current) {
+                return;
+            }
+
+            $current = $parentDirectory;
+        }
+    }
+
+    private function deleteDirectoryIfEmptyOrRemovable(string $directory): bool
+    {
         $entries = scandir($directory);
         if ($entries === false) {
-            return;
+            return false;
         }
 
         foreach (array_diff($entries, ['.', '..']) as $entry) {
             $path = $directory.DIRECTORY_SEPARATOR.$entry;
             if (! is_file($path) || ! in_array(strtolower($entry), self::REMOVABLE_EMPTY_PARENT_FILES, true)) {
-                return;
+                return false;
             }
 
             @unlink($path);
@@ -293,10 +307,10 @@ class LibraryScanItemImporter
 
         $entries = scandir($directory);
         if ($entries === false || array_diff($entries, ['.', '..']) !== []) {
-            return;
+            return false;
         }
 
-        @rmdir($directory);
+        return @rmdir($directory);
     }
 
     private function existingLocalFileByOriginalPath(?string $originalRelativePath): ?AtlasFile
