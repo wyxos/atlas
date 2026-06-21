@@ -375,3 +375,45 @@ it('broadcasts removed ids while queued bulk removal jobs run', function () {
     Event::assertDispatched(DownloadTransfersRemoved::class, fn (DownloadTransfersRemoved $event): bool => $event->ids === [$firstTransfer->id]);
     Event::assertDispatched(DownloadTransfersRemoved::class, fn (DownloadTransfersRemoved $event): bool => $event->ids === [$secondTransfer->id]);
 });
+
+it('queued completed transfer pruning only removes rows before the cutoff', function () {
+    Event::fake([DownloadTransfersRemoved::class]);
+
+    $oldFile = File::factory()->create([
+        'url' => 'https://example.com/old-completed-prune.bin',
+    ]);
+    $recentFile = File::factory()->create([
+        'url' => 'https://example.com/recent-completed-prune.bin',
+    ]);
+
+    $oldTransfer = DownloadTransfer::query()->create([
+        'file_id' => $oldFile->id,
+        'url' => (string) $oldFile->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+        'finished_at' => now()->subHours(25),
+    ]);
+    $recentTransfer = DownloadTransfer::query()->create([
+        'file_id' => $recentFile->id,
+        'url' => (string) $recentFile->url,
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::COMPLETED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 100,
+        'last_broadcast_percent' => 100,
+        'finished_at' => now()->subHours(23),
+    ]);
+
+    (new RemoveDownloadTransfers(
+        completedOnly: true,
+        completedBefore: now()->subDay()->toISOString(),
+    ))->handle(app(DownloadTransferRemovalService::class));
+
+    expect(DownloadTransfer::query()->whereKey($oldTransfer->id)->exists())->toBeFalse()
+        ->and(DownloadTransfer::query()->whereKey($recentTransfer->id)->exists())->toBeTrue();
+
+    Event::assertDispatched(DownloadTransfersRemoved::class, fn (DownloadTransfersRemoved $event): bool => $event->ids === [$oldTransfer->id]);
+});

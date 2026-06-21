@@ -17,6 +17,8 @@ return [
 
     'bulk_removal_chunk_size' => (int) env('DOWNLOADS_BULK_REMOVAL_CHUNK_SIZE', 100),
 
+    'auto_remove_completed_after' => (int) env('DOWNLOADS_AUTO_REMOVE_COMPLETED_AFTER', 24),
+
     'tmp_dir' => env('DOWNLOADS_TMP_DIR', 'downloads/.tmp'),
 
     'ffmpeg_path' => env('DOWNLOADS_FFMPEG_PATH', 'ffmpeg'),

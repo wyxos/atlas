@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 
 class RemoveDownloadTransfers implements ShouldQueue
 {
@@ -26,6 +27,7 @@ class RemoveDownloadTransfers implements ShouldQueue
         public bool $alsoFromDisk = false,
         public bool $alsoDeleteRecord = false,
         public bool $completedOnly = false,
+        public ?string $completedBefore = null,
     ) {
         $this->onQueue('downloads');
     }
@@ -41,7 +43,16 @@ class RemoveDownloadTransfers implements ShouldQueue
         };
 
         if ($this->completedOnly) {
-            $removalService->removeCompleted($this->alsoFromDisk, $this->alsoDeleteRecord, $broadcastRemoved);
+            $completedBefore = is_string($this->completedBefore) && $this->completedBefore !== ''
+                ? Carbon::parse($this->completedBefore)
+                : null;
+
+            $removalService->removeCompleted(
+                $this->alsoFromDisk,
+                $this->alsoDeleteRecord,
+                $broadcastRemoved,
+                $completedBefore,
+            );
 
             return;
         }

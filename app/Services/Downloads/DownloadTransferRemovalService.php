@@ -7,6 +7,8 @@ use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\DownloadedFileClearService;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 
@@ -120,13 +122,13 @@ final class DownloadTransferRemovalService
         bool $alsoFromDisk = false,
         bool $alsoDeleteRecord = false,
         ?callable $afterChunk = null,
+        ?CarbonInterface $finishedBefore = null,
     ): int {
         $removedCount = 0;
         $handledIds = [];
 
-        DownloadTransfer::query()
+        $this->completedQuery($finishedBefore)
             ->with('file')
-            ->where('status', DownloadTransferStatus::COMPLETED)
             ->orderBy('id')
             ->chunkById($this->bulkRemovalChunkSize(), function ($transfers) use ($alsoFromDisk, $alsoDeleteRecord, $afterChunk, &$removedCount, &$handledIds): void {
                 $chunkRemovedIds = [];
@@ -156,10 +158,9 @@ final class DownloadTransferRemovalService
         return $removedCount;
     }
 
-    public function completedCount(): int
+    public function completedCount(?CarbonInterface $finishedBefore = null): int
     {
-        return DownloadTransfer::query()
-            ->where('status', DownloadTransferStatus::COMPLETED)
+        return $this->completedQuery($finishedBefore)
             ->count();
     }
 
@@ -266,5 +267,19 @@ final class DownloadTransferRemovalService
     private function isYtDlpTransfer(DownloadTransfer $downloadTransfer): bool
     {
         return data_get($downloadTransfer->file?->listing_metadata, 'download_via') === 'yt-dlp';
+    }
+
+    /**
+     * @return Builder<DownloadTransfer>
+     */
+    private function completedQuery(?CarbonInterface $finishedBefore = null): Builder
+    {
+        return DownloadTransfer::query()
+            ->where('status', DownloadTransferStatus::COMPLETED)
+            ->when($finishedBefore !== null, function (Builder $query) use ($finishedBefore): void {
+                $query
+                    ->whereNotNull('finished_at')
+                    ->where('finished_at', '<=', $finishedBefore);
+            });
     }
 }
