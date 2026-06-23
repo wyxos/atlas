@@ -3,7 +3,8 @@ import { vi } from 'vitest';
 
 export const mockResolveApiConnectionStatus = vi.fn();
 export const mockGetStoredOptions = vi.fn();
-export const mockSaveStoredOptions = vi.fn();
+export const mockSaveSiteCustomizationsForCurrentConnection = vi.fn();
+export const mockSaveStoredConnectionOptions = vi.fn();
 export const mockClipboardWriteText = vi.fn();
 
 vi.mock('./atlas-api', () => ({
@@ -14,7 +15,8 @@ vi.mock('./atlas-options', () => ({
     DEFAULT_ATLAS_DOMAIN: 'https://atlas.test',
     getStoredOptions: mockGetStoredOptions,
     normalizeDomain: (value: string) => value.trim().replace(/\/+$/, ''),
-    saveStoredOptions: mockSaveStoredOptions,
+    saveSiteCustomizationsForCurrentConnection: mockSaveSiteCustomizationsForCurrentConnection,
+    saveStoredConnectionOptions: mockSaveStoredConnectionOptions,
     validateDomain: (value: string) => (value === '' ? 'Atlas domain is required.' : null),
 }));
 
@@ -65,7 +67,8 @@ export function setupOptionsAppTestEnvironment(): void {
     vi.unstubAllGlobals();
 
     mockGetStoredOptions.mockResolvedValue(createStoredOptions());
-    mockSaveStoredOptions.mockResolvedValue(undefined);
+    mockSaveSiteCustomizationsForCurrentConnection.mockResolvedValue(createStoredOptions());
+    mockSaveStoredConnectionOptions.mockResolvedValue(createStoredOptions());
     mockResolveApiConnectionStatus.mockResolvedValue({
         label: 'Ready',
         detail: 'Connected.',

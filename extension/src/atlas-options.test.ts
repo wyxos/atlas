@@ -168,13 +168,15 @@ describe('atlas-options', () => {
     });
 
     it('stores normalized site customizations in Atlas and keeps only bootstrap connection in chrome storage', async () => {
-        const { STORAGE_KEYS, getStoredOptions, saveStoredOptions } = await import('./atlas-options');
+        const { STORAGE_KEYS, getStoredOptions, saveSiteCustomizationsForCurrentConnection } = await import('./atlas-options');
         const remote = installRemoteSettingsFetchMock();
+        storageState[STORAGE_KEYS.atlasDomain] = 'https://atlas.test';
+        storageState[STORAGE_KEYS.apiToken] = 'token';
         storageState[STORAGE_KEYS.settingsMigrationByDomain] = {
             'https://atlas.test': true,
         };
 
-        await saveStoredOptions('https://atlas.test', 'token', [
+        await saveSiteCustomizationsForCurrentConnection([
             {
                 enabled: false,
                 domain: 'https://Example.com/path',
@@ -363,13 +365,13 @@ describe('atlas-options', () => {
     });
 
     it('does not overwrite the bootstrap connection when remote settings save fails', async () => {
-        const { STORAGE_KEYS, saveStoredOptions } = await import('./atlas-options');
+        const { STORAGE_KEYS, saveStoredConnectionOptions } = await import('./atlas-options');
         vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'Unauthenticated.' }), { status: 401 })));
 
         storageState[STORAGE_KEYS.atlasDomain] = 'https://atlas.wyxos.com';
         storageState[STORAGE_KEYS.apiToken] = 'existing-token';
 
-        await expect(saveStoredOptions('https://atlas.test', '', [])).rejects.toThrow();
+        await expect(saveStoredConnectionOptions('https://atlas.test', '')).rejects.toThrow();
 
         expect(storageState[STORAGE_KEYS.atlasDomain]).toBe('https://atlas.wyxos.com');
         expect(storageState[STORAGE_KEYS.apiToken]).toBe('existing-token');

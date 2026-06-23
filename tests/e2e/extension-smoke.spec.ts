@@ -205,8 +205,9 @@ test.describe.serial('Atlas extension smoke', () => {
         await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
 
         await expect(optionsPage.getByRole('heading', { name: 'Atlas Extension Options' })).toBeVisible();
-        await expect(optionsPage.getByText('Runtime Diagnostics')).toBeVisible();
-        await expect(optionsPage.getByRole('button', { name: 'Save Changes' })).toBeVisible();
+        await expect(optionsPage.getByRole('tab', { name: 'Runtime' })).toBeVisible();
+        await expect(optionsPage.getByRole('button', { name: 'Save Connection' })).toBeVisible();
+        await expect(optionsPage.getByRole('button', { name: 'Save Profiles' })).toBeVisible();
         await optionsPage.close();
     });
 

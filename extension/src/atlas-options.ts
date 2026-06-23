@@ -327,6 +327,11 @@ async function readLocalOptionsSnapshot(): Promise<LocalOptionsSnapshot> {
     const settingsUpdatedAt = typeof storedSettingsUpdatedAt === 'string'
         ? storedSettingsUpdatedAt
         : '';
+    const hasStoredLocalSettings = stored[STORAGE_KEYS.siteCustomizations] !== undefined
+        || stored[STORAGE_KEYS.matchRules] !== undefined
+        || stored[STORAGE_KEYS.referrerQueryParamsToStripByDomain] !== undefined
+        || stored[STORAGE_KEYS.closeTabAfterQueueByDomain] !== undefined
+        || stored[STORAGE_KEYS.reactAllItemsInPostByDomain] !== undefined;
     const siteCustomizations = stored[STORAGE_KEYS.siteCustomizations] !== undefined
         ? parseStoredSiteCustomizations(stored[STORAGE_KEYS.siteCustomizations])
         : deriveSiteCustomizationsFromLegacyStorage(
@@ -347,7 +352,7 @@ async function readLocalOptionsSnapshot(): Promise<LocalOptionsSnapshot> {
         atlasDomain,
         apiToken,
         localSettings,
-        hasLocalSettings: hasMigrationSettings(localSettings),
+        hasLocalSettings: hasStoredLocalSettings && hasMigrationSettings(localSettings),
         settingsMigrationByDomain: parseStoredMigrationMap(stored[STORAGE_KEYS.settingsMigrationByDomain]),
         settingsUpdatedAt,
     };
@@ -508,34 +513,60 @@ async function saveRemoteSettingsForConnection(
     return requestRemoteSettings(atlasDomain, apiToken, 'POST', settings);
 }
 
-export async function saveStoredOptions(
-    atlasDomain: string,
-    apiToken: string,
-    siteCustomizations: SiteCustomization[] = [],
-): Promise<void> {
+async function loadRemoteSettingsForConnection(atlasDomain: string, apiToken: string): Promise<ExtensionSettings> {
+    if (!hasAtlasApiAuth(atlasDomain, apiToken)) {
+        throw new Error('Set the API key before loading extension settings from Atlas.');
+    }
+
+    return requestRemoteSettings(atlasDomain, apiToken, 'GET');
+}
+
+function rememberSavedStoredOptions(atlasDomain: string, apiToken: string, settingsUpdatedAt: string, settings: ExtensionSettings): StoredOptions {
+    return rememberStoredOptions(storedOptionsCacheKey(atlasDomain, apiToken, settingsUpdatedAt), {
+        atlasDomain,
+        apiToken,
+        ...settings,
+    });
+}
+
+export async function saveStoredConnectionOptions(atlasDomain: string, apiToken: string): Promise<StoredOptions> {
     const normalizedDomain = normalizeDomain(atlasDomain);
     const normalizedToken = apiToken.trim();
     const snapshot = await readLocalOptionsSnapshot();
-    invalidateStoredOptionsCache();
+    const remoteSettings = await loadRemoteSettingsForConnection(normalizedDomain, normalizedToken);
 
-    const connectionSnapshot: LocalOptionsSnapshot = {
+    invalidateStoredOptionsCache();
+    await saveConnectionOptions(normalizedDomain, normalizedToken);
+    const settingsUpdatedAt = await notifySettingsChanged({
+        [STORAGE_KEYS.settingsMigrationByDomain]: {
+            ...snapshot.settingsMigrationByDomain,
+            [normalizedDomain]: true,
+        },
+    });
+
+    return rememberSavedStoredOptions(normalizedDomain, normalizedToken, settingsUpdatedAt, remoteSettings);
+}
+
+export async function saveSiteCustomizationsForCurrentConnection(siteCustomizations: SiteCustomization[]): Promise<StoredOptions> {
+    const snapshot = await readLocalOptionsSnapshot();
+    const currentSettings = await loadRemoteSettingsForSnapshot({
         ...snapshot,
-        atlasDomain: normalizedDomain,
-        apiToken: normalizedToken,
-    };
-    const currentSettings = await loadRemoteSettingsForSnapshot(connectionSnapshot);
-    const savedSettings = await saveRemoteSettingsForConnection(normalizedDomain, normalizedToken, {
+        hasLocalSettings: false,
+    });
+    const savedSettings = await saveRemoteSettingsForConnection(snapshot.atlasDomain, snapshot.apiToken, {
         ...currentSettings,
         siteCustomizations: normalizeSiteCustomizations(siteCustomizations),
     });
-    await saveConnectionOptions(normalizedDomain, normalizedToken);
-    await clearLocalExtensionSettings();
-    const settingsUpdatedAt = await notifySettingsChanged();
-    rememberStoredOptions(storedOptionsCacheKey(normalizedDomain, normalizedToken, settingsUpdatedAt), {
-        atlasDomain: normalizedDomain,
-        apiToken: normalizedToken,
-        ...savedSettings,
+
+    invalidateStoredOptionsCache();
+    const settingsUpdatedAt = await notifySettingsChanged({
+        [STORAGE_KEYS.settingsMigrationByDomain]: {
+            ...snapshot.settingsMigrationByDomain,
+            [snapshot.atlasDomain]: true,
+        },
     });
+
+    return rememberSavedStoredOptions(snapshot.atlasDomain, snapshot.apiToken, settingsUpdatedAt, savedSettings);
 }
 
 export async function saveFullSettingsForCurrentConnection(settings: ExtensionSettings): Promise<void> {
@@ -543,11 +574,7 @@ export async function saveFullSettingsForCurrentConnection(settings: ExtensionSe
     invalidateStoredOptionsCache();
     const savedSettings = await saveRemoteSettingsForConnection(atlasDomain, apiToken, settings);
     const settingsUpdatedAt = await notifySettingsChanged();
-    rememberStoredOptions(storedOptionsCacheKey(atlasDomain, apiToken, settingsUpdatedAt), {
-        atlasDomain,
-        apiToken,
-        ...savedSettings,
-    });
+    rememberSavedStoredOptions(atlasDomain, apiToken, settingsUpdatedAt, savedSettings);
 }
 
 export {

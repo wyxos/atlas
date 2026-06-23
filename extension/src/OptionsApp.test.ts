@@ -5,7 +5,8 @@ import {
     mockClipboardWriteText,
     mockGetStoredOptions,
     mockResolveApiConnectionStatus,
-    mockSaveStoredOptions,
+    mockSaveSiteCustomizationsForCurrentConnection,
+    mockSaveStoredConnectionOptions,
     mountOptionsApp,
     setupOptionsAppTestEnvironment,
 } from './options-app-test-utils';
@@ -122,12 +123,10 @@ describe('OptionsApp', () => {
         expect((input.element as HTMLInputElement).value).toBe('171');
         expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
 
-        await wrapper.get('form').trigger('submit');
+        await wrapper.get('[data-test-save-profiles]').trigger('click');
         await flushPromises();
 
-        expect(mockSaveStoredOptions).toHaveBeenCalledWith(
-            'https://atlas.test',
-            'test-token',
+        expect(mockSaveSiteCustomizationsForCurrentConnection).toHaveBeenCalledWith(
             expect.arrayContaining([
                 expect.objectContaining({
                     domain: 'example.com',
@@ -400,7 +399,7 @@ describe('OptionsApp', () => {
         expect(wrapper.findAll('[data-test-customization-domain-button]')).toHaveLength(2);
     });
 
-    it('saves normalized connection settings and refreshes the status cards', async () => {
+    it('saves normalized connection settings without saving profile changes', async () => {
         vi.useFakeTimers();
 
         mockResolveApiConnectionStatus.mockReset();
@@ -430,48 +429,15 @@ describe('OptionsApp', () => {
         await apiKeyInput!.setValue(' next-token ');
         await wrapper.get('[data-test-toggle-customization-enabled]').trigger('click');
 
-        await wrapper.get('form').trigger('submit');
+        await wrapper.get('[data-test-save-connection]').trigger('click');
         await flushPromises();
 
-        expect(mockSaveStoredOptions).toHaveBeenCalledWith(
+        expect(mockSaveStoredConnectionOptions).toHaveBeenCalledWith(
             'https://atlas.example.com',
             ' next-token ',
-            [
-                {
-                    enabled: false,
-                    domain: 'civitai.com',
-                    matchRules: [],
-                    widget: {
-                        minImageWidth: null,
-                    },
-                    referrerCleaner: {
-                        stripQueryParams: [],
-                    },
-                    mediaCleaner: {
-                        stripQueryParams: [],
-                        rewriteRules: [],
-                        strategies: ['civitaiCanonical'],
-                    },
-                },
-                {
-                    enabled: true,
-                    domain: 'example.com',
-                    matchRules: ['.*\\/gallery\\/.*'],
-                    widget: {
-                        minImageWidth: 160,
-                    },
-                    referrerCleaner: {
-                        stripQueryParams: ['tag'],
-                    },
-                    mediaCleaner: {
-                        stripQueryParams: [],
-                        rewriteRules: [],
-                        strategies: [],
-                    },
-                },
-            ],
         );
-        expect(wrapper.text()).toContain('Saved.');
+        expect(mockSaveSiteCustomizationsForCurrentConnection).not.toHaveBeenCalled();
+        expect(wrapper.text()).toContain('Connection saved.');
 
         await wrapper.get('[data-test-options-tab="runtime"]').trigger('click');
         await flushPromises();

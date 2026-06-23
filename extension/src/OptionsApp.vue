@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Badge from '@/components/ui/Badge.vue';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OptionsBackgroundRelayFeed from './OptionsBackgroundRelayFeed.vue';
+import OptionsConnectionPanel from './OptionsConnectionPanel.vue';
 import OptionsReverbFeed from './OptionsReverbFeed.vue';
 import SiteCustomizationManager from './SiteCustomizationManager.vue';
 import { resolveApiConnectionStatus } from './atlas-api';
@@ -11,7 +12,8 @@ import {
     DEFAULT_ATLAS_DOMAIN,
     getStoredOptions,
     normalizeDomain,
-    saveStoredOptions,
+    saveSiteCustomizationsForCurrentConnection,
+    saveStoredConnectionOptions,
     validateDomain,
 } from './atlas-options';
 import { validateDomainRule } from './match-rules';
@@ -40,13 +42,14 @@ const activeCustomizationTab = ref<CustomizationTab>('matchRules');
 const activeOptionsTab = ref<'setup' | 'runtime'>('setup');
 const newCustomizationDomain = ref('');
 const errorMessage = ref('');
-const isSaved = ref(false);
+const successMessage = ref('');
 const isCustomizationJsonCopied = ref(false);
 const statusLabel = ref<'Ready' | 'Setup required' | 'Auth failed' | 'Offline' | 'Checking'>('Checking');
 const statusDetail = ref('Validating extension API access.');
 const reverbStatusLabel = ref<'Available' | 'Disconnected' | 'Unavailable' | 'Checking'>('Checking');
 const reverbStatusDetail = ref('Checking Reverb connection.');
 let customizationCopyTimeout: ReturnType<typeof setTimeout> | null = null;
+let successMessageTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const selectedCustomization = computed<SiteCustomizationForm | null>(() =>
     siteCustomizationForms.value[selectedCustomizationIndex.value] ?? null);
@@ -79,6 +82,7 @@ const reverbStatusDetailClasses = computed(() => [
     'text-sm',
     reverbStatusLabel.value === 'Unavailable' ? 'text-danger-100' : 'text-blue-slate-300',
 ]);
+const canSaveProfiles = computed(() => statusLabel.value === 'Ready');
 
 function splitQueryParamsText(input: string): string[] {
     return input.split(/[,\n]+/);
@@ -190,9 +194,25 @@ function markCustomizationJsonCopied(): void {
     }, 2000);
 }
 
-async function saveOptions(): Promise<void> {
-    isSaved.value = false;
+function clearSuccessMessageTimeout(): void {
+    if (successMessageTimeout !== null) {
+        clearTimeout(successMessageTimeout);
+        successMessageTimeout = null;
+    }
+}
+
+function showSuccessMessage(message: string): void {
+    clearSuccessMessageTimeout();
+    successMessage.value = message;
+    successMessageTimeout = setTimeout(() => {
+        successMessage.value = '';
+        successMessageTimeout = null;
+    }, 2000);
+}
+
+async function saveConnectionOptions(): Promise<void> {
     errorMessage.value = '';
+    successMessage.value = '';
     resetCustomizationJsonCopied();
 
     const normalizedDomain = normalizeDomain(atlasDomain.value);
@@ -202,24 +222,43 @@ async function saveOptions(): Promise<void> {
         return;
     }
 
+    atlasDomain.value = normalizedDomain;
+
+    try {
+        const stored = await saveStoredConnectionOptions(normalizedDomain, apiToken.value);
+        apiToken.value = stored.apiToken;
+        syncFormsFromSiteCustomizations(stored.siteCustomizations);
+        await refreshApiConnectionStatus();
+        showSuccessMessage('Connection saved.');
+        errorMessage.value = '';
+    } catch (error) {
+        errorMessage.value = error instanceof Error ? error.message : 'Failed to save extension connection.';
+    }
+}
+
+async function saveProfileOptions(): Promise<void> {
+    errorMessage.value = '';
+    successMessage.value = '';
+    resetCustomizationJsonCopied();
+
+    if (!canSaveProfiles.value) {
+        errorMessage.value = 'Connect to Atlas before saving profiles.';
+        return;
+    }
+
     const siteCustomizations = validateCustomizationForms();
     if (siteCustomizations === null) {
         return;
     }
 
-    atlasDomain.value = normalizedDomain;
-
     try {
-        await saveStoredOptions(normalizedDomain, apiToken.value, siteCustomizations);
-        syncFormsFromSiteCustomizations(siteCustomizations);
-        isSaved.value = true;
+        const stored = await saveSiteCustomizationsForCurrentConnection(siteCustomizations);
+        syncFormsFromSiteCustomizations(stored.siteCustomizations);
         await refreshApiConnectionStatus();
-        setTimeout(() => {
-            isSaved.value = false;
-        }, 2000);
+        showSuccessMessage('Profiles saved.');
         errorMessage.value = '';
     } catch (error) {
-        errorMessage.value = error instanceof Error ? error.message : 'Failed to save extension options.';
+        errorMessage.value = error instanceof Error ? error.message : 'Failed to save extension profiles.';
     }
 }
 
@@ -302,6 +341,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     resetCustomizationJsonCopied();
+    clearSuccessMessageTimeout();
 });
 
 function addCustomizationDomain(): void {
@@ -421,49 +461,15 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
                     </TabsList>
 
                     <TabsContent value="setup">
-                        <form
+                        <section
                             class="space-y-6 rounded-sm border border-smart-blue-500/30 bg-prussian-blue-700/55 p-5 shadow-lg shadow-prussian-blue-950/10"
-                            @submit.prevent="saveOptions"
                         >
-                            <section class="space-y-4">
-                                <div class="border-b border-smart-blue-500/20 pb-4">
-                                    <h2 class="text-lg font-semibold text-regal-navy-100">Connection</h2>
-                                    <p class="mt-1 text-sm text-blue-slate-300">
-                                        Atlas domain and API key used by extension requests, auth checks, and Reverb discovery.
-                                    </p>
-                                </div>
-
-                                <div class="grid gap-4 lg:grid-cols-2">
-                                    <label class="block space-y-2">
-                                        <span class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">Atlas Domain</span>
-                                        <input
-                                            v-model="atlasDomain"
-                                            type="url"
-                                            placeholder="https://atlas.test"
-                                            class="w-full rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
-                                        />
-                                    </label>
-
-                                    <label class="block space-y-2">
-                                        <span class="text-xs font-semibold uppercase tracking-[0.22em] text-smart-blue-200">API Key</span>
-                                        <div class="flex items-center gap-2">
-                                            <input
-                                                v-model="apiToken"
-                                                :type="showApiToken ? 'text' : 'password'"
-                                                autocomplete="off"
-                                                class="w-full rounded-sm border border-smart-blue-500/35 bg-prussian-blue-900/55 px-4 py-3 text-sm text-regal-navy-100 outline-none transition placeholder:text-twilight-indigo-400 focus:border-smart-blue-300"
-                                            />
-                                            <button
-                                                type="button"
-                                                class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-3 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
-                                                @click="showApiToken = !showApiToken"
-                                            >
-                                                {{ showApiToken ? 'Hide' : 'Show' }}
-                                            </button>
-                                        </div>
-                                    </label>
-                                </div>
-                            </section>
+                            <OptionsConnectionPanel
+                                v-model:atlas-domain="atlasDomain"
+                                v-model:api-token="apiToken"
+                                v-model:show-api-token="showApiToken"
+                                @save="saveConnectionOptions"
+                            />
 
                             <section class="space-y-4 border-t border-smart-blue-500/20 pt-6">
                                 <div class="border-b border-smart-blue-500/20 pb-4">
@@ -500,23 +506,22 @@ function toggleMediaCleanerStrategy(strategy: MediaCleanerStrategy): void {
                                 {{ errorMessage }}
                             </div>
 
-                            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-smart-blue-500/20 pt-4">
-                                <p class="text-sm text-twilight-indigo-300">
-                                    Saving updates the Atlas connection plus the enabled or disabled site profile registry for this browser profile.
-                                </p>
-
+                            <div class="flex flex-wrap items-center justify-end gap-3 border-t border-smart-blue-500/20 pt-4">
                                 <div class="flex items-center gap-3">
                                     <button
-                                        type="submit"
-                                        class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-3 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28"
+                                        type="button"
+                                        class="inline-flex items-center justify-center rounded-sm border border-smart-blue-400/60 bg-smart-blue-500/18 px-4 py-3 text-sm font-medium text-smart-blue-100 transition hover:bg-smart-blue-500/28 disabled:cursor-not-allowed disabled:opacity-55"
+                                        :disabled="!canSaveProfiles"
+                                        data-test-save-profiles
+                                        @click="saveProfileOptions"
                                     >
-                                        Save Changes
+                                        Save Profiles
                                     </button>
 
-                                    <p v-if="isSaved" class="text-sm text-emerald-300">Saved.</p>
+                                    <p v-if="successMessage" class="text-sm text-emerald-300">{{ successMessage }}</p>
                                 </div>
                             </div>
-                        </form>
+                        </section>
                     </TabsContent>
 
                     <TabsContent value="runtime">
