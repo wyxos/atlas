@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Atlas Extension",
     "description": "Atlas browser extension popup.",
-    "version": "0.22.0",
+    "version": "0.23.0",
     "permissions": [
         "storage",
         "tabs",
