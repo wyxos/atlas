@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
     createInitialProposedTabState,
     mergeProcessorResultIntoTabState,
+    mergeTabPresenceIntoTabState,
     mergeReverbEventIntoTabState,
+    selectProposedReferrerPresentation,
 } from './state-merge';
 
 describe('proposed tab state merge', () => {
@@ -174,6 +176,76 @@ describe('proposed tab state merge', () => {
                 downloadedAt: '2026-06-23T11:05:00.000Z',
                 transferId: 888,
                 percent: 100,
+            },
+        });
+    });
+
+    it('keeps opened-elsewhere presentation separate from empty Atlas referrer results', () => {
+        const referrerUrl = 'https://civitai.com/images/2';
+        const state = mergeProcessorResultIntoTabState(createInitialProposedTabState({
+            instanceId: 'tab-7:document-1',
+            documentId: 'document-1',
+            pageUrl: 'https://civitai.com/feed',
+            referrerUrl: 'https://civitai.com/images/1',
+            createdAt: 1000,
+        }), {
+            requestId: 'request-1',
+            ok: true,
+            status: 200,
+            result: {
+                exists: false,
+                reaction: null,
+                reactedAt: null,
+                downloadedAt: null,
+                blacklistedAt: null,
+                referrerUrl: 'https://civitai.com/images/1',
+                sourceUrl: null,
+                fileId: null,
+                transferId: null,
+                status: null,
+                percent: null,
+            },
+            results: [
+                {
+                    exists: false,
+                    reaction: null,
+                    reactedAt: null,
+                    downloadedAt: null,
+                    blacklistedAt: null,
+                    referrerUrl,
+                    sourceUrl: null,
+                    fileId: null,
+                    transferId: null,
+                    status: null,
+                    percent: null,
+                },
+            ],
+        }, 2000);
+
+        const withOpenTabPresence = mergeTabPresenceIntoTabState(state, {
+            urls: [referrerUrl],
+            counts: {
+                [referrerUrl]: 1,
+            },
+        }, 3000);
+
+        expect(withOpenTabPresence.referrerResultsByUrl[referrerUrl]).toMatchObject({
+            exists: false,
+            reaction: null,
+        });
+        expect(withOpenTabPresence.openReferrerTabsByUrl[referrerUrl]).toMatchObject({
+            openTabCount: 1,
+            isOpenInAnotherTab: true,
+        });
+        expect(selectProposedReferrerPresentation(withOpenTabPresence, referrerUrl)).toMatchObject({
+            kind: 'opened-elsewhere',
+            referrerUrl,
+            fileState: {
+                exists: false,
+            },
+            openTabState: {
+                openTabCount: 1,
+                isOpenInAnotherTab: true,
             },
         });
     });

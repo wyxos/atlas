@@ -551,7 +551,7 @@ function startPageWork(options: { fullScan?: boolean; bypassBadgeCheckCache?: bo
     });
 }
 
-function stopPageWork(): void {
+function destroyPageWork(): void {
     if (!isPageWorkActive) {
         return;
     }
@@ -572,7 +572,7 @@ function stopPageWork(): void {
 async function bootstrap(): Promise<void> {
     installStorageListener();
     installRuntimeMessageListener();
-    installPageVisibilityLifecycle(startPageWork, stopPageWork);
+    installPageVisibilityLifecycle(startPageWork, destroyPageWork);
 
     const bypassBadgeCheckCache = await shouldBypassBadgeCheckCacheForPageStart();
     if (isPageVisible()) {

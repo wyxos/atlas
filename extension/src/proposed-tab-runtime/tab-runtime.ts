@@ -4,14 +4,18 @@ import {
     markProposedTabStateChecking,
     markProposedTabStateDestroyed,
     mergeProcessorResultIntoTabState,
+    mergeTabPresenceIntoTabState,
     mergeReverbEventIntoTabState,
+    selectProposedReferrerPresentation,
 } from './state-merge';
 import {
     emptyProposedReferrerFileState,
+    type ProposedReferrerPresentation,
     type ProposedReferrerLifecycleTarget,
     type ProposedReferrerProcessorRequest,
     type ProposedReferrerProcessorResponse,
     type ProposedReverbEvent,
+    type ProposedTabPresencePayload,
     type ProposedTabRuntimeState,
 } from './types';
 
@@ -46,7 +50,9 @@ export type ProposedTabRuntime = {
     startWhenDomReady: (documentLike?: DomReadyDocument) => void;
     startReferrerLifecycle: () => Promise<ProposedTabRuntimeState>;
     handleTabVisibilityChanged: (visibilityState: 'hidden' | 'visible' | string) => ProposedTabRuntimeState;
+    handleTabPresenceChanged: (payload: ProposedTabPresencePayload) => ProposedTabRuntimeState;
     handleReverbEvent: (event: ProposedReverbEvent) => ProposedTabRuntimeState;
+    getPresentationForReferrer: (referrerUrl: string | null) => ProposedReferrerPresentation;
     destroy: (reason: string) => ProposedTabRuntimeState;
     getState: () => ProposedTabRuntimeState;
     handleTabActivated?: undefined;
@@ -182,11 +188,24 @@ export function createProposedTabRuntime(options: ProposedTabRuntimeOptions): Pr
         return publish(nextState);
     }
 
+    function handleTabPresenceChanged(payload: ProposedTabPresencePayload): ProposedTabRuntimeState {
+        const nextState = mergeTabPresenceIntoTabState(state, payload, now());
+        if (nextState === state) {
+            return cloneProposedTabState(state);
+        }
+
+        return publish(nextState);
+    }
+
     return {
         startWhenDomReady,
         startReferrerLifecycle,
         handleTabVisibilityChanged: () => cloneProposedTabState(state),
+        handleTabPresenceChanged,
         handleReverbEvent,
+        getPresentationForReferrer: (referrerUrl: string | null) => {
+            return selectProposedReferrerPresentation(state, referrerUrl);
+        },
         destroy: (reason: string) => publish(markProposedTabStateDestroyed(state, reason, now())),
         getState: () => cloneProposedTabState(state),
     };

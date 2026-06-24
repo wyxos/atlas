@@ -1,8 +1,12 @@
+import { normalizeComparableOpenTabUrl, normalizeComparableOpenTabUrls } from '../open-tab-url';
 import {
     emptyProposedReferrerFileState,
+    type ProposedOpenReferrerTabState,
     type ProposedReferrerFileState,
+    type ProposedReferrerPresentation,
     type ProposedReferrerProcessorResponse,
     type ProposedReverbEvent,
+    type ProposedTabPresencePayload,
     type ProposedTabRuntimeState,
 } from './types';
 
@@ -35,11 +39,20 @@ function cloneReferrerResultsByUrl(
     );
 }
 
+function cloneOpenReferrerTabsByUrl(
+    openReferrerTabsByUrl: Record<string, ProposedOpenReferrerTabState>,
+): Record<string, ProposedOpenReferrerTabState> {
+    return Object.fromEntries(
+        Object.entries(openReferrerTabsByUrl).map(([url, tabState]) => [url, { ...tabState }]),
+    );
+}
+
 export function cloneProposedTabState(state: ProposedTabRuntimeState): ProposedTabRuntimeState {
     return {
         ...state,
         referrerResult: state.referrerResult === null ? null : cloneReferrerFileState(state.referrerResult),
         referrerResultsByUrl: cloneReferrerResultsByUrl(state.referrerResultsByUrl),
+        openReferrerTabsByUrl: cloneOpenReferrerTabsByUrl(state.openReferrerTabsByUrl),
     };
 }
 
@@ -55,6 +68,7 @@ export function createInitialProposedTabState(input: InitialStateInput): Propose
         lifecycleRunCount: 0,
         referrerResult: null,
         referrerResultsByUrl: {},
+        openReferrerTabsByUrl: {},
         lastRequestId: null,
         lastError: null,
         destroyReason: null,
@@ -79,6 +93,17 @@ export function markProposedTabStateChecking(
         lastError: null,
         updatedAt: now,
     };
+}
+
+function hasVisibleFileState(result: ProposedReferrerFileState | null): boolean {
+    return result !== null
+        && (
+            result.exists
+            || result.reaction !== null
+            || result.reactedAt !== null
+            || result.downloadedAt !== null
+            || result.blacklistedAt !== null
+        );
 }
 
 function normalizeProcessorResult(
@@ -117,6 +142,74 @@ function withResultsByReferrerUrl(
         }, result),
         cloneReferrerResultsByUrl(state.referrerResultsByUrl),
     );
+}
+
+function buildComparableCountMap(values: unknown): Map<string, number> {
+    if (!values || typeof values !== 'object') {
+        return new Map<string, number>();
+    }
+
+    const counts = new Map<string, number>();
+    for (const [rawUrl, rawCount] of Object.entries(values)) {
+        const comparableUrl = normalizeComparableOpenTabUrl(rawUrl);
+        if (comparableUrl === null || typeof rawCount !== 'number' || !Number.isFinite(rawCount)) {
+            continue;
+        }
+
+        const count = Math.max(0, Math.floor(rawCount));
+        if (count > 0) {
+            counts.set(comparableUrl, count);
+        }
+    }
+
+    return counts;
+}
+
+function isOpenInAnotherTabForUrl(state: ProposedTabRuntimeState, comparableUrl: string, openTabCount: number): boolean {
+    const comparablePageUrl = normalizeComparableOpenTabUrl(state.pageUrl);
+
+    return comparablePageUrl === comparableUrl
+        ? openTabCount > 1
+        : openTabCount > 0;
+}
+
+export function mergeTabPresenceIntoTabState(
+    state: ProposedTabRuntimeState,
+    payload: ProposedTabPresencePayload,
+    now: number,
+): ProposedTabRuntimeState {
+    if (state.phase === 'destroyed') {
+        return state;
+    }
+
+    const changedUrls = normalizeComparableOpenTabUrls(payload.urls);
+    if (changedUrls.length === 0) {
+        return state;
+    }
+
+    const counts = buildComparableCountMap(payload.counts);
+    const openReferrerTabsByUrl = cloneOpenReferrerTabsByUrl(state.openReferrerTabsByUrl);
+    for (const comparableUrl of changedUrls) {
+        const openTabCount = counts.get(comparableUrl) ?? 0;
+        if (openTabCount === 0) {
+            delete openReferrerTabsByUrl[comparableUrl];
+            continue;
+        }
+
+        openReferrerTabsByUrl[comparableUrl] = {
+            referrerUrl: comparableUrl,
+            comparableUrl,
+            openTabCount,
+            isOpenInAnotherTab: isOpenInAnotherTabForUrl(state, comparableUrl, openTabCount),
+            updatedAt: now,
+        };
+    }
+
+    return {
+        ...state,
+        openReferrerTabsByUrl,
+        updatedAt: now,
+    };
 }
 
 export function mergeProcessorResultIntoTabState(
@@ -243,6 +336,72 @@ export function mergeReverbEventIntoTabState(
         referrerResult: shouldReplacePrimaryResult(state, event, next) ? next : state.referrerResult,
         referrerResultsByUrl: withResultByReferrerUrl(state, next),
         updatedAt: now,
+    };
+}
+
+function findFileStateForReferrer(
+    state: ProposedTabRuntimeState,
+    referrerUrl: string | null,
+): ProposedReferrerFileState | null {
+    const normalizedReferrerUrl = normalizeRuntimeUrl(referrerUrl);
+    if (normalizedReferrerUrl === null) {
+        return state.referrerResult;
+    }
+
+    const directResult = state.referrerResultsByUrl[normalizedReferrerUrl];
+    if (directResult !== undefined) {
+        return directResult;
+    }
+
+    return sameRuntimeUrl(state.referrerResult?.referrerUrl, normalizedReferrerUrl)
+        ? state.referrerResult
+        : null;
+}
+
+export function selectProposedReferrerPresentation(
+    state: ProposedTabRuntimeState,
+    referrerUrl: string | null,
+): ProposedReferrerPresentation {
+    const normalizedReferrerUrl = normalizeRuntimeUrl(referrerUrl);
+    const comparableReferrerUrl = normalizeComparableOpenTabUrl(normalizedReferrerUrl);
+    const fileState = findFileStateForReferrer(state, normalizedReferrerUrl);
+    const openTabState = comparableReferrerUrl === null
+        ? null
+        : state.openReferrerTabsByUrl[comparableReferrerUrl] ?? null;
+    const comparablePageUrl = normalizeComparableOpenTabUrl(state.pageUrl);
+
+    if (hasVisibleFileState(fileState)) {
+        return {
+            kind: 'file-state',
+            referrerUrl: normalizedReferrerUrl,
+            fileState,
+            openTabState,
+        };
+    }
+
+    if (comparableReferrerUrl !== null && comparablePageUrl === comparableReferrerUrl) {
+        return {
+            kind: 'same-page',
+            referrerUrl: normalizedReferrerUrl,
+            fileState,
+            openTabState,
+        };
+    }
+
+    if (openTabState?.isOpenInAnotherTab === true) {
+        return {
+            kind: 'opened-elsewhere',
+            referrerUrl: normalizedReferrerUrl,
+            fileState,
+            openTabState,
+        };
+    }
+
+    return {
+        kind: 'empty',
+        referrerUrl: normalizedReferrerUrl,
+        fileState,
+        openTabState,
     };
 }
 

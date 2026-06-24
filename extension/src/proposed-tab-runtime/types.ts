@@ -1,6 +1,6 @@
 export const PROPOSED_REFERRER_REACTION_REQUEST = 'ATLAS_PROPOSED_EXECUTE_REFERRER_REACTION';
 export const PROPOSED_TAB_RUNTIME_EVENT_STRATEGY = 'reverb-only-raw-event-relay';
-export const PROPOSED_TAB_RUNTIME_FIRST_CUTOVER_SCOPE = 'anchor-referrer-decorations';
+export const PROPOSED_TAB_RUNTIME_FIRST_CUTOVER_SCOPE = 'anchor-referrer-and-file-reaction-state';
 
 export type ProposedReactionType = 'love' | 'like' | 'funny';
 
@@ -23,6 +23,14 @@ export type ProposedReferrerFileState = {
     percent: number | null;
 };
 
+export type ProposedOpenReferrerTabState = {
+    referrerUrl: string;
+    comparableUrl: string;
+    openTabCount: number;
+    isOpenInAnotherTab: boolean;
+    updatedAt: number;
+};
+
 export type ProposedReferrerLifecycleTarget = {
     referrerUrl: string;
     pageUrl: string | null;
@@ -40,11 +48,26 @@ export type ProposedTabRuntimeState = {
     lifecycleRunCount: number;
     referrerResult: ProposedReferrerFileState | null;
     referrerResultsByUrl: Record<string, ProposedReferrerFileState>;
+    openReferrerTabsByUrl: Record<string, ProposedOpenReferrerTabState>;
     lastRequestId: string | null;
     lastError: string | null;
     destroyReason: string | null;
     createdAt: number;
     updatedAt: number;
+};
+
+export type ProposedTabPresencePayload = {
+    urls?: unknown;
+    counts?: unknown;
+};
+
+export type ProposedReferrerPresentationKind = 'file-state' | 'same-page' | 'opened-elsewhere' | 'empty';
+
+export type ProposedReferrerPresentation = {
+    kind: ProposedReferrerPresentationKind;
+    referrerUrl: string | null;
+    fileState: ProposedReferrerFileState | null;
+    openTabState: ProposedOpenReferrerTabState | null;
 };
 
 export type ProposedReferrerProcessorRequest = {

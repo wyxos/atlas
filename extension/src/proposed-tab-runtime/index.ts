@@ -9,7 +9,9 @@ export {
     markProposedTabStateChecking,
     markProposedTabStateDestroyed,
     mergeProcessorResultIntoTabState,
+    mergeTabPresenceIntoTabState,
     mergeReverbEventIntoTabState,
+    selectProposedReferrerPresentation,
 } from './state-merge';
 export { createProposedTabRuntime } from './tab-runtime';
 export { createProposedTabReverbListener } from './tab-reverb-listener';
@@ -21,6 +23,9 @@ export {
 } from './types';
 export type {
     ProposedReactionType,
+    ProposedOpenReferrerTabState,
+    ProposedReferrerPresentation,
+    ProposedReferrerPresentationKind,
     ProposedReferrerLifecycleTarget,
     ProposedReferrerFileState,
     ProposedReferrerProcessorRequest,
@@ -28,6 +33,7 @@ export type {
     ProposedReferrerProcessorResponse,
     ProposedReverbEvent,
     ProposedReverbEventName,
+    ProposedTabPresencePayload,
     ProposedTabRuntimePhase,
     ProposedTabRuntimeState,
 } from './types';

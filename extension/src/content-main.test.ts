@@ -536,7 +536,7 @@ describe('content-main', () => {
         expect(mockAnchorRuntime.registerVisibleFromDocument).toHaveBeenCalledWith(100);
     });
 
-    it('disconnects active page observers and keeps referrer reaction cache syncs when the tab becomes hidden', async () => {
+    it('keeps active page observers and state listeners when the tab becomes hidden', async () => {
         mockGetStoredOptions.mockResolvedValue({
             siteCustomizations: [],
         });
@@ -551,36 +551,28 @@ describe('content-main', () => {
 
         const mutationObserverDisconnectsBeforeHide = mockMutationObserverDisconnect.mock.calls.length;
         const unsubscribeCallsBeforeHide = mockUnsubscribeDownloadProgress.mock.calls.length;
-        const modelCleanupCallsBeforeHide = mockCleanupCivitAiModelBrowseCtas.mock.calls.length;
-        const userCleanupCallsBeforeHide = mockCleanupCivitAiUserBrowseLinks.mock.calls.length;
         const duplicateGuardDestroyCallsBeforeHide = mockDuplicateAnchorTabGuard.destroy.mock.calls.length;
         const anchorSuspendCallsBeforeHide = mockAnchorRuntime.suspend.mock.calls.length;
+        const overlayApplyCallsBeforeHide = mockOverlayApply.mock.calls.length;
 
         setDocumentVisibility('hidden');
         document.dispatchEvent(new Event('visibilitychange'));
 
-        expect(mockMutationObserverDisconnect.mock.calls.length).toBeGreaterThan(mutationObserverDisconnectsBeforeHide);
-        expect(mockUnsubscribeDownloadProgress.mock.calls.length).toBeGreaterThan(unsubscribeCallsBeforeHide);
-        expect(mockCleanupCivitAiModelBrowseCtas.mock.calls.length).toBeGreaterThan(modelCleanupCallsBeforeHide);
-        expect(mockCleanupCivitAiUserBrowseLinks.mock.calls.length).toBeGreaterThan(userCleanupCallsBeforeHide);
-        expect(mockDuplicateAnchorTabGuard.destroy.mock.calls.length).toBeGreaterThan(duplicateGuardDestroyCallsBeforeHide);
-        expect(mockAnchorRuntime.suspend.mock.calls.length).toBeGreaterThan(anchorSuspendCallsBeforeHide);
+        expect(mockMutationObserverDisconnect.mock.calls.length).toBe(mutationObserverDisconnectsBeforeHide);
+        expect(mockUnsubscribeDownloadProgress.mock.calls.length).toBe(unsubscribeCallsBeforeHide);
+        expect(mockDuplicateAnchorTabGuard.destroy.mock.calls.length).toBe(duplicateGuardDestroyCallsBeforeHide);
+        expect(mockAnchorRuntime.suspend.mock.calls.length).toBe(anchorSuspendCallsBeforeHide);
+        expect(mockOverlayApply.mock.calls.length).toBe(overlayApplyCallsBeforeHide);
 
-        progressListener?.({
-            event: 'DownloadTransferQueued',
-            transferId: 55,
-        });
-        runtimeMessageListener?.({
-            type: 'ATLAS_REFERRER_REACTION_SYNC',
-            phase: 'pending',
-            urls: ['https://example.com/post'],
-        });
+        setDocumentVisibility('visible');
+        document.dispatchEvent(new Event('visibilitychange'));
 
-        expect(mockDownloadEventSheetPush).not.toHaveBeenCalled();
-        expect(mockAnchorRuntime.handleReferrerReactionSync).toHaveBeenCalledWith({
-            type: 'ATLAS_REFERRER_REACTION_SYNC',
-            phase: 'pending',
-            urls: ['https://example.com/post'],
-        });
+        expect(mockOverlayApply.mock.calls.length).toBe(overlayApplyCallsBeforeHide);
+
+        const tabPresenceMessage = { type: 'ATLAS_TAB_PRESENCE_CHANGED', urls: ['https://example.com/post'], counts: { 'https://example.com/post': 2 } };
+        runtimeMessageListener?.(tabPresenceMessage);
+
+        expect(mockAnchorRuntime.handleTabPresenceChanged).toHaveBeenCalledWith(['https://example.com/post']);
+        expect(mockDuplicateAnchorTabGuard.handleTabPresenceChanged).toHaveBeenCalledWith(tabPresenceMessage);
     });
 });

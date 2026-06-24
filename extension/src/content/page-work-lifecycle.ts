@@ -1,25 +1,23 @@
-import { documentWasDiscarded, shouldBypassBadgeCheckCacheForPageStart } from './restored-page-badge-check';
+import { documentWasDiscarded } from './restored-page-badge-check';
 
 type StartPageWork = (options: { fullScan?: boolean; bypassBadgeCheckCache?: boolean }) => void;
-type StopPageWork = () => void;
+type DestroyPageWork = () => void;
 
 export function isPageVisible(): boolean {
     return document.visibilityState !== 'hidden';
 }
 
-export function installPageVisibilityLifecycle(startPageWork: StartPageWork, stopPageWork: StopPageWork): void {
+export function installPageVisibilityLifecycle(startPageWork: StartPageWork, destroyPageWork: DestroyPageWork): void {
     document.addEventListener('visibilitychange', () => {
         if (isPageVisible()) {
-            void shouldBypassBadgeCheckCacheForPageStart()
-                .then((bypassBadgeCheckCache) => {
-                    if (isPageVisible()) {
-                        startPageWork({ fullScan: false, bypassBadgeCheckCache });
-                    }
-                });
-            return;
+            startPageWork({ fullScan: false });
         }
+    });
 
-        stopPageWork();
+    window.addEventListener('pagehide', (event: PageTransitionEvent) => {
+        if (!event.persisted) {
+            destroyPageWork();
+        }
     });
 
     window.addEventListener('pageshow', (event: PageTransitionEvent) => {

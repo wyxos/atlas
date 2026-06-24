@@ -37,7 +37,7 @@ function createProcessor(response = successfulProcessorResponse()): ProposedRefe
 describe('createProposedTabRuntime', () => {
     it('documents the accepted cutover strategy as Reverb-only events for anchor referrer decorations first', () => {
         expect(PROPOSED_TAB_RUNTIME_EVENT_STRATEGY).toBe('reverb-only-raw-event-relay');
-        expect(PROPOSED_TAB_RUNTIME_FIRST_CUTOVER_SCOPE).toBe('anchor-referrer-decorations');
+        expect(PROPOSED_TAB_RUNTIME_FIRST_CUTOVER_SCOPE).toBe('anchor-referrer-and-file-reaction-state');
     });
 
     it('performs one referrer lifecycle and treats tab visibility changes as state no-ops', async () => {
@@ -293,6 +293,53 @@ describe('createProposedTabRuntime', () => {
             'https://civitai.com/images/2': {
                 reaction: null,
                 fileId: 456,
+            },
+        });
+    });
+
+    it('merges tab-presence changes while hidden and preserves them on return without rechecking', async () => {
+        const processor = createProcessor(successfulProcessorResponse({
+            result: {
+                ...successfulProcessorResponse().result,
+                exists: false,
+                reaction: null,
+                reactedAt: null,
+                downloadedAt: null,
+                blacklistedAt: null,
+                referrerUrl: 'https://civitai.com/images/2',
+                sourceUrl: null,
+                fileId: null,
+            },
+        }));
+        const runtime = createProposedTabRuntime({
+            instanceId: 'tab-7:document-1',
+            documentId: 'document-1',
+            pageUrl: 'https://civitai.com/feed',
+            referrerUrl: 'https://civitai.com/images/2',
+            atlasDomain: 'https://atlas.test',
+            apiToken: 'test-token',
+            processor,
+            now: () => 1000,
+        });
+
+        await runtime.startReferrerLifecycle();
+        runtime.handleTabVisibilityChanged('hidden');
+        const stateAfterHiddenPresence = runtime.handleTabPresenceChanged({
+            urls: ['https://civitai.com/images/2'],
+            counts: {
+                'https://civitai.com/images/2': 1,
+            },
+        });
+        runtime.handleTabVisibilityChanged('visible');
+        await runtime.startReferrerLifecycle();
+
+        expect(processor.executeReferrerReaction).toHaveBeenCalledTimes(1);
+        expect(runtime.getState()).toEqual(stateAfterHiddenPresence);
+        expect(runtime.getPresentationForReferrer('https://civitai.com/images/2')).toMatchObject({
+            kind: 'opened-elsewhere',
+            openTabState: {
+                openTabCount: 1,
+                isOpenInAnotherTab: true,
             },
         });
     });

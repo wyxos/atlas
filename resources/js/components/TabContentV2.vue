@@ -423,12 +423,8 @@ async function goToFirstPage(): Promise<void> { stopActiveVibeAutomation(); hydr
 async function retryTabBootstrap(): Promise<void> { await browseActions.initialize(); }
 
 watch(
-    () => vibeStatus.value.loadState,
-    () => {
-        const isLoading = vibeStatus.value.phase === 'loading'
-            || vibeStatus.value.phase === 'filling'
-            || vibeStatus.value.phase === 'refreshing'
-            || vibeStatus.value.loadState === 'loading';
+    isVibeLoading,
+    (isLoading) => {
         emit('update:loading', isLoading);
         props.onLoadingChange?.(isLoading);
     },
