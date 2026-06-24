@@ -24,7 +24,7 @@ import { clearDeviantArtBackgroundImageStyle } from './content/deviantart-backgr
 import { installCivitAiModelBrowseCtas } from './content/civitai-model-browse-cta';
 import { installCivitAiUserBrowseLinks } from './content/civitai-user-browse-link';
 import { installDeviantArtArtistBrowseCtas } from './content/deviantart-artist-browse-cta';
-import { installPageVisibilityLifecycle, isPageVisible } from './content/page-work-lifecycle';
+import { installPageVisibilityLifecycle } from './content/page-work-lifecycle';
 import { shouldBypassBadgeCheckCacheForPageStart } from './content/restored-page-badge-check';
 import { isVisibleInViewport } from './content/viewport-visibility';
 import { createAnchorReferrerShortcutListener } from './content/anchor-referrer-shortcut-listener';
@@ -516,7 +516,7 @@ async function loadRulesAndProcess(options: LoadRulesAndProcessOptions = {}): Pr
 
     if (options.fullScan ?? true) {
         processAllCurrentMedia();
-        anchorMediaRuntime.registerFromDocument();
+        anchorMediaRuntime.registerFromDocument({ checkImmediately: true });
         bypassBadgeCheckCacheForCurrentProcessing = previousBypass;
         return;
     }
@@ -532,6 +532,9 @@ function startPageWork(options: { fullScan?: boolean; bypassBadgeCheckCache?: bo
             bypassBadgeCheckCacheForCurrentProcessing = true;
             processVisiblePageWork();
             bypassBadgeCheckCacheForCurrentProcessing = previousBypass;
+        }
+        if (options.fullScan === false) {
+            processVisiblePageWork();
         }
         return;
     }
@@ -575,11 +578,7 @@ async function bootstrap(): Promise<void> {
     installPageVisibilityLifecycle(startPageWork, destroyPageWork);
 
     const bypassBadgeCheckCache = await shouldBypassBadgeCheckCacheForPageStart();
-    if (isPageVisible()) {
-        startPageWork({ fullScan: true, bypassBadgeCheckCache });
-    } else {
-        anchorMediaRuntime.suspend();
-    }
+    startPageWork({ fullScan: true, bypassBadgeCheckCache });
 }
 
 if (document.readyState === 'loading') {

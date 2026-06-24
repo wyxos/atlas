@@ -505,7 +505,7 @@ describe('content-main', () => {
         });
     });
 
-    it('does not start page work while hidden and resumes with a bounded visible scan', async () => {
+    it('starts page work while hidden and uses a bounded visible scan on first activation', async () => {
         setDocumentVisibility('hidden');
         mockGetStoredOptions.mockResolvedValue({
             siteCustomizations: [],
@@ -514,11 +514,15 @@ describe('content-main', () => {
 
         await import('./content-main');
         await flushPromises();
+        await flushPromises();
 
-        expect(mockAnchorRuntime.suspend).toHaveBeenCalledTimes(1);
-        expect(mockGetStoredOptions).not.toHaveBeenCalled();
-        expect(mockSubscribeToDownloadProgress).not.toHaveBeenCalled();
-        expect(mockMutationObserverObserve).not.toHaveBeenCalled();
+        expect(mockAnchorRuntime.resume).toHaveBeenCalledTimes(1);
+        expect(mockAnchorRuntime.suspend).not.toHaveBeenCalled();
+        expect(mockGetStoredOptions).toHaveBeenCalledTimes(1);
+        expect(mockSubscribeToDownloadProgress).toHaveBeenCalledTimes(1);
+        expect(mockMutationObserverObserve).toHaveBeenCalled();
+        expect(mockAnchorRuntime.registerFromDocument).toHaveBeenCalledTimes(1);
+        expect(mockAnchorRuntime.registerVisibleFromDocument).not.toHaveBeenCalled();
 
         setDocumentVisibility('visible');
         document.dispatchEvent(new Event('visibilitychange'));
@@ -528,7 +532,7 @@ describe('content-main', () => {
         expect(mockAnchorRuntime.resume).toHaveBeenCalledTimes(1);
         expect(mockGetStoredOptions).toHaveBeenCalledTimes(1);
         expect(mockAnchorRuntime.registerVisibleFromDocument).toHaveBeenCalledWith(100);
-        expect(mockAnchorRuntime.registerFromDocument).not.toHaveBeenCalled();
+        expect(mockAnchorRuntime.registerFromDocument).toHaveBeenCalledTimes(1);
 
         mockAnchorRuntime.registerVisibleFromDocument.mockClear();
         window.dispatchEvent(new Event('scroll'));

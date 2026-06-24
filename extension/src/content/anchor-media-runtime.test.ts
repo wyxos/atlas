@@ -132,6 +132,31 @@ describe('anchor-media-runtime', () => {
         expect(anchor.querySelector('[data-atlas-anchor-reaction-badge="1"]')).toBeNull();
     });
 
+    it('can run the initial referrer check before viewport visibility is available', async () => {
+        mockEnqueueReferrerCheck.mockResolvedValue(missedReferrerResult());
+        const { createAnchorMediaRuntime } = await import('./anchor-media-runtime');
+        const runtime = createAnchorMediaRuntime({
+            getIsEnabled: () => true,
+            getRules: () => [],
+            getReferrerCleanerQueryParams: () => [],
+            getPageHostname: () => 'example.com',
+        });
+
+        const anchor = document.createElement('a');
+        anchor.href = 'https://example.com/background-tab-post';
+        const image = document.createElement('img');
+        anchor.appendChild(image);
+        document.body.appendChild(anchor);
+
+        runtime.registerFromDocument();
+        expect(mockEnqueueReferrerCheck).not.toHaveBeenCalled();
+
+        runtime.registerFromDocument({ checkImmediately: true });
+        await flushPromises();
+
+        expect(mockEnqueueReferrerCheck).toHaveBeenCalledWith('https://example.com/background-tab-post', []);
+    });
+
     it('does not requeue an already checked visible referrer while scroll fallback repeats registration', async () => {
         let resolveCheck: ((value: ReturnType<typeof missedReferrerResult>) => void) | null = null;
         const checkPromise = new Promise<ReturnType<typeof missedReferrerResult>>((resolve) => {

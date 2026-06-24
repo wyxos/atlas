@@ -46,6 +46,8 @@ type ReferrerCheckState = {
     settledWhilePaused?: boolean;
 };
 
+type RegisterAnchorMediaCandidateOptions = { checkImmediately?: boolean };
+
 function isTerminalTransferStatus(status: string | null): boolean {
     return status === 'completed' || status === 'failed' || status === 'canceled';
 }
@@ -319,7 +321,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         });
     }
 
-    function registerAnchorMediaCandidate(media: MediaElement): void {
+    function registerAnchorMediaCandidate(media: MediaElement, optionsOverride: RegisterAnchorMediaCandidateOptions = {}): void {
         if (isPaused) {
             return;
         }
@@ -333,7 +335,7 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         }
         anchorMediaObserver.observe(media);
 
-        if (isVisibleInViewport(media)) {
+        if (optionsOverride.checkImmediately === true || isVisibleInViewport(media)) {
             applyAnchorMediaBorder(media);
         }
     }
@@ -354,10 +356,10 @@ export function createAnchorMediaRuntime(options: AnchorMediaRuntimeOptions) {
         }
     }
 
-    function registerFromDocument(): void {
+    function registerFromDocument(optionsOverride: RegisterAnchorMediaCandidateOptions = {}): void {
         for (const mediaElement of document.querySelectorAll('a[href] img, a[href] video')) {
             if (isMediaElement(mediaElement)) {
-                registerAnchorMediaCandidate(mediaElement);
+                registerAnchorMediaCandidate(mediaElement, optionsOverride);
             }
         }
     }
