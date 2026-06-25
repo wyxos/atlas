@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -79,6 +80,29 @@ test('settings services includes extension api key status', function () {
     $response->assertSuccessful();
     $response->assertJsonPath('extension.api_key_configured', false);
     $response->assertJsonPath('extension.default_domain', rtrim((string) config('app.url', 'https://atlas.test'), '/'));
+});
+
+test('database seeder stores a stable local extension api key for the demo user', function () {
+    (new DatabaseSeeder)->run();
+
+    $demoUser = User::query()->where('email', 'demo@atlas.test')->firstOrFail();
+    $storedHash = DB::table('settings')
+        ->where('key', 'extension.api_key_hash')
+        ->where('machine', '')
+        ->value('value');
+    $storedUserId = DB::table('settings')
+        ->where('key', 'extension.api_key_user_id')
+        ->where('machine', '')
+        ->value('value');
+
+    expect($storedHash)->toBe(hash('sha256', 'atlas_local_development_key'));
+    expect($storedUserId)->toBe((string) $demoUser->id);
+
+    $this->withHeaders([
+        'X-Atlas-Api-Key' => 'atlas_local_development_key',
+    ])->getJson('/api/extension/ping')
+        ->assertSuccessful()
+        ->assertJsonPath('ok', true);
 });
 
 test('extension ping validates api key', function () {
