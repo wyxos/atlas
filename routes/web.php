@@ -37,6 +37,18 @@ if (app()->environment(['local', 'testing'])) {
 }
 
 // Public extension API endpoints. Kept in web.php with SPA-style /api prefix; no api middleware throttling is applied.
+Route::prefix('/api/extension/v2')->name('api.extension.v2.')->group(function (): void {
+    Route::get('/ping', [\App\Http\Controllers\ExtensionV2Controller::class, 'ping'])
+        ->name('ping');
+    Route::post('/assets/status', [\App\Http\Controllers\ExtensionV2Controller::class, 'assetStatuses'])
+        ->name('assets.status');
+    Route::post('/reactions', [\App\Http\Controllers\ExtensionV2Controller::class, 'react'])
+        ->name('reactions');
+    Route::delete('/files/{file}', [\App\Http\Controllers\ExtensionFileController::class, 'destroy'])
+        ->name('files.destroy');
+    Route::post('/broadcasting/auth', [\App\Http\Controllers\ExtensionV2Controller::class, 'broadcastAuth'])
+        ->name('broadcast-auth');
+});
 Route::get('/api/extension/ping', [\App\Http\Controllers\ExtensionApiController::class, 'ping'])
     ->name('api.extension.ping');
 Route::get('/api/extension/settings', [\App\Http\Controllers\ExtensionSettingsController::class, 'show'])

@@ -35,6 +35,10 @@ it('includes original URL in non-terminal progress payloads', function () {
     expect($payload['downloadTransferId'])->toBe($transfer->id)
         ->and($payload['status'])->toBe(DownloadTransferStatus::DOWNLOADING)
         ->and($payload['percent'])->toBe(25)
+        ->and($payload['file'])->toMatchArray([
+            'atlas_url' => url("/browse/file/{$file->id}"),
+            'id' => $file->id,
+        ])
         ->and($payload['original'])->toBe('https://images.example.com/media/progress.jpg')
         ->and(array_key_exists('reaction', $payload))->toBeTrue()
         ->and($payload['reaction'])->toBeNull()
@@ -173,6 +177,55 @@ it('includes null reaction for extension payloads when no reaction exists', func
         ->and(array_key_exists('referrer_url', $payload))->toBeTrue()
         ->and(array_key_exists('downloaded_at', $payload))->toBeTrue()
         ->and(array_key_exists('blacklisted_at', $payload))->toBeTrue();
+});
+
+it('does not report stale downloaded timestamps while an active transfer is running', function () {
+    $file = File::factory()->create([
+        'downloaded_at' => now()->subHour(),
+        'url' => 'https://images.example.com/media/restarted.jpg',
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://images.example.com/media/restarted.jpg',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 12,
+        'last_broadcast_percent' => 12,
+    ]);
+
+    $payload = DownloadTransferPayload::forProgress($transfer, 12);
+
+    expect($payload['status'])->toBe(DownloadTransferStatus::DOWNLOADING)
+        ->and($payload['percent'])->toBe(12)
+        ->and($payload['downloaded_at'])->toBeNull();
+});
+
+it('does not report stale downloaded timestamps after a failed terminal redownload', function () {
+    $file = File::factory()->create([
+        'downloaded_at' => now()->subHour(),
+        'path' => 'downloads/aa/bb/restarted.jpg',
+        'url' => 'https://images.example.com/media/restarted.jpg',
+    ]);
+
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => 'https://images.example.com/media/restarted.jpg',
+        'domain' => 'example.com',
+        'status' => DownloadTransferStatus::FAILED,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 12,
+        'last_broadcast_percent' => 12,
+        'error' => 'Restart failed.',
+    ]);
+
+    $payload = DownloadTransferPayload::forProgress($transfer, 12);
+
+    expect($payload['status'])->toBe(DownloadTransferStatus::FAILED)
+        ->and($payload['percent'])->toBe(12)
+        ->and($payload['path'])->toBe('downloads/aa/bb/restarted.jpg')
+        ->and($payload['downloaded_at'])->toBeNull();
 });
 
 it('prefers downloaded file URLs for terminal yt-dlp payloads', function () {

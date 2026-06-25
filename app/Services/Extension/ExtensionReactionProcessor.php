@@ -18,9 +18,7 @@ use Illuminate\Validation\ValidationException;
 
 class ExtensionReactionProcessor
 {
-    public function __construct(
-        private readonly ExtensionActiveTransferLookup $activeTransferLookup,
-    ) {}
+    public function __construct(private readonly ExtensionActiveTransferLookup $activeTransferLookup) {}
 
     /**
      * @param  array<string, mixed>  $item
@@ -89,6 +87,7 @@ class ExtensionReactionProcessor
 
         return [
             'file' => [
+                'atlas_url' => url("/browse/file/{$file->id}"),
                 'id' => $file->id,
                 'url' => $file->url,
                 'referrer_url' => $file->referrer_url,
@@ -101,7 +100,7 @@ class ExtensionReactionProcessor
                 'transfer_id' => $activeTransfer?->id,
                 'status' => $activeTransfer?->status,
                 'progress_percent' => $activeTransfer?->last_broadcast_percent,
-                'downloaded_at' => $file->downloaded_at?->toIso8601String(),
+                'downloaded_at' => $activeTransfer ? null : $file->downloaded_at?->toIso8601String(),
             ],
             'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
         ];
@@ -129,6 +128,7 @@ class ExtensionReactionProcessor
 
         return [
             'file' => [
+                'atlas_url' => url("/browse/file/{$file->id}"),
                 'id' => $file->id,
                 'url' => $file->url,
                 'referrer_url' => $file->referrer_url,
@@ -141,7 +141,7 @@ class ExtensionReactionProcessor
                 'transfer_id' => $activeTransfer?->id,
                 'status' => $activeTransfer?->status,
                 'progress_percent' => $activeTransfer?->last_broadcast_percent,
-                'downloaded_at' => $file->downloaded_at?->toIso8601String(),
+                'downloaded_at' => $activeTransfer ? null : $file->downloaded_at?->toIso8601String(),
             ],
             'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
         ];

@@ -2,6 +2,7 @@
 
 namespace App\Services\Downloads;
 
+use App\Enums\DownloadTransferStatus;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Support\FileApiPath;
@@ -58,8 +59,11 @@ final class DownloadTransferPayload
      */
     public static function forProgress(DownloadTransfer $transfer, int $percent): array
     {
+        $file = self::assetUrlFileForTransfer($transfer);
         $payload = [
             'id' => $transfer->id,
+            'asset_url' => self::assetUrl($file, $transfer->url),
+            'file' => self::atlasFilePayload($file),
             'fileId' => $transfer->file_id,
             'file_id' => $transfer->file_id,
             'status' => $transfer->status,
@@ -85,6 +89,10 @@ final class DownloadTransferPayload
                     ...self::filePayload($file, $transfer->url),
                 ];
             }
+        }
+
+        if ($transfer->status !== DownloadTransferStatus::COMPLETED) {
+            $payload['downloaded_at'] = null;
         }
 
         return $payload;
@@ -148,6 +156,7 @@ final class DownloadTransferPayload
             : null;
 
         return [
+            'asset_url' => self::assetUrl($file, $sourceUrl),
             'path' => $path,
             'absolute_path' => $absolutePath,
             'original' => $original,
@@ -158,6 +167,45 @@ final class DownloadTransferPayload
             'size' => $file?->size,
             'filename' => $file?->filename,
         ];
+    }
+
+    /**
+     * @return array{id:int, atlas_url:string}|null
+     */
+    private static function atlasFilePayload(?File $file): ?array
+    {
+        if (! $file?->id) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $file->id,
+            'atlas_url' => url("/browse/file/{$file->id}"),
+        ];
+    }
+
+    private static function assetUrl(?File $file, ?string $sourceUrl): ?string
+    {
+        if (is_string($file?->preview_url) && $file->preview_url !== '') {
+            return $file->preview_url;
+        }
+
+        if (is_string($file?->url) && $file->url !== '') {
+            return $file->url;
+        }
+
+        return $sourceUrl;
+    }
+
+    private static function assetUrlFileForTransfer(DownloadTransfer $transfer): ?File
+    {
+        if ($transfer->relationLoaded('file')) {
+            return $transfer->file;
+        }
+
+        return $transfer->file()
+            ->select(['id', 'preview_url', 'url'])
+            ->first();
     }
 
     private static function plannedPath(?File $file, ?string $sourceUrl): ?string
