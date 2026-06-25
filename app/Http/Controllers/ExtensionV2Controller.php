@@ -128,10 +128,19 @@ class ExtensionV2Controller extends Controller
             return $this->invalidApiKeyResponse();
         }
 
-        $assetUrls = $this->uniqueStrings($request->validated('asset_urls'));
+        $validated = $request->validated();
+        $assetUrls = $this->uniqueStrings($validated['asset_urls'] ?? []);
+        $referrerUrls = $this->uniqueStrings($validated['referrer_urls'] ?? []);
         $filesByAssetUrl = $this->filesByAssetUrl($assetUrls);
+        $filesByReferrerUrl = $this->filesByReferrerUrl($referrerUrls, (int) $user->id);
         $fileIds = array_values(array_unique(array_filter(
-            array_map(static fn (?File $file): int => (int) ($file?->id ?? 0), $filesByAssetUrl),
+            array_map(
+                static fn (?File $file): int => (int) ($file?->id ?? 0),
+                [
+                    ...array_values($filesByAssetUrl),
+                    ...array_values($filesByReferrerUrl),
+                ],
+            ),
             static fn (int $fileId): bool => $fileId > 0,
         )));
         $activeTransfers = $activeTransferLookup->byFileId($fileIds);
@@ -149,8 +158,17 @@ class ExtensionV2Controller extends Controller
                 : null;
         }
 
+        $referrers = [];
+        foreach ($referrerUrls as $referrerUrl) {
+            $file = $filesByReferrerUrl[$referrerUrl] ?? null;
+            $referrers[$referrerUrl] = $file
+                ? $this->assetStatusPayload($referrerUrl, $file, $activeTransfers[(int) $file->id] ?? null, $reactions)
+                : null;
+        }
+
         return response()->json([
             'assets' => $assets,
+            'referrers' => $referrers,
         ]);
     }
 
@@ -227,6 +245,64 @@ class ExtensionV2Controller extends Controller
         }
 
         return $matches;
+    }
+
+    /**
+     * @param  list<string>  $referrerUrls
+     * @return array<string, File|null>
+     */
+    private function filesByReferrerUrl(array $referrerUrls, int $userId): array
+    {
+        if ($referrerUrls === []) {
+            return [];
+        }
+
+        $referrerUrlHashes = array_map(static fn (string $referrerUrl): string => hash('sha256', $referrerUrl), $referrerUrls);
+        $files = File::query()
+            ->select(['id', 'url', 'url_hash', 'referrer_url', 'referrer_url_hash', 'preview_url', 'downloaded_at', 'blacklisted_at', 'updated_at'])
+            ->where(function ($query) use ($referrerUrls, $referrerUrlHashes): void {
+                $query
+                    ->whereIn('referrer_url_hash', $referrerUrlHashes)
+                    ->orWhereIn('referrer_url', $referrerUrls);
+            })
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $positiveReactionsByFileId = Reaction::query()
+            ->where('user_id', $userId)
+            ->whereIn('file_id', $files->pluck('id')->all())
+            ->whereIn('type', $this->positiveReactionTypes())
+            ->pluck('type', 'file_id')
+            ->all();
+        $byReferrerUrlHash = $files->groupBy('referrer_url_hash');
+        $byReferrerUrl = $files
+            ->filter(fn (File $file): bool => is_string($file->referrer_url) && $file->referrer_url !== '')
+            ->groupBy('referrer_url');
+        $matches = [];
+
+        foreach ($referrerUrls as $referrerUrl) {
+            $candidates = $byReferrerUrlHash
+                ->get(hash('sha256', $referrerUrl), collect())
+                ->merge($byReferrerUrl->get($referrerUrl, collect()))
+                ->unique('id')
+                ->values();
+            $matches[$referrerUrl] = $candidates->first(
+                fn (File $file): bool => isset($positiveReactionsByFileId[$file->id])
+            ) ?? $candidates->first(
+                fn (File $file): bool => $file->blacklisted_at !== null
+            );
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function positiveReactionTypes(): array
+    {
+        return ['love', 'like', 'funny'];
     }
 
     /**

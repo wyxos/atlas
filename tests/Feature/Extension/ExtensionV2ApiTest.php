@@ -157,6 +157,78 @@ test('v2 asset status checks match by asset url including downloaded video previ
     expect($assets['https://cdn.example.test/media/missing.jpg'])->toBeNull();
 });
 
+test('v2 asset status checks match skipped assets by referrer url', function () {
+    $user = User::factory()->create();
+    setExtensionReactionApiKey('valid-api-key', $user->id);
+
+    $sharedReferrerUrl = 'https://www.example.test/post/shared';
+    $olderPositive = File::factory()->create([
+        'referrer_url' => $sharedReferrerUrl,
+        'url' => 'https://cdn.example.test/media/shared-old.jpg',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $olderPositive->id,
+        'type' => 'like',
+        'user_id' => $user->id,
+    ]);
+    $newerBlacklisted = File::factory()->create([
+        'blacklisted_at' => now(),
+        'referrer_url' => $sharedReferrerUrl,
+        'url' => 'https://cdn.example.test/media/shared-blacklisted.jpg',
+    ]);
+    $latestPositive = File::factory()->create([
+        'referrer_url' => $sharedReferrerUrl,
+        'url' => 'https://cdn.example.test/media/shared-latest.jpg',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $latestPositive->id,
+        'type' => 'love',
+        'user_id' => $user->id,
+    ]);
+
+    $blacklistedReferrerUrl = 'https://www.example.test/post/blacklisted';
+    $blacklisted = File::factory()->create([
+        'blacklisted_at' => now(),
+        'referrer_url' => $blacklistedReferrerUrl,
+        'url' => 'https://cdn.example.test/media/blacklisted.jpg',
+    ]);
+    File::factory()->create([
+        'referrer_url' => $blacklistedReferrerUrl,
+        'url' => 'https://cdn.example.test/media/unreacted-with-blacklist.jpg',
+    ]);
+
+    $unreactedReferrerUrl = 'https://www.example.test/post/unreacted';
+    File::factory()->create([
+        'referrer_url' => $unreactedReferrerUrl,
+        'url' => 'https://cdn.example.test/media/unreacted-only.jpg',
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/v2/assets/status', [
+        'referrer_urls' => [
+            $sharedReferrerUrl,
+            $blacklistedReferrerUrl,
+            $unreactedReferrerUrl,
+            'https://www.example.test/post/missing',
+        ],
+    ]);
+
+    $response->assertOk();
+
+    $referrers = $response->json('referrers');
+
+    expect($referrers[$sharedReferrerUrl]['file']['id'])->toBe($latestPositive->id);
+    expect($referrers[$sharedReferrerUrl]['reaction']['type'])->toBe('love');
+    expect($referrers[$blacklistedReferrerUrl]['file']['id'])->toBe($blacklisted->id);
+    expect($referrers[$blacklistedReferrerUrl]['blacklisted_at'])->not->toBeNull();
+    expect($referrers[$unreactedReferrerUrl])->toBeNull();
+    expect($referrers['https://www.example.test/post/missing'])->toBeNull();
+    expect($response->json('assets'))->toBe([]);
+
+    expect($newerBlacklisted->id)->not->toBe($latestPositive->id);
+});
+
 test('v2 asset status prefers active transfer progress over stale downloaded state', function () {
     $user = User::factory()->create();
     setExtensionReactionApiKey('valid-api-key', $user->id);
