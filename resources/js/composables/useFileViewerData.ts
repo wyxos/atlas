@@ -2,12 +2,26 @@ import { ref, watch, toRefs, computed, type Ref } from 'vue';
 import FileSourceMetadataController from '@/actions/App/Http/Controllers/FileSourceMetadataController';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { FeedItem } from '@/composables/useTabs';
+import { resolveFilePreviewUrl } from '@/lib/filePreviewGeneration';
 import type { File } from '@/types/file';
+import { getMimeTypeCategory } from '@/utils/file';
+
+type FileMediaKind = 'image' | 'video' | 'audio' | 'file';
 
 function isSpotifyFile(file: File): boolean {
     return file.source?.trim().toLowerCase() === 'spotify'
         || file.mime_type?.trim().toLowerCase() === 'audio/spotify'
         || Boolean(file.spotify_uri?.trim());
+}
+
+function resolveFileMediaKind(file: File): FileMediaKind {
+    const category = getMimeTypeCategory(file.mime_type);
+
+    if (category === 'audio' || category === 'video' || category === 'image') {
+        return category;
+    }
+
+    return 'file';
 }
 
 export function useFileViewerData(params: {
@@ -105,18 +119,12 @@ export function useFileViewerData(params: {
             return;
         }
 
+        const mediaKind = resolveFileMediaKind(file);
         const spotifyFile = isSpotifyFile(file);
-        const refreshedPreview = (spotifyFile ? file.cover_url : null)
-            ?? file.preview_url
-            ?? file.preview_file_url
-            ?? file.poster_url
-            ?? file.file_url
-            ?? file.url
-            ?? item.preview
-            ?? item.src;
+        const refreshedPreview = resolveFilePreviewUrl(file, mediaKind, item.preview ?? item.src ?? null);
         const refreshedUrl = spotifyFile
             ? (file.file_url ?? file.disk_url ?? refreshedPreview)
-            : (file.file_url ?? file.url ?? item.url ?? item.src);
+            : (file.file_url ?? file.disk_url ?? file.url ?? item.url ?? item.src);
 
         item.url = file.url;
         item.original = refreshedUrl;
@@ -132,6 +140,7 @@ export function useFileViewerData(params: {
         item.blacklisted_at = file.blacklisted_at;
         item.blacklist_rule = file.blacklist_rule ?? null;
         item.downloaded = file.downloaded;
+        item.preview_generation = file.preview_generation ?? null;
         item.notFound = file.not_found;
         item.source = file.source;
         item.source_id = file.source_id;

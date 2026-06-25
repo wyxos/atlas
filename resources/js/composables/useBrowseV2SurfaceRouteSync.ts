@@ -2,9 +2,11 @@ import { computed, nextTick, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router';
 import type { FeedItem } from '@/composables/useTabs';
 import type { File } from '@/types/file';
+import { resolveFilePreviewUrl } from '@/lib/filePreviewGeneration';
 import { getMimeTypeCategory } from '@/utils/file';
 
 type SurfaceMode = 'fullscreen' | 'list';
+type FileMediaKind = 'image' | 'video' | 'audio' | 'file';
 
 type UseBrowseV2SurfaceRouteSyncOptions = {
     activeIndex: Ref<number>;
@@ -24,7 +26,7 @@ export function buildBrowseV2FilePath(fileId: number): string {
     return `/browse/file/${fileId}`;
 }
 
-function resolveFileMediaKind(file: File): FeedItem['media_kind'] {
+function resolveFileMediaKind(file: File): FileMediaKind {
     const category = getMimeTypeCategory(file.mime_type);
 
     if (category === 'audio' || category === 'video' || category === 'image') {
@@ -38,14 +40,7 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
     const mediaKind = resolveFileMediaKind(file);
     const isSpotifyAudio = mediaKind === 'audio'
         && (Boolean(file.spotify_uri) || file.source?.trim().toLowerCase() === 'spotify' || file.mime_type?.trim().toLowerCase() === 'audio/spotify');
-    const previewUrl = (mediaKind === 'audio' ? file.cover_url : null)
-        ?? file.preview_file_url
-        ?? file.preview_url
-        ?? file.poster_url
-        ?? file.file_url
-        ?? file.disk_url
-        ?? file.url
-        ?? '';
+    const previewUrl = resolveFilePreviewUrl(file, mediaKind);
     const originalUrl = isSpotifyAudio
         ? (file.file_url ?? file.disk_url ?? previewUrl)
         : (file.file_url ?? file.disk_url ?? file.url ?? previewUrl);
@@ -74,6 +69,7 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         blacklisted_at: file.blacklisted_at,
         blacklist_rule: file.blacklist_rule ?? null,
         downloaded: file.downloaded,
+        preview_generation: file.preview_generation ?? null,
         title: file.title ?? file.filename,
         filename: file.filename,
         source: file.source,

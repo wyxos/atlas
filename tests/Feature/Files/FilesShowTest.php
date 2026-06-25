@@ -4,10 +4,12 @@ use App\Models\Album;
 use App\Models\AlbumCover;
 use App\Models\Container;
 use App\Models\File;
+use App\Models\MediaProcessorTask;
 use App\Models\ModerationRule;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -195,4 +197,45 @@ test('file show includes audio album cover url', function () {
 
     $response->assertSuccessful();
     $response->assertJsonPath('file.cover_url', "/api/audio/album-covers/{$cover->id}");
+});
+
+test('downloaded files with failed preview generation do not expose remote preview fallbacks', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'facebook.com',
+        'url' => 'https://www.facebook.com/reel/123',
+        'preview_url' => 'https://www.facebook.com/reel/123',
+        'mime_type' => 'video/mp4',
+        'downloaded' => true,
+        'downloaded_at' => now(),
+        'path' => 'downloads/aa/bb/video.mp4',
+        'preview_path' => null,
+        'poster_path' => null,
+    ]);
+    MediaProcessorTask::query()->create([
+        'id' => (string) Str::uuid(),
+        'file_id' => $file->id,
+        'operation' => 'video_preview',
+        'status' => 'failed',
+        'phase' => 'failed',
+        'progress' => 100,
+        'storage_profile' => 'atlas-local',
+        'input_path' => $file->path,
+        'output_paths' => [
+            'preview_path' => 'downloads/aa/bb/preview/video.mp4',
+            'poster_path' => 'downloads/aa/bb/preview/video.jpg',
+        ],
+        'failed_at' => now(),
+        'error_message' => 'Processor exited with code 1.',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.preview_url', null);
+    $response->assertJsonPath('file.preview_file_url', null);
+    $response->assertJsonPath('file.poster_url', null);
+    $response->assertJsonPath('file.preview_generation.status', 'failed');
+    $response->assertJsonPath('file.preview_generation.can_retry', true);
+    $response->assertJsonPath('file.preview_generation.message', 'Processor exited with code 1.');
 });

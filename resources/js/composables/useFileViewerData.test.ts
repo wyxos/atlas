@@ -135,6 +135,102 @@ describe('useFileViewerData', () => {
         expect(items.value[0].seen_count).toBe(4);
     });
 
+    it('does not use downloaded file urls as previews when refreshed file data has failed preview generation', () => {
+        const items = ref([{
+            id: 1,
+            src: '/api/files/1/old-preview',
+            preview: '/api/files/1/old-preview',
+            original: '/api/files/1/downloaded',
+            originalUrl: '/api/files/1/downloaded',
+            url: 'https://www.facebook.com/reel/123',
+        }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: false });
+
+        const { setFileData } = useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+        });
+
+        setFileData({
+            id: 1,
+            url: 'https://www.facebook.com/reel/123',
+            file_url: '/api/files/1/downloaded',
+            disk_url: '/api/files/1/downloaded',
+            preview_url: null,
+            preview_file_url: null,
+            poster_url: null,
+            preview_generation: {
+                status: 'failed',
+                can_retry: true,
+                message: 'Processor exited with code 1.',
+            },
+            previewed_count: 3,
+            seen_count: 4,
+            auto_blacklisted: false,
+            blacklisted_at: null,
+            downloaded: true,
+            not_found: false,
+        } as any);
+
+        expect(items.value[0].src).toBe('');
+        expect(items.value[0].preview).toBe('');
+        expect(items.value[0].thumbnail).toBe('');
+        expect(items.value[0].original).toBe('/api/files/1/downloaded');
+        expect(items.value[0].originalUrl).toBe('/api/files/1/downloaded');
+        expect(items.value[0].preview_generation.status).toBe('failed');
+    });
+
+    it('updates feed preview urls when refreshed file data has generated preview assets', () => {
+        const items = ref([{
+            id: 1,
+            src: '',
+            preview: '',
+            thumbnail: '',
+            original: '/api/files/1/downloaded',
+            originalUrl: '/api/files/1/downloaded',
+        }] as any[]);
+        const navigation = reactive({ currentItemIndex: 0 as number | null });
+        const overlay = reactive({ fillComplete: true });
+        const sheet = reactive({ isOpen: false });
+
+        const { setFileData } = useFileViewerData({
+            items,
+            navigation,
+            overlay,
+            sheet,
+        });
+
+        setFileData({
+            id: 1,
+            url: 'https://www.facebook.com/reel/123',
+            file_url: '/api/files/1/downloaded',
+            disk_url: '/api/files/1/downloaded',
+            preview_url: '/api/files/1/preview',
+            preview_file_url: '/api/files/1/preview',
+            poster_url: '/api/files/1/poster',
+            preview_generation: {
+                status: 'ready',
+                can_retry: false,
+                message: null,
+            },
+            previewed_count: 3,
+            seen_count: 4,
+            auto_blacklisted: false,
+            blacklisted_at: null,
+            downloaded: true,
+            not_found: false,
+        } as any);
+
+        expect(items.value[0].src).toBe('/api/files/1/preview');
+        expect(items.value[0].preview).toBe('/api/files/1/preview');
+        expect(items.value[0].thumbnail).toBe('/api/files/1/preview');
+        expect(items.value[0].preview_generation.status).toBe('ready');
+    });
+
     it('refreshes source metadata and updates the sheet and feed item metadata cache', async () => {
         mockAxios.post.mockResolvedValueOnce({
             data: {

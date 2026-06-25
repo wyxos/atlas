@@ -47,6 +47,15 @@ export interface FileSourceAccess {
     can_unwatch: boolean;
 }
 
+export interface FilePreviewGeneration {
+    status: 'ready' | 'missing' | 'queued' | 'submitting' | 'accepted' | 'processing' | 'completed' | 'failed' | string;
+    can_retry: boolean;
+    message: string | null;
+    task_id?: string | null;
+    phase?: string | null;
+    progress?: number | null;
+}
+
 export interface FileModerationRuleDetails {
     id: number;
     name: string;
@@ -81,6 +90,7 @@ export interface File {
     disk_url: string | null;
     preview_file_url: string | null;
     poster_url: string | null;
+    preview_generation: FilePreviewGeneration | null;
     preview_path: string | null;
     poster_path: string | null;
     tags: string[] | null;

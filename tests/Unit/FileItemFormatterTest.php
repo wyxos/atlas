@@ -5,6 +5,7 @@ use App\Models\AlbumCover;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Models\MediaProcessorTask;
 use App\Services\FileItemFormatter;
 use App\Support\FileApiPath;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -99,6 +100,38 @@ it('uses preview route for downloaded video previews', function () {
     expect($item['src'])->toBe(FileApiPath::preview($file->id));
     expect($item['preview'])->toBe(FileApiPath::preview($file->id));
     expect($item['original'])->toBe(FileApiPath::downloaded($file->id));
+});
+
+it('does not fall back to a remote preview url for downloaded videos with failed preview generation', function () {
+    $file = formatterFile([
+        'id' => 110,
+        'mime_type' => 'video/mp4',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/test.mp4',
+        'url' => 'https://www.facebook.com/reel/123',
+        'preview_url' => 'https://www.facebook.com/reel/123',
+        'preview_path' => null,
+        'poster_path' => null,
+    ]);
+    $file->setRelation('latestPreviewMediaProcessorTask', new MediaProcessorTask([
+        'operation' => 'video_preview',
+        'status' => 'failed',
+        'phase' => 'failed',
+        'progress' => 100,
+        'error_message' => 'Processor exited with code 1.',
+    ]));
+
+    $items = FileItemFormatter::format([$file], 1);
+
+    expect($items[0]['src'])->toBe('')
+        ->and($items[0]['preview'])->toBe('')
+        ->and($items[0]['thumbnail'])->toBe('')
+        ->and($items[0]['original'])->toBe(FileApiPath::downloaded($file->id))
+        ->and($items[0]['preview_generation'])->toMatchArray([
+            'status' => 'failed',
+            'can_retry' => true,
+            'message' => 'Processor exited with code 1.',
+        ]);
 });
 
 it('treats application/mp4 as video for remote items', function () {

@@ -69,6 +69,7 @@ export type TabContentV2ViewProps = {
     handleReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
     headerMasonry: BrowseFeedHandle | null;
     isFilterSheetOpen: boolean;
+    isPreviewRegenerationQueued?: (item: FeedItem) => boolean;
     itemInteractions: TabContentItemInteractions;
     localFileDeletion: LocalFileDeletion;
     localService: ServiceOption | null | undefined;
@@ -84,6 +85,7 @@ export type TabContentV2ViewProps = {
     removingLoadedItems?: boolean;
     pendingBatchAction?: LoadedItemsBulkAction | null;
     promptDialog: TabContentPromptDialogHandle;
+    queuePreviewRegeneration?: (item: FeedItem, options?: { automatic?: boolean }) => void | Promise<void>;
     fileSheetPresentation: FileSheetPresentation;
     resolve: (params: { cursor: string | null; pageSize: number; signal?: AbortSignal }) => Promise<VibeResolveResult>;
     setAutoScrollSpeed?: (value: number) => void;

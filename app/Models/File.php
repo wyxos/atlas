@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ActionType;
+use App\Support\FilePreviewGeneration;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -184,6 +185,18 @@ class File extends Model
     public function moderationActions(): HasMany
     {
         return $this->hasMany(FileModerationAction::class);
+    }
+
+    public function mediaProcessorTasks(): HasMany
+    {
+        return $this->hasMany(MediaProcessorTask::class);
+    }
+
+    public function latestPreviewMediaProcessorTask(): HasOne
+    {
+        return $this->hasOne(MediaProcessorTask::class)
+            ->whereIn('operation', FilePreviewGeneration::operations())
+            ->latestOfMany('created_at');
     }
 
     public function autoBlacklistModerationAction(): HasOne

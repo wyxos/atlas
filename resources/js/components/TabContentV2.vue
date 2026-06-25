@@ -7,6 +7,7 @@ import { useBrowseV2SurfaceRouteSync } from '@/composables/useBrowseV2SurfaceRou
 import { useBrowseGridAutoScrollShortcut } from '@/composables/useBrowseGridAutoScrollShortcut';
 import { createBrowseForm, BrowseFormKey } from '@/composables/useBrowseForm';
 import { useDownloadedReactionPrompt } from '@/composables/useDownloadedReactionPrompt';
+import { useFilePreviewRegeneration } from '@/composables/useFilePreviewRegeneration';
 import { useFileViewerData } from '@/composables/useFileViewerData';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { useLoadedItemsBatchActionConfirmation } from '@/composables/useLoadedItemsBatchActionConfirmation';
@@ -281,6 +282,10 @@ const fileViewerData = useFileViewerData({
     targetFileId: fileSheet.targetFileId,
 });
 const syncedFileViewerData = createSyncedFileViewerData({ fileViewerData, getCurrentVibeItems: () => vibeRef.value?.getItems() ?? [] });
+const filePreviewRegeneration = useFilePreviewRegeneration({
+    sessionItems,
+    setFileData: (file) => syncedFileViewerData.value.setFileData(file),
+});
 const headerMasonry = vibeMasonry;
 const fillControls = useVibeFillControls({ getVibeHandle: () => vibeRef.value, status: vibeStatus, surfaceMode });
 const { autoScrollActive, autoScrollSpeed, fillActionsDisabled, fillCallCount } = fillControls;
@@ -527,6 +532,8 @@ watch(
         :file-viewer-data="syncedFileViewerData"
         :open-file-sheet="fileSheet.open" :open-file-sheet-for-item="fileSheet.openForItem"
         :close-file-sheet="fileSheet.close"
+        :queue-preview-regeneration="filePreviewRegeneration.queuePreviewRegeneration"
+        :is-preview-regeneration-queued="filePreviewRegeneration.isPreviewRegenerationQueued"
         :downloaded-reaction-prompt="downloadedReactionPrompt"
         :handle-container-blacklist-change="containerBlacklists.handleContainerBlacklistChange"
     />

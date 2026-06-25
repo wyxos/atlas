@@ -215,6 +215,8 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             :total-items="vibeStatus.itemCount" :vibe-item="item as VibeViewerItem"
                             :containers="containerInteractions" :item-interactions="itemInteractions" :local-file-deletion="localFileDeletion"
                             :is-removing-from-tab="isRemovingItemFromTab" :open-file-sheet="openFileSheetForItem" :remove-item-from-tab="removeItemFromTab"
+                            :queue-preview-regeneration="queuePreviewRegeneration"
+                            :is-preview-regeneration-queued="isPreviewRegenerationQueued"
                             :source-watch-refresh="sourceWatchRefresh" :on-reaction="handleReaction"
                         />
                     </template>

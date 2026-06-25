@@ -10,6 +10,7 @@ use App\Services\SourceMedia\SourceWatchRefreshService;
 use App\Support\ContainerBrowseTabPayload;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
+use App\Support\FilePreviewGeneration;
 use App\Support\SourceAccessState;
 use App\Support\SpotifyTrack;
 use Illuminate\Container\Container as IoCContainer;
@@ -100,6 +101,14 @@ class FileItemFormatter
                 $persistedFiles->load('containers');
             }
 
+            $persistedFilesMissingPreviewTasks = $files->filter(
+                fn (File $file): bool => $file->exists && ! $file->relationLoaded('latestPreviewMediaProcessorTask')
+            );
+
+            if ($persistedFilesMissingPreviewTasks->isNotEmpty()) {
+                $persistedFilesMissingPreviewTasks->load('latestPreviewMediaProcessorTask');
+            }
+
             $audioFilesMissingCovers = $files->filter(
                 fn (File $file): bool => $file->exists
                     && FileMimeType::isAudio($file->mime_type)
@@ -129,6 +138,29 @@ class FileItemFormatter
                 foreach ($filesNeedingContainers as $file) {
                     if (isset($filesWithContainers[$file->id])) {
                         $file->setRelation('containers', $filesWithContainers[$file->id]->containers);
+                    }
+                }
+            }
+
+            $filesNeedingPreviewTasks = array_values(array_filter(
+                $fileList,
+                fn (File $file): bool => $file->exists && ! $file->relationLoaded('latestPreviewMediaProcessorTask')
+            ));
+
+            if ($filesNeedingPreviewTasks !== []) {
+                $fileIds = array_map(fn (File $file) => $file->id, $filesNeedingPreviewTasks);
+                $filesWithPreviewTasks = File::query()
+                    ->whereIn('id', $fileIds)
+                    ->with('latestPreviewMediaProcessorTask')
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($filesNeedingPreviewTasks as $file) {
+                    if (isset($filesWithPreviewTasks[$file->id])) {
+                        $file->setRelation(
+                            'latestPreviewMediaProcessorTask',
+                            $filesWithPreviewTasks[$file->id]->latestPreviewMediaProcessorTask
+                        );
                     }
                 }
             }
@@ -212,12 +244,15 @@ class FileItemFormatter
 
             $originalUrl = $file->url;
             $thumbnailUrl = $file->preview_url;
+            $previewGeneration = FilePreviewGeneration::state($file);
 
             $isStored = $file->path && ($file->downloaded || $file->imported_at !== null);
             if ($isStored) {
                 $originalUrl = $file->downloaded ? FileApiPath::downloaded($file->id) : FileApiPath::serve($file->id);
                 if ($file->preview_path) {
                     $thumbnailUrl = FileApiPath::preview($file->id);
+                } elseif (FilePreviewGeneration::shouldSuppressRemotePreviewUrl($file)) {
+                    $thumbnailUrl = '';
                 }
             } else {
                 if (! $originalUrl && $file->path) {
@@ -284,6 +319,7 @@ class FileItemFormatter
                 'seen_count' => $file->seen_count ?? 0,
                 'downloaded' => (bool) $file->downloaded,
                 'imported_at' => $file->imported_at?->toIso8601String(),
+                'preview_generation' => $previewGeneration,
                 'auto_blacklisted' => $file->auto_blacklisted ?? false,
                 'reaction' => $reaction, // Current user's reaction for this file
                 // Include metadata with prompt if available - full metadata loaded on-demand

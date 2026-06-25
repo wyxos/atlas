@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\FilePreviewAssetsUpdated;
 use App\Models\File;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Bus\Queueable;
@@ -40,5 +41,6 @@ class GenerateFilePreviewAssets implements ShouldQueue
         }
 
         $file->update($updates);
+        event(new FilePreviewAssetsUpdated((int) $file->id));
     }
 }

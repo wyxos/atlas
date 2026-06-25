@@ -5,6 +5,7 @@ use App\Enums\LibraryScanMediaTask as LibraryMediaTask;
 use App\Enums\LibraryScanRunStatus;
 use App\Enums\MediaProcessorOperation;
 use App\Enums\MediaProcessorTaskStatus;
+use App\Events\FilePreviewAssetsUpdated;
 use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
 use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Models\File;
@@ -15,6 +16,7 @@ use App\Models\MediaProcessorTask;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\LibraryScans\MediaProbeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -149,6 +151,7 @@ it('keeps WebP image preview work on the standard PNG preview extension', functi
 
 it('accepts a signed completion callback and stores preview paths', function () {
     configureRemoteMediaProcessor();
+    Event::fake([FilePreviewAssetsUpdated::class]);
 
     $hash = str_repeat('b', 40);
     $file = File::factory()->create([
@@ -191,6 +194,8 @@ it('accepts a signed completion callback and stores preview paths', function () 
     expect($task->fresh()?->status)->toBe(MediaProcessorTaskStatus::COMPLETED)
         ->and($file->fresh()?->preview_path)->toBe("downloads/bb/bb/preview/{$hash}.mp4")
         ->and($file->fresh()?->poster_path)->toBe("downloads/bb/bb/preview/{$hash}.jpg");
+
+    Event::assertDispatched(FilePreviewAssetsUpdated::class, fn (FilePreviewAssetsUpdated $event): bool => $event->fileId === $file->id);
 });
 
 it('reconciles in-flight tasks before sampling stale queued backlog', function () {

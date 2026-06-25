@@ -131,6 +131,42 @@ describe('TabContentV2GridOverlay', () => {
         expect(props.openFileSheet).toHaveBeenCalledWith(props.item, props.index);
     });
 
+    it('shows failed preview generation state and wires retry', async () => {
+        const props = createProps();
+        props.item.src = '';
+        props.item.preview = '';
+        props.item.thumbnail = '';
+        props.item.downloaded = true;
+        props.item.preview_generation = {
+            status: 'failed',
+            can_retry: true,
+            message: 'Processor exited with code 1.',
+        };
+        const queuePreviewRegeneration = vi.fn();
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props: {
+                ...props,
+                queuePreviewRegeneration,
+                isPreviewRegenerationQueued: vi.fn().mockReturnValue(false),
+            },
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-test="preview-generation-state"]').text()).toContain('Preview failed');
+        expect(wrapper.text()).toContain('Processor exited with code 1.');
+
+        await wrapper.get('[data-test="preview-regeneration-trigger"]').trigger('click');
+
+        expect(queuePreviewRegeneration).toHaveBeenCalledWith(props.item);
+    });
+
     it('marks non-sibling cards as dimmed while a container drawer is open', () => {
         const wrapper = mount(TabContentV2GridOverlay, {
             props: {

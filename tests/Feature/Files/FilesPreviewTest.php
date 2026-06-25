@@ -31,3 +31,30 @@ test('preview request queues generation when preview is missing', function () {
     $response->assertNotFound();
     Queue::assertPushed(GenerateFilePreviewAssets::class);
 });
+
+test('authenticated users can queue preview asset regeneration for downloaded files', function () {
+    /** @var \Tests\TestCase $this */
+    /** @var \App\Models\User $admin */
+    $admin = User::factory()->admin()->create();
+
+    Queue::fake();
+    Storage::fake(config('downloads.disk'));
+
+    $file = File::factory()->create([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/test.mp4',
+        'preview_path' => null,
+        'poster_path' => null,
+        'mime_type' => 'video/mp4',
+    ]);
+
+    Storage::disk(config('downloads.disk'))->put($file->path, 'video');
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/preview-assets");
+
+    $response->assertAccepted();
+    $response->assertJsonPath('queued', true);
+    $response->assertJsonPath('file.id', $file->id);
+    $response->assertJsonPath('file.preview_generation.status', 'queued');
+    Queue::assertPushed(GenerateFilePreviewAssets::class, fn (GenerateFilePreviewAssets $job): bool => $job->fileId === $file->id && $job->force === true);
+});

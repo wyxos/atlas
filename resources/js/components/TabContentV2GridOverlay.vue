@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Info, Loader2, RefreshCw, Trash2, UserMinus, UserPlus } from 'lucide-vue-next';
+import { AlertTriangle, Info, Loader2, RefreshCw, Trash2, UserMinus, UserPlus } from 'lucide-vue-next';
 import type { VibeViewerItem } from '@wyxos/vibe';
 import type { LocalFileDeletion } from '@/composables/useLocalFileDeletion';
 import type { SourceWatchRefreshActions } from '@/composables/useSourceWatchRefresh';
@@ -26,6 +26,8 @@ interface Props {
     isRemovingFromTab?: (item: FeedItem) => boolean;
     openFileSheet: (item: FeedItem, index: number) => void;
     removeItemFromTab?: (item: FeedItem) => void | Promise<void>;
+    queuePreviewRegeneration?: (item: FeedItem) => void | Promise<void>;
+    isPreviewRegenerationQueued?: (item: FeedItem) => boolean;
     sourceWatchRefresh: SourceWatchRefreshActions;
     onReaction: (item: VibeViewerItem, type: ReactionType) => void | Promise<void>;
 }
@@ -55,6 +57,40 @@ const showDeleteButton = computed(() => props.hovered
     && props.localFileDeletion.actions.canDelete(props.item));
 const showRemoveFromTab = computed(() => Boolean(props.removeItemFromTab));
 const isRemovingFromTab = computed(() => props.isRemovingFromTab?.(props.item) ?? false);
+const previewGeneration = computed(() => props.item.preview_generation ?? null);
+const previewGenerationStatus = computed(() => previewGeneration.value?.status ?? null);
+const previewRegenerationQueued = computed(() => props.isPreviewRegenerationQueued?.(props.item) ?? false);
+const showPreviewGenerationState = computed(() => props.item.downloaded === true
+    && Boolean(previewGeneration.value)
+    && !props.item.src
+    && !props.item.preview
+    && !props.item.thumbnail);
+const canRetryPreviewGeneration = computed(() => showPreviewGenerationState.value
+    && Boolean(props.queuePreviewRegeneration)
+    && !previewRegenerationQueued.value
+    && (previewGenerationStatus.value === 'failed' || previewGenerationStatus.value === 'missing' || previewGeneration.value?.can_retry === true));
+const previewGenerationTitle = computed(() => {
+    if (previewGenerationStatus.value === 'failed') {
+        return 'Preview failed';
+    }
+
+    if (previewGenerationStatus.value === 'missing') {
+        return 'Preview missing';
+    }
+
+    return 'Generating preview';
+});
+const previewGenerationMessage = computed(() => {
+    if (previewGenerationStatus.value === 'failed') {
+        return previewGeneration.value?.message ?? 'Preview generation failed.';
+    }
+
+    if (previewGenerationStatus.value === 'missing') {
+        return 'A new preview task has been queued.';
+    }
+
+    return '';
+});
 const showReactions = computed(() => (
     (
         props.hovered
@@ -182,6 +218,43 @@ const showReactions = computed(() => (
             >
                 <Trash2 :size="14" />
             </Button>
+        </div>
+
+        <div
+            v-if="showPreviewGenerationState"
+            class="pointer-events-none absolute inset-0 flex items-center justify-center px-3"
+            data-test="preview-generation-state"
+        >
+            <div class="pointer-events-auto max-w-[13rem] border border-white/15 bg-black/75 p-3 text-center shadow-2xl backdrop-blur">
+                <div class="mb-2 flex justify-center text-danger-200">
+                    <Loader2
+                        v-if="previewRegenerationQueued || (previewGenerationStatus !== 'failed' && previewGenerationStatus !== 'missing')"
+                        :size="18"
+                        class="animate-spin"
+                    />
+                    <AlertTriangle v-else :size="18" />
+                </div>
+                <div class="text-xs font-semibold text-white">
+                    {{ previewGenerationTitle }}
+                </div>
+                <div
+                    v-if="previewGenerationMessage"
+                    class="mt-1 text-[11px] leading-snug text-white/65"
+                >
+                    {{ previewGenerationMessage }}
+                </div>
+                <Button
+                    v-if="canRetryPreviewGeneration"
+                    variant="ghost"
+                    size="sm"
+                    class="mt-3 h-7 border border-white/10 bg-white/10 px-2 text-[11px] text-white hover:bg-white/15"
+                    data-test="preview-regeneration-trigger"
+                    @click.stop="queuePreviewRegeneration?.(item)"
+                >
+                    <RefreshCw :size="12" />
+                    Retry
+                </Button>
+            </div>
         </div>
 
         <div

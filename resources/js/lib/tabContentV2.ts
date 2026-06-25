@@ -9,6 +9,7 @@ import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseContr
 import type { BrowseFormInstance } from '@/composables/useBrowseForm';
 import type { FeedItem } from '@/composables/useTabs';
 import type { BrowsePageToken } from '@/types/browse';
+import { blocksDownloadedPreviewFallback } from '@/lib/filePreviewGeneration';
 import { appendBrowseServiceFilters } from '@/utils/browseQuery';
 
 export type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
@@ -192,7 +193,10 @@ export function isSpotifyFeedAudio(item: FeedItem): boolean {
 export function mapFeedItemToVibeItem(item: FeedItem): AtlasVibeViewerItem {
     const previewUrl = normalizeUrl(item.preview ?? item.src ?? null);
     const isSpotifyAudio = isSpotifyFeedAudio(item);
-    const fullUrl = isSpotifyAudio
+    const shouldHoldOriginalUrl = !previewUrl && blocksDownloadedPreviewFallback(item);
+    const fullUrl = shouldHoldOriginalUrl
+        ? ''
+        : isSpotifyAudio
         ? previewUrl ?? normalizeUrl(item.src ?? item.thumbnail ?? null) ?? ''
         : normalizeUrl(item.originalUrl ?? item.original ?? item.url ?? item.preview ?? item.src ?? null) ?? '';
     const type = item.media_kind === 'audio'

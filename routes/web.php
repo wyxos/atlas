@@ -183,6 +183,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/files/{file}/preview', [\App\Http\Controllers\FilesController::class, 'servePreview'])->name('api.files.preview');
     Route::get('/api/files/{file}/icon', [\App\Http\Controllers\FilesController::class, 'serveIcon'])->name('api.files.icon');
     Route::get('/api/files/{file}/poster', [\App\Http\Controllers\FilesController::class, 'serveVideoPoster'])->name('api.files.poster');
+    Route::post('/api/files/{file}/preview-assets', \App\Http\Controllers\FilePreviewAssetsController::class)->name('api.files.preview-assets.store');
     Route::delete('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'destroy'])->name('api.files.destroy');
     Route::get('/api/files/{file}/reaction', [\App\Http\Controllers\FileReactionController::class, 'show'])->name('api.files.reaction.show');
     Route::post('/api/files/reactions/batch', [\App\Http\Controllers\FileReactionController::class, 'batchShow'])->name('api.files.reactions.batch');

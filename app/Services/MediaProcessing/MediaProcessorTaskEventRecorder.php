@@ -4,6 +4,7 @@ namespace App\Services\MediaProcessing;
 
 use App\Enums\MediaProcessorOperation;
 use App\Enums\MediaProcessorTaskStatus;
+use App\Events\FilePreviewAssetsUpdated;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\MediaProcessorTask;
@@ -130,6 +131,7 @@ class MediaProcessorTaskEventRecorder
         if ($updates !== []) {
             $file->forceFill($updates)->save();
             $this->libraryIndex->files([$file->id]);
+            event(new FilePreviewAssetsUpdated((int) $file->id));
         }
 
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];

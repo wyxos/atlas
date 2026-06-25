@@ -102,4 +102,27 @@ describe('mapBrowseV2FileToFeedItem', () => {
         expect(item.url).toBe('https://open.spotify.com/track/5P97xlvOl6IadKTLVId5ap');
         expect(item.spotify_uri).toBe('spotify:track:5P97xlvOl6IadKTLVId5ap');
     });
+
+    it('does not use downloaded file urls as previews while preview generation is failed', () => {
+        const item = mapBrowseV2FileToFeedItem(createFile({
+            downloaded: true,
+            downloaded_at: '2026-06-25T15:35:44Z',
+            file_url: '/api/files/111/downloaded',
+            disk_url: '/api/files/111/downloaded',
+            preview_url: null,
+            preview_file_url: null,
+            poster_url: null,
+            preview_generation: {
+                status: 'failed',
+                can_retry: true,
+                message: 'Processor exited with code 1.',
+            },
+        }));
+
+        expect(item.src).toBe('');
+        expect(item.preview).toBeUndefined();
+        expect(item.thumbnail).toBeUndefined();
+        expect(item.original).toBe('/api/files/111/downloaded');
+        expect(item.preview_generation?.status).toBe('failed');
+    });
 });
