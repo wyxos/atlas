@@ -27,62 +27,19 @@ Route::get('/api/csrf', function () {
     return response()->noContent();
 })->name('api.csrf');
 
-if (app()->environment(['local', 'testing'])) {
-    Route::get('/__dev/extension-options', function () {
-        return response()
-            ->view('extension-options-preview')
-            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-            ->header('Pragma', 'no-cache');
-    })->name('dev.extension-options');
-}
-
 // Public extension API endpoints. Kept in web.php with SPA-style /api prefix; no api middleware throttling is applied.
-Route::prefix('/api/extension/v2')->name('api.extension.v2.')->group(function (): void {
-    Route::get('/ping', [\App\Http\Controllers\ExtensionV2Controller::class, 'ping'])
+Route::prefix('/api/extension')->name('api.extension.')->group(function (): void {
+    Route::get('/ping', [\App\Http\Controllers\ExtensionController::class, 'ping'])
         ->name('ping');
-    Route::post('/assets/status', [\App\Http\Controllers\ExtensionV2Controller::class, 'assetStatuses'])
+    Route::post('/assets/status', [\App\Http\Controllers\ExtensionController::class, 'assetStatuses'])
         ->name('assets.status');
-    Route::post('/reactions', [\App\Http\Controllers\ExtensionV2Controller::class, 'react'])
+    Route::post('/reactions', [\App\Http\Controllers\ExtensionController::class, 'react'])
         ->name('reactions');
     Route::delete('/files/{file}', [\App\Http\Controllers\ExtensionFileController::class, 'destroy'])
         ->name('files.destroy');
-    Route::post('/broadcasting/auth', [\App\Http\Controllers\ExtensionV2Controller::class, 'broadcastAuth'])
+    Route::post('/broadcasting/auth', [\App\Http\Controllers\ExtensionController::class, 'broadcastAuth'])
         ->name('broadcast-auth');
 });
-Route::get('/api/extension/ping', [\App\Http\Controllers\ExtensionApiController::class, 'ping'])
-    ->name('api.extension.ping');
-Route::get('/api/extension/settings', [\App\Http\Controllers\ExtensionSettingsController::class, 'show'])
-    ->name('api.extension.settings');
-Route::post('/api/extension/settings', [\App\Http\Controllers\ExtensionSettingsController::class, 'store'])
-    ->name('api.extension.settings.store');
-Route::post('/api/extension/matches', [\App\Http\Controllers\ExtensionApiController::class, 'matches'])
-    ->name('api.extension.matches');
-Route::post('/api/extension/badges/checks', [\App\Http\Controllers\ExtensionApiController::class, 'badgeChecks'])
-    ->name('api.extension.badges.checks');
-Route::post('/api/extension/referrer-checks', [\App\Http\Controllers\ExtensionApiController::class, 'referrerChecks'])
-    ->name('api.extension.referrer-checks');
-Route::post('/api/extension/civitai/status', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'status'])
-    ->name('api.extension.civitai.status');
-Route::post('/api/extension/civitai/feed', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'feed'])
-    ->name('api.extension.civitai.feed');
-Route::post('/api/extension/civitai/reactions', [\App\Http\Controllers\ExtensionCompanionCivitaiController::class, 'react'])
-    ->name('api.extension.civitai.reactions');
-Route::post('/api/extension/reactions', [\App\Http\Controllers\ExtensionApiController::class, 'react'])
-    ->name('api.extension.reactions');
-Route::post('/api/extension/reactions/batch', [\App\Http\Controllers\ExtensionApiController::class, 'reactBatch'])
-    ->name('api.extension.reactions.batch');
-Route::delete('/api/extension/files/{file}', [\App\Http\Controllers\ExtensionFileController::class, 'destroy'])
-    ->name('api.extension.files.destroy');
-Route::post('/api/extension/download-status', [\App\Http\Controllers\ExtensionApiController::class, 'downloadStatus'])
-    ->name('api.extension.download-status');
-Route::post('/api/extension/browse-tabs/civitai-model', [\App\Http\Controllers\ExtensionApiController::class, 'openCivitAiModelBrowseTab'])
-    ->name('api.extension.browse-tabs.civitai-model');
-Route::post('/api/extension/browse-tabs/civitai-user', [\App\Http\Controllers\ExtensionApiController::class, 'openCivitAiUserBrowseTab'])
-    ->name('api.extension.browse-tabs.civitai-user');
-Route::post('/api/extension/browse-tabs/deviantart-user', [\App\Http\Controllers\ExtensionApiController::class, 'openDeviantArtUserBrowseTab'])
-    ->name('api.extension.browse-tabs.deviantart-user');
-Route::post('/api/extension/broadcasting/auth', [\App\Http\Controllers\ExtensionApiController::class, 'broadcastAuth'])
-    ->name('api.extension.broadcast-auth');
 
 Route::post('/api/media-processor/tasks/{mediaProcessorTask}/events', \App\Http\Controllers\MediaProcessorTaskEventController::class)
     ->name('api.media-processor.tasks.events');
@@ -142,9 +99,6 @@ Route::middleware('auth')->group(function () {
         ->name('api.settings.library-scans.cancel');
     Route::post('/api/settings/library-scans/{libraryScanRun}/restart', [\App\Http\Controllers\LibraryScanController::class, 'restart'])
         ->name('api.settings.library-scans.restart');
-    Route::get('/settings/browser-extension/download', [\App\Http\Controllers\BrowserExtensionDownloadController::class, 'download'])
-        ->name('settings.browser-extension.download');
-
     Route::post('/profile/password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::delete('/profile/account', [\App\Http\Controllers\ProfileController::class, 'deleteAccount'])->name('profile.account.delete');
     Route::get('/api/users', [\App\Http\Controllers\UsersController::class, 'index'])->name('api.users.index');

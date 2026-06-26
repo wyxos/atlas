@@ -20,7 +20,6 @@ export default defineConfig(({ command }) => {
                 input: [
                     'resources/css/app.css',
                     'resources/js/app.ts',
-                    'resources/js/extension-options-preview.ts',
                 ],
                 refresh: true,
             }),

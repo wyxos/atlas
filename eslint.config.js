@@ -76,15 +76,6 @@ export default tseslint.config(
         },
     },
     {
-        files: ['extension/src/**/*.{js,ts,vue}'],
-        languageOptions: {
-            globals: {
-                ...globals.browser,
-                __ATLAS_EXTENSION_VERSION__: 'readonly',
-            },
-        },
-    },
-    {
         ignores: [
             'node_modules/**',
             'vendor/**',

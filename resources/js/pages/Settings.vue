@@ -30,7 +30,6 @@ const isSpotifyRefreshing = ref(false);
 const isSpotifyDisconnecting = ref(false);
 const isDeviantArtRefreshing = ref(false);
 const isDeviantArtDisconnecting = ref(false);
-const browserExtensionDownloadUrl = '/settings/browser-extension/download';
 
 type OAuthServiceStatus<TAccount> = {
     key: string;
@@ -384,14 +383,9 @@ onMounted(() => {
                         <div>
                             <h5 class="text-lg font-semibold text-smart-blue-300 mb-2">Browser Extension</h5>
                             <p class="text-twilight-indigo-200">
-                                Configure extension API access and download the latest package.
+                                Configure extension API access.
                             </p>
                         </div>
-                        <Button as-child variant="secondary">
-                            <a :href="browserExtensionDownloadUrl">
-                                Download Extension
-                            </a>
-                        </Button>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2 mb-4">

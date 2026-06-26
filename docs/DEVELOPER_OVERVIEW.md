@@ -1,6 +1,6 @@
 # Developer Overview
 
-Atlas is a Laravel 12 and Vue 3 application for fast media feed curation, local library browsing, background downloads, moderation, and lightweight audio/video playback. It also includes a browser extension that connects source sites back to the Atlas app.
+Atlas is a Laravel 12 and Vue 3 application for fast media feed curation, local library browsing, background downloads, moderation, and lightweight audio/video playback. It exposes a browser-extension API for the standalone Atlas extension.
 
 ## Main pieces
 
@@ -10,7 +10,6 @@ Atlas is a Laravel 12 and Vue 3 application for fast media feed curation, local 
 - `app/Services` holds most domain behavior. Notable areas include browsing, CivitAI and DeviantArt source handling, downloads, preview generation, moderation, library indexing, and audio metadata.
 - `app/Jobs` and `app/Console/Commands` run background work for downloads, scans, previews, metadata, cleanup, reindexing, and maintenance.
 - `resources/js` is the Vue SPA. `resources/js/app.ts` mounts the dashboard shell, configures Vue Router, registers Laravel Echo/Reverb, and mounts the public home screenshot carousel when present.
-- `extension/src` is the browser extension source, including the options UI, background runtime, content scripts, reaction badge behavior, source-tab bridges, and Atlas API client.
 
 ## Runtime dependencies
 
