@@ -33,6 +33,8 @@ Route::prefix('/api/extension')->name('api.extension.')->group(function (): void
         ->name('ping');
     Route::post('/assets/status', [\App\Http\Controllers\ExtensionController::class, 'assetStatuses'])
         ->name('assets.status');
+    Route::post('/reactions/batch', [\App\Http\Controllers\ExtensionController::class, 'batchReact'])
+        ->name('reactions.batch');
     Route::post('/reactions', [\App\Http\Controllers\ExtensionController::class, 'react'])
         ->name('reactions');
     Route::delete('/files/{file}', [\App\Http\Controllers\ExtensionFileController::class, 'destroy'])

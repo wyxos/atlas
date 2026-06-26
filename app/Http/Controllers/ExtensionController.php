@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ExtensionAssetStatusRequest;
+use App\Http\Requests\ExtensionBatchReactionRequest;
 use App\Http\Requests\ExtensionBroadcastAuthRequest;
 use App\Http\Requests\ExtensionReactionRequest;
 use App\Models\File;
@@ -90,6 +91,87 @@ class ExtensionController extends Controller
 
         $validated = $request->validated();
         $extensionChannel = $this->extensionAuthenticator->resolveChannel($request, $user);
+        $payload = $this->processReactionPayload(
+            $validated,
+            $validated['type'],
+            $this->downloadBehaviorFromValidated($validated, $validated['type']),
+            $request,
+            $user,
+            $extensionChannel,
+            $containerMetadataService,
+            $fileBlacklistService,
+            $fileReactionService,
+            $downloadRuntimeContext,
+            $reactionProcessor,
+        );
+
+        return response()->json([
+            'asset_url' => $validated['asset_url'],
+            ...$payload,
+            'reverb' => app(ExtensionApiPayloadSupport::class)->reverbPayload($extensionChannel),
+        ], 201);
+    }
+
+    public function batchReact(
+        ExtensionBatchReactionRequest $request,
+        ExtensionApiKeyService $extensionApiKey,
+        ExtensionContainerMetadataService $containerMetadataService,
+        FileBlacklistService $fileBlacklistService,
+        FileReactionService $fileReactionService,
+        ExtensionDownloadRuntimeContext $downloadRuntimeContext,
+        ExtensionReactionProcessor $reactionProcessor,
+    ): JsonResponse {
+        $user = $this->resolveUser($request, $extensionApiKey);
+        if (! $user) {
+            return $this->invalidApiKeyResponse();
+        }
+
+        $validated = $request->validated();
+        $extensionChannel = $this->extensionAuthenticator->resolveChannel($request, $user);
+        $items = [];
+
+        foreach ($validated['items'] as $item) {
+            $items[] = [
+                'asset_url' => $item['asset_url'],
+                ...$this->processReactionPayload(
+                    $item,
+                    $validated['type'],
+                    $this->downloadBehaviorFromValidated($validated, $validated['type']),
+                    $request,
+                    $user,
+                    $extensionChannel,
+                    $containerMetadataService,
+                    $fileBlacklistService,
+                    $fileReactionService,
+                    $downloadRuntimeContext,
+                    $reactionProcessor,
+                ),
+            ];
+        }
+
+        return response()->json([
+            'items' => $items,
+            'reverb' => app(ExtensionApiPayloadSupport::class)->reverbPayload($extensionChannel),
+        ], 201);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function processReactionPayload(
+        array $validated,
+        string $reactionType,
+        string $downloadBehavior,
+        Request $request,
+        User $user,
+        string $extensionChannel,
+        ExtensionContainerMetadataService $containerMetadataService,
+        FileBlacklistService $fileBlacklistService,
+        FileReactionService $fileReactionService,
+        ExtensionDownloadRuntimeContext $downloadRuntimeContext,
+        ExtensionReactionProcessor $reactionProcessor,
+    ): array {
         $metadata = is_array($validated['metadata'] ?? null) ? $validated['metadata'] : [];
         $item = [
             'page_url' => $validated['referrer_url'] ?? null,
@@ -98,10 +180,11 @@ class ExtensionController extends Controller
             'tag_name' => $this->tagNameFromMetadata($metadata),
             'url' => $validated['asset_url'],
         ];
-        $payload = $reactionProcessor->process(
+
+        return $reactionProcessor->process(
             $item,
-            $validated['type'],
-            $validated['type'] === 'blacklist' ? 'skip' : 'queue',
+            $reactionType,
+            $downloadBehavior,
             $fileReactionService,
             $fileBlacklistService,
             $containerMetadataService,
@@ -110,12 +193,20 @@ class ExtensionController extends Controller
             $downloadRuntimeContext->fromValidated([], $request),
             $this->listingMetadataFromPayload($validated),
         );
+    }
 
-        return response()->json([
-            'asset_url' => $validated['asset_url'],
-            ...$payload,
-            'reverb' => app(ExtensionApiPayloadSupport::class)->reverbPayload($extensionChannel),
-        ], 201);
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function downloadBehaviorFromValidated(array $validated, string $reactionType): string
+    {
+        if ($reactionType === 'blacklist') {
+            return 'skip';
+        }
+
+        $downloadAction = $validated['download_action'] ?? null;
+
+        return in_array($downloadAction, ['skip', 'force'], true) ? $downloadAction : 'queue';
     }
 
     public function assetStatuses(
