@@ -226,22 +226,14 @@ class ExtensionController extends Controller
         $urlHashes = array_map(static fn (string $assetUrl): string => hash('sha256', $assetUrl), $assetUrls);
         $files = File::query()
             ->select(['id', 'url', 'url_hash', 'referrer_url', 'preview_url', 'downloaded_at', 'blacklisted_at'])
-            ->where(function ($query) use ($assetUrls, $urlHashes): void {
-                $query
-                    ->whereIn('url_hash', $urlHashes)
-                    ->orWhereIn('preview_url', $assetUrls);
-            })
+            ->whereIn('url_hash', $urlHashes)
             ->get();
 
         $byUrlHash = $files->keyBy('url_hash');
-        $byPreviewUrl = $files
-            ->filter(fn (File $file): bool => is_string($file->preview_url) && $file->preview_url !== '')
-            ->keyBy('preview_url');
         $matches = [];
 
         foreach ($assetUrls as $assetUrl) {
-            $matches[$assetUrl] = $byUrlHash->get(hash('sha256', $assetUrl))
-                ?? $byPreviewUrl->get($assetUrl);
+            $matches[$assetUrl] = $byUrlHash->get(hash('sha256', $assetUrl));
         }
 
         return $matches;

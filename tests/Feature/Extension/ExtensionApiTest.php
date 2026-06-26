@@ -105,7 +105,7 @@ test('extension reactions do not queue downloads for blacklist reactions', funct
     Queue::assertNotPushed(DownloadFile::class);
 });
 
-test('extension asset status checks match by asset url including downloaded video previews', function () {
+test('extension asset status checks match by exact asset url', function () {
     $user = User::factory()->create();
     setExtensionApiKey('valid-api-key', $user->id);
 
@@ -124,9 +124,9 @@ test('extension asset status checks match by asset url including downloaded vide
     $video = File::factory()->create([
         'downloaded' => true,
         'downloaded_at' => now()->subMinute(),
-        'preview_url' => 'https://video-cdn.example.test/stream/video.mp4',
+        'preview_url' => 'https://video-cdn.example.test/preview/video.mp4',
         'referrer_url' => 'https://www.example.test/watch/video',
-        'url' => 'https://www.example.test/watch/video',
+        'url' => 'https://video-cdn.example.test/stream/video.mp4',
     ]);
     Reaction::query()->create([
         'file_id' => $video->id,
@@ -155,6 +155,40 @@ test('extension asset status checks match by asset url including downloaded vide
     expect($assets['https://video-cdn.example.test/stream/video.mp4']['file']['atlas_url'])->toBe(url("/browse/file/{$video->id}"));
     expect($assets['https://video-cdn.example.test/stream/video.mp4']['reaction']['type'])->toBe('like');
     expect($assets['https://cdn.example.test/media/missing.jpg'])->toBeNull();
+});
+
+test('extension asset status checks ignore preview url matches', function () {
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $file = File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subMinute(),
+        'preview_url' => 'https://cdn.example.test/media/preview-only.jpg',
+        'url' => 'https://cdn.example.test/media/original-only.jpg',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'type' => 'love',
+        'user_id' => $user->id,
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/assets/status', [
+        'asset_urls' => [
+            'https://cdn.example.test/media/preview-only.jpg',
+            'https://cdn.example.test/media/original-only.jpg',
+        ],
+    ]);
+
+    $response->assertOk();
+
+    $assets = $response->json('assets');
+
+    expect($assets['https://cdn.example.test/media/preview-only.jpg'])->toBeNull();
+    expect($assets['https://cdn.example.test/media/original-only.jpg']['file']['id'])->toBe($file->id);
+    expect($assets['https://cdn.example.test/media/original-only.jpg']['reaction']['type'])->toBe('love');
 });
 
 test('extension asset status checks match skipped assets by referrer url', function () {
