@@ -5,13 +5,14 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
 require_once __DIR__.'/ExtensionApiTestSupport.php';
 
 uses(RefreshDatabase::class);
 
-test('extension batch reactions store each file and queue positive downloads', function () {
+test('extension batch reactions queue one processing job without synchronously storing files', function () {
     Queue::fake();
 
     $user = User::factory()->create();
@@ -49,6 +50,67 @@ test('extension batch reactions store each file and queue positive downloads', f
     $response->assertJsonPath('items.1.asset_url', 'https://images.example.test/deviation/file-2.jpg');
     $response->assertJsonPath('items.0.reaction.type', 'love');
     $response->assertJsonPath('items.1.reaction.type', 'love');
+    $response->assertJsonPath('items.0.download.requested', true);
+    $response->assertJsonPath('items.1.download.requested', true);
+    $response->assertJsonPath('items.0.queued', true);
+    $response->assertJsonPath('items.1.queued', true);
+
+    expect(File::query()->whereIn('url', [
+        'https://images.example.test/deviation/file-1.jpg',
+        'https://images.example.test/deviation/file-2.jpg',
+    ])->exists())->toBeFalse();
+
+    Queue::assertPushed('App\\Jobs\\ProcessExtensionBatchReaction', function (object $job) use ($user): bool {
+        return $job->userId === $user->id
+            && $job->reactionType === 'love'
+            && $job->downloadBehavior === 'queue'
+            && count($job->items) === 2;
+    });
+    Queue::assertNotPushed(DownloadFile::class);
+});
+
+test('queued extension batch reactions store files in bulk and queue positive downloads', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $jobClass = 'App\\Jobs\\ProcessExtensionBatchReaction';
+
+    expect(class_exists($jobClass))->toBeTrue();
+
+    $job = new $jobClass(
+        userId: (int) $user->id,
+        extensionChannel: str_repeat('a', 64),
+        items: [
+            [
+                'asset_url' => 'https://images.example.test/deviation/file-1.jpg',
+                'metadata' => [
+                    'asset_type' => 'image',
+                    'resolution' => '1000x1400',
+                ],
+                'referrer_url' => 'https://www.deviantart.com/artist/art/title-123?file=1',
+                'source' => 'www.deviantart.com',
+            ],
+            [
+                'asset_url' => 'https://images.example.test/deviation/file-2.jpg',
+                'metadata' => [
+                    'asset_type' => 'image',
+                    'resolution' => '1200x1600',
+                ],
+                'referrer_url' => 'https://www.deviantart.com/artist/art/title-123?file=2',
+                'source' => 'www.deviantart.com',
+            ],
+        ],
+        reactionType: 'love',
+        downloadBehavior: 'queue',
+        runtimeContext: ['user_id' => (int) $user->id],
+    );
+
+    DB::enableQueryLog();
+    app()->call([$job, 'handle']);
+    $reactionWrites = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains(strtolower((string) $query['query']), 'reactions'))
+        ->filter(fn (array $query): bool => str_contains(strtolower((string) $query['query']), 'insert'))
+        ->count();
 
     $firstFile = File::query()->where('url', 'https://images.example.test/deviation/file-1.jpg')->first();
     $secondFile = File::query()->where('url', 'https://images.example.test/deviation/file-2.jpg')->first();
@@ -58,7 +120,8 @@ test('extension batch reactions store each file and queue positive downloads', f
         ->and($firstFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/title-123?file=1')
         ->and($secondFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/title-123?file=2')
         ->and(data_get($firstFile?->listing_metadata, 'extension_user_id'))->toBe($user->id)
-        ->and(data_get($secondFile?->listing_metadata, 'extension_user_id'))->toBe($user->id);
+        ->and(data_get($secondFile?->listing_metadata, 'extension_user_id'))->toBe($user->id)
+        ->and($reactionWrites)->toBe(1);
 
     expect(Reaction::query()
         ->whereIn('file_id', [$firstFile?->id, $secondFile?->id])
@@ -67,6 +130,54 @@ test('extension batch reactions store each file and queue positive downloads', f
         ->count())->toBe(2);
 
     Queue::assertPushed(DownloadFile::class, 2);
+});
+
+test('queued extension batch reactions can update reactions without queueing downloads', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $jobClass = 'App\\Jobs\\ProcessExtensionBatchReaction';
+
+    expect(class_exists($jobClass))->toBeTrue();
+
+    $job = new $jobClass(
+        userId: (int) $user->id,
+        extensionChannel: str_repeat('c', 64),
+        items: [
+            [
+                'asset_url' => 'https://images.example.test/deviation/update-only-1.jpg',
+                'referrer_url' => 'https://www.deviantart.com/artist/art/update-only-123?file=1',
+                'source' => 'www.deviantart.com',
+            ],
+            [
+                'asset_url' => 'https://images.example.test/deviation/update-only-2.jpg',
+                'referrer_url' => 'https://www.deviantart.com/artist/art/update-only-123?file=2',
+                'source' => 'www.deviantart.com',
+            ],
+        ],
+        reactionType: 'like',
+        downloadBehavior: 'skip',
+        runtimeContext: ['user_id' => (int) $user->id],
+    );
+
+    app()->call([$job, 'handle']);
+
+    $fileIds = File::query()
+        ->whereIn('url', [
+            'https://images.example.test/deviation/update-only-1.jpg',
+            'https://images.example.test/deviation/update-only-2.jpg',
+        ])
+        ->pluck('id')
+        ->all();
+
+    expect($fileIds)->toHaveCount(2)
+        ->and(Reaction::query()
+            ->whereIn('file_id', $fileIds)
+            ->where('user_id', $user->id)
+            ->where('type', 'like')
+            ->count())->toBe(2);
+
+    Queue::assertNotPushed(DownloadFile::class);
 });
 
 test('extension reactions can update reactions without queueing downloads', function () {
@@ -106,6 +217,43 @@ test('extension reactions can update reactions without queueing downloads', func
     Queue::assertNotPushed(DownloadFile::class);
 });
 
+test('extension batch reactions can update reactions without marking downloads requested', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions/batch', [
+        'download_action' => 'skip',
+        'items' => [
+            [
+                'asset_url' => 'https://images.example.test/deviation/update-only-1.jpg',
+                'referrer_url' => 'https://www.deviantart.com/artist/art/update-only-123?file=1',
+                'source' => 'www.deviantart.com',
+            ],
+            [
+                'asset_url' => 'https://images.example.test/deviation/update-only-2.jpg',
+                'referrer_url' => 'https://www.deviantart.com/artist/art/update-only-123?file=2',
+                'source' => 'www.deviantart.com',
+            ],
+        ],
+        'type' => 'like',
+    ]);
+
+    $response->assertCreated();
+    $response->assertJsonPath('items.0.download.requested', false);
+    $response->assertJsonPath('items.1.download.requested', false);
+
+    Queue::assertPushed('App\\Jobs\\ProcessExtensionBatchReaction', function (object $job): bool {
+        return $job->reactionType === 'like'
+            && $job->downloadBehavior === 'skip'
+            && count($job->items) === 2;
+    });
+    Queue::assertNotPushed(DownloadFile::class);
+});
+
 test('extension batch reactions can force redownloads for every item', function () {
     Queue::fake();
 
@@ -133,6 +281,46 @@ test('extension batch reactions can force redownloads for every item', function 
 
     $response->assertCreated();
     $response->assertJsonCount(2, 'items');
+    $response->assertJsonPath('items.0.download.requested', true);
+    $response->assertJsonPath('items.1.download.requested', true);
+
+    Queue::assertPushed('App\\Jobs\\ProcessExtensionBatchReaction', function (object $job): bool {
+        return $job->reactionType === 'love'
+            && $job->downloadBehavior === 'force'
+            && count($job->items) === 2;
+    });
+    Queue::assertNotPushed(DownloadFile::class);
+});
+
+test('queued extension batch reactions can force redownloads for every item', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $jobClass = 'App\\Jobs\\ProcessExtensionBatchReaction';
+
+    expect(class_exists($jobClass))->toBeTrue();
+
+    $job = new $jobClass(
+        userId: (int) $user->id,
+        extensionChannel: str_repeat('b', 64),
+        items: [
+            [
+                'asset_url' => 'https://images.example.test/deviation/redownload-1.jpg',
+                'referrer_url' => 'https://www.deviantart.com/artist/art/title-123?file=1',
+                'source' => 'www.deviantart.com',
+            ],
+            [
+                'asset_url' => 'https://images.example.test/deviation/redownload-2.jpg',
+                'referrer_url' => 'https://www.deviantart.com/artist/art/title-123?file=2',
+                'source' => 'www.deviantart.com',
+            ],
+        ],
+        reactionType: 'love',
+        downloadBehavior: 'force',
+        runtimeContext: ['user_id' => (int) $user->id],
+    );
+
+    app()->call([$job, 'handle']);
 
     $fileIds = File::query()
         ->whereIn('url', [

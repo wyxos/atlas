@@ -34,7 +34,8 @@ class FileReactionService
      *             expires_at: int|null
      *         }>,
      *         user_agent?: string
-     *     }
+     *     },
+     *     queueLibrarySync?: bool
      * }  $options
      * @return array{reaction: array{type: string}|null, reacted_at: string|null, changed: bool}
      */

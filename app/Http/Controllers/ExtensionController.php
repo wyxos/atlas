@@ -6,6 +6,7 @@ use App\Http\Requests\ExtensionAssetStatusRequest;
 use App\Http\Requests\ExtensionBatchReactionRequest;
 use App\Http\Requests\ExtensionBroadcastAuthRequest;
 use App\Http\Requests\ExtensionReactionRequest;
+use App\Jobs\ProcessExtensionBatchReaction;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -115,11 +116,7 @@ class ExtensionController extends Controller
     public function batchReact(
         ExtensionBatchReactionRequest $request,
         ExtensionApiKeyService $extensionApiKey,
-        ExtensionContainerMetadataService $containerMetadataService,
-        FileBlacklistService $fileBlacklistService,
-        FileReactionService $fileReactionService,
         ExtensionDownloadRuntimeContext $downloadRuntimeContext,
-        ExtensionReactionProcessor $reactionProcessor,
     ): JsonResponse {
         $user = $this->resolveUser($request, $extensionApiKey);
         if (! $user) {
@@ -128,29 +125,19 @@ class ExtensionController extends Controller
 
         $validated = $request->validated();
         $extensionChannel = $this->extensionAuthenticator->resolveChannel($request, $user);
-        $items = [];
+        $downloadBehavior = $this->downloadBehaviorFromValidated($validated, $validated['type']);
 
-        foreach ($validated['items'] as $item) {
-            $items[] = [
-                'asset_url' => $item['asset_url'],
-                ...$this->processReactionPayload(
-                    $item,
-                    $validated['type'],
-                    $this->downloadBehaviorFromValidated($validated, $validated['type']),
-                    $request,
-                    $user,
-                    $extensionChannel,
-                    $containerMetadataService,
-                    $fileBlacklistService,
-                    $fileReactionService,
-                    $downloadRuntimeContext,
-                    $reactionProcessor,
-                ),
-            ];
-        }
+        ProcessExtensionBatchReaction::dispatch(
+            userId: (int) $user->id,
+            extensionChannel: $extensionChannel,
+            items: $validated['items'],
+            reactionType: $validated['type'],
+            downloadBehavior: $downloadBehavior,
+            runtimeContext: $downloadRuntimeContext->fromValidated([], $request),
+        );
 
         return response()->json([
-            'items' => $items,
+            'items' => $this->batchReactionAcceptedItems($validated['items'], $validated['type'], $downloadBehavior),
             'reverb' => app(ExtensionApiPayloadSupport::class)->reverbPayload($extensionChannel),
         ], 201);
     }
@@ -207,6 +194,30 @@ class ExtensionController extends Controller
         $downloadAction = $validated['download_action'] ?? null;
 
         return in_array($downloadAction, ['skip', 'force'], true) ? $downloadAction : 'queue';
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function batchReactionAcceptedItems(array $items, string $reactionType, string $downloadBehavior): array
+    {
+        $downloadRequested = $reactionType !== 'blacklist' && $downloadBehavior !== 'skip';
+
+        return array_map(static fn (array $item): array => [
+            'asset_url' => $item['asset_url'],
+            'blacklisted_at' => null,
+            'download' => [
+                'downloaded_at' => null,
+                'progress_percent' => 0,
+                'requested' => $downloadRequested,
+                'status' => null,
+                'transfer_id' => null,
+            ],
+            'queued' => true,
+            'reaction' => $reactionType === 'blacklist' ? null : ['type' => $reactionType],
+            'reacted_at' => null,
+        ], $items);
     }
 
     public function assetStatuses(

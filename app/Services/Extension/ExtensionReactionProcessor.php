@@ -4,21 +4,19 @@ namespace App\Services\Extension;
 
 use App\Models\File;
 use App\Models\User;
-use App\Services\CivitAiImages;
-use App\Services\DeviantArtImages;
 use App\Services\FileBlacklistService;
 use App\Services\FilePreviewService;
 use App\Services\FileReactionService;
-use App\Support\CivitAiMediaUrl;
-use App\Support\DeviantArtPageUrl;
 use App\Support\FileTypeDetector;
-use App\Support\StableFileIdentity;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ExtensionReactionProcessor
 {
-    public function __construct(private readonly ExtensionActiveTransferLookup $activeTransferLookup) {}
+    public function __construct(
+        private readonly ExtensionActiveTransferLookup $activeTransferLookup,
+        private readonly ExtensionFileIdentityResolver $identityResolver,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $item
@@ -40,30 +38,12 @@ class ExtensionReactionProcessor
         array $listingMetadataOverrides = [],
         array $options = [],
     ): array {
-        $url = $this->normalizeUrl($item['url'] ?? null);
-        if ($url === null) {
-            throw ValidationException::withMessages([
-                'url' => 'A valid media URL is required.',
-            ]);
-        }
-
-        $referrerUrl = $this->normalizeOptionalUrl($item['referrer_url_hash_aware'] ?? null)
-            ?? $this->normalizeOptionalUrl($item['referrer_url'] ?? null);
-        $previewUrl = $url;
-        $pageUrl = $this->normalizeOptionalUrl($item['page_url'] ?? null);
-        $tagName = isset($item['tag_name']) && is_string($item['tag_name']) ? $item['tag_name'] : null;
-        $source = $containerMetadataService->sourceFromCandidateUrls([$referrerUrl, $pageUrl, $url]) ?? 'extension';
-
-        $file = $this->findOrCreateFile(
-            $url,
-            $source,
-            $referrerUrl,
-            $previewUrl,
+        $file = $this->fileForExtensionItem(
+            $item,
+            $containerMetadataService,
+            $user,
             $extensionChannel,
-            (int) $user->id,
-            $pageUrl,
-            $tagName,
-            $listingMetadataOverrides
+            $listingMetadataOverrides,
         );
         $loadActiveTransfer = $options['loadActiveTransfer'] ?? true;
         if ($reactionType === 'blacklist') {
@@ -104,6 +84,44 @@ class ExtensionReactionProcessor
             ],
             'blacklisted_at' => $file->blacklisted_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed>  $listingMetadataOverrides
+     */
+    public function fileForExtensionItem(
+        array $item,
+        ExtensionContainerMetadataService $containerMetadataService,
+        User $user,
+        string $extensionChannel,
+        array $listingMetadataOverrides = [],
+    ): File {
+        $url = $this->normalizeUrl($item['url'] ?? null);
+        if ($url === null) {
+            throw ValidationException::withMessages([
+                'url' => 'A valid media URL is required.',
+            ]);
+        }
+
+        $referrerUrl = $this->normalizeOptionalUrl($item['referrer_url_hash_aware'] ?? null)
+            ?? $this->normalizeOptionalUrl($item['referrer_url'] ?? null);
+        $previewUrl = $url;
+        $pageUrl = $this->normalizeOptionalUrl($item['page_url'] ?? null);
+        $tagName = isset($item['tag_name']) && is_string($item['tag_name']) ? $item['tag_name'] : null;
+        $source = $containerMetadataService->sourceFromCandidateUrls([$referrerUrl, $pageUrl, $url]) ?? 'extension';
+
+        return $this->findOrCreateFile(
+            $url,
+            $source,
+            $referrerUrl,
+            $previewUrl,
+            $extensionChannel,
+            (int) $user->id,
+            $pageUrl,
+            $tagName,
+            $listingMetadataOverrides
+        );
     }
 
     /**
@@ -196,7 +214,7 @@ class ExtensionReactionProcessor
     ): File {
         $downloadVia = $this->shouldUseYtDlp($url, $pageUrl, $tagName) ? 'yt-dlp' : null;
         $rawCanonicalUrl = $downloadVia === 'yt-dlp' && $pageUrl !== null ? $pageUrl : $url;
-        $identity = $this->resolveExtensionFileIdentity(
+        $identity = $this->identityResolver->resolve(
             $rawCanonicalUrl,
             $source,
             $referrerUrl,
@@ -220,7 +238,7 @@ class ExtensionReactionProcessor
             default => true,
         });
 
-        $file = $this->findExistingFileForExtensionIdentity($urlHash, $canonicalUrl, $source, $sourceId, $referrerUrl);
+        $file = $this->findExistingFileForExtensionIdentity($urlHash, $source, $sourceId, $referrerUrl);
 
         if (! $file) {
             return File::query()->create([
@@ -254,7 +272,7 @@ class ExtensionReactionProcessor
         }
         if ($referrerUrl !== null
             && $file->referrer_url !== $referrerUrl
-            && ! $this->referrerUrlsAreEquivalent($source, $file->referrer_url, $referrerUrl)) {
+            && ! $this->identityResolver->referrerUrlsAreEquivalent($source, $file->referrer_url, $referrerUrl)) {
             $updates['referrer_url'] = $referrerUrl;
         }
         if ($file->preview_url === null && $previewUrl !== null) {
@@ -291,156 +309,13 @@ class ExtensionReactionProcessor
         return $file;
     }
 
-    /**
-     * @return array{url: string, source_id: string|null}
-     */
-    private function resolveExtensionFileIdentity(
-        string $url,
-        string $source,
-        ?string $referrerUrl,
-        ?string $pageUrl,
-        ?string $tagName,
-    ): array {
-        if ($source !== CivitAiImages::SOURCE) {
-            return [
-                'url' => $url,
-                'source_id' => null,
-            ];
-        }
-
-        $sourceId = $this->extractCivitAiImageIdFromCandidateUrls([$referrerUrl, $pageUrl]);
-        if ($sourceId === null) {
-            return [
-                'url' => $url,
-                'source_id' => null,
-            ];
-        }
-
-        return [
-            'url' => $this->canonicalizeCivitAiMediaUrl($url, $sourceId, $tagName) ?? $url,
-            'source_id' => $sourceId,
-        ];
-    }
-
     private function findExistingFileForExtensionIdentity(
         string $urlHash,
-        string $canonicalUrl,
         string $source,
         ?string $sourceId,
         ?string $referrerUrl,
     ): ?File {
-        $file = File::query()
-            ->where('url_hash', $urlHash)
-            ->first();
-        if ($file) {
-            return $file;
-        }
-
-        return StableFileIdentity::findExistingFile(
-            $source,
-            $sourceId,
-            $this->identityReferrerUrl($source, $referrerUrl),
-        );
-    }
-
-    private function identityReferrerUrl(string $source, ?string $referrerUrl): ?string
-    {
-        if ($source === DeviantArtImages::SOURCE) {
-            return DeviantArtPageUrl::normalize($referrerUrl) ?? $referrerUrl;
-        }
-
-        return $referrerUrl;
-    }
-
-    private function referrerUrlsAreEquivalent(string $source, ?string $currentReferrerUrl, string $nextReferrerUrl): bool
-    {
-        if ($source !== DeviantArtImages::SOURCE) {
-            return false;
-        }
-
-        $current = DeviantArtPageUrl::normalize($currentReferrerUrl);
-        $next = DeviantArtPageUrl::normalize($nextReferrerUrl);
-
-        return $current !== null && $current === $next;
-    }
-
-    /**
-     * @param  array<int, mixed>  $candidateUrls
-     */
-    private function extractCivitAiImageIdFromCandidateUrls(array $candidateUrls): ?string
-    {
-        foreach ($candidateUrls as $candidateUrl) {
-            $imageId = $this->extractCivitAiImageIdFromUrl(is_string($candidateUrl) ? $candidateUrl : null);
-            if ($imageId !== null) {
-                return $imageId;
-            }
-        }
-
-        return null;
-    }
-
-    private function extractCivitAiImageIdFromUrl(?string $url): ?string
-    {
-        if (! is_string($url) || trim($url) === '') {
-            return null;
-        }
-
-        $host = parse_url($url, PHP_URL_HOST);
-        $path = parse_url($url, PHP_URL_PATH);
-        if (! is_string($host) || ! is_string($path)) {
-            return null;
-        }
-
-        $normalizedHost = strtolower(trim($host));
-        if (! CivitAiMediaUrl::isPageHost($normalizedHost)) {
-            return null;
-        }
-
-        if (preg_match('#^/images/(\d+)(?:/|$)#i', $path, $matches) !== 1) {
-            return null;
-        }
-
-        return $matches[1] ?? null;
-    }
-
-    private function canonicalizeCivitAiMediaUrl(string $url, string $imageId, ?string $tagName): ?string
-    {
-        $parts = parse_url($url);
-        if (! is_array($parts)) {
-            return null;
-        }
-
-        $scheme = isset($parts['scheme']) && is_string($parts['scheme']) ? strtolower($parts['scheme']) : null;
-        $host = isset($parts['host']) && is_string($parts['host']) ? strtolower($parts['host']) : null;
-        $path = isset($parts['path']) && is_string($parts['path']) ? trim($parts['path'], '/') : null;
-        if ($scheme === null || ! in_array($scheme, ['http', 'https'], true) || ! CivitAiMediaUrl::isMediaHost($host) || $path === null || $path === '') {
-            return null;
-        }
-
-        $segments = array_values(array_filter(explode('/', $path), static fn (string $segment): bool => $segment !== ''));
-        if (count($segments) < 4) {
-            return null;
-        }
-
-        $token = $segments[0] ?? '';
-        $guid = $segments[1] ?? '';
-        $filename = end($segments);
-        if (! is_string($filename) || $token === '' || $guid === '') {
-            return null;
-        }
-
-        $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
-        if ($extension === '') {
-            return null;
-        }
-
-        $isVideo = in_array($tagName, ['video', 'iframe'], true)
-            || in_array($extension, ['mp4', 'm4v', 'mov', 'webm'], true);
-        if (! $isVideo) {
-            return CivitAiMediaUrl::normalizeImageUrl($url);
-        }
-
-        return "{$scheme}://".CivitAiMediaUrl::PRIMARY_MEDIA_HOST."/{$token}/{$guid}/transcode=true,original=true,quality=90/{$imageId}.{$extension}";
+        return $this->identityResolver->findExisting($urlHash, $source, $sourceId, $referrerUrl);
     }
 
     /**
