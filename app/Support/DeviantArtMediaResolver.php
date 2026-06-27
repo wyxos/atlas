@@ -53,13 +53,6 @@ class DeviantArtMediaResolver
             'preview_url' => $media['preview_url'],
         ];
 
-        $username = self::artistUsername($row);
-        if ($username !== null) {
-            $row['user_container_source'] = 'deviantart.com';
-            $row['user_container_source_id'] = $username;
-            $row['user_container_referrer_url'] = self::artistGalleryUrl($username);
-        }
-
         return $row;
     }
 

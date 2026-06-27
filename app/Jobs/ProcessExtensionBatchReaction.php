@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\User;
+use App\Services\BrowsePersister;
+use App\Services\DeviantArtImages;
 use App\Services\Extension\ExtensionBatchReactionService;
 use App\Services\Extension\ExtensionContainerMetadataService;
 use App\Services\Extension\ExtensionReactionProcessor;
@@ -10,6 +12,7 @@ use App\Services\FileBlacklistService;
 use App\Services\FilePreviewService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Collection;
 
 class ProcessExtensionBatchReaction implements ShouldQueue
 {
@@ -42,6 +45,8 @@ class ProcessExtensionBatchReaction implements ShouldQueue
         ExtensionContainerMetadataService $containerMetadataService,
         FileBlacklistService $fileBlacklistService,
         ExtensionBatchReactionService $batchReactionService,
+        BrowsePersister $browsePersister,
+        DeviantArtImages $deviantArtImages,
     ): void {
         $user = User::query()->find($this->userId);
         if (! $user instanceof User || $this->items === []) {
@@ -51,12 +56,16 @@ class ProcessExtensionBatchReaction implements ShouldQueue
         $files = [];
 
         foreach ($this->items as $item) {
+            $listingMetadataOverrides = [
+                ...$this->listingMetadataFromPayload($item),
+                ...$deviantArtImages->containerMetadataFromCandidateUrls($this->candidateUrlsFromPayload($item)),
+            ];
             $file = $reactionProcessor->fileForExtensionItem(
                 $this->processorItemFromPayload($item),
                 $containerMetadataService,
                 $user,
                 $this->extensionChannel,
-                $this->listingMetadataFromPayload($item),
+                $listingMetadataOverrides,
             );
 
             $files[(int) $file->id] = $file;
@@ -65,6 +74,8 @@ class ProcessExtensionBatchReaction implements ShouldQueue
         if ($files === []) {
             return;
         }
+
+        $browsePersister->attachContainersForFiles(new Collection(array_values($files)));
 
         if ($this->reactionType === 'blacklist') {
             $fileBlacklistService->apply(
@@ -88,6 +99,21 @@ class ProcessExtensionBatchReaction implements ShouldQueue
                 'queueDownload' => $this->downloadBehavior !== 'skip',
             ],
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<mixed>
+     */
+    private function candidateUrlsFromPayload(array $payload): array
+    {
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+
+        return [
+            $metadata['page_url'] ?? null,
+            $payload['referrer_url'] ?? null,
+            $payload['asset_url'] ?? null,
+        ];
     }
 
     /**

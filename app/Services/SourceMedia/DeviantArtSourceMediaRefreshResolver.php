@@ -17,6 +17,7 @@ final class DeviantArtSourceMediaRefreshResolver implements SourceMediaRefreshRe
     public function __construct(
         private readonly DeviantArtOAuthService $oauth,
         private readonly DeviantArtApiClient $client,
+        private readonly DeviantArtImages $deviantArtImages,
     ) {}
 
     public function supports(File $file): bool
@@ -53,13 +54,18 @@ final class DeviantArtSourceMediaRefreshResolver implements SourceMediaRefreshRe
             ? $media['filename']
             : $media['url'];
 
+        $listingMetadata = [
+            ...DeviantArtMediaResolver::listingMetadata($payload, $media),
+            ...$this->deviantArtImages->containerMetadataFromApiRow($payload, [$rawReferrer, $referrer]),
+        ];
+
         return new ResolvedSourceMedia(
             url: $media['url'],
             previewUrl: $media['preview_url'],
             size: $media['filesize'],
             ext: FileTypeDetector::extensionFromUrl($typeProbe),
             mimeType: FileMimeType::canonicalize(FileTypeDetector::mimeFromUrl($typeProbe)),
-            listingMetadata: DeviantArtMediaResolver::listingMetadata($payload, $media),
+            listingMetadata: $listingMetadata,
             metadataPayload: DeviantArtMediaResolver::metadataPayload($payload, $media),
         );
     }

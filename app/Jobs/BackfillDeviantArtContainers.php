@@ -2,9 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\Container;
 use App\Models\File;
 use App\Services\BrowsePersister;
-use App\Services\Extension\ExtensionContainerMetadataService;
+use App\Services\DeviantArtImages;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class BackfillDeviantArtContainers implements ShouldQueue
 {
@@ -31,25 +33,19 @@ class BackfillDeviantArtContainers implements ShouldQueue
 
     public function handle(
         BrowsePersister $browsePersister,
-        ExtensionContainerMetadataService $containerMetadataService,
+        DeviantArtImages $deviantArtImages,
     ): void {
         $files = $this->filesForChunk();
         if ($files->isEmpty()) {
             return;
         }
 
-        $postEligibleUrls = $this->postEligibleUrls($files, $containerMetadataService);
         $filesToAttach = new Collection;
 
         foreach ($files as $file) {
             $listingMetadata = is_array($file->listing_metadata) ? $file->listing_metadata : [];
-            $postContainerUrl = $containerMetadataService->firstSupportedContainerUrl(
-                $this->postCandidateUrlsForFile($file, $listingMetadata)
-            );
-
-            $overrides = $containerMetadataService->metadataOverridesFromCandidateUrls(
-                $this->candidateUrlsForFile($file, $listingMetadata),
-                includePostContainer: $this->shouldIncludePostContainer($listingMetadata, $postContainerUrl, $postEligibleUrls),
+            $overrides = $deviantArtImages->containerMetadataFromCandidateUrls(
+                $this->candidateUrlsForFile($file, $listingMetadata)
             );
 
             if ($overrides === [] && ! $this->hasDerivedContainerMetadata($listingMetadata)) {
@@ -80,6 +76,10 @@ class BackfillDeviantArtContainers implements ShouldQueue
 
         if ($filesToAttach->isNotEmpty()) {
             $browsePersister->attachContainersForFiles($filesToAttach);
+
+            foreach ($filesToAttach as $file) {
+                $this->detachLegacyPostContainers($file, $deviantArtImages);
+            }
         }
 
         if ($files->count() === $this->chunk) {
@@ -106,46 +106,12 @@ class BackfillDeviantArtContainers implements ShouldQueue
             ->get();
     }
 
-    private function postEligibleUrls(
-        Collection $files,
-        ExtensionContainerMetadataService $containerMetadataService,
-    ): array {
-        $counts = [];
-
-        foreach ($files as $file) {
-            $listingMetadata = is_array($file->listing_metadata) ? $file->listing_metadata : [];
-            $postContainerUrl = $containerMetadataService->firstSupportedContainerUrl(
-                $this->postCandidateUrlsForFile($file, $listingMetadata)
-            );
-
-            if ($postContainerUrl === null) {
-                continue;
-            }
-
-            $counts[$postContainerUrl] = ($counts[$postContainerUrl] ?? 0) + 1;
-        }
-
-        return collect($counts)
-            ->filter(static fn (int $count): bool => $count > 1)
-            ->map(static fn (): bool => true)
-            ->all();
-    }
-
-    private function shouldIncludePostContainer(array $listingMetadata, ?string $postContainerUrl, array $postEligibleUrls): bool
-    {
-        if (($listingMetadata['post_container_source'] ?? null) === 'deviantart.com'
-            && is_string($listingMetadata['post_container_referrer_url'] ?? null)
-            && trim((string) $listingMetadata['post_container_referrer_url']) !== '') {
-            return true;
-        }
-
-        return $postContainerUrl !== null && isset($postEligibleUrls[$postContainerUrl]);
-    }
-
     private function hasDerivedContainerMetadata(array $listingMetadata): bool
     {
         return (
             ($listingMetadata['post_container_source'] ?? null) === 'deviantart.com'
+            && is_string($listingMetadata['post_container_source_id'] ?? null)
+            && trim((string) $listingMetadata['post_container_source_id']) !== ''
             && is_string($listingMetadata['post_container_referrer_url'] ?? null)
             && trim((string) $listingMetadata['post_container_referrer_url']) !== ''
         ) || (
@@ -159,20 +125,44 @@ class BackfillDeviantArtContainers implements ShouldQueue
     {
         return [
             $listingMetadata['post_container_referrer_url'] ?? null,
-            $listingMetadata['page_url'] ?? null,
             $file->referrer_url,
+            $listingMetadata['page_url'] ?? null,
             $file->source === 'deviantart.com' ? $file->url : null,
             $listingMetadata['user_container_referrer_url'] ?? null,
         ];
     }
 
-    private function postCandidateUrlsForFile(File $file, array $listingMetadata): array
+    private function detachLegacyPostContainers(File $file, DeviantArtImages $deviantArtImages): void
     {
-        return [
-            $listingMetadata['post_container_referrer_url'] ?? null,
-            $listingMetadata['page_url'] ?? null,
-            $file->referrer_url,
-            $file->source === 'deviantart.com' ? $file->url : null,
-        ];
+        $listingMetadata = is_array($file->listing_metadata) ? $file->listing_metadata : [];
+        $canonicalSourceId = $listingMetadata['post_container_source_id'] ?? null;
+        if (! is_string($canonicalSourceId) || trim($canonicalSourceId) === '') {
+            return;
+        }
+
+        $legacyContainers = $file->containers()
+            ->where('containers.type', 'Post')
+            ->where('containers.source', DeviantArtImages::SOURCE)
+            ->where('containers.source_id', 'like', 'http%')
+            ->get();
+
+        foreach ($legacyContainers as $legacyContainer) {
+            if (! $legacyContainer instanceof Container) {
+                continue;
+            }
+
+            if ($deviantArtImages->postSourceIdFromUrl($legacyContainer->source_id) !== $canonicalSourceId) {
+                continue;
+            }
+
+            DB::table('container_file')
+                ->where('container_id', $legacyContainer->id)
+                ->where('file_id', $file->id)
+                ->delete();
+
+            if (! DB::table('container_file')->where('container_id', $legacyContainer->id)->exists()) {
+                $legacyContainer->delete();
+            }
+        }
     }
 }

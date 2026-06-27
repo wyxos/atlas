@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Services\DeviantArt\DeviantArtOAuthConfig;
 use App\Services\DeviantArt\DeviantArtOAuthService;
+use App\Services\DeviantArt\InfersDeviantArtContainers;
 use App\Support\DeviantArtApiClient;
 use App\Support\DeviantArtImagesFilterSchema;
 use App\Support\DeviantArtMediaResolver;
@@ -20,6 +21,8 @@ use Throwable;
 
 class DeviantArtImages extends BaseService
 {
+    use InfersDeviantArtContainers;
+
     public const string KEY = 'deviantart-images';
 
     public const string SOURCE = 'deviantart.com';
@@ -46,13 +49,26 @@ class DeviantArtImages extends BaseService
     public function containers(array $listingMetadata = [], array $detailMetadata = []): array
     {
         $containers = [];
-        $username = DeviantArtMediaResolver::artistUsername($listingMetadata);
+        $username = isset($listingMetadata['user_container_source_id']) && is_string($listingMetadata['user_container_source_id'])
+            ? trim($listingMetadata['user_container_source_id'])
+            : DeviantArtMediaResolver::artistUsername($listingMetadata);
 
         if ($username !== null && $username !== '') {
+            $containers[] = $this->userContainer($username);
+        }
+
+        $postSourceId = isset($listingMetadata['post_container_source_id']) && is_string($listingMetadata['post_container_source_id'])
+            ? trim($listingMetadata['post_container_source_id'])
+            : null;
+        $postReferrer = isset($listingMetadata['post_container_referrer_url']) && is_string($listingMetadata['post_container_referrer_url'])
+            ? trim($listingMetadata['post_container_referrer_url'])
+            : null;
+        if ($postSourceId !== null && $postSourceId !== '' && $postReferrer !== null && $postReferrer !== '') {
             $containers[] = [
-                'type' => 'User',
-                'source_id' => $username,
-                'referrer' => DeviantArtMediaResolver::artistGalleryUrl($username),
+                'type' => 'Post',
+                'source' => self::SOURCE,
+                'source_id' => $postSourceId,
+                'referrer' => $postReferrer,
             ];
         }
 
@@ -241,6 +257,11 @@ class DeviantArtImages extends BaseService
         $id = isset($row['deviationid']) ? (string) $row['deviationid'] : sha1((string) ($referrer ?? $media['url']));
         $typeProbe = $media['filename'] !== null && $media['filename'] !== '' ? $media['filename'] : $media['url'];
 
+        $listingMetadata = [
+            ...DeviantArtMediaResolver::listingMetadata($row, $media),
+            ...$this->containerMetadataFromApiRow($row, [$rawReferrer, $referrer]),
+        ];
+
         $file = [
             'source' => self::SOURCE,
             'source_id' => $id,
@@ -254,7 +275,7 @@ class DeviantArtImages extends BaseService
             'title' => isset($row['title']) && is_string($row['title']) ? $row['title'] : null,
             'description' => isset($row['excerpt']) && is_string($row['excerpt']) ? $row['excerpt'] : null,
             'preview_url' => $media['preview_url'],
-            'listing_metadata' => json_encode(DeviantArtMediaResolver::listingMetadata($row, $media)),
+            'listing_metadata' => json_encode($listingMetadata),
             'created_at' => $now,
             'updated_at' => $now,
         ];

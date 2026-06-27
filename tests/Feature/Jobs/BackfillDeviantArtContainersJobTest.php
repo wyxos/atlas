@@ -16,7 +16,7 @@ test('backfill deviantart containers derives user and batch post containers for 
     $batchFirst = File::factory()->create([
         'source' => 'extension',
         'url' => 'https://images.example.test/kiririchann-1.jpg',
-        'referrer_url' => $batchUrl,
+        'referrer_url' => $batchUrl.'?file=1',
         'listing_metadata' => [
             'page_url' => $batchUrl,
         ],
@@ -25,11 +25,18 @@ test('backfill deviantart containers derives user and batch post containers for 
     $batchSecond = File::factory()->create([
         'source' => 'extension',
         'url' => 'https://images.example.test/kiririchann-2.jpg',
-        'referrer_url' => $batchUrl.'#image-2',
+        'referrer_url' => $batchUrl.'?file=2',
         'listing_metadata' => [
             'page_url' => $batchUrl,
         ],
     ]);
+    $legacyBatchPostContainer = Container::query()->create([
+        'type' => 'Post',
+        'source' => 'deviantart.com',
+        'source_id' => $batchUrl,
+        'referrer' => $batchUrl,
+    ]);
+    $legacyBatchPostContainer->files()->attach([$batchFirst->id, $batchSecond->id]);
 
     $single = File::factory()->create([
         'source' => 'extension',
@@ -67,6 +74,8 @@ test('backfill deviantart containers derives user and batch post containers for 
 
     expect(data_get($batchFirst->listing_metadata, 'post_container_referrer_url'))->toBe($batchUrl);
     expect(data_get($batchSecond->listing_metadata, 'post_container_referrer_url'))->toBe($batchUrl);
+    expect(data_get($batchFirst->listing_metadata, 'post_container_source_id'))->toBe('Komi-Shuuko-Serving-Drinks-1306906991');
+    expect(data_get($batchSecond->listing_metadata, 'post_container_source_id'))->toBe('Komi-Shuuko-Serving-Drinks-1306906991');
     expect(data_get($batchFirst->listing_metadata, 'user_container_source_id'))->toBe('kiririchann');
     expect(data_get($batchSecond->listing_metadata, 'user_container_source_id'))->toBe('kiririchann');
 
@@ -88,7 +97,7 @@ test('backfill deviantart containers derives user and batch post containers for 
     $this->assertDatabaseHas('containers', [
         'type' => 'Post',
         'source' => 'deviantart.com',
-        'source_id' => $batchUrl,
+        'source_id' => 'Komi-Shuuko-Serving-Drinks-1306906991',
         'referrer' => $batchUrl,
     ]);
 
@@ -122,13 +131,14 @@ test('backfill deviantart containers derives user and batch post containers for 
     $postContainer = Container::query()
         ->where('type', 'Post')
         ->where('source', 'deviantart.com')
-        ->where('source_id', $batchUrl)
+        ->where('source_id', 'Komi-Shuuko-Serving-Drinks-1306906991')
         ->first();
 
     expect($postContainer)->not->toBeNull();
     expect($batchFirst->containers()->where('containers.id', $postContainer?->id)->exists())->toBeTrue();
     expect($batchSecond->containers()->where('containers.id', $postContainer?->id)->exists())->toBeTrue();
     expect($single->containers()->where('containers.id', $postContainer?->id)->exists())->toBeFalse();
+    expect(Container::query()->whereKey($legacyBatchPostContainer->id)->exists())->toBeFalse();
 });
 
 test('backfill deviantart containers queues the next chunk when more matching files remain', function () {

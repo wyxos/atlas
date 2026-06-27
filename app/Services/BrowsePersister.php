@@ -201,10 +201,10 @@ class BrowsePersister
             $service = $serviceCache[$source];
             $fileContainers = [];
 
-            $containers = $service->containers($listingMetadata, $file->detail_metadata ?? []);
-            if (empty($containers)) {
-                $containers = $this->fallbackContainers($listingMetadata);
-            }
+            $containers = [
+                ...$service->containers($listingMetadata, $file->detail_metadata ?? []),
+                ...$this->fallbackContainers($listingMetadata),
+            ];
 
             foreach ($containers as $container) {
                 $type = $container['type'] ?? null;
@@ -430,13 +430,16 @@ class BrowsePersister
             }
         } elseif (isset($listingMetadata['post_container_referrer_url']) && is_string($listingMetadata['post_container_referrer_url'])) {
             $postContainerReferrerUrl = trim($listingMetadata['post_container_referrer_url']);
+            $postContainerSourceId = isset($listingMetadata['post_container_source_id']) && is_string($listingMetadata['post_container_source_id'])
+                ? trim($listingMetadata['post_container_source_id'])
+                : $postContainerReferrerUrl;
             if ($postContainerReferrerUrl !== '') {
                 $containers[] = [
                     'type' => 'Post',
                     'source' => isset($listingMetadata['post_container_source']) && is_string($listingMetadata['post_container_source']) && $listingMetadata['post_container_source'] !== ''
                         ? $listingMetadata['post_container_source']
                         : null,
-                    'source_id' => $postContainerReferrerUrl,
+                    'source_id' => $postContainerSourceId !== '' ? $postContainerSourceId : $postContainerReferrerUrl,
                     'referrer' => $postContainerReferrerUrl,
                 ];
             }
@@ -456,11 +459,16 @@ class BrowsePersister
         if (isset($listingMetadata['user_container_source_id']) && is_string($listingMetadata['user_container_source_id'])) {
             $userContainerSourceId = trim($listingMetadata['user_container_source_id']);
             if ($userContainerSourceId !== '') {
+                $userContainerSource = isset($listingMetadata['user_container_source']) && is_string($listingMetadata['user_container_source']) && $listingMetadata['user_container_source'] !== ''
+                    ? $listingMetadata['user_container_source']
+                    : null;
+                if ($userContainerSource === 'deviantart.com') {
+                    $userContainerSourceId = strtolower($userContainerSourceId);
+                }
+
                 $containers[] = [
                     'type' => 'User',
-                    'source' => isset($listingMetadata['user_container_source']) && is_string($listingMetadata['user_container_source']) && $listingMetadata['user_container_source'] !== ''
-                        ? $listingMetadata['user_container_source']
-                        : null,
+                    'source' => $userContainerSource,
                     'source_id' => $userContainerSourceId,
                     'referrer' => isset($listingMetadata['user_container_referrer_url']) && is_string($listingMetadata['user_container_referrer_url']) && $listingMetadata['user_container_referrer_url'] !== ''
                         ? $listingMetadata['user_container_referrer_url']

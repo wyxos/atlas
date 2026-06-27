@@ -65,13 +65,81 @@ it('maps image deviations to atlas files and user containers', function () {
     $listingMetadata = json_decode($file['listing_metadata'], true);
     expect($listingMetadata['user_container_source'])->toBe('deviantart.com')
         ->and($listingMetadata['user_container_source_id'])->toBe('artist')
-        ->and($listingMetadata['user_container_referrer_url'])->toBe('https://www.deviantart.com/artist/gallery');
+        ->and($listingMetadata['user_container_referrer_url'])->toBe('https://www.deviantart.com/artist/gallery')
+        ->and($listingMetadata)->not->toHaveKey('post_container_source_id')
+        ->and($listingMetadata)->not->toHaveKey('post_container_referrer_url');
 
     expect($service->containers($listingMetadata))->toMatchArray([[
         'type' => 'User',
+        'source' => 'deviantart.com',
         'source_id' => 'artist',
         'referrer' => 'https://www.deviantart.com/artist/gallery',
     ]]);
+});
+
+it('infers DeviantArt user and post containers from file-index referrers', function () {
+    $service = new DeviantArtImages;
+
+    $metadata = $service->containerMetadataFromCandidateUrls([
+        'https://www.deviantart.com/2821986s/art/Tohsaka-Rin-Fate-1348544787?file=4',
+    ]);
+
+    expect($metadata)->toMatchArray([
+        'post_container_referrer_url' => 'https://www.deviantart.com/2821986s/art/Tohsaka-Rin-Fate-1348544787',
+        'post_container_source' => 'deviantart.com',
+        'post_container_source_id' => 'Tohsaka-Rin-Fate-1348544787',
+        'user_container_referrer_url' => 'https://www.deviantart.com/2821986s/gallery',
+        'user_container_source' => 'deviantart.com',
+        'user_container_source_id' => '2821986s',
+    ]);
+
+    expect($service->containers($metadata))->toMatchArray([
+        [
+            'type' => 'User',
+            'source' => 'deviantart.com',
+            'source_id' => '2821986s',
+            'referrer' => 'https://www.deviantart.com/2821986s/gallery',
+        ],
+        [
+            'type' => 'Post',
+            'source' => 'deviantart.com',
+            'source_id' => 'Tohsaka-Rin-Fate-1348544787',
+            'referrer' => 'https://www.deviantart.com/2821986s/art/Tohsaka-Rin-Fate-1348544787',
+        ],
+    ]);
+});
+
+it('infers DeviantArt user containers without post containers for single-item referrers', function () {
+    $service = new DeviantArtImages;
+
+    $metadata = $service->containerMetadataFromCandidateUrls([
+        'https://www.deviantart.com/2821986s/art/Tohsaka-Rin-Fate-1348544787',
+    ]);
+
+    expect($metadata)->toMatchArray([
+        'user_container_referrer_url' => 'https://www.deviantart.com/2821986s/gallery',
+        'user_container_source' => 'deviantart.com',
+        'user_container_source_id' => '2821986s',
+    ])
+        ->and($metadata)->not->toHaveKey('post_container_source_id')
+        ->and($metadata)->not->toHaveKey('post_container_referrer_url');
+
+    expect($service->containers($metadata))->toMatchArray([[
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => '2821986s',
+        'referrer' => 'https://www.deviantart.com/2821986s/gallery',
+    ]]);
+});
+
+it('ignores DeviantArt URLs that are not exact post paths for container inference', function () {
+    $service = new DeviantArtImages;
+
+    $metadata = $service->containerMetadataFromCandidateUrls([
+        'https://www.deviantart.com/2821986s/art/Tohsaka-Rin-Fate-1348544787/extra?file=4',
+    ]);
+
+    expect($metadata)->toBe([]);
 });
 
 it('derives DeviantArt user containers from deviation URLs when author metadata is missing', function () {
@@ -97,6 +165,7 @@ it('derives DeviantArt user containers from deviation URLs when author metadata 
         ->and($listingMetadata['user_container_referrer_url'])->toBe('https://www.deviantart.com/deviantartbender/gallery')
         ->and($service->containers($listingMetadata))->toMatchArray([[
             'type' => 'User',
+            'source' => 'deviantart.com',
             'source_id' => 'deviantartbender',
             'referrer' => 'https://www.deviantart.com/deviantartbender/gallery',
         ]]);
@@ -128,6 +197,7 @@ it('normalizes mixed-case DeviantArt usernames for container keys', function () 
         ->and($listingMetadata['user_container_referrer_url'])->toBe('https://www.deviantart.com/animeaivideos/gallery')
         ->and($service->containers($listingMetadata))->toMatchArray([[
             'type' => 'User',
+            'source' => 'deviantart.com',
             'source_id' => 'animeaivideos',
             'referrer' => 'https://www.deviantart.com/animeaivideos/gallery',
         ]]);

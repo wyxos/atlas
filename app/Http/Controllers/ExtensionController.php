@@ -10,6 +10,7 @@ use App\Jobs\ProcessExtensionBatchReaction;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\DeviantArtImages;
 use App\Services\Extension\ExtensionActiveTransferLookup;
 use App\Services\Extension\ExtensionApiPayloadSupport;
 use App\Services\Extension\ExtensionContainerMetadataService;
@@ -80,6 +81,7 @@ class ExtensionController extends Controller
         ExtensionReactionRequest $request,
         ExtensionApiKeyService $extensionApiKey,
         ExtensionContainerMetadataService $containerMetadataService,
+        DeviantArtImages $deviantArtImages,
         FileBlacklistService $fileBlacklistService,
         FileReactionService $fileReactionService,
         ExtensionDownloadRuntimeContext $downloadRuntimeContext,
@@ -100,6 +102,7 @@ class ExtensionController extends Controller
             $user,
             $extensionChannel,
             $containerMetadataService,
+            $deviantArtImages,
             $fileBlacklistService,
             $fileReactionService,
             $downloadRuntimeContext,
@@ -154,6 +157,7 @@ class ExtensionController extends Controller
         User $user,
         string $extensionChannel,
         ExtensionContainerMetadataService $containerMetadataService,
+        DeviantArtImages $deviantArtImages,
         FileBlacklistService $fileBlacklistService,
         FileReactionService $fileReactionService,
         ExtensionDownloadRuntimeContext $downloadRuntimeContext,
@@ -167,8 +171,16 @@ class ExtensionController extends Controller
             'tag_name' => $this->tagNameFromMetadata($metadata),
             'url' => $validated['asset_url'],
         ];
+        $inferredContainerMetadata = $deviantArtImages->containerMetadataFromCandidateUrls([
+            $validated['referrer_url'] ?? null,
+            $validated['asset_url'] ?? null,
+        ]);
+        $listingMetadataOverrides = [
+            ...$this->listingMetadataFromPayload($validated),
+            ...$inferredContainerMetadata,
+        ];
 
-        return $reactionProcessor->process(
+        $payload = $reactionProcessor->process(
             $item,
             $reactionType,
             $downloadBehavior,
@@ -178,8 +190,11 @@ class ExtensionController extends Controller
             $user,
             $extensionChannel,
             $downloadRuntimeContext->fromValidated([], $request),
-            $this->listingMetadataFromPayload($validated),
+            $listingMetadataOverrides,
         );
+        app(ExtensionApiPayloadSupport::class)->attachDerivedContainers([$payload], $inferredContainerMetadata);
+
+        return $payload;
     }
 
     /**
