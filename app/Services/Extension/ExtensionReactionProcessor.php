@@ -339,36 +339,6 @@ class ExtensionReactionProcessor
 
     private function shouldUseYtDlp(string $url, ?string $pageUrl, ?string $tagName): bool
     {
-        if ($tagName !== 'video' && $tagName !== 'iframe') {
-            return false;
-        }
-
-        $videoPlatformHosts = [
-            'x.com',
-            'twitter.com',
-            'facebook.com',
-            'fb.watch',
-            'youtube.com',
-            'youtu.be',
-            'instagram.com',
-            'tiktok.com',
-            'vimeo.com',
-        ];
-
-        $hosts = array_values(array_filter([
-            parse_url($url, PHP_URL_HOST),
-            parse_url((string) $pageUrl, PHP_URL_HOST),
-        ], static fn ($host) => is_string($host) && $host !== ''));
-
-        foreach ($hosts as $host) {
-            $normalizedHost = strtolower($host);
-            foreach ($videoPlatformHosts as $platformHost) {
-                if ($normalizedHost === $platformHost || str_ends_with($normalizedHost, '.'.$platformHost)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return in_array($tagName, ['video', 'iframe'], true);
     }
 }

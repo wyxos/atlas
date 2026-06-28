@@ -4,6 +4,7 @@ namespace App;
 
 use App\Exceptions\LibraryUnavailableException;
 use App\Models\File;
+use App\Models\User;
 use App\Services\BrowseModerationService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
@@ -25,19 +26,22 @@ class Browser
      * - page: page number for pagination
      * - any other inputs are forwarded to fetch()
      */
-    public static function handle(): array
+    public static function handle(?array $params = null, ?User $user = null): array
     {
-        return (new self)->run();
+        return (new self)->run($params, $user);
     }
 
     /**
+     * @param  array<string, mixed>|null  $params
+     *
      * @throws ConnectionException
      */
-    public function run(): array
+    public function run(?array $params = null, ?User $user = null): array
     {
-        $params = request()->all();
+        $params ??= request()->all();
+        $userId = $user !== null ? (int) $user->id : (auth()->check() ? (int) auth()->id() : null);
         // Check if this is a local tab
-        $tabId = request()->input('tab_id');
+        $tabId = $params['tab_id'] ?? null;
         $feed = $params['feed'] ?? null;
 
         $isLocalMode = $feed === 'local';
@@ -76,7 +80,7 @@ class Browser
             && (string) ($params['service'] ?? '') === ''
             && (string) ($params['source'] ?? '') === $requestedService;
 
-        $pageParam = request()->input('page', 1);
+        $pageParam = $params['page'] ?? 1;
         $shouldDetachTabFiles = $tabId && (string) $pageParam === '1';
 
         // Resolve service instance
@@ -164,7 +168,7 @@ class Browser
         }
 
         // Eager load reactions for the current user
-        if (auth()->check() && ! empty($persisted)) {
+        if ($userId !== null && ! empty($persisted)) {
             $fileIds = [];
             foreach ($persisted as $file) {
                 if ($file instanceof \App\Models\File) {
@@ -173,7 +177,7 @@ class Browser
             }
 
             if (! empty($fileIds)) {
-                $userReactions = \App\Models\Reaction::where('user_id', auth()->id())
+                $userReactions = \App\Models\Reaction::where('user_id', $userId)
                     ->whereIn('file_id', $fileIds)
                     ->get()
                     ->keyBy('file_id');
@@ -201,21 +205,21 @@ class Browser
 
         // Attach filtered files to tab if tab_id is provided and not in local mode
         // Local mode doesn't attach files to tabs as they get updated every time
-        if ($tabId && $shouldDetachTabFiles && $serviceError === null) {
-            $this->detachFilesFromTab((int) $tabId);
+        if ($tabId && $shouldDetachTabFiles && $serviceError === null && $userId !== null) {
+            $this->detachFilesFromTab((int) $tabId, $userId);
         }
 
-        if ($tabId && ! $isLocalMode && $serviceError === null) {
-            $this->attachFilesToTab($tabId, $persisted);
+        if ($tabId && ! $isLocalMode && $serviceError === null && $userId !== null) {
+            $this->attachFilesToTab((int) $tabId, $persisted, $userId);
         }
 
-        if ($tabId && $serviceError === null) {
+        if ($tabId && $serviceError === null && $userId !== null) {
             // Update tab's params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation.
 
             $tab = \App\Models\Tab::query()
                 ->where('id', (int) $tabId)
-                ->where('user_id', auth()->id())
+                ->where('user_id', $userId)
                 ->first();
 
             if ($tab) {
@@ -230,7 +234,7 @@ class Browser
                 }
 
                 // Persist the current page token; keep the next token separately.
-                $pageToPersist = request()->input('page', 1);
+                $pageToPersist = $params['page'] ?? 1;
                 $nextToPersist = $filter['next'] ?? null;
 
                 // Canonical UI filter state for this service.
@@ -256,7 +260,7 @@ class Browser
 
                 // Always sync current pagination state into the per-service entry.
                 $serviceEntry['page'] = $pageToPersist;
-                $serviceEntry['limit'] = $filter['limit'] ?? request()->input('limit', $service->defaultParams()['limit'] ?? 20);
+                $serviceEntry['limit'] = $filter['limit'] ?? ($params['limit'] ?? ($service->defaultParams()['limit'] ?? 20));
 
                 // Only keep per-service filters for online services.
                 if (! $isLocalMode) {
@@ -292,7 +296,7 @@ class Browser
         }
 
         // Page can be int (page number) or string (cursor) for pagination tracking
-        $page = request()->input('page', 1);
+        $page = $params['page'] ?? 1;
         $items = FileItemFormatter::format($persisted, $page, [
             ...$params,
             'feed' => $isLocalMode ? 'local' : 'online',
@@ -307,7 +311,7 @@ class Browser
                 'service' => $serviceKey, // Store the active feed service key as 'service' for frontend compatibility
                 ...$service->defaultParams(),
                 ...$filter,
-                'page' => request()->input('page', 1),
+                'page' => $params['page'] ?? 1,
                 'next' => $filter['next'] ?? null,
             ],
             'moderation' => $immediateActions,
@@ -332,15 +336,23 @@ class Browser
     /**
      * Attach files to a browse tab with positions.
      */
-    protected function attachFilesToTab(int $tabId, array $files): void
+    protected function attachFilesToTab(int $tabId, array $files, ?int $userId = null): void
     {
         if (empty($files)) {
             return; // Nothing to attach
         }
 
+        if ($userId === null && auth()->check()) {
+            $userId = (int) auth()->id();
+        }
+
+        if ($userId === null) {
+            return;
+        }
+
         $tab = \App\Models\Tab::find($tabId);
 
-        if (! $tab || $tab->user_id !== auth()->id()) {
+        if (! $tab || (int) $tab->user_id !== $userId) {
             return; // Tab doesn't exist or user doesn't own it
         }
 
@@ -378,11 +390,19 @@ class Browser
     /**
      * Detach all files currently attached to a browse tab.
      */
-    protected function detachFilesFromTab(int $tabId): void
+    protected function detachFilesFromTab(int $tabId, ?int $userId = null): void
     {
+        if ($userId === null && auth()->check()) {
+            $userId = (int) auth()->id();
+        }
+
+        if ($userId === null) {
+            return;
+        }
+
         $tab = \App\Models\Tab::find($tabId);
 
-        if (! $tab || $tab->user_id !== auth()->id()) {
+        if (! $tab || (int) $tab->user_id !== $userId) {
             return;
         }
 

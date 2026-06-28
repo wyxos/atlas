@@ -43,6 +43,14 @@ Route::prefix('/api/extension')->name('api.extension.')->group(function (): void
         ->name('broadcast-auth');
 });
 
+// Public API endpoints owned by the Comfy companion app integration.
+Route::prefix('/api/comfy-companion')->name('api.comfy-companion.')->group(function (): void {
+    Route::post('/browse/civitai-model', [\App\Http\Controllers\ComfyCompanionBrowseController::class, 'civitAiModel'])
+        ->name('browse.civitai-model');
+    Route::post('/tabs/civitai-model', [\App\Http\Controllers\ComfyCompanionTabController::class, 'openCivitAiModel'])
+        ->name('tabs.civitai-model');
+});
+
 Route::post('/api/media-processor/tasks/{mediaProcessorTask}/events', \App\Http\Controllers\MediaProcessorTaskEventController::class)
     ->name('api.media-processor.tasks.events');
 
