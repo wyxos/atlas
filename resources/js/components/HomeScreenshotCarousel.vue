@@ -16,6 +16,7 @@ defineProps<{
 <template>
     <Carousel
         class="h-full"
+        aria-label="Atlas product screenshots"
         :opts="{ align: 'start', loop: true }"
         data-test="home-screenshot-carousel"
     >
@@ -33,6 +34,7 @@ defineProps<{
                         height="1080"
                         class="h-full min-h-[min(46svh,30rem)] w-full object-cover object-left-top"
                         decoding="async"
+                        loading="lazy"
                     >
                     <figcaption class="absolute bottom-4 left-4 z-10 rounded border border-white/15 bg-prussian-blue-950/80 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-smart-blue-100 backdrop-blur">
                         {{ slide.label }}

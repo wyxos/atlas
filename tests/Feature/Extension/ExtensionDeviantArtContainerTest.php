@@ -85,7 +85,16 @@ test('queued extension batch reactions attach every file to one post container',
         ->and($userContainer)->not->toBeNull();
 
     foreach ($files as $file) {
-        expect(data_get($file->listing_metadata, 'post_container_referrer_url'))->toBe($postUrl)
+        $expectedReferrerUrl = str_ends_with((string) $file->url, 'post-container-1.jpg')
+            ? $postUrl
+            : $postUrl.'?file='.match (true) {
+                str_ends_with((string) $file->url, 'post-container-2.jpg') => '2',
+                default => '3',
+            };
+
+        expect($file->referrer_url)->toBe($expectedReferrerUrl)
+            ->and(data_get($file->listing_metadata, 'page_url'))->toBe($expectedReferrerUrl)
+            ->and(data_get($file->listing_metadata, 'post_container_referrer_url'))->toBe($postUrl)
             ->and(data_get($file->listing_metadata, 'post_container_source'))->toBe('deviantart.com')
             ->and(data_get($file->listing_metadata, 'post_container_source_id'))->toBe('title-123')
             ->and(data_get($file->listing_metadata, 'user_container_source_id'))->toBe('artist')
@@ -136,6 +145,8 @@ test('extension reactions attach DeviantArt post and user containers', function 
     expect($file)->not->toBeNull()
         ->and($postContainer)->not->toBeNull()
         ->and($userContainer)->not->toBeNull()
+        ->and($file?->referrer_url)->toBe($postUrl)
+        ->and(data_get($file?->listing_metadata, 'page_url'))->toBe($postUrl)
         ->and(data_get($file?->listing_metadata, 'post_container_source'))->toBe('deviantart.com')
         ->and(data_get($file?->listing_metadata, 'post_container_source_id'))->toBe('title-123')
         ->and(data_get($file?->listing_metadata, 'post_container_referrer_url'))->toBe($postUrl)

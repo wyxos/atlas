@@ -15,6 +15,12 @@ it('renders the section-based public home page with hash navigation hooks', func
             'Keyboard flow',
             'Playback',
         ], false)
+        ->assertSee('Triage noisy media feeds without losing the good stuff.')
+        ->assertSee('Private media library')
+        ->assertSee('Browse external sources and local folders, react fast, auto-save what matters, and keep a searchable private library behind one dashboard.')
+        ->assertSee('External feeds')
+        ->assertSee('Local imports')
+        ->assertSee('Reactions + moderation')
         ->assertSee('id="atlas-home"', false)
         ->assertSee('data-home-scroller', false)
         ->assertSee('home/dashboard-hero.png', false)
@@ -29,7 +35,11 @@ it('renders the section-based public home page with hash navigation hooks', func
         ->assertSee('DeviantArt', false)
         ->assertSee('Wallhaven', false)
         ->assertSee('Local files', false)
+        ->assertDontSee('Media operations, organized.', false)
+        ->assertDontSee('One private workspace for feeds, imports, reactions, transfers, metadata, and playback.', false)
         ->assertDontSee('What is Atlas', false)
+        ->assertDontSee('Private media curation')
+        ->assertDontSee('curation')
         ->assertDontSee('Atlas badge', false)
         ->assertDontSee('Bring unmanaged files into Atlas storage', false)
         ->assertDontSee('Live queue', false)
@@ -40,7 +50,7 @@ it('renders the section-based public home page with hash navigation hooks', func
 
     preg_match_all('/\bAtlas\b/', html_entity_decode($visibleText), $matches);
 
-    expect($matches[0])->toHaveCount(1);
+    expect($matches[0])->toHaveCount(4);
 
     foreach (['CivitAI', 'DeviantArt', 'Wallhaven'] as $sourceName) {
         preg_match_all('/\b'.preg_quote($sourceName, '/').'\b/', html_entity_decode($visibleText), $sourceMatches);

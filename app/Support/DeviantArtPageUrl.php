@@ -35,6 +35,27 @@ final class DeviantArtPageUrl
             return null;
         }
 
-        return 'https://www.deviantart.com'.$path;
+        return 'https://www.deviantart.com'.$path.self::normalizedQuery($parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parts
+     */
+    private static function normalizedQuery(array $parts): string
+    {
+        $query = isset($parts['query']) && is_string($parts['query']) ? $parts['query'] : '';
+        if ($query === '') {
+            return '';
+        }
+
+        parse_str($query, $queryParameters);
+        $file = $queryParameters['file'] ?? null;
+        if (! is_string($file) || $file === '1') {
+            return '';
+        }
+
+        $normalizedQuery = http_build_query(['file' => $file], '', '&', PHP_QUERY_RFC3986);
+
+        return $normalizedQuery !== '' ? '?'.$normalizedQuery : '';
     }
 }

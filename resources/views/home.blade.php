@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title>{{ config('app.name', 'Atlas') }}</title>
+        <meta name="description" content="Atlas is a private media library for triaging noisy feeds, saving what matters, and keeping a searchable personal archive.">
 
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             @vite(['resources/css/app.css', 'resources/js/app.ts'])
@@ -179,6 +180,12 @@
                     'label' => 'Full view',
                 ],
             ];
+
+            $heroPills = [
+                ['label' => 'External feeds', 'description' => 'Browse web services in one queue'],
+                ['label' => 'Local imports', 'description' => 'Scan folders into managed storage'],
+                ['label' => 'Reactions + moderation', 'description' => 'Keep, skip, flag, and filter fast'],
+            ];
         @endphp
 
         <header class="fixed left-0 right-0 top-0 z-30 border-b border-twilight-indigo-500/40 bg-prussian-blue-800/85 px-4 backdrop-blur md:px-8">
@@ -196,7 +203,7 @@
                                 Dashboard
                             </a>
                         @else
-                            <span class="hidden text-xs text-twilight-indigo-300 sm:inline">Private workspace access</span>
+                            <span class="hidden text-xs text-twilight-indigo-300 sm:inline">Private self-hosted workspace</span>
                             <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded bg-smart-blue-500 px-4 py-2 font-semibold text-white transition-colors hover:bg-smart-blue-600">
                                 Log in
                             </a>
@@ -219,12 +226,13 @@
 
         <main id="atlas-home" class="atlas-home-scroller w-full" data-home-scroller>
             <section id="hero" data-home-section class="atlas-home-section atlas-hero-section flex w-full flex-col justify-start gap-8 px-4 pb-8 pt-24 md:px-8 lg:px-12">
-                <div class="grid w-full flex-1 items-center gap-8 lg:grid-cols-[0.62fr_1.38fr]">
+                <div class="grid w-full flex-1 items-center gap-8 lg:grid-cols-[0.82fr_1.18fr]">
                     <div class="space-y-6">
                         <div class="space-y-4">
-                            <h1 class="text-4xl font-semibold text-regal-navy-100 sm:text-5xl lg:text-6xl">Media operations, organized.</h1>
+                            <p class="text-xs font-semibold uppercase tracking-widest text-smart-blue-200">Private media library</p>
+                            <h1 class="text-4xl font-semibold text-regal-navy-100 sm:text-5xl lg:text-5xl">Triage noisy media feeds without losing the good stuff.</h1>
                             <p class="text-sm leading-6 text-blue-slate-100 md:text-lg">
-                                One private workspace for feeds, imports, reactions, transfers, metadata, and playback.
+                                Browse external sources and local folders, react fast, auto-save what matters, and keep a searchable private library behind one dashboard.
                             </p>
                         </div>
                         <div class="flex flex-wrap gap-3">
@@ -233,13 +241,21 @@
                                     Open dashboard
                                 </a>
                                 <a href="{{ url('/browse') }}" class="inline-flex items-center justify-center rounded border border-twilight-indigo-500 px-5 py-3 text-sm font-semibold text-twilight-indigo-100 transition-colors hover:border-smart-blue-300 hover:text-smart-blue-100">
-                                    Open files
+                                    Browse files
                                 </a>
                             @else
                                 <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded bg-smart-blue-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-smart-blue-600">
                                     Log in
                                 </a>
                             @endauth
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            @foreach ($heroPills as $pill)
+                                <div class="rounded border border-twilight-indigo-500/40 bg-prussian-blue-800/70 p-4">
+                                    <div class="text-sm font-semibold text-regal-navy-100">{{ $pill['label'] }}</div>
+                                    <div class="mt-2 text-xs leading-5 text-twilight-indigo-200">{{ $pill['description'] }}</div>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
 
@@ -253,6 +269,9 @@
                             decoding="async"
                             fetchpriority="high"
                         >
+                        <figcaption class="absolute bottom-4 left-4 z-10 rounded border border-white/15 bg-prussian-blue-950/80 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-smart-blue-100 backdrop-blur">
+                            Dashboard overview · coverage, inventory, containers
+                        </figcaption>
                     </figure>
                 </div>
             </section>
@@ -261,9 +280,9 @@
                 <div class="grid w-full items-center gap-8 lg:grid-cols-[0.72fr_1.28fr]">
                     <header class="space-y-4">
                         <p class="text-xs font-semibold uppercase tracking-widest text-smart-blue-200">What it does</p>
-                        <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">Turn noisy feeds and local folders into one decision flow.</h2>
+                        <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">One pass from discovery to a saved library.</h2>
                         <p class="text-sm leading-6 text-blue-slate-100 md:text-base">
-                            Capture candidates, decide quickly, and keep queue state with saved media.
+                            Review a stream, mark the decision, and let Atlas carry the save, transfer, and queue state forward.
                         </p>
                     </header>
 
@@ -292,7 +311,7 @@
                         <p class="text-xs font-semibold uppercase tracking-widest text-smart-blue-200">Supported sources</p>
                         <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">Online feeds beside local files.</h2>
                         <p class="text-sm leading-6 text-blue-slate-100 md:text-base">
-                            Remote services sit next to filters for type, reaction, transfer, moderation, and random sampling.
+                            Remote services and local libraries share filters for type, reaction, transfer state, moderation, and random sampling.
                         </p>
                     </header>
 
@@ -356,7 +375,7 @@
                         <p class="text-xs font-semibold uppercase tracking-widest text-smart-blue-200">Extension</p>
                         <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">React and save without leaving the page.</h2>
                         <p class="text-sm leading-6 text-blue-slate-100 md:text-base">
-                            The bundled add-on handles API keys, badges, batch reactions, transfer status, and remote tab handoff.
+                            The bundled add-on brings Atlas decisions into the source page with badges, batch reactions, transfer status, and remote tab handoff.
                         </p>
                     </header>
                 </div>
@@ -366,9 +385,9 @@
                 <div class="grid w-full items-center gap-8 lg:grid-cols-[0.78fr_1.22fr]">
                     <header class="space-y-4">
                         <p class="text-xs font-semibold uppercase tracking-widest text-smart-blue-200">Import</p>
-                        <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">Bring unmanaged files into managed storage.</h2>
+                        <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">Turn existing folders into managed inventory.</h2>
                         <p class="text-sm leading-6 text-blue-slate-100 md:text-base">
-                            Scans discover folders, queue imports, detect duplicates, and re-run parsers for audio details.
+                            Scans discover folders, queue imports, detect duplicates, and rerun parsers so old files join the same workflow.
                         </p>
                     </header>
 
@@ -428,9 +447,9 @@
 
                     <header class="order-1 space-y-4 lg:order-2">
                         <p class="text-xs font-semibold uppercase tracking-widest text-smart-blue-200">Moderation</p>
-                        <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">Keep files searchable, filtered, and consistent.</h2>
+                        <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">Make every decision improve the next pass.</h2>
                         <p class="text-sm leading-6 text-blue-slate-100 md:text-base">
-                            Reactions, container rules, not-found state, blacklists, preview counts, and metadata keep decisions stable.
+                            Reactions, container rules, not-found state, blacklists, preview counts, and metadata keep repeat noise out of the way.
                         </p>
                     </header>
                 </div>
@@ -442,7 +461,7 @@
                         <p class="text-xs font-semibold uppercase tracking-widest text-smart-blue-200">Keyboard flow</p>
                         <h2 class="text-3xl font-semibold text-regal-navy-100 md:text-5xl">Fast triage without turning the browser into a form.</h2>
                         <p class="text-sm leading-6 text-blue-slate-100 md:text-base">
-                            Undo, auto-scroll, loading locks, quick reactions, blacklist actions, and original opens stay close to the working surface.
+                            Undo, auto-scroll, loading locks, quick reactions, blacklist actions, and original opens stay under your hands.
                         </p>
                     </header>
 
@@ -493,6 +512,20 @@
                         <p class="text-sm leading-6 text-blue-slate-100 md:text-base">
                             Downloaded and imported files get byte-range support, posters, previews, and mobile-sized controls for video, audio, and image checks.
                         </p>
+                        <div class="flex flex-wrap gap-3">
+                            @auth
+                                <a href="{{ url('/browse') }}" class="inline-flex items-center justify-center rounded bg-smart-blue-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-smart-blue-600">
+                                    Browse library
+                                </a>
+                            @else
+                                <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded bg-smart-blue-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-smart-blue-600">
+                                    Log in to Atlas
+                                </a>
+                            @endauth
+                            <a href="https://youtu.be/g1Ogg5vivSM" class="inline-flex items-center justify-center rounded border border-twilight-indigo-500 px-5 py-3 text-sm font-semibold text-twilight-indigo-100 transition-colors hover:border-smart-blue-300 hover:text-smart-blue-100">
+                                Watch demo
+                            </a>
+                        </div>
                     </header>
                 </div>
             </section>

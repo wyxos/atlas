@@ -7,7 +7,7 @@ vi.mock('@/components/ui/carousel', () => ({
     Carousel: {
         name: 'Carousel',
         props: ['opts'],
-        template: '<section data-test="mock-carousel"><slot /></section>',
+        template: '<section v-bind="$attrs" data-test="mock-carousel"><slot /></section>',
     },
     CarouselContent: {
         name: 'CarouselContent',
@@ -52,10 +52,16 @@ describe('HomeScreenshotCarousel', () => {
         });
 
         expect(wrapper.findAll('[data-test="mock-carousel-item"]')).toHaveLength(3);
+        expect(wrapper.find('[aria-label="Atlas product screenshots"]').exists()).toBe(true);
         expect(wrapper.findAll('img').map((image) => image.attributes('src'))).toEqual([
             '/home/browse-civitai-most-reactions.png',
             '/home/browse-deviantart.png',
             '/home/browse-full-view.png',
+        ]);
+        expect(wrapper.findAll('img').map((image) => image.attributes('loading'))).toEqual([
+            'lazy',
+            'lazy',
+            'lazy',
         ]);
         expect(wrapper.text()).toContain('Feed sorting');
         expect(wrapper.text()).toContain('Source browsing');

@@ -31,6 +31,10 @@ Route::get('/api/csrf', function () {
 Route::prefix('/api/extension')->name('api.extension.')->group(function (): void {
     Route::get('/ping', [\App\Http\Controllers\ExtensionController::class, 'ping'])
         ->name('ping');
+    Route::get('/settings', [\App\Http\Controllers\ExtensionSettingsController::class, 'show'])
+        ->name('settings.show');
+    Route::put('/settings', [\App\Http\Controllers\ExtensionSettingsController::class, 'update'])
+        ->name('settings.update');
     Route::post('/assets/status', [\App\Http\Controllers\ExtensionController::class, 'assetStatuses'])
         ->name('assets.status');
     Route::post('/reactions/batch', [\App\Http\Controllers\ExtensionController::class, 'batchReact'])

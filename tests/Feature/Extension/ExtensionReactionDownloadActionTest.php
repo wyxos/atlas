@@ -117,7 +117,7 @@ test('queued extension batch reactions store files in bulk and queue positive do
 
     expect($firstFile)->not->toBeNull()
         ->and($secondFile)->not->toBeNull()
-        ->and($firstFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/title-123?file=1')
+        ->and($firstFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/title-123')
         ->and($secondFile?->referrer_url)->toBe('https://www.deviantart.com/artist/art/title-123?file=2')
         ->and(data_get($firstFile?->listing_metadata, 'extension_user_id'))->toBe($user->id)
         ->and(data_get($secondFile?->listing_metadata, 'extension_user_id'))->toBe($user->id)

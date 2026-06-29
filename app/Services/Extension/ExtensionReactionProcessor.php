@@ -4,9 +4,11 @@ namespace App\Services\Extension;
 
 use App\Models\File;
 use App\Models\User;
+use App\Services\DeviantArtImages;
 use App\Services\FileBlacklistService;
 use App\Services\FilePreviewService;
 use App\Services\FileReactionService;
+use App\Support\DeviantArtPageUrl;
 use App\Support\FileTypeDetector;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -110,6 +112,10 @@ class ExtensionReactionProcessor
         $pageUrl = $this->normalizeOptionalUrl($item['page_url'] ?? null);
         $tagName = isset($item['tag_name']) && is_string($item['tag_name']) ? $item['tag_name'] : null;
         $source = $containerMetadataService->sourceFromCandidateUrls([$referrerUrl, $pageUrl, $url]) ?? 'extension';
+        if ($source === DeviantArtImages::SOURCE) {
+            $referrerUrl = $this->normalizeDeviantArtReferrerUrl($referrerUrl);
+            $pageUrl = $this->normalizeDeviantArtReferrerUrl($pageUrl);
+        }
 
         return $this->findOrCreateFile(
             $url,
@@ -199,6 +205,15 @@ class ExtensionReactionProcessor
         $trimmed = trim($url);
 
         return $trimmed !== '' ? $trimmed : null;
+    }
+
+    private function normalizeDeviantArtReferrerUrl(?string $url): ?string
+    {
+        if ($url === null) {
+            return null;
+        }
+
+        return DeviantArtPageUrl::normalize($url) ?? $url;
     }
 
     private function findOrCreateFile(
