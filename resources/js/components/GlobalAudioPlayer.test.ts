@@ -1,37 +1,43 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import GlobalAudioPlayer from './GlobalAudioPlayer.vue';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
+import { resetAudioPlaybackSessionForTests } from '@/composables/useAudioPlaybackSession';
 
+const mountedWrappers: VueWrapper[] = [];
 function testTrack(id: number, overrides: Partial<AudioPlayerTrack> = {}): AudioPlayerTrack {
     return {
         id,
         title: `Track ${id}`,
-        artists: '',
-        album: '',
-        coverUrl: null,
+        artists: '', album: '', coverUrl: null,
         duration: `0:${id.toString().padStart(2, '0')}`,
         durationSeconds: id,
-        reaction: null,
-        blacklistedAt: null,
-        previewedCount: 0,
-        seenCount: 0,
+        reaction: null, blacklistedAt: null,
+        previewedCount: 0, seenCount: 0,
         playbackUrl: `/api/files/${id}/serve`,
         ...overrides,
     };
 }
+function mountGlobalAudioPlayer(): VueWrapper {
+    const wrapper = mount(GlobalAudioPlayer);
+    mountedWrappers.push(wrapper);
 
+    return wrapper;
+}
 describe('GlobalAudioPlayer', () => {
     afterEach(() => {
+        mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
         useGlobalAudioPlayer().clear();
+        resetAudioPlaybackSessionForTests();
         delete (window as unknown as { axios?: unknown }).axios;
+        delete window.Echo;
         delete window.Spotify;
+        window.sessionStorage.clear();
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
-
     it('renders a custom static player surface without native audio controls', () => {
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
         const playerText = wrapper.get('[data-test="global-audio-player"]').text();
         const playButton = wrapper.get('[aria-label="Play"]');
         const shuffleButton = wrapper.get('[aria-label="Shuffle queue"]');
@@ -141,7 +147,7 @@ describe('GlobalAudioPlayer', () => {
         player.queueAndPlay([testTrack(41)], 41);
         vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(375);
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
         const playerSurface = wrapper.get('[data-test="global-audio-player"]');
 
         expect(playerSurface.attributes('data-mobile-actions-expanded')).toBe('false');
@@ -201,7 +207,7 @@ describe('GlobalAudioPlayer', () => {
             },
         ], 41, { queueLabel: 'All audio' });
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
 
         expect(wrapper.text()).toContain('Atlas Seed Track 0041');
         expect(wrapper.text()).toContain('Signal Park');
@@ -242,7 +248,7 @@ describe('GlobalAudioPlayer', () => {
             },
         ], 41, { queueLabel: 'All audio' });
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
         const seekInput = wrapper.get('[aria-label="Playback progress"]');
 
         await seekInput.setValue('45');
@@ -256,7 +262,7 @@ describe('GlobalAudioPlayer', () => {
         const player = useGlobalAudioPlayer();
         player.queueAndPlay([testTrack(41, { duration: '3:00', durationSeconds: 180 }), testTrack(42)], 41);
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
         await wrapper.get('[aria-label="Playback progress"]').setValue('137');
 
         expect(wrapper.text()).toContain('2:17');
@@ -273,7 +279,7 @@ describe('GlobalAudioPlayer', () => {
     });
 
     it('controls volume and restores the previous amount after mute', async () => {
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
         await wrapper.vm.$nextTick();
 
         const audio = wrapper.get('audio').element as HTMLAudioElement;
@@ -333,7 +339,7 @@ describe('GlobalAudioPlayer', () => {
             },
         ], 41, { queueLabel: 'All audio' });
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
 
         await wrapper.get('[aria-label="Queue"]').trigger('click');
 
@@ -354,7 +360,7 @@ describe('GlobalAudioPlayer', () => {
     it('closes the queue sheet from the outside click backdrop', async () => {
         const player = useGlobalAudioPlayer();
         player.queueAndPlay([testTrack(41), testTrack(42)], 41);
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
 
         await wrapper.get('[aria-label="Queue"]').trigger('click');
 
@@ -408,7 +414,7 @@ describe('GlobalAudioPlayer', () => {
             },
         ], 742);
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
 
         await wrapper.get('[aria-label="Queue"]').trigger('click');
         await flushPromises();
@@ -472,7 +478,7 @@ describe('GlobalAudioPlayer', () => {
             }),
         ], 41);
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
         await flushPromises();
 
         expect(post).toHaveBeenCalledWith('/api/audio/details', {
@@ -500,7 +506,7 @@ describe('GlobalAudioPlayer', () => {
         player.queueAndPlay(copiedPlaylist, 1);
         vi.spyOn(Math, 'random').mockReturnValue(0);
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
         const shuffleButton = wrapper.get('[aria-label="Shuffle queue"]');
 
         expect(shuffleButton.attributes('aria-pressed')).toBe('false');
@@ -547,7 +553,7 @@ describe('GlobalAudioPlayer', () => {
             },
         ], 41);
 
-        const wrapper = mount(GlobalAudioPlayer);
+        const wrapper = mountGlobalAudioPlayer();
 
         await wrapper.get('[aria-label="Repeat off"]').trigger('click');
         expect(player.repeatMode.value).toBe('all');

@@ -143,6 +143,7 @@ export function useAudioQueueDetails(audioPlayer: GlobalAudioPlayer) {
             refreshedQueueDetailIds.value = new Set();
             preloadPlaybackWindow();
         },
+        { immediate: true },
     );
 
     watch(

@@ -160,7 +160,7 @@ function readAudioPlayerState(): PersistedAudioPlayerState | null {
             version: 1,
             currentTrackId: restoredTrackId,
             isShuffleEnabled: Boolean(state.isShuffleEnabled && restoredUnshuffledQueueIds.length > 0 && restoredQueue.length > 0),
-            isPlaying: Boolean(state.isPlaying && restoredTrackId !== null),
+            isPlaying: false,
             playbackPositionSeconds: typeof state.playbackPositionSeconds === 'number' && Number.isFinite(state.playbackPositionSeconds)
                 ? Math.max(0, state.playbackPositionSeconds)
                 : 0,

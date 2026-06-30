@@ -104,6 +104,72 @@ describe('useAudioPlaybackEngines', () => {
         }
     });
 
+    it('does not start native or Spotify playback while this instance is observing', async () => {
+        const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(41, { source: 'local', spotifyUri: null }),
+            testTrack(91, { source: 'spotify', spotifyUri }),
+        ], 41);
+
+        const audioElement = {
+            currentTime: 0,
+            pause: vi.fn(),
+            play: vi.fn().mockResolvedValue(undefined),
+        } as unknown as HTMLAudioElement;
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const isPlaybackOwner = ref(false);
+        const playbackEngines = useAudioPlaybackEngines(player, ref(audioElement), currentTime, mediaDuration, durationSeconds, {
+            isPlaybackOwner,
+        });
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+
+            expect(audioElement.play).not.toHaveBeenCalled();
+            expect(audioElement.pause).toHaveBeenCalled();
+
+            player.playNext();
+            await playbackEngines.startCurrentPlayback();
+
+            expect(spotifyPlaybackMocks.play).not.toHaveBeenCalled();
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
+    it('stops active output immediately when ownership is lost', async () => {
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([testTrack(41)], 41);
+
+        const audioElement = {
+            currentTime: 0,
+            pause: vi.fn(),
+            play: vi.fn().mockResolvedValue(undefined),
+        } as unknown as HTMLAudioElement;
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const isPlaybackOwner = ref(true);
+        const playbackEngines = useAudioPlaybackEngines(player, ref(audioElement), currentTime, mediaDuration, durationSeconds, {
+            isPlaybackOwner,
+        });
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+            expect(audioElement.play).toHaveBeenCalledTimes(1);
+
+            isPlaybackOwner.value = false;
+            await playbackEngines.startCurrentPlayback();
+
+            expect(audioElement.pause).toHaveBeenCalled();
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
     it('ignores stale paused Spotify snapshots while a new start is pending', async () => {
         const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
         const player = useGlobalAudioPlayer();

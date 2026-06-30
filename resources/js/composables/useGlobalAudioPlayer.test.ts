@@ -67,7 +67,7 @@ describe('useGlobalAudioPlayer', () => {
         expect(restoredPlayer.isShuffleEnabled.value).toBe(false);
         expect(restoredPlayer.playbackPositionSeconds.value).toBe(72.3);
         expect(restoredPlayer.repeatMode.value).toBe('all');
-        expect(restoredPlayer.isPlaying.value).toBe(true);
+        expect(restoredPlayer.isPlaying.value).toBe(false);
     });
 
     it('restores shuffled mode and can toggle back to the original queue order after reload', async () => {

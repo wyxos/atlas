@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import GlobalAudioPlayer from './GlobalAudioPlayer.vue';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
+import { resetAudioPlaybackSessionForTests } from '@/composables/useAudioPlaybackSession';
 
 const mountedWrappers: VueWrapper[] = [];
 
@@ -223,6 +224,7 @@ describe('GlobalAudioPlayer Spotify playback', () => {
     afterEach(() => {
         mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
         useGlobalAudioPlayer().clear();
+        resetAudioPlaybackSessionForTests();
         delete window.Spotify;
         spotifyPlayerInstances.splice(0);
         spotifyCurrentState = null;
@@ -258,15 +260,9 @@ describe('GlobalAudioPlayer Spotify playback', () => {
 
         expect(wrapper.get('audio').attributes('src')).toBeUndefined();
         expect(spotifyPlayerInstances[0]?.activateElement).toHaveBeenCalled();
-        expect(fetchMock).toHaveBeenCalledWith(
+        expect(fetchMock).not.toHaveBeenCalledWith(
             'https://api.spotify.com/v1/me/player',
-            expect.objectContaining({
-                body: JSON.stringify({
-                    device_ids: ['atlas-browser-device'],
-                    play: false,
-                }),
-                method: 'PUT',
-            }),
+            expect.objectContaining({ method: 'PUT' }),
         );
         expect(fetchMock).toHaveBeenCalledWith(
             'https://api.spotify.com/v1/me/player/play?device_id=atlas-browser-device',
