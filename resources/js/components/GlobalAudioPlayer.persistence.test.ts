@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import GlobalAudioPlayer from './GlobalAudioPlayer.vue';
 import { useGlobalAudioPlayer, type AudioPlayerTrack } from '@/composables/useGlobalAudioPlayer';
+import { resetAudioPlaybackSessionForTests } from '@/composables/useAudioPlaybackSession';
 
 function testTrack(id: number, overrides: Partial<AudioPlayerTrack> = {}): AudioPlayerTrack {
     return {
@@ -23,6 +24,7 @@ function testTrack(id: number, overrides: Partial<AudioPlayerTrack> = {}): Audio
 
 afterEach(() => {
     useGlobalAudioPlayer().clear();
+    resetAudioPlaybackSessionForTests();
 });
 
 describe('GlobalAudioPlayer persistence', () => {

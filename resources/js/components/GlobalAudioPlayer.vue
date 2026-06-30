@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import {
-    Ban,
-    Heart,
     ListMusic,
     MoreVertical,
     Music,
@@ -13,10 +11,9 @@ import {
     Shuffle,
     SkipBack,
     SkipForward,
-    Smile,
-    ThumbsUp,
 } from 'lucide-vue-next';
 import AudioQueueSheet from './AudioQueueSheet.vue';
+import GlobalAudioPlayerReactions from './GlobalAudioPlayerReactions.vue';
 import AudioVolumeControl from './AudioVolumeControl.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast/use-toast';
@@ -24,6 +21,7 @@ import { useAudioMediaSession } from '@/composables/useAudioMediaSession';
 import { useAudioPlaybackEngines } from '@/composables/useAudioPlaybackEngines';
 import { useAudioQueueDetails } from '@/composables/useAudioQueueDetails';
 import { useAudioPlaybackStatsRecorder } from '@/composables/useAudioPlaybackStatsRecorder';
+import { useGlobalAudioPlaybackOwnership } from '@/composables/useGlobalAudioPlaybackOwnership';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
 import type { ReactionType } from '@/types/reaction';
 
@@ -41,8 +39,32 @@ const { handleQueueVisibleItemsChange } = useAudioQueueDetails(audioPlayer);
 const { handleTrackNaturallyEnded } = useAudioPlaybackStatsRecorder(audioPlayer);
 
 const MOBILE_ACTIONS_SWIPE_THRESHOLD = 28;
+let startCurrentPlayback: () => Promise<void> = async () => {};
+let activateSpotifyElement: () => void = () => {};
 
-const currentTrack = audioPlayer.currentTrack, currentTrackId = audioPlayer.currentTrackId, isPlaying = audioPlayer.isPlaying;
+const {
+    canUsePlaybackControls,
+    claimPlaybackOnThisDevice,
+    claimRequestInFlight,
+    currentTrack,
+    currentTrackId,
+    durationSeconds,
+    handlePlaybackClick,
+    isObservingRemotePlayback,
+    isPlaying,
+    playbackSession,
+    updateOwnerPlaybackSession,
+} = useGlobalAudioPlaybackOwnership({
+    activateSpotifyElement: () => activateSpotifyElement(),
+    audioPlayer,
+    currentTime,
+    mediaDuration,
+    startCurrentPlayback: () => {
+        void startCurrentPlayback();
+    },
+    toast,
+});
+
 const hasTrack = computed(() => currentTrack.value !== null);
 const hasFavorite = computed(() => currentTrack.value?.reaction?.type === 'love');
 const hasLike = computed(() => currentTrack.value?.reaction?.type === 'like');
@@ -57,17 +79,9 @@ const trackSubtitle = computed(() => {
     return currentTrack.value.artists || currentTrack.value.album || 'Unknown artist';
 });
 
-const durationSeconds = computed(() => {
-    if (mediaDuration.value > 0) {
-        return mediaDuration.value;
-    }
-
-    return currentTrack.value?.durationSeconds ?? 0;
-});
-
 const durationLabel = computed(() => durationSeconds.value > 0 ? formatSeconds(durationSeconds.value) : '0:00');
 const currentTimeLabel = computed(() => currentTime.value > 0 ? formatSeconds(currentTime.value) : '0:00');
-const canSeek = computed(() => hasTrack.value && durationSeconds.value > 0);
+const canSeek = computed(() => canUsePlaybackControls.value && hasTrack.value && durationSeconds.value > 0);
 const progressWidth = computed(() => {
     if (durationSeconds.value <= 0) {
         return '0%';
@@ -87,6 +101,15 @@ const repeatButtonLabel = computed(() => {
     return 'Repeat off';
 });
 
+const playbackEngines = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds, {
+    isPlaybackOwner: playbackSession.canOutputAudio,
+    onSpotifyAuthenticationError: notifySpotifyAuthenticationError,
+    onTrackEnded: handleTrackNaturallyEnded,
+    volume: playbackVolume,
+});
+activateSpotifyElement = playbackEngines.activateSpotifyElement;
+startCurrentPlayback = playbackEngines.startCurrentPlayback;
+
 const {
     handleEnded,
     handleLoadedMetadata,
@@ -94,38 +117,40 @@ const {
     handleTimeUpdate,
     nativeAudioSource,
     setSpotifyVolume,
-    startCurrentPlayback,
     teardown,
-} = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds, {
-    onSpotifyAuthenticationError: notifySpotifyAuthenticationError,
-    onTrackEnded: handleTrackNaturallyEnded,
-    volume: playbackVolume,
-});
+} = playbackEngines;
+void startCurrentPlayback();
 
 useAudioMediaSession({
     currentTime,
     currentTrack,
     durationSeconds,
     isPlaying,
-    onNext: audioPlayer.playNext,
-    onPause: audioPlayer.pause,
-    onPlay: audioPlayer.resume,
-    onPrevious: audioPlayer.playPrevious,
+    onNext: () => {
+        if (canUsePlaybackControls.value) {
+            audioPlayer.playNext();
+        }
+    },
+    onPause: () => {
+        if (canUsePlaybackControls.value) {
+            audioPlayer.pause();
+        }
+    },
+    onPlay: () => {
+        if (canUsePlaybackControls.value) {
+            audioPlayer.resume();
+        }
+    },
+    onPrevious: () => {
+        if (canUsePlaybackControls.value) {
+            audioPlayer.playPrevious();
+        }
+    },
     trackSubtitle,
 });
 
-const controlButtonClass = [
-    'player-control-button inline-flex size-12 items-center justify-center rounded-full 2xl:size-14',
-    'text-blue-slate-300 transition-colors',
-    'enabled:cursor-pointer enabled:hover:bg-smart-blue-700 enabled:hover:text-white',
-    'disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50',
-    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-500',
-].join(' ');
-
-const reactionButtonClass = [
-    'inline-flex items-center justify-center rounded p-1.5 transition-colors',
-    'enabled:cursor-pointer disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50',
-].join(' ');
+const controlButtonClass = 'player-control-button inline-flex size-12 items-center justify-center rounded-full text-blue-slate-300 transition-colors enabled:cursor-pointer enabled:hover:bg-smart-blue-700 enabled:hover:text-white disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-500 2xl:size-14';
+const reactionButtonClass = 'inline-flex items-center justify-center rounded p-1.5 transition-colors enabled:cursor-pointer disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50';
 
 function notifySpotifyAuthenticationError(message: string): void {
     toast.error(message || 'Spotify is not connected for this account.', {
@@ -141,10 +166,6 @@ function formatSeconds(value: number): string {
     const remainingSeconds = seconds % 60;
 
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-}
-
-function handlePlaybackClick(): void {
-    audioPlayer.togglePlayback();
 }
 
 function handleVolumeChange(volume: number): void {
@@ -222,17 +243,23 @@ async function handleBlacklist(): Promise<void> {
     });
 }
 
-watch(currentTrackId, () => {
-    void startCurrentPlayback();
-}, { immediate: true, flush: 'sync' });
+function handleSeekInput(event: Event): void {
+    if (!canUsePlaybackControls.value) {
+        return;
+    }
 
-watch(audioPlayer.playbackPositionSeconds, (positionSeconds) => {
-    currentTime.value = positionSeconds;
-}, { flush: 'sync' });
+    handleSeek(event);
+    void updateOwnerPlaybackSession();
+}
 
-watch(isPlaying, () => {
-    void startCurrentPlayback();
-});
+function handleEndedInput(): void {
+    if (!canUsePlaybackControls.value) {
+        return;
+    }
+
+    handleEnded();
+    void updateOwnerPlaybackSession();
+}
 
 watch(audioPlayer.hasQueue, (hasQueue) => {
     if (!hasQueue) {
@@ -240,7 +267,9 @@ watch(audioPlayer.hasQueue, (hasQueue) => {
     }
 });
 
-onBeforeUnmount(teardown);
+onBeforeUnmount(() => {
+    teardown();
+});
 
 </script>
 
@@ -295,7 +324,7 @@ onBeforeUnmount(teardown);
             tabindex="-1"
             @loadedmetadata="handleLoadedMetadata"
             @timeupdate="handleTimeUpdate"
-            @ended="handleEnded"
+            @ended="handleEndedInput"
         ></audio>
         <div class="grid gap-3 md:min-h-24 lg:grid-cols-[minmax(280px,1fr)_minmax(420px,2fr)_minmax(220px,1fr)] lg:items-stretch 2xl:min-h-32">
             <div class="flex h-full min-w-0 items-stretch justify-center gap-3 md:justify-start" data-test="global-audio-player-track">
@@ -303,7 +332,7 @@ onBeforeUnmount(teardown);
                     type="button"
                     class="hidden size-12 shrink-0 items-center justify-center overflow-hidden bg-prussian-blue-700 ring-1 ring-twilight-indigo-500 transition enabled:cursor-pointer enabled:hover:ring-smart-blue-300 disabled:cursor-default md:flex md:size-24 2xl:size-32"
                     data-test="global-audio-player-cover"
-                    :disabled="!hasTrack"
+                    :disabled="!hasTrack || !canUsePlaybackControls"
                     aria-label="Focus current track in playlist"
                     @click="audioPlayer.requestCurrentTrackFocus"
                 >
@@ -349,46 +378,17 @@ onBeforeUnmount(teardown);
                         ]"
                         data-test="global-audio-player-reactions"
                     >
-                        <button
-                            type="button"
-                            :class="[reactionButtonClass, hasFavorite ? 'bg-red-500 text-white' : 'text-white enabled:hover:text-red-400']"
-                            :disabled="!hasTrack"
-                            :aria-pressed="hasFavorite"
-                            aria-label="Favorite"
-                            @click="handleReaction('love')"
-                        >
-                            <Heart class="size-6 md:size-8" />
-                        </button>
-                        <button
-                            type="button"
-                            :class="[reactionButtonClass, hasLike ? 'bg-smart-blue-500 text-white' : 'text-white enabled:hover:text-smart-blue-400']"
-                            :disabled="!hasTrack"
-                            :aria-pressed="hasLike"
-                            aria-label="Like"
-                            @click="handleReaction('like')"
-                        >
-                            <ThumbsUp class="size-6 md:size-8" />
-                        </button>
-                        <button
-                            type="button"
-                            :class="[reactionButtonClass, isBlacklisted ? 'bg-danger-600 text-white' : 'text-white enabled:hover:text-danger-300']"
-                            :disabled="!hasTrack || isBlacklisted"
-                            :aria-pressed="isBlacklisted"
-                            aria-label="Blacklist"
-                            @click="handleBlacklist"
-                        >
-                            <Ban class="size-6 md:size-8" />
-                        </button>
-                        <button
-                            type="button"
-                            :class="[reactionButtonClass, hasFunny ? 'bg-yellow-500 text-white' : 'text-white enabled:hover:text-yellow-400']"
-                            :disabled="!hasTrack"
-                            :aria-pressed="hasFunny"
-                            aria-label="Funny"
-                            @click="handleReaction('funny')"
-                        >
-                            <Smile class="size-6 md:size-8" />
-                        </button>
+                        <GlobalAudioPlayerReactions
+                            :can-use-playback-controls="canUsePlaybackControls"
+                            :has-favorite="hasFavorite"
+                            :has-funny="hasFunny"
+                            :has-like="hasLike"
+                            :has-track="hasTrack"
+                            :is-blacklisted="isBlacklisted"
+                            :reaction-button-class="reactionButtonClass"
+                            @blacklist="handleBlacklist"
+                            @reaction="handleReaction"
+                        />
                     </div>
                 </div>
             </div>
@@ -408,8 +408,8 @@ onBeforeUnmount(teardown);
                         :aria-valuemax="Math.round(durationSeconds)"
                         :aria-valuenow="Math.round(currentTime)"
                         :style="{ '--seek-progress': progressWidth }"
-                        @input="handleSeek"
-                        @change="handleSeek"
+                        @input="handleSeekInput"
+                        @change="handleSeekInput"
                     >
                     <span class="tabular-nums">{{ durationLabel }}</span>
                 </div>
@@ -418,8 +418,8 @@ onBeforeUnmount(teardown);
                     <button
                         type="button"
                         :class="[controlButtonClass, audioPlayer.isShuffleEnabled.value ? 'bg-smart-blue-800 text-smart-blue-100' : '']"
-                        :disabled="audioPlayer.queueLength.value === 0"
-                        :aria-disabled="audioPlayer.queueLength.value === 0"
+                        :disabled="!canUsePlaybackControls || audioPlayer.queueLength.value === 0"
+                        :aria-disabled="!canUsePlaybackControls || audioPlayer.queueLength.value === 0"
                         :aria-pressed="audioPlayer.isShuffleEnabled.value"
                         aria-label="Shuffle queue"
                         @click="audioPlayer.shuffleQueue"
@@ -429,29 +429,26 @@ onBeforeUnmount(teardown);
                     <button
                         type="button"
                         :class="controlButtonClass"
-                        :disabled="!audioPlayer.canPlayPrevious.value"
-                        :aria-disabled="!audioPlayer.canPlayPrevious.value"
+                        :disabled="!canUsePlaybackControls || !audioPlayer.canPlayPrevious.value"
+                        :aria-disabled="!canUsePlaybackControls || !audioPlayer.canPlayPrevious.value"
                         aria-label="Previous"
                         @click="audioPlayer.playPrevious"
                     >
                         <SkipBack class="size-7 2xl:size-8" />
                     </button>
-                    <button
-                        type="button"
-                        class="inline-flex size-14 items-center justify-center rounded-full bg-smart-blue-600 text-white shadow-lg shadow-smart-blue-900/30 transition enabled:cursor-pointer enabled:hover:scale-105 enabled:hover:bg-smart-blue-500 disabled:cursor-not-allowed disabled:bg-smart-blue-900/60 disabled:text-blue-slate-400 disabled:opacity-60 disabled:shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-300 2xl:size-16"
-                        :disabled="!hasTrack"
-                        :aria-disabled="!hasTrack"
-                        :aria-label="isPlaying ? 'Pause' : 'Play'"
-                        @click="handlePlaybackClick"
-                    >
+                    <button v-if="isObservingRemotePlayback" type="button" class="inline-flex h-12 items-center justify-center gap-2 rounded bg-smart-blue-600 px-4 text-sm font-semibold text-white shadow-lg shadow-smart-blue-900/30 transition enabled:cursor-pointer enabled:hover:bg-smart-blue-500 disabled:cursor-not-allowed disabled:bg-smart-blue-900/60 disabled:text-blue-slate-400 disabled:opacity-60 disabled:shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-300 2xl:h-14 2xl:px-5" :disabled="!hasTrack || claimRequestInFlight" :aria-disabled="!hasTrack || claimRequestInFlight" data-test="audio-ownership-claim" aria-label="Play on this device" @click="claimPlaybackOnThisDevice">
+                        <Play class="size-5 fill-current 2xl:size-6" />
+                        <span>Play on this device</span>
+                    </button>
+                    <button v-else type="button" class="inline-flex size-14 items-center justify-center rounded-full bg-smart-blue-600 text-white shadow-lg shadow-smart-blue-900/30 transition enabled:cursor-pointer enabled:hover:scale-105 enabled:hover:bg-smart-blue-500 disabled:cursor-not-allowed disabled:bg-smart-blue-900/60 disabled:text-blue-slate-400 disabled:opacity-60 disabled:shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-300 2xl:size-16" :disabled="!hasTrack" :aria-disabled="!hasTrack" :aria-label="isPlaying ? 'Pause' : 'Play'" @click="handlePlaybackClick">
                         <Pause v-if="isPlaying" class="size-7 fill-current 2xl:size-8" />
                         <Play v-else class="ml-0.5 size-7 fill-current 2xl:size-8" />
                     </button>
                     <button
                         type="button"
                         :class="controlButtonClass"
-                        :disabled="!audioPlayer.canPlayNext.value"
-                        :aria-disabled="!audioPlayer.canPlayNext.value"
+                        :disabled="!canUsePlaybackControls || !audioPlayer.canPlayNext.value"
+                        :aria-disabled="!canUsePlaybackControls || !audioPlayer.canPlayNext.value"
                         aria-label="Next"
                         @click="audioPlayer.playNext"
                     >
@@ -460,8 +457,8 @@ onBeforeUnmount(teardown);
                     <button
                         type="button"
                         :class="[controlButtonClass, audioPlayer.repeatMode.value !== 'none' ? 'bg-smart-blue-800 text-smart-blue-100' : '']"
-                        :disabled="!hasTrack"
-                        :aria-disabled="!hasTrack"
+                        :disabled="!canUsePlaybackControls || !hasTrack"
+                        :aria-disabled="!canUsePlaybackControls || !hasTrack"
                         :aria-label="repeatButtonLabel"
                         :aria-pressed="audioPlayer.repeatMode.value !== 'none'"
                         @click="audioPlayer.cycleRepeatMode"
@@ -476,8 +473,8 @@ onBeforeUnmount(teardown);
                 <button
                     type="button"
                     :class="[controlButtonClass, isQueueSheetOpen ? 'bg-smart-blue-800 text-smart-blue-100' : '']"
-                    :disabled="!audioPlayer.hasQueue.value"
-                    :aria-disabled="!audioPlayer.hasQueue.value"
+                    :disabled="!canUsePlaybackControls || !audioPlayer.hasQueue.value"
+                    :aria-disabled="!canUsePlaybackControls || !audioPlayer.hasQueue.value"
                     :aria-expanded="isQueueSheetOpen"
                     aria-controls="audio-queue-sheet"
                     aria-label="Queue"

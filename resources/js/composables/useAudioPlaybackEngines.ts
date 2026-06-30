@@ -19,7 +19,7 @@ const SPOTIFY_START_POSITION_TOLERANCE_SECONDS = 3;
 const SPOTIFY_POLL_START_ADVANCE_SECONDS = 0.25;
 const SPOTIFY_START_STALE_GUARD_SECONDS = 6;
 type GlobalAudioPlayer = ReturnType<typeof useGlobalAudioPlayer>;
-type AudioPlaybackEngineOptions = { onSpotifyAuthenticationError?: (message: string) => void; onTrackEnded?: (trackId: number) => void; volume?: Ref<number> };
+type AudioPlaybackEngineOptions = { isPlaybackOwner?: Ref<boolean> | ComputedRef<boolean>; onSpotifyAuthenticationError?: (message: string) => void; onTrackEnded?: (trackId: number) => void; volume?: Ref<number> };
 type SpotifyPendingStart = { correctedStalePosition: boolean; observedFreshPlaybackAt: number | null; playConfirmedAt: number | null; positionSeconds: number; requestedAt: number; uri: string };
 export function useAudioPlaybackEngines(
     audioPlayer: GlobalAudioPlayer,
@@ -29,25 +29,19 @@ export function useAudioPlaybackEngines(
     durationSeconds: ComputedRef<number>,
     options: AudioPlaybackEngineOptions = {},
 ) {
-    const nativeAudioSource = computed(() => {
-        const track = audioPlayer.currentTrack.value;
-        return track && !isSpotifyAudioTrack(track) ? track.playbackUrl : undefined;
-    });
-
+    const nativeAudioSource = computed(() => isPlaybackOwner() && audioPlayer.currentTrack.value && !isSpotifyAudioTrack(audioPlayer.currentTrack.value) ? audioPlayer.currentTrack.value.playbackUrl : undefined);
     let activeEngine: PlaybackEngine | null = null;
     let playbackToken = 0;
     let spotifyPlayback: SpotifyPlaybackController | null = null;
     let spotifyHasObservedPlayback = false;
-    let spotifyPollingInterval: ReturnType<typeof setInterval> | null = null;
-    let spotifyProgressInterval: ReturnType<typeof setInterval> | null = null;
+    let spotifyPollingInterval: ReturnType<typeof setInterval> | null = null, spotifyProgressInterval: ReturnType<typeof setInterval> | null = null;
     let spotifyLastSnapshot: SpotifyPlaybackSnapshot | null = null;
-    let spotifyDisplayPositionSeconds: number | null = null;
-    let spotifyDisplayPositionAt = 0;
+    let spotifyDisplayPositionSeconds: number | null = null, spotifyDisplayPositionAt = 0;
     let spotifyPendingStart: SpotifyPendingStart | null = null;
-    let spotifyWasNearEnd = false;
-    let spotifyEndHandled = false;
+    let spotifyWasNearEnd = false, spotifyEndHandled = false;
     let displayedTrackId = audioPlayer.currentTrackId.value;
 
+    function isPlaybackOwner(): boolean { return options.isPlaybackOwner?.value ?? true; }
     function spotifyController(): SpotifyPlaybackController {
         spotifyPlayback ??= createSpotifyPlaybackController({
             initialVolume: options.volume?.value ?? 0.7,
@@ -64,6 +58,7 @@ export function useAudioPlaybackEngines(
         });
     }
 
+    function activateSpotifyElement(): void { spotifyController().activateElement(); }
     function clearSpotifyPolling(): void {
         if (spotifyPollingInterval) {
             clearInterval(spotifyPollingInterval);
@@ -82,7 +77,6 @@ export function useAudioPlaybackEngines(
         clearSpotifyPolling();
         clearSpotifyProgressTicker();
     }
-
     function resetSpotifyTracking(): void {
         spotifyHasObservedPlayback = false;
         spotifyLastSnapshot = null;
@@ -92,7 +86,6 @@ export function useAudioPlaybackEngines(
         spotifyWasNearEnd = false;
         spotifyEndHandled = false;
     }
-
     async function stopSpotifyPlayback(controller: SpotifyPlaybackController | null = spotifyPlayback, options: { destroy?: boolean } = {}): Promise<void> {
         clearSpotifyTimers();
         resetSpotifyTracking();
@@ -106,20 +99,16 @@ export function useAudioPlaybackEngines(
             if (options.destroy) { controller.destroy(); if (spotifyPlayback === controller) { spotifyPlayback = null; } }
         }
     }
-
     async function stopAllPlaybackEngines(options: { destroySpotify?: boolean } = {}): Promise<void> {
         activeEngine = null; audioRef.value?.pause();
         await stopSpotifyPlayback(spotifyPlayback, { destroy: options.destroySpotify });
     }
-
     async function stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(controller: SpotifyPlaybackController | null = spotifyPlayback): Promise<void> {
         if (!canTrackOwnSpotifyPlayback(audioPlayer.isPlaying.value, audioPlayer.currentTrack.value)) { await stopSpotifyPlayback(controller, { destroy: true }); }
     }
-
     function handlePageHide(): void {
         void stopSpotifyPlayback(spotifyPlayback, { destroy: true });
     }
-
     function playbackPositionFromPlayer(): number {
         const storedPosition = audioPlayer.playbackPositionSeconds.value;
         return durationSeconds.value > 0 ? Math.min(durationSeconds.value, storedPosition) : storedPosition;
@@ -315,7 +304,7 @@ export function useAudioPlaybackEngines(
     function startSpotifyProgressTicker(token: number): void {
         clearSpotifyProgressTicker();
         spotifyProgressInterval = setInterval(() => {
-            if (token !== playbackToken || activeEngine !== 'spotify') {
+            if (token !== playbackToken || activeEngine !== 'spotify' || !isPlaybackOwner()) {
                 clearSpotifyProgressTicker();
                 return;
             }
@@ -347,6 +336,7 @@ export function useAudioPlaybackEngines(
     }
 
     function handleSpotifyStateChange(snapshot: SpotifyPlaybackSnapshot | null, source: 'event' | 'poll' = 'event'): void {
+        if (!isPlaybackOwner()) { return; }
         const track = audioPlayer.currentTrack.value;
         if (activeEngine !== 'spotify' || !track || !isSpotifyAudioTrack(track)) {
             return;
@@ -398,7 +388,7 @@ export function useAudioPlaybackEngines(
     function startSpotifyPolling(token: number): void {
         clearSpotifyPolling();
         spotifyPollingInterval = setInterval(() => {
-            if (token !== playbackToken || activeEngine !== 'spotify') {
+            if (token !== playbackToken || activeEngine !== 'spotify' || !isPlaybackOwner()) {
                 clearSpotifyTimers();
                 return;
             }
@@ -421,7 +411,7 @@ export function useAudioPlaybackEngines(
         await nextTick();
 
         const track = audioPlayer.currentTrack.value;
-        if (token !== playbackToken || !audioRef.value || !track || isSpotifyAudioTrack(track)) {
+        if (token !== playbackToken || !isPlaybackOwner() || !audioRef.value || !track || isSpotifyAudioTrack(track)) {
             return;
         }
 
@@ -440,6 +430,7 @@ export function useAudioPlaybackEngines(
     async function startCurrentPlayback(): Promise<void> {
         const token = ++playbackToken;
         const track = audioPlayer.currentTrack.value;
+        if (!isPlaybackOwner()) { await stopAllPlaybackEngines({ destroySpotify: true }); return; }
         if (track?.id !== displayedTrackId) { resetDisplayedPlaybackPosition(track); }
         displayedTrackId = track?.id ?? null;
 
@@ -531,12 +522,13 @@ export function useAudioPlaybackEngines(
     }
 
     function handleTimeUpdate(): void {
+        if (!isPlaybackOwner()) { return; }
         currentTime.value = audioRef.value?.currentTime ?? 0;
         audioPlayer.updatePlaybackPosition(currentTime.value);
     }
 
     function handleSeek(event: Event): void {
-        if (!(event.target instanceof HTMLInputElement) || durationSeconds.value <= 0 || !audioPlayer.currentTrack.value) {
+        if (!isPlaybackOwner() || !(event.target instanceof HTMLInputElement) || durationSeconds.value <= 0 || !audioPlayer.currentTrack.value) {
             return;
         }
 
@@ -565,6 +557,7 @@ export function useAudioPlaybackEngines(
     }
 
     function handleEnded(): void {
+        if (!isPlaybackOwner()) { return; }
         const endedTrackId = audioPlayer.currentTrackId.value;
         if (endedTrackId !== null) { options.onTrackEnded?.(endedTrackId); }
 
@@ -591,6 +584,7 @@ export function useAudioPlaybackEngines(
     window.addEventListener('pagehide', handlePageHide);
 
     return {
+        activateSpotifyElement,
         handleEnded,
         handleLoadedMetadata,
         handleSeek,

@@ -154,6 +154,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/audio/{file}/metadata-proposals/latest', [\App\Http\Controllers\AudioMetadataController::class, 'latestForFile'])->name('api.audio.files.metadata-proposals.latest');
     Route::post('/api/audio/{file}/metadata/restore-from-file', [\App\Http\Controllers\AudioMetadataController::class, 'restoreFromFile'])->name('api.audio.files.metadata.restore-from-file');
     Route::post('/api/audio/{file}/metadata-runs', [\App\Http\Controllers\AudioMetadataController::class, 'storeForFile'])->name('api.audio.files.metadata-runs.store');
+    Route::get('/api/audio/playback-session', [\App\Http\Controllers\AudioPlaybackSessionController::class, 'show'])->name('api.audio.playback-session.show');
+    Route::post('/api/audio/playback-session/claim', [\App\Http\Controllers\AudioPlaybackSessionController::class, 'claim'])->name('api.audio.playback-session.claim');
+    Route::post('/api/audio/playback-session/heartbeat', [\App\Http\Controllers\AudioPlaybackSessionController::class, 'heartbeat'])->name('api.audio.playback-session.heartbeat');
+    Route::post('/api/audio/playback-session/update', [\App\Http\Controllers\AudioPlaybackSessionController::class, 'update'])->name('api.audio.playback-session.update');
+    Route::post('/api/audio/playback-session/release', [\App\Http\Controllers\AudioPlaybackSessionController::class, 'release'])->name('api.audio.playback-session.release');
     Route::post('/api/audio/playback-events', [\App\Http\Controllers\AudioPlaybackEventController::class, 'store'])->name('api.audio.playback-events.store');
     Route::get('/api/audio/album-covers/{albumCover}', [\App\Http\Controllers\AlbumCoverController::class, 'show'])->name('api.audio.album-covers.show');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');

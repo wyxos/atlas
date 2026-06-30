@@ -477,6 +477,11 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
     }
 
     return {
+        activateElement(): void {
+            void player?.activateElement().catch(() => {
+                options.onError?.('Spotify autoplay was blocked.');
+            });
+        },
         async currentState(): Promise<SpotifyPlaybackSnapshot | null> {
             if (!player) {
                 return null;
@@ -511,17 +516,6 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             const positionMs = Math.max(0, Math.round(positionSeconds * 1000));
 
             await player?.activateElement();
-            assertSpotifyPlaybackCurrent(options);
-            await waitForSpotifyDevice(token, targetDeviceId, false, options);
-            assertSpotifyPlaybackCurrent(options);
-            await spotifyApiRequest('/me/player', token, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    device_ids: [targetDeviceId],
-                    play: false,
-                }),
-            });
-
             assertSpotifyPlaybackCurrent(options);
             await waitForSpotifyDevice(token, targetDeviceId, false, options);
             assertSpotifyPlaybackCurrent(options);
