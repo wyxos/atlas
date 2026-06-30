@@ -38,6 +38,7 @@ type AxiosLike = {
 };
 
 const AUDIO_PLAYBACK_INSTANCE_STORAGE_KEY = 'atlas:audioPlaybackInstanceId';
+const AVAILABILITY_RETRY_MS = 250;
 const HEARTBEAT_INTERVAL_MS = 5000;
 const REMOTE_PROGRESS_TICK_MS = 250;
 
@@ -63,6 +64,7 @@ const session = ref<AudioPlaybackSession>(emptyAudioPlaybackSession());
 const remotePositionSeconds = ref(0);
 const availabilityCheck = ref(0);
 let echoChannelName: string | null = null;
+let availabilityRetryTimeout: ReturnType<typeof setTimeout> | null = null;
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 let remoteProgressInterval: ReturnType<typeof setInterval> | null = null;
 let hasStarted = false;
@@ -84,7 +86,7 @@ const isLeaseOwner = computed(() => Boolean(
     && session.value.owner_instance_id === instanceId.value
     && session.value.lease_token,
 ));
-const canOutputAudio = computed(() => !isAvailable.value || isLeaseOwner.value);
+const canOutputAudio = computed(() => !isAvailable.value || !hasOtherOwner.value);
 const role = computed<AudioPlaybackRole>(() => hasOtherOwner.value ? 'observer' : 'owner');
 const shouldShowOwnershipUi = computed(() => hasOtherOwner.value && session.value.current_track !== null);
 
@@ -102,13 +104,14 @@ function currentUserId(): number | null {
 function axiosClient(): AxiosLike | null {
     const axios = typeof window !== 'undefined' ? window.axios as unknown : null;
 
-    return axios
-        && typeof axios === 'object'
-        && 'get' in axios
-        && 'post' in axios
-        && typeof axios.get === 'function'
-        && typeof axios.post === 'function'
-        ? axios as AxiosLike
+    if ((typeof axios !== 'object' && typeof axios !== 'function') || axios === null) {
+        return null;
+    }
+
+    const candidate = axios as Partial<AxiosLike>;
+
+    return typeof candidate.get === 'function' && typeof candidate.post === 'function'
+        ? candidate as AxiosLike
         : null;
 }
 
@@ -366,17 +369,49 @@ function refreshHeartbeat(): void {
     }, HEARTBEAT_INTERVAL_MS);
 }
 
+function clearAvailabilityRetry(): void {
+    if (!availabilityRetryTimeout) {
+        return;
+    }
+
+    clearTimeout(availabilityRetryTimeout);
+    availabilityRetryTimeout = null;
+}
+
+function scheduleAvailabilityRetry(): void {
+    if (availabilityRetryTimeout) {
+        return;
+    }
+
+    availabilityRetryTimeout = setTimeout(() => {
+        availabilityRetryTimeout = null;
+        start();
+    }, AVAILABILITY_RETRY_MS);
+}
+
 function setSnapshotProvider(provider: () => AudioPlaybackSessionSnapshot): void {
     snapshotProvider = provider;
     refreshHeartbeat();
 }
 
-function start(): void {
+function refreshAvailability(): boolean {
     availabilityCheck.value += 1;
-    if (hasStarted || !isAvailable.value) {
+
+    return isAvailable.value;
+}
+
+function start(): void {
+    const isSessionAvailable = refreshAvailability();
+    if (hasStarted) {
         return;
     }
 
+    if (!isSessionAvailable) {
+        scheduleAvailabilityRetry();
+        return;
+    }
+
+    clearAvailabilityRetry();
     instanceId.value = readOrCreateInstanceId();
     hasStarted = true;
     startEchoListener();
@@ -385,6 +420,7 @@ function start(): void {
 
 function stop(): void {
     hasStarted = false;
+    clearAvailabilityRetry();
     stopEchoListener();
     if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
@@ -436,6 +472,7 @@ export function useAudioPlaybackSession() {
         isAvailable,
         isLeaseOwner,
         release,
+        refreshAvailability,
         remotePositionSeconds,
         role,
         session,

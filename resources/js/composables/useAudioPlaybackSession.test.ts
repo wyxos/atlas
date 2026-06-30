@@ -199,4 +199,77 @@ describe('useAudioPlaybackSession', () => {
             position_seconds: 5,
         }));
     });
+
+    it('allows local playback output when there is no remote owner', async () => {
+        installUserMeta();
+        installEcho();
+        Object.assign(window, {
+            axios: {
+                get: vi.fn().mockResolvedValue({
+                    data: session({
+                        version: 0,
+                        lease_token: null,
+                        owner_instance_id: null,
+                        owner_label: null,
+                        state: 'idle',
+                        source: null,
+                        current_track: null,
+                        queue_label: null,
+                        position_seconds: 0,
+                        duration_seconds: null,
+                    }),
+                }),
+                post: vi.fn(),
+            },
+        });
+
+        const { playbackSession } = mountHarness();
+        await flushPromises();
+
+        expect(playbackSession.role.value).toBe('owner');
+        expect(playbackSession.hasOtherOwner.value).toBe(false);
+        expect(playbackSession.canOutputAudio.value).toBe(true);
+    });
+
+    it('detects the callable axios instance installed by the app bootstrap', async () => {
+        installUserMeta();
+        const echo = installEcho();
+        const axios = Object.assign(vi.fn(), {
+            get: vi.fn().mockResolvedValue({ data: session() }),
+            post: vi.fn(),
+        });
+        Object.assign(window, { axios });
+
+        const { playbackSession } = mountHarness();
+        await flushPromises();
+
+        expect(playbackSession.isAvailable.value).toBe(true);
+        expect(axios.get).toHaveBeenCalledWith('/api/audio/playback-session');
+        expect(echo.privateChannel).toHaveBeenCalledWith('App.Models.User.42');
+    });
+
+    it('starts after realtime dependencies become available following mount', async () => {
+        vi.useFakeTimers();
+        installUserMeta();
+        Object.assign(window, {
+            axios: {
+                get: vi.fn().mockResolvedValue({ data: session() }),
+                post: vi.fn(),
+            },
+        });
+
+        const { playbackSession } = mountHarness();
+        await flushPromises();
+
+        expect(playbackSession.isAvailable.value).toBe(false);
+        expect(window.axios.get).not.toHaveBeenCalled();
+
+        const echo = installEcho();
+        await vi.advanceTimersByTimeAsync(250);
+        await flushPromises();
+
+        expect(playbackSession.isAvailable.value).toBe(true);
+        expect(window.axios.get).toHaveBeenCalledWith('/api/audio/playback-session');
+        expect(echo.privateChannel).toHaveBeenCalledWith('App.Models.User.42');
+    });
 });

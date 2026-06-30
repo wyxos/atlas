@@ -59,7 +59,7 @@ function installPlaybackSessionMocks(session: AudioPlaybackSession): void {
     Object.assign(window, {
         axios: {
             get: vi.fn().mockResolvedValue({ data: session }),
-            post: vi.fn((url: string) => {
+            post: vi.fn((url: string, data?: Record<string, unknown>) => {
                 if (url === '/api/audio/details') {
                     return Promise.resolve({ data: { items: [] } });
                 }
@@ -67,10 +67,12 @@ function installPlaybackSessionMocks(session: AudioPlaybackSession): void {
                 return Promise.resolve({
                     data: {
                         ...session,
+                        ...data,
                         version: session.version + 1,
                         lease_token: 'owned-lease',
-                        owner_instance_id: window.sessionStorage.getItem('atlas:audioPlaybackInstanceId'),
+                        owner_instance_id: data?.instance_id ?? window.sessionStorage.getItem('atlas:audioPlaybackInstanceId'),
                         owner_label: 'Windows Chrome',
+                        server_recorded_at_ms: Date.now(),
                     },
                 });
             }),
@@ -115,6 +117,73 @@ describe('GlobalAudioPlayer ownership', () => {
 
         expect(window.axios.post).toHaveBeenCalledWith('/api/audio/playback-session/claim', expect.objectContaining({
             current_track: expect.objectContaining({ id: 41 }),
+            state: 'playing',
+        }));
+    });
+
+    it('claims ownership when local playback starts from another surface', async () => {
+        installPlaybackSessionMocks(playbackSession({
+            version: 0,
+            lease_token: null,
+            owner_instance_id: null,
+            owner_label: null,
+            state: 'idle',
+            source: null,
+            current_track: null,
+            queue_label: null,
+            position_seconds: 0,
+            duration_seconds: null,
+        }));
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+
+        mount(GlobalAudioPlayer);
+        await flushPromises();
+
+        vi.mocked(window.axios.post).mockClear();
+
+        useGlobalAudioPlayer().queueAndPlay([testTrack(51, {
+            title: 'Local Track',
+            duration: '3:00',
+            durationSeconds: 180,
+        })], 51, { queueLabel: 'All audio' });
+        await flushPromises();
+
+        expect(window.axios.post).toHaveBeenCalledWith('/api/audio/playback-session/claim', expect.objectContaining({
+            current_track: expect.objectContaining({ id: 51 }),
+            queue_label: 'All audio',
+            state: 'playing',
+        }));
+    });
+
+    it('refreshes availability before claiming local playback started after app globals attach', async () => {
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+
+        mount(GlobalAudioPlayer);
+        await flushPromises();
+
+        installPlaybackSessionMocks(playbackSession({
+            version: 0,
+            lease_token: null,
+            owner_instance_id: null,
+            owner_label: null,
+            state: 'idle',
+            source: null,
+            current_track: null,
+            queue_label: null,
+            position_seconds: 0,
+            duration_seconds: null,
+        }));
+
+        useGlobalAudioPlayer().queueAndPlay([testTrack(61, {
+            title: 'Late Globals Track',
+            duration: '3:00',
+            durationSeconds: 180,
+        })], 61, { queueLabel: 'All audio' });
+        await flushPromises();
+
+        expect(window.axios.post).toHaveBeenCalledWith('/api/audio/playback-session/claim', expect.objectContaining({
+            current_track: expect.objectContaining({ id: 61 }),
+            queue_label: 'All audio',
             state: 'playing',
         }));
     });

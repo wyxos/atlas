@@ -108,12 +108,15 @@ export function useGlobalAudioPlaybackOwnership(options: UseGlobalAudioPlaybackO
     }
 
     async function claimOwnershipForLocalPlayback(): Promise<void> {
+        const localTrack = options.audioPlayer.currentTrack.value;
+        const isSessionAvailable = playbackSession.refreshAvailability();
+
         if (
             claimRequestInFlight.value
-            || !playbackSession.isAvailable.value
+            || !isSessionAvailable
             || playbackSession.isLeaseOwner.value
             || !options.audioPlayer.isPlaying.value
-            || !options.audioPlayer.currentTrack.value
+            || !localTrack
         ) {
             return;
         }
@@ -176,10 +179,16 @@ export function useGlobalAudioPlaybackOwnership(options: UseGlobalAudioPlaybackO
         options.startCurrentPlayback();
     });
 
-    watch([options.audioPlayer.currentTrackId, options.audioPlayer.isPlaying], () => {
+    watch([
+        options.audioPlayer.currentTrackId,
+        options.audioPlayer.isPlaying,
+        playbackSession.isAvailable,
+        playbackSession.isLeaseOwner,
+        playbackSession.hasOtherOwner,
+    ], () => {
         void claimOwnershipForLocalPlayback();
         void updateOwnerPlaybackSession();
-    }, { flush: 'post' });
+    }, { immediate: true, flush: 'post' });
 
     watch(playbackSession.canOutputAudio, () => {
         options.startCurrentPlayback();
