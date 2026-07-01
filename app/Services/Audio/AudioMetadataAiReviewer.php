@@ -32,6 +32,7 @@ class AudioMetadataAiReviewer
     public function __construct(
         private readonly AudioMetadataDiscogsAiReviewPayloads $discogsPayloads,
         private readonly AudioMetadataAiReviewPrompts $prompts,
+        private readonly AudioMetadataAiGatewayClient $gateway,
     ) {}
 
     /**
@@ -179,27 +180,12 @@ class AudioMetadataAiReviewer
      */
     private function reviewWithGateway(string $baseUrl, array $input, ?string $prompt = null, string $schemaVersion = 'atlas-audio-metadata-review-v1'): array
     {
-        $request = Http::timeout((int) config('services.audio_metadata.ai_timeout_seconds', 90))
-            ->acceptJson()
-            ->asJson();
-
-        $token = (string) config('services.audio_metadata.ai_token', '');
-        if ($token !== '') {
-            $request = $request->withToken($token);
-        }
-
-        $response = $request->post($baseUrl.'/v1/audio/metadata-review', [
-            'model' => config('services.audio_metadata.ai_model'),
-            'schemaVersion' => $schemaVersion,
-            'input' => $input,
-            'prompt' => $prompt ?? $this->prompts->review($input),
-        ]);
-
-        if (! $response->successful()) {
-            throw new RuntimeException('AI gateway returned HTTP '.$response->status().'.');
-        }
-
-        return $this->jsonPayload($response->json());
+        return $this->gateway->review(
+            $baseUrl,
+            $input,
+            $prompt ?? $this->prompts->review($input),
+            $schemaVersion,
+        );
     }
 
     /**
@@ -231,7 +217,7 @@ class AudioMetadataAiReviewer
             throw new RuntimeException('Ollama returned HTTP '.$response->status().'.');
         }
 
-        return $this->jsonPayload($response->json());
+        return $this->gateway->jsonPayload($response->json());
     }
 
     /**
@@ -390,46 +376,6 @@ class AudioMetadataAiReviewer
         }
 
         return $normalized;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function jsonPayload(mixed $payload): array
-    {
-        if (is_array($payload) && isset($payload['message']['content']) && is_string($payload['message']['content'])) {
-            return $this->decodeJson($payload['message']['content']);
-        }
-
-        if (is_array($payload) && isset($payload['response']) && is_string($payload['response'])) {
-            return $this->decodeJson($payload['response']);
-        }
-
-        if (! is_array($payload)) {
-            throw new RuntimeException('AI response was not JSON.');
-        }
-
-        return $payload;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function decodeJson(string $content): array
-    {
-        $content = trim($content);
-
-        if (str_starts_with($content, '```')) {
-            $content = preg_replace('/^```(?:json)?\s*/i', '', $content) ?? $content;
-            $content = preg_replace('/\s*```$/', '', $content) ?? $content;
-        }
-
-        $decoded = json_decode($content, true);
-        if (! is_array($decoded)) {
-            throw new RuntimeException('AI response JSON could not be decoded.');
-        }
-
-        return $decoded;
     }
 
     private function cleanString(mixed $value): ?string

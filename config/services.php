@@ -99,9 +99,10 @@ return [
         'user_agent' => env('AUDIO_METADATA_USER_AGENT', 'Atlas/1.0 (+'.rtrim((string) env('APP_URL', 'http://localhost'), '/').')'),
         'ai_enabled' => env('AUDIO_METADATA_AI_ENABLED', true),
         'ai_driver' => env('AUDIO_METADATA_AI_DRIVER', 'gateway'),
-        'ai_base_url' => env('AUDIO_METADATA_AI_BASE_URL'),
-        'ai_token' => env('AUDIO_METADATA_AI_TOKEN'),
-        'ai_model' => env('AUDIO_METADATA_AI_MODEL', 'qwen2.5:3b'),
+        'ai_provider' => env('AUDIO_METADATA_AI_PROVIDER', 'audio_metadata'),
+        'ai_base_url' => env('AUDIO_METADATA_AI_BASE_URL', 'https://ai.wyxos.com/v1'),
+        'ai_token' => env('AUDIO_METADATA_AI_TOKEN', env('LITELLM_MASTER_KEY')),
+        'ai_model' => env('AUDIO_METADATA_AI_MODEL', 'local-fast'),
         'ai_timeout_seconds' => env('AUDIO_METADATA_AI_TIMEOUT', 90),
     ],
 

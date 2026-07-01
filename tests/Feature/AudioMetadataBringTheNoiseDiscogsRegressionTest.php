@@ -205,11 +205,11 @@ test('production bring the noise lookup prefers an album release with matching t
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $schema = (string) ($request->data()['schemaVersion'] ?? '');
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
             $aiSchemas[] = $schema;
 
-            return Http::response(match ($schema) {
+            return audioMetadataAiResponse(match ($schema) {
                 'atlas-audio-metadata-discogs-search-v1' => [
                     'queries' => [[
                         'release_title' => 'Bring the Noise Remix [Pump-Kin Remix]',

@@ -83,11 +83,11 @@ test('local embedded tags can use ai discogs search expansion to propose source 
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
+        if ($url === 'https://ollama.test/v1/responses') {
             $aiCalls++;
-            $schema = $request->data()['schemaVersion'] ?? null;
+            $schema = audioMetadataAiSchemaVersion($request);
 
-            return Http::response($schema === 'atlas-audio-metadata-discogs-search-v1'
+            return audioMetadataAiResponse($schema === 'atlas-audio-metadata-discogs-search-v1'
                 ? [
                     'queries' => [[
                         'release_title' => 'GTO TV Animation Original Soundtrack 2',
@@ -229,10 +229,10 @@ test('local ai discogs rejects later alternate releases when current soundtrack 
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $schema = $request->data()['schemaVersion'] ?? null;
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
 
-            return Http::response($schema === 'atlas-audio-metadata-discogs-search-v1'
+            return audioMetadataAiResponse($schema === 'atlas-audio-metadata-discogs-search-v1'
                 ? [
                     'queries' => [[
                         'release_title' => 'GTO TV Animation Original Soundtrack 2',
@@ -354,10 +354,10 @@ test('local ai discogs rejects track-title singles for current soundtrack albums
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $schema = $request->data()['schemaVersion'] ?? null;
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
 
-            return Http::response($schema === 'atlas-audio-metadata-discogs-search-v1'
+            return audioMetadataAiResponse($schema === 'atlas-audio-metadata-discogs-search-v1'
                 ? [
                     'queries' => [[
                         'release_title' => 'しずく',

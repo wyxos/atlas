@@ -87,11 +87,11 @@ test('production bring the noise row still field reviews release fields after ge
             return Http::response([], 404);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $schema = (string) ($request->data()['schemaVersion'] ?? '');
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
             $aiSchemas[] = $schema;
 
-            return Http::response(match ($schema) {
+            return audioMetadataAiResponse(match ($schema) {
                 'atlas-audio-metadata-field-adjudication-v1' => [
                     'verdict' => 'ambiguous',
                     'confidence' => 0.82,
@@ -201,8 +201,8 @@ test('production audio sample matrix keeps release fields behind field review af
             return Http::response([], 404);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            return Http::response(match ((string) ($request->data()['schemaVersion'] ?? '')) {
+        if ($url === 'https://ollama.test/v1/responses') {
+            return audioMetadataAiResponse(match (audioMetadataAiSchemaVersion($request)) {
                 'atlas-audio-metadata-field-adjudication-v1' => [
                     'verdict' => 'ambiguous',
                     'confidence' => 0.8,

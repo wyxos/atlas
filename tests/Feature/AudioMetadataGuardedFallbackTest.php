@@ -132,12 +132,13 @@ test('local ai discogs search runs when fingerprint candidates are guarded out',
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $schema = (string) ($request->data()['schemaVersion'] ?? '');
-            $provider = (string) data_get($request->data(), 'input.candidate.provider');
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
+            $prompt = audioMetadataAiPrompt($request);
+            $provider = str_contains($prompt, '"provider": "discogs_release"') ? 'discogs_release' : 'default';
             $aiSchemas[] = $schema;
 
-            return Http::response(match ($schema) {
+            return audioMetadataAiResponse(match ($schema) {
                 'atlas-audio-metadata-discogs-search-v1' => [
                     'queries' => [[
                         'release_title' => "Rock N' Rave",
@@ -317,8 +318,8 @@ test('local ai discogs search cannot accept a different release family with only
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            return Http::response(match ((string) ($request->data()['schemaVersion'] ?? '')) {
+        if ($url === 'https://ollama.test/v1/responses') {
+            return audioMetadataAiResponse(match (audioMetadataAiSchemaVersion($request)) {
                 'atlas-audio-metadata-discogs-search-v1' => [
                     'queries' => [[
                         'release_title' => "Rock N' Rave",

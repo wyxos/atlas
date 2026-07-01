@@ -30,9 +30,9 @@ test('ai adjudicates competing discogs releases before proposing release-level m
         ->andReturn(null));
 
     $aiSchemas = [];
-    $adjudicationInput = null;
+    $adjudicationPrompt = null;
 
-    Http::fake(function (Request $request) use (&$aiSchemas, &$adjudicationInput) {
+    Http::fake(function (Request $request) use (&$aiSchemas, &$adjudicationPrompt) {
         $url = $request->url();
 
         if (str_starts_with($url, 'https://musicbrainz.test/ws/2/release?')) {
@@ -56,15 +56,14 @@ test('ai adjudicates competing discogs releases before proposing release-level m
             return Http::response(tronLegacySpecialEditionDiscogsRelease());
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $data = $request->data();
-            $schema = (string) ($data['schemaVersion'] ?? '');
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
             $aiSchemas[] = $schema;
 
             if ($schema === 'atlas-audio-metadata-discogs-release-adjudication-v1') {
-                $adjudicationInput = $data['input'] ?? null;
+                $adjudicationPrompt = audioMetadataAiPrompt($request);
 
-                return Http::response([
+                return audioMetadataAiResponse([
                     'verdict' => 'accept',
                     'confidence' => 0.96,
                     'reason' => 'The current album says CD2, and release 2588959 exposes Castor as disc 2 track 4 while 13466177 is a 29-file digital edition.',
@@ -90,7 +89,7 @@ test('ai adjudicates competing discogs releases before proposing release-level m
                 ]);
             }
 
-            return Http::response([
+            return audioMetadataAiResponse([
                 'verdict' => 'accept',
                 'confidence' => 0.94,
                 'reason' => 'The AI-selected Discogs release matches the current title, artist, duration, and CD2 context.',
@@ -154,7 +153,8 @@ test('ai adjudicates competing discogs releases before proposing release-level m
         ->assertJsonPath('proposal.evidence.release_adjudication.selected_release_id', '2588959');
 
     expect($aiSchemas)->toContain('atlas-audio-metadata-discogs-release-adjudication-v1')
-        ->and(data_get($adjudicationInput, 'candidates.*.release_id'))->toContain('13466177', '2588959');
+        ->and($adjudicationPrompt)->toContain('13466177')
+        ->and($adjudicationPrompt)->toContain('2588959');
 });
 
 test('ambiguous discogs release adjudication does not fall back to deterministic release packaging', function () {
@@ -198,8 +198,8 @@ test('ambiguous discogs release adjudication does not fall back to deterministic
             return Http::response(tronLegacySpecialEditionDiscogsRelease());
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            return Http::response([
+        if ($url === 'https://ollama.test/v1/responses') {
+            return audioMetadataAiResponse([
                 'verdict' => 'ambiguous',
                 'confidence' => 0.68,
                 'reason' => 'Both releases match title and duration, but the edition evidence is insufficient.',

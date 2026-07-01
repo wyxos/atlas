@@ -399,13 +399,13 @@ test('ai field review replaces placeholder and missing field reasons with explic
     config([
         'services.audio_metadata.ai_enabled' => true,
         'services.audio_metadata.ai_driver' => 'gateway',
-        'services.audio_metadata.ai_base_url' => 'https://ollama.test',
+        'services.audio_metadata.ai_base_url' => 'https://ollama.test/v1',
         'services.audio_metadata.ai_token' => 'ai-token',
         'services.audio_metadata.ai_model' => 'qwen-test',
     ]);
 
     Http::fake([
-        'https://ollama.test/v1/audio/metadata-review' => Http::response([
+        'https://ollama.test/v1/responses' => audioMetadataAiResponse([
             'verdict' => 'ambiguous',
             'confidence' => 0.82,
             'reason' => 'short summary',

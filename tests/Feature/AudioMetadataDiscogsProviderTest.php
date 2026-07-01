@@ -244,11 +244,11 @@ test('discogs lookup uses ai search terms from current metadata before local fal
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $schema = (string) ($request->data()['schemaVersion'] ?? '');
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
             $aiSchemas[] = $schema;
 
-            return Http::response($schema === 'atlas-audio-metadata-discogs-search-v1'
+            return audioMetadataAiResponse($schema === 'atlas-audio-metadata-discogs-search-v1'
                 ? [
                     'queries' => [[
                         'release_title' => 'Floating World',

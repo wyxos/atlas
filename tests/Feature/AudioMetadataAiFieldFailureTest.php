@@ -256,10 +256,10 @@ test('metadata lookup keeps fingerprint and cover candidates as raw options with
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
+        if ($url === 'https://ollama.test/v1/responses') {
             $aiFieldReviewCalls++;
 
-            return Http::response([
+            return audioMetadataAiResponse([
                 'verdict' => 'reject',
                 'confidence' => 0.91,
                 'reason' => 'Reject the fingerprint package for this test so the next source candidate must be tried.',

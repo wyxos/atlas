@@ -65,3 +65,40 @@ function configureLibraryScanStorage(): string
 
     return $root;
 }
+
+function audioMetadataAiResponse(array $payload, string $model = 'qwen-test'): mixed
+{
+    return Illuminate\Support\Facades\Http::response([
+        'id' => 'resp_test',
+        'status' => 'completed',
+        'model' => $model,
+        'output' => [[
+            'type' => 'message',
+            'status' => 'completed',
+            'content' => [[
+                'type' => 'output_text',
+                'text' => json_encode($payload),
+            ]],
+        ]],
+        'usage' => [
+            'input_tokens' => 12,
+            'output_tokens' => 8,
+            'input_tokens_details' => [
+                'cached_tokens' => 0,
+            ],
+            'output_tokens_details' => [
+                'reasoning_tokens' => 0,
+            ],
+        ],
+    ]);
+}
+
+function audioMetadataAiSchemaVersion(Illuminate\Http\Client\Request $request): string
+{
+    return (string) data_get($request->data(), 'metadata.schema_version', '');
+}
+
+function audioMetadataAiPrompt(Illuminate\Http\Client\Request $request): string
+{
+    return (string) data_get($request->data(), 'input.1.content.0.text', '');
+}

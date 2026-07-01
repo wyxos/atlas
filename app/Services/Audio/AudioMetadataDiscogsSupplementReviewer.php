@@ -47,6 +47,7 @@ class AudioMetadataDiscogsSupplementReviewer
 
     public function __construct(
         private readonly AudioMetadataValueExtractor $values,
+        private readonly AudioMetadataAiGatewayClient $gateway,
     ) {}
 
     /**
@@ -132,24 +133,12 @@ class AudioMetadataDiscogsSupplementReviewer
      */
     private function reviewWithGateway(string $baseUrl, array $input): array
     {
-        $request = Http::timeout((int) config('services.audio_metadata.ai_timeout_seconds', 90))->acceptJson()->asJson();
-        $token = (string) config('services.audio_metadata.ai_token', '');
-        if ($token !== '') {
-            $request = $request->withToken($token);
-        }
-
-        $response = $request->post($baseUrl.'/v1/audio/metadata-review', [
-            'model' => config('services.audio_metadata.ai_model'),
-            'schemaVersion' => 'atlas-audio-metadata-discogs-supplement-v1',
-            'input' => $input,
-            'prompt' => $this->prompt($input),
-        ]);
-
-        if (! $response->successful()) {
-            throw new RuntimeException('AI gateway returned HTTP '.$response->status().'.');
-        }
-
-        return $this->jsonPayload($response->json());
+        return $this->gateway->review(
+            $baseUrl,
+            $input,
+            $this->prompt($input),
+            'atlas-audio-metadata-discogs-supplement-v1',
+        );
     }
 
     /**
@@ -172,7 +161,7 @@ class AudioMetadataDiscogsSupplementReviewer
             throw new RuntimeException('Ollama returned HTTP '.$response->status().'.');
         }
 
-        return $this->jsonPayload($response->json());
+        return $this->gateway->jsonPayload($response->json());
     }
 
     /**
@@ -233,45 +222,6 @@ class AudioMetadataDiscogsSupplementReviewer
             array_map(fn (mixed $field): ?string => $this->values->cleanString($field), $fields),
             fn (?string $field): bool => $field !== null && in_array($field, self::DISCOGS_RELEASE_PACKAGE_FIELDS, true),
         ));
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function jsonPayload(mixed $payload): array
-    {
-        if (is_array($payload) && isset($payload['message']['content']) && is_string($payload['message']['content'])) {
-            return $this->decodeJson($payload['message']['content']);
-        }
-
-        if (is_array($payload) && isset($payload['response']) && is_string($payload['response'])) {
-            return $this->decodeJson($payload['response']);
-        }
-
-        if (! is_array($payload)) {
-            throw new RuntimeException('AI response was not JSON.');
-        }
-
-        return $payload;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function decodeJson(string $content): array
-    {
-        $content = trim($content);
-        if (str_starts_with($content, '```')) {
-            $content = preg_replace('/^```(?:json)?\s*/i', '', $content) ?? $content;
-            $content = preg_replace('/\s*```$/', '', $content) ?? $content;
-        }
-
-        $decoded = json_decode($content, true);
-        if (! is_array($decoded)) {
-            throw new RuntimeException('AI response JSON could not be decoded.');
-        }
-
-        return $decoded;
     }
 
     /**

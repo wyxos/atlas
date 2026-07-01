@@ -227,15 +227,16 @@ test('strong discogs release evidence wins over musicbrainz recording id only pr
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $data = $request->data();
-            $schema = (string) ($data['schemaVersion'] ?? '');
-            $provider = (string) data_get($data, 'input.candidate.provider');
+        if ($url === 'https://ollama.test/v1/responses') {
+            $schema = audioMetadataAiSchemaVersion($request);
+            $prompt = audioMetadataAiPrompt($request);
+            $provider = str_contains($prompt, '"provider": "discogs_release"') ? 'discogs_release' : 'default';
+
             if ($schema === 'atlas-audio-metadata-field-adjudication-v1') {
                 $fieldReviewedProviders[] = $provider;
             }
 
-            return Http::response(match ($provider) {
+            return audioMetadataAiResponse(match ($provider) {
                 'discogs_release' => [
                     'verdict' => 'accept',
                     'confidence' => 0.93,
@@ -368,10 +369,10 @@ function fakeChristopherLawrenceDiscogsResponses(array $fieldReviewResponse, ?st
             ]);
         }
 
-        if ($url === 'https://ollama.test/v1/audio/metadata-review') {
-            $fieldReviewPrompt = (string) ($request->data()['prompt'] ?? '');
+        if ($url === 'https://ollama.test/v1/responses') {
+            $fieldReviewPrompt = audioMetadataAiPrompt($request);
 
-            return Http::response($fieldReviewResponse);
+            return audioMetadataAiResponse($fieldReviewResponse);
         }
 
         return Http::response([], 404);
