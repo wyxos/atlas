@@ -187,4 +187,45 @@ describe('GlobalAudioPlayer ownership', () => {
             state: 'playing',
         }));
     });
+
+    it('pushes owner metadata duration updates to the playback session', async () => {
+        installPlaybackSessionMocks(playbackSession({
+            version: 0,
+            lease_token: null,
+            owner_instance_id: null,
+            owner_label: null,
+            state: 'idle',
+            source: null,
+            current_track: null,
+            queue_label: null,
+            position_seconds: 0,
+            duration_seconds: null,
+        }));
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+
+        const wrapper = mount(GlobalAudioPlayer);
+        await flushPromises();
+
+        useGlobalAudioPlayer().queueAndPlay([testTrack(71, {
+            title: 'Duration Track',
+            duration: '6:12',
+            durationSeconds: 372,
+        })], 71, { queueLabel: 'All audio' });
+        await flushPromises();
+
+        vi.mocked(window.axios.post).mockClear();
+        Object.defineProperty(wrapper.get('audio').element, 'duration', {
+            configurable: true,
+            value: 91,
+        });
+
+        await wrapper.get('audio').trigger('loadedmetadata');
+        await flushPromises();
+
+        expect(window.axios.post).toHaveBeenCalledWith('/api/audio/playback-session/update', expect.objectContaining({
+            current_track: expect.objectContaining({ id: 71 }),
+            duration_seconds: 91,
+            state: 'playing',
+        }));
+    });
 });

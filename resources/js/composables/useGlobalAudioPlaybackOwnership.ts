@@ -179,6 +179,10 @@ export function useGlobalAudioPlaybackOwnership(options: UseGlobalAudioPlaybackO
         options.startCurrentPlayback();
     });
 
+    watch(options.mediaDuration, () => {
+        void updateOwnerPlaybackSession();
+    }, { flush: 'post' });
+
     watch([
         options.audioPlayer.currentTrackId,
         options.audioPlayer.isPlaying,
