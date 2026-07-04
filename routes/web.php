@@ -37,6 +37,10 @@ Route::prefix('/api/extension')->name('api.extension.')->group(function (): void
         ->name('settings.update');
     Route::post('/assets/status', [\App\Http\Controllers\ExtensionController::class, 'assetStatuses'])
         ->name('assets.status');
+    Route::post('/asset-match-rules/preview', [\App\Http\Controllers\ExtensionAssetMatchRuleController::class, 'preview'])
+        ->name('asset-match-rules.preview');
+    Route::post('/asset-match-rules/apply', [\App\Http\Controllers\ExtensionAssetMatchRuleController::class, 'apply'])
+        ->name('asset-match-rules.apply');
     Route::post('/reactions/batch', [\App\Http\Controllers\ExtensionController::class, 'batchReact'])
         ->name('reactions.batch');
     Route::post('/reactions', [\App\Http\Controllers\ExtensionController::class, 'react'])

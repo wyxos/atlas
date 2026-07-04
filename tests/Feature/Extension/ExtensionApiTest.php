@@ -3,6 +3,7 @@
 use App\Enums\DownloadTransferStatus;
 use App\Jobs\DownloadFile;
 use App\Models\DownloadTransfer;
+use App\Models\ExtensionAssetMatchIdentity;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -299,6 +300,90 @@ test('extension asset status prefers active transfer progress over stale downloa
     expect($asset['download']['status'])->toBe(DownloadTransferStatus::DOWNLOADING)
         ->and($asset['download']['progress_percent'])->toBe(12)
         ->and($asset['download']['downloaded_at'])->toBeNull();
+});
+
+test('extension asset status checks match by derived identity items', function () {
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $file = File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subMinute(),
+        'preview_url' => 'https://scontent.example.test/v/t39/photo.jpg?oh=stored-token',
+        'referrer_url' => 'https://www.facebook.com/photo/?fbid=122099716773370530&set=a.1',
+        'url' => 'https://scontent.example.test/v/t39/photo.jpg?oh=stored-token',
+    ]);
+    ExtensionAssetMatchIdentity::query()->create([
+        'file_id' => $file->id,
+        'match_by' => 'referrer',
+        'match_url' => 'https://www.facebook.com/photo/?fbid=122099716773370530',
+        'rule_id' => 'facebook-photo-fbid',
+        'rule_digest' => 'facebook-photo-fbid-v1',
+    ]);
+    Reaction::query()->create([
+        'file_id' => $file->id,
+        'type' => 'love',
+        'user_id' => $user->id,
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/assets/status', [
+        'match_items' => [[
+            'lookup_id' => 'asset-1',
+            'match_by' => 'referrer',
+            'match_url' => 'https://www.facebook.com/photo/?fbid=122099716773370530',
+            'rule_id' => 'facebook-photo-fbid',
+            'rule_digest' => 'facebook-photo-fbid-v1',
+        ]],
+    ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('matches.asset-1.file.id', $file->id);
+    $response->assertJsonPath('matches.asset-1.reaction.type', 'love');
+    $response->assertJsonPath('assets', []);
+    $response->assertJsonPath('referrers', []);
+});
+
+test('extension reactions upsert match identity without rewriting raw urls', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $rawAssetUrl = 'https://scontent.example.test/v/t39/photo.jpg?oh=browser-token';
+    $rawReferrerUrl = 'https://www.facebook.com/photo/?fbid=122099716773370530&set=a.1';
+    $matchUrl = 'https://www.facebook.com/photo/?fbid=122099716773370530';
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'asset_url' => $rawAssetUrl,
+        'match_identity' => [
+            'match_by' => 'referrer',
+            'match_url' => $matchUrl,
+            'rule_id' => 'facebook-photo-fbid',
+            'rule_digest' => 'facebook-photo-fbid-v1',
+        ],
+        'referrer_url' => $rawReferrerUrl,
+        'source' => 'facebook.com',
+        'type' => 'love',
+    ]);
+
+    $response->assertCreated();
+
+    $file = File::query()->where('url', $rawAssetUrl)->first();
+
+    expect($file)->not->toBeNull();
+    expect($file?->url)->toBe($rawAssetUrl);
+    expect($file?->referrer_url)->toBe($rawReferrerUrl);
+    expect(ExtensionAssetMatchIdentity::query()
+        ->where('file_id', $file?->id)
+        ->where('match_by', 'referrer')
+        ->where('match_url', $matchUrl)
+        ->where('rule_id', 'facebook-photo-fbid')
+        ->where('rule_digest', 'facebook-photo-fbid-v1')
+        ->exists())->toBeTrue();
 });
 
 test('extension file delete removes downloaded files with extension authentication', function () {

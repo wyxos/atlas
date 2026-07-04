@@ -128,6 +128,7 @@ class ProcessExtensionBatchReaction implements ShouldQueue
             'page_url' => $payload['referrer_url'] ?? null,
             'referrer_url' => $payload['referrer_url'] ?? null,
             'referrer_url_hash_aware' => $payload['referrer_url'] ?? null,
+            'match_identity' => $payload['match_identity'] ?? null,
             'tag_name' => $this->tagNameFromMetadata($metadata),
             'url' => $payload['asset_url'] ?? null,
         ];

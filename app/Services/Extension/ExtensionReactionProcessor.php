@@ -17,6 +17,7 @@ class ExtensionReactionProcessor
 {
     public function __construct(
         private readonly ExtensionActiveTransferLookup $activeTransferLookup,
+        private readonly ExtensionAssetMatchIdentityService $assetMatchIdentities,
         private readonly ExtensionFileIdentityResolver $identityResolver,
     ) {}
 
@@ -117,7 +118,7 @@ class ExtensionReactionProcessor
             $pageUrl = $this->normalizeDeviantArtReferrerUrl($pageUrl);
         }
 
-        return $this->findOrCreateFile(
+        $file = $this->findOrCreateFile(
             $url,
             $source,
             $referrerUrl,
@@ -128,6 +129,9 @@ class ExtensionReactionProcessor
             $tagName,
             $listingMetadataOverrides
         );
+        $this->assetMatchIdentities->upsertForFile($file, $item['match_identity'] ?? null);
+
+        return $file;
     }
 
     /**

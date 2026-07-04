@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\DeviantArtImages;
 use App\Services\Extension\ExtensionActiveTransferLookup;
 use App\Services\Extension\ExtensionApiPayloadSupport;
+use App\Services\Extension\ExtensionAssetMatchIdentityService;
 use App\Services\Extension\ExtensionContainerMetadataService;
 use App\Services\Extension\ExtensionDownloadRuntimeContext;
 use App\Services\Extension\ExtensionReactionProcessor;
@@ -168,6 +169,7 @@ class ExtensionController extends Controller
             'page_url' => $validated['referrer_url'] ?? null,
             'referrer_url' => $validated['referrer_url'] ?? null,
             'referrer_url_hash_aware' => $validated['referrer_url'] ?? null,
+            'match_identity' => $validated['match_identity'] ?? null,
             'tag_name' => $this->tagNameFromMetadata($metadata),
             'url' => $validated['asset_url'],
         ];
@@ -239,6 +241,7 @@ class ExtensionController extends Controller
         ExtensionAssetStatusRequest $request,
         ExtensionApiKeyService $extensionApiKey,
         ExtensionActiveTransferLookup $activeTransferLookup,
+        ExtensionAssetMatchIdentityService $assetMatchIdentities,
     ): JsonResponse {
         $user = $this->resolveUser($request, $extensionApiKey);
         if (! $user) {
@@ -248,14 +251,17 @@ class ExtensionController extends Controller
         $validated = $request->validated();
         $assetUrls = $this->uniqueStrings($validated['asset_urls'] ?? []);
         $referrerUrls = $this->uniqueStrings($validated['referrer_urls'] ?? []);
+        $matchItems = $this->arrayItems($validated['match_items'] ?? []);
         $filesByAssetUrl = $this->filesByAssetUrl($assetUrls);
         $filesByReferrerUrl = $this->filesByReferrerUrl($referrerUrls, (int) $user->id);
+        $filesByMatchLookupId = $assetMatchIdentities->filesByMatchItems($matchItems, (int) $user->id);
         $fileIds = array_values(array_unique(array_filter(
             array_map(
                 static fn (?File $file): int => (int) ($file?->id ?? 0),
                 [
                     ...array_values($filesByAssetUrl),
                     ...array_values($filesByReferrerUrl),
+                    ...array_values($filesByMatchLookupId),
                 ],
             ),
             static fn (int $fileId): bool => $fileId > 0,
@@ -283,8 +289,22 @@ class ExtensionController extends Controller
                 : null;
         }
 
+        $matches = [];
+        foreach ($matchItems as $matchItem) {
+            $lookupId = trim((string) ($matchItem['lookup_id'] ?? ''));
+            if ($lookupId === '') {
+                continue;
+            }
+
+            $file = $filesByMatchLookupId[$lookupId] ?? null;
+            $matches[$lookupId] = $file
+                ? $this->assetStatusPayload((string) ($matchItem['match_url'] ?? $lookupId), $file, $activeTransfers[(int) $file->id] ?? null, $reactions)
+                : null;
+        }
+
         return response()->json([
             'assets' => $assets,
+            'matches' => $matches,
             'referrers' => $referrers,
         ]);
     }
@@ -456,5 +476,17 @@ class ExtensionController extends Controller
             array_map(static fn (mixed $value): string => trim((string) $value), is_array($values) ? $values : $values->all()),
             static fn (string $value): bool => $value !== '',
         )));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function arrayItems(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_filter($values, static fn (mixed $value): bool => is_array($value)));
     }
 }
