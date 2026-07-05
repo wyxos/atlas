@@ -180,7 +180,7 @@ class ExtensionAssetMatchIdentityService
             ? $file->referrer_url
             : $file->url;
         $matchUrl = $this->normalizeUrl($rawUrl);
-        if ($matchUrl === null || ! $this->urlCleanup->urlMatchesDomain($matchUrl, $normalizedRule['domain'])) {
+        if ($matchUrl === null || ! $this->fileMatchesRuleDomain($file, $normalizedRule, $matchUrl)) {
             return null;
         }
 
@@ -298,11 +298,88 @@ class ExtensionAssetMatchIdentityService
         $column = $rule['match_by'] === self::MATCH_BY_REFERRER ? 'referrer_url' : 'url';
 
         return File::query()
-            ->select(['id', 'url', 'referrer_url', 'updated_at', 'blacklisted_at'])
+            ->select(['id', 'source', 'url', 'referrer_url', 'updated_at', 'blacklisted_at', 'listing_metadata'])
             ->whereNotNull($column)
             ->when($rule['domain'] !== null, function (Builder $query) use ($column, $rule): void {
-                $query->where($column, 'like', '%'.$rule['domain'].'%');
+                if ($rule['match_by'] === self::MATCH_BY_REFERRER) {
+                    $query->where($column, 'like', '%'.$rule['domain'].'%');
+
+                    return;
+                }
+
+                $query->where(function (Builder $query) use ($column, $rule): void {
+                    $query
+                        ->where($column, 'like', '%'.$rule['domain'].'%')
+                        ->orWhere('source', $rule['domain'])
+                        ->orWhere('source', 'like', '%.'.$rule['domain'])
+                        ->orWhere('referrer_url', 'like', '%'.$rule['domain'].'%')
+                        ->orWhere('listing_metadata', 'like', '%'.$rule['domain'].'%');
+                });
             });
+    }
+
+    /**
+     * @param  array{match_by: string, domain: string|null}  $rule
+     */
+    private function fileMatchesRuleDomain(File $file, array $rule, string $matchUrl): bool
+    {
+        if ($rule['domain'] === null) {
+            return true;
+        }
+
+        foreach ($this->ruleDomainCandidates($file, $rule['match_by'], $matchUrl) as $candidate) {
+            if ($this->valueMatchesDomain($candidate, $rule['domain'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function ruleDomainCandidates(File $file, string $matchBy, string $matchUrl): array
+    {
+        if ($matchBy === self::MATCH_BY_REFERRER) {
+            return [
+                $file->referrer_url,
+                $matchUrl,
+            ];
+        }
+
+        return [
+            $file->source,
+            $this->metadataValue($file->listing_metadata, 'source'),
+            $this->metadataValue($file->listing_metadata, 'page_url'),
+            $file->referrer_url,
+            $matchUrl,
+        ];
+    }
+
+    private function metadataValue(mixed $metadata, string $key): mixed
+    {
+        return is_array($metadata) ? ($metadata[$key] ?? null) : null;
+    }
+
+    private function valueMatchesDomain(mixed $value, string $domain): bool
+    {
+        if (! is_string($value)) {
+            return false;
+        }
+
+        $candidate = strtolower(trim($value));
+        if ($candidate === '') {
+            return false;
+        }
+
+        if ($this->normalizeUrl($candidate) !== null) {
+            return $this->urlCleanup->urlMatchesDomain($candidate, $domain);
+        }
+
+        $host = trim($candidate, ". \t\n\r\0\x0B");
+
+        return $host === $domain || str_ends_with($host, '.'.$domain);
     }
 
     /**
