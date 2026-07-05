@@ -217,6 +217,50 @@ test('extension reactions can update reactions without queueing downloads', func
     Queue::assertNotPushed(DownloadFile::class);
 });
 
+test('extension reactions pass runtime cookies and user agent to queued downloads', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+        'User-Agent' => 'RequestUserAgent/ignored',
+    ])->postJson('/api/extension/reactions', [
+        'asset_url' => 'https://video.twimg.com/ext_tw_video/example/pu/vid/1280x720/video.mp4',
+        'cookies' => [
+            [
+                'domain' => '.x.com',
+                'expires_at' => 1893456000,
+                'host_only' => false,
+                'http_only' => true,
+                'name' => 'auth_token',
+                'path' => '/',
+                'secure' => true,
+                'value' => 'test-token',
+            ],
+        ],
+        'download_action' => 'force',
+        'metadata' => [
+            'asset_type' => 'video',
+        ],
+        'referrer_url' => 'https://x.com/example/status/1234567890',
+        'source' => 'x.com',
+        'type' => 'love',
+        'user_agent' => 'AtlasExtensionRuntime/1.0',
+    ]);
+
+    $response->assertCreated();
+
+    Queue::assertPushed(DownloadFile::class, function (DownloadFile $job): bool {
+        return $job->forceDownload === true
+            && data_get($job->runtimeContext, 'cookies.0.name') === 'auth_token'
+            && data_get($job->runtimeContext, 'cookies.0.domain') === 'x.com'
+            && data_get($job->runtimeContext, 'cookies.0.value') === 'test-token'
+            && ($job->runtimeContext['user_agent'] ?? null) === 'AtlasExtensionRuntime/1.0';
+    });
+});
+
 test('extension batch reactions can update reactions without marking downloads requested', function () {
     Queue::fake();
 
@@ -250,6 +294,56 @@ test('extension batch reactions can update reactions without marking downloads r
         return $job->reactionType === 'like'
             && $job->downloadBehavior === 'skip'
             && count($job->items) === 2;
+    });
+    Queue::assertNotPushed(DownloadFile::class);
+});
+
+test('extension batch reactions pass runtime cookies and user agent to the queued batch job', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+        'User-Agent' => 'RequestUserAgent/ignored',
+    ])->postJson('/api/extension/reactions/batch', [
+        'cookies' => [
+            [
+                'domain' => '.x.com',
+                'expires_at' => 1893456000,
+                'host_only' => false,
+                'http_only' => true,
+                'name' => 'auth_token',
+                'path' => '/',
+                'secure' => true,
+                'value' => 'test-token',
+            ],
+        ],
+        'download_action' => 'force',
+        'items' => [
+            [
+                'asset_url' => 'https://video.twimg.com/ext_tw_video/example/pu/vid/1280x720/video.mp4',
+                'metadata' => [
+                    'asset_type' => 'video',
+                ],
+                'referrer_url' => 'https://x.com/example/status/1234567890',
+                'source' => 'x.com',
+            ],
+        ],
+        'type' => 'love',
+        'user_agent' => 'AtlasExtensionRuntime/1.0',
+    ]);
+
+    $response->assertCreated();
+
+    Queue::assertPushed('App\\Jobs\\ProcessExtensionBatchReaction', function (object $job): bool {
+        return $job->reactionType === 'love'
+            && $job->downloadBehavior === 'force'
+            && data_get($job->runtimeContext, 'cookies.0.name') === 'auth_token'
+            && data_get($job->runtimeContext, 'cookies.0.domain') === 'x.com'
+            && data_get($job->runtimeContext, 'cookies.0.value') === 'test-token'
+            && ($job->runtimeContext['user_agent'] ?? null) === 'AtlasExtensionRuntime/1.0';
     });
     Queue::assertNotPushed(DownloadFile::class);
 });

@@ -137,7 +137,7 @@ class ExtensionController extends Controller
             items: $validated['items'],
             reactionType: $validated['type'],
             downloadBehavior: $downloadBehavior,
-            runtimeContext: $downloadRuntimeContext->fromValidated([], $request),
+            runtimeContext: $downloadRuntimeContext->fromValidated($validated, $request),
         );
 
         return response()->json([
@@ -191,7 +191,7 @@ class ExtensionController extends Controller
             $containerMetadataService,
             $user,
             $extensionChannel,
-            $downloadRuntimeContext->fromValidated([], $request),
+            $downloadRuntimeContext->fromValidated($validated, $request),
             $listingMetadataOverrides,
         );
         app(ExtensionApiPayloadSupport::class)->attachDerivedContainers([$payload], $inferredContainerMetadata);
