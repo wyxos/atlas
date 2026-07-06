@@ -3,6 +3,8 @@
 namespace App\Services\Downloads;
 
 use App\Enums\DownloadTransferStatus;
+use App\Events\DownloadTransferProgressUpdated;
+use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
@@ -28,6 +30,53 @@ final class DownloadTransferRemovalService
     public function bulkRemovalChunkSize(): int
     {
         return max(1, (int) config('downloads.bulk_removal_chunk_size', 100));
+    }
+
+    /**
+     * @param  array<int, mixed>  $fileIds
+     * @return list<int>
+     */
+    public function cancelActiveForFileIds(array $fileIds): array
+    {
+        $fileIds = $this->normalizeFileIds($fileIds);
+        if ($fileIds === []) {
+            return [];
+        }
+
+        return DownloadTransfer::query()
+            ->with('file')
+            ->whereIn('file_id', $fileIds)
+            ->whereIn('status', $this->cancelableActiveStatuses())
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (DownloadTransfer $transfer): bool => $this->cancel($transfer))
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    public function cancel(DownloadTransfer $downloadTransfer, bool $dispatchPump = true): bool
+    {
+        if (! in_array($downloadTransfer->status, $this->cancelableActiveStatuses(), true)) {
+            return false;
+        }
+
+        $this->cancelBatch($downloadTransfer);
+        $this->cleanupTransferParts($downloadTransfer);
+
+        $downloadTransfer->update([
+            'status' => DownloadTransferStatus::CANCELED,
+        ]);
+
+        $this->resetFileProgress($downloadTransfer);
+        $this->broadcastState($downloadTransfer);
+
+        if ($dispatchPump && ! $this->shouldDeferYtDlpTempCleanup($downloadTransfer)) {
+            PumpDomainDownloads::dispatch($downloadTransfer->domain);
+        }
+
+        return true;
     }
 
     /**
@@ -256,6 +305,46 @@ final class DownloadTransferRemovalService
             ->pluck('id')
             ->map(static fn ($id): int => (int) $id)
             ->all();
+    }
+
+    private function broadcastState(DownloadTransfer $downloadTransfer): void
+    {
+        $downloadTransfer->refresh();
+
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($downloadTransfer, (int) ($downloadTransfer->last_broadcast_percent ?? 0))
+            ));
+        } catch (\Throwable) {
+            // Broadcast errors shouldn't fail transfer cancellation.
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function cancelableActiveStatuses(): array
+    {
+        return [
+            DownloadTransferStatus::PENDING,
+            DownloadTransferStatus::QUEUED,
+            DownloadTransferStatus::PREPARING,
+            DownloadTransferStatus::DOWNLOADING,
+            DownloadTransferStatus::ASSEMBLING,
+            DownloadTransferStatus::PAUSED,
+        ];
+    }
+
+    /**
+     * @param  array<int, mixed>  $fileIds
+     * @return list<int>
+     */
+    private function normalizeFileIds(array $fileIds): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(static fn (mixed $fileId): int => is_numeric($fileId) ? (int) $fileId : 0, $fileIds),
+            static fn (int $fileId): bool => $fileId > 0,
+        )));
     }
 
     private function shouldDeferYtDlpTempCleanup(DownloadTransfer $downloadTransfer): bool

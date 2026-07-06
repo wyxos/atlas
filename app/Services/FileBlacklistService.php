@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\EvaluateContainerAutoBlacklist;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\Downloads\DownloadTransferRemovalService;
 use App\Services\Library\LibraryIndexSyncDispatcher;
 use Illuminate\Support\Facades\DB;
 
@@ -12,6 +13,7 @@ class FileBlacklistService
 {
     public function __construct(
         private readonly DownloadedFileClearService $downloadedFileClearService,
+        private readonly DownloadTransferRemovalService $downloadTransferRemovalService,
         private readonly LibraryIndexSyncDispatcher $libraryIndexSyncDispatcher,
         private readonly MetricsService $metricsService,
     ) {}
@@ -119,6 +121,7 @@ class FileBlacklistService
             app(TabFileService::class)->detachFilesFromUserTabs($userId, $fileIds);
         }
 
+        $this->downloadTransferRemovalService->cancelActiveForFileIds($fileIds);
         $this->downloadedFileClearService->clearMany($files, queueDelete: $queueDelete, syncIndex: false);
 
         $this->libraryIndexSyncDispatcher->filesAndReactions($fileIds);

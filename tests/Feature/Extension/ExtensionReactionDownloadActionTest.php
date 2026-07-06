@@ -1,10 +1,16 @@
 <?php
 
+use App\Enums\DownloadChunkStatus;
+use App\Enums\DownloadTransferStatus;
 use App\Jobs\DownloadFile;
+use App\Jobs\Downloads\PumpDomainDownloads;
+use App\Models\DownloadChunk;
+use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
@@ -431,4 +437,55 @@ test('queued extension batch reactions can force redownloads for every item', fu
         fn (DownloadFile $job): bool => in_array($job->fileId, $fileIds, true)
             && $job->forceDownload === true
     ))->toBeTrue();
+});
+
+test('extension blacklist cancels an active download transfer', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+    $file = File::factory()->create([
+        'url' => 'https://cdn.example.test/media/downloading-file.jpg',
+    ]);
+    File::query()->whereKey($file->id)->update(['download_progress' => 35]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'cdn.example.test',
+        'status' => DownloadTransferStatus::DOWNLOADING,
+        'bytes_total' => 100,
+        'bytes_downloaded' => 35,
+        'last_broadcast_percent' => 35,
+    ]);
+    DownloadChunk::query()->create([
+        'download_transfer_id' => $transfer->id,
+        'index' => 0,
+        'range_start' => 0,
+        'range_end' => 10,
+        'bytes_downloaded' => 11,
+        'status' => DownloadChunkStatus::DOWNLOADING,
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Atlas-Api-Key' => 'valid-api-key',
+    ])->postJson('/api/extension/reactions', [
+        'asset_url' => $file->url,
+        'referrer_url' => 'https://www.example.test/post/downloading-file',
+        'source' => 'example.test',
+        'type' => 'blacklist',
+    ]);
+
+    $response->assertCreated();
+    $response->assertJsonPath('download.requested', false);
+    $response->assertJsonPath('download.transfer_id', null);
+
+    $transfer->refresh();
+    $file->refresh();
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::CANCELED)
+        ->and($file->download_progress)->toBe(0)
+        ->and($file->blacklisted_at)->not->toBeNull()
+        ->and(DownloadChunk::query()->where('download_transfer_id', $transfer->id)->count())->toBe(0);
+
+    Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job): bool => $job->domain === 'cdn.example.test');
 });
