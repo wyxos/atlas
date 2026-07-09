@@ -167,6 +167,38 @@ describe('TabContentV2GridOverlay', () => {
         expect(queuePreviewRegeneration).toHaveBeenCalledWith(props.item);
     });
 
+    it('shows unavailable preview generation state without retry', () => {
+        const props = createProps();
+        props.item.src = '';
+        props.item.preview = '';
+        props.item.thumbnail = '';
+        props.item.downloaded = true;
+        props.item.preview_generation = {
+            status: 'unavailable',
+            can_retry: false,
+            message: 'Original file is missing and the remote source is no longer available.',
+        };
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props: {
+                ...props,
+                queuePreviewRegeneration: vi.fn(),
+                isPreviewRegenerationQueued: vi.fn().mockReturnValue(false),
+            },
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-test="preview-generation-state"]').text()).toContain('Preview unavailable');
+        expect(wrapper.text()).toContain('Original file is missing and the remote source is no longer available.');
+        expect(wrapper.find('[data-test="preview-regeneration-trigger"]').exists()).toBe(false);
+    });
+
     it('marks non-sibling cards as dimmed while a container drawer is open', () => {
         const wrapper = mount(TabContentV2GridOverlay, {
             props: {

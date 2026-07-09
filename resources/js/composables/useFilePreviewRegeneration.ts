@@ -16,11 +16,13 @@ const CHANNEL = 'file-previews';
 
 function shouldQueuePreviewRegeneration(item: FeedItem): boolean {
     const status = item.preview_generation?.status ?? null;
+    const canRetry = item.preview_generation?.can_retry ?? false;
 
     return item.downloaded === true
         && !item.src
         && !item.preview
         && !item.thumbnail
+        && canRetry === true
         && (status === 'failed' || status === 'missing');
 }
 
@@ -84,7 +86,11 @@ export function useFilePreviewRegeneration(args: {
         setQueued(item.id, true);
 
         try {
-            const { data } = await window.axios.post<{ file?: File }>(`/api/files/${item.id}/preview-assets`);
+            const { data } = await window.axios.post<{
+                queued?: boolean;
+                action?: 'preview_queued' | 'redownload_queued' | 'unavailable';
+                file?: File;
+            }>(`/api/files/${item.id}/preview-assets`);
             if (data.file) {
                 args.setFileData(data.file);
             }

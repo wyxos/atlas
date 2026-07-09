@@ -6,9 +6,12 @@ use App\Enums\MediaProcessorOperation;
 use App\Enums\MediaProcessorTaskStatus;
 use App\Models\File;
 use App\Models\MediaProcessorTask;
+use App\Services\FilePreviewRepairService;
 
 class FilePreviewGeneration
 {
+    public const string UNAVAILABLE_STATUS = 'unavailable';
+
     /**
      * @return list<string>
      */
@@ -61,10 +64,13 @@ class FilePreviewGeneration
         $status = is_string($task->status) && $task->status !== ''
             ? $task->status
             : MediaProcessorTaskStatus::QUEUED;
+        $nonRetryableFailure = $status === MediaProcessorTaskStatus::FAILED
+            && is_string($task->error_code)
+            && in_array($task->error_code, FilePreviewRepairService::nonRetryableErrorCodes(), true);
 
         return [
-            'status' => $status,
-            'can_retry' => $status === MediaProcessorTaskStatus::FAILED,
+            'status' => $nonRetryableFailure ? self::UNAVAILABLE_STATUS : $status,
+            'can_retry' => $status === MediaProcessorTaskStatus::FAILED && ! $nonRetryableFailure,
             'message' => $status === MediaProcessorTaskStatus::FAILED
                 ? ($task->error_message ?: 'Preview generation failed.')
                 : null,
@@ -76,8 +82,7 @@ class FilePreviewGeneration
 
     private static function isStoredPreviewableFile(File $file): bool
     {
-        return (bool) $file->path
-            && ((bool) $file->downloaded || $file->imported_at !== null)
+        return ((bool) $file->downloaded || $file->imported_at !== null)
             && (FileMimeType::isImage($file->mime_type) || FileMimeType::isVideo($file->mime_type));
     }
 

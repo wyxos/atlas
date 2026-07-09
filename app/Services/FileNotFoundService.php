@@ -76,26 +76,37 @@ class FileNotFoundService
     }
 
     /**
-     * @return array{file_id: int, not_found: bool, affected_tabs_by_user: array<int, array{user_id: int, tab_ids: array<int, int>}>, supported: bool}
+     * @return array{file_id: int, not_found: bool, affected_tabs_by_user: array<int, array{user_id: int, tab_ids: array<int, int>}>, supported: bool, checked: bool}
      */
-    public function reconcileRedownloadSourceCheck(File $file): array
+    public function reconcileRedownloadSourceCheck(File $file, bool $requireStoredPath = true, bool $requireConclusiveCheck = false): array
     {
         $fileId = (int) $file->id;
 
-        if (! $this->supportsRedownloadSourceCheck($file)) {
-            return $this->result($fileId, (bool) $file->not_found, supported: false);
+        if (! $this->supportsRedownloadSourceCheck($file, $requireStoredPath)) {
+            return $this->result($fileId, (bool) $file->not_found, supported: false, checked: false);
         }
 
-        $result = Cache::lock("file-redownload-not-found:{$fileId}", self::CHECK_LOCK_TTL_SECONDS)
-            ->get(function () use ($file, $fileId): array {
+        $lockSuffix = $requireStoredPath ? 'stored' : 'preview-repair';
+        $result = Cache::lock("file-redownload-not-found:{$fileId}:{$lockSuffix}", self::CHECK_LOCK_TTL_SECONDS)
+            ->get(function () use ($file, $fileId, $requireStoredPath, $requireConclusiveCheck): array {
                 $file = File::query()->find($file->id);
 
-                if (! $file || ! $this->supportsRedownloadSourceCheck($file)) {
-                    return $this->result($fileId, false, supported: false);
+                if (! $file || ! $this->supportsRedownloadSourceCheck($file, $requireStoredPath)) {
+                    return $this->result($fileId, false, supported: false, checked: false);
                 }
 
-                if (! $this->redownloadSourceReturnsNotFound($file)) {
-                    return $this->result((int) $file->id, (bool) $file->not_found, supported: true);
+                $sourceCheck = $this->redownloadSourceState($file);
+                if (! $sourceCheck['checked']) {
+                    return $this->result(
+                        (int) $file->id,
+                        (bool) $file->not_found,
+                        supported: ! $requireConclusiveCheck,
+                        checked: false,
+                    );
+                }
+
+                if (! $sourceCheck['not_found']) {
+                    return $this->result((int) $file->id, (bool) $file->not_found, supported: true, checked: true);
                 }
 
                 $wasMarkedNotFound = (bool) $file->not_found;
@@ -109,7 +120,7 @@ class FileNotFoundService
                     $file->refresh();
                 }
 
-                return $this->result((int) $file->id, true, supported: true);
+                return $this->result((int) $file->id, true, supported: true, checked: true);
             });
 
         return is_array($result)
@@ -131,13 +142,17 @@ class FileNotFoundService
             && CivitAiMediaUrl::isMediaUrl($file->url);
     }
 
-    private function supportsRedownloadSourceCheck(File $file): bool
+    private function supportsRedownloadSourceCheck(File $file, bool $requireStoredPath = true): bool
     {
         if (strtolower(trim((string) $file->source)) === 'local') {
             return false;
         }
 
-        if (! (bool) $file->downloaded || ! $file->path) {
+        if ($requireStoredPath && (! (bool) $file->downloaded || ! $file->path)) {
+            return false;
+        }
+
+        if (! $requireStoredPath && ! (bool) $file->downloaded && $file->downloaded_at === null) {
             return false;
         }
 
@@ -152,18 +167,48 @@ class FileNotFoundService
 
     private function redownloadSourceReturnsNotFound(File $file): bool
     {
+        return $this->redownloadSourceState($file)['not_found'];
+    }
+
+    /**
+     * @return array{not_found: bool, checked: bool}
+     */
+    private function redownloadSourceState(File $file): array
+    {
         $urls = $this->redownloadSourceCheckUrls($file);
         if ($urls === []) {
-            return false;
+            return [
+                'not_found' => false,
+                'checked' => false,
+            ];
         }
 
+        $unknown = false;
         foreach ($urls as $url) {
-            if (! $this->urlReturnsNotFound($url)) {
-                return false;
+            $state = $this->urlNotFoundState($url);
+            if ($state === false) {
+                return [
+                    'not_found' => false,
+                    'checked' => true,
+                ];
+            }
+
+            if ($state === null) {
+                $unknown = true;
             }
         }
 
-        return true;
+        if ($unknown) {
+            return [
+                'not_found' => false,
+                'checked' => false,
+            ];
+        }
+
+        return [
+            'not_found' => true,
+            'checked' => true,
+        ];
     }
 
     /**
@@ -189,8 +234,13 @@ class FileNotFoundService
 
     private function urlReturnsNotFound(?string $url): bool
     {
+        return $this->urlNotFoundState($url) === true;
+    }
+
+    private function urlNotFoundState(?string $url): ?bool
+    {
         if (! is_string($url) || trim($url) === '') {
-            return false;
+            return null;
         }
 
         try {
@@ -206,7 +256,7 @@ class FileNotFoundService
 
             return $this->request('get', $url)->status() === 404;
         } catch (ConnectionException) {
-            return false;
+            return null;
         }
     }
 
@@ -238,13 +288,14 @@ class FileNotFoundService
         return $url;
     }
 
-    private function result(int $fileId, bool $notFound, array $affectedTabsByUser = [], bool $supported = true): array
+    private function result(int $fileId, bool $notFound, array $affectedTabsByUser = [], bool $supported = true, bool $checked = true): array
     {
         return [
             'file_id' => $fileId,
             'not_found' => $notFound,
             'affected_tabs_by_user' => $affectedTabsByUser,
             'supported' => $supported,
+            'checked' => $checked,
         ];
     }
 }

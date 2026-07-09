@@ -239,3 +239,43 @@ test('downloaded files with failed preview generation do not expose remote previ
     $response->assertJsonPath('file.preview_generation.can_retry', true);
     $response->assertJsonPath('file.preview_generation.message', 'Processor exited with code 1.');
 });
+
+test('downloaded files with unavailable preview generation do not expose remote preview fallbacks', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'facebook.com',
+        'url' => 'https://www.facebook.com/reel/123',
+        'preview_url' => 'https://www.facebook.com/reel/123',
+        'mime_type' => 'video/mp4',
+        'downloaded' => true,
+        'downloaded_at' => now(),
+        'path' => 'downloads/aa/bb/video.mp4',
+        'preview_path' => null,
+        'poster_path' => null,
+    ]);
+    MediaProcessorTask::query()->create([
+        'id' => (string) Str::uuid(),
+        'file_id' => $file->id,
+        'operation' => 'video_preview',
+        'status' => 'failed',
+        'phase' => 'unavailable',
+        'progress' => 100,
+        'storage_profile' => 'atlas-local',
+        'input_path' => $file->path,
+        'output_paths' => [],
+        'failed_at' => now(),
+        'last_event_at' => now(),
+        'error_code' => 'preview_redownload_not_found',
+        'error_message' => 'Original file is missing and the remote source is no longer available.',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('file.preview_url', null);
+    $response->assertJsonPath('file.preview_file_url', null);
+    $response->assertJsonPath('file.poster_url', null);
+    $response->assertJsonPath('file.preview_generation.status', 'unavailable');
+    $response->assertJsonPath('file.preview_generation.can_retry', false);
+    $response->assertJsonPath('file.preview_generation.message', 'Original file is missing and the remote source is no longer available.');
+});

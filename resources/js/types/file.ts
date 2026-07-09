@@ -48,7 +48,7 @@ export interface FileSourceAccess {
 }
 
 export interface FilePreviewGeneration {
-    status: 'ready' | 'missing' | 'queued' | 'submitting' | 'accepted' | 'processing' | 'completed' | 'failed' | string;
+    status: 'ready' | 'missing' | 'queued' | 'submitting' | 'accepted' | 'processing' | 'completed' | 'failed' | 'unavailable' | string;
     can_retry: boolean;
     message: string | null;
     task_id?: string | null;

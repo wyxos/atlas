@@ -68,8 +68,12 @@ const showPreviewGenerationState = computed(() => props.item.downloaded === true
 const canRetryPreviewGeneration = computed(() => showPreviewGenerationState.value
     && Boolean(props.queuePreviewRegeneration)
     && !previewRegenerationQueued.value
-    && (previewGenerationStatus.value === 'failed' || previewGenerationStatus.value === 'missing' || previewGeneration.value?.can_retry === true));
+    && previewGeneration.value?.can_retry === true);
 const previewGenerationTitle = computed(() => {
+    if (previewGenerationStatus.value === 'unavailable' || (previewGeneration.value?.can_retry === false && previewGenerationStatus.value === 'failed')) {
+        return 'Preview unavailable';
+    }
+
     if (previewGenerationStatus.value === 'failed') {
         return 'Preview failed';
     }
@@ -81,7 +85,7 @@ const previewGenerationTitle = computed(() => {
     return 'Generating preview';
 });
 const previewGenerationMessage = computed(() => {
-    if (previewGenerationStatus.value === 'failed') {
+    if (previewGenerationStatus.value === 'unavailable' || previewGenerationStatus.value === 'failed') {
         return previewGeneration.value?.message ?? 'Preview generation failed.';
     }
 
@@ -228,7 +232,7 @@ const showReactions = computed(() => (
             <div class="pointer-events-auto max-w-[13rem] border border-white/15 bg-black/75 p-3 text-center shadow-2xl backdrop-blur">
                 <div class="mb-2 flex justify-center text-danger-200">
                     <Loader2
-                        v-if="previewRegenerationQueued || (previewGenerationStatus !== 'failed' && previewGenerationStatus !== 'missing')"
+                        v-if="previewRegenerationQueued || (previewGenerationStatus !== 'failed' && previewGenerationStatus !== 'missing' && previewGenerationStatus !== 'unavailable')"
                         :size="18"
                         class="animate-spin"
                     />
