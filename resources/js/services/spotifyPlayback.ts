@@ -76,10 +76,6 @@ type SpotifyApiDevice = {
     is_active: boolean;
 };
 
-type SpotifyApiDevicesResponse = {
-    devices?: SpotifyApiDevice[];
-};
-
 type SpotifyApiCurrentPlaybackResponse = {
     device?: SpotifyApiDevice | null;
     is_playing?: boolean;
@@ -244,21 +240,6 @@ async function spotifyApiRequest(path: string, token: string, init: RequestInit)
     }
 }
 
-async function spotifyApiJsonRequest<T>(path: string, token: string): Promise<T> {
-    const response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
-        headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`,
-        },
-    });
-
-    if (!response.ok) {
-        throw await spotifyApiError(response);
-    }
-
-    return await response.json() as T;
-}
-
 async function spotifyApiOptionalJsonRequest<T>(path: string, token: string): Promise<T | null> {
     const response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
         headers: {
@@ -303,37 +284,6 @@ async function delay(milliseconds: number, options?: SpotifyPlayOptions): Promis
     });
 
     assertSpotifyPlaybackCurrent(options);
-}
-
-async function findSpotifyDevice(token: string, deviceId: string): Promise<SpotifyApiDevice | null> {
-    const payload = await spotifyApiJsonRequest<SpotifyApiDevicesResponse>('/me/player/devices', token);
-
-    return payload.devices?.find((device) => device.id === deviceId) ?? null;
-}
-
-async function waitForSpotifyDevice(
-    token: string,
-    deviceId: string,
-    requiresActiveDevice = false,
-    options?: SpotifyPlayOptions,
-): Promise<SpotifyApiDevice> {
-    const startedAt = Date.now();
-
-    do {
-        assertSpotifyPlaybackCurrent(options);
-        const device = await findSpotifyDevice(token, deviceId);
-        assertSpotifyPlaybackCurrent(options);
-
-        if (device && (!requiresActiveDevice || device.is_active)) {
-            return device;
-        }
-
-        await delay(SPOTIFY_DEVICE_READY_POLL_MS, options);
-    } while (Date.now() - startedAt < SPOTIFY_DEVICE_READY_TIMEOUT_MS);
-
-    throw new Error(requiresActiveDevice
-        ? 'Spotify did not switch playback to the Atlas browser player.'
-        : 'The Atlas Spotify browser player is not available in Spotify Connect yet.');
 }
 
 async function currentSpotifyPlayback(token: string): Promise<SpotifyApiCurrentPlaybackResponse | null> {
@@ -476,6 +426,40 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
         return readyPromise;
     }
 
+    function destroyPlayer(): void {
+        player?.disconnect();
+        player = null;
+        deviceId = null;
+        readyPromise = null;
+    }
+
+    function shouldRetryAfterStartupError(error: unknown): boolean {
+        return !isSpotifyPlaybackSuperseded(error)
+            && !isSpotifyPlaybackAuthenticationError(error);
+    }
+
+    async function startPlayback(
+        token: string,
+        uri: string,
+        positionMs: number,
+        options: SpotifyPlayOptions,
+    ): Promise<SpotifyPlaybackSnapshot> {
+        const targetDeviceId = await ensurePlayer(token);
+        assertSpotifyPlaybackCurrent(options);
+
+        await player?.activateElement();
+        assertSpotifyPlaybackCurrent(options);
+        await spotifyApiRequest(`/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}`, token, {
+            method: 'PUT',
+            body: JSON.stringify({
+                position_ms: positionMs,
+                uris: [uri],
+            }),
+        });
+
+        return await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
+    }
+
     return {
         activateElement(): void {
             void player?.activateElement().catch(() => {
@@ -495,10 +479,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             return apiPlaybackToSnapshot(await currentSpotifyPlayback(currentAccessToken), deviceId);
         },
         destroy(): void {
-            player?.disconnect();
-            player = null;
-            deviceId = null;
-            readyPromise = null;
+            destroyPlayer();
         },
         async pause(): Promise<void> {
             if (!player) {
@@ -511,22 +492,25 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             assertSpotifyPlaybackCurrent(options);
             const token = await fetchAccessToken();
             assertSpotifyPlaybackCurrent(options);
-            const targetDeviceId = await ensurePlayer(token);
-            assertSpotifyPlaybackCurrent(options);
             const positionMs = Math.max(0, Math.round(positionSeconds * 1000));
 
-            await player?.activateElement();
-            assertSpotifyPlaybackCurrent(options);
-            await waitForSpotifyDevice(token, targetDeviceId, false, options);
-            assertSpotifyPlaybackCurrent(options);
-            await spotifyApiRequest(`/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}`, token, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    position_ms: positionMs,
-                    uris: [uri],
-                }),
-            });
-            return await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
+            try {
+                return await startPlayback(token, uri, positionMs, options);
+            } catch (error) {
+                if (!shouldRetryAfterStartupError(error)) {
+                    throw error;
+                }
+
+                destroyPlayer();
+                assertSpotifyPlaybackCurrent(options);
+
+                try {
+                    return await startPlayback(token, uri, positionMs, options);
+                } catch (retryError) {
+                    destroyPlayer();
+                    throw retryError;
+                }
+            }
         },
         async seek(positionSeconds: number): Promise<void> {
             if (!player) {
