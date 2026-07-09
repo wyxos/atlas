@@ -2,27 +2,32 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\MediaProcessorTaskStatus;
 use App\Models\File;
 use App\Services\FilePreviewOriginalHealthService;
 use App\Support\FileMimeType;
 use App\Support\FilePreviewGeneration;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\File as FileFacade;
 
 class ReactedPreviewOriginalAuditCommand extends Command
 {
+    private const string STALE_PREVIEW_TASK = 'stale_preview_task';
+
     protected $signature = 'atlas:audit-reacted-preview-originals
         {--from=2026-05-26 : UTC start date, inclusive}
         {--to=2026-05-30 : UTC end date, inclusive}
         {--reaction=love,like,funny : Comma-separated positive reaction types}
+        {--stale-after-minutes=60 : Active preview task age required to report it as stale}
         {--chunk=500 : Chunk size for scanning file IDs}
         {--limit=0 : Max number of affected files to report (0 = no limit)}
         {--output= : Exact report directory; defaults to storage/app/reports/reacted-preview-originals/<timestamp>}
         {--json : Output the aggregate report as JSON}';
 
-    protected $description = 'Audit positive-reacted downloaded files whose originals cannot generate previews.';
+    protected $description = 'Audit positive-reacted downloaded files with unhealthy originals or stalled preview generation.';
 
     public function handle(FilePreviewOriginalHealthService $health): int
     {
@@ -65,12 +70,16 @@ class ReactedPreviewOriginalAuditCommand extends Command
         ];
         $limit = max(0, (int) $this->option('limit'));
         $remaining = $limit;
+        $staleAfterMinutes = max(1, (int) $this->option('stale-after-minutes'));
+        $staleBefore = CarbonImmutable::now('UTC')->subMinutes($staleAfterMinutes);
+        $summary['stale_after_minutes'] = $staleAfterMinutes;
 
         $this->baseQuery($window['start'], $window['end_exclusive'], $reactionTypes)
             ->chunkById(max(1, (int) $this->option('chunk')), function ($files) use (
                 $health,
                 $handle,
                 $limit,
+                $staleBefore,
                 &$remaining,
                 &$summary,
             ): bool {
@@ -81,6 +90,7 @@ class ReactedPreviewOriginalAuditCommand extends Command
 
                     $summary['files_scanned']++;
                     $state = $health->inspect($file);
+                    $state = $this->withStalePreviewTask($file, $state, $staleBefore);
                     if (! $state['previewable']) {
                         $summary['unsupported_files_skipped']++;
 
@@ -142,10 +152,14 @@ class ReactedPreviewOriginalAuditCommand extends Command
             ->select([
                 'id',
                 'source',
+                'url',
+                'referrer_url',
                 'mime_type',
                 'downloaded',
                 'downloaded_at',
+                'imported_at',
                 'path',
+                'preview_url',
                 'preview_path',
                 'poster_path',
                 'size',
@@ -155,6 +169,7 @@ class ReactedPreviewOriginalAuditCommand extends Command
                 ->select(['id', 'file_id', 'type', 'created_at'])
                 ->whereIn('type', $reactionTypes)
                 ->orderBy('created_at')])
+            ->with('latestPreviewMediaProcessorTask')
             ->where('downloaded_at', '>=', $start)
             ->where('downloaded_at', '<', $endExclusive)
             ->whereHas('reactions', fn (Builder $query): Builder => $query->whereIn('type', $reactionTypes))
@@ -182,6 +197,66 @@ class ReactedPreviewOriginalAuditCommand extends Command
                 });
             })
             ->orderBy('id');
+    }
+
+    /**
+     * @param  array{
+     *     previewable: bool,
+     *     healthy: bool,
+     *     reason_codes: list<string>,
+     *     expected_size: int|null,
+     *     actual_size: int|null,
+     *     message: string|null,
+     *     recommended_action: string
+     * }  $health
+     * @return array{
+     *     previewable: bool,
+     *     healthy: bool,
+     *     reason_codes: list<string>,
+     *     expected_size: int|null,
+     *     actual_size: int|null,
+     *     message: string|null,
+     *     recommended_action: string
+     * }
+     */
+    private function withStalePreviewTask(File $file, array $health, CarbonImmutable $staleBefore): array
+    {
+        if (! $this->hasStalePreviewTask($file, $staleBefore)) {
+            return $health;
+        }
+
+        $originalHealthy = $health['healthy'];
+        $health['healthy'] = false;
+        $health['reason_codes'][] = self::STALE_PREVIEW_TASK;
+        $health['reason_codes'] = array_values(array_unique($health['reason_codes']));
+
+        if ($originalHealthy) {
+            $health['message'] = 'Preview generation task has stopped making progress.';
+            $health['recommended_action'] = 'retry_preview_generation';
+        }
+
+        return $health;
+    }
+
+    private function hasStalePreviewTask(File $file, CarbonImmutable $staleBefore): bool
+    {
+        $task = $file->latestPreviewMediaProcessorTask;
+        if (! $task || ! in_array($task->status, MediaProcessorTaskStatus::active(), true)) {
+            return false;
+        }
+
+        $latestActivity = collect([
+            $task->last_event_at,
+            $task->started_at,
+            $task->submitted_at,
+            $task->updated_at,
+            $task->created_at,
+        ])->filter(fn (mixed $timestamp): bool => $timestamp instanceof DateTimeInterface)
+            ->sortByDesc(fn (DateTimeInterface $timestamp): int => $timestamp->getTimestamp())
+            ->first();
+
+        return $latestActivity instanceof DateTimeInterface
+            && CarbonImmutable::instance($latestActivity)->utc()->lte($staleBefore);
     }
 
     /**
