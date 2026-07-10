@@ -5,26 +5,23 @@ namespace App\Http\Controllers;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Jobs\Downloads\PumpDomainDownloads;
+use App\Jobs\Downloads\PumpDomainDownloadsAfterYtDlpRelease;
 use App\Jobs\Downloads\RemoveDownloadTransfers;
-use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
-use App\Models\File;
 use App\Services\Downloads\DownloadTransferActionAvailability;
 use App\Services\Downloads\DownloadTransferActionSupport;
-use App\Services\Downloads\DownloadTransferExecutionLock;
+use App\Services\Downloads\DownloadTransferActionTransition;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRemovalService;
-use App\Services\Downloads\DownloadTransferTempDirectory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Storage;
 
 class DownloadTransferActionsController extends Controller
 {
     public function __construct(
         private readonly DownloadTransferRemovalService $transferRemovalService,
         private readonly DownloadTransferActionSupport $actionSupport,
+        private readonly DownloadTransferActionTransition $actionTransition,
     ) {}
 
     public function pause(DownloadTransfer $downloadTransfer): JsonResponse
@@ -35,14 +32,12 @@ class DownloadTransferActionsController extends Controller
             ], 409);
         }
 
-        $this->cancelBatch($downloadTransfer);
-
-        $downloadTransfer->update([
-            'status' => DownloadTransferStatus::PAUSED,
-        ]);
-
+        $releasedDomain = $downloadTransfer->domain;
+        if (! $this->actionTransition->pause($downloadTransfer)) {
+            return response()->json(['message' => 'Download is no longer active.'], 409);
+        }
         $this->broadcastState($downloadTransfer);
-        $this->dispatchPumpIfReady($downloadTransfer);
+        $this->dispatchPumpIfReady($downloadTransfer, $releasedDomain);
 
         return response()->json([
             'message' => 'Download paused.',
@@ -61,16 +56,17 @@ class DownloadTransferActionsController extends Controller
             ], 409);
         }
 
-        if ($downloadTransfer->status === DownloadTransferStatus::PAUSED) {
-            $this->cleanupTransferParts($downloadTransfer);
-            $this->resetTransferProgress($downloadTransfer);
-        } else {
-            $this->queueTransferForResume($downloadTransfer);
+        $releasedDomain = $downloadTransfer->domain;
+        $resumed = $downloadTransfer->status === DownloadTransferStatus::PAUSED
+            ? $this->actionTransition->resumeFromScratch($downloadTransfer)
+            : $this->actionTransition->resumeFailed($downloadTransfer);
+        if (! $resumed) {
+            return response()->json(['message' => 'Download is no longer resumable.'], 409);
         }
 
         $this->broadcastState($downloadTransfer);
 
-        $this->dispatchPumpIfReady($downloadTransfer);
+        $this->dispatchPumpIfReady($downloadTransfer, $releasedDomain);
 
         return response()->json([
             'message' => 'Download resumed.',
@@ -85,16 +81,12 @@ class DownloadTransferActionsController extends Controller
             ], 409);
         }
 
-        $this->cancelBatch($downloadTransfer);
-        $this->cleanupTransferParts($downloadTransfer);
-
-        $downloadTransfer->update([
-            'status' => DownloadTransferStatus::CANCELED,
-        ]);
-
-        $this->resetFileProgress($downloadTransfer);
+        $releasedDomain = $downloadTransfer->domain;
+        if (! $this->actionTransition->cancel($downloadTransfer)) {
+            return response()->json(['message' => 'Download is no longer cancelable.'], 409);
+        }
         $this->broadcastState($downloadTransfer);
-        $this->dispatchPumpIfReady($downloadTransfer);
+        $this->dispatchPumpIfReady($downloadTransfer, $releasedDomain);
 
         return response()->json([
             'message' => 'Download canceled.',
@@ -122,12 +114,14 @@ class DownloadTransferActionsController extends Controller
                 continue;
             }
 
-            $this->cancelBatch($transfer);
-            $transfer->update([
-                'status' => DownloadTransferStatus::PAUSED,
-            ]);
+            $releasedDomain = $transfer->domain;
+            if (! $this->actionTransition->pause($transfer)) {
+                $skippedIds[] = $transfer->id;
+
+                continue;
+            }
             $this->broadcastState($transfer);
-            $this->dispatchPumpIfReady($transfer);
+            $this->dispatchPumpIfReady($transfer, $releasedDomain);
             $pausedIds[] = $transfer->id;
         }
 
@@ -159,14 +153,14 @@ class DownloadTransferActionsController extends Controller
                 continue;
             }
 
-            $this->cancelBatch($transfer);
-            $this->cleanupTransferParts($transfer);
-            $transfer->update([
-                'status' => DownloadTransferStatus::CANCELED,
-            ]);
-            $this->resetFileProgress($transfer);
+            $releasedDomain = $transfer->domain;
+            if (! $this->actionTransition->cancel($transfer)) {
+                $skippedIds[] = $transfer->id;
+
+                continue;
+            }
             $this->broadcastState($transfer);
-            $this->dispatchPumpIfReady($transfer);
+            $this->dispatchPumpIfReady($transfer, $releasedDomain);
             $canceledIds[] = $transfer->id;
         }
 
@@ -189,13 +183,14 @@ class DownloadTransferActionsController extends Controller
             ], 409);
         }
 
-        $this->cancelBatch($downloadTransfer);
-        $this->cleanupTransferParts($downloadTransfer);
-        $this->resetTransferProgress($downloadTransfer);
+        $releasedDomain = $downloadTransfer->domain;
+        if (! $this->actionTransition->restart($downloadTransfer)) {
+            return response()->json(['message' => 'Download is no longer restartable.'], 409);
+        }
 
         $this->broadcastState($downloadTransfer);
 
-        $this->dispatchPumpIfReady($downloadTransfer);
+        $this->dispatchPumpIfReady($downloadTransfer, $releasedDomain);
 
         return response()->json([
             'message' => 'Download restarted.',
@@ -351,95 +346,6 @@ class DownloadTransferActionsController extends Controller
         ]);
     }
 
-    private function cancelBatch(DownloadTransfer $downloadTransfer): void
-    {
-        if (! $downloadTransfer->batch_id) {
-            return;
-        }
-
-        $batch = Bus::findBatch($downloadTransfer->batch_id);
-        if ($batch) {
-            $batch->cancel();
-        }
-    }
-
-    private function cleanupTransferParts(DownloadTransfer $downloadTransfer): void
-    {
-        $downloadTransfer->loadMissing('file');
-
-        DownloadChunk::query()
-            ->where('download_transfer_id', $downloadTransfer->id)
-            ->delete();
-
-        if ($this->shouldDeferYtDlpTempCleanup($downloadTransfer)) {
-            return;
-        }
-
-        $disk = Storage::disk(config('downloads.disk'));
-        $tmpDir = app(DownloadTransferTempDirectory::class)->forTransfer($downloadTransfer);
-
-        if ($disk->exists($tmpDir)) {
-            $disk->deleteDirectory($tmpDir);
-        }
-    }
-
-    private function resetTransferProgress(DownloadTransfer $downloadTransfer): void
-    {
-        $downloadTransfer->loadMissing('file');
-
-        $updates = [
-            'status' => DownloadTransferStatus::PENDING,
-            'bytes_total' => null,
-            'bytes_downloaded' => 0,
-            'last_broadcast_percent' => 0,
-            'queued_at' => null,
-            'started_at' => null,
-            'finished_at' => null,
-            'failed_at' => null,
-            'batch_id' => null,
-            'error' => null,
-        ];
-
-        if ($downloadTransfer->file?->url) {
-            $freshUrl = (string) $downloadTransfer->file->url;
-            $updates['url'] = $freshUrl;
-
-            $host = parse_url($freshUrl, PHP_URL_HOST);
-            if ($host) {
-                $updates['domain'] = strtolower($host);
-            }
-        }
-
-        if ($this->isYtDlpTransfer($downloadTransfer)) {
-            $updates['attempt'] = ((int) ($downloadTransfer->attempt ?? 0)) + 1;
-        }
-
-        $downloadTransfer->update($updates);
-
-        $this->resetFileProgress($downloadTransfer);
-    }
-
-    private function queueTransferForResume(DownloadTransfer $downloadTransfer): void
-    {
-        $downloadTransfer->update([
-            'status' => DownloadTransferStatus::PENDING,
-            'queued_at' => null,
-            'started_at' => null,
-            'finished_at' => null,
-            'failed_at' => null,
-            'batch_id' => null,
-            'error' => null,
-        ]);
-    }
-
-    private function resetFileProgress(DownloadTransfer $downloadTransfer): void
-    {
-        File::query()->whereKey($downloadTransfer->file_id)->update([
-            'download_progress' => 0,
-            'updated_at' => now(),
-        ]);
-    }
-
     private function broadcastState(DownloadTransfer $downloadTransfer): void
     {
         $downloadTransfer->refresh();
@@ -453,25 +359,17 @@ class DownloadTransferActionsController extends Controller
         }
     }
 
-    private function dispatchPumpIfReady(DownloadTransfer $downloadTransfer): void
+    private function dispatchPumpIfReady(DownloadTransfer $downloadTransfer, string $releasedDomain): void
     {
-        $downloadTransfer->loadMissing('file');
+        if ($this->actionTransition->shouldDeferPump($downloadTransfer)) {
+            PumpDomainDownloadsAfterYtDlpRelease::dispatch($downloadTransfer->id, $releasedDomain)
+                ->delay(now()->addSeconds(5));
 
-        if ($this->shouldDeferYtDlpTempCleanup($downloadTransfer)) {
             return;
         }
 
-        PumpDomainDownloads::dispatch($downloadTransfer->domain);
-    }
-
-    private function shouldDeferYtDlpTempCleanup(DownloadTransfer $downloadTransfer): bool
-    {
-        return $this->isYtDlpTransfer($downloadTransfer)
-            && app(DownloadTransferExecutionLock::class)->isYtDlpActive($downloadTransfer->id);
-    }
-
-    private function isYtDlpTransfer(DownloadTransfer $downloadTransfer): bool
-    {
-        return data_get($downloadTransfer->file?->listing_metadata, 'download_via') === 'yt-dlp';
+        foreach (array_unique(array_filter([$releasedDomain, $downloadTransfer->domain])) as $domain) {
+            PumpDomainDownloads::dispatch($domain);
+        }
     }
 }

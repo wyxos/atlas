@@ -3,16 +3,36 @@
 use App\Enums\DownloadChunkStatus;
 use App\Enums\DownloadTransferStatus;
 use App\Jobs\Downloads\PumpDomainDownloads;
+use App\Jobs\Downloads\PumpDomainDownloadsAfterYtDlpRelease;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\User;
+use App\Services\Downloads\DownloadTransferActionTransition;
 use App\Services\Downloads\DownloadTransferExecutionLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
+
+it('does not let a stale paused resume overwrite a concurrent cancel', function () {
+    Storage::fake('atlas');
+    $file = File::factory()->create(['url' => 'https://example.test/file.bin']);
+    $paused = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.test',
+        'status' => DownloadTransferStatus::PAUSED,
+        'attempt' => 1,
+    ]);
+    $stalePaused = $paused->replicate()->setAttribute('id', $paused->id);
+
+    expect(app(DownloadTransferActionTransition::class)->cancel($paused))->toBeTrue()
+        ->and(app(DownloadTransferActionTransition::class)->resumeFromScratch($stalePaused))->toBeFalse()
+        ->and($paused->fresh()->status)->toBe(DownloadTransferStatus::CANCELED)
+        ->and($paused->fresh()->attempt)->toBe(1);
+});
 
 it('pauses an active transfer', function () {
     $user = User::factory()->create();
@@ -138,8 +158,8 @@ it('rejects resume for failed transfers that require a scratch restart', functio
 
     $transfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,
-        'url' => $file->url,
-        'domain' => 'example.com',
+        'url' => 'https://old.example.test/watch/restart-race',
+        'domain' => 'old.example.test',
         'status' => DownloadTransferStatus::FAILED,
         'bytes_total' => null,
         'bytes_downloaded' => 42,
@@ -200,6 +220,7 @@ it('cancels an active transfer and clears progress', function () {
 });
 
 it('keeps active yt-dlp fragments on cancel until the running process exits', function () {
+    Bus::fake();
     Storage::fake('atlas');
 
     $user = User::factory()->create();
@@ -234,6 +255,12 @@ it('keeps active yt-dlp fragments on cancel until the running process exits', fu
     expect($transfer->status)->toBe(DownloadTransferStatus::CANCELED);
     expect($file->download_progress)->toBe(0);
     Storage::disk('atlas')->assertExists($fragmentPath);
+    Bus::assertDispatched(PumpDomainDownloadsAfterYtDlpRelease::class, function (PumpDomainDownloadsAfterYtDlpRelease $job) use ($transfer): bool {
+        return $job->downloadTransferId === $transfer->id
+            && $job->releasedDomain === 'example.com'
+            && $job->delay !== null;
+    });
+    Bus::assertNotDispatched(PumpDomainDownloads::class);
 
     $lock?->release();
 });
@@ -272,6 +299,81 @@ it('restarts a canceled transfer', function () {
     Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'example.com');
 });
 
+it('restarts a native yt-dlp fallback with its retained direct asset', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $assetUrl = 'https://assets.example.test/video.mp4';
+    $file = File::factory()->create([
+        'url' => 'https://pages.example.test/posts/123',
+        'preview_url' => $assetUrl,
+        'listing_metadata' => [
+            'download_via_reason' => 'yt-dlp-unsupported-native-fallback',
+            'extension_channel' => 'stable',
+            'tag_name' => 'video',
+        ],
+    ]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $assetUrl,
+        'domain' => 'assets.example.test',
+        'status' => DownloadTransferStatus::FAILED,
+        'failed_at' => now(),
+        'error' => 'Native fallback failed.',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/restart");
+
+    $response->assertSuccessful();
+
+    $transfer->refresh();
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::PENDING)
+        ->and($transfer->url)->toBe($assetUrl)
+        ->and($transfer->domain)->toBe('assets.example.test')
+        ->and($transfer->attempt)->toBe(1);
+
+    Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'assets.example.test');
+});
+
+it('treats a marked native fallback as native even if a stale yt-dlp marker remains', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $assetUrl = 'https://assets.example.test/media.mp4';
+    $file = File::factory()->create([
+        'url' => 'https://page.example.test/watch/1',
+        'preview_url' => $assetUrl,
+        'listing_metadata' => [
+            'download_via' => 'yt-dlp',
+            'download_via_reason' => 'yt-dlp-unsupported-native-fallback',
+            'extension_channel' => 'stable',
+            'tag_name' => 'video',
+        ],
+    ]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $assetUrl,
+        'domain' => 'assets.example.test',
+        'status' => DownloadTransferStatus::FAILED,
+        'attempt' => 3,
+        'failed_at' => now(),
+        'error' => 'Native fallback failed.',
+    ]);
+    $lock = app(DownloadTransferExecutionLock::class)->acquireYtDlp($transfer->id, 30);
+
+    try {
+        $response = $this->actingAs($user)->postJson("/api/download-transfers/{$transfer->id}/restart");
+    } finally {
+        $lock?->release();
+    }
+
+    $response->assertSuccessful();
+    expect($transfer->fresh()->status)->toBe(DownloadTransferStatus::PENDING)
+        ->and($transfer->fresh()->attempt)->toBe(4);
+    Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'assets.example.test');
+});
+
 it('defers restarting yt-dlp until the superseded process releases the transfer lock', function () {
     Bus::fake();
     Storage::fake('atlas');
@@ -284,8 +386,8 @@ it('defers restarting yt-dlp until the superseded process releases the transfer 
     File::query()->whereKey($file->id)->update(['download_progress' => 40]);
     $transfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,
-        'url' => $file->url,
-        'domain' => 'example.com',
+        'url' => 'https://old.example.test/watch/restart-race',
+        'domain' => 'old.example.test',
         'status' => DownloadTransferStatus::CANCELED,
         'attempt' => 0,
         'bytes_total' => null,
@@ -307,11 +409,17 @@ it('defers restarting yt-dlp until the superseded process releases the transfer 
 
     expect($transfer->status)->toBe(DownloadTransferStatus::PENDING);
     expect($transfer->attempt)->toBe(1);
+    expect($transfer->domain)->toBe('example.com');
     expect($transfer->bytes_downloaded)->toBe(0);
     expect($transfer->last_broadcast_percent)->toBe(0);
     expect($file->download_progress)->toBe(0);
 
     Storage::disk('atlas')->assertExists($fragmentPath);
+    Bus::assertDispatched(PumpDomainDownloadsAfterYtDlpRelease::class, function (PumpDomainDownloadsAfterYtDlpRelease $job) use ($transfer): bool {
+        return $job->downloadTransferId === $transfer->id
+            && $job->releasedDomain === 'old.example.test'
+            && $job->delay !== null;
+    });
     Bus::assertNotDispatched(PumpDomainDownloads::class);
 
     $lock?->release();

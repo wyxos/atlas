@@ -8,10 +8,14 @@ use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadFailureMessage;
+use App\Services\Downloads\DownloadTransferGeneration;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\NativeFallbackMediaValidator;
+use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,11 +39,15 @@ class DownloadTransferChunk implements ShouldQueue
 
     public int $timeout = 600;
 
+    public ?int $attempt = null;
+
     public function __construct(
         public int $downloadTransferId,
         public int $downloadChunkId,
-        public ?string $contentTypeHeader = null
+        public ?string $contentTypeHeader = null,
+        ?int $attempt = null,
     ) {
+        $this->attempt = $attempt;
         $this->onQueue('downloads');
     }
 
@@ -48,12 +56,15 @@ class DownloadTransferChunk implements ShouldQueue
      */
     public function handle(
         DownloadTransferProgressBroadcaster $broadcaster,
-        ?DownloadTransferRequestOptions $requestOptions = null
+        ?DownloadTransferRequestOptions $requestOptions = null,
+        ?NativeFallbackMediaValidator $mediaValidator = null,
     ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
+        $mediaValidator ??= app(NativeFallbackMediaValidator::class);
+        $this->attempt ??= 0;
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
-        if (! $transfer || $transfer->status !== DownloadTransferStatus::DOWNLOADING) {
+        if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [DownloadTransferStatus::DOWNLOADING])) {
             return;
         }
 
@@ -88,6 +99,11 @@ class DownloadTransferChunk implements ShouldQueue
                 ->withOptions(['stream' => true])
                 ->get($transfer->url);
 
+            $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+            if (! $transfer) {
+                return;
+            }
+
             if (! $this->isValidRangeResponse($response)) {
                 if ($this->shouldRetryStatus($response->status())) {
                     $this->scheduleRetry($transfer, $chunk, "Received HTTP {$response->status()} for {$rangeHeader}.");
@@ -100,13 +116,28 @@ class DownloadTransferChunk implements ShouldQueue
                 return;
             }
 
+            $nativeRejection = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer)
+                ? $mediaValidator->rejectionForContentType($response->header('Content-Type'))
+                : null;
+            if ($nativeRejection !== null) {
+                $this->failTransfer($transfer, $chunk, $nativeRejection);
+
+                return;
+            }
+
             if ($transfer->error !== null || $transfer->failed_at !== null) {
-                DownloadTransfer::query()->whereKey($transfer->id)->update([
+                $updated = DownloadTransferGeneration::update($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING], [
                     'failed_at' => null,
                     'error' => null,
                     'updated_at' => now(),
                 ]);
-                $transfer->refresh();
+                if ($updated === 0) {
+                    return;
+                }
+                $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+                if (! $transfer) {
+                    return;
+                }
             }
 
             $disk = Storage::disk(config('downloads.disk'));
@@ -157,7 +188,7 @@ class DownloadTransferChunk implements ShouldQueue
                     if ($this->shouldStop($transfer->id, $chunk, $fh)) {
                         return;
                     }
-                    $broadcaster->maybeBroadcast($transfer->id);
+                    $broadcaster->maybeBroadcast($transfer->id, $this->attempt);
                 }
             }
 
@@ -172,12 +203,28 @@ class DownloadTransferChunk implements ShouldQueue
                 return;
             }
 
+            $nativeRejection = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer)
+                ? $mediaValidator->rejectionForArtifact($absolutePartPath, $response->header('Content-Type'))
+                : null;
+            if ($nativeRejection !== null) {
+                $this->failTransfer($transfer, $chunk, $nativeRejection);
+                $disk->delete($chunk->part_path);
+
+                return;
+            }
+
+            if (! DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING])) {
+                $disk->delete($chunk->part_path);
+
+                return;
+            }
+
             $chunk->update([
                 'status' => DownloadChunkStatus::COMPLETED,
                 'finished_at' => now(),
             ]);
 
-            $broadcaster->maybeBroadcast($transfer->id);
+            $broadcaster->maybeBroadcast($transfer->id, $this->attempt);
         } catch (Throwable $e) {
             if (is_resource($fh)) {
                 fclose($fh);
@@ -197,11 +244,12 @@ class DownloadTransferChunk implements ShouldQueue
 
     public function failed(Throwable $e): void
     {
+        $this->attempt ??= 0;
         $transfer = DownloadTransfer::query()->find($this->downloadTransferId);
-        if (! $transfer || ! in_array($transfer->status, [
+        if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [
             DownloadTransferStatus::DOWNLOADING,
             DownloadTransferStatus::ASSEMBLING,
-        ], true)) {
+        ])) {
             return;
         }
 
@@ -219,8 +267,8 @@ class DownloadTransferChunk implements ShouldQueue
 
     private function shouldStop(int $transferId, DownloadChunk $chunk, $fh): bool
     {
-        $status = DownloadTransfer::query()->whereKey($transferId)->value('status');
-        if ($status === DownloadTransferStatus::DOWNLOADING) {
+        $state = DownloadTransfer::query()->whereKey($transferId)->first(['status', 'attempt']);
+        if (DownloadTransferGeneration::matches($state, $this->attempt, [DownloadTransferStatus::DOWNLOADING])) {
             return false;
         }
 
@@ -229,7 +277,7 @@ class DownloadTransferChunk implements ShouldQueue
         }
 
         $chunk->update([
-            'status' => $status === DownloadTransferStatus::PAUSED
+            'status' => $state?->status === DownloadTransferStatus::PAUSED
                 ? DownloadChunkStatus::PAUSED
                 : DownloadChunkStatus::CANCELED,
             'finished_at' => now(),
@@ -253,29 +301,44 @@ class DownloadTransferChunk implements ShouldQueue
             return;
         }
 
-        DownloadTransfer::query()->whereKey($transferId)->increment('bytes_downloaded', $pendingBytes);
-        DownloadChunk::query()->whereKey($chunkId)->increment('bytes_downloaded', $pendingBytes);
+        DB::transaction(function () use ($transferId, $chunkId, $pendingBytes): void {
+            $transfer = DownloadTransfer::query()->lockForUpdate()->find($transferId);
+            if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [DownloadTransferStatus::DOWNLOADING])) {
+                return;
+            }
+
+            $transfer->increment('bytes_downloaded', $pendingBytes);
+            DownloadChunk::query()->whereKey($chunkId)->increment('bytes_downloaded', $pendingBytes);
+        });
         $pendingBytes = 0;
     }
 
     private function failTransfer(DownloadTransfer $transfer, ?DownloadChunk $chunk, string $message): void
     {
-        if ($chunk) {
-            $chunk->update([
-                'status' => DownloadChunkStatus::FAILED,
+        $failed = DownloadTransferGeneration::runLocked($transfer->id, $this->attempt, [
+            DownloadTransferStatus::DOWNLOADING,
+            DownloadTransferStatus::ASSEMBLING,
+        ], function (DownloadTransfer $current) use ($chunk, $message): void {
+            $safeMessage = DownloadFailureMessage::normalize($message);
+            if ($chunk) {
+                DownloadChunk::query()->whereKey($chunk->id)->update([
+                    'status' => DownloadChunkStatus::FAILED,
+                    'failed_at' => now(),
+                    'error' => $safeMessage,
+                ]);
+            }
+            $current->forceFill([
+                'status' => DownloadTransferStatus::FAILED,
                 'failed_at' => now(),
-                'error' => $message,
-            ]);
+                'error' => $safeMessage,
+            ])->save();
+            app(DownloadTransferRuntimeStore::class)->forgetForTransfer($current->id);
+        });
+        if (! $failed) {
+            return;
         }
 
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'status' => DownloadTransferStatus::FAILED,
-            'failed_at' => now(),
-            'error' => $message,
-        ]);
-        app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
-
-        $updated = DownloadTransfer::query()->find($transfer->id);
+        $updated = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::FAILED]);
         if ($updated) {
             try {
                 event(new DownloadTransferProgressUpdated(
@@ -325,27 +388,46 @@ class DownloadTransferChunk implements ShouldQueue
         $delay = max(1, (int) $this->backoff);
         $attempt = max(1, $this->attempts());
         $message = $this->retryMessage($attempt, $delay, $reason);
-
-        if ($chunk) {
-            $this->resetChunkProgressForRetry($transfer, $chunk);
-
-            DownloadChunk::query()->whereKey($chunk->id)->update([
-                'status' => DownloadChunkStatus::PENDING,
-                'bytes_downloaded' => 0,
-                'finished_at' => null,
-                'failed_at' => null,
-                'error' => $message,
-                'updated_at' => now(),
-            ]);
+        $scheduled = DownloadTransferGeneration::runLocked(
+            $transfer->id,
+            $this->attempt,
+            [DownloadTransferStatus::DOWNLOADING],
+            function (DownloadTransfer $current) use ($chunk, $message): void {
+                $chunkBytes = max(0, (int) ($chunk?->bytes_downloaded ?? 0));
+                if ($chunkBytes > 0) {
+                    $current->forceFill([
+                        'bytes_downloaded' => max(0, (int) $current->bytes_downloaded - $chunkBytes),
+                    ]);
+                }
+                $boundary = $this->retryPercentBoundary(
+                    max(0, (int) $current->bytes_downloaded),
+                    $current->bytes_total,
+                );
+                $current->forceFill([
+                    'last_broadcast_percent' => $boundary,
+                    'failed_at' => null,
+                    'error' => $message,
+                ])->save();
+                if ($chunk) {
+                    DownloadChunk::query()->whereKey($chunk->id)->update([
+                        'status' => DownloadChunkStatus::PENDING,
+                        'bytes_downloaded' => 0,
+                        'finished_at' => null,
+                        'failed_at' => null,
+                        'error' => $message,
+                    ]);
+                }
+                File::query()->whereKey($current->file_id)->update([
+                    'download_progress' => $boundary,
+                    'updated_at' => now(),
+                ]);
+            },
+        );
+        if (! $scheduled) {
+            return;
         }
 
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'failed_at' => null,
-            'error' => $message,
-            'updated_at' => now(),
-        ]);
-
-        $updated = DownloadTransfer::query()->find($transfer->id);
+        $updated = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
         if ($updated) {
             try {
                 event(new DownloadTransferProgressUpdated(
@@ -357,40 +439,6 @@ class DownloadTransferChunk implements ShouldQueue
         }
 
         $this->release($delay);
-    }
-
-    private function resetChunkProgressForRetry(DownloadTransfer $transfer, DownloadChunk $chunk): void
-    {
-        $chunkBytes = max(0, (int) ($chunk->bytes_downloaded ?? 0));
-
-        if ($chunkBytes > 0) {
-            DownloadTransfer::query()->whereKey($transfer->id)->update([
-                'bytes_downloaded' => DB::raw("CASE WHEN bytes_downloaded >= {$chunkBytes} THEN bytes_downloaded - {$chunkBytes} ELSE 0 END"),
-                'updated_at' => now(),
-            ]);
-        }
-
-        $updatedTransfer = DownloadTransfer::query()->find($transfer->id);
-        if (! $updatedTransfer) {
-            return;
-        }
-
-        $boundary = $this->retryPercentBoundary(
-            max(0, (int) ($updatedTransfer->bytes_downloaded ?? 0)),
-            $updatedTransfer->bytes_total,
-        );
-
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'last_broadcast_percent' => $boundary,
-            'updated_at' => now(),
-        ]);
-
-        if ($transfer->file_id) {
-            File::query()->whereKey($transfer->file_id)->update([
-                'download_progress' => $boundary,
-                'updated_at' => now(),
-            ]);
-        }
     }
 
     private function retryPercentBoundary(int $bytesDownloaded, ?int $bytesTotal): int
@@ -407,10 +455,8 @@ class DownloadTransferChunk implements ShouldQueue
 
     private function retryMessage(int $attempt, int $delay, string $reason): string
     {
-        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $reason));
-        if ($cleanReason === '') {
-            $cleanReason = 'Transient network error.';
-        }
+        $cleanReason = DownloadFailureMessage::normalize($reason, 'Transient network error.');
+        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $cleanReason));
 
         return "Retry {$attempt}/{$this->tries} scheduled in {$delay}s: {$cleanReason}";
     }

@@ -6,11 +6,16 @@ use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadFailureMessage;
+use App\Services\Downloads\DownloadTransferGeneration;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\Downloads\FileDownloadFinalizer;
+use App\Services\Downloads\NativeFallbackMediaValidator;
+use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,10 +35,14 @@ class DownloadTransferSingleStream implements ShouldQueue
 
     public int $backoff = 30;
 
+    public ?int $attempt = null;
+
     public function __construct(
         public int $downloadTransferId,
-        public ?string $contentTypeHeader = null
+        public ?string $contentTypeHeader = null,
+        ?int $attempt = null,
     ) {
+        $this->attempt = $attempt;
         $this->onQueue('downloads');
     }
 
@@ -43,9 +52,14 @@ class DownloadTransferSingleStream implements ShouldQueue
     public function handle(
         FileDownloadFinalizer $finalizer,
         DownloadTransferProgressBroadcaster $broadcaster,
-        ?DownloadTransferRequestOptions $requestOptions = null
+        ?DownloadTransferRequestOptions $requestOptions = null,
+        ?NativeFallbackMediaValidator $mediaValidator = null,
+        ?DownloadTransferTempDirectory $tempDirectory = null,
     ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
+        $mediaValidator ??= app(NativeFallbackMediaValidator::class);
+        $tempDirectory ??= app(DownloadTransferTempDirectory::class);
+        $this->attempt ??= 0;
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
@@ -55,7 +69,7 @@ class DownloadTransferSingleStream implements ShouldQueue
         $fh = null;
 
         try {
-            if ($transfer->status !== DownloadTransferStatus::DOWNLOADING) {
+            if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [DownloadTransferStatus::DOWNLOADING])) {
                 return;
             }
 
@@ -66,6 +80,11 @@ class DownloadTransferSingleStream implements ShouldQueue
             $response = Http::timeout($timeout)->withHeaders($headers)
                 ->withOptions(['stream' => true])
                 ->get($transfer->url);
+
+            $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+            if (! $transfer) {
+                return;
+            }
 
             if (! $this->isValidResponse($response)) {
                 if ($this->shouldRetryStatus($response->status())) {
@@ -79,37 +98,64 @@ class DownloadTransferSingleStream implements ShouldQueue
                 return;
             }
 
+            $nativeRejection = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer)
+                ? $mediaValidator->rejectionForContentType($response->header('Content-Type'))
+                : null;
+            if ($nativeRejection !== null) {
+                $this->failTransfer($transfer, $nativeRejection);
+
+                return;
+            }
+
             if ($transfer->error !== null || $transfer->failed_at !== null) {
-                $transfer->update([
-                    'failed_at' => null,
-                    'error' => null,
-                    'updated_at' => now(),
-                ]);
-                $transfer->refresh();
+                $updated = DownloadTransferGeneration::runLocked(
+                    $transfer->id,
+                    $this->attempt,
+                    [DownloadTransferStatus::DOWNLOADING],
+                    function (DownloadTransfer $current): void {
+                        $current->forceFill(['failed_at' => null, 'error' => null])->save();
+                    },
+                );
+                if (! $updated) {
+                    return;
+                }
+                $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+                if (! $transfer) {
+                    return;
+                }
             }
 
             if (! $transfer->bytes_total) {
                 $contentLength = $response->header('Content-Length');
                 $totalBytes = is_numeric($contentLength) && (int) $contentLength > 0 ? (int) $contentLength : null;
                 if ($totalBytes) {
-                    $transfer->update([
-                        'bytes_total' => $totalBytes,
-                        'bytes_downloaded' => 0,
-                        'last_broadcast_percent' => 0,
-                        'updated_at' => now(),
-                    ]);
-                    if ($transfer->file && (! $transfer->file->size || $transfer->file->size <= 0)) {
-                        $transfer->file->update([
-                            'size' => $totalBytes,
-                            'updated_at' => now(),
-                        ]);
+                    $updated = DownloadTransferGeneration::runLocked(
+                        $transfer->id,
+                        $this->attempt,
+                        [DownloadTransferStatus::DOWNLOADING],
+                        function (DownloadTransfer $current) use ($totalBytes): void {
+                            $current->forceFill([
+                                'bytes_total' => $totalBytes,
+                                'bytes_downloaded' => 0,
+                                'last_broadcast_percent' => 0,
+                            ])->save();
+                            if (! $current->file->size || $current->file->size <= 0) {
+                                $current->file->update(['size' => $totalBytes, 'updated_at' => now()]);
+                            }
+                        },
+                    );
+                    if (! $updated) {
+                        return;
                     }
-                    $transfer->refresh();
+                    $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+                    if (! $transfer) {
+                        return;
+                    }
                 }
             }
             $disk = Storage::disk(config('downloads.disk'));
 
-            $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+            $tmpDir = $tempDirectory->attempt($transfer->id, $this->attempt);
             $tmpPath = "{$tmpDir}/single.tmp";
 
             if (! $disk->exists($tmpDir)) {
@@ -156,7 +202,7 @@ class DownloadTransferSingleStream implements ShouldQueue
                     if ($this->shouldStop($transfer->id, $fh)) {
                         return;
                     }
-                    $broadcaster->maybeBroadcast($transfer->id);
+                    $broadcaster->maybeBroadcast($transfer->id, $this->attempt);
                 }
             }
 
@@ -165,32 +211,50 @@ class DownloadTransferSingleStream implements ShouldQueue
             fclose($fh);
             $fh = null;
 
-            $finalizer->finalize(
-                $transfer->file,
-                $tmpPath,
-                $this->contentTypeHeader ?? $response->header('Content-Type'),
-                false
+            $resolvedContentType = $this->contentTypeHeader ?? $response->header('Content-Type');
+            $nativeRejection = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer)
+                ? $mediaValidator->rejectionForArtifact($absoluteTmpPath, $resolvedContentType)
+                : null;
+            if ($nativeRejection !== null) {
+                $this->failTransfer($transfer, $nativeRejection);
+                $this->cleanupTempArtifacts($tmpDir);
+
+                return;
+            }
+
+            $finalized = DownloadTransferGeneration::runLocked(
+                $transfer->id,
+                $this->attempt,
+                [DownloadTransferStatus::DOWNLOADING],
+                function (DownloadTransfer $current) use ($finalizer, $tmpPath, $resolvedContentType): void {
+                    $current->forceFill(['status' => DownloadTransferStatus::ASSEMBLING])->save();
+                    $finalizer->finalize($current->file, $tmpPath, $resolvedContentType, false);
+                    $current->forceFill([
+                        'status' => DownloadTransferStatus::PREVIEWING,
+                        'last_broadcast_percent' => 100,
+                        'finished_at' => null,
+                        'failed_at' => null,
+                        'error' => null,
+                    ])->save();
+                    File::query()->whereKey($current->file_id)->update([
+                        'download_progress' => 100,
+                        'updated_at' => now(),
+                    ]);
+                    app(DownloadTransferRuntimeStore::class)->forgetForTransfer($current->id);
+                },
             );
+            if (! $finalized) {
+                $this->cleanupTempArtifacts($tmpDir);
 
-            $transfer->update([
-                'status' => DownloadTransferStatus::PREVIEWING,
-                'finished_at' => null,
-                'failed_at' => null,
-                'error' => null,
-            ]);
-            app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
+                return;
+            }
 
-            File::query()->whereKey($transfer->file_id)->update([
-                'download_progress' => 100,
-                'updated_at' => now(),
-            ]);
+            $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::PREVIEWING]);
+            if (! $transfer) {
+                $this->cleanupTempArtifacts($tmpDir);
 
-            DownloadTransfer::query()->whereKey($transfer->id)->update([
-                'last_broadcast_percent' => 100,
-                'updated_at' => now(),
-            ]);
-
-            $transfer->refresh();
+                return;
+            }
 
             try {
                 event(new DownloadTransferProgressUpdated(
@@ -202,13 +266,7 @@ class DownloadTransferSingleStream implements ShouldQueue
 
             GenerateTransferPreview::dispatch($transfer->id);
 
-            if ($disk->exists($tmpPath)) {
-                $disk->delete($tmpPath);
-            }
-
-            if ($disk->exists($tmpDir)) {
-                $disk->deleteDirectory($tmpDir);
-            }
+            $this->cleanupTempArtifacts($tmpDir);
 
             PumpDomainDownloads::dispatch($transfer->domain);
         } catch (Throwable $e) {
@@ -228,8 +286,11 @@ class DownloadTransferSingleStream implements ShouldQueue
 
     private function shouldStop(int $transferId, $fh): bool
     {
-        $status = DownloadTransfer::query()->whereKey($transferId)->value('status');
-        if ($status === DownloadTransferStatus::DOWNLOADING) {
+        $isCurrent = DownloadTransfer::query()->whereKey($transferId)
+            ->where('attempt', $this->attempt)
+            ->where('status', DownloadTransferStatus::DOWNLOADING)
+            ->exists();
+        if ($isCurrent) {
             return false;
         }
 
@@ -251,18 +312,29 @@ class DownloadTransferSingleStream implements ShouldQueue
             return;
         }
 
-        DownloadTransfer::query()->whereKey($transferId)->increment('bytes_downloaded', $pendingBytes);
+        DownloadTransfer::query()->whereKey($transferId)
+            ->where('attempt', $this->attempt)
+            ->where('status', DownloadTransferStatus::DOWNLOADING)
+            ->increment('bytes_downloaded', $pendingBytes);
         $pendingBytes = 0;
     }
 
     private function failTransfer(DownloadTransfer $transfer, string $message): void
     {
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'status' => DownloadTransferStatus::FAILED,
-            'failed_at' => now(),
-            'error' => $message,
-        ]);
-        app(DownloadTransferRuntimeStore::class)->forgetForTransfer($transfer->id);
+        $failed = DownloadTransferGeneration::runLocked($transfer->id, $this->attempt, [
+            DownloadTransferStatus::DOWNLOADING,
+            DownloadTransferStatus::ASSEMBLING,
+        ], function (DownloadTransfer $current) use ($message): void {
+            $current->forceFill([
+                'status' => DownloadTransferStatus::FAILED,
+                'failed_at' => now(),
+                'error' => DownloadFailureMessage::normalize($message),
+            ])->save();
+            app(DownloadTransferRuntimeStore::class)->forgetForTransfer($current->id);
+        });
+        if (! $failed) {
+            return;
+        }
 
         $updated = DownloadTransfer::query()->find($transfer->id);
         if ($updated) {
@@ -314,14 +386,26 @@ class DownloadTransferSingleStream implements ShouldQueue
         $delay = max(1, (int) $this->backoff);
         $attempt = max(1, $this->attempts());
         $message = $this->retryMessage($attempt, $delay, $reason);
-
-        $this->resetProgressForRetry($transfer);
-
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'failed_at' => null,
-            'error' => $message,
-            'updated_at' => now(),
-        ]);
+        $scheduled = DownloadTransferGeneration::runLocked(
+            $transfer->id,
+            $this->attempt,
+            [DownloadTransferStatus::DOWNLOADING],
+            function (DownloadTransfer $current) use ($message): void {
+                $current->forceFill([
+                    'bytes_downloaded' => 0,
+                    'last_broadcast_percent' => 0,
+                    'failed_at' => null,
+                    'error' => $message,
+                ])->save();
+                File::query()->whereKey($current->file_id)->update([
+                    'download_progress' => 0,
+                    'updated_at' => now(),
+                ]);
+            },
+        );
+        if (! $scheduled) {
+            return;
+        }
 
         $updated = DownloadTransfer::query()->find($transfer->id);
         if ($updated) {
@@ -337,30 +421,20 @@ class DownloadTransferSingleStream implements ShouldQueue
         $this->release($delay);
     }
 
-    private function resetProgressForRetry(DownloadTransfer $transfer): void
-    {
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'bytes_downloaded' => 0,
-            'last_broadcast_percent' => 0,
-            'updated_at' => now(),
-        ]);
-
-        if ($transfer->file_id) {
-            File::query()->whereKey($transfer->file_id)->update([
-                'download_progress' => 0,
-                'updated_at' => now(),
-            ]);
-        }
-    }
-
     private function retryMessage(int $attempt, int $delay, string $reason): string
     {
-        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $reason));
-        if ($cleanReason === '') {
-            $cleanReason = 'Transient network error.';
-        }
+        $cleanReason = DownloadFailureMessage::normalize($reason, 'Transient network error.');
+        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $cleanReason));
 
         return "Retry {$attempt}/{$this->tries} scheduled in {$delay}s: {$cleanReason}";
+    }
+
+    private function cleanupTempArtifacts(string $tmpDir): void
+    {
+        $disk = Storage::disk(config('downloads.disk'));
+        if ($disk->exists($tmpDir)) {
+            $disk->deleteDirectory($tmpDir);
+        }
     }
 
     // Progress broadcasting is handled by DownloadTransferProgressBroadcaster.

@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
 
 it('retries transient chunk stream read failures and resets chunk progress', function () {
     Http::fake(function () {
-        throw new RuntimeException('Unable to read from stream');
+        throw new RuntimeException('Unable to read from stream at ftp://private.example.test/secret-value');
     });
 
     $file = File::factory()->create([
@@ -67,9 +67,12 @@ it('retries transient chunk stream read failures and resets chunk progress', fun
         ->and($transfer->last_broadcast_percent)->toBe(0)
         ->and($transfer->error)->toContain('Retry 1/3 scheduled in 30s')
         ->and($transfer->error)->toContain('Unable to read from stream')
+        ->and($transfer->error)->toContain('[redacted URL]')
+        ->and($transfer->error)->not->toContain('private.example.test')
         ->and($chunk->status)->toBe(DownloadChunkStatus::PENDING)
         ->and($chunk->bytes_downloaded)->toBe(0)
         ->and($chunk->failed_at)->toBeNull()
         ->and($chunk->error)->toContain('Retry 1/3 scheduled in 30s')
+        ->and($chunk->error)->not->toContain('private.example.test')
         ->and($file->download_progress)->toBe(0);
 });

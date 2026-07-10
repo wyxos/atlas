@@ -4,6 +4,7 @@ use App\Enums\DownloadTransferStatus;
 use App\Jobs\Downloads\DownloadTransferYtDlp;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\FileDownloadFinalizer;
@@ -72,6 +73,7 @@ it('passes runtime cookies and user agent to yt-dlp command builder', function (
 
     $capturedRuntimeOptions = [];
     $capturedCookieJarContents = '';
+    $capturedCookieJarPath = null;
 
     $script = <<<'PHP'
 $template = $argv[1] ?? '';
@@ -83,12 +85,13 @@ if (!is_dir($dir)) {
 file_put_contents($output, str_repeat("A", 1024));
 PHP;
 
-    $this->mock(YtDlpCommandBuilder::class, function (MockInterface $mock) use (&$capturedRuntimeOptions, &$capturedCookieJarContents, $script): void {
+    $this->mock(YtDlpCommandBuilder::class, function (MockInterface $mock) use (&$capturedRuntimeOptions, &$capturedCookieJarContents, &$capturedCookieJarPath, $script): void {
         $mock->shouldReceive('build')
             ->once()
-            ->andReturnUsing(function (string $url, string $outputTemplate, array $runtimeOptions = []) use (&$capturedRuntimeOptions, &$capturedCookieJarContents, $script): array {
+            ->andReturnUsing(function (string $url, string $outputTemplate, array $runtimeOptions = []) use (&$capturedRuntimeOptions, &$capturedCookieJarContents, &$capturedCookieJarPath, $script): array {
                 $capturedRuntimeOptions = $runtimeOptions;
                 $cookieJarPath = $runtimeOptions['cookies_path'] ?? null;
+                $capturedCookieJarPath = is_string($cookieJarPath) ? $cookieJarPath : null;
                 if (is_string($cookieJarPath) && $cookieJarPath !== '' && is_file($cookieJarPath)) {
                     $capturedCookieJarContents = (string) file_get_contents($cookieJarPath);
                 }
@@ -107,5 +110,10 @@ PHP;
         ->and($capturedRuntimeOptions['cookies_path'] ?? null)->not->toBeNull()
         ->and($capturedCookieJarContents)->toContain('auth_token')
         ->and($capturedCookieJarContents)->toContain('ct0')
-        ->and($capturedCookieJarContents)->not->toContain('other');
+        ->and($capturedCookieJarContents)->not->toContain('other')
+        ->and(is_string($capturedCookieJarPath) && is_file($capturedCookieJarPath))->toBeFalse();
+
+    $lock = app(DownloadTransferExecutionLock::class)->acquireYtDlp($transfer->id, 30);
+    expect($lock)->not->toBeNull();
+    $lock?->release();
 });

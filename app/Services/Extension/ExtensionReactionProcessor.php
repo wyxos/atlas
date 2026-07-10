@@ -5,6 +5,7 @@ namespace App\Services\Extension;
 use App\Models\File;
 use App\Models\User;
 use App\Services\DeviantArtImages;
+use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
 use App\Services\FileBlacklistService;
 use App\Services\FilePreviewService;
 use App\Services\FileReactionService;
@@ -298,6 +299,7 @@ class ExtensionReactionProcessor
             $updates['preview_url'] = $previewUrl;
         }
         $listingMetadata = is_array($file->listing_metadata) ? $file->listing_metadata : [];
+        $preserveNativeFallback = YtDlpUnsupportedUrlFallback::isEstablishedForFile($file);
         $listingChanged = false;
         foreach ($listingMetadataOverrides + [
             'extension_channel' => $extensionChannel,
@@ -306,6 +308,10 @@ class ExtensionReactionProcessor
             'tag_name' => $tagName,
             'download_via' => $downloadVia,
         ] as $key => $value) {
+            if ($key === 'download_via' && $preserveNativeFallback) {
+                continue;
+            }
+
             if ($value === null || (is_string($value) && trim($value) === '') || (is_array($value) && $value === [])) {
                 continue;
             }

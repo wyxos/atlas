@@ -33,7 +33,7 @@ class PumpDomainDownloads implements ShouldQueue
         $maxPerDomain = (int) config('downloads.max_transfers_per_domain');
         $maxTotal = (int) config('downloads.max_transfers_total');
 
-        $transferIds = DB::transaction(function () use ($maxPerDomain, $maxTotal) {
+        $claims = DB::transaction(function () use ($maxPerDomain, $maxTotal) {
             DownloadTransfer::query()
                 ->where('domain', $this->domain)
                 ->lockForUpdate()
@@ -89,8 +89,17 @@ class PumpDomainDownloads implements ShouldQueue
                     'updated_at' => now(),
                 ]);
 
-            return $ids;
+            return DownloadTransfer::query()
+                ->whereIn('id', $ids)
+                ->get(['id', 'attempt'])
+                ->map(fn (DownloadTransfer $transfer): array => [
+                    'id' => $transfer->id,
+                    'attempt' => (int) ($transfer->attempt ?? 0),
+                ])
+                ->all();
         });
+
+        $transferIds = array_column($claims, 'id');
 
         $transfers = DownloadTransfer::query()
             ->with(['file:id,filename,path,url,preview_url,size,referrer_url'])
@@ -98,8 +107,9 @@ class PumpDomainDownloads implements ShouldQueue
             ->get()
             ->keyBy('id');
 
-        foreach ($transferIds as $transferId) {
-            QueueDownloadTransfer::dispatch($transferId);
+        foreach ($claims as $claim) {
+            $transferId = $claim['id'];
+            QueueDownloadTransfer::dispatch($transferId, $claim['attempt']);
 
             try {
                 $transfer = $transfers->get($transferId);

@@ -6,7 +6,11 @@ use App\Jobs\Downloads\GenerateTransferPreview;
 use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferActionAvailability;
+use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferRequestOptions;
+use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\Downloads\YtDlpCommandBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -144,4 +148,63 @@ PHP;
 
     Bus::assertDispatched(PumpDomainDownloads::class);
     Bus::assertNotDispatched(GenerateTransferPreview::class);
+});
+
+it('keeps resumable fragments while deleting runtime cookies and releasing the execution lock', function () {
+    Bus::fake([PumpDomainDownloads::class]);
+    [, $transfer] = makeYtDlpTransfer();
+    app(DownloadTransferRuntimeStore::class)->putForTransfer($transfer->id, [
+        'cookies' => [[
+            'name' => 'session',
+            'value' => 'private-value',
+            'domain' => 'example.com',
+            'path' => '/',
+            'secure' => true,
+            'http_only' => true,
+            'host_only' => true,
+            'expires_at' => time() + 3600,
+        ]],
+    ]);
+
+    $script = <<<'PHP'
+$template = $argv[1] ?? '';
+$output = str_replace('%(ext)s', 'mp4', $template);
+$dir = dirname($output);
+if (!is_dir($dir)) {
+    mkdir($dir, 0777, true);
+}
+file_put_contents($dir . DIRECTORY_SEPARATOR . 'download.mp4.part', 'partial-fragment');
+fwrite(STDERR, "ERROR: HTTP Error 503: Service Unavailable\n");
+exit(1);
+PHP;
+
+    $this->mock(YtDlpCommandBuilder::class, function (MockInterface $mock) use ($script): void {
+        $mock->shouldReceive('build')
+            ->once()
+            ->andReturnUsing(fn (string $url, string $outputTemplate, array $runtimeOptions = []): array => [
+                PHP_BINARY,
+                '-r',
+                $script,
+                $outputTemplate,
+            ]);
+    });
+
+    (new DownloadTransferYtDlp($transfer->id))->handle(
+        app(FileDownloadFinalizer::class),
+        app(YtDlpCommandBuilder::class),
+        app(DownloadTransferRequestOptions::class),
+    );
+
+    $transfer->refresh()->load('file');
+    $directory = app(DownloadTransferTempDirectory::class)->ytDlpAttempt($transfer->id, 0);
+    $cookieJarPath = Storage::disk(config('downloads.disk'))->path($directory.'/runtime-cookies.txt');
+
+    expect($transfer->status)->toBe(DownloadTransferStatus::FAILED)
+        ->and(DownloadTransferActionAvailability::canResume($transfer))->toBeTrue()
+        ->and(Storage::disk(config('downloads.disk'))->exists($directory.'/download.mp4.part'))->toBeTrue()
+        ->and(is_file($cookieJarPath))->toBeFalse();
+
+    $lock = app(DownloadTransferExecutionLock::class)->acquireYtDlp($transfer->id, 30);
+    expect($lock)->not->toBeNull();
+    $lock?->release();
 });

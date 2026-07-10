@@ -59,8 +59,14 @@ final class DownloadTransferActionAvailability
     private static function isYtDlpTransfer(DownloadTransfer $transfer): bool
     {
         $file = self::transferFile($transfer);
+        if (! $file) {
+            return false;
+        }
 
-        return data_get($file?->listing_metadata, 'download_via') === 'yt-dlp';
+        $candidate = clone $transfer;
+        $candidate->setRelation('file', $file);
+
+        return YtDlpUnsupportedUrlFallback::usesYtDlp($candidate);
     }
 
     private static function transferFile(DownloadTransfer $transfer): ?File
@@ -71,7 +77,7 @@ final class DownloadTransferActionAvailability
         }
 
         return $transfer->file()
-            ->select(['id', 'listing_metadata'])
+            ->select(['id', 'listing_metadata', 'preview_url'])
             ->first();
     }
 }

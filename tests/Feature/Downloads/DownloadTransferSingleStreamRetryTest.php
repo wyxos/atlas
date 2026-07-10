@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
 
 it('retries transient single stream read failures and resets visible progress', function () {
     Http::fake(function () {
-        throw new RuntimeException('Unable to read from stream');
+        throw new RuntimeException('Unable to read from stream at https://private.example.test/secret-value');
     });
 
     $file = File::factory()->create([
@@ -60,5 +60,7 @@ it('retries transient single stream read failures and resets visible progress', 
         ->and($transfer->last_broadcast_percent)->toBe(0)
         ->and($transfer->error)->toContain('Retry 1/3 scheduled in 30s')
         ->and($transfer->error)->toContain('Unable to read from stream')
+        ->and($transfer->error)->toContain('[redacted URL]')
+        ->and($transfer->error)->not->toContain('private.example.test')
         ->and($file->download_progress)->toBe(0);
 });

@@ -2,15 +2,19 @@
 
 namespace App\Jobs\Downloads;
 
-use App\Enums\DownloadChunkStatus;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Events\DownloadTransferQueued;
-use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadFailureMessage;
+use App\Services\Downloads\DownloadTransferBatchFailureHandler;
+use App\Services\Downloads\DownloadTransferChunkPlanner;
 use App\Services\Downloads\DownloadTransferExecutionLock;
+use App\Services\Downloads\DownloadTransferGeneration;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRequestOptions;
+use App\Services\Downloads\NativeFallbackMediaValidator;
+use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,7 +24,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 use function data_get;
@@ -33,37 +36,51 @@ class PrepareDownloadTransfer implements ShouldQueue
 
     public int $backoff = 30;
 
-    public function __construct(public int $downloadTransferId)
+    public ?int $attempt = null;
+
+    public function __construct(public int $downloadTransferId, ?int $attempt = null)
     {
+        $this->attempt = $attempt;
         $this->onQueue('downloads');
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(
         ?DownloadTransferRequestOptions $requestOptions = null,
-        ?DownloadTransferExecutionLock $executionLock = null
+        ?DownloadTransferExecutionLock $executionLock = null,
+        ?NativeFallbackMediaValidator $mediaValidator = null,
+        ?DownloadTransferChunkPlanner $chunkPlanner = null,
     ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
         $executionLock ??= app(DownloadTransferExecutionLock::class);
+        $mediaValidator ??= app(NativeFallbackMediaValidator::class);
+        $chunkPlanner ??= app(DownloadTransferChunkPlanner::class);
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
             return;
         }
+        $this->attempt ??= (int) ($transfer->attempt ?? 0);
 
         try {
-            if (! in_array($transfer->status, [DownloadTransferStatus::QUEUED, DownloadTransferStatus::PREPARING], true)) {
+            if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [
+                DownloadTransferStatus::QUEUED,
+                DownloadTransferStatus::PREPARING,
+            ])) {
                 return;
             }
 
-            if (data_get($transfer->file->listing_metadata, 'download_via') === 'yt-dlp') {
+            $isNativeYtDlpFallback = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer);
+            if (data_get($transfer->file->listing_metadata, 'download_via') === 'yt-dlp' && ! $isNativeYtDlpFallback) {
                 if ($executionLock->isYtDlpActive($transfer->id)) {
+                    $this->requeueWhileYtDlpIsActive($transfer);
+
                     return;
                 }
 
-                $transfer->update([
+                $updated = DownloadTransferGeneration::update($transfer->id, $this->attempt, [
+                    DownloadTransferStatus::QUEUED,
+                    DownloadTransferStatus::PREPARING,
+                ], [
                     'bytes_total' => null,
                     'bytes_downloaded' => max(0, (int) ($transfer->bytes_downloaded ?? 0)),
                     'last_broadcast_percent' => max(0, min(99, (int) ($transfer->last_broadcast_percent ?? 0))),
@@ -72,35 +89,38 @@ class PrepareDownloadTransfer implements ShouldQueue
                     'failed_at' => null,
                     'error' => null,
                 ]);
-
-                $transfer->refresh();
-                try {
-                    event(new DownloadTransferProgressUpdated(
-                        DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                    ));
-                } catch (Throwable) {
-                    // Broadcast errors shouldn't fail downloads.
+                if ($updated === 0) {
+                    return;
                 }
 
-                DownloadTransferYtDlp::dispatch($transfer->id, (int) ($transfer->attempt ?? 0));
+                $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+                if (! $transfer) {
+                    return;
+                }
+                $this->broadcastProgress($transfer);
+
+                DownloadTransferYtDlp::dispatch($transfer->id, $this->attempt);
 
                 return;
             }
 
-            $transfer->update([
+            $updated = DownloadTransferGeneration::update($transfer->id, $this->attempt, [
+                DownloadTransferStatus::QUEUED,
+                DownloadTransferStatus::PREPARING,
+            ], [
                 'status' => DownloadTransferStatus::PREPARING,
                 'failed_at' => null,
                 'error' => null,
             ]);
-
-            $transfer->refresh();
-            try {
-                event(new DownloadTransferProgressUpdated(
-                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                ));
-            } catch (Throwable) {
-                // Broadcast errors shouldn't fail downloads.
+            if ($updated === 0) {
+                return;
             }
+
+            $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::PREPARING]);
+            if (! $transfer) {
+                return;
+            }
+            $this->broadcastProgress($transfer);
 
             $url = $transfer->url;
             if (! is_string($url) || ! preg_match('/^https?:\/\//i', $url)) {
@@ -112,6 +132,11 @@ class PrepareDownloadTransfer implements ShouldQueue
             $timeout = (int) config('downloads.http_timeout_seconds');
 
             $head = Http::timeout($timeout)->withHeaders($headers)->head($url);
+            $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::PREPARING]);
+            if (! $transfer) {
+                return;
+            }
+            $isNativeYtDlpFallback = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer);
             $contentType = $head->header('Content-Type');
             $contentLength = $head->header('Content-Length');
             $acceptRanges = $head->header('Accept-Ranges');
@@ -119,67 +144,68 @@ class PrepareDownloadTransfer implements ShouldQueue
             $headMime = is_string($contentType)
                 ? strtolower(trim(explode(';', $contentType, 2)[0]))
                 : '';
+            $headLooksLikeHtml = in_array($headMime, ['text/html', 'application/xhtml+xml'], true);
+            $nativeRejection = $isNativeYtDlpFallback
+                ? $mediaValidator->rejectionForContentType($contentType)
+                : null;
+            if ($nativeRejection !== null) {
+                $this->failTransfer($transfer, $nativeRejection);
+
+                return;
+            }
 
             $tagName = data_get($transfer->file->listing_metadata, 'tag_name');
-            if (in_array($tagName, ['video', 'iframe'], true)) {
+            if (in_array($tagName, ['video', 'iframe'], true) && ! $isNativeYtDlpFallback) {
                 // For video/iframe sources, treat blocked/empty HEAD probes like HTML pages and force yt-dlp.
-                $headLooksLikeHtml = in_array($headMime, ['text/html', 'application/xhtml+xml'], true);
                 $headProbeUnavailable = $headStatus >= 400 || $headMime === '';
                 if ($headLooksLikeHtml || $headProbeUnavailable) {
                     if ($executionLock->isYtDlpActive($transfer->id)) {
+                        $this->requeueWhileYtDlpIsActive($transfer);
+
                         return;
                     }
 
-                    try {
-                        $metadata = $transfer->file->listing_metadata;
-                        if ($metadata instanceof \Illuminate\Support\Collection) {
-                            $metadata = $metadata->all();
-                        }
-                        if (! is_array($metadata)) {
-                            $metadata = [];
-                        }
-
-                        $metadata['download_via'] = 'yt-dlp';
-                        $metadata['download_via_reason'] = $headLooksLikeHtml
-                            ? 'content-type-html'
-                            : 'head-probe-unavailable';
-
-                        $transfer->file->forceFill([
-                            'listing_metadata' => $metadata,
-                        ])->save();
-                    } catch (Throwable) {
-                        // Metadata updates shouldn't block the download fallback.
-                    }
-
-                    // If the extension provided a page URL, prefer it for yt-dlp (embed URLs frequently return HTML).
                     $pageUrl = data_get($transfer->file->listing_metadata, 'page_url');
-                    if (is_string($pageUrl) && $pageUrl !== '') {
-                        $transfer->update([
-                            'url' => $pageUrl,
-                            'updated_at' => now(),
-                        ]);
+                    $transitioned = DownloadTransferGeneration::runLocked(
+                        $transfer->id,
+                        $this->attempt,
+                        [DownloadTransferStatus::PREPARING],
+                        function (DownloadTransfer $current) use ($headLooksLikeHtml, $pageUrl): void {
+                            try {
+                                $metadata = $current->file->listing_metadata;
+                                $metadata = is_array($metadata) ? $metadata : [];
+                                $metadata['download_via'] = 'yt-dlp';
+                                $metadata['download_via_reason'] = $headLooksLikeHtml
+                                    ? 'content-type-html'
+                                    : 'head-probe-unavailable';
+                                $current->file->forceFill(['listing_metadata' => $metadata])->save();
+                            } catch (Throwable) {
+                                // Metadata updates shouldn't block the download fallback.
+                            }
+
+                            $current->forceFill([
+                                'url' => is_string($pageUrl) && $pageUrl !== '' ? $pageUrl : $current->url,
+                                'bytes_total' => null,
+                                'bytes_downloaded' => 0,
+                                'last_broadcast_percent' => 0,
+                                'status' => DownloadTransferStatus::DOWNLOADING,
+                                'started_at' => $current->started_at ?? now(),
+                                'failed_at' => null,
+                                'error' => null,
+                            ])->save();
+                        },
+                    );
+                    if (! $transitioned) {
+                        return;
                     }
 
-                    $transfer->update([
-                        'bytes_total' => null,
-                        'bytes_downloaded' => 0,
-                        'last_broadcast_percent' => 0,
-                        'status' => DownloadTransferStatus::DOWNLOADING,
-                        'started_at' => $transfer->started_at ?? now(),
-                        'failed_at' => null,
-                        'error' => null,
-                    ]);
-
-                    $transfer->refresh();
-                    try {
-                        event(new DownloadTransferProgressUpdated(
-                            DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                        ));
-                    } catch (Throwable) {
-                        // Broadcast errors shouldn't fail downloads.
+                    $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+                    if (! $transfer) {
+                        return;
                     }
+                    $this->broadcastProgress($transfer);
 
-                    DownloadTransferYtDlp::dispatch($transfer->id, (int) ($transfer->attempt ?? 0));
+                    DownloadTransferYtDlp::dispatch($transfer->id, $this->attempt);
 
                     return;
                 }
@@ -189,7 +215,22 @@ class PrepareDownloadTransfer implements ShouldQueue
             $rangesSupported = is_string($acceptRanges) && str_contains(strtolower($acceptRanges), 'bytes');
 
             if (! $rangesSupported || $totalBytes === null) {
-                $rangeProbe = Http::timeout($timeout)->withHeaders(array_merge($headers, ['Range' => 'bytes=0-0']))->get($url);
+                $rangeProbe = Http::timeout($timeout)
+                    ->withHeaders(array_merge($headers, ['Range' => 'bytes=0-0']))
+                    ->withOptions(['stream' => true])
+                    ->get($url);
+                $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::PREPARING]);
+                if (! $transfer) {
+                    return;
+                }
+                $rangeRejection = $isNativeYtDlpFallback
+                    ? $mediaValidator->rejectionForContentType($rangeProbe->header('Content-Type'))
+                    : null;
+                if ($rangeRejection !== null) {
+                    $this->failTransfer($transfer, $rangeRejection);
+
+                    return;
+                }
                 if ($rangeProbe->status() === 206) {
                     $rangesSupported = true;
                     $contentType = $contentType ?? $rangeProbe->header('Content-Type');
@@ -198,7 +239,7 @@ class PrepareDownloadTransfer implements ShouldQueue
             }
 
             if ($totalBytes === null) {
-                $transfer->update([
+                $updated = DownloadTransferGeneration::update($transfer->id, $this->attempt, [DownloadTransferStatus::PREPARING], [
                     'bytes_total' => null,
                     'bytes_downloaded' => 0,
                     'last_broadcast_percent' => 0,
@@ -207,131 +248,86 @@ class PrepareDownloadTransfer implements ShouldQueue
                     'failed_at' => null,
                     'error' => null,
                 ]);
-
-                $transfer->refresh();
-                try {
-                    event(new DownloadTransferProgressUpdated(
-                        DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                    ));
-                } catch (Throwable) {
-                    // Broadcast errors shouldn't fail downloads.
+                if ($updated === 0) {
+                    return;
                 }
 
-                DownloadTransferSingleStream::dispatch($transfer->id, $contentType);
+                $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+                if (! $transfer) {
+                    return;
+                }
+                $this->broadcastProgress($transfer);
+
+                DownloadTransferSingleStream::dispatch($transfer->id, $contentType, $this->attempt);
 
                 return;
             }
 
-            if ($transfer->file && (! $transfer->file->size || $transfer->file->size <= 0)) {
-                $transfer->file->update([
-                    'size' => $totalBytes,
-                    'updated_at' => now(),
-                ]);
+            $transitioned = DownloadTransferGeneration::runLocked(
+                $transfer->id,
+                $this->attempt,
+                [DownloadTransferStatus::PREPARING],
+                function (DownloadTransfer $current) use ($totalBytes): void {
+                    if (! $current->file->size || $current->file->size <= 0) {
+                        $current->file->update(['size' => $totalBytes, 'updated_at' => now()]);
+                    }
+                    $current->forceFill([
+                        'bytes_total' => $totalBytes,
+                        'bytes_downloaded' => 0,
+                        'last_broadcast_percent' => 0,
+                        'status' => DownloadTransferStatus::DOWNLOADING,
+                        'started_at' => $current->started_at ?? now(),
+                        'failed_at' => null,
+                        'error' => null,
+                    ])->save();
+                },
+            );
+            if (! $transitioned) {
+                return;
             }
-            $transfer->update([
-                'bytes_total' => $totalBytes,
-                'bytes_downloaded' => 0,
-                'last_broadcast_percent' => 0,
-                'status' => DownloadTransferStatus::DOWNLOADING,
-                'started_at' => $transfer->started_at ?? now(),
-                'failed_at' => null,
-                'error' => null,
-            ]);
 
-            $transfer->refresh();
-            try {
-                event(new DownloadTransferProgressUpdated(
-                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                ));
-            } catch (Throwable) {
-                // Broadcast errors shouldn't fail downloads.
+            $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING]);
+            if (! $transfer) {
+                return;
             }
+            $this->broadcastProgress($transfer);
 
             if (! $rangesSupported || $totalBytes < (int) config('downloads.min_bytes_for_chunking')) {
-                DownloadTransferSingleStream::dispatch($transfer->id, $contentType);
+                DownloadTransferSingleStream::dispatch($transfer->id, $contentType, $this->attempt);
 
                 return;
             }
 
-            $chunkCount = max(1, (int) config('downloads.chunk_count'));
-            $chunkSize = (int) ceil($totalBytes / $chunkCount);
-
-            $disk = Storage::disk(config('downloads.disk'));
-            $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
-            if (! $disk->exists($tmpDir)) {
-                $disk->makeDirectory($tmpDir, 0755, true);
+            $chunkIds = $chunkPlanner->plan($transfer->id, $this->attempt, $totalBytes);
+            if ($chunkIds === []) {
+                return;
             }
 
-            $chunkIds = [];
-
-            for ($i = 0; $i < $chunkCount; $i++) {
-                $start = $i * $chunkSize;
-                if ($start >= $totalBytes) {
-                    break;
-                }
-
-                $end = min($totalBytes - 1, (($i + 1) * $chunkSize) - 1);
-                $partPath = "{$tmpDir}/part-{$i}.part";
-
-                $chunk = DownloadChunk::query()->create([
-                    'download_transfer_id' => $transfer->id,
-                    'index' => $i,
-                    'range_start' => $start,
-                    'range_end' => $end,
-                    'bytes_downloaded' => 0,
-                    'status' => DownloadChunkStatus::PENDING,
-                    'part_path' => $partPath,
-                ]);
-
-                $chunkIds[] = $chunk->id;
-            }
-
-            $jobs = array_map(fn (int $chunkId) => new DownloadTransferChunk($transfer->id, $chunkId, $contentType), $chunkIds);
+            $jobs = array_map(fn (int $chunkId) => new DownloadTransferChunk(
+                $transfer->id,
+                $chunkId,
+                $contentType,
+                $this->attempt,
+            ), $chunkIds);
             $transferId = $transfer->id;
             $transferDomain = $transfer->domain;
+            $transferAttempt = $this->attempt;
             $queueConnection = (string) config('queue.default');
 
             $batch = Bus::batch($jobs)
                 ->onConnection($queueConnection)
                 ->onQueue('downloads')
-                ->then(fn () => AssembleDownloadTransfer::dispatch($transferId, $contentType))
-                ->catch(function (Batch $batch, Throwable $e) use ($transferId, $transferDomain) {
-                    $message = trim(str_replace(["\r", "\n"], ' ', $e->getMessage()));
-                    if ($message === '') {
-                        $message = 'Chunk download batch failed.';
-                    }
-
-                    DownloadChunk::query()
-                        ->where('download_transfer_id', $transferId)
-                        ->whereIn('status', [DownloadChunkStatus::PENDING, DownloadChunkStatus::DOWNLOADING])
-                        ->update([
-                            'status' => DownloadChunkStatus::FAILED,
-                            'failed_at' => now(),
-                            'error' => $message,
-                        ]);
-
-                    DownloadTransfer::query()->whereKey($transferId)->update([
-                        'status' => DownloadTransferStatus::FAILED,
-                        'failed_at' => now(),
-                        'error' => $message,
-                    ]);
-
-                    $updated = DownloadTransfer::query()->find($transferId);
-                    if ($updated) {
-                        try {
-                            event(new DownloadTransferProgressUpdated(
-                                DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
-                            ));
-                        } catch (Throwable) {
-                            // Broadcast errors shouldn't fail downloads.
-                        }
-                    }
-
-                    PumpDomainDownloads::dispatch($transferDomain);
-                })
+                ->then(fn () => AssembleDownloadTransfer::dispatch($transferId, $contentType, $transferAttempt))
+                ->catch(fn (Batch $batch, Throwable $e) => app(DownloadTransferBatchFailureHandler::class)->handle(
+                    $transferId,
+                    $transferAttempt,
+                    $transferDomain,
+                    $chunkIds,
+                    $e,
+                ))
                 ->dispatch();
 
-            $transfer->update([
+            DownloadTransferGeneration::update($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING], [
                 'batch_id' => $batch->id,
             ]);
         } catch (Throwable $e) {
@@ -351,7 +347,6 @@ class PrepareDownloadTransfer implements ShouldQueue
             return null;
         }
 
-        // Example: "bytes 0-0/12345"
         $parts = explode('/', $contentRange);
         if (count($parts) !== 2) {
             return null;
@@ -364,21 +359,23 @@ class PrepareDownloadTransfer implements ShouldQueue
 
     private function failTransfer(DownloadTransfer $transfer, string $message): void
     {
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
+        $updatedCount = DownloadTransferGeneration::update($transfer->id, $this->attempt, [
+            DownloadTransferStatus::QUEUED,
+            DownloadTransferStatus::PREPARING,
+            DownloadTransferStatus::DOWNLOADING,
+            DownloadTransferStatus::ASSEMBLING,
+        ], [
             'status' => DownloadTransferStatus::FAILED,
             'failed_at' => now(),
-            'error' => $message,
+            'error' => DownloadFailureMessage::normalize($message),
         ]);
+        if ($updatedCount === 0) {
+            return;
+        }
 
-        $updated = DownloadTransfer::query()->find($transfer->id);
+        $updated = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::FAILED]);
         if ($updated) {
-            try {
-                event(new DownloadTransferProgressUpdated(
-                    DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
-                ));
-            } catch (Throwable) {
-                // Broadcast errors shouldn't fail downloads.
-            }
+            $this->broadcastProgress($updated);
         }
 
         PumpDomainDownloads::dispatch($transfer->domain);
@@ -404,45 +401,69 @@ class PrepareDownloadTransfer implements ShouldQueue
 
     private function scheduleRetry(DownloadTransfer $transfer, string $reason): void
     {
-        $delay = max(1, $this->retryDelaySeconds());
+        $delay = max(1, (int) $this->backoff);
         $attempt = max(1, $this->attempts());
         $message = $this->retryMessage($attempt, $delay, $reason);
 
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
+        $updatedCount = DownloadTransferGeneration::update($transfer->id, $this->attempt, [
+            DownloadTransferStatus::QUEUED,
+            DownloadTransferStatus::PREPARING,
+        ], [
             'status' => DownloadTransferStatus::QUEUED,
             'queued_at' => now(),
             'failed_at' => null,
             'error' => $message,
             'updated_at' => now(),
         ]);
+        if ($updatedCount === 0) {
+            return;
+        }
 
-        $updated = DownloadTransfer::query()->with('file')->find($transfer->id);
+        $updated = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::QUEUED]);
         if ($updated) {
             try {
                 event(new DownloadTransferQueued(DownloadTransferPayload::forQueued($updated)));
-                event(new DownloadTransferProgressUpdated(
-                    DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
-                ));
             } catch (Throwable) {
                 // Broadcast errors shouldn't fail downloads.
             }
+            $this->broadcastProgress($updated);
         }
 
         $this->release($delay);
     }
 
-    private function retryDelaySeconds(): int
-    {
-        return (int) $this->backoff;
-    }
-
     private function retryMessage(int $attempt, int $delay, string $reason): string
     {
-        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $reason));
-        if ($cleanReason === '') {
-            $cleanReason = 'Transient network error.';
-        }
+        $cleanReason = DownloadFailureMessage::normalize($reason, 'Transient network error.');
+        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $cleanReason));
 
         return "Retry {$attempt}/{$this->tries} scheduled in {$delay}s: {$cleanReason}";
+    }
+
+    private function requeueWhileYtDlpIsActive(DownloadTransfer $transfer): void
+    {
+        $requeued = DownloadTransferGeneration::update($transfer->id, $this->attempt, [
+            DownloadTransferStatus::QUEUED,
+            DownloadTransferStatus::PREPARING,
+        ], [
+            'status' => DownloadTransferStatus::PENDING,
+            'queued_at' => null,
+            'updated_at' => now(),
+        ]);
+        if ($requeued > 0) {
+            PumpDomainDownloadsAfterYtDlpRelease::dispatch($transfer->id, $transfer->domain)
+                ->delay(now()->addSeconds(5));
+        }
+    }
+
+    private function broadcastProgress(DownloadTransfer $transfer): void
+    {
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+            ));
+        } catch (Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
     }
 }

@@ -7,8 +7,14 @@ use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadFailureMessage;
+use App\Services\Downloads\DownloadTransferGeneration;
 use App\Services\Downloads\DownloadTransferPayload;
+use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\Downloads\FileDownloadFinalizer;
+use App\Services\Downloads\NativeFallbackMediaValidator;
+use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,21 +31,31 @@ class AssembleDownloadTransfer implements ShouldQueue
 
     public int $backoff = 30;
 
+    public ?int $attempt = null;
+
     /**
      * Create a new job instance.
      */
     public function __construct(
         public int $downloadTransferId,
-        public ?string $contentTypeHeader = null
+        public ?string $contentTypeHeader = null,
+        ?int $attempt = null,
     ) {
+        $this->attempt = $attempt;
         $this->onQueue('downloads');
     }
 
     /**
      * Execute the job.
      */
-    public function handle(FileDownloadFinalizer $finalizer): void
-    {
+    public function handle(
+        FileDownloadFinalizer $finalizer,
+        ?NativeFallbackMediaValidator $mediaValidator = null,
+        ?DownloadTransferTempDirectory $tempDirectory = null,
+    ): void {
+        $mediaValidator ??= app(NativeFallbackMediaValidator::class);
+        $tempDirectory ??= app(DownloadTransferTempDirectory::class);
+        $this->attempt ??= 0;
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
             return;
@@ -48,17 +64,20 @@ class AssembleDownloadTransfer implements ShouldQueue
         $out = null;
 
         try {
-            if ($transfer->status !== DownloadTransferStatus::DOWNLOADING) {
+            if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [DownloadTransferStatus::DOWNLOADING])) {
                 return;
             }
 
-            $transfer->update([
+            $updated = DownloadTransferGeneration::update($transfer->id, $this->attempt, [DownloadTransferStatus::DOWNLOADING], [
                 'status' => DownloadTransferStatus::ASSEMBLING,
             ]);
+            if ($updated === 0) {
+                return;
+            }
 
             $disk = Storage::disk(config('downloads.disk'));
 
-            $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+            $tmpDir = $tempDirectory->attempt($transfer->id, $this->attempt);
             $assembledPath = "{$tmpDir}/assembled.tmp";
 
             if (! $disk->exists($tmpDir)) {
@@ -79,6 +98,14 @@ class AssembleDownloadTransfer implements ShouldQueue
                 ->get();
 
             foreach ($chunks as $chunk) {
+                if (! DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::ASSEMBLING])) {
+                    fclose($out);
+                    $out = null;
+                    $this->cleanupTempArtifacts($tmpDir);
+
+                    return;
+                }
+
                 if (empty($chunk->part_path) || ! $disk->exists($chunk->part_path)) {
                     fclose($out);
                     $out = null;
@@ -104,26 +131,48 @@ class AssembleDownloadTransfer implements ShouldQueue
             fclose($out);
             $out = null;
 
-            $finalizer->finalize($transfer->file, $assembledPath, $this->contentTypeHeader, false);
+            $nativeRejection = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer)
+                ? $mediaValidator->rejectionForArtifact($absoluteAssembledPath, $this->contentTypeHeader)
+                : null;
+            if ($nativeRejection !== null) {
+                $this->failTransfer($transfer, $nativeRejection);
+                $this->cleanupTempArtifacts($tmpDir);
 
-            $transfer->update([
-                'status' => DownloadTransferStatus::PREVIEWING,
-                'finished_at' => null,
-                'failed_at' => null,
-                'error' => null,
-            ]);
+                return;
+            }
 
-            File::query()->whereKey($transfer->file_id)->update([
-                'download_progress' => 100,
-                'updated_at' => now(),
-            ]);
+            $finalized = DownloadTransferGeneration::runLocked(
+                $transfer->id,
+                $this->attempt,
+                [DownloadTransferStatus::ASSEMBLING],
+                function (DownloadTransfer $current) use ($finalizer, $assembledPath): void {
+                    $finalizer->finalize($current->file, $assembledPath, $this->contentTypeHeader, false);
+                    $current->forceFill([
+                        'status' => DownloadTransferStatus::PREVIEWING,
+                        'last_broadcast_percent' => 100,
+                        'finished_at' => null,
+                        'failed_at' => null,
+                        'error' => null,
+                    ])->save();
+                    File::query()->whereKey($current->file_id)->update([
+                        'download_progress' => 100,
+                        'updated_at' => now(),
+                    ]);
+                    app(DownloadTransferRuntimeStore::class)->forgetForTransfer($current->id);
+                },
+            );
+            if (! $finalized) {
+                $this->cleanupTempArtifacts($tmpDir);
 
-            DownloadTransfer::query()->whereKey($transfer->id)->update([
-                'last_broadcast_percent' => 100,
-                'updated_at' => now(),
-            ]);
+                return;
+            }
 
-            $transfer->refresh();
+            $transfer = DownloadTransferGeneration::fresh($transfer->id, $this->attempt, [DownloadTransferStatus::PREVIEWING]);
+            if (! $transfer) {
+                $this->cleanupTempArtifacts($tmpDir);
+
+                return;
+            }
 
             try {
                 event(new DownloadTransferProgressUpdated(
@@ -135,19 +184,7 @@ class AssembleDownloadTransfer implements ShouldQueue
 
             GenerateTransferPreview::dispatch($transfer->id);
 
-            foreach ($chunks as $chunk) {
-                if ($chunk->part_path) {
-                    $disk->delete($chunk->part_path);
-                }
-            }
-
-            if ($disk->exists($assembledPath)) {
-                $disk->delete($assembledPath);
-            }
-
-            if ($disk->exists($tmpDir)) {
-                $disk->deleteDirectory($tmpDir);
-            }
+            $this->cleanupTempArtifacts($tmpDir);
 
             PumpDomainDownloads::dispatch($transfer->domain);
         } catch (Throwable $e) {
@@ -161,11 +198,20 @@ class AssembleDownloadTransfer implements ShouldQueue
 
     private function failTransfer(DownloadTransfer $transfer, string $message): void
     {
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'status' => DownloadTransferStatus::FAILED,
-            'failed_at' => now(),
-            'error' => $message,
-        ]);
+        $failed = DownloadTransferGeneration::runLocked($transfer->id, $this->attempt, [
+            DownloadTransferStatus::DOWNLOADING,
+            DownloadTransferStatus::ASSEMBLING,
+        ], function (DownloadTransfer $current) use ($message): void {
+            $current->forceFill([
+                'status' => DownloadTransferStatus::FAILED,
+                'failed_at' => now(),
+                'error' => DownloadFailureMessage::normalize($message),
+            ])->save();
+            app(DownloadTransferRuntimeStore::class)->forgetForTransfer($current->id);
+        });
+        if (! $failed) {
+            return;
+        }
 
         $updated = DownloadTransfer::query()->find($transfer->id);
         if ($updated) {
@@ -179,5 +225,13 @@ class AssembleDownloadTransfer implements ShouldQueue
         }
 
         PumpDomainDownloads::dispatch($transfer->domain);
+    }
+
+    private function cleanupTempArtifacts(string $tmpDir): void
+    {
+        $disk = Storage::disk(config('downloads.disk'));
+        if ($disk->exists($tmpDir)) {
+            $disk->deleteDirectory($tmpDir);
+        }
     }
 }

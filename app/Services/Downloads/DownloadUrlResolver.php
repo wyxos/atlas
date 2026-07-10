@@ -15,6 +15,13 @@ final class DownloadUrlResolver
      */
     public function resolve(File $file, array $runtimeContext = []): ResolvedDownloadUrl
     {
+        if (YtDlpUnsupportedUrlFallback::isEstablishedForFile($file)) {
+            $nativeUrl = YtDlpUnsupportedUrlFallback::nativeUrl($file);
+            if ($nativeUrl !== null) {
+                return new ResolvedDownloadUrl($nativeUrl);
+            }
+        }
+
         foreach ($this->resolvers() as $resolver) {
             if (! $resolver->supports($file)) {
                 continue;

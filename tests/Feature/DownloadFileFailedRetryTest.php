@@ -95,3 +95,29 @@ test('retries a matching failed transfer instead of creating a duplicate', funct
     Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'example.com');
     Event::assertDispatched(DownloadTransferProgressUpdated::class, fn (DownloadTransferProgressUpdated $event) => $event->downloadTransferId === $transfer->id);
 });
+
+test('a stale failed-transfer reset cannot reclaim an active replacement generation', function () {
+    $file = File::factory()->create([
+        'url' => 'https://example.test/file.bin',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+    $transfer = DownloadTransfer::query()->create([
+        'file_id' => $file->id,
+        'url' => $file->url,
+        'domain' => 'example.test',
+        'status' => DownloadTransferStatus::FAILED,
+        'attempt' => 0,
+    ]);
+    $stale = $transfer->replicate()->setAttribute('id', $transfer->id);
+    $method = new ReflectionMethod(DownloadFile::class, 'resetFailedTransferForRetry');
+    $job = new DownloadFile($file->id);
+
+    $claimed = $method->invoke($job, $transfer, $file, $file->url, 'example.test', null);
+    $lost = $method->invoke($job, $stale, $file, $file->url, 'example.test', null);
+
+    expect($claimed)->toBeInstanceOf(DownloadTransfer::class)
+        ->and($lost)->toBeNull()
+        ->and($transfer->fresh()->status)->toBe(DownloadTransferStatus::PENDING)
+        ->and($transfer->fresh()->attempt)->toBe(1);
+});

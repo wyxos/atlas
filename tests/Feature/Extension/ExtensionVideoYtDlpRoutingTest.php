@@ -82,3 +82,42 @@ test('extension image reactions keep direct download routing', function () {
         return $job->fileId === $file?->id && $job->forceDownload === false;
     });
 });
+
+test('later extension reactions preserve an established native yt-dlp fallback', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    setExtensionApiKey('valid-api-key', $user->id);
+
+    $assetUrl = 'https://assets.example.test/video.mp4';
+    $pageUrl = 'https://pages.example.test/posts/123';
+    $payload = [
+        'asset_url' => $assetUrl,
+        'metadata' => [
+            'asset_type' => 'video',
+            'resolution' => '854x480',
+        ],
+        'referrer_url' => $pageUrl,
+        'source' => 'pages.example.test',
+        'type' => 'like',
+    ];
+
+    $this->withHeaders(['X-Atlas-Api-Key' => 'valid-api-key'])
+        ->postJson('/api/extension/reactions', $payload)
+        ->assertCreated();
+
+    $file = File::query()->where('url', $pageUrl)->firstOrFail();
+    $metadata = $file->listing_metadata;
+    unset($metadata['download_via']);
+    $metadata['download_via_reason'] = 'yt-dlp-unsupported-native-fallback';
+    $file->update(['listing_metadata' => $metadata]);
+
+    $this->withHeaders(['X-Atlas-Api-Key' => 'valid-api-key'])
+        ->postJson('/api/extension/reactions', $payload)
+        ->assertCreated();
+
+    $file->refresh();
+
+    expect(data_get($file->listing_metadata, 'download_via'))->toBeNull()
+        ->and(data_get($file->listing_metadata, 'download_via_reason'))->toBe('yt-dlp-unsupported-native-fallback');
+});

@@ -11,7 +11,7 @@ uses(RefreshDatabase::class);
 
 it('releases retry for transient prepare failures and keeps transfer visible in queue', function () {
     Http::fake(function () {
-        throw new RuntimeException('cURL error 28: Operation timed out after 30001 milliseconds with 0 bytes received');
+        throw new RuntimeException('cURL error 28 requesting https://private.example.test/secret-value and ftp://private.example.test/other');
     });
 
     $file = File::factory()->create([
@@ -45,5 +45,8 @@ it('releases retry for transient prepare failures and keeps transfer visible in 
     expect($transfer->status)->toBe(DownloadTransferStatus::QUEUED)
         ->and($transfer->failed_at)->toBeNull()
         ->and($transfer->error)->toContain('Retry 1/3 scheduled in 30s')
-        ->and($transfer->error)->toContain('cURL error 28');
+        ->and($transfer->error)->toContain('cURL error 28')
+        ->and($transfer->error)->toContain('[redacted URL]')
+        ->and($transfer->error)->not->toContain('private.example.test')
+        ->and($transfer->error)->not->toContain('secret-value');
 });

@@ -18,6 +18,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
@@ -97,6 +98,19 @@ class DownloadFile implements ShouldQueue
                     $domain,
                     $resolvedDownload->filesize,
                 );
+                if (! $transfer) {
+                    $current = DownloadTransfer::query()
+                        ->where('file_id', $file->id)
+                        ->whereIn('status', $activeStatuses)
+                        ->latest('id')
+                        ->first();
+                    if ($current) {
+                        $this->maybeRefreshRuntimeContext($runtimeStore, $current);
+                        PumpDomainDownloads::dispatch((string) $current->domain);
+                    }
+
+                    return;
+                }
 
                 $this->maybeRefreshRuntimeContext($runtimeStore, $transfer);
                 $this->broadcastTransferProgress($transfer);
@@ -143,39 +157,45 @@ class DownloadFile implements ShouldQueue
         string $downloadUrl,
         string $domain,
         ?int $filesize,
-    ): DownloadTransfer {
-        $transfer->setRelation('file', $file);
-        $this->cleanupTransferParts($transfer);
+    ): ?DownloadTransfer {
+        $expectedAttempt = (int) ($transfer->attempt ?? 0);
 
-        $updates = [
-            'url' => $downloadUrl,
-            'domain' => $domain,
-            'status' => DownloadTransferStatus::PENDING,
-            'bytes_total' => $filesize !== null && $filesize > 0 ? $filesize : null,
-            'bytes_downloaded' => 0,
-            'last_broadcast_percent' => 0,
-            'batch_id' => null,
-            'queued_at' => null,
-            'started_at' => null,
-            'finished_at' => null,
-            'failed_at' => null,
-            'error' => null,
-        ];
+        return DB::transaction(function () use ($transfer, $file, $downloadUrl, $domain, $filesize, $expectedAttempt): ?DownloadTransfer {
+            $current = DownloadTransfer::query()->lockForUpdate()->find($transfer->id);
+            if (! $current
+                || $current->status !== DownloadTransferStatus::FAILED
+                || (int) ($current->attempt ?? 0) !== $expectedAttempt
+                || $current->file_id !== $file->id
+                || $current->url !== $downloadUrl) {
+                return null;
+            }
 
-        if ($this->isYtDlpTransfer($transfer)) {
-            $updates['attempt'] = ((int) ($transfer->attempt ?? 0)) + 1;
-        }
+            $currentFile = File::query()->lockForUpdate()->find($current->file_id);
+            if (! $currentFile) {
+                return null;
+            }
 
-        $transfer->update($updates);
+            $current->setRelation('file', $currentFile);
+            $this->cleanupTransferParts($current);
+            $current->forceFill([
+                'url' => $downloadUrl,
+                'domain' => $domain,
+                'status' => DownloadTransferStatus::PENDING,
+                'bytes_total' => $filesize !== null && $filesize > 0 ? $filesize : null,
+                'bytes_downloaded' => 0,
+                'last_broadcast_percent' => 0,
+                'batch_id' => null,
+                'queued_at' => null,
+                'started_at' => null,
+                'finished_at' => null,
+                'failed_at' => null,
+                'error' => null,
+                'attempt' => $expectedAttempt + 1,
+            ])->save();
+            $currentFile->forceFill(['download_progress' => 0])->save();
 
-        $file->forceFill([
-            'download_progress' => 0,
-        ])->save();
-
-        $transfer->refresh();
-        $transfer->setRelation('file', $file);
-
-        return $transfer;
+            return $current;
+        });
     }
 
     private function cleanupTransferParts(DownloadTransfer $transfer): void
@@ -190,11 +210,6 @@ class DownloadFile implements ShouldQueue
         if ($disk->exists($tmpDir)) {
             $disk->deleteDirectory($tmpDir);
         }
-    }
-
-    private function isYtDlpTransfer(DownloadTransfer $transfer): bool
-    {
-        return data_get($transfer->file?->listing_metadata, 'download_via') === 'yt-dlp';
     }
 
     private function broadcastTransferProgress(DownloadTransfer $transfer): void

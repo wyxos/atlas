@@ -4,6 +4,7 @@ namespace App\Jobs\Downloads;
 
 use App\Enums\DownloadTransferStatus;
 use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadTransferGeneration;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -14,8 +15,11 @@ class QueueDownloadTransfer implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $downloadTransferId)
+    public ?int $attempt = null;
+
+    public function __construct(public int $downloadTransferId, ?int $attempt = null)
     {
+        $this->attempt = $attempt;
         $this->onQueue('downloads');
     }
 
@@ -28,11 +32,12 @@ class QueueDownloadTransfer implements ShouldQueue
         if (! $transfer) {
             return;
         }
+        $this->attempt ??= (int) ($transfer->attempt ?? 0);
 
-        if ($transfer->status !== DownloadTransferStatus::QUEUED) {
+        if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [DownloadTransferStatus::QUEUED])) {
             return;
         }
 
-        PrepareDownloadTransfer::dispatch($transfer->id);
+        PrepareDownloadTransfer::dispatch($transfer->id, $this->attempt);
     }
 }
