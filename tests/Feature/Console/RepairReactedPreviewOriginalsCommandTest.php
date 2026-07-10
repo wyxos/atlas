@@ -9,9 +9,11 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\MediaProcessorTask;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\File as FileFacade;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -103,6 +105,82 @@ it('queues unhealthy originals through the normal download path up to the downlo
         ->and($second->fresh())
         ->downloaded->toBeTrue()
         ->path->toBe('downloads/aa/bb/missing-second.jpg');
+});
+
+it('continues after a transient original repair failure and retries that record after restart', function () {
+    Bus::fake();
+    Log::spy();
+
+    $failFirstSourceCheck = true;
+    Http::fake(function (Request $request) use (&$failFirstSourceCheck) {
+        if ($failFirstSourceCheck && str_contains($request->url(), '/source/first')) {
+            throw new RuntimeException('Sensitive upstream failure details.');
+        }
+
+        return Http::response('', 200);
+    });
+
+    $first = reactedPreviewRepairFile([
+        'path' => 'downloads/aa/bb/transient-first.jpg',
+        'referrer_url' => 'https://example.test/source/first',
+    ]);
+    $second = reactedPreviewRepairFile([
+        'path' => 'downloads/aa/bb/transient-second.jpg',
+        'referrer_url' => 'https://example.test/source/second',
+    ]);
+    $report = writeReactedPreviewRepairReport($this->repairReportDirectory, [
+        [
+            'file_id' => $first->id,
+            'reason_codes' => 'missing_disk_file|stale_preview_task',
+            'recommended_action' => 'redownload_original',
+        ],
+        [
+            'file_id' => $second->id,
+            'reason_codes' => 'missing_disk_file|stale_preview_task',
+            'recommended_action' => 'redownload_original',
+        ],
+    ]);
+    $arguments = [
+        '--report' => $report,
+        '--max-downloads' => 2,
+        '--max-previews' => 0,
+        '--json' => true,
+    ];
+
+    $this->artisan('atlas:repair-reacted-preview-originals', $arguments)
+        ->expectsOutputToContain('"failed": 1')
+        ->doesntExpectOutputToContain('Sensitive upstream failure details.')
+        ->assertExitCode(1);
+
+    Bus::assertDispatchedTimes(DownloadFile::class, 1);
+    Bus::assertDispatched(DownloadFile::class, fn (DownloadFile $job): bool => $job->fileId === $second->id);
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->with(
+            'Reacted preview original repair candidate failed.',
+            \Mockery::on(fn (array $context): bool => $context === [
+                'file_id' => $first->id,
+                'stage' => 'original',
+                'exception_class' => RuntimeException::class,
+                'exception_code' => '0',
+            ]),
+        );
+
+    $state = json_decode(
+        FileFacade::get($this->repairReportDirectory.DIRECTORY_SEPARATOR.'repair-state.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+    expect($state['processed_file_ids'])
+        ->toContain($second->id)
+        ->not->toContain($first->id);
+
+    $failFirstSourceCheck = false;
+
+    $this->artisan('atlas:repair-reacted-preview-originals', $arguments)->assertExitCode(0);
+
+    Bus::assertDispatchedTimes(DownloadFile::class, 2);
+    Bus::assertDispatched(DownloadFile::class, fn (DownloadFile $job): bool => $job->fileId === $first->id);
 });
 
 it('does not reset or queue an original when the download cap is already full', function () {

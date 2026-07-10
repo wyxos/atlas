@@ -118,11 +118,13 @@ class RepairReactedPreviewOriginals extends Command
                 'preview_workload' => $workloads['preview'],
                 'pending_download_candidates' => count($candidates['downloads']),
                 'pending_preview_candidates' => count($candidates['previews']),
-                'dispatch_complete' => $candidates['downloads'] === [] && $candidates['previews'] === [],
+                'dispatch_complete' => $candidates['downloads'] === []
+                    && $candidates['previews'] === []
+                    && $stats['failed'] === 0,
             ];
             $this->outputSummary($summary, $options['json']);
 
-            return self::SUCCESS;
+            return $stats['failed'] === 0 ? self::SUCCESS : self::FAILURE;
         } catch (Throwable) {
             try {
                 $state->persist();

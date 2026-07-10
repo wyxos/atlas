@@ -12,6 +12,7 @@ use App\Support\FileMimeType;
 use App\Support\FilePreviewGeneration;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use RuntimeException;
 use Throwable;
@@ -107,44 +108,48 @@ class ReactedPreviewOriginalRepairRunner
 
         while ($slots > 0 && $fileIds !== []) {
             $fileId = array_shift($fileIds);
-            $file = $this->findFile($fileId);
-            if (! $file) {
-                $stats['missing_records']++;
-                $state->recordProcessed($fileId);
+            $slotConsumed = false;
 
-                continue;
-            }
-            if ($this->hasRequiredPreviewAssets($file)) {
-                $stats['resolved']++;
-                $state->recordProcessed($fileId);
-
-                continue;
-            }
-            if ($this->isUnavailable($file)) {
-                $stats['unavailable']++;
-                $state->recordProcessed($fileId);
-
-                continue;
-            }
-            if ($this->hasActiveDownload($fileId)) {
-                $inflight++;
-                $slots--;
-                $state->recordProcessed($fileId, 'download');
-
-                continue;
-            }
-
-            $originalState = $this->health->inspect($file);
-            if ($originalState['healthy']) {
-                $previewCandidates[] = $fileId;
-
-                continue;
-            }
-
-            $slots--;
             try {
-                $result = $this->repairs->repairUnhealthyOriginal($file, $originalState, null);
+                $file = $this->findFile($fileId);
+                if (! $file) {
+                    $stats['missing_records']++;
+                    $state->recordProcessed($fileId);
+
+                    continue;
+                }
+                if ($this->hasRequiredPreviewAssets($file)) {
+                    $stats['resolved']++;
+                    $state->recordProcessed($fileId);
+
+                    continue;
+                }
+                if ($this->isUnavailable($file)) {
+                    $stats['unavailable']++;
+                    $state->recordProcessed($fileId);
+
+                    continue;
+                }
+                if ($this->hasActiveDownload($fileId)) {
+                    $inflight++;
+                    $slots--;
+                    $slotConsumed = true;
+                    $state->recordProcessed($fileId, 'download');
+
+                    continue;
+                }
+
+                $originalState = $this->health->inspect($file);
+                if ($originalState['healthy']) {
+                    $previewCandidates[] = $fileId;
+
+                    continue;
+                }
+
+                $slots--;
+                $slotConsumed = true;
                 $stats['stale_tasks_superseded'] += $this->supersedeStalePreviewTasks($fileId, $cutoff);
+                $result = $this->repairs->repairUnhealthyOriginal($file, $originalState, null);
 
                 if ($result['action'] === FilePreviewRepairService::ACTION_REDOWNLOAD_QUEUED) {
                     $stats['redownloads_queued']++;
@@ -156,7 +161,11 @@ class ReactedPreviewOriginalRepairRunner
                 }
                 $state->recordProcessed($fileId, 'download');
             } catch (Throwable $exception) {
-                throw new RuntimeException("Original repair failed for file ID {$fileId}.", previous: $exception);
+                if (! $slotConsumed) {
+                    $slots--;
+                }
+
+                $this->recordCandidateFailure($fileId, 'original', $exception, $stats);
             }
         }
 
@@ -178,53 +187,75 @@ class ReactedPreviewOriginalRepairRunner
     ): void {
         while ($slots > 0 && $fileIds !== []) {
             $fileId = array_shift($fileIds);
-            $file = $this->findFile($fileId);
-            if (! $file) {
-                $stats['missing_records']++;
-                $state->recordProcessed($fileId);
+            $slotConsumed = false;
 
-                continue;
-            }
-            if ($this->hasRequiredPreviewAssets($file)) {
-                $stats['resolved']++;
-                $state->recordProcessed($fileId);
-
-                continue;
-            }
-            if ($this->isUnavailable($file)) {
-                $stats['unavailable']++;
-                $state->recordProcessed($fileId);
-
-                continue;
-            }
-            if ($this->hasActiveDownload($fileId)) {
-                $state->recordProcessed($fileId, 'download');
-
-                continue;
-            }
-
-            $originalState = $this->health->inspect($file);
-            if (! $originalState['healthy']) {
-                $downloadCandidates[] = $fileId;
-
-                continue;
-            }
-            if ($this->hasFreshActivePreviewTask($fileId, $cutoff)) {
-                $state->recordProcessed($fileId, 'preview');
-
-                continue;
-            }
-
-            $slots--;
             try {
+                $file = $this->findFile($fileId);
+                if (! $file) {
+                    $stats['missing_records']++;
+                    $state->recordProcessed($fileId);
+
+                    continue;
+                }
+                if ($this->hasRequiredPreviewAssets($file)) {
+                    $stats['resolved']++;
+                    $state->recordProcessed($fileId);
+
+                    continue;
+                }
+                if ($this->isUnavailable($file)) {
+                    $stats['unavailable']++;
+                    $state->recordProcessed($fileId);
+
+                    continue;
+                }
+                if ($this->hasActiveDownload($fileId)) {
+                    $state->recordProcessed($fileId, 'download');
+
+                    continue;
+                }
+
+                $originalState = $this->health->inspect($file);
+                if (! $originalState['healthy']) {
+                    $downloadCandidates[] = $fileId;
+
+                    continue;
+                }
+                if ($this->hasFreshActivePreviewTask($fileId, $cutoff)) {
+                    $state->recordProcessed($fileId, 'preview');
+
+                    continue;
+                }
+
+                $slots--;
+                $slotConsumed = true;
                 $stats['stale_tasks_superseded'] += $this->supersedeStalePreviewTasks($fileId, $cutoff);
                 GenerateFilePreviewAssets::dispatch($fileId, true)->onQueue('processing');
                 $stats['previews_queued']++;
                 $state->recordProcessed($fileId, 'preview');
             } catch (Throwable $exception) {
-                throw new RuntimeException("Preview dispatch failed for file ID {$fileId}.", previous: $exception);
+                if (! $slotConsumed) {
+                    $slots--;
+                }
+
+                $this->recordCandidateFailure($fileId, 'preview', $exception, $stats);
             }
         }
+    }
+
+    /**
+     * @param  array<string, int>  $stats
+     */
+    private function recordCandidateFailure(int $fileId, string $stage, Throwable $exception, array &$stats): void
+    {
+        $stats['failed']++;
+
+        Log::warning('Reacted preview original repair candidate failed.', [
+            'file_id' => $fileId,
+            'stage' => $stage,
+            'exception_class' => $exception::class,
+            'exception_code' => (string) $exception->getCode(),
+        ]);
     }
 
     private function findFile(int $fileId): ?File
