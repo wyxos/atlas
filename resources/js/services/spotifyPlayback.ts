@@ -92,6 +92,7 @@ const SPOTIFY_SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
 const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
 const SPOTIFY_DEVICE_READY_TIMEOUT_MS = 5000;
 const SPOTIFY_DEVICE_READY_POLL_MS = 250;
+const SPOTIFY_PLAYBACK_START_MAX_ATTEMPTS = Math.ceil(SPOTIFY_DEVICE_READY_TIMEOUT_MS / SPOTIFY_DEVICE_READY_POLL_MS);
 const SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS = 1500;
 const SPOTIFY_AUTHENTICATION_ERROR_STATUSES = new Set([401, 403, 409]);
 
@@ -108,6 +109,13 @@ class SpotifyPlaybackAuthenticationError extends Error {
     constructor(message: string, public readonly status: number | null = null) {
         super(message);
         this.name = 'SpotifyPlaybackAuthenticationError';
+    }
+}
+
+class SpotifyPlaybackApiError extends Error {
+    constructor(message: string, public readonly status: number) {
+        super(message);
+        this.name = 'SpotifyPlaybackApiError';
     }
 }
 
@@ -273,7 +281,7 @@ async function spotifyApiError(response: Response): Promise<Error> {
 
     return SPOTIFY_AUTHENTICATION_ERROR_STATUSES.has(response.status)
         ? new SpotifyPlaybackAuthenticationError(message, response.status)
-        : new Error(message);
+        : new SpotifyPlaybackApiError(message, response.status);
 }
 
 async function delay(milliseconds: number, options?: SpotifyPlayOptions): Promise<void> {
@@ -294,6 +302,42 @@ async function pauseSpotifyDevice(token: string, deviceId: string): Promise<void
     await spotifyApiRequest(`/me/player/pause?device_id=${encodeURIComponent(deviceId)}`, token, {
         method: 'PUT',
     });
+}
+
+function isSpotifyDeviceNotFoundError(error: unknown): error is SpotifyPlaybackApiError {
+    return error instanceof SpotifyPlaybackApiError
+        && error.status === 404
+        && /device not found/i.test(error.message);
+}
+
+async function startSpotifyDevicePlayback(
+    token: string,
+    deviceId: string,
+    uri: string,
+    positionMs: number,
+    options?: SpotifyPlayOptions,
+): Promise<void> {
+    for (let attempt = 1; attempt <= SPOTIFY_PLAYBACK_START_MAX_ATTEMPTS; attempt++) {
+        assertSpotifyPlaybackCurrent(options);
+
+        try {
+            await spotifyApiRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, token, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    position_ms: positionMs,
+                    uris: [uri],
+                }),
+            });
+
+            return;
+        } catch (error) {
+            if (!isSpotifyDeviceNotFoundError(error) || attempt === SPOTIFY_PLAYBACK_START_MAX_ATTEMPTS) {
+                throw error;
+            }
+        }
+
+        await delay(SPOTIFY_DEVICE_READY_POLL_MS, options);
+    }
 }
 
 function isPlaybackNearRequestedPosition(
@@ -449,13 +493,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
 
         await player?.activateElement();
         assertSpotifyPlaybackCurrent(options);
-        await spotifyApiRequest(`/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}`, token, {
-            method: 'PUT',
-            body: JSON.stringify({
-                position_ms: positionMs,
-                uris: [uri],
-            }),
-        });
+        await startSpotifyDevicePlayback(token, targetDeviceId, uri, positionMs, options);
 
         return await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
     }
