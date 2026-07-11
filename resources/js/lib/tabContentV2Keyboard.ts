@@ -20,14 +20,16 @@ export function createTabContentV2KeydownHandler(options: TabContentV2KeydownOpt
             return;
         }
 
-        if (shouldCloseFileSheetForEscape(event, options.getFileSheetOpen())) {
+        const surfaceMode = options.getSurfaceMode();
+
+        if (surfaceMode === 'list' && shouldCloseFileSheetForEscape(event, options.getFileSheetOpen())) {
             event.preventDefault();
             event.stopImmediatePropagation();
             options.closeFileSheet();
             return;
         }
 
-        if (shouldExitFullscreenForMediaBarEscape(event, options.getSurfaceMode())) {
+        if (shouldExitFullscreenForMediaBarEscape(event, surfaceMode)) {
             event.preventDefault();
             options.updateSurfaceMode('list');
         }

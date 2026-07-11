@@ -65,6 +65,39 @@ test('items are formatted correctly', function () {
     expect($item['key'])->toBe("{$item['page']}-{$item['id']}");
 });
 
+test('restored DeviantArt items retain source identity and source action capabilities', function () {
+    $user = User::factory()->create();
+    $file = File::factory()->create([
+        'source' => 'deviantart.com',
+        'source_id' => '52BAFA97-9DB9-0E5F-FF2D-C39083F89817',
+        'listing_metadata' => [
+            'deviationid' => '52BAFA97-9DB9-0E5F-FF2D-C39083F89817',
+        ],
+    ]);
+    $container = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'deviantart.com',
+        'source_id' => 'restored-artist',
+    ]);
+    $file->containers()->attach($container->id);
+
+    $tab = Tab::factory()
+        ->for($user)
+        ->withParams(['service' => 'deviantart-images'])
+        ->withFiles([$file->id])
+        ->create();
+
+    $response = $this->actingAs($user)->getJson(route('api.tabs.show', ['tab' => $tab->id]));
+
+    $response->assertSuccessful()
+        ->assertJsonPath('tab.items.0.source', 'deviantart.com')
+        ->assertJsonPath('tab.items.0.source_id', '52BAFA97-9DB9-0E5F-FF2D-C39083F89817')
+        ->assertJsonPath('tab.items.0.containers.0.source', 'deviantart.com')
+        ->assertJsonPath('tab.items.0.capabilities.refresh_source_media', true)
+        ->assertJsonPath('tab.items.0.capabilities.watch_source_and_refresh', true)
+        ->assertJsonPath('tab.items.0.capabilities.unwatch_source_account', true);
+});
+
 test('audio items use album covers as browse previews', function () {
     $user = User::factory()->create();
     $audio = File::factory()->create([

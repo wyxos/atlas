@@ -2,9 +2,11 @@
 import { Copy, Loader2, RefreshCw, Trash2, PanelRightClose } from 'lucide-vue-next';
 import { computed, useAttrs } from 'vue';
 import type { VibeFullscreenPreviewItem } from '@wyxos/vibe';
-import type { File, FileMetadataRecord } from '@/types/file';
+import { Button } from '@/components/ui/button';
+import type { File, FileContainer, FileMetadataRecord } from '@/types/file';
 import { copyToClipboard } from '@/utils/clipboard';
 import FullscreenSheetPreviewStrip from './FullscreenSheetPreviewStrip.vue';
+import FileViewerSheetContainerSection from './FileViewerSheetContainerSection.vue';
 import FileSourceMetadataRefreshAction from './FileSourceMetadataRefreshAction.vue';
 import FileViewerMetadataTree from './FileViewerMetadataTree.vue';
 import FileViewerPromptSection from './FileViewerPromptSection.vue';
@@ -22,11 +24,13 @@ interface Props {
     prompt?: string | null;
     showPrompt?: boolean;
     totalItems?: number;
+    canManageContainerBlacklist?: (container: FileContainer) => boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     isPromptLoading: false, isRefreshingSourceMetadata: false, sourceMetadataRefreshError: null,
     nextPreviews: () => [], prompt: null, showPrompt: false, totalItems: 0,
+    canManageContainerBlacklist: () => false,
 });
 
 defineOptions({
@@ -42,6 +46,8 @@ const emit = defineEmits<{
     'mark-corrupted-file': [fileId: number];
     'test-prompt': [prompt: string];
     'refresh-source-metadata': [fileId: number];
+    'delete-file': [fileId: number];
+    'manage-container-blacklist': [container: FileContainer];
 }>();
 
 const hasNextPreviews = computed(() => props.nextPreviews.length > 0);
@@ -160,13 +166,27 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                 <h2 class="text-lg font-semibold text-white">
                     # {{ displayFileId || '' }}
                 </h2>
-                <button
-                    @click="emit('close')"
-                    class="p-2 rounded-lg hover:bg-prussian-blue-700 text-white transition-colors"
-                    aria-label="Hide details panel"
-                >
-                    <PanelRightClose :size="20" />
-                </button>
+                <div class="flex items-center gap-2">
+                    <Button
+                        v-if="fileData"
+                        size="icon-sm"
+                        variant="outline"
+                        color="danger"
+                        aria-label="Delete file"
+                        title="Delete file"
+                        data-test="file-sheet-delete-file"
+                        @click="emit('delete-file', fileData.id)"
+                    >
+                        <Trash2 />
+                    </Button>
+                    <button
+                        @click="emit('close')"
+                        class="p-2 rounded-lg hover:bg-prussian-blue-700 text-white transition-colors"
+                        aria-label="Hide details panel"
+                    >
+                        <PanelRightClose :size="20" />
+                    </button>
+                </div>
             </div>
             <FileSourceMetadataRefreshAction
                 :file-data="fileData"
@@ -392,70 +412,12 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                         <div class="font-semibold text-white mb-1">Blacklisted</div>
                         <div>{{ new Date(fileData.blacklisted_at).toLocaleString() }}</div>
                     </div>
-                    <div v-if="fileData.containers && fileData.containers.length > 0" class="space-y-2">
-                        <div class="font-semibold text-white mb-1">Containers</div>
-                        <div class="space-y-3">
-                            <div
-                                v-for="container in fileData.containers"
-                                :key="container.id"
-                                class="rounded-lg border border-twilight-indigo-500/50 bg-prussian-blue-900/50 p-3"
-                            >
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <div class="font-semibold text-white">
-                                            #{{ container.id }} {{ container.type || 'Container' }}
-                                        </div>
-                                        <div class="wrap-break-word text-xs text-twilight-indigo-100">
-                                            {{ container.source }}
-                                            <template v-if="container.source_id">
-                                                · {{ container.source_id }}
-                                            </template>
-                                        </div>
-                                    </div>
-                                    <div class="text-[10px] uppercase tracking-wide text-twilight-indigo-100">
-                                        {{ container.blacklisted ? 'blacklisted' : 'not blacklisted' }}
-                                    </div>
-                                </div>
-                                <div v-if="container.referrer" class="mt-3">
-                                    <div class="font-semibold text-white mb-1">Referrer</div>
-                                    <a
-                                        :href="container.referrer"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="wrap-break-word text-smart-blue-400 hover:text-smart-blue-300"
-                                    >
-                                        {{ container.referrer }}
-                                    </a>
-                                </div>
-                                <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
-                                    <div class="rounded bg-prussian-blue-700/60 p-2">
-                                        <div class="font-semibold text-white">Unreacted</div>
-                                        <div>{{ container.file_stats.unreacted }}</div>
-                                    </div>
-                                    <div class="rounded bg-prussian-blue-700/60 p-2">
-                                        <div class="font-semibold text-white">Blacklisted</div>
-                                        <div>{{ container.file_stats.blacklisted }}</div>
-                                    </div>
-                                    <div class="rounded bg-prussian-blue-700/60 p-2">
-                                        <div class="font-semibold text-white">Positive</div>
-                                        <div>{{ container.file_stats.positive }}</div>
-                                    </div>
-                                </div>
-                                <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                        <div class="font-semibold text-white mb-1">Action</div>
-                                        <div class="uppercase tracking-wide text-twilight-indigo-100">
-                                            {{ container.action_type || 'none' }}
-                                        </div>
-                                    </div>
-                                    <div v-if="container.blacklisted_at">
-                                        <div class="font-semibold text-white mb-1">Blacklisted At</div>
-                                        <div>{{ new Date(container.blacklisted_at).toLocaleString() }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <FileViewerSheetContainerSection
+                        v-if="fileData.containers && fileData.containers.length > 0"
+                        :containers="fileData.containers"
+                        :can-manage-container-blacklist="canManageContainerBlacklist"
+                        @manage="emit('manage-container-blacklist', $event)"
+                    />
                     <div v-if="hasMetadataSections" class="space-y-3" data-test="file-provider-metadata">
                         <div>
                             <div class="font-semibold text-white mb-1">Provider Metadata</div>

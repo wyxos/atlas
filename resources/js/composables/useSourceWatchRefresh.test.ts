@@ -111,9 +111,19 @@ function makeFile(overrides: Partial<File> = {}): File {
     };
 }
 
+function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((resolvePromise) => {
+        resolve = resolvePromise;
+    });
+
+    return { promise, resolve };
+}
+
 describe('useSourceWatchRefresh', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockAxios.post.mockReset();
     });
 
     it('posts source watch refresh and applies returned file data', async () => {
@@ -131,7 +141,7 @@ describe('useSourceWatchRefresh', () => {
             },
         });
 
-        await actions.watchAndRefresh(makeItem(), 'exampleartist');
+        await actions.watchAndRefresh(makeItem(), 'posted-response-artist');
 
         expect(mockAxios.post).toHaveBeenCalledWith('/api/files/42/source-watch-refresh');
         expect(setFileData).toHaveBeenCalledWith(refreshedFile);
@@ -191,10 +201,19 @@ describe('useSourceWatchRefresh', () => {
         );
     });
 
-    it('only offers watch refresh when watcher access is missing', () => {
+    it('offers watch refresh for supported source accounts until they are known to be watched', () => {
         const actions = useSourceWatchRefresh({ setFileData: vi.fn() });
 
         expect(actions.canWatchAndRefresh(makeItem(), 'exampleartist')).toBe(true);
+        expect(actions.canWatchAndRefresh(makeItem({
+            source_access: {
+                provider: 'deviantart',
+                access_type: null,
+                has_access: true,
+                requires_watch: false,
+                can_unwatch: false,
+            },
+        }), 'exampleartist')).toBe(true);
         expect(actions.canWatchAndRefresh(makeItem({
             source_access: {
                 provider: 'deviantart',
@@ -219,6 +238,97 @@ describe('useSourceWatchRefresh', () => {
                 can_unwatch: true,
             },
         }), 'exampleartist')).toBe(true);
+    });
+
+    it('keeps a successfully watched account available to a remounted composable instance', async () => {
+        const firstInstance = useSourceWatchRefresh({ setFileData: vi.fn() });
+        const item = makeItem({
+            id: 142,
+            source_access: {
+                provider: 'deviantart',
+                access_type: null,
+                has_access: true,
+                requires_watch: false,
+                can_unwatch: false,
+            },
+        });
+
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                supported: true,
+                watched: true,
+                changed: false,
+                message: 'Source account watched. Source media is already current.',
+            },
+        });
+
+        await firstInstance.watchAndRefresh(item, 'remount-artist');
+
+        const remountedInstance = useSourceWatchRefresh({ setFileData: vi.fn() });
+
+        expect(remountedInstance.canWatchAndRefresh(item, 'remount-artist')).toBe(false);
+        expect(remountedInstance.canUnwatchSourceAccount(item, 'remount-artist')).toBe(true);
+    });
+
+    it('tracks the pending operation type for refresh, watch, and unwatch actions', async () => {
+        const actions = useSourceWatchRefresh({ setFileData: vi.fn() });
+
+        const refreshItem = makeItem({
+            id: 241,
+            capabilities: {
+                refresh_source_media: true,
+                watch_source_and_refresh: true,
+                unwatch_source_account: true,
+            },
+        });
+        const refreshResponse = deferred<{ data: { changed: boolean } }>();
+        mockAxios.post.mockReturnValueOnce(refreshResponse.promise);
+
+        const refreshRequest = actions.refreshSourceMedia(refreshItem);
+        expect(actions.pendingOperationFor(refreshItem)).toBe('refresh');
+        refreshResponse.resolve({ data: { changed: false } });
+        await refreshRequest;
+        expect(actions.pendingOperationFor(refreshItem)).toBeNull();
+
+        const watchItem = makeItem({ id: 242 });
+        const watchResponse = deferred<{ data: { supported: boolean; watched: boolean; changed: boolean } }>();
+        mockAxios.post.mockReturnValueOnce(watchResponse.promise);
+
+        const watchRequest = actions.watchAndRefresh(watchItem, 'pending-operation-artist');
+        expect(actions.pendingOperationFor(watchItem)).toBe('watch');
+        watchResponse.resolve({
+            data: {
+                supported: true,
+                watched: true,
+                changed: false,
+            },
+        });
+        await watchRequest;
+        expect(actions.pendingOperationFor(watchItem)).toBeNull();
+
+        const unwatchItem = makeItem({
+            id: 243,
+            source_access: {
+                provider: 'deviantart',
+                access_type: 'watchers',
+                has_access: true,
+                requires_watch: false,
+                can_unwatch: true,
+            },
+        });
+        const unwatchResponse = deferred<{ data: { supported: boolean; unwatched: boolean } }>();
+        mockAxios.post.mockReturnValueOnce(unwatchResponse.promise);
+
+        const unwatchRequest = actions.unwatchSourceAccount(unwatchItem, 'pending-unwatch-artist');
+        expect(actions.pendingOperationFor(unwatchItem)).toBe('unwatch');
+        unwatchResponse.resolve({
+            data: {
+                supported: true,
+                unwatched: true,
+            },
+        });
+        await unwatchRequest;
+        expect(actions.pendingOperationFor(unwatchItem)).toBeNull();
     });
 
     it('does not run when capabilities are disabled', async () => {

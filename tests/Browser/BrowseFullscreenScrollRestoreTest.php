@@ -71,35 +71,33 @@ function waitForBrowsePath($page, string $path): void
 
 function waitForBrowseListReady($page): void
 {
-    $state = $page->script(<<<'JS'
-        async () => {
-            for (let attempt = 0; attempt < 80; attempt += 1) {
+    $state = [];
+
+    for ($attempt = 0; $attempt < 80; $attempt++) {
+        $state = $page->script(<<<'JS'
+            () => {
                 const scroller = document.querySelector('[data-testid="vibe-list-scroll"]');
                 const listSurface = document.querySelector('[data-testid="vibe-list-surface"]');
 
-                if (scroller && listSurface?.getAttribute('data-visible') === 'true') {
-                    return {
-                        ready: true,
-                        cardCount: document.querySelectorAll('[data-testid="vibe-list-card-open"]').length,
-                        listVisible: listSurface.getAttribute('data-visible'),
-                        path: window.location.pathname,
-                    };
-                }
-
-                await new Promise((resolve) => window.setTimeout(resolve, 100));
+                return {
+                    ready: Boolean(scroller && listSurface?.getAttribute('data-visible') === 'true'),
+                    cardCount: document.querySelectorAll('[data-testid="vibe-list-card-open"]').length,
+                    bodyText: document.body.innerText.slice(0, 300),
+                    hasScroller: Boolean(scroller),
+                    listVisible: listSurface?.getAttribute('data-visible') ?? null,
+                    path: window.location.pathname,
+                };
             }
+            JS);
 
-            return {
-                ready: false,
-                bodyText: document.body.innerText.slice(0, 300),
-                hasScroller: Boolean(document.querySelector('[data-testid="vibe-list-scroll"]')),
-                listVisible: document.querySelector('[data-testid="vibe-list-surface"]')?.getAttribute('data-visible') ?? null,
-                path: window.location.pathname,
-            };
+        if ($state['ready'] ?? false) {
+            return;
         }
-        JS);
 
-    expect($state['ready'] ?? false)->toBeTrue('Expected the browse list to finish mounting. State: '.json_encode($state));
+        usleep(100_000);
+    }
+
+    expect(false)->toBeTrue('Expected the browse list to finish mounting. State: '.json_encode($state));
 }
 
 function settleBrowseUi($page, int $milliseconds = 600): void

@@ -9,8 +9,10 @@ use App\Models\FileMetadata;
 use App\Models\ModerationRule;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\Extension\ExtensionBatchReactionService;
 use App\Services\FileModerationService;
 use App\Services\FilePreviewService;
+use App\Services\FileReactionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
@@ -76,6 +78,44 @@ test('moderation rule blacklists dispatch container auto blacklist evaluation jo
     });
 });
 
+test('positive file reactions dispatch container evaluations', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $container = Container::factory()->create(['blacklisted_at' => now()]);
+    $file = createContainerAutoBlacklistFiles(1)->firstOrFail();
+    $file->containers()->attach($container->id);
+
+    app(FileReactionService::class)->set($file, $user, 'like', [
+        'queueDownload' => false,
+        'queueLibrarySync' => false,
+    ]);
+
+    Bus::assertDispatched(EvaluateContainerAutoBlacklist::class, function ($job) use ($container, $user): bool {
+        return $job->containerId === $container->id
+            && $job->userId === $user->id;
+    });
+});
+
+test('extension bulk positive reactions dispatch container evaluations', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $container = Container::factory()->create(['blacklisted_at' => now()]);
+    $file = createContainerAutoBlacklistFiles(1)->firstOrFail();
+    $file->containers()->attach($container->id);
+
+    app(ExtensionBatchReactionService::class)->setMany([$file], $user, 'love', [
+        'queueDownload' => false,
+        'queueLibrarySync' => false,
+    ]);
+
+    Bus::assertDispatched(EvaluateContainerAutoBlacklist::class, function ($job) use ($container, $user): bool {
+        return $job->containerId === $container->id
+            && $job->userId === $user->id;
+    });
+});
+
 test('container evaluation auto blacklists keep containers and unreacted child files after thirty blacklisted items', function () {
     Bus::fake();
 
@@ -134,17 +174,26 @@ test('container evaluation uses feed removal after one hundred blacklisted items
     }
 });
 
-test('container evaluation does not auto blacklist containers with ten positive items', function () {
+test('container evaluation preserves the aggregate positive guard across users', function () {
     Bus::fake();
 
     $user = User::factory()->create();
+    $otherUser = User::factory()->create();
     $container = Container::factory()->create(['blacklisted_at' => null]);
     $blacklistedFiles = createContainerAutoBlacklistFiles(100, ['blacklisted_at' => now()]);
-    $positiveFiles = createContainerAutoBlacklistFiles(10);
+    $userPositiveFiles = createContainerAutoBlacklistFiles(5);
+    $otherUserPositiveFiles = createContainerAutoBlacklistFiles(5);
     $unreactedFiles = createContainerAutoBlacklistFiles(2);
 
-    attachContainerAutoBlacklistFiles($container, $blacklistedFiles, $positiveFiles, $unreactedFiles);
-    reactToContainerAutoBlacklistFiles($positiveFiles, $user);
+    attachContainerAutoBlacklistFiles(
+        $container,
+        $blacklistedFiles,
+        $userPositiveFiles,
+        $otherUserPositiveFiles,
+        $unreactedFiles,
+    );
+    reactToContainerAutoBlacklistFiles($userPositiveFiles, $user);
+    reactToContainerAutoBlacklistFiles($otherUserPositiveFiles, $otherUser);
 
     (new EvaluateContainerAutoBlacklist((int) $container->id, (int) $user->id))->handle();
 
@@ -153,6 +202,64 @@ test('container evaluation does not auto blacklist containers with ten positive 
     foreach ($unreactedFiles as $file) {
         expect($file->fresh()->blacklisted_at)->toBeNull();
     }
+});
+
+test('container evaluation auto unblacklists at ten positive items from the current user', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $container = Container::factory()->create([
+        'blacklisted_at' => now(),
+        'action_type' => ActionType::BLACKLIST,
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+    $currentUserPositiveFiles = createContainerAutoBlacklistFiles(9);
+    $otherUserPositiveFile = createContainerAutoBlacklistFiles(1);
+
+    attachContainerAutoBlacklistFiles($container, $currentUserPositiveFiles, $otherUserPositiveFile);
+    reactToContainerAutoBlacklistFiles($currentUserPositiveFiles, $user);
+    reactToContainerAutoBlacklistFiles($otherUserPositiveFile, $otherUser);
+
+    (new EvaluateContainerAutoBlacklist((int) $container->id, (int) $user->id))->handle();
+
+    expect($container->fresh()->blacklisted_at)->not->toBeNull();
+
+    $tenthPositiveFile = createContainerAutoBlacklistFiles(1);
+    attachContainerAutoBlacklistFiles($container, $tenthPositiveFile);
+    reactToContainerAutoBlacklistFiles($tenthPositiveFile, $user);
+
+    (new EvaluateContainerAutoBlacklist((int) $container->id, (int) $user->id))->handle();
+
+    $container->refresh();
+    expect($container->blacklisted_at)->toBeNull()
+        ->and($container->action_type)->toBeNull()
+        ->and($container->blacklist_previewed_count_mode)->toBe(BlacklistPreviewedCountMode::PRESERVE);
+});
+
+test('container evaluation does not auto unblacklist without an acting user', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $container = Container::factory()->create([
+        'blacklisted_at' => now(),
+        'action_type' => ActionType::BLACKLIST,
+        'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::FEED_REMOVED,
+    ]);
+    $userPositiveFiles = createContainerAutoBlacklistFiles(5);
+    $otherUserPositiveFiles = createContainerAutoBlacklistFiles(5);
+
+    attachContainerAutoBlacklistFiles($container, $userPositiveFiles, $otherUserPositiveFiles);
+    reactToContainerAutoBlacklistFiles($userPositiveFiles, $user);
+    reactToContainerAutoBlacklistFiles($otherUserPositiveFiles, $otherUser);
+
+    (new EvaluateContainerAutoBlacklist((int) $container->id))->handle();
+
+    $container->refresh();
+    expect($container->blacklisted_at)->not->toBeNull()
+        ->and($container->action_type)->toBe(ActionType::BLACKLIST)
+        ->and($container->blacklist_previewed_count_mode)->toBe(BlacklistPreviewedCountMode::FEED_REMOVED);
 });
 
 /**

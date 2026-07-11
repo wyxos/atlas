@@ -1,8 +1,7 @@
-import { computed, ref, type ComputedRef, type Ref } from 'vue';
+import { computed, reactive, ref, type ComputedRef, type Ref } from 'vue';
 import { useFileViewerSheetState } from '@/composables/useFileViewerSheetState';
 import type { FeedItem } from '@/composables/useTabs';
 
-type FileSheetPresentation = 'inline' | 'overlay';
 type FileSheetOverlay = Parameters<typeof useFileViewerSheetState>[0]['overlay'];
 type FileSheetPromptDialog = {
     clear: () => void;
@@ -14,59 +13,103 @@ export function useTabContentV2FileSheet(params: {
     currentVisibleItem: ComputedRef<FeedItem | null>;
     overlay: FileSheetOverlay;
     promptDialog: FileSheetPromptDialog;
+    surfaceMode: Ref<'fullscreen' | 'list'>;
 }) {
-    const sheet = useFileViewerSheetState({ overlay: params.overlay });
-    const pinnedItem = ref<FeedItem | null>(null);
-    const presentation = ref<FileSheetPresentation>('inline');
-
-    const item = computed(() => (
-        presentation.value === 'overlay'
-            ? (pinnedItem.value ?? params.currentVisibleItem.value)
-            : params.currentVisibleItem.value
+    const viewerSheet = useFileViewerSheetState({
+        overlay: params.overlay,
+        storageKey: 'atlas:fileViewerSheetOpen',
+    });
+    const gridSheet = useFileViewerSheetState({
+        autoOpenForFileMedia: false,
+        overlay: params.overlay,
+        storageKey: null,
+    });
+    const gridItem = ref<FeedItem | null>(null);
+    const viewerItem = computed(() => params.currentVisibleItem.value);
+    const viewerTargetFileId = computed(() => viewerItem.value?.id ?? null);
+    const gridTargetFileId = computed(() => gridItem.value?.id ?? null);
+    const activeState = reactive({
+        get isOpen(): boolean {
+            return params.surfaceMode.value === 'fullscreen'
+                ? viewerSheet.sheetState.isOpen
+                : gridSheet.sheetState.isOpen;
+        },
+    });
+    const activeTargetFileId = computed(() => (
+        params.surfaceMode.value === 'fullscreen'
+            ? viewerTargetFileId.value
+            : gridTargetFileId.value
     ));
-    const targetFileId = computed(() => item.value?.id ?? null);
 
-    function open(): void {
-        pinnedItem.value = null;
-        presentation.value = 'inline';
+    function openViewer(): void {
         params.promptDialog.clear();
-        sheet.setSheetOpen(true);
+        viewerSheet.setSheetOpen(true);
     }
 
-    function openForItem(fileItem: FeedItem, index: number): void {
+    function openGridForItem(fileItem: FeedItem, index: number): void {
         params.activeIndex.value = index;
-        pinnedItem.value = fileItem;
-        presentation.value = 'overlay';
+        gridItem.value = fileItem;
         params.promptDialog.select(fileItem);
-        sheet.setSheetOpen(true);
+        gridSheet.setSheetOpen(true);
     }
 
-    function close(): void {
-        sheet.setSheetOpen(false);
-        pinnedItem.value = null;
+    function closeViewer(): void {
+        viewerSheet.setSheetOpen(false);
         params.promptDialog.clear();
     }
 
-    function closeForFullscreenExit(): void {
-        sheet.setSheetOpen(false, { persist: false });
-        pinnedItem.value = null;
-        presentation.value = 'inline';
+    function closeGrid(): void {
+        gridSheet.setSheetOpen(false);
+        gridItem.value = null;
         params.promptDialog.clear();
+    }
+
+    function resetViewer(): void {
+        viewerSheet.setSheetOpen(false, { persist: false });
+        params.promptDialog.clear();
+    }
+
+    function enterViewer(): void {
+        if (viewerSheet.sheetState.isOpen) {
+            params.promptDialog.clear();
+        }
+    }
+
+    function exitViewer(): void {
+        params.promptDialog.clear();
+
+        if (gridSheet.sheetState.isOpen && gridItem.value) {
+            params.promptDialog.select(gridItem.value);
+        }
     }
 
     function reset(): void {
-        closeForFullscreenExit();
+        resetViewer();
+        gridSheet.setSheetOpen(false, { persist: false });
+        gridItem.value = null;
     }
 
     return {
-        close,
-        closeForFullscreenExit,
-        item,
-        open,
-        openForItem,
-        presentation,
+        active: {
+            state: activeState,
+            targetFileId: activeTargetFileId,
+        },
+        grid: {
+            close: closeGrid,
+            item: computed(() => gridItem.value),
+            openForItem: openGridForItem,
+            state: gridSheet.sheetState,
+            targetFileId: gridTargetFileId,
+        },
         reset,
-        state: sheet.sheetState,
-        targetFileId,
+        viewer: {
+            close: closeViewer,
+            enter: enterViewer,
+            exit: exitViewer,
+            item: viewerItem,
+            open: openViewer,
+            state: viewerSheet.sheetState,
+            targetFileId: viewerTargetFileId,
+        },
     };
 }

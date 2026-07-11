@@ -266,6 +266,8 @@ class TabController extends Controller
         $files = $tab->files()
             ->select([
                 'files.id',
+                'files.source',
+                'files.source_id',
                 'files.url',
                 'files.preview_url',
                 'files.mime_type',

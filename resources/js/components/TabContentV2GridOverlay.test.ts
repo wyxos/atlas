@@ -85,7 +85,7 @@ function createProps(overrides: Partial<{ hovered: boolean }> = {}) {
             canRefreshSourceMedia: vi.fn().mockReturnValue(false),
             canWatchAndRefresh: vi.fn().mockReturnValue(false),
             canUnwatchSourceAccount: vi.fn().mockReturnValue(false),
-            isWatchingAndRefreshing: vi.fn().mockReturnValue(false),
+            pendingOperationFor: vi.fn().mockReturnValue(null),
             refreshSourceMedia: vi.fn(),
             watchAndRefresh: vi.fn(),
             unwatchSourceAccount: vi.fn(),
@@ -331,7 +331,7 @@ describe('TabContentV2GridOverlay', () => {
         expect(props.sourceWatchRefresh.watchAndRefresh).toHaveBeenCalledWith(props.item, 'exampleartist');
     });
 
-    it('shows source media refresh action before watch access metadata is known', async () => {
+    it('shows source media refresh action on hover before watch access metadata is known', async () => {
         const props = createProps({ hovered: true });
         props.itemInteractions.preload.isItemPreloaded.mockReturnValue(false);
         props.item.source = 'deviantart.com';
@@ -359,18 +359,10 @@ describe('TabContentV2GridOverlay', () => {
         expect(props.sourceWatchRefresh.refreshSourceMedia).toHaveBeenCalledWith(props.item);
     });
 
-    it('shows source watch refresh action even when the locked asset did not preload', () => {
-        const props = createProps({ hovered: true });
-        props.itemInteractions.preload.isItemPreloaded.mockReturnValue(false);
-        props.containers.badges.getContainersForItem.mockReturnValue([
-            {
-                id: 9,
-                type: 'User',
-                source: 'deviantart.com',
-                source_id: 'exampleartist',
-            },
-        ]);
-        props.sourceWatchRefresh.canWatchAndRefresh.mockImplementation((_item: FeedItem, username: string | null) => username === 'exampleartist');
+    it('keeps DeviantArt source media refresh hidden until the card is hovered', async () => {
+        const props = createProps();
+        props.item.source = 'deviantart.com';
+        props.sourceWatchRefresh.canRefreshSourceMedia.mockReturnValue(true);
 
         const wrapper = mount(TabContentV2GridOverlay, {
             props,
@@ -383,20 +375,16 @@ describe('TabContentV2GridOverlay', () => {
             },
         });
 
-        expect(wrapper.find('[data-test="source-watch-refresh-trigger"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="source-media-refresh-trigger"]').exists()).toBe(false);
+
+        await wrapper.setProps({ hovered: true });
+
+        expect(wrapper.find('[data-test="source-media-refresh-trigger"]').exists()).toBe(true);
     });
 
-    it('shows and wires source unwatch action for watched DeviantArt access items', async () => {
+    it('keeps unavailable DeviantArt source media refresh hover-visible and disabled', async () => {
         const props = createProps({ hovered: true });
-        props.containers.badges.getContainersForItem.mockReturnValue([
-            {
-                id: 9,
-                type: 'User',
-                source: 'deviantart.com',
-                source_id: 'exampleartist',
-            },
-        ]);
-        props.sourceWatchRefresh.canUnwatchSourceAccount.mockImplementation((_item: FeedItem, username: string | null) => username === 'exampleartist');
+        props.item.source = 'deviantart.com';
 
         const wrapper = mount(TabContentV2GridOverlay, {
             props,
@@ -409,8 +397,68 @@ describe('TabContentV2GridOverlay', () => {
             },
         });
 
-        await wrapper.get('[data-test="source-unwatch-trigger"]').trigger('click');
+        const refreshButton = wrapper.get('[data-test="source-media-refresh-trigger"]');
 
-        expect(props.sourceWatchRefresh.unwatchSourceAccount).toHaveBeenCalledWith(props.item, 'exampleartist');
+        expect(refreshButton.attributes('disabled')).toBeDefined();
+        expect(refreshButton.attributes('aria-label')).toBe('Source media refresh unavailable');
+
+        await refreshButton.trigger('click');
+
+        expect(props.sourceWatchRefresh.refreshSourceMedia).not.toHaveBeenCalled();
     });
+
+    it('recognizes a restored DeviantArt item from its container when source is absent', () => {
+        const props = createProps({ hovered: true });
+        props.item.source = null;
+        props.containers.badges.getContainersForItem.mockReturnValue([
+            {
+                id: 9,
+                type: 'User',
+                source: 'deviantart.com',
+                source_id: 'restored-artist',
+            },
+        ]);
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        const refreshButton = wrapper.get('[data-test="source-media-refresh-trigger"]');
+
+        expect(refreshButton.attributes('disabled')).toBeDefined();
+        expect(refreshButton.attributes('aria-label')).toBe('Source media refresh unavailable');
+    });
+
+    it('shows DeviantArt source media refresh progress while the action is pending', () => {
+        const props = createProps({ hovered: true });
+        props.item.source = 'deviantart.com';
+        props.sourceWatchRefresh.canRefreshSourceMedia.mockReturnValue(true);
+        props.sourceWatchRefresh.pendingOperationFor.mockReturnValue('refresh');
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        const refreshButton = wrapper.get('[data-test="source-media-refresh-trigger"]');
+
+        expect(refreshButton.attributes('disabled')).toBeDefined();
+        expect(refreshButton.attributes('aria-busy')).toBe('true');
+        expect(refreshButton.attributes('aria-label')).toBe('Refreshing source media');
+        expect(refreshButton.find('.animate-spin').exists()).toBe(true);
+    });
+
 });

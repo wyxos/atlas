@@ -17,7 +17,7 @@ function createEscapeEvent(target: EventTarget = document.body): KeyboardEvent {
 }
 
 describe('createTabContentV2KeydownHandler', () => {
-    it('closes the file sheet on Escape', () => {
+    it('closes the grid file sheet on Escape', () => {
         const closeFileSheet = vi.fn();
         const handler = createTabContentV2KeydownHandler({
             closeContainerSheet: vi.fn(),
@@ -33,6 +33,48 @@ describe('createTabContentV2KeydownHandler', () => {
 
         expect(closeFileSheet).toHaveBeenCalledTimes(1);
         expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('exits fullscreen without closing the viewer file sheet', () => {
+        document.body.innerHTML = '<div data-testid="vibe-media-bar"><button data-test="target" /></div>';
+        const target = document.querySelector('[data-test="target"]') as HTMLButtonElement;
+        const closeFileSheet = vi.fn();
+        const updateSurfaceMode = vi.fn();
+        const handler = createTabContentV2KeydownHandler({
+            closeContainerSheet: vi.fn(),
+            closeFileSheet,
+            getContainerSheetOpen: () => false,
+            getFileSheetOpen: () => true,
+            getSurfaceMode: () => 'fullscreen',
+            updateSurfaceMode,
+        });
+        const event = createEscapeEvent(target);
+
+        handler(event);
+
+        expect(closeFileSheet).not.toHaveBeenCalled();
+        expect(updateSurfaceMode).toHaveBeenCalledWith('list');
+        expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('leaves viewer-owned Escape unconsumed while preserving the viewer file sheet', () => {
+        const closeFileSheet = vi.fn();
+        const updateSurfaceMode = vi.fn();
+        const handler = createTabContentV2KeydownHandler({
+            closeContainerSheet: vi.fn(),
+            closeFileSheet,
+            getContainerSheetOpen: () => false,
+            getFileSheetOpen: () => true,
+            getSurfaceMode: () => 'fullscreen',
+            updateSurfaceMode,
+        });
+        const event = createEscapeEvent();
+
+        handler(event);
+
+        expect(closeFileSheet).not.toHaveBeenCalled();
+        expect(updateSurfaceMode).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
     });
 
     it('lets the container sheet consume Escape before the file sheet', () => {

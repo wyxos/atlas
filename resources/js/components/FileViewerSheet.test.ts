@@ -365,4 +365,20 @@ describe('FileViewerSheet', () => {
 
         expect(wrapper.emitted('select-preview')).toEqual([[1]]);
     });
+
+    it('requests deletion from the sheet action without deleting immediately', async () => {
+        const fileData = makeFile({ id: 42 });
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: fileData.id,
+                fileData,
+                isLoading: false,
+            },
+        });
+
+        await wrapper.get('[data-test="file-sheet-delete-file"]').trigger('click');
+
+        expect(wrapper.emitted('delete-file')).toEqual([[42]]);
+    });
 });

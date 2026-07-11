@@ -168,10 +168,12 @@ function createProps() {
         applyService: vi.fn(async () => undefined),
         cancelFill: vi.fn(),
         cancelBatchAction: vi.fn(),
-        closeFileSheet: vi.fn(),
+        closeGridFileSheet: vi.fn(),
+        closeViewerFileSheet: vi.fn(),
         confirmBatchAction: vi.fn(),
         containerInteractions: {
             managerRef: ref(null),
+            isBlacklistable: vi.fn(() => true),
             drawer: {
                 state: { isOpen: ref(false) },
                 derived: { container: ref(null), highlightedItemIds: ref(new Set<number>()), items: ref([]) },
@@ -187,9 +189,10 @@ function createProps() {
             close: vi.fn(),
             setOpen: vi.fn(),
         },
-        fileSheetState: { isOpen: false },
-        fileSheetItem: null,
-        fileSheetPresentation: 'inline' as 'inline' | 'overlay',
+        gridFileSheetState: { isOpen: false },
+        gridFileSheetItem: null,
+        viewerFileSheetState: { isOpen: false },
+        viewerFileSheetItem: null,
         fileViewerData: {
             fileData: ref(null),
             isLoadingFileData: ref(false),
@@ -226,7 +229,8 @@ function createProps() {
             },
             actions: {
                 close: vi.fn(),
-                confirm: vi.fn(),
+                confirm: vi.fn(async () => false),
+                openFromFileSheet: vi.fn(),
             },
         },
         localService: null,
@@ -238,8 +242,8 @@ function createProps() {
             handleContextMenuCapture: vi.fn(),
             handleMouseDownCapture: vi.fn(),
         },
-        openFileSheet: vi.fn(),
-        openFileSheetForItem: vi.fn(),
+        openViewerFileSheet: vi.fn(),
+        openGridFileSheetForItem: vi.fn(),
         promptDialog: {
             data: {
                 promptDialogOpen: ref(false),
@@ -468,8 +472,7 @@ describe('TabContentV2View', () => {
 
     it('overlays the list-mode file sheet without reserving grid space for grid item info actions', async () => {
         const props = createProps();
-        props.fileSheetPresentation = 'overlay';
-        props.fileSheetState.isOpen = true;
+        props.gridFileSheetState.isOpen = true;
         props.surfaceMode = 'list';
 
         const wrapper = mountView(props);
@@ -486,12 +489,12 @@ describe('TabContentV2View', () => {
         expect(overlayTransition?.props('leaveActiveClass')).toContain('duration-300');
 
         await wrapper.get('[data-test="file-viewer-sheet-overlay"]').trigger('click');
-        expect(props.closeFileSheet).toHaveBeenCalledTimes(1);
+        expect(props.closeGridFileSheet).toHaveBeenCalledTimes(1);
     });
 
     it('renders list-mode file sheets as a grid overlay even when the saved sheet state is inline', () => {
         const props = createProps();
-        props.fileSheetState.isOpen = true;
+        props.gridFileSheetState.isOpen = true;
         props.surfaceMode = 'list';
 
         const wrapper = mountView(props);
@@ -502,11 +505,31 @@ describe('TabContentV2View', () => {
         expect(vibeLayoutSpy.mock.calls[0][0].attrs.style).toEqual({});
     });
 
+    it('does not copy viewer-owned visibility into the list-mode grid sheet', () => {
+        const props = createProps();
+        const sheetSpy = vi.fn();
+        props.surfaceMode = 'list';
+        props.viewerFileSheetState.isOpen = true;
+        props.gridFileSheetState.isOpen = false;
+        const fileViewerSheetStub = defineComponent({
+            props: { isOpen: Boolean },
+            setup(stubProps) {
+                sheetSpy(stubProps);
+                return () => h('div');
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, { props, global: { stubs: { ...defaultStubs, FileViewerSheet: fileViewerSheetStub } } });
+
+        expect(wrapper.find('[data-test="file-viewer-sheet-overlay"]').exists()).toBe(false);
+        expect(sheetSpy.mock.calls[0][0].isOpen).toBe(false);
+    });
+
     it('uses loaded file data for the list-mode file sheet id when no sheet item is pinned', () => {
         const props = createProps();
         const fileViewerSheetSpy = vi.fn();
         const fileViewerSheetStub = defineComponent({ props: { fileId: { type: Number, default: null } }, setup: (stubProps) => (fileViewerSheetSpy(stubProps), () => h('div')) });
-        props.fileSheetState.isOpen = true; props.surfaceMode = 'list'; props.fileSheetItem = null; (props.fileViewerData.fileData as { value: { id: number } | null }).value = { id: 222 };
+        props.gridFileSheetState.isOpen = true; props.surfaceMode = 'list'; props.gridFileSheetItem = null; (props.fileViewerData.fileData as { value: { id: number } | null }).value = { id: 222 };
         mount(TabContentV2View, { props, global: { stubs: { ...defaultStubs, FileViewerSheet: fileViewerSheetStub } } });
         expect(fileViewerSheetSpy.mock.calls[0][0].fileId).toBe(222);
     });

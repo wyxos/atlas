@@ -34,14 +34,17 @@ function updateOpen(value: boolean): void {
 
 <template>
     <Dialog :model-value="open" @update:model-value="updateOpen">
-        <DialogContent class="sm:max-w-[460px] bg-prussian-blue-600 border-danger-500/30">
+        <DialogContent
+            class="sm:max-w-[460px] bg-prussian-blue-600 border-danger-500/30"
+            data-test="local-file-delete-dialog"
+        >
             <DialogHeader>
-                <DialogTitle class="text-danger-400">Delete Library File</DialogTitle>
+                <DialogTitle class="text-danger-400">Delete file</DialogTitle>
                 <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
                     Delete
                     <span v-if="props.filename" class="font-semibold text-danger-300">{{ props.filename }}</span>
                     <span v-else>this file</span>
-                    from Atlas storage? This removes the downloaded asset, generated previews, and the Atlas file record.
+                    from Atlas? This permanently removes the Atlas file record and any stored asset or generated previews when present.
                 </DialogDescription>
             </DialogHeader>
 
@@ -55,7 +58,12 @@ function updateOpen(value: boolean): void {
             </div>
 
             <DialogFooter>
-                <Button variant="outline" :disabled="deleting" @click="emit('cancel')">
+                <Button
+                    variant="outline"
+                    :disabled="deleting"
+                    data-test="local-file-delete-cancel"
+                    @click="emit('cancel')"
+                >
                     Cancel
                 </Button>
                 <Button

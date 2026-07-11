@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\DB;
 class FileReactionService
 {
     /**
+     * @var list<string>
+     */
+    private const array POSITIVE_REACTION_TYPES = ['love', 'like', 'funny'];
+
+    /**
      * Set a reaction for a file (idempotent).
      *
      * Unlike the UI controller, this does NOT toggle off if the same reaction is set again.
@@ -59,7 +64,7 @@ class FileReactionService
             ->first();
 
         if ($existingReaction && $existingReaction->type === $type) {
-            $shouldNormalizePositiveState = in_array($type, ['love', 'like', 'funny'], true)
+            $shouldNormalizePositiveState = in_array($type, self::POSITIVE_REACTION_TYPES, true)
                 && (
                     $file->auto_blacklisted
                     || $file->blacklisted_at !== null
@@ -204,7 +209,7 @@ class FileReactionService
         $hasTerminalPreviewCount = (int) $file->previewed_count >= FilePreviewService::FEED_REMOVED_PREVIEW_COUNT;
 
         // Positive reactions recover a blacklisted file and queue/download as normal.
-        if (in_array($type, ['love', 'like', 'funny'], true)) {
+        if (in_array($type, self::POSITIVE_REACTION_TYPES, true)) {
             $updates = ['auto_blacklisted' => false];
             $willClearBlacklist = $file->blacklisted_at !== null;
 
@@ -234,6 +239,10 @@ class FileReactionService
                 'type' => $type,
             ]
         );
+
+        if (in_array($type, self::POSITIVE_REACTION_TYPES, true)) {
+            app(ContainerBlacklistService::class)->queueEvaluationForFiles([(int) $file->id], (int) $user->id);
+        }
 
         if ($queueDownload) {
             $this->dispatchDownloadFile($file->id, $forceDownload, $downloadRuntimeContext);

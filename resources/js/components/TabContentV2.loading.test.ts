@@ -63,7 +63,7 @@ vi.mock('@/composables/useLoadedItemsBatchActionConfirmation', () => ({
 vi.mock('@/composables/useLocalFileDeletion', () => ({
     useLocalFileDeletion: () => ({
         state: { deleteError: ref(null), deleting: ref(false), dialogOpen: ref(false), itemToDelete: ref(null) },
-        actions: { close: vi.fn(), confirm: vi.fn() },
+        actions: { close: vi.fn(), confirm: vi.fn(async () => false), openFromFileSheet: vi.fn() },
     }),
 }));
 vi.mock('@/composables/useTabContentBrowseState', () => ({
@@ -107,6 +107,7 @@ vi.mock('@/composables/useTabContentBrowseState', () => ({
 vi.mock('@/composables/useTabContentContainerInteractions', () => ({
     useTabContentContainerInteractions: () => ({
         clearHoveredContainer: vi.fn(),
+        isBlacklistable: vi.fn(() => false),
         drawer: { actions: { setOpen: vi.fn() }, derived: { highlightedItemIds: ref(new Set()) }, state: { isOpen: ref(false) } },
         managerRef: ref(null),
         sheet: { actions: { close: vi.fn() }, state: { isOpen: ref(false) } },
@@ -135,15 +136,24 @@ vi.mock('@/composables/useTabContentV2ContainerBlacklists', () => ({
 }));
 vi.mock('@/composables/useTabContentV2FileSheet', () => ({
     useTabContentV2FileSheet: () => ({
-        close: vi.fn(),
-        closeForFullscreenExit: vi.fn(),
-        item: null,
-        open: vi.fn(),
-        openForItem: vi.fn(),
-        presentation: ref('inline'),
+        active: { state: reactive({ isOpen: false }), targetFileId: ref(null) },
+        grid: {
+            close: vi.fn(),
+            item: ref(null),
+            openForItem: vi.fn(),
+            state: reactive({ isOpen: false }),
+            targetFileId: ref(null),
+        },
         reset: vi.fn(),
-        state: reactive({ isOpen: false }),
-        targetFileId: ref(null),
+        viewer: {
+            close: vi.fn(),
+            enter: vi.fn(),
+            exit: vi.fn(),
+            item: ref(null),
+            open: vi.fn(),
+            state: reactive({ isOpen: false }),
+            targetFileId: ref(null),
+        },
     }),
 }));
 vi.mock('@/composables/useTabContentVibeRemoval', () => ({

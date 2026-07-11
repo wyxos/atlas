@@ -6,6 +6,7 @@ use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\ContainerBlacklistService;
 use App\Services\FileMetricClassifier;
 use App\Services\FilePreviewService;
 use App\Services\FileReactionService;
@@ -65,6 +66,11 @@ class ExtensionBatchReactionService
         }
 
         $bulkResult = $this->setManyPositiveWithoutRecovery($bulkFiles, $user, $type, $options);
+        app(ContainerBlacklistService::class)->queueEvaluationForFiles(
+            $bulkResult['changed_file_ids'],
+            (int) $user->id,
+        );
+
         foreach ($bulkResult['results'] as $fileId => $result) {
             $results[$fileId] = $result;
         }

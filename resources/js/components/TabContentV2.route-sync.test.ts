@@ -99,7 +99,8 @@ vi.mock('@/composables/useLocalFileDeletion', () => ({
         },
         actions: {
             close: vi.fn(),
-            confirm: vi.fn(),
+            confirm: vi.fn(async () => false),
+            openFromFileSheet: vi.fn(),
         },
     }),
 }));

@@ -31,32 +31,35 @@ type WatchAccessState = {
     canUnwatch: boolean;
 };
 
+export type SourceWatchRefreshOperation = 'refresh' | 'watch' | 'unwatch';
+
 export type SourceWatchRefreshActions = {
     canRefreshSourceMedia: (item: FeedItem) => boolean;
     canWatchAndRefresh: (item: FeedItem, username: string | null) => boolean;
     canUnwatchSourceAccount: (item: FeedItem, username: string | null) => boolean;
-    isWatchingAndRefreshing: (item: FeedItem) => boolean;
+    pendingOperationFor: (item: FeedItem) => SourceWatchRefreshOperation | null;
     refreshSourceMedia: (item: FeedItem) => Promise<void>;
     watchAndRefresh: (item: FeedItem, username: string) => Promise<void>;
     unwatchSourceAccount: (item: FeedItem, username: string) => Promise<void>;
 };
 
+const watchedSourceUsernames = ref<Set<string>>(new Set());
+
 export function useSourceWatchRefresh(options: {
     setFileData: (file: File) => void;
 }): SourceWatchRefreshActions {
     const toast = useToast();
-    const pendingFileIds = ref<Set<number>>(new Set());
-    const watchedSourceUsernames = ref<Set<string>>(new Set());
+    const pendingOperations = ref<Map<number, SourceWatchRefreshOperation>>(new Map());
 
-    function setPending(fileId: number, pending: boolean): void {
-        const next = new Set(pendingFileIds.value);
-        if (pending) {
-            next.add(fileId);
+    function setPendingOperation(fileId: number, operation: SourceWatchRefreshOperation | null): void {
+        const next = new Map(pendingOperations.value);
+        if (operation !== null) {
+            next.set(fileId, operation);
         } else {
             next.delete(fileId);
         }
 
-        pendingFileIds.value = next;
+        pendingOperations.value = next;
     }
 
     function showStatusToast(item: FeedItem, title: string, description: string, variant: 'success' | 'error'): void {
@@ -149,7 +152,7 @@ export function useSourceWatchRefresh(options: {
             return false;
         }
 
-        return watchAccessForItem(item).requiresWatch;
+        return !watchAccessForItem(item).canUnwatch;
     }
 
     function canUnwatchSourceAccount(item: FeedItem, username: string | null): boolean {
@@ -166,16 +169,16 @@ export function useSourceWatchRefresh(options: {
             || watchAccessForItem(item).canUnwatch;
     }
 
-    function isWatchingAndRefreshing(item: FeedItem): boolean {
-        return pendingFileIds.value.has(item.id);
+    function pendingOperationFor(item: FeedItem): SourceWatchRefreshOperation | null {
+        return pendingOperations.value.get(item.id) ?? null;
     }
 
     async function refreshSourceMediaAction(item: FeedItem): Promise<void> {
-        if (!canRefreshSourceMedia(item) || isWatchingAndRefreshing(item)) {
+        if (!canRefreshSourceMedia(item) || pendingOperationFor(item) !== null) {
             return;
         }
 
-        setPending(item.id, true);
+        setPendingOperation(item.id, 'refresh');
 
         try {
             const { data } = await window.axios.post<SourceMediaRefreshResponse>(
@@ -199,16 +202,16 @@ export function useSourceWatchRefresh(options: {
 
             showStatusToast(item, 'Source action failed', message, 'error');
         } finally {
-            setPending(item.id, false);
+            setPendingOperation(item.id, null);
         }
     }
 
     async function watchAndRefresh(item: FeedItem, username: string): Promise<void> {
-        if (!canWatchAndRefresh(item, username) || isWatchingAndRefreshing(item)) {
+        if (!canWatchAndRefresh(item, username) || pendingOperationFor(item) !== null) {
             return;
         }
 
-        setPending(item.id, true);
+        setPendingOperation(item.id, 'watch');
 
         try {
             const { data } = await window.axios.post<SourceWatchRefreshResponse>(
@@ -239,16 +242,16 @@ export function useSourceWatchRefresh(options: {
 
             showStatusToast(item, 'Source action failed', message, 'error');
         } finally {
-            setPending(item.id, false);
+            setPendingOperation(item.id, null);
         }
     }
 
     async function unwatchSourceAccountAction(item: FeedItem, username: string): Promise<void> {
-        if (!canUnwatchSourceAccount(item, username) || isWatchingAndRefreshing(item)) {
+        if (!canUnwatchSourceAccount(item, username) || pendingOperationFor(item) !== null) {
             return;
         }
 
-        setPending(item.id, true);
+        setPendingOperation(item.id, 'unwatch');
 
         try {
             const { data } = await window.axios.post<SourceUnwatchResponse>(
@@ -276,7 +279,7 @@ export function useSourceWatchRefresh(options: {
 
             showStatusToast(item, 'Source action failed', message, 'error');
         } finally {
-            setPending(item.id, false);
+            setPendingOperation(item.id, null);
         }
     }
 
@@ -284,7 +287,7 @@ export function useSourceWatchRefresh(options: {
         canRefreshSourceMedia,
         canWatchAndRefresh,
         canUnwatchSourceAccount,
-        isWatchingAndRefreshing,
+        pendingOperationFor,
         refreshSourceMedia: refreshSourceMediaAction,
         watchAndRefresh,
         unwatchSourceAccount: unwatchSourceAccountAction,

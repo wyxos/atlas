@@ -10,6 +10,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { createTabContentV2KeydownHandler } from '@/lib/tabContentV2Keyboard';
 import { getContainerPillTargets, getFeedItemFromVibeItem, shouldDimGridItemForContainerDrawer } from '@/lib/tabContentV2ViewHelpers';
 import type { TabContentV2ViewProps } from '@/types/tabContentV2View';
+import type { FileContainer } from '@/types/file';
 import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -36,9 +37,17 @@ const showGlobalStartPanel = computed(() => Boolean(globalStartPanel?.isOpen.val
 const sourceWatchRefresh = useSourceWatchRefresh({
     setFileData: props.fileViewerData.setFileData,
 });
+function closeActiveFileSheet(): void {
+    if (props.surfaceMode === 'fullscreen') {
+        props.closeViewerFileSheet();
+        return;
+    }
+
+    props.closeGridFileSheet();
+}
 const fileRedownloadActions = useFileRedownloadActions({
     applyFilters: props.applyFilters,
-    closeFileSheet: props.closeFileSheet,
+    closeFileSheet: closeActiveFileSheet,
     setFileData: props.fileViewerData.setFileData,
 });
 const sheetPromptItemId = computed(() => props.promptDialog.data.promptDialogItemId.value);
@@ -53,9 +62,13 @@ const isSheetPromptLoading = computed(() => {
     return Boolean(promptLoading);
 });
 const showSheetPrompt = computed(() => sheetPromptItemId.value !== null);
-const isFileSheetOverlay = computed(() => props.surfaceMode === 'list' && props.fileSheetState.isOpen);
-const shouldReserveFileSheetSpace = computed(() => props.fileSheetState.isOpen && !isFileSheetOverlay.value);
-const fileSheetFileId = computed(() => props.fileSheetItem?.id
+const isGridFileSheetOverlay = computed(() => props.surfaceMode === 'list' && props.gridFileSheetState.isOpen);
+const shouldReserveFileSheetSpace = computed(() => props.surfaceMode === 'fullscreen' && props.viewerFileSheetState.isOpen);
+const gridFileSheetFileId = computed(() => props.gridFileSheetItem?.id
+    ?? props.fileViewerData.fileData.value?.id
+    ?? props.currentVisibleItem?.id
+    ?? null);
+const viewerFileSheetFileId = computed(() => props.viewerFileSheetItem?.id
     ?? props.fileViewerData.fileData.value?.id
     ?? props.currentVisibleItem?.id
     ?? null);
@@ -84,6 +97,76 @@ function handlePromptTest(prompt: string): void { serviceHeaderRef.value?.openMo
 
 async function handleSourceMetadataRefresh(fileId: number): Promise<void> {
     await props.fileViewerData.refreshSourceMetadata?.(fileId);
+}
+
+function canManageContainerBlacklist(container: FileContainer): boolean {
+    return container.blacklisted || props.containerInteractions.isBlacklistable(container);
+}
+
+function handleManageContainerBlacklist(owner: FileSheetOwner, container: FileContainer): void {
+    if (!canManageContainerBlacklist(container)) {
+        return;
+    }
+
+    const fileId = owner === 'viewer' ? viewerFileSheetFileId.value : gridFileSheetFileId.value;
+
+    props.containerInteractions.managerRef.value?.openBlacklistDialog({
+        id: container.id,
+        type: container.type,
+        source: container.source,
+        source_id: container.source_id ?? '',
+        currentFileIds: fileId === null ? [] : [fileId],
+        referrer: container.referrer,
+    });
+}
+
+function handleContainerBlacklistChanged(change: Parameters<TabContentV2ViewProps['handleContainerBlacklistChange']>[0]): void {
+    const container = props.fileViewerData.fileData.value?.containers?.find((candidate) => candidate.id === change.blacklist.id);
+    if (container) {
+        container.blacklisted = change.action === 'created';
+        container.blacklisted_at = change.action === 'created' ? change.blacklist.blacklisted_at : null;
+        container.action_type = change.action === 'created' ? change.blacklist.action_type : null;
+        container.blacklist_previewed_count_mode = change.action === 'created'
+            ? change.blacklist.blacklist_previewed_count_mode
+            : 'preserve';
+    }
+
+    props.handleContainerBlacklistChange(change);
+}
+
+type FileSheetOwner = 'grid' | 'viewer';
+const deletingFileSheetOwner = ref<FileSheetOwner | null>(null);
+
+function handleDeleteFile(owner: FileSheetOwner, fileId: number): void {
+    const item = owner === 'viewer' ? props.viewerFileSheetItem : props.gridFileSheetItem;
+    if (!item || item.id !== fileId) {
+        return;
+    }
+
+    deletingFileSheetOwner.value = owner;
+    props.localFileDeletion.actions.openFromFileSheet(item);
+}
+
+function closeFileDeleteDialog(): void {
+    if (props.localFileDeletion.actions.close()) {
+        deletingFileSheetOwner.value = null;
+    }
+}
+
+async function confirmFileDeletion(): Promise<void> {
+    const owner = deletingFileSheetOwner.value;
+    const deleted = await props.localFileDeletion.actions.confirm();
+    if (!deleted) {
+        return;
+    }
+
+    if (owner === 'viewer') {
+        props.closeViewerFileSheet();
+    } else if (owner === 'grid') {
+        props.closeGridFileSheet();
+    }
+
+    deletingFileSheetOwner.value = null;
 }
 
 async function handleBlacklist(item: VibeViewerItem): Promise<void> {
@@ -119,9 +202,11 @@ function cancelMasonryLoad(): void { if (props.headerMasonry) { props.headerMaso
 
 const handleRootKeydown = createTabContentV2KeydownHandler({
     closeContainerSheet: props.containerInteractions.sheet.actions.close,
-    closeFileSheet: props.closeFileSheet,
+    closeFileSheet: closeActiveFileSheet,
     getContainerSheetOpen: () => props.containerInteractions.sheet.state.isOpen.value,
-    getFileSheetOpen: () => props.fileSheetState.isOpen,
+    getFileSheetOpen: () => props.surfaceMode === 'fullscreen'
+        ? props.viewerFileSheetState.isOpen
+        : props.gridFileSheetState.isOpen,
     getSurfaceMode: () => props.surfaceMode,
     updateSurfaceMode: props.updateSurfaceMode,
 });
@@ -172,7 +257,7 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
             <ContainerBlacklistManager
                 :ref="containerInteractions.managerRef"
                 :disabled="Boolean(headerMasonry?.isLoading)"
-                @blacklists-changed="handleContainerBlacklistChange"
+                @blacklists-changed="handleContainerBlacklistChanged"
             />
         </TabContentServiceHeader>
         <TabContentStartForm
@@ -214,7 +299,7 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             :item="getFeedItemFromVibeItem(item as VibeViewerItem)!"
                             :total-items="vibeStatus.itemCount" :vibe-item="item as VibeViewerItem"
                             :containers="containerInteractions" :item-interactions="itemInteractions" :local-file-deletion="localFileDeletion"
-                            :is-removing-from-tab="isRemovingItemFromTab" :open-file-sheet="openFileSheetForItem" :remove-item-from-tab="removeItemFromTab"
+                            :is-removing-from-tab="isRemovingItemFromTab" :open-file-sheet="openGridFileSheetForItem" :remove-item-from-tab="removeItemFromTab"
                             :queue-preview-regeneration="queuePreviewRegeneration"
                             :is-preview-regeneration-queued="isPreviewRegenerationQueued"
                             :source-watch-refresh="sourceWatchRefresh" :on-reaction="handleReaction"
@@ -277,8 +362,8 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             <button
                                 type="button"
                                 class="inline-flex h-8 w-8 items-center justify-center border border-twilight-indigo-500 bg-prussian-blue-900/55 text-twilight-indigo-100 transition hover:border-smart-blue-400 hover:bg-prussian-blue-800 hover:text-white"
-                                :aria-label="fileSheetState.isOpen ? 'Hide file sheet' : 'Show file sheet'"
-                                @click="fileSheetState.isOpen ? closeFileSheet() : openFileSheet()"
+                                :aria-label="viewerFileSheetState.isOpen ? 'Hide file sheet' : 'Show file sheet'"
+                                @click="viewerFileSheetState.isOpen ? closeViewerFileSheet() : openViewerFileSheet()"
                             >
                                 <PanelRightOpen :size="16" />
                             </button>
@@ -298,10 +383,10 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                     </template>
                     <template #fullscreen-aside="{ nextPreviews, total }">
                         <FileViewerSheet
-                            v-if="fileSheetState.isOpen"
+                            v-if="viewerFileSheetState.isOpen"
                             embedded
-                            :is-open="fileSheetState.isOpen"
-                            :file-id="fileSheetFileId"
+                            :is-open="viewerFileSheetState.isOpen"
+                            :file-id="viewerFileSheetFileId"
                             :file-data="fileViewerData.fileData.value"
                             :is-loading="fileViewerData.isLoadingFileData.value"
                             :is-prompt-loading="isSheetPromptLoading"
@@ -311,7 +396,10 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                             :prompt="promptDialog.data.currentPromptData.value"
                             :show-prompt="showSheetPrompt"
                             :total-items="total"
-                            @close="closeFileSheet"
+                            :can-manage-container-blacklist="canManageContainerBlacklist"
+                            @close="closeViewerFileSheet"
+                            @delete-file="handleDeleteFile('viewer', $event)"
+                            @manage-container-blacklist="handleManageContainerBlacklist('viewer', $event)"
                             @select-preview="props.updateActiveIndex"
                             @redownload-file="fileRedownloadActions.handleFileRedownload"
                             @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
@@ -342,14 +430,14 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         leave-to-class="translate-x-full opacity-0"
                     >
                         <div
-                            v-if="isFileSheetOverlay"
+                            v-if="isGridFileSheetOverlay"
                             class="absolute inset-0 z-20 flex max-w-full justify-end"
                             data-test="file-viewer-sheet-overlay"
-                            @click.self="closeFileSheet"
+                            @click.self="closeGridFileSheet"
                         >
                             <FileViewerSheet
-                                :is-open="fileSheetState.isOpen"
-                                :file-id="fileSheetFileId"
+                                :is-open="gridFileSheetState.isOpen"
+                                :file-id="gridFileSheetFileId"
                                 :file-data="fileViewerData.fileData.value"
                                 :is-loading="fileViewerData.isLoadingFileData.value"
                                 :is-prompt-loading="isSheetPromptLoading"
@@ -357,8 +445,11 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                                 :source-metadata-refresh-error="sourceMetadataRefreshError"
                                 :prompt="promptDialog.data.currentPromptData.value"
                                 :show-prompt="showSheetPrompt"
+                                :can-manage-container-blacklist="canManageContainerBlacklist"
                                 data-test="file-viewer-sheet-panel"
-                                @close="closeFileSheet"
+                                @close="closeGridFileSheet"
+                                @delete-file="handleDeleteFile('grid', $event)"
+                                @manage-container-blacklist="handleManageContainerBlacklist('grid', $event)"
                                 @redownload-file="fileRedownloadActions.handleFileRedownload"
                                 @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
                                 @test-prompt="handlePromptTest"
@@ -367,10 +458,10 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         </div>
                     </Transition>
                     <FileViewerSheet
-                        v-if="!isFileSheetOverlay"
+                        v-if="!isGridFileSheetOverlay"
                         data-test="file-viewer-sheet-inline"
-                        :is-open="fileSheetState.isOpen"
-                        :file-id="fileSheetFileId"
+                        :is-open="gridFileSheetState.isOpen"
+                        :file-id="gridFileSheetFileId"
                         :file-data="fileViewerData.fileData.value"
                         :is-loading="fileViewerData.isLoadingFileData.value"
                         :is-prompt-loading="isSheetPromptLoading"
@@ -378,7 +469,10 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                         :source-metadata-refresh-error="sourceMetadataRefreshError"
                         :prompt="promptDialog.data.currentPromptData.value"
                         :show-prompt="showSheetPrompt"
-                        @close="closeFileSheet"
+                        :can-manage-container-blacklist="canManageContainerBlacklist"
+                        @close="closeGridFileSheet"
+                        @delete-file="handleDeleteFile('grid', $event)"
+                        @manage-container-blacklist="handleManageContainerBlacklist('grid', $event)"
                         @redownload-file="fileRedownloadActions.handleFileRedownload"
                         @mark-corrupted-file="fileRedownloadActions.handleMarkCorruptedFile"
                         @test-prompt="handlePromptTest"
@@ -429,9 +523,9 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
             :filename="localFileDeletion.state.itemToDelete.value?.filename ?? null"
             :deleting="localFileDeletion.state.deleting.value"
             :delete-error="localFileDeletion.state.deleteError.value"
-            @update:open="(value) => { if (!value) localFileDeletion.actions.close(); }"
-            @cancel="localFileDeletion.actions.close"
-            @confirm="localFileDeletion.actions.confirm"
+            @update:open="(value) => { if (!value) closeFileDeleteDialog(); }"
+            @cancel="closeFileDeleteDialog"
+            @confirm="confirmFileDeletion"
         />
 
         <LoadedItemsBatchActionDialog

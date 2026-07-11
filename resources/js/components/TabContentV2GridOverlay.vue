@@ -42,15 +42,46 @@ const deviantArtUserContainer = computed(() => itemContainers.value.find((contai
     && container.source_id.trim() !== ''
 )) ?? null);
 const deviantArtUsername = computed(() => deviantArtUserContainer.value?.source_id?.trim() ?? null);
+const isDeviantArtItem = computed(() => (
+    String(props.item.source ?? '').trim().toLowerCase() === 'deviantart.com'
+    || itemContainers.value.some((container) => String(container.source ?? '').trim().toLowerCase() === 'deviantart.com')
+));
 const isPreloaded = computed(() => props.itemInteractions.preload.isItemPreloaded(props.item.id));
 const showContainers = computed(() => props.hovered && isPreloaded.value && itemContainers.value.length > 0);
-const showSourceMediaRefreshButton = computed(() => props.hovered
-    && props.sourceWatchRefresh.canRefreshSourceMedia(props.item));
+const canRefreshSourceMedia = computed(() => props.sourceWatchRefresh.canRefreshSourceMedia(props.item));
+const showSourceMediaRefreshButton = computed(() => props.hovered && isDeviantArtItem.value);
 const showSourceWatchRefreshButton = computed(() => props.hovered
     && props.sourceWatchRefresh.canWatchAndRefresh(props.item, deviantArtUsername.value));
 const showSourceUnwatchButton = computed(() => props.hovered
     && props.sourceWatchRefresh.canUnwatchSourceAccount(props.item, deviantArtUsername.value));
-const isSourceWatchRefreshPending = computed(() => props.sourceWatchRefresh.isWatchingAndRefreshing(props.item));
+const pendingSourceOperation = computed(() => props.sourceWatchRefresh.pendingOperationFor(props.item));
+const isSourceActionPending = computed(() => pendingSourceOperation.value !== null);
+const isSourceMediaRefreshPending = computed(() => pendingSourceOperation.value === 'refresh');
+const isSourceWatchPending = computed(() => pendingSourceOperation.value === 'watch');
+const isSourceUnwatchPending = computed(() => pendingSourceOperation.value === 'unwatch');
+const sourceMediaRefreshLabel = computed(() => {
+    if (isSourceMediaRefreshPending.value) {
+        return 'Refreshing source media';
+    }
+
+    if (isSourceWatchPending.value) {
+        return 'Source account watch in progress';
+    }
+
+    if (isSourceUnwatchPending.value) {
+        return 'Source account unwatch in progress';
+    }
+
+    return canRefreshSourceMedia.value
+        ? 'Refresh source media'
+        : 'Source media refresh unavailable';
+});
+const sourceWatchLabel = computed(() => isSourceWatchPending.value
+    ? 'Watching source account and refreshing media'
+    : 'Watch source account and refresh media');
+const sourceUnwatchLabel = computed(() => isSourceUnwatchPending.value
+    ? 'Unwatching source account'
+    : 'Unwatch source account');
 const showPromptButton = computed(() => props.hovered && isPreloaded.value);
 const showDeleteButton = computed(() => props.hovered
     && isPreloaded.value
@@ -146,14 +177,17 @@ const showReactions = computed(() => (
                 v-if="showSourceMediaRefreshButton"
                 variant="ghost"
                 size="sm"
-                class="h-7 w-7 bg-black/55 p-0 text-white hover:bg-black/75 disabled:cursor-wait disabled:opacity-80"
-                aria-label="Refresh source media"
+                class="h-7 w-7 bg-black/55 p-0 text-white hover:bg-black/75 disabled:opacity-80"
+                :class="isSourceActionPending ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'"
+                :aria-label="sourceMediaRefreshLabel"
+                :aria-busy="isSourceMediaRefreshPending ? 'true' : undefined"
+                :title="sourceMediaRefreshLabel"
                 data-test="source-media-refresh-trigger"
-                :disabled="isSourceWatchRefreshPending"
+                :disabled="!canRefreshSourceMedia || isSourceActionPending"
                 @click.stop="sourceWatchRefresh.refreshSourceMedia(item)"
             >
                 <Loader2
-                    v-if="isSourceWatchRefreshPending"
+                    v-if="isSourceMediaRefreshPending"
                     :size="14"
                     class="animate-spin"
                 />
@@ -164,9 +198,11 @@ const showReactions = computed(() => (
                 variant="ghost"
                 size="sm"
                 class="h-7 w-7 bg-smart-blue-700/80 p-0 text-white hover:bg-smart-blue-600 disabled:cursor-wait disabled:opacity-80"
-                aria-label="Watch source account and refresh media"
+                :aria-label="sourceWatchLabel"
+                :aria-busy="isSourceWatchPending ? 'true' : undefined"
+                :title="sourceWatchLabel"
                 data-test="source-watch-refresh-trigger"
-                :disabled="isSourceWatchRefreshPending"
+                :disabled="isSourceActionPending"
                 @click.stop="() => {
                     if (deviantArtUsername) {
                         sourceWatchRefresh.watchAndRefresh(item, deviantArtUsername);
@@ -174,7 +210,7 @@ const showReactions = computed(() => (
                 }"
             >
                 <Loader2
-                    v-if="isSourceWatchRefreshPending"
+                    v-if="isSourceWatchPending"
                     :size="14"
                     class="animate-spin"
                 />
@@ -185,9 +221,11 @@ const showReactions = computed(() => (
                 variant="ghost"
                 size="sm"
                 class="h-7 w-7 bg-zinc-700/80 p-0 text-white hover:bg-zinc-600 disabled:cursor-wait disabled:opacity-80"
-                aria-label="Unwatch source account"
+                :aria-label="sourceUnwatchLabel"
+                :aria-busy="isSourceUnwatchPending ? 'true' : undefined"
+                :title="sourceUnwatchLabel"
                 data-test="source-unwatch-trigger"
-                :disabled="isSourceWatchRefreshPending"
+                :disabled="isSourceActionPending"
                 @click.stop="() => {
                     if (deviantArtUsername) {
                         sourceWatchRefresh.unwatchSourceAccount(item, deviantArtUsername);
@@ -195,7 +233,7 @@ const showReactions = computed(() => (
                 }"
             >
                 <Loader2
-                    v-if="isSourceWatchRefreshPending"
+                    v-if="isSourceUnwatchPending"
                     :size="14"
                     class="animate-spin"
                 />

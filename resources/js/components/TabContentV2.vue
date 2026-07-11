@@ -225,7 +225,6 @@ const localFileDeletion = useLocalFileDeletion({
     items,
     masonry: vibeMasonry,
     isLocal: form.isLocal,
-    totalAvailable: browseState.totalAvailable,
     clearHover: itemInteractions.state.clearHover,
 });
 const containerBlacklists = useTabContentV2ContainerBlacklists({
@@ -268,7 +267,7 @@ const currentVisibleItem = computed(() => {
 
     return candidateItems[safeIndex] ?? null;
 });
-const fileSheet = useTabContentV2FileSheet({ activeIndex, currentVisibleItem, overlay: fullscreenOverlayState, promptDialog });
+const fileSheet = useTabContentV2FileSheet({ activeIndex, currentVisibleItem, overlay: fullscreenOverlayState, promptDialog, surfaceMode });
 const shouldShowStandaloneRouteBootstrap = computed(() => Boolean(tab.value)
     && hasRouteFileSelection.value
     && !isClosingFullscreenRoute.value
@@ -278,8 +277,8 @@ const fileViewerData = useFileViewerData({
     items: sessionItems,
     navigation: currentNavigation,
     overlay: fullscreenOverlayState,
-    sheet: fileSheet.state,
-    targetFileId: fileSheet.targetFileId,
+    sheet: fileSheet.active.state,
+    targetFileId: fileSheet.active.targetFileId,
 });
 const syncedFileViewerData = createSyncedFileViewerData({ fileViewerData, getCurrentVibeItems: () => vibeRef.value?.getItems() ?? [] });
 const filePreviewRegeneration = useFilePreviewRegeneration({
@@ -441,12 +440,13 @@ watch(
     (mode, previousMode) => {
         if (mode === 'fullscreen' && previousMode !== 'fullscreen') {
             itemInteractions.viewer.onOpen();
+            fileSheet.viewer.enter();
             return;
         }
 
         if (previousMode === 'fullscreen' && mode !== 'fullscreen') {
             itemInteractions.viewer.onClose();
-            fileSheet.closeForFullscreenExit();
+            fileSheet.viewer.exit();
         }
     },
 );
@@ -525,13 +525,14 @@ watch(
         :prompt-dialog="promptDialog"
         :local-file-deletion="localFileDeletion"
         :handle-reaction="handleReaction"
-        :file-sheet-state="fileSheet.state"
-        :file-sheet-item="fileSheet.item"
-        :file-sheet-presentation="fileSheet.presentation.value"
+        :grid-file-sheet-state="fileSheet.grid.state"
+        :grid-file-sheet-item="fileSheet.grid.item.value"
+        :viewer-file-sheet-state="fileSheet.viewer.state"
+        :viewer-file-sheet-item="fileSheet.viewer.item.value"
         :current-visible-item="currentVisibleItem"
         :file-viewer-data="syncedFileViewerData"
-        :open-file-sheet="fileSheet.open" :open-file-sheet-for-item="fileSheet.openForItem"
-        :close-file-sheet="fileSheet.close"
+        :open-viewer-file-sheet="fileSheet.viewer.open" :close-viewer-file-sheet="fileSheet.viewer.close"
+        :open-grid-file-sheet-for-item="fileSheet.grid.openForItem" :close-grid-file-sheet="fileSheet.grid.close"
         :queue-preview-regeneration="filePreviewRegeneration.queuePreviewRegeneration"
         :is-preview-regeneration-queued="filePreviewRegeneration.isPreviewRegenerationQueued"
         :downloaded-reaction-prompt="downloadedReactionPrompt"

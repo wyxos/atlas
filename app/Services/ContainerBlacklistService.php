@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Enums\BlacklistPreviewedCountMode;
+use App\Jobs\EvaluateContainerAutoBlacklist;
 use App\Models\Container;
+use Illuminate\Support\Facades\DB;
 
 class ContainerBlacklistService
 {
+    public function __construct(private readonly MetricsService $metricsService) {}
+
     /**
      * Immediately apply a blacklist container action to files already attached to the container.
      *
@@ -70,5 +74,58 @@ class ContainerBlacklistService
         }
 
         return array_values(array_unique($blacklistedFileIds));
+    }
+
+    /**
+     * Clear the blacklist state without changing the files that were previously affected by it.
+     */
+    public function clear(Container $container): bool
+    {
+        $updated = Container::query()
+            ->whereKey($container->id)
+            ->whereNotNull('blacklisted_at')
+            ->update([
+                'blacklisted_at' => null,
+                'action_type' => null,
+                'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
+                'updated_at' => now(),
+            ]);
+
+        if ($updated !== 1) {
+            return false;
+        }
+
+        $this->metricsService->incrementMetric(MetricsService::KEY_CONTAINERS_BLACKLISTED, -1);
+        $container->refresh();
+
+        return true;
+    }
+
+    /**
+     * Queue one evaluation per container attached to the supplied files.
+     */
+    public function queueEvaluationForFiles(iterable $fileIds, ?int $userId = null): void
+    {
+        $fileIds = collect($fileIds)
+            ->map(fn (mixed $fileId): int => (int) $fileId)
+            ->filter(fn (int $fileId): bool => $fileId > 0)
+            ->unique()
+            ->values();
+
+        if ($fileIds->isEmpty()) {
+            return;
+        }
+
+        $containerIds = DB::table('container_file')
+            ->whereIn('file_id', $fileIds->all())
+            ->distinct()
+            ->pluck('container_id')
+            ->map(fn (mixed $containerId): int => (int) $containerId)
+            ->filter(fn (int $containerId): bool => $containerId > 0)
+            ->values();
+
+        foreach ($containerIds as $containerId) {
+            EvaluateContainerAutoBlacklist::dispatch($containerId, $userId);
+        }
     }
 }

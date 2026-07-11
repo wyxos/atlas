@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Jobs\EvaluateContainerAutoBlacklist;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Downloads\DownloadTransferRemovalService;
@@ -127,7 +126,7 @@ class FileBlacklistService
         $this->libraryIndexSyncDispatcher->filesAndReactions($fileIds);
 
         if ($queueContainerAutoBlacklistEvaluation) {
-            $this->dispatchContainerAutoBlacklistEvaluation($newBlacklistIds, $userId);
+            app(ContainerBlacklistService::class)->queueEvaluationForFiles($newBlacklistIds, $userId);
         }
 
         return $fileIds;
@@ -191,27 +190,5 @@ class FileBlacklistService
         return Reaction::query()
             ->where('file_id', $file->id)
             ->get();
-    }
-
-    /**
-     * @param  array<int>  $fileIds
-     */
-    private function dispatchContainerAutoBlacklistEvaluation(array $fileIds, ?int $userId): void
-    {
-        if ($fileIds === []) {
-            return;
-        }
-
-        $containerIds = DB::table('container_file')
-            ->whereIn('file_id', $fileIds)
-            ->distinct()
-            ->pluck('container_id')
-            ->map(fn (mixed $containerId): int => (int) $containerId)
-            ->filter(fn (int $containerId): bool => $containerId > 0)
-            ->values();
-
-        foreach ($containerIds as $containerId) {
-            EvaluateContainerAutoBlacklist::dispatch((int) $containerId, $userId);
-        }
     }
 }

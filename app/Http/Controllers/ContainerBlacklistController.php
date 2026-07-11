@@ -112,17 +112,9 @@ class ContainerBlacklistController extends Controller
      */
     public function destroy(Container $container): JsonResponse
     {
-        if ($container->blacklisted_at === null) {
+        if (! app(ContainerBlacklistService::class)->clear($container)) {
             return response()->json(['message' => 'Container is not blacklisted'], 404);
         }
-
-        $container->update([
-            'blacklisted_at' => null,
-            'action_type' => null,
-            'blacklist_previewed_count_mode' => BlacklistPreviewedCountMode::PRESERVE,
-        ]);
-
-        app(MetricsService::class)->incrementMetric(MetricsService::KEY_CONTAINERS_BLACKLISTED, -1);
 
         return response()->json(['message' => 'Container removed from blacklist successfully']);
     }

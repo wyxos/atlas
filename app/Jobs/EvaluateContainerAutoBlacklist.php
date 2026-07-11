@@ -54,12 +54,22 @@ class EvaluateContainerAutoBlacklist implements ShouldQueue
 
         $container = Container::query()->find($this->containerId);
 
-        if (! $container instanceof Container || $container->blacklisted_at !== null) {
+        if (! $container instanceof Container) {
             return;
         }
 
-        $positiveCount = $this->positiveFileCount($container);
-        if ($positiveCount >= self::POSITIVE_REACTION_LIMIT) {
+        if ($container->blacklisted_at !== null) {
+            if (
+                is_int($this->userId)
+                && $this->positiveFileCount($container, $this->userId) >= self::POSITIVE_REACTION_LIMIT
+            ) {
+                $containerBlacklistService->clear($container);
+            }
+
+            return;
+        }
+
+        if ($this->positiveFileCount($container) >= self::POSITIVE_REACTION_LIMIT) {
             return;
         }
 
@@ -95,10 +105,18 @@ class EvaluateContainerAutoBlacklist implements ShouldQueue
             ->count();
     }
 
-    private function positiveFileCount(Container $container): int
+    private function positiveFileCount(Container $container, ?int $userId = null): int
     {
         return (int) $container->files()
-            ->whereHas('reactions', fn (Builder $query): Builder => $query->whereIn('type', self::POSITIVE_REACTION_TYPES))
+            ->whereHas('reactions', function (Builder $query) use ($userId): Builder {
+                $query->whereIn('type', self::POSITIVE_REACTION_TYPES);
+
+                if (is_int($userId)) {
+                    $query->where('user_id', $userId);
+                }
+
+                return $query;
+            })
             ->count();
     }
 

@@ -1,4 +1,4 @@
-import { computed, ref, type Ref, type ShallowRef } from 'vue';
+import { computed, ref, shallowRef, type Ref, type ShallowRef } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 import type { BrowseFeedHandle } from '@/types/browse';
 
@@ -6,7 +6,6 @@ type UseLocalFileDeletionOptions = {
     items: ShallowRef<FeedItem[]>;
     masonry: Ref<BrowseFeedHandle | null>;
     isLocal: Ref<boolean>;
-    totalAvailable: Ref<number | null>;
     clearHover: () => void;
 };
 
@@ -29,7 +28,7 @@ function getDeleteErrorMessage(error: unknown): string {
         return 'You do not have permission to delete this file.';
     }
 
-    return 'Failed to delete the library file. Please try again.';
+    return 'Failed to delete the file. Please try again.';
 }
 
 export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
@@ -37,17 +36,25 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
     const deleteError = ref<string | null>(null);
     const deleting = ref(false);
     const pendingItemId = ref<number | null>(null);
+    const pendingItem = shallowRef<FeedItem | null>(null);
 
     const itemToDelete = computed(() => {
         if (pendingItemId.value === null) {
             return null;
         }
 
-        return options.items.value.find((item) => item.id === pendingItemId.value) ?? null;
+        return options.items.value.find((item) => item.id === pendingItemId.value) ?? pendingItem.value;
     });
 
     function canDelete(item: FeedItem): boolean {
         return options.isLocal.value && item.downloaded === true;
+    }
+
+    function setPendingItem(item: FeedItem): void {
+        pendingItemId.value = item.id;
+        pendingItem.value = item;
+        deleteError.value = null;
+        dialogOpen.value = true;
     }
 
     function open(item: FeedItem): void {
@@ -55,27 +62,24 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
             return;
         }
 
-        pendingItemId.value = item.id;
-        deleteError.value = null;
-        dialogOpen.value = true;
+        setPendingItem(item);
     }
 
-    function close(): void {
+    function openFromFileSheet(item: FeedItem): void {
+        setPendingItem(item);
+    }
+
+    function close(): boolean {
         if (deleting.value) {
-            return;
+            return false;
         }
 
         dialogOpen.value = false;
         deleteError.value = null;
         pendingItemId.value = null;
-    }
+        pendingItem.value = null;
 
-    function decrementVisibleTotal(): void {
-        if (options.totalAvailable.value === null) {
-            return;
-        }
-
-        options.totalAvailable.value = Math.max(0, options.totalAvailable.value - 1);
+        return true;
     }
 
     async function removeFromCurrentView(item: FeedItem): Promise<void> {
@@ -90,10 +94,10 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
         }
     }
 
-    async function confirm(): Promise<void> {
+    async function confirm(): Promise<boolean> {
         const item = itemToDelete.value;
         if (!item || deleting.value) {
-            return;
+            return false;
         }
 
         deleting.value = true;
@@ -108,7 +112,6 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
                 },
             });
 
-            decrementVisibleTotal();
             await removeFromCurrentView(item);
             shouldClose = true;
         } catch (error) {
@@ -120,6 +123,8 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
                 close();
             }
         }
+
+        return shouldClose;
     }
 
     return {
@@ -132,6 +137,7 @@ export function useLocalFileDeletion(options: UseLocalFileDeletionOptions) {
         actions: {
             canDelete,
             open,
+            openFromFileSheet,
             close,
             confirm,
         },

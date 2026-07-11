@@ -142,13 +142,15 @@ function createProps() {
         applyFilters: vi.fn(),
         applyService: vi.fn(),
         cancelFill: vi.fn(),
-        closeFileSheet: vi.fn(),
+        closeGridFileSheet: vi.fn(),
+        closeViewerFileSheet: vi.fn(),
         containerInteractions: createContainerInteractions(),
         currentVisibleItem: null,
         downloadedReactionPrompt: { data: { open: ref(false) }, chooseReact: vi.fn(), chooseRedownload: vi.fn(), close: vi.fn(), setOpen: vi.fn() },
-        fileSheetState: { isOpen: false },
-        fileSheetItem: null,
-        fileSheetPresentation: 'inline' as 'inline' | 'overlay',
+        gridFileSheetState: { isOpen: false },
+        gridFileSheetItem: null,
+        viewerFileSheetState: { isOpen: false },
+        viewerFileSheetItem: null,
         fileViewerData: { fileData: ref(null), isLoadingFileData: ref(false), setFileData: vi.fn() },
         form: { data: { limit: 20, feed: 'online', source: null }, reset: vi.fn() },
         goToFirstPage: vi.fn(),
@@ -160,13 +162,13 @@ function createProps() {
         headerMasonry: null,
         isFilterSheetOpen: false,
         itemInteractions: { performLoadedItemsBulkAction: vi.fn(), reactions: { onFileBlacklist: vi.fn() } },
-        localFileDeletion: { state: { dialogOpen: ref(false), itemToDelete: ref(null), deleting: ref(false), deleteError: ref(null) }, actions: { close: vi.fn(), confirm: vi.fn() } },
+        localFileDeletion: { state: { dialogOpen: ref(false), itemToDelete: ref(null), deleting: ref(false), deleteError: ref(null) }, actions: { close: vi.fn(), confirm: vi.fn(async () => false), openFromFileSheet: vi.fn() } },
         localService: null,
         loadNext: vi.fn(),
         masonryRenderKey: 0,
         mouseShortcuts: { handleAuxClickCapture: vi.fn(), handleClickCapture: vi.fn(), handleContextMenuCapture: vi.fn(), handleMouseDownCapture: vi.fn() },
-        openFileSheet: vi.fn(),
-        openFileSheetForItem: vi.fn(),
+        openViewerFileSheet: vi.fn(),
+        openGridFileSheetForItem: vi.fn(),
         removeItemFromTab: undefined as ((item: unknown) => void) | undefined,
         isRemovingItemFromTab: undefined as ((item: unknown) => boolean) | undefined,
         promptDialog: { data: { promptDialogOpen: ref(false), promptDialogItemId: ref(null), promptDataLoading: ref(false), currentPromptData: ref(null) }, clear: vi.fn(), setOpen: vi.fn(), select: vi.fn(), copy: vi.fn(), close: vi.fn() },
@@ -325,9 +327,9 @@ describe('TabContentV2View fullscreen chrome', () => {
     it('renders the file sheet in the fullscreen aside slot', () => {
         const props = createProps();
         const sheetSpy = vi.fn();
-        props.fileSheetState.isOpen = true;
+        props.viewerFileSheetState.isOpen = true;
         props.currentVisibleItem = { id: 11 } as never;
-        props.fileSheetItem = props.currentVisibleItem;
+        props.viewerFileSheetItem = props.currentVisibleItem;
 
         const fileViewerSheetStub = defineComponent({
             name: 'FileViewerSheetStub',
@@ -374,13 +376,29 @@ describe('TabContentV2View fullscreen chrome', () => {
         expect(wrapper.find('[data-testid="file-viewer-sheet-stub"]').exists()).toBe(false);
     });
 
+    it('does not render the grid-owned sheet in fullscreen mode', () => {
+        const props = createProps();
+        props.gridFileSheetState.isOpen = true;
+        props.gridFileSheetItem = { id: 12 } as never;
+        const fileViewerSheetStub = defineComponent({
+            name: 'FileViewerSheetStub',
+            setup() {
+                return () => h('div', { 'data-testid': 'file-viewer-sheet-stub' });
+            },
+        });
+
+        const wrapper = mount(TabContentV2View, { props, global: { stubs: { ...defaultStubs, FileViewerSheet: fileViewerSheetStub } } });
+
+        expect(wrapper.find('[data-testid="file-viewer-sheet-stub"]').exists()).toBe(false);
+    });
+
     it('wires the fullscreen file sheet toggle', async () => {
         const props = createProps();
         const wrapper = mount(TabContentV2View, { props, global: { stubs: defaultStubs } });
 
         await wrapper.get('[aria-label="Show file sheet"]').trigger('click');
 
-        expect(props.openFileSheet).toHaveBeenCalledTimes(1);
+        expect(props.openViewerFileSheet).toHaveBeenCalledTimes(1);
     });
 
     it('shows an Atlas fullscreen lock message at the trailing placeholder and unlocks from there', async () => {

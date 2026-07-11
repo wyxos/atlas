@@ -13,7 +13,6 @@ import type { ReactionType } from '@/types/reaction';
 import type { LocalSourceSelection } from '@/utils/localSourceSelection';
 
 export type FileSheetState = { isOpen: boolean };
-export type FileSheetPresentation = 'inline' | 'overlay';
 export type FileViewerDataShape = {
     fileData: { value: File | null };
     isLoadingFileData: { value: boolean };
@@ -42,7 +41,8 @@ export type TabContentV2ViewProps = {
     applyFilters: () => Promise<void>;
     applyService: () => Promise<void>;
     cancelFill: () => void;
-    closeFileSheet: () => void;
+    closeGridFileSheet: () => void;
+    closeViewerFileSheet: () => void;
     confirmBatchAction?: () => void;
     containerInteractions: TabContentContainerInteractions;
     currentVisibleItem: FeedItem | null;
@@ -50,8 +50,10 @@ export type TabContentV2ViewProps = {
     cancelRemoveLoadedItems?: () => void;
     canRemoveLoadedItems?: boolean;
     downloadedReactionPrompt: DownloadedReactionPromptShape;
-    fileSheetState: FileSheetState;
-    fileSheetItem: FeedItem | null;
+    gridFileSheetState: FileSheetState;
+    gridFileSheetItem: FeedItem | null;
+    viewerFileSheetState: FileSheetState;
+    viewerFileSheetItem: FeedItem | null;
     fileViewerData: FileViewerDataShape;
     form: BrowseFormInstance;
     fillActionsDisabled?: boolean;
@@ -78,15 +80,14 @@ export type TabContentV2ViewProps = {
     loadedItemsRemovalOpen?: boolean;
     masonryRenderKey: number;
     mouseShortcuts: MouseShortcutHandlers;
-    openFileSheet: () => void;
-    openFileSheetForItem: (item: FeedItem, index: number) => void;
+    openViewerFileSheet: () => void;
+    openGridFileSheetForItem: (item: FeedItem, index: number) => void;
     removeItemFromTab?: (item: FeedItem) => void | Promise<void>;
     removeLoadedItems?: () => void;
     removingLoadedItems?: boolean;
     pendingBatchAction?: LoadedItemsBulkAction | null;
     promptDialog: TabContentPromptDialogHandle;
     queuePreviewRegeneration?: (item: FeedItem, options?: { automatic?: boolean }) => void | Promise<void>;
-    fileSheetPresentation: FileSheetPresentation;
     resolve: (params: { cursor: string | null; pageSize: number; signal?: AbortSignal }) => Promise<VibeResolveResult>;
     setAutoScrollSpeed?: (value: number) => void;
     setFillCallCount?: (value: number) => void;
