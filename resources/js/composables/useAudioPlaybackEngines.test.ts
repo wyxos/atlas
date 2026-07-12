@@ -140,6 +140,54 @@ describe('useAudioPlaybackEngines', () => {
         }
     });
 
+    it('pauses and preserves a confirmed Spotify device across a native track handoff', async () => {
+        const firstUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const nextUri = 'spotify:track:2A3B4C5D6E7F8G9H0I1J2K';
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(41, { source: 'spotify', spotifyUri: firstUri }),
+            testTrack(61, { source: 'local', spotifyUri: null }),
+            testTrack(91, { source: 'spotify', spotifyUri: nextUri }),
+        ], 41);
+
+        const audioElement = {
+            currentTime: 0,
+            pause: vi.fn(),
+            play: vi.fn().mockResolvedValue(undefined),
+        } as unknown as HTMLAudioElement;
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(player, ref(audioElement), currentTime, mediaDuration, durationSeconds);
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+            spotifyPlaybackMocks.pause.mockClear();
+            spotifyPlaybackMocks.destroy.mockClear();
+            spotifyPlaybackMocks.play.mockClear();
+
+            player.playNext();
+            await playbackEngines.startCurrentPlayback();
+
+            expect(spotifyPlaybackMocks.pause).toHaveBeenCalledOnce();
+            expect(spotifyPlaybackMocks.destroy).not.toHaveBeenCalled();
+            expect(audioElement.play).toHaveBeenCalledOnce();
+
+            player.playNext();
+            await playbackEngines.startCurrentPlayback();
+
+            expect(spotifyPlaybackMocks.destroy).not.toHaveBeenCalled();
+            expect(spotifyPlaybackMocks.play).toHaveBeenCalledOnce();
+            expect(spotifyPlaybackMocks.play).toHaveBeenCalledWith(
+                nextUri,
+                0,
+                expect.objectContaining({ shouldContinue: expect.any(Function) }),
+            );
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
     it('does not start native or Spotify playback while this instance is observing', async () => {
         const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
         const player = useGlobalAudioPlayer();

@@ -1,19 +1,24 @@
-type SpotifyAccessTokenResponse = {
-    access_token?: string;
-    message?: string;
-};
+import {
+    activateSpotifyDevice,
+    apiPlaybackToSnapshot,
+    assertSpotifyPlaybackCurrent,
+    currentSpotifyPlayback,
+    delay,
+    fetchAccessToken,
+    SpotifyPlaybackAuthenticationError,
+    SpotifyPlaybackOwnershipError,
+    SpotifyPlaybackSupersededError,
+    startSpotifyDevicePlayback,
+    waitForAtlasPlayback,
+    type SpotifyPlaybackSnapshot,
+    type SpotifyPlayOptions,
+} from './spotifyPlaybackApi';
 
-type SpotifySdkReadyEvent = {
-    device_id: string;
-};
+export type { SpotifyPlaybackSnapshot } from './spotifyPlaybackApi';
 
-type SpotifySdkError = {
-    message: string;
-};
-
-type SpotifySdkTrack = {
-    uri?: string;
-};
+type SpotifySdkReadyEvent = { device_id: string };
+type SpotifySdkError = { message: string };
+type SpotifySdkTrack = { uri?: string };
 
 type SpotifySdkPlaybackState = {
     paused: boolean;
@@ -54,70 +59,18 @@ declare global {
     }
 }
 
-export type SpotifyPlaybackSnapshot = {
-    durationMs: number;
-    paused: boolean;
-    positionMs: number;
-    trackUri: string | null;
-};
-
 type SpotifyPlaybackOptions = {
     initialVolume?: number;
     onError?: (message: string) => void;
     onStateChange?: (snapshot: SpotifyPlaybackSnapshot | null) => void;
 };
 
-type SpotifyPlayOptions = {
-    shouldContinue?: () => boolean;
-};
-
-type SpotifyApiDevice = {
-    id: string | null;
-    is_active: boolean;
-};
-
-type SpotifyApiCurrentPlaybackResponse = {
-    device?: SpotifyApiDevice | null;
-    is_playing?: boolean;
-    item?: {
-        duration_ms?: number;
-        uri?: string;
-    } | null;
-    progress_ms?: number | null;
-};
-
 export type SpotifyPlaybackController = ReturnType<typeof createSpotifyPlaybackController>;
 
 const SPOTIFY_SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
-const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
-const SPOTIFY_DEVICE_READY_TIMEOUT_MS = 5000;
-const SPOTIFY_DEVICE_READY_POLL_MS = 250;
-const SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 3000, 4000, 5000] as const;
-const SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS = 1500;
-const SPOTIFY_AUTHENTICATION_ERROR_STATUSES = new Set([401, 403, 409]);
+const SPOTIFY_DEVICE_RECONNECT_DELAY_MS = 500;
 
 let sdkLoadPromise: Promise<void> | null = null;
-
-class SpotifyPlaybackSupersededError extends Error {
-    constructor() {
-        super('Spotify playback request was superseded.');
-        this.name = 'SpotifyPlaybackSupersededError';
-    }
-}
-
-class SpotifyPlaybackAuthenticationError extends Error {
-    constructor(message: string, public readonly status: number | null = null) {
-        super(message);
-        this.name = 'SpotifyPlaybackAuthenticationError';
-    }
-}
-
-class SpotifyPlaybackApiError extends Error {
-    constructor(message: string, public readonly status: number) {
-        super(message);
-        this.name = 'SpotifyPlaybackApiError';
-    }
-}
 
 export function isSpotifyPlaybackSuperseded(error: unknown): boolean {
     return error instanceof SpotifyPlaybackSupersededError;
@@ -125,12 +78,6 @@ export function isSpotifyPlaybackSuperseded(error: unknown): boolean {
 
 export function isSpotifyPlaybackAuthenticationError(error: unknown): error is SpotifyPlaybackAuthenticationError {
     return error instanceof SpotifyPlaybackAuthenticationError;
-}
-
-function assertSpotifyPlaybackCurrent(options?: SpotifyPlayOptions): void {
-    if (options?.shouldContinue?.() === false) {
-        throw new SpotifyPlaybackSupersededError();
-    }
 }
 
 function sdkStateToSnapshot(state: SpotifySdkPlaybackState | null): SpotifyPlaybackSnapshot | null {
@@ -148,26 +95,6 @@ function sdkStateToSnapshot(state: SpotifySdkPlaybackState | null): SpotifyPlayb
 
 function clampSpotifyVolume(volume: number): number {
     return Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.7;
-}
-
-function apiPlaybackToSnapshot(playback: SpotifyApiCurrentPlaybackResponse | null, deviceId: string | null): SpotifyPlaybackSnapshot | null {
-    if (!playback || !deviceId || playback.device?.id !== deviceId) {
-        return null;
-    }
-
-    const durationMs = typeof playback.item?.duration_ms === 'number' && Number.isFinite(playback.item.duration_ms)
-        ? playback.item.duration_ms
-        : 0;
-    const positionMs = typeof playback.progress_ms === 'number' && Number.isFinite(playback.progress_ms)
-        ? playback.progress_ms
-        : 0;
-
-    return {
-        durationMs,
-        paused: playback.is_playing === false,
-        positionMs,
-        trackUri: playback.item?.uri ?? null,
-    };
 }
 
 function loadSpotifySdk(): Promise<void> {
@@ -207,225 +134,105 @@ function loadSpotifySdk(): Promise<void> {
     return sdkLoadPromise;
 }
 
-async function fetchAccessToken(): Promise<string> {
-    const response = await fetch('/api/spotify/playback-token', {
-        credentials: 'same-origin',
-        headers: {
-            Accept: 'application/json',
-        },
-    });
-
-    const payload = await response.json().catch(() => ({})) as SpotifyAccessTokenResponse;
-    if (!response.ok) {
-        const message = payload.message ?? 'Unable to load Spotify playback token.';
-
-        if (SPOTIFY_AUTHENTICATION_ERROR_STATUSES.has(response.status)) {
-            throw new SpotifyPlaybackAuthenticationError(message, response.status);
-        }
-
-        throw new Error(message);
-    }
-
-    const token = payload.access_token?.trim();
-    if (!token) {
-        throw new Error('Spotify playback token response was empty.');
-    }
-
-    return token;
-}
-
-async function spotifyApiRequest(path: string, token: string, init: RequestInit): Promise<void> {
-    const response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
-        ...init,
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok && response.status !== 204) {
-        throw await spotifyApiError(response);
-    }
-}
-
-async function spotifyApiOptionalJsonRequest<T>(path: string, token: string): Promise<T | null> {
-    const response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
-        headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`,
-        },
-    });
-
-    if (response.status === 204) {
-        return null;
-    }
-
-    if (!response.ok) {
-        throw await spotifyApiError(response);
-    }
-
-    return await response.json() as T;
-}
-
-async function spotifyApiErrorMessage(response: Response): Promise<string> {
-    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-    const message = payload?.error?.message?.trim();
-
-    return message && message !== ''
-        ? message
-        : `Spotify playback request failed with HTTP ${response.status}.`;
-}
-
-async function spotifyApiError(response: Response): Promise<Error> {
-    const message = await spotifyApiErrorMessage(response);
-
-    return SPOTIFY_AUTHENTICATION_ERROR_STATUSES.has(response.status)
-        ? new SpotifyPlaybackAuthenticationError(message, response.status)
-        : new SpotifyPlaybackApiError(message, response.status);
-}
-
-async function delay(milliseconds: number, options?: SpotifyPlayOptions): Promise<void> {
-    assertSpotifyPlaybackCurrent(options);
-
-    await new Promise<void>((resolve) => {
-        window.setTimeout(resolve, milliseconds);
-    });
-
-    assertSpotifyPlaybackCurrent(options);
-}
-
-async function currentSpotifyPlayback(token: string): Promise<SpotifyApiCurrentPlaybackResponse | null> {
-    return await spotifyApiOptionalJsonRequest<SpotifyApiCurrentPlaybackResponse>('/me/player', token);
-}
-
-async function pauseSpotifyDevice(token: string, deviceId: string): Promise<void> {
-    await spotifyApiRequest(`/me/player/pause?device_id=${encodeURIComponent(deviceId)}`, token, {
-        method: 'PUT',
-    });
-}
-
-function isSpotifyDeviceNotFoundError(error: unknown): error is SpotifyPlaybackApiError {
-    return error instanceof SpotifyPlaybackApiError
-        && error.status === 404
-        && /device not found/i.test(error.message);
-}
-
-async function startSpotifyDevicePlayback(
-    token: string,
-    deviceId: string,
-    uri: string,
-    positionMs: number,
-    retryDeviceRegistration: boolean,
-    options?: SpotifyPlayOptions,
-): Promise<void> {
-    const retryDelays = retryDeviceRegistration ? SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS : [];
-    const maxAttempts = retryDelays.length + 1;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        assertSpotifyPlaybackCurrent(options);
-
-        if (attempt > 1) {
-            await delay(retryDelays[attempt - 2] ?? 0, options);
-        }
-
-        try {
-            await spotifyApiRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, token, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    position_ms: positionMs,
-                    uris: [uri],
-                }),
-            });
-
-            return;
-        } catch (error) {
-            if (!isSpotifyDeviceNotFoundError(error) || attempt === maxAttempts) {
-                throw error;
-            }
-        }
-    }
-}
-
-function isPlaybackNearRequestedPosition(
-    playback: SpotifyApiCurrentPlaybackResponse | null,
-    positionMs: number,
-    requestedAt: number,
-): boolean {
-    if (typeof playback?.progress_ms !== 'number' || !Number.isFinite(playback.progress_ms)) {
-        return true;
-    }
-
-    const elapsedMs = Date.now() - requestedAt;
-    const allowedProgressMs = positionMs + elapsedMs + SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS;
-
-    return playback.progress_ms >= positionMs - SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS
-        && playback.progress_ms <= allowedProgressMs;
-}
-
-async function waitForAtlasPlayback(
-    token: string,
-    deviceId: string,
-    uri: string,
-    positionMs: number,
-    options?: SpotifyPlayOptions,
-): Promise<SpotifyPlaybackSnapshot> {
-    const startedAt = Date.now();
-
-    do {
-        assertSpotifyPlaybackCurrent(options);
-        const playback = await currentSpotifyPlayback(token);
-        assertSpotifyPlaybackCurrent(options);
-
-        const activeDeviceId = playback?.device?.id ?? null;
-        const activeTrackUri = playback?.item?.uri ?? null;
-
-        if (
-            activeDeviceId === deviceId
-            && activeTrackUri === uri
-            && playback?.is_playing !== false
-            && isPlaybackNearRequestedPosition(playback, positionMs, startedAt)
-        ) {
-            return apiPlaybackToSnapshot(playback, deviceId) ?? {
-                durationMs: 0,
-                paused: false,
-                positionMs,
-                trackUri: uri,
-            };
-        }
-
-        if (activeDeviceId && activeDeviceId !== deviceId && activeTrackUri === uri) {
-            await pauseSpotifyDevice(token, activeDeviceId);
-            throw new Error('Spotify started playback on another device instead of Atlas, so Atlas paused it.');
-        }
-
-        await delay(SPOTIFY_DEVICE_READY_POLL_MS, options);
-    } while (Date.now() - startedAt < SPOTIFY_DEVICE_READY_TIMEOUT_MS);
-
-    throw new Error('Spotify did not confirm playback on the Atlas browser player.');
-}
-
-export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions = {}) {
+export function createSpotifyPlaybackController(controllerOptions: SpotifyPlaybackOptions = {}) {
     let player: SpotifyPlayer | null = null;
     let deviceId: string | null = null;
+    let activatedDeviceId: string | null = null;
     let readyPromise: Promise<string> | null = null;
+    let resolveReady: ((deviceId: string) => void) | null = null;
+    let rejectReady: ((error: unknown) => void) | null = null;
     let currentAccessToken = '';
-    let targetVolume = clampSpotifyVolume(options.initialVolume ?? 0.7);
-    let hasConfirmedPlayback = false;
-    let hasConfirmedPlaybackInSession = false;
+    let targetVolume = clampSpotifyVolume(controllerOptions.initialVolume ?? 0.7);
 
-    function destroyPlayer(expectedPlayer?: SpotifyPlayer, resetSession = false): void {
-        if (expectedPlayer && player !== expectedPlayer) { return; }
+    function clearReadyPromise(): void {
+        readyPromise = null;
+        resolveReady = null;
+        rejectReady = null;
+    }
 
+    function resolveReadyPromise(readyDeviceId: string): void {
+        const resolve = resolveReady;
+        clearReadyPromise();
+        resolve?.(readyDeviceId);
+    }
+
+    function rejectReadyPromise(error: unknown): void {
+        const reject = rejectReady;
+        clearReadyPromise();
+        reject?.(error);
+    }
+
+    function createPlayer(): SpotifyPlayer {
+        if (!window.Spotify?.Player) {
+            throw new Error('Spotify Web Playback SDK is unavailable.');
+        }
+
+        const sdkPlayer = new window.Spotify.Player({
+            name: 'Atlas',
+            getOAuthToken: (callback) => {
+                callback(currentAccessToken);
+            },
+            volume: targetVolume,
+        });
+
+        sdkPlayer.addListener('ready', ({ device_id }) => {
+            if (player !== sdkPlayer) { return; }
+
+            deviceId = device_id;
+            activatedDeviceId = null;
+            resolveReadyPromise(device_id);
+        });
+        sdkPlayer.addListener('not_ready', ({ device_id }) => {
+            if (player !== sdkPlayer || deviceId !== device_id) { return; }
+
+            sdkPlayer.disconnect();
+            deviceId = null;
+            activatedDeviceId = null;
+            controllerOptions.onStateChange?.(null);
+        });
+        sdkPlayer.addListener('player_state_changed', (state) => {
+            if (player === sdkPlayer) { controllerOptions.onStateChange?.(sdkStateToSnapshot(state)); }
+        });
+
+        const rejectWithSdkError = ({ message }: SpotifySdkError): void => {
+            if (player !== sdkPlayer) { return; }
+
+            controllerOptions.onError?.(message);
+            rejectReadyPromise(new Error(message));
+        };
+        const rejectWithAuthenticationError = ({ message }: SpotifySdkError): void => {
+            if (player !== sdkPlayer) { return; }
+
+            const authenticationMessage = message || 'Spotify authentication failed. Reconnect Spotify and try again.';
+            controllerOptions.onError?.(authenticationMessage);
+            rejectReadyPromise(new SpotifyPlaybackAuthenticationError(authenticationMessage));
+        };
+
+        sdkPlayer.addListener('initialization_error', rejectWithSdkError);
+        sdkPlayer.addListener('authentication_error', rejectWithAuthenticationError);
+        sdkPlayer.addListener('account_error', rejectWithSdkError);
+        sdkPlayer.addListener('playback_error', ({ message }) => {
+            if (player === sdkPlayer) { controllerOptions.onError?.(message); }
+        });
+        sdkPlayer.addListener('autoplay_failed', ({ message }) => {
+            if (player === sdkPlayer) { controllerOptions.onError?.(message || 'Spotify autoplay was blocked.'); }
+        });
+
+        return sdkPlayer;
+    }
+
+    function destroyPlayer(): void {
         const playerToDisconnect = player;
+        const connectionError = new SpotifyPlaybackSupersededError();
+
         player = null;
         deviceId = null;
-        readyPromise = null;
-        hasConfirmedPlayback = false;
-        if (resetSession) { hasConfirmedPlaybackInSession = false; }
+        activatedDeviceId = null;
+        rejectReadyPromise(connectionError);
         playerToDisconnect?.disconnect();
     }
 
-    async function ensurePlayer(accessToken: string): Promise<string> {
+    async function connectPlayer(accessToken: string): Promise<string> {
         await loadSpotifySdk();
         currentAccessToken = accessToken;
 
@@ -437,77 +244,40 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             return readyPromise;
         }
 
+        const sdkPlayer = player ?? createPlayer();
+        player = sdkPlayer;
         readyPromise = new Promise((resolve, reject) => {
-            if (!window.Spotify?.Player) {
-                reject(new Error('Spotify Web Playback SDK is unavailable.'));
-                return;
+            resolveReady = resolve;
+            rejectReady = reject;
+        });
+        const connection = readyPromise;
+
+        void sdkPlayer.connect().then((connected) => {
+            if (player === sdkPlayer && !connected && !deviceId) {
+                rejectReadyPromise(new Error('Spotify Web Playback SDK did not connect.'));
             }
-
-            const sdkPlayer = new window.Spotify.Player({
-                name: 'Atlas',
-                getOAuthToken: (callback) => {
-                    callback(currentAccessToken);
-                },
-                volume: targetVolume,
-            });
-            player = sdkPlayer;
-
-            player.addListener('ready', ({ device_id }) => {
-                if (player !== sdkPlayer) { return; }
-
-                deviceId = device_id;
-                resolve(device_id);
-            });
-            player.addListener('not_ready', ({ device_id }) => {
-                if (player === sdkPlayer && deviceId === device_id) { destroyPlayer(sdkPlayer); }
-            });
-            player.addListener('player_state_changed', (state) => {
-                if (player === sdkPlayer) { options.onStateChange?.(sdkStateToSnapshot(state)); }
-            });
-
-            const rejectWithSdkError = ({ message }: SpotifySdkError): void => {
-                if (player !== sdkPlayer) { return; }
-
-                options.onError?.(message);
-                reject(new Error(message));
-            };
-            const rejectWithAuthenticationError = ({ message }: SpotifySdkError): void => {
-                if (player !== sdkPlayer) { return; }
-
-                const authenticationMessage = message || 'Spotify authentication failed. Reconnect Spotify and try again.';
-                options.onError?.(authenticationMessage);
-                reject(new SpotifyPlaybackAuthenticationError(authenticationMessage));
-            };
-
-            player.addListener('initialization_error', rejectWithSdkError);
-            player.addListener('authentication_error', rejectWithAuthenticationError);
-            player.addListener('account_error', rejectWithSdkError);
-            player.addListener('playback_error', ({ message }) => {
-                if (player === sdkPlayer) { options.onError?.(message); }
-            });
-            player.addListener('autoplay_failed', ({ message }) => {
-                if (player === sdkPlayer) { options.onError?.(message || 'Spotify autoplay was blocked.'); }
-            });
-
-            void sdkPlayer.connect().then((connected) => {
-                if (!connected) {
-                    reject(new Error('Spotify Web Playback SDK did not connect.'));
-                }
-            }).catch(reject);
+        }).catch((error: unknown) => {
+            if (player === sdkPlayer) { rejectReadyPromise(error); }
         });
 
-        return readyPromise;
+        return connection;
     }
 
-    function shouldRetryAfterStartupError(error: unknown): boolean {
-        if (isSpotifyPlaybackSuperseded(error) || isSpotifyPlaybackAuthenticationError(error)) {
-            return false;
+    async function reconnectPlayer(accessToken: string, options: SpotifyPlayOptions): Promise<string> {
+        const sdkPlayer = player;
+
+        if (!sdkPlayer) {
+            return connectPlayer(accessToken);
         }
 
-        return !isSpotifyDeviceNotFoundError(error)
-            || hasConfirmedPlayback
-            || hasConfirmedPlaybackInSession
-            || player === null;
+        sdkPlayer.disconnect();
+        deviceId = null;
+        activatedDeviceId = null;
+        rejectReadyPromise(new SpotifyPlaybackSupersededError());
+        await delay(SPOTIFY_DEVICE_RECONNECT_DELAY_MS, options);
+        assertSpotifyPlaybackCurrent(options);
+
+        return connectPlayer(accessToken);
     }
 
     async function startPlayback(
@@ -516,25 +286,31 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
         positionMs: number,
         options: SpotifyPlayOptions,
     ): Promise<SpotifyPlaybackSnapshot> {
-        const targetDeviceId = await ensurePlayer(token);
-        const retryDeviceRegistration = !hasConfirmedPlayback;
+        const targetDeviceId = await connectPlayer(token);
         assertSpotifyPlaybackCurrent(options);
 
         await player?.activateElement();
         assertSpotifyPlaybackCurrent(options);
-        await startSpotifyDevicePlayback(token, targetDeviceId, uri, positionMs, retryDeviceRegistration, options);
 
-        const snapshot = await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
-        hasConfirmedPlayback = true;
-        hasConfirmedPlaybackInSession = true;
+        const retryDeviceRegistration = activatedDeviceId !== targetDeviceId;
+        await activateSpotifyDevice(token, targetDeviceId, options, retryDeviceRegistration);
+        assertSpotifyPlaybackCurrent(options);
 
-        return snapshot;
+        if (deviceId !== targetDeviceId) {
+            throw new Error('The Atlas Spotify browser player went offline while it was activating.');
+        }
+
+        activatedDeviceId = targetDeviceId;
+
+        await startSpotifyDevicePlayback(token, targetDeviceId, uri, positionMs);
+
+        return await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
     }
 
     return {
         activateElement(): void {
             void player?.activateElement().catch(() => {
-                options.onError?.('Spotify autoplay was blocked.');
+                controllerOptions.onError?.('Spotify autoplay was blocked.');
             });
         },
         async currentState(): Promise<SpotifyPlaybackSnapshot | null> {
@@ -550,7 +326,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             return apiPlaybackToSnapshot(await currentSpotifyPlayback(currentAccessToken), deviceId);
         },
         destroy(): void {
-            destroyPlayer(undefined, true);
+            destroyPlayer();
         },
         async pause(): Promise<void> {
             if (!player) {
@@ -568,19 +344,19 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             try {
                 return await startPlayback(token, uri, positionMs, options);
             } catch (error) {
-                if (!shouldRetryAfterStartupError(error)) {
+                if (
+                    isSpotifyPlaybackSuperseded(error)
+                    || isSpotifyPlaybackAuthenticationError(error)
+                    || error instanceof SpotifyPlaybackOwnershipError
+                ) {
                     throw error;
                 }
 
-                destroyPlayer();
+                activatedDeviceId = null;
+                await reconnectPlayer(token, options);
                 assertSpotifyPlaybackCurrent(options);
 
-                try {
-                    return await startPlayback(token, uri, positionMs, options);
-                } catch (retryError) {
-                    destroyPlayer();
-                    throw retryError;
-                }
+                return await startPlayback(token, uri, positionMs, options);
             }
         },
         async seek(positionSeconds: number): Promise<void> {

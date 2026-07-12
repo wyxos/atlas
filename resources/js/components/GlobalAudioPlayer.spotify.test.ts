@@ -260,9 +260,15 @@ describe('GlobalAudioPlayer Spotify playback', () => {
 
         expect(wrapper.get('audio').attributes('src')).toBeUndefined();
         expect(spotifyPlayerInstances[0]?.activateElement).toHaveBeenCalled();
-        expect(fetchMock).not.toHaveBeenCalledWith(
+        expect(fetchMock).toHaveBeenCalledWith(
             'https://api.spotify.com/v1/me/player',
-            expect.objectContaining({ method: 'PUT' }),
+            expect.objectContaining({
+                method: 'PUT',
+                body: JSON.stringify({
+                    device_ids: ['atlas-browser-device'],
+                    play: false,
+                }),
+            }),
         );
         expect(fetchMock).toHaveBeenCalledWith(
             'https://api.spotify.com/v1/me/player/play?device_id=atlas-browser-device',

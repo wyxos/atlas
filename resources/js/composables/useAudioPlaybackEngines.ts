@@ -59,19 +59,9 @@ export function useAudioPlaybackEngines(
     }
 
     function activateSpotifyElement(): void { spotifyController().activateElement(); }
-    function clearSpotifyPolling(): void {
-        if (spotifyPollingInterval) {
-            clearInterval(spotifyPollingInterval);
-            spotifyPollingInterval = null;
-        }
-    }
+    function clearSpotifyPolling(): void { if (spotifyPollingInterval) { clearInterval(spotifyPollingInterval); spotifyPollingInterval = null; } }
 
-    function clearSpotifyProgressTicker(): void {
-        if (spotifyProgressInterval) {
-            clearInterval(spotifyProgressInterval);
-            spotifyProgressInterval = null;
-        }
-    }
+    function clearSpotifyProgressTicker(): void { if (spotifyProgressInterval) { clearInterval(spotifyProgressInterval); spotifyProgressInterval = null; } }
 
     function clearSpotifyTimers(): void {
         clearSpotifyPolling();
@@ -102,6 +92,9 @@ export function useAudioPlaybackEngines(
     async function stopAllPlaybackEngines(options: { destroySpotify?: boolean } = {}): Promise<void> {
         activeEngine = null; audioRef.value?.pause();
         await stopSpotifyPlayback(spotifyPlayback, { destroy: options.destroySpotify });
+    }
+    function hasUnconfirmedSpotifyStart(): boolean {
+        return spotifyPendingStart !== null && spotifyPendingStart.playConfirmedAt === null;
     }
     async function stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(controller: SpotifyPlaybackController | null = spotifyPlayback): Promise<void> {
         if (!canTrackOwnSpotifyPlayback(audioPlayer.isPlaying.value, audioPlayer.currentTrack.value)) { await stopSpotifyPlayback(controller, { destroy: true }); }
@@ -438,12 +431,12 @@ export function useAudioPlaybackEngines(
         syncPlaybackPositionFromPlayer();
 
         if (!track || !audioPlayer.isPlaying.value) {
-            await stopAllPlaybackEngines({ destroySpotify: !isSpotifyAudioTrack(track) });
+            await stopAllPlaybackEngines({ destroySpotify: hasUnconfirmedSpotifyStart() });
             return;
         }
 
         if (activeEngine === 'spotify' && isSpotifyAudioTrack(track)) { clearSpotifyTimers(); resetSpotifyTracking(); }
-        else { await stopAllPlaybackEngines({ destroySpotify: !isSpotifyAudioTrack(track) }); }
+        else { await stopAllPlaybackEngines({ destroySpotify: hasUnconfirmedSpotifyStart() }); }
 
         if (token !== playbackToken) {
             return;
