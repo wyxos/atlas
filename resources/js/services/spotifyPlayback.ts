@@ -92,7 +92,7 @@ const SPOTIFY_SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
 const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
 const SPOTIFY_DEVICE_READY_TIMEOUT_MS = 5000;
 const SPOTIFY_DEVICE_READY_POLL_MS = 250;
-const SPOTIFY_PLAYBACK_START_MAX_ATTEMPTS = Math.ceil(SPOTIFY_DEVICE_READY_TIMEOUT_MS / SPOTIFY_DEVICE_READY_POLL_MS);
+const SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 3000, 4000, 5000] as const;
 const SPOTIFY_PLAYBACK_POSITION_TOLERANCE_MS = 1500;
 const SPOTIFY_AUTHENTICATION_ERROR_STATUSES = new Set([401, 403, 409]);
 
@@ -317,8 +317,14 @@ async function startSpotifyDevicePlayback(
     positionMs: number,
     options?: SpotifyPlayOptions,
 ): Promise<void> {
-    for (let attempt = 1; attempt <= SPOTIFY_PLAYBACK_START_MAX_ATTEMPTS; attempt++) {
+    const maxAttempts = SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS.length + 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         assertSpotifyPlaybackCurrent(options);
+
+        if (attempt > 1) {
+            await delay(SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS[attempt - 2] ?? 0, options);
+        }
 
         try {
             await spotifyApiRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, token, {
@@ -331,12 +337,10 @@ async function startSpotifyDevicePlayback(
 
             return;
         } catch (error) {
-            if (!isSpotifyDeviceNotFoundError(error) || attempt === SPOTIFY_PLAYBACK_START_MAX_ATTEMPTS) {
+            if (!isSpotifyDeviceNotFoundError(error) || attempt === maxAttempts) {
                 throw error;
             }
         }
-
-        await delay(SPOTIFY_DEVICE_READY_POLL_MS, options);
     }
 }
 
@@ -479,7 +483,8 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
 
     function shouldRetryAfterStartupError(error: unknown): boolean {
         return !isSpotifyPlaybackSuperseded(error)
-            && !isSpotifyPlaybackAuthenticationError(error);
+            && !isSpotifyPlaybackAuthenticationError(error)
+            && !isSpotifyDeviceNotFoundError(error);
     }
 
     async function startPlayback(
