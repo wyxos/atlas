@@ -104,6 +104,42 @@ describe('useAudioPlaybackEngines', () => {
         }
     });
 
+    it('reuses the connected Spotify device without pausing it between Spotify tracks', async () => {
+        const firstUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const nextUri = 'spotify:track:2A3B4C5D6E7F8G9H0I1J2K';
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(41, { source: 'spotify', spotifyUri: firstUri }),
+            testTrack(91, { source: 'spotify', spotifyUri: nextUri }),
+        ], 41);
+
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(player, ref(null), currentTime, mediaDuration, durationSeconds);
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+            spotifyPlaybackMocks.pause.mockClear();
+            spotifyPlaybackMocks.destroy.mockClear();
+            spotifyPlaybackMocks.play.mockClear();
+
+            player.playNext();
+            await playbackEngines.startCurrentPlayback();
+
+            expect(spotifyPlaybackMocks.pause).not.toHaveBeenCalled();
+            expect(spotifyPlaybackMocks.destroy).not.toHaveBeenCalled();
+            expect(spotifyPlaybackMocks.play).toHaveBeenCalledOnce();
+            expect(spotifyPlaybackMocks.play).toHaveBeenCalledWith(
+                nextUri,
+                0,
+                expect.objectContaining({ shouldContinue: expect.any(Function) }),
+            );
+        } finally {
+            playbackEngines.teardown();
+        }
+    });
+
     it('does not start native or Spotify playback while this instance is observing', async () => {
         const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
         const player = useGlobalAudioPlayer();

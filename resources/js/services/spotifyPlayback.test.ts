@@ -18,6 +18,7 @@ type SpotifyPlaybackState = {
 
 type ListenerMap = {
     ready?: (event: SpotifyReadyEvent) => void;
+    not_ready?: (event: SpotifyReadyEvent) => void;
     player_state_changed?: (state: SpotifyPlaybackState | null) => void;
 };
 
@@ -25,6 +26,8 @@ const spotifyPlayerInstances: MockSpotifyPlayer[] = [];
 
 class MockSpotifyPlayer {
     listeners: ListenerMap = {};
+
+    readonly deviceId: string;
 
     activateElement = vi.fn().mockResolvedValue(undefined);
 
@@ -39,10 +42,13 @@ class MockSpotifyPlayer {
     setVolume = vi.fn().mockResolvedValue(undefined);
 
     constructor() {
+        this.deviceId = spotifyPlayerInstances.length === 0
+            ? 'atlas-browser-device'
+            : `atlas-browser-device-${spotifyPlayerInstances.length + 1}`;
         spotifyPlayerInstances.push(this);
     }
 
-    addListener(event: 'ready', callback: (event: SpotifyReadyEvent) => void): boolean;
+    addListener(event: 'ready' | 'not_ready', callback: (event: SpotifyReadyEvent) => void): boolean;
     addListener(event: 'player_state_changed', callback: (state: SpotifyPlaybackState | null) => void): boolean;
     addListener(event: keyof ListenerMap, callback: NonNullable<ListenerMap[keyof ListenerMap]>): boolean {
         this.listeners[event] = callback as never;
@@ -51,9 +57,13 @@ class MockSpotifyPlayer {
     }
 
     connect(): Promise<boolean> {
-        this.listeners.ready?.({ device_id: 'atlas-browser-device' });
+        this.listeners.ready?.({ device_id: this.deviceId });
 
         return Promise.resolve(true);
+    }
+
+    emitNotReady(): void {
+        this.listeners.not_ready?.({ device_id: this.deviceId });
     }
 }
 
@@ -80,9 +90,9 @@ function emptyResponse(status = 204): Response {
     } as Response;
 }
 
-function spotifyPlaybackResponse(uri: string, positionMs = 0): Response {
+function spotifyPlaybackResponse(uri: string, positionMs = 0, deviceId = 'atlas-browser-device'): Response {
     return jsonResponse({
-        device: { id: 'atlas-browser-device', is_active: true },
+        device: { id: deviceId, is_active: true },
         is_playing: true,
         item: {
             duration_ms: 10000,
@@ -141,7 +151,11 @@ describe('Spotify playback service', () => {
             }
 
             if (url === 'https://api.spotify.com/v1/me/player') {
-                return spotifyPlaybackResponse(spotifyUri);
+                return spotifyPlaybackResponse(
+                    spotifyUri,
+                    0,
+                    spotifyPlayerInstances.at(-1)?.deviceId,
+                );
             }
 
             throw new Error(`Unexpected Spotify request: ${url}`);
@@ -207,7 +221,7 @@ describe('Spotify playback service', () => {
                 return jsonResponse({ access_token: 'spotify-access-token' });
             }
 
-            if (url === 'https://api.spotify.com/v1/me/player/play?device_id=atlas-browser-device') {
+            if (url.startsWith('https://api.spotify.com/v1/me/player/play?device_id=atlas-browser-device')) {
                 playAttempts++;
 
                 return playAttempts === 1
@@ -216,7 +230,11 @@ describe('Spotify playback service', () => {
             }
 
             if (url === 'https://api.spotify.com/v1/me/player') {
-                return spotifyPlaybackResponse(spotifyUri);
+                return spotifyPlaybackResponse(
+                    spotifyUri,
+                    0,
+                    spotifyPlayerInstances.at(-1)?.deviceId,
+                );
             }
 
             throw new Error(`Unexpected Spotify request: ${url}`);
@@ -230,6 +248,104 @@ describe('Spotify playback service', () => {
         expect(spotifyPlayerInstances).toHaveLength(2);
         expect(spotifyPlayerInstances[0]?.disconnect).toHaveBeenCalledOnce();
         expect(playAttempts).toBe(2);
+    });
+
+    it('reconnects with a fresh device id after the SDK reports the current device not ready', async () => {
+        installSpotifySdkMock();
+        const firstUri = 'spotify:track:first-device';
+        const nextUri = 'spotify:track:fresh-device';
+        let activeDeviceId = '';
+        let activeUri = '';
+        const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = String(input);
+
+            if (url === '/api/spotify/playback-token') {
+                return jsonResponse({ access_token: 'spotify-access-token' });
+            }
+
+            if (url.startsWith('https://api.spotify.com/v1/me/player/play?device_id=')) {
+                activeDeviceId = decodeURIComponent(url.split('device_id=')[1] ?? '');
+                activeUri = (JSON.parse(String(init?.body)) as { uris: string[] }).uris[0] ?? '';
+
+                return emptyResponse();
+            }
+
+            if (url === 'https://api.spotify.com/v1/me/player') {
+                return spotifyPlaybackResponse(activeUri, 0, activeDeviceId);
+            }
+
+            throw new Error(`Unexpected Spotify request: ${url}`);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const controller = createSpotifyPlaybackController();
+        await controller.play(firstUri, 0);
+
+        const firstPlayer = spotifyPlayerInstances[0]!;
+        firstPlayer.emitNotReady();
+
+        await expect(controller.play(nextUri, 0)).resolves.toMatchObject({
+            trackUri: nextUri,
+        });
+
+        expect(spotifyPlayerInstances).toHaveLength(2);
+        expect(firstPlayer.disconnect).toHaveBeenCalledOnce();
+        expect(activeDeviceId).toBe('atlas-browser-device-2');
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://api.spotify.com/v1/me/player/play?device_id=atlas-browser-device-2',
+            expect.anything(),
+        );
+    });
+
+    it('reconnects once when a previously confirmed device becomes stale between tracks', async () => {
+        installSpotifySdkMock();
+        const firstUri = 'spotify:track:confirmed-device';
+        const nextUri = 'spotify:track:stale-device-recovery';
+        let activeDeviceId = '';
+        let activeUri = '';
+        let staleDeviceAttempts = 0;
+        const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = String(input);
+
+            if (url === '/api/spotify/playback-token') {
+                return jsonResponse({ access_token: 'spotify-access-token' });
+            }
+
+            if (url.startsWith('https://api.spotify.com/v1/me/player/play?device_id=')) {
+                const requestedDeviceId = decodeURIComponent(url.split('device_id=')[1] ?? '');
+                const requestedUri = (JSON.parse(String(init?.body)) as { uris: string[] }).uris[0] ?? '';
+
+                if (requestedDeviceId === 'atlas-browser-device' && requestedUri === nextUri) {
+                    staleDeviceAttempts++;
+
+                    return spotifyDeviceErrorResponse();
+                }
+
+                activeDeviceId = requestedDeviceId;
+                activeUri = requestedUri;
+
+                return emptyResponse();
+            }
+
+            if (url === 'https://api.spotify.com/v1/me/player') {
+                return spotifyPlaybackResponse(activeUri, 0, activeDeviceId);
+            }
+
+            throw new Error(`Unexpected Spotify request: ${url}`);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const controller = createSpotifyPlaybackController();
+        await controller.play(firstUri, 0);
+
+        await expect(controller.play(nextUri, 0)).resolves.toMatchObject({
+            trackUri: nextUri,
+        });
+
+        expect(staleDeviceAttempts).toBe(1);
+        expect(spotifyPlayerInstances).toHaveLength(2);
+        expect(spotifyPlayerInstances[0]?.disconnect).toHaveBeenCalledOnce();
+        expect(activeDeviceId).toBe('atlas-browser-device-2');
     });
 
     it('keeps a registered SDK player available after Spotify exceeds the registration timeout', async () => {

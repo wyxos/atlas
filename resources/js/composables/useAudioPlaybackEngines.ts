@@ -442,14 +442,15 @@ export function useAudioPlaybackEngines(
             return;
         }
 
-        await stopAllPlaybackEngines({ destroySpotify: !isSpotifyAudioTrack(track) });
+        if (activeEngine === 'spotify' && isSpotifyAudioTrack(track)) { clearSpotifyTimers(); resetSpotifyTracking(); }
+        else { await stopAllPlaybackEngines({ destroySpotify: !isSpotifyAudioTrack(track) }); }
+
         if (token !== playbackToken) {
             return;
         }
 
         if (isSpotifyAudioTrack(track)) {
             activeEngine = 'spotify';
-            resetSpotifyTracking();
             const spotifyUri = track.spotifyUri!;
             const spotifyPlaybackController = spotifyController();
             const startPositionSeconds = playbackPositionFromPlayer();

@@ -315,15 +315,17 @@ async function startSpotifyDevicePlayback(
     deviceId: string,
     uri: string,
     positionMs: number,
+    retryDeviceRegistration: boolean,
     options?: SpotifyPlayOptions,
 ): Promise<void> {
-    const maxAttempts = SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS.length + 1;
+    const retryDelays = retryDeviceRegistration ? SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS : [];
+    const maxAttempts = retryDelays.length + 1;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         assertSpotifyPlaybackCurrent(options);
 
         if (attempt > 1) {
-            await delay(SPOTIFY_DEVICE_REGISTRATION_RETRY_DELAYS_MS[attempt - 2] ?? 0, options);
+            await delay(retryDelays[attempt - 2] ?? 0, options);
         }
 
         try {
@@ -408,10 +410,26 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
     let readyPromise: Promise<string> | null = null;
     let currentAccessToken = '';
     let targetVolume = clampSpotifyVolume(options.initialVolume ?? 0.7);
+    let hasConfirmedPlayback = false;
+
+    function destroyPlayer(expectedPlayer?: SpotifyPlayer): void {
+        if (expectedPlayer && player !== expectedPlayer) { return; }
+
+        const playerToDisconnect = player;
+        player = null;
+        deviceId = null;
+        readyPromise = null;
+        hasConfirmedPlayback = false;
+        playerToDisconnect?.disconnect();
+    }
 
     async function ensurePlayer(accessToken: string): Promise<string> {
         await loadSpotifySdk();
         currentAccessToken = accessToken;
+
+        if (player && deviceId) {
+            return deviceId;
+        }
 
         if (player && readyPromise) {
             return readyPromise;
@@ -423,32 +441,37 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
                 return;
             }
 
-            player = new window.Spotify.Player({
+            const sdkPlayer = new window.Spotify.Player({
                 name: 'Atlas',
                 getOAuthToken: (callback) => {
                     callback(currentAccessToken);
                 },
                 volume: targetVolume,
             });
+            player = sdkPlayer;
 
             player.addListener('ready', ({ device_id }) => {
+                if (player !== sdkPlayer) { return; }
+
                 deviceId = device_id;
                 resolve(device_id);
             });
             player.addListener('not_ready', ({ device_id }) => {
-                if (deviceId === device_id) {
-                    deviceId = null;
-                }
+                if (player === sdkPlayer && deviceId === device_id) { destroyPlayer(sdkPlayer); }
             });
             player.addListener('player_state_changed', (state) => {
-                options.onStateChange?.(sdkStateToSnapshot(state));
+                if (player === sdkPlayer) { options.onStateChange?.(sdkStateToSnapshot(state)); }
             });
 
             const rejectWithSdkError = ({ message }: SpotifySdkError): void => {
+                if (player !== sdkPlayer) { return; }
+
                 options.onError?.(message);
                 reject(new Error(message));
             };
             const rejectWithAuthenticationError = ({ message }: SpotifySdkError): void => {
+                if (player !== sdkPlayer) { return; }
+
                 const authenticationMessage = message || 'Spotify authentication failed. Reconnect Spotify and try again.';
                 options.onError?.(authenticationMessage);
                 reject(new SpotifyPlaybackAuthenticationError(authenticationMessage));
@@ -458,13 +481,13 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             player.addListener('authentication_error', rejectWithAuthenticationError);
             player.addListener('account_error', rejectWithSdkError);
             player.addListener('playback_error', ({ message }) => {
-                options.onError?.(message);
+                if (player === sdkPlayer) { options.onError?.(message); }
             });
             player.addListener('autoplay_failed', ({ message }) => {
-                options.onError?.(message || 'Spotify autoplay was blocked.');
+                if (player === sdkPlayer) { options.onError?.(message || 'Spotify autoplay was blocked.'); }
             });
 
-            void player.connect().then((connected) => {
+            void sdkPlayer.connect().then((connected) => {
                 if (!connected) {
                     reject(new Error('Spotify Web Playback SDK did not connect.'));
                 }
@@ -474,17 +497,14 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
         return readyPromise;
     }
 
-    function destroyPlayer(): void {
-        player?.disconnect();
-        player = null;
-        deviceId = null;
-        readyPromise = null;
-    }
-
     function shouldRetryAfterStartupError(error: unknown): boolean {
-        return !isSpotifyPlaybackSuperseded(error)
-            && !isSpotifyPlaybackAuthenticationError(error)
-            && !isSpotifyDeviceNotFoundError(error);
+        if (isSpotifyPlaybackSuperseded(error) || isSpotifyPlaybackAuthenticationError(error)) {
+            return false;
+        }
+
+        return !isSpotifyDeviceNotFoundError(error)
+            || hasConfirmedPlayback
+            || player === null;
     }
 
     async function startPlayback(
@@ -494,13 +514,17 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
         options: SpotifyPlayOptions,
     ): Promise<SpotifyPlaybackSnapshot> {
         const targetDeviceId = await ensurePlayer(token);
+        const retryDeviceRegistration = !hasConfirmedPlayback;
         assertSpotifyPlaybackCurrent(options);
 
         await player?.activateElement();
         assertSpotifyPlaybackCurrent(options);
-        await startSpotifyDevicePlayback(token, targetDeviceId, uri, positionMs, options);
+        await startSpotifyDevicePlayback(token, targetDeviceId, uri, positionMs, retryDeviceRegistration, options);
 
-        return await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
+        const snapshot = await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
+        hasConfirmedPlayback = true;
+
+        return snapshot;
     }
 
     return {
