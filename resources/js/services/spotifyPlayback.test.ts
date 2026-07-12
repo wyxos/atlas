@@ -297,6 +297,59 @@ describe('Spotify playback service', () => {
         );
     });
 
+    it('replaces an unregistered recovery device after a confirmed player goes not ready', async () => {
+        installSpotifySdkMock();
+        runTimersImmediately();
+        const firstUri = 'spotify:track:confirmed-before-idle';
+        const nextUri = 'spotify:track:resume-after-idle';
+        let activeDeviceId = '';
+        let activeUri = '';
+        let unregisteredRecoveryAttempts = 0;
+        const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = String(input);
+
+            if (url === '/api/spotify/playback-token') {
+                return jsonResponse({ access_token: 'spotify-access-token' });
+            }
+
+            if (url.startsWith('https://api.spotify.com/v1/me/player/play?device_id=')) {
+                const requestedDeviceId = decodeURIComponent(url.split('device_id=')[1] ?? '');
+                const requestedUri = (JSON.parse(String(init?.body)) as { uris: string[] }).uris[0] ?? '';
+
+                if (requestedDeviceId === 'atlas-browser-device-2') {
+                    unregisteredRecoveryAttempts++;
+
+                    return spotifyDeviceErrorResponse();
+                }
+
+                activeDeviceId = requestedDeviceId;
+                activeUri = requestedUri;
+
+                return emptyResponse();
+            }
+
+            if (url === 'https://api.spotify.com/v1/me/player') {
+                return spotifyPlaybackResponse(activeUri, 0, activeDeviceId);
+            }
+
+            throw new Error(`Unexpected Spotify request: ${url}`);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const controller = createSpotifyPlaybackController();
+        await controller.play(firstUri, 0);
+        spotifyPlayerInstances[0]!.emitNotReady();
+
+        await expect(controller.play(nextUri, 0)).resolves.toMatchObject({
+            trackUri: nextUri,
+        });
+
+        expect(unregisteredRecoveryAttempts).toBeGreaterThan(1);
+        expect(spotifyPlayerInstances).toHaveLength(3);
+        expect(spotifyPlayerInstances[1]?.disconnect).toHaveBeenCalledOnce();
+        expect(activeDeviceId).toBe('atlas-browser-device-3');
+    });
+
     it('reconnects once when a previously confirmed device becomes stale between tracks', async () => {
         installSpotifySdkMock();
         const firstUri = 'spotify:track:confirmed-device';

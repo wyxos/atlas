@@ -411,8 +411,9 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
     let currentAccessToken = '';
     let targetVolume = clampSpotifyVolume(options.initialVolume ?? 0.7);
     let hasConfirmedPlayback = false;
+    let hasConfirmedPlaybackInSession = false;
 
-    function destroyPlayer(expectedPlayer?: SpotifyPlayer): void {
+    function destroyPlayer(expectedPlayer?: SpotifyPlayer, resetSession = false): void {
         if (expectedPlayer && player !== expectedPlayer) { return; }
 
         const playerToDisconnect = player;
@@ -420,6 +421,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
         deviceId = null;
         readyPromise = null;
         hasConfirmedPlayback = false;
+        if (resetSession) { hasConfirmedPlaybackInSession = false; }
         playerToDisconnect?.disconnect();
     }
 
@@ -504,6 +506,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
 
         return !isSpotifyDeviceNotFoundError(error)
             || hasConfirmedPlayback
+            || hasConfirmedPlaybackInSession
             || player === null;
     }
 
@@ -523,6 +526,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
 
         const snapshot = await waitForAtlasPlayback(token, targetDeviceId, uri, positionMs, options);
         hasConfirmedPlayback = true;
+        hasConfirmedPlaybackInSession = true;
 
         return snapshot;
     }
@@ -546,7 +550,7 @@ export function createSpotifyPlaybackController(options: SpotifyPlaybackOptions 
             return apiPlaybackToSnapshot(await currentSpotifyPlayback(currentAccessToken), deviceId);
         },
         destroy(): void {
-            destroyPlayer();
+            destroyPlayer(undefined, true);
         },
         async pause(): Promise<void> {
             if (!player) {
