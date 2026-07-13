@@ -30,7 +30,7 @@ export function useSpotifyPlaybackNotifications() {
 
         toast.info('Reconnecting to Spotify…', {
             id: SPOTIFY_RECOVERY_TOAST_ID,
-            description: 'Restoring the browser player after this tab was idle.',
+            description: 'Restoring the browser player after Spotify lost the active device.',
         });
     }
 

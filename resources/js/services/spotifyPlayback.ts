@@ -3,7 +3,6 @@ import {
     apiPlaybackToSnapshot,
     assertSpotifyPlaybackCurrent,
     currentSpotifyPlayback,
-    delay,
     fetchAccessToken,
     isSpotifyDeviceAvailable,
     SpotifyPlaybackAuthenticationError,
@@ -70,8 +69,6 @@ type SpotifyPlaybackOptions = {
 export type SpotifyPlaybackController = ReturnType<typeof createSpotifyPlaybackController>;
 
 const SPOTIFY_SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
-const SPOTIFY_DEVICE_RECONNECT_DELAY_MS = 500;
-
 let sdkLoadPromise: Promise<void> | null = null;
 
 export function isSpotifyPlaybackSuperseded(error: unknown): boolean {
@@ -268,24 +265,7 @@ export function createSpotifyPlaybackController(controllerOptions: SpotifyPlayba
         return connection;
     }
 
-    async function reconnectPlayer(accessToken: string, options: SpotifyPlayOptions): Promise<string> {
-        const sdkPlayer = player;
-
-        if (!sdkPlayer) {
-            return connectPlayer(accessToken);
-        }
-
-        sdkPlayer.disconnect();
-        deviceId = null;
-        activatedDeviceId = null;
-        rejectReadyPromise(new SpotifyPlaybackSupersededError());
-        await delay(SPOTIFY_DEVICE_RECONNECT_DELAY_MS, options);
-        assertSpotifyPlaybackCurrent(options);
-
-        return connectPlayer(accessToken);
-    }
-
-    async function reconnectIfDeviceRegistrationExpired(
+    async function prepareExpiredDeviceRegistrationRetry(
         token: string,
         options: SpotifyPlayOptions,
         beginRecovery: () => void,
@@ -305,7 +285,7 @@ export function createSpotifyPlaybackController(controllerOptions: SpotifyPlayba
 
         shouldVerifyDeviceRegistration = false;
         beginRecovery();
-        await reconnectPlayer(token, options);
+        activatedDeviceId = null;
 
         return true;
     }
@@ -376,7 +356,7 @@ export function createSpotifyPlaybackController(controllerOptions: SpotifyPlayba
             assertSpotifyPlaybackCurrent(options);
             const positionMs = Math.max(0, Math.round(positionSeconds * 1000));
             let isRecovering = false;
-            let reconnectedBeforeStart = false;
+            let preparedRecoveryBeforeStart = false;
             const beginRecovery = (): void => {
                 if (isRecovering) {
                     return;
@@ -387,7 +367,7 @@ export function createSpotifyPlaybackController(controllerOptions: SpotifyPlayba
             };
 
             try {
-                reconnectedBeforeStart = await reconnectIfDeviceRegistrationExpired(token, options, beginRecovery);
+                preparedRecoveryBeforeStart = await prepareExpiredDeviceRegistrationRetry(token, options, beginRecovery);
 
                 return await startPlayback(token, uri, positionMs, options);
             } catch (error) {
@@ -395,14 +375,14 @@ export function createSpotifyPlaybackController(controllerOptions: SpotifyPlayba
                     isSpotifyPlaybackSuperseded(error)
                     || isSpotifyPlaybackAuthenticationError(error)
                     || error instanceof SpotifyPlaybackOwnershipError
-                    || reconnectedBeforeStart
+                    || preparedRecoveryBeforeStart
+                    || activatedDeviceId === null
                 ) {
                     throw error;
                 }
 
                 beginRecovery();
                 activatedDeviceId = null;
-                await reconnectPlayer(token, options);
                 assertSpotifyPlaybackCurrent(options);
 
                 return await startPlayback(token, uri, positionMs, options);

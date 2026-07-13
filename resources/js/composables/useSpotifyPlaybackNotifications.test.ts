@@ -24,7 +24,7 @@ describe('useSpotifyPlaybackNotifications', () => {
 
         expect(mockToast.info).toHaveBeenCalledWith('Reconnecting to Spotify…', {
             id: 'spotify-playback-recovery',
-            description: 'Restoring the browser player after this tab was idle.',
+            description: 'Restoring the browser player after Spotify lost the active device.',
         });
         expect(mockToast.dismiss).toHaveBeenCalledWith('spotify-playback-recovery');
     });
