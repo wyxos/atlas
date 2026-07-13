@@ -7,6 +7,7 @@ import {
     type SpotifyPlaybackController,
     type SpotifyPlaybackSnapshot,
 } from '@/services/spotifyPlayback';
+import { registerSpotifyPlaybackLifecycle } from '@/services/spotifyPlaybackLifecycle';
 import { canTrackOwnSpotifyPlayback, isSpotifyAudioTrack, type PlaybackEngine, spotifyStartConfirmationSnapshot } from '@/lib/audioPlaybackOwnership';
 
 const SPOTIFY_POLL_INTERVAL_MS = 750;
@@ -19,7 +20,7 @@ const SPOTIFY_START_POSITION_TOLERANCE_SECONDS = 3;
 const SPOTIFY_POLL_START_ADVANCE_SECONDS = 0.25;
 const SPOTIFY_START_STALE_GUARD_SECONDS = 6;
 type GlobalAudioPlayer = ReturnType<typeof useGlobalAudioPlayer>;
-type AudioPlaybackEngineOptions = { isPlaybackOwner?: Ref<boolean> | ComputedRef<boolean>; onSpotifyAuthenticationError?: (message: string) => void; onTrackEnded?: (trackId: number) => void; volume?: Ref<number> };
+type AudioPlaybackEngineOptions = { isPlaybackOwner?: Ref<boolean> | ComputedRef<boolean>; onSpotifyAuthenticationError?: (message: string) => void; onSpotifyPlaybackError?: () => void; onSpotifyRecoveryStateChange?: (isRecovering: boolean) => void; onTrackEnded?: (trackId: number) => void; volume?: Ref<number> };
 type SpotifyPendingStart = { correctedStalePosition: boolean; observedFreshPlaybackAt: number | null; playConfirmedAt: number | null; positionSeconds: number; requestedAt: number; uri: string };
 export function useAudioPlaybackEngines(
     audioPlayer: GlobalAudioPlayer,
@@ -46,6 +47,7 @@ export function useAudioPlaybackEngines(
         spotifyPlayback ??= createSpotifyPlaybackController({
             initialVolume: options.volume?.value ?? 0.7,
             onError: (message) => console.error('Spotify playback error:', message),
+            onRecoveryStateChange: options.onSpotifyRecoveryStateChange,
             onStateChange: (snapshot) => handleSpotifyStateChange(snapshot, 'event'),
         });
 
@@ -98,9 +100,6 @@ export function useAudioPlaybackEngines(
     }
     async function stopSpotifyPlaybackIfCurrentTrackCannotOwnIt(controller: SpotifyPlaybackController | null = spotifyPlayback): Promise<void> {
         if (!canTrackOwnSpotifyPlayback(audioPlayer.isPlaying.value, audioPlayer.currentTrack.value)) { await stopSpotifyPlayback(controller, { destroy: true }); }
-    }
-    function handlePageHide(): void {
-        void stopSpotifyPlayback(spotifyPlayback, { destroy: true });
     }
     function playbackPositionFromPlayer(): number {
         const storedPosition = audioPlayer.playbackPositionSeconds.value;
@@ -498,6 +497,7 @@ export function useAudioPlaybackEngines(
                 }
 
                 console.error('Failed to start Spotify playback:', error);
+                options.onSpotifyPlaybackError?.();
                 audioPlayer.pause();
             }
 
@@ -571,11 +571,14 @@ export function useAudioPlaybackEngines(
     }
 
     function teardown(): void {
-        window.removeEventListener('pagehide', handlePageHide);
+        unregisterSpotifyPlaybackLifecycle();
         void stopAllPlaybackEngines({ destroySpotify: true });
     }
 
-    window.addEventListener('pagehide', handlePageHide);
+    const unregisterSpotifyPlaybackLifecycle = registerSpotifyPlaybackLifecycle({
+        onPageHide: () => void stopSpotifyPlayback(spotifyPlayback, { destroy: true }),
+        onTabHidden: () => spotifyPlayback?.markDeviceRegistrationStale(),
+    });
 
     return {
         activateSpotifyElement,

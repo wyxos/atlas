@@ -165,6 +165,10 @@ async function currentSpotifyDevices(token: string): Promise<SpotifyApiDevice[]>
     return Array.isArray(response?.devices) ? response.devices : [];
 }
 
+export async function isSpotifyDeviceAvailable(token: string, deviceId: string): Promise<boolean> {
+    return (await currentSpotifyDevices(token)).some(({ id }) => id === deviceId);
+}
+
 async function pauseSpotifyDevice(token: string, deviceId: string): Promise<void> {
     await spotifyApiRequest(`/me/player/pause?device_id=${encodeURIComponent(deviceId)}`, token, { method: 'PUT' });
 }

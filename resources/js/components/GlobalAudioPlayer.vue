@@ -23,6 +23,7 @@ import { useAudioQueueDetails } from '@/composables/useAudioQueueDetails';
 import { useAudioPlaybackStatsRecorder } from '@/composables/useAudioPlaybackStatsRecorder';
 import { useGlobalAudioPlaybackOwnership } from '@/composables/useGlobalAudioPlaybackOwnership';
 import { useGlobalAudioPlayer } from '@/composables/useGlobalAudioPlayer';
+import { useSpotifyPlaybackNotifications } from '@/composables/useSpotifyPlaybackNotifications';
 import type { ReactionType } from '@/types/reaction';
 
 const audioPlayer = useGlobalAudioPlayer();
@@ -37,6 +38,7 @@ const isQueueSheetOpen = audioPlayer.isQueueSheetOpen;
 const toast = useToast();
 const { handleQueueVisibleItemsChange } = useAudioQueueDetails(audioPlayer);
 const { handleTrackNaturallyEnded } = useAudioPlaybackStatsRecorder(audioPlayer);
+const { notifySpotifyAuthenticationError, notifySpotifyPlaybackError, notifySpotifyRecoveryStateChange } = useSpotifyPlaybackNotifications();
 
 const MOBILE_ACTIONS_SWIPE_THRESHOLD = 28;
 let startCurrentPlayback: () => Promise<void> = async () => {};
@@ -104,6 +106,8 @@ const repeatButtonLabel = computed(() => {
 const playbackEngines = useAudioPlaybackEngines(audioPlayer, audioRef, currentTime, mediaDuration, durationSeconds, {
     isPlaybackOwner: playbackSession.canOutputAudio,
     onSpotifyAuthenticationError: notifySpotifyAuthenticationError,
+    onSpotifyPlaybackError: notifySpotifyPlaybackError,
+    onSpotifyRecoveryStateChange: notifySpotifyRecoveryStateChange,
     onTrackEnded: handleTrackNaturallyEnded,
     volume: playbackVolume,
 });
@@ -151,14 +155,6 @@ useAudioMediaSession({
 
 const controlButtonClass = 'player-control-button inline-flex size-12 items-center justify-center rounded-full text-blue-slate-300 transition-colors enabled:cursor-pointer enabled:hover:bg-smart-blue-700 enabled:hover:text-white disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-smart-blue-500 2xl:size-14';
 const reactionButtonClass = 'inline-flex items-center justify-center rounded p-1.5 transition-colors enabled:cursor-pointer disabled:cursor-not-allowed disabled:text-blue-slate-500 disabled:opacity-50';
-
-function notifySpotifyAuthenticationError(message: string): void {
-    toast.error(message || 'Spotify is not connected for this account.', {
-        id: 'spotify-playback-authentication-error',
-        description: 'Connect or refresh Spotify in Settings, then try playback again.',
-        duration: 8000,
-    });
-}
 
 function formatSeconds(value: number): string {
     const seconds = Math.max(0, Math.floor(value));

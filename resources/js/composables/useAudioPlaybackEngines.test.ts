@@ -7,6 +7,7 @@ const spotifyPlaybackMocks = vi.hoisted(() => ({
     authenticationError: new Error('Spotify is not connected for this account.'),
     currentState: vi.fn().mockResolvedValue(null),
     destroy: vi.fn(),
+    markDeviceRegistrationStale: vi.fn(),
     options: null as {
         onStateChange?: (snapshot: {
             durationMs: number;
@@ -478,6 +479,64 @@ describe('useAudioPlaybackEngines', () => {
             expect(notifySpotifyAuthenticationError).toHaveBeenCalledWith('Spotify is not connected for this account.');
             expect(player.isPlaying.value).toBe(false);
         } finally {
+            playbackEngines.teardown();
+        }
+    });
+
+    it('marks a connected Spotify device stale when the tab becomes hidden', async () => {
+        const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const visibilityState = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(91, { source: 'spotify', spotifyUri }),
+        ], 91);
+
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(player, ref(null), currentTime, mediaDuration, durationSeconds);
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+            document.dispatchEvent(new Event('visibilitychange'));
+
+            expect(spotifyPlaybackMocks.markDeviceRegistrationStale).toHaveBeenCalledOnce();
+        } finally {
+            visibilityState.mockRestore();
+            playbackEngines.teardown();
+        }
+    });
+
+    it('reports a retryable Spotify playback failure and reverts playback state', async () => {
+        const spotifyUri = 'spotify:track:1A2B3C4D5E6F7G8H9I0J1K';
+        const notifySpotifyPlaybackError = vi.fn();
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        spotifyPlaybackMocks.play.mockRejectedValueOnce(new Error('Device not found'));
+
+        const player = useGlobalAudioPlayer();
+        player.queueAndPlay([
+            testTrack(91, { source: 'spotify', spotifyUri }),
+        ], 91);
+
+        const currentTime = ref(0);
+        const mediaDuration = ref(180);
+        const durationSeconds = computed(() => mediaDuration.value || (player.currentTrack.value?.durationSeconds ?? 0));
+        const playbackEngines = useAudioPlaybackEngines(
+            player,
+            ref(null),
+            currentTime,
+            mediaDuration,
+            durationSeconds,
+            { onSpotifyPlaybackError: notifySpotifyPlaybackError },
+        );
+
+        try {
+            await playbackEngines.startCurrentPlayback();
+
+            expect(notifySpotifyPlaybackError).toHaveBeenCalledOnce();
+            expect(player.isPlaying.value).toBe(false);
+        } finally {
+            consoleError.mockRestore();
             playbackEngines.teardown();
         }
     });
