@@ -13,6 +13,7 @@ use App\Services\Downloads\DownloadTransferExecutionLock;
 use App\Services\Downloads\DownloadTransferGeneration;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRequestOptions;
+use App\Services\Downloads\DownloadTransferUrlRefreshService;
 use App\Services\Downloads\NativeFallbackMediaValidator;
 use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
 use Illuminate\Bus\Batch;
@@ -49,11 +50,13 @@ class PrepareDownloadTransfer implements ShouldQueue
         ?DownloadTransferExecutionLock $executionLock = null,
         ?NativeFallbackMediaValidator $mediaValidator = null,
         ?DownloadTransferChunkPlanner $chunkPlanner = null,
+        ?DownloadTransferUrlRefreshService $urlRefreshService = null,
     ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
         $executionLock ??= app(DownloadTransferExecutionLock::class);
         $mediaValidator ??= app(NativeFallbackMediaValidator::class);
         $chunkPlanner ??= app(DownloadTransferChunkPlanner::class);
+        $urlRefreshService ??= app(DownloadTransferUrlRefreshService::class);
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
@@ -66,6 +69,10 @@ class PrepareDownloadTransfer implements ShouldQueue
                 DownloadTransferStatus::QUEUED,
                 DownloadTransferStatus::PREPARING,
             ])) {
+                return;
+            }
+
+            if ($urlRefreshService->refreshBeforeRequest($transfer)) {
                 return;
             }
 
@@ -136,6 +143,11 @@ class PrepareDownloadTransfer implements ShouldQueue
             if (! $transfer) {
                 return;
             }
+            if (in_array($head->status(), [401, 403], true)
+                && $urlRefreshService->refreshAfterUnauthorized($transfer)) {
+                return;
+            }
+
             $isNativeYtDlpFallback = YtDlpUnsupportedUrlFallback::isNativeTransfer($transfer);
             $contentType = $head->header('Content-Type');
             $contentLength = $head->header('Content-Length');

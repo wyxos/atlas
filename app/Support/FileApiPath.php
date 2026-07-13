@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\SourceMediaVariant;
+
 final class FileApiPath
 {
     public static function downloaded(int $fileId): string
@@ -27,6 +29,11 @@ final class FileApiPath
     public static function serve(int $fileId): string
     {
         return "/api/files/{$fileId}/serve";
+    }
+
+    public static function sourceMedia(int $fileId, SourceMediaVariant $variant): string
+    {
+        return "/api/files/{$fileId}/source-media/{$variant->value}";
     }
 
     public static function icon(int $fileId): string

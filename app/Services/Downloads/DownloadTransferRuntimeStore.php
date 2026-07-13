@@ -22,6 +22,9 @@ final class DownloadTransferRuntimeStore
      *         host_only: bool,
      *         expires_at: int|null
      *     }>,
+     *     user_id?: int,
+     *     provider_url_expires_at?: int,
+     *     provider_url_refresh_attempted?: bool,
      *     user_agent?: string
      * }  $context
      */
@@ -47,6 +50,9 @@ final class DownloadTransferRuntimeStore
      *         host_only: bool,
      *         expires_at: int|null
      *     }>,
+     *     user_id?: int,
+     *     provider_url_expires_at?: int,
+     *     provider_url_refresh_attempted?: bool,
      *     user_agent?: string
      * }
      */
@@ -75,6 +81,9 @@ final class DownloadTransferRuntimeStore
      *         host_only: bool,
      *         expires_at: int|null
      *     }>,
+     *     user_id?: int,
+     *     provider_url_expires_at?: int,
+     *     provider_url_refresh_attempted?: bool,
      *     user_agent?: string
      * }
      */
@@ -85,6 +94,20 @@ final class DownloadTransferRuntimeStore
         $cookies = $this->normalizeCookies($context['cookies'] ?? null);
         if ($cookies !== []) {
             $normalized['cookies'] = $cookies;
+        }
+
+        $userId = $context['user_id'] ?? null;
+        if (is_numeric($userId) && (int) $userId > 0) {
+            $normalized['user_id'] = (int) $userId;
+        }
+
+        $providerUrlExpiresAt = $context['provider_url_expires_at'] ?? null;
+        if (is_numeric($providerUrlExpiresAt) && (int) $providerUrlExpiresAt > 0) {
+            $normalized['provider_url_expires_at'] = (int) $providerUrlExpiresAt;
+        }
+
+        if (array_key_exists('provider_url_refresh_attempted', $context)) {
+            $normalized['provider_url_refresh_attempted'] = $context['provider_url_refresh_attempted'] === true;
         }
 
         $userAgent = trim((string) ($context['user_agent'] ?? ''));

@@ -44,7 +44,7 @@ class DownloadTransferActionsController extends Controller
         ]);
     }
 
-    public function resume(DownloadTransfer $downloadTransfer): JsonResponse
+    public function resume(Request $request, DownloadTransfer $downloadTransfer): JsonResponse
     {
         $downloadTransfer->loadMissing('file');
 
@@ -58,7 +58,7 @@ class DownloadTransferActionsController extends Controller
 
         $releasedDomain = $downloadTransfer->domain;
         $resumed = $downloadTransfer->status === DownloadTransferStatus::PAUSED
-            ? $this->actionTransition->resumeFromScratch($downloadTransfer)
+            ? $this->actionTransition->resumeFromScratch($downloadTransfer, ['user_id' => (int) $request->user()->id])
             : $this->actionTransition->resumeFailed($downloadTransfer);
         if (! $resumed) {
             return response()->json(['message' => 'Download is no longer resumable.'], 409);
@@ -171,7 +171,7 @@ class DownloadTransferActionsController extends Controller
         ]);
     }
 
-    public function restart(DownloadTransfer $downloadTransfer): JsonResponse
+    public function restart(Request $request, DownloadTransfer $downloadTransfer): JsonResponse
     {
         if (! in_array($downloadTransfer->status, [
             DownloadTransferStatus::FAILED,
@@ -184,7 +184,7 @@ class DownloadTransferActionsController extends Controller
         }
 
         $releasedDomain = $downloadTransfer->domain;
-        if (! $this->actionTransition->restart($downloadTransfer)) {
+        if (! $this->actionTransition->restart($downloadTransfer, ['user_id' => (int) $request->user()->id])) {
             return response()->json(['message' => 'Download is no longer restartable.'], 409);
         }
 

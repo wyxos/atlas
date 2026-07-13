@@ -23,8 +23,49 @@ type UseTabContentNotFoundReconciliationOptions = {
 
 export function useTabContentNotFoundReconciliation(options: UseTabContentNotFoundReconciliationOptions) {
     const previewFailureReportInFlightIds = new Set<number>();
+    const dynamicMediaRefreshAttemptedIds = new Set<number>();
 
     let echoChannelName: string | null = null;
+    let dynamicMediaRetrySequence = 0;
+
+    function forceRefreshUrl(value: unknown, retry: number): string | null {
+        if (typeof value !== 'string' || value.trim() === '') {
+            return null;
+        }
+
+        try {
+            const url = new URL(value, window.location.origin);
+            url.searchParams.set('refresh', '1');
+            url.searchParams.set('retry', retry.toString());
+
+            return url.origin === window.location.origin
+                ? `${url.pathname}${url.search}${url.hash}`
+                : url.toString();
+        } catch {
+            return null;
+        }
+    }
+
+    function retryDynamicSourceMedia(item: FeedItem): boolean {
+        if (item.capabilities?.dynamic_source_media !== true
+            || dynamicMediaRefreshAttemptedIds.has(item.id)) {
+            return false;
+        }
+
+        dynamicMediaRefreshAttemptedIds.add(item.id);
+        dynamicMediaRetrySequence += 1;
+
+        for (const key of ['src', 'preview', 'original', 'originalUrl', 'thumbnail'] as const) {
+            const refreshedUrl = forceRefreshUrl(item[key], dynamicMediaRetrySequence);
+            if (refreshedUrl !== null) {
+                item[key] = refreshedUrl;
+            }
+        }
+
+        triggerRef(options.items);
+
+        return true;
+    }
 
     function isCivitAiMediaUrl(value: unknown): boolean {
         if (typeof value !== 'string' || value.trim() === '') {
@@ -172,8 +213,22 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
 
     function onBatchFailures(payloads: Array<{ item: FeedItem; error: unknown }>): void {
         for (const { item } of payloads) {
+            if (retryDynamicSourceMedia(item)) {
+                continue;
+            }
+
             reportItem(item);
         }
+    }
+
+    function onBatchPreloaded(items: FeedItem[]): void {
+        for (const item of items) {
+            dynamicMediaRefreshAttemptedIds.delete(item.id);
+        }
+    }
+
+    function reset(): void {
+        dynamicMediaRefreshAttemptedIds.clear();
     }
 
     onMounted(() => {
@@ -186,6 +241,8 @@ export function useTabContentNotFoundReconciliation(options: UseTabContentNotFou
 
     return {
         onBatchFailures,
+        onBatchPreloaded,
         reportItem,
+        reset,
     };
 }

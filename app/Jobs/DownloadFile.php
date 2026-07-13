@@ -13,6 +13,7 @@ use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\DownloadTransferTempDirectory;
 use App\Services\Downloads\DownloadUrlResolver;
+use App\Services\Downloads\ResolvedDownloadUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -39,6 +40,8 @@ class DownloadFile implements ShouldQueue
      *         expires_at: int|null
      *     }>,
      *     user_id?: int,
+     *     provider_url_expires_at?: int,
+     *     provider_url_refresh_attempted?: bool,
      *     user_agent?: string
      * }  $runtimeContext
      */
@@ -86,6 +89,7 @@ class DownloadFile implements ShouldQueue
             PumpDomainDownloads::dispatch((string) $existing->domain);
         } else {
             $resolvedDownload = $downloadUrlResolver->resolve($file, $this->runtimeContext);
+            $this->rememberResolvedDownloadUrl($resolvedDownload);
             $downloadUrl = $resolvedDownload->url;
             $domain = $this->extractDomain($downloadUrl) ?? 'unknown';
             $failedTransfer = $this->matchingFailedTransfer($file, $downloadUrl);
@@ -232,14 +236,29 @@ class DownloadFile implements ShouldQueue
         $runtimeStore->putForTransfer($transferId, $this->runtimeContext);
     }
 
+    private function rememberResolvedDownloadUrl(ResolvedDownloadUrl $resolvedDownload): void
+    {
+        if (! $resolvedDownload->providerResolved) {
+            return;
+        }
+
+        $this->runtimeContext['provider_url_refresh_attempted'] = false;
+        if ($resolvedDownload->expiresAt !== null) {
+            $this->runtimeContext['provider_url_expires_at'] = $resolvedDownload->expiresAt->timestamp;
+        } else {
+            unset($this->runtimeContext['provider_url_expires_at']);
+        }
+    }
+
     private function maybeRefreshRuntimeContext(DownloadTransferRuntimeStore $runtimeStore, DownloadTransfer $transfer): void
     {
         if ($this->runtimeContext === []) {
             return;
         }
 
-        if ($this->shouldReplaceRuntimeContext($transfer) || $runtimeStore->getForTransfer($transfer->id) === []) {
-            $runtimeStore->putForTransfer($transfer->id, $this->runtimeContext);
+        $storedContext = $runtimeStore->getForTransfer($transfer->id);
+        if ($this->shouldReplaceRuntimeContext($transfer) || $storedContext === []) {
+            $runtimeStore->putForTransfer($transfer->id, [...$storedContext, ...$this->runtimeContext]);
         }
     }
 

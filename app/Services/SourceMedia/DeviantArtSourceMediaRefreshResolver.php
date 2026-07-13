@@ -2,6 +2,8 @@
 
 namespace App\Services\SourceMedia;
 
+use App\Enums\SourceMediaUrlPolicy;
+use App\Enums\SourceMediaVariant;
 use App\Models\File;
 use App\Models\User;
 use App\Services\DeviantArt\DeviantArtOAuthService;
@@ -11,6 +13,7 @@ use App\Support\DeviantArtMediaResolver;
 use App\Support\DeviantArtPageUrl;
 use App\Support\FileMimeType;
 use App\Support\FileTypeDetector;
+use Carbon\CarbonImmutable;
 
 final class DeviantArtSourceMediaRefreshResolver implements SourceMediaRefreshResolver
 {
@@ -24,6 +27,16 @@ final class DeviantArtSourceMediaRefreshResolver implements SourceMediaRefreshRe
     {
         return strtolower(trim((string) $file->source)) === DeviantArtImages::SOURCE
             && $this->deviationId($file) !== null;
+    }
+
+    public function mediaUrlPolicy(File $file): SourceMediaUrlPolicy
+    {
+        return SourceMediaUrlPolicy::Expiring;
+    }
+
+    public function mediaUrlExpiresAt(File $file, SourceMediaVariant $variant): ?CarbonImmutable
+    {
+        return self::expiresAt($variant->currentUrl($file));
     }
 
     public function resolve(File $file, User $user): ?ResolvedSourceMedia
@@ -62,12 +75,56 @@ final class DeviantArtSourceMediaRefreshResolver implements SourceMediaRefreshRe
         return new ResolvedSourceMedia(
             url: $media['url'],
             previewUrl: $media['preview_url'],
+            urlExpiresAt: self::expiresAt($media['url']),
+            previewUrlExpiresAt: self::expiresAt($media['preview_url']),
             size: $media['filesize'],
             ext: FileTypeDetector::extensionFromUrl($typeProbe),
             mimeType: FileMimeType::canonicalize(FileTypeDetector::mimeFromUrl($typeProbe)),
             listingMetadata: $listingMetadata,
             metadataPayload: DeviantArtMediaResolver::metadataPayload($payload, $media),
         );
+    }
+
+    private static function expiresAt(?string $url): ?CarbonImmutable
+    {
+        if (! is_string($url) || trim($url) === '') {
+            return null;
+        }
+
+        $queryString = parse_url($url, PHP_URL_QUERY);
+        if (! is_string($queryString) || $queryString === '') {
+            return null;
+        }
+
+        parse_str($queryString, $query);
+        $token = $query['token'] ?? null;
+        if (! is_string($token)) {
+            return null;
+        }
+
+        $segments = explode('.', $token);
+        if (count($segments) < 2) {
+            return null;
+        }
+
+        $payload = strtr($segments[1], '-_', '+/');
+        $remainder = strlen($payload) % 4;
+        if ($remainder !== 0) {
+            $payload .= str_repeat('=', 4 - $remainder);
+        }
+
+        $decoded = base64_decode($payload, true);
+        if (! is_string($decoded)) {
+            return null;
+        }
+
+        $claims = json_decode($decoded, true);
+        $expiresAt = is_array($claims) ? ($claims['exp'] ?? null) : null;
+        if (! is_numeric($expiresAt) || (int) $expiresAt <= 0) {
+            return null;
+        }
+
+        return CarbonImmutable::createFromTimestampUTC((int) $expiresAt);
     }
 
     private function deviationId(File $file): ?string

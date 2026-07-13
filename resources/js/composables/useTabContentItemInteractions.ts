@@ -335,13 +335,17 @@ export function useTabContentItemInteractions(options: UseTabContentItemInteract
     }
 
     const preloadHandlers = {
-        reset: resetPreloadedItems,
+        reset(): void {
+            resetPreloadedItems();
+            notFoundReconciliation.reset();
+        },
         isItemPreloaded,
         async onItemPreloaded(item: FeedItem): Promise<void> {
             await handleItemInViewAndLoaded(item);
         },
         onBatchPreloaded(batch: FeedItem[]): void {
             markItemsPreloaded(batch);
+            notFoundReconciliation.onBatchPreloaded(batch);
 
             for (const item of batch) {
                 void handleItemInViewAndLoaded(item);

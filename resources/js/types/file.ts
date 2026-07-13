@@ -33,6 +33,7 @@ export interface FileMetadata {
 
 export interface FileCapabilities {
     refresh_source_media: boolean;
+    dynamic_source_media: boolean;
     restore_listing_metadata?: boolean;
     restore_detail_metadata?: boolean;
     watch_source_and_refresh: boolean;
@@ -80,12 +81,14 @@ export interface File {
     description: string | null;
     url: string | null;
     file_url?: string | null;
+    source_media_url?: string | null;
     spotify_uri?: string | null;
     referrer_url: string | null;
     path: string | null;
     absolute_path: string | null;
     absolute_preview_path: string | null;
     preview_url: string | null;
+    source_media_preview_url?: string | null;
     cover_url: string | null;
     disk_url: string | null;
     preview_file_url: string | null;

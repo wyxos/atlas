@@ -148,6 +148,63 @@ describe('useTabContentItemInteractions', () => {
         expect(mockQueueBatchReaction).toHaveBeenCalledTimes(1);
     });
 
+    it('retries dynamic source media once after an asset error and resets after a successful load', () => {
+        const item = {
+            id: 42,
+            width: 500,
+            height: 500,
+            page: 1,
+            key: '1-42',
+            index: 0,
+            src: '/api/files/42/source-media/preview',
+            preview: '/api/files/42/source-media/preview',
+            original: '/api/files/42/source-media/original',
+            originalUrl: '/api/files/42/source-media/original',
+            thumbnail: '/api/files/42/source-media/preview',
+            capabilities: {
+                refresh_source_media: true,
+                dynamic_source_media: true,
+                watch_source_and_refresh: false,
+                unwatch_source_account: false,
+            },
+        } as FeedItem;
+        const items = shallowRef<FeedItem[]>([item]);
+        const incrementPreviewCount = vi.fn();
+        const interactions = useTabContentItemInteractions({
+            items,
+            loadedItems: ref(items.value),
+            tab: ref(null),
+            form: { isLocal: ref(false), data: { feed: 'online' } } as any,
+            masonry: ref(null),
+            fileViewer: ref(null),
+            itemPreview: {
+                incrementPreviewCount,
+                clearPreviewedItems: vi.fn(),
+                markPreviewedItems: vi.fn(),
+            },
+            onReaction: vi.fn(),
+            promptDownloadedReaction: vi.fn(),
+            clearHoveredContainer: vi.fn(),
+        });
+
+        interactions.preload.onBatchFailures([{ item, error: new Error('load failed') }]);
+        const firstRetryUrl = item.src;
+
+        expect(firstRetryUrl).toContain('refresh=1');
+        expect(firstRetryUrl).toContain('retry=1');
+        expect(item.original).toContain('refresh=1');
+
+        interactions.preload.onBatchFailures([{ item, error: new Error('still failed') }]);
+        expect(item.src).toBe(firstRetryUrl);
+
+        interactions.preload.onBatchPreloaded([item]);
+        interactions.preload.onBatchFailures([{ item, error: new Error('failed later') }]);
+
+        expect(item.src).toContain('retry=2');
+        expect(incrementPreviewCount).toHaveBeenCalledWith(42);
+        expect(window.axios.post).not.toHaveBeenCalledWith('/api/files/42/preview-failure');
+    });
+
     it('clears hover state when reacting to a hovered online item that is removed from view', async () => {
         const item = {
             id: 1,

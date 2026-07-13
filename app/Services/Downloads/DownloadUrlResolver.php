@@ -36,6 +36,17 @@ final class DownloadUrlResolver
         return new ResolvedDownloadUrl((string) $file->url);
     }
 
+    public function supportsProviderRefresh(File $file): bool
+    {
+        foreach ($this->resolvers() as $resolver) {
+            if ($resolver->supports($file)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @return list<SourceDownloadUrlResolver>
      */

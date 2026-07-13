@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\DeviantArt\DeviantArtOAuthService;
 use App\Services\DeviantArtImages;
 use App\Support\DeviantArtApiClient;
+use Carbon\CarbonImmutable;
 use Throwable;
 
 final class DeviantArtDownloadUrlResolver implements SourceDownloadUrlResolver
@@ -18,12 +19,13 @@ final class DeviantArtDownloadUrlResolver implements SourceDownloadUrlResolver
 
     public function supports(File $file): bool
     {
-        return strtolower(trim((string) $file->source)) === DeviantArtImages::SOURCE;
+        return strtolower(trim((string) $file->source)) === DeviantArtImages::SOURCE
+            && ! $this->isKnownUndownloadable($file);
     }
 
     public function resolve(File $file, array $runtimeContext = []): ?ResolvedDownloadUrl
     {
-        if (! $this->supports($file) || $this->isKnownUndownloadable($file)) {
+        if (! $this->supports($file)) {
             return null;
         }
 
@@ -58,7 +60,43 @@ final class DeviantArtDownloadUrlResolver implements SourceDownloadUrlResolver
             url: $url,
             filename: isset($payload['filename']) && is_string($payload['filename']) ? trim($payload['filename']) : null,
             filesize: isset($payload['filesize']) && is_numeric($payload['filesize']) ? (int) $payload['filesize'] : null,
+            expiresAt: $this->urlExpiry($url),
+            providerResolved: true,
         );
+    }
+
+    private function urlExpiry(string $url): ?CarbonImmutable
+    {
+        $query = parse_url($url, PHP_URL_QUERY);
+        if (! is_string($query) || $query === '') {
+            return null;
+        }
+
+        parse_str($query, $parameters);
+        $token = $parameters['token'] ?? null;
+        if (! is_string($token) || $token === '') {
+            return null;
+        }
+
+        $segments = explode('.', $token);
+        if (count($segments) < 2) {
+            return null;
+        }
+
+        $payload = strtr($segments[1], '-_', '+/');
+        $payload .= str_repeat('=', (4 - strlen($payload) % 4) % 4);
+        $decoded = base64_decode($payload, true);
+        if (! is_string($decoded)) {
+            return null;
+        }
+
+        $claims = json_decode($decoded, true);
+        $expiresAt = is_array($claims) ? ($claims['exp'] ?? null) : null;
+        if (! is_numeric($expiresAt) || (int) $expiresAt <= 0) {
+            return null;
+        }
+
+        return CarbonImmutable::createFromTimestampUTC((int) $expiresAt);
     }
 
     private function isKnownUndownloadable(File $file): bool

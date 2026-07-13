@@ -16,6 +16,7 @@ final class DownloadTransferActionTransition
         private readonly DownloadTransferExecutionLock $executionLock,
         private readonly DownloadTransferTempDirectory $tempDirectory,
         private readonly DownloadUrlResolver $downloadUrlResolver,
+        private readonly DownloadTransferRuntimeStore $runtimeStore,
     ) {}
 
     public function pause(DownloadTransfer $transfer): bool
@@ -49,18 +50,41 @@ final class DownloadTransferActionTransition
         });
     }
 
-    public function resumeFromScratch(DownloadTransfer $transfer): bool
+    /**
+     * @param  array<string, mixed>  $runtimeContext
+     */
+    public function resumeFromScratch(DownloadTransfer $transfer, array $runtimeContext = []): bool
     {
-        return $this->resetFromScratch($transfer, [DownloadTransferStatus::PAUSED]);
+        return $this->resetFromScratch($transfer, [DownloadTransferStatus::PAUSED], $runtimeContext);
     }
 
-    public function restart(DownloadTransfer $transfer): bool
+    /**
+     * @param  array<string, mixed>  $runtimeContext
+     */
+    public function restart(DownloadTransfer $transfer, array $runtimeContext = []): bool
     {
         return $this->resetFromScratch($transfer, [
             DownloadTransferStatus::FAILED,
             DownloadTransferStatus::CANCELED,
             DownloadTransferStatus::COMPLETED,
-        ]);
+        ], $runtimeContext);
+    }
+
+    /**
+     * @param  array<string, mixed>  $runtimeContext
+     */
+    public function refreshExpiredUrl(DownloadTransfer $transfer, array $runtimeContext): bool
+    {
+        return $this->resetFromScratch(
+            $transfer,
+            [
+                DownloadTransferStatus::QUEUED,
+                DownloadTransferStatus::PREPARING,
+                DownloadTransferStatus::DOWNLOADING,
+            ],
+            $runtimeContext,
+            requireProviderResolution: true,
+        );
     }
 
     public function resumeFailed(DownloadTransfer $transfer): bool
@@ -89,10 +113,31 @@ final class DownloadTransferActionTransition
 
     /**
      * @param  list<string>  $statuses
+     * @param  array<string, mixed>  $runtimeContext
      */
-    private function resetFromScratch(DownloadTransfer $transfer, array $statuses): bool
-    {
-        return $this->locked($transfer, $statuses, function (DownloadTransfer $current): void {
+    private function resetFromScratch(
+        DownloadTransfer $transfer,
+        array $statuses,
+        array $runtimeContext = [],
+        bool $requireProviderResolution = false,
+    ): bool {
+        $reset = false;
+        $updatedRuntimeContext = $runtimeContext;
+        $updated = $this->locked($transfer, $statuses, function (DownloadTransfer $current) use (
+            &$reset,
+            &$updatedRuntimeContext,
+            $runtimeContext,
+            $requireProviderResolution,
+        ): void {
+            $resolvedDownload = $current->file->url
+                ? $this->downloadUrlResolver->resolve($current->file, $runtimeContext)
+                : null;
+            $requiresProviderResolution = $requireProviderResolution
+                || $this->downloadUrlResolver->supportsProviderRefresh($current->file);
+            if ($requiresProviderResolution && ! $resolvedDownload?->providerResolved) {
+                return;
+            }
+
             $this->cancelBatch($current);
             $this->cleanupOwnedArtifacts($current);
             $updates = [
@@ -108,18 +153,38 @@ final class DownloadTransferActionTransition
                 'batch_id' => null,
                 'error' => null,
             ];
-            if ($current->file->url) {
-                $freshUrl = $this->downloadUrlResolver->resolve($current->file)->url;
+            if ($resolvedDownload !== null) {
+                $freshUrl = $resolvedDownload->url;
                 $updates['url'] = $freshUrl;
                 $host = parse_url($freshUrl, PHP_URL_HOST);
                 if (is_string($host) && $host !== '') {
                     $updates['domain'] = strtolower($host);
                 }
+
+                if ($resolvedDownload->providerResolved) {
+                    $updatedRuntimeContext['provider_url_refresh_attempted'] = (bool) ($runtimeContext['provider_url_refresh_attempted'] ?? false);
+                    if ($resolvedDownload->expiresAt !== null) {
+                        $updatedRuntimeContext['provider_url_expires_at'] = $resolvedDownload->expiresAt->timestamp;
+                    } else {
+                        unset($updatedRuntimeContext['provider_url_expires_at']);
+                    }
+                }
             }
 
             $current->forceFill($updates)->save();
             $current->file->forceFill(['download_progress' => 0])->save();
+            $reset = true;
         });
+
+        if (! $updated || ! $reset) {
+            return false;
+        }
+
+        if ($updatedRuntimeContext !== []) {
+            $this->runtimeStore->putForTransfer($transfer->id, $updatedRuntimeContext);
+        }
+
+        return true;
     }
 
     /**

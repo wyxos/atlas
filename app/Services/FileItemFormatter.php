@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\SourceMediaVariant;
 use App\Models\Container;
 use App\Models\File;
 use App\Services\Moderation\FilePromptResolver;
@@ -245,6 +246,7 @@ class FileItemFormatter
             $originalUrl = $file->url;
             $thumbnailUrl = $file->preview_url;
             $previewGeneration = FilePreviewGeneration::state($file);
+            $usesDynamicSourceMedia = $sourceMediaRefreshes->usesDynamicMediaUrls($file);
 
             $isStored = $file->path && ($file->downloaded || $file->imported_at !== null);
             if ($isStored) {
@@ -257,6 +259,11 @@ class FileItemFormatter
             } else {
                 if (! $originalUrl && $file->path) {
                     $originalUrl = FileApiPath::serve($file->id);
+                }
+
+                if ($usesDynamicSourceMedia && ($originalUrl || $thumbnailUrl)) {
+                    $originalUrl = FileApiPath::sourceMedia($file->id, SourceMediaVariant::Original);
+                    $thumbnailUrl = FileApiPath::sourceMedia($file->id, SourceMediaVariant::Preview);
                 }
             }
 
@@ -329,6 +336,7 @@ class FileItemFormatter
                 'source_access' => SourceAccessState::forFile($file),
                 'capabilities' => [
                     'refresh_source_media' => $sourceMediaRefreshes->supports($file),
+                    'dynamic_source_media' => $usesDynamicSourceMedia,
                     'watch_source_and_refresh' => $sourceWatchRefreshes->supports($file),
                     'unwatch_source_account' => $sourceWatchRefreshes->supportsUnwatch($file),
                 ],

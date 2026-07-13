@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Enums\ActionType;
+use App\Enums\SourceMediaVariant;
 use App\Enums\SourceMetadataRestoreTarget;
 use App\Models\File;
 use App\Services\FileModerationService;
@@ -80,9 +81,11 @@ class FileResource extends JsonResource
     private static function capabilities(File $file): array
     {
         $metadataRestore = app(SourceMetadataRestoreService::class);
+        $sourceMediaRefreshes = app(SourceMediaRefreshService::class);
 
         return [
-            'refresh_source_media' => app(SourceMediaRefreshService::class)->supports($file),
+            'refresh_source_media' => $sourceMediaRefreshes->supports($file),
+            'dynamic_source_media' => $sourceMediaRefreshes->usesDynamicMediaUrls($file),
             'restore_listing_metadata' => $metadataRestore->supports($file, SourceMetadataRestoreTarget::LISTING),
             'restore_detail_metadata' => $metadataRestore->supports($file, SourceMetadataRestoreTarget::DETAIL),
             'watch_source_and_refresh' => app(SourceWatchRefreshService::class)->supports($file),
@@ -164,6 +167,14 @@ class FileResource extends JsonResource
                 : $this->preview_url
         );
         $coverUrl = self::audioCoverUrl($this->resource);
+        $usesDynamicSourceMedia = app(SourceMediaRefreshService::class)
+            ->usesDynamicMediaUrls($this->resource);
+        $sourceMediaUrl = $usesDynamicSourceMedia && ($this->url || $this->preview_url)
+            ? FileApiPath::sourceMedia((int) $this->id, SourceMediaVariant::Original)
+            : null;
+        $sourceMediaPreviewUrl = $usesDynamicSourceMedia && ($this->preview_url || $this->url)
+            ? FileApiPath::sourceMedia((int) $this->id, SourceMediaVariant::Preview)
+            : null;
 
         $fileUrl = self::toRelativeInternalApiUrl($fileUrl, $request);
         $diskUrl = self::toRelativeInternalApiUrl($diskUrl, $request);
@@ -256,11 +267,13 @@ class FileResource extends JsonResource
             'description' => $this->description,
             'url' => $this->url,
             'file_url' => $fileUrl,
+            'source_media_url' => $sourceMediaUrl,
             'referrer_url' => $this->referrer_url,
             'path' => $this->path,
             'absolute_path' => $absolutePath,
             'absolute_preview_path' => $absolutePreviewPath,
             'preview_url' => $previewUrl,
+            'source_media_preview_url' => $sourceMediaPreviewUrl,
             'cover_url' => $coverUrl,
             'disk_url' => $diskUrl,
             'preview_file_url' => $previewFileUrl,

@@ -13,6 +13,7 @@ use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
 use App\Services\Downloads\DownloadTransferTempDirectory;
+use App\Services\Downloads\DownloadTransferUrlRefreshService;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\Downloads\NativeFallbackMediaValidator;
 use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
@@ -55,10 +56,12 @@ class DownloadTransferSingleStream implements ShouldQueue
         ?DownloadTransferRequestOptions $requestOptions = null,
         ?NativeFallbackMediaValidator $mediaValidator = null,
         ?DownloadTransferTempDirectory $tempDirectory = null,
+        ?DownloadTransferUrlRefreshService $urlRefreshService = null,
     ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
         $mediaValidator ??= app(NativeFallbackMediaValidator::class);
         $tempDirectory ??= app(DownloadTransferTempDirectory::class);
+        $urlRefreshService ??= app(DownloadTransferUrlRefreshService::class);
         $this->attempt ??= 0;
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
@@ -70,6 +73,10 @@ class DownloadTransferSingleStream implements ShouldQueue
 
         try {
             if (! DownloadTransferGeneration::matches($transfer, $this->attempt, [DownloadTransferStatus::DOWNLOADING])) {
+                return;
+            }
+
+            if ($urlRefreshService->refreshBeforeRequest($transfer)) {
                 return;
             }
 
@@ -87,6 +94,11 @@ class DownloadTransferSingleStream implements ShouldQueue
             }
 
             if (! $this->isValidResponse($response)) {
+                if (in_array($response->status(), [401, 403], true)
+                    && $urlRefreshService->refreshAfterUnauthorized($transfer)) {
+                    return;
+                }
+
                 if ($this->shouldRetryStatus($response->status())) {
                     $this->scheduleRetry($transfer, "Received HTTP {$response->status()} while downloading.");
 

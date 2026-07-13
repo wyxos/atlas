@@ -40,10 +40,11 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
     const mediaKind = resolveFileMediaKind(file);
     const isSpotifyAudio = mediaKind === 'audio'
         && (Boolean(file.spotify_uri) || file.source?.trim().toLowerCase() === 'spotify' || file.mime_type?.trim().toLowerCase() === 'audio/spotify');
-    const previewUrl = resolveFilePreviewUrl(file, mediaKind);
+    const previewUrl = file.source_media_preview_url
+        ?? resolveFilePreviewUrl(file, mediaKind);
     const originalUrl = isSpotifyAudio
         ? (file.file_url ?? file.disk_url ?? previewUrl)
-        : (file.file_url ?? file.disk_url ?? file.url ?? previewUrl);
+        : (file.source_media_url ?? file.file_url ?? file.disk_url ?? file.url ?? previewUrl);
 
     return {
         id: file.id,

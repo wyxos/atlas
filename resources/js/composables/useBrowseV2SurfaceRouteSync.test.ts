@@ -46,6 +46,12 @@ function createFile(overrides: Partial<File> = {}): File {
         listing_metadata: null,
         detail_metadata: null,
         containers: [],
+        capabilities: {
+            refresh_source_media: false,
+            dynamic_source_media: false,
+            watch_source_and_refresh: false,
+            unwatch_source_account: false,
+        },
         created_at: '2026-04-17T00:00:00Z',
         updated_at: '2026-04-17T00:00:00Z',
         ...overrides,
@@ -77,6 +83,24 @@ describe('mapBrowseV2FileToFeedItem', () => {
         expect(item.type).toBe('image');
         expect(item.preview).toBe('/api/audio/album-covers/501');
         expect(item.original).toBe('/api/files/111/downloaded');
+    });
+
+    it('prefers Atlas dynamic source media endpoints for standalone files', () => {
+        const item = mapBrowseV2FileToFeedItem(createFile({
+            source: 'deviantart.com',
+            source_media_url: '/api/files/111/source-media/original',
+            source_media_preview_url: '/api/files/111/source-media/preview',
+            capabilities: {
+                refresh_source_media: true,
+                dynamic_source_media: true,
+                watch_source_and_refresh: false,
+                unwatch_source_account: false,
+            },
+        }));
+
+        expect(item.preview).toBe('/api/files/111/source-media/preview');
+        expect(item.original).toBe('/api/files/111/source-media/original');
+        expect(item.capabilities?.dynamic_source_media).toBe(true);
     });
 
     it('keeps spotify standalone browse items on cover art instead of external page playback urls', () => {

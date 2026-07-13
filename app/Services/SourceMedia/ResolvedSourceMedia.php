@@ -2,6 +2,8 @@
 
 namespace App\Services\SourceMedia;
 
+use Carbon\CarbonImmutable;
+
 final class ResolvedSourceMedia
 {
     /**
@@ -11,6 +13,8 @@ final class ResolvedSourceMedia
     public function __construct(
         public readonly string $url,
         public readonly ?string $previewUrl = null,
+        public readonly ?CarbonImmutable $urlExpiresAt = null,
+        public readonly ?CarbonImmutable $previewUrlExpiresAt = null,
         public readonly ?int $size = null,
         public readonly ?string $ext = null,
         public readonly ?string $mimeType = null,

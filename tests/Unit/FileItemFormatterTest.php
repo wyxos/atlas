@@ -393,7 +393,30 @@ it('includes minimal source access state for DeviantArt watcher-gated library it
         ])
         ->and($items[0]['capabilities'])->toMatchArray([
             'refresh_source_media' => true,
+            'dynamic_source_media' => true,
             'watch_source_and_refresh' => true,
             'unwatch_source_account' => true,
-        ]);
+        ])
+        ->and($items[0]['src'])->toBe(FileApiPath::sourceMedia($file->id, \App\Enums\SourceMediaVariant::Preview))
+        ->and($items[0]['original'])->toBe(FileApiPath::sourceMedia($file->id, \App\Enums\SourceMediaVariant::Original));
+});
+
+it('keeps stored DeviantArt files on local media endpoints', function () {
+    $file = formatterFile([
+        'id' => 111,
+        'source' => 'deviantart.com',
+        'source_id' => '94985905-E28F-48B8-A2B1-E102D3233071',
+        'mime_type' => 'image/jpeg',
+        'url' => 'https://images.example.test/remote-original.jpg',
+        'preview_url' => 'https://images.example.test/remote-preview.jpg',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/local-original.jpg',
+        'preview_path' => 'downloads/aa/bb/preview/local-preview.jpg',
+    ]);
+
+    $items = FileItemFormatter::format([$file], 1);
+
+    expect($items[0]['src'])->toBe(FileApiPath::preview($file->id))
+        ->and($items[0]['original'])->toBe(FileApiPath::downloaded($file->id))
+        ->and($items[0]['capabilities']['dynamic_source_media'])->toBeFalse();
 });

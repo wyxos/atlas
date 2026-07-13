@@ -14,6 +14,7 @@ use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\DownloadTransferRequestOptions;
 use App\Services\Downloads\DownloadTransferRuntimeStore;
+use App\Services\Downloads\DownloadTransferUrlRefreshService;
 use App\Services\Downloads\NativeFallbackMediaValidator;
 use App\Services\Downloads\YtDlpUnsupportedUrlFallback;
 use Illuminate\Bus\Batchable;
@@ -58,9 +59,11 @@ class DownloadTransferChunk implements ShouldQueue
         DownloadTransferProgressBroadcaster $broadcaster,
         ?DownloadTransferRequestOptions $requestOptions = null,
         ?NativeFallbackMediaValidator $mediaValidator = null,
+        ?DownloadTransferUrlRefreshService $urlRefreshService = null,
     ): void {
         $requestOptions ??= app(DownloadTransferRequestOptions::class);
         $mediaValidator ??= app(NativeFallbackMediaValidator::class);
+        $urlRefreshService ??= app(DownloadTransferUrlRefreshService::class);
         $this->attempt ??= 0;
 
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
@@ -81,6 +84,10 @@ class DownloadTransferChunk implements ShouldQueue
             }
 
             if (! in_array($chunk->status, [DownloadChunkStatus::PENDING, DownloadChunkStatus::DOWNLOADING], true)) {
+                return;
+            }
+
+            if ($urlRefreshService->refreshBeforeRequest($transfer)) {
                 return;
             }
 
@@ -105,6 +112,11 @@ class DownloadTransferChunk implements ShouldQueue
             }
 
             if (! $this->isValidRangeResponse($response)) {
+                if (in_array($response->status(), [401, 403], true)
+                    && $urlRefreshService->refreshAfterUnauthorized($transfer)) {
+                    return;
+                }
+
                 if ($this->shouldRetryStatus($response->status())) {
                     $this->scheduleRetry($transfer, $chunk, "Received HTTP {$response->status()} for {$rangeHeader}.");
 
