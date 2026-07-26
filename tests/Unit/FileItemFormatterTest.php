@@ -102,6 +102,27 @@ it('uses preview route for downloaded video previews', function () {
     expect($item['original'])->toBe(FileApiPath::downloaded($file->id));
 });
 
+it('uses a generated streamable video as the viewer original', function () {
+    $file = formatterFile([
+        'id' => 112,
+        'mime_type' => 'video/mp4',
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/test.mp4',
+    ]);
+    $file->setRelation('metadata', new FileMetadata([
+        'payload' => [
+            'conversions' => [
+                'streamable_video' => 'downloads/aa/bb/conversions/test.mp4',
+            ],
+        ],
+    ]));
+
+    $items = FileItemFormatter::format([$file], 1);
+
+    expect($items[0]['original'])->toBe(FileApiPath::streamable($file->id))
+        ->and($items[0]['originalUrl'])->toBe(FileApiPath::streamable($file->id));
+});
+
 it('does not fall back to a remote preview url for downloaded videos with failed preview generation', function () {
     $file = formatterFile([
         'id' => 110,

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\File;
+use App\Models\FileMetadata;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -170,4 +171,37 @@ test('serve returns imported files from atlas storage', function () {
 
     $response->assertStatus(206);
     expect($response->streamedContent())->toBe('atlas-imp');
+});
+
+test('streamable video route serves the generated browser-compatible copy with range support', function () {
+    Storage::fake('atlas');
+
+    $admin = User::factory()->admin()->create();
+    $originalPath = 'downloads/aa/bb/original.mp4';
+    $streamablePath = 'downloads/aa/bb/conversions/original.mp4';
+    Storage::disk('atlas')->put($originalPath, 'original-video');
+    Storage::disk('atlas')->put($streamablePath, 'streamable-video');
+
+    $file = File::factory()->create([
+        'path' => $originalPath,
+        'downloaded' => true,
+        'mime_type' => 'video/mp4',
+    ]);
+    FileMetadata::query()->create([
+        'file_id' => $file->id,
+        'payload' => [
+            'conversions' => [
+                'streamable_video' => $streamablePath,
+            ],
+        ],
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->withHeader('Range', 'bytes=0-9')
+        ->get("/api/files/{$file->id}/streamable");
+
+    $response->assertStatus(206)
+        ->assertHeader('Content-Type', 'video/mp4')
+        ->assertHeader('Content-Range', 'bytes 0-9/16');
+    expect($response->streamedContent())->toBe('streamable');
 });

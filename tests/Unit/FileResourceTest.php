@@ -116,6 +116,26 @@ it('prefers downloaded and preview file routes for downloaded files', function (
         ->and($data['preview_url'])->toBe("/api/files/{$file->id}/preview");
 });
 
+it('uses a generated streamable video for playback while preserving the original download url', function () {
+    $file = resourceFile([
+        'downloaded' => true,
+        'path' => 'downloads/aa/bb/example.mp4',
+        'mime_type' => 'video/mp4',
+    ], new FileMetadata([
+        'payload' => [
+            'conversions' => [
+                'streamable_video' => 'downloads/aa/bb/conversions/example.mp4',
+            ],
+        ],
+    ]));
+
+    $data = FileResource::make($file)->toArray(Request::create('https://atlas.test/files'));
+
+    expect($data['disk_url'])->toBe(FileApiPath::downloaded($file->id))
+        ->and($data['streamable_url'])->toBe(FileApiPath::streamable($file->id))
+        ->and($data['file_url'])->toBe(FileApiPath::streamable($file->id));
+});
+
 it('includes an audio cover url when an album cover relation is loaded', function () {
     $file = resourceFile([
         'id' => 202,

@@ -6,6 +6,7 @@ use App\Enums\LibraryScanRunStatus;
 use App\Enums\MediaProcessorOperation;
 use App\Enums\MediaProcessorTaskStatus;
 use App\Events\FilePreviewAssetsUpdated;
+use App\Jobs\GenerateFileStreamableVideo;
 use App\Jobs\LibraryScans\CreateLibraryScanStreamableVideo;
 use App\Jobs\LibraryScans\NormalizeLibraryScanAudio;
 use App\Models\File;
@@ -18,6 +19,7 @@ use App\Services\LibraryScans\MediaProbeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -25,6 +27,7 @@ uses(RefreshDatabase::class);
 
 it('submits downloaded video preview work to the remote processor with managed hash paths', function () {
     configureRemoteMediaProcessor();
+    Queue::fake();
     Http::fake([
         'processor.test/tasks' => Http::response(['accepted' => true], 202),
     ]);
@@ -44,6 +47,7 @@ it('submits downloaded video preview work to the remote processor with managed h
 
     expect($updates)->toBe([])
         ->and(MediaProcessorTask::query()->count())->toBe(1);
+    Queue::assertPushed(GenerateFileStreamableVideo::class, fn (GenerateFileStreamableVideo $job): bool => $job->fileId === $file->id);
 
     $task = MediaProcessorTask::query()->firstOrFail();
     expect($task->operation)->toBe(MediaProcessorOperation::VIDEO_PREVIEW)

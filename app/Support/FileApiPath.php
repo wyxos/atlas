@@ -11,6 +11,11 @@ final class FileApiPath
         return "/api/files/{$fileId}/downloaded";
     }
 
+    public static function streamable(int $fileId): string
+    {
+        return "/api/files/{$fileId}/streamable";
+    }
+
     public static function preview(int $fileId): string
     {
         return "/api/files/{$fileId}/preview";

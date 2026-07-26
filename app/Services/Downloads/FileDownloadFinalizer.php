@@ -2,9 +2,11 @@
 
 namespace App\Services\Downloads;
 
+use App\Jobs\GenerateFileStreamableVideo;
 use App\Models\File;
 use App\Services\FilePreviewService;
 use App\Services\Library\LibraryIndexSyncDispatcher;
+use App\Services\MediaProcessing\RemoteMediaProcessorClient;
 use App\Services\MetricsService;
 use App\Support\AtlasStorage;
 use App\Support\FileMimeType;
@@ -18,6 +20,7 @@ class FileDownloadFinalizer
     public function __construct(
         private readonly FileDownloadPreviewAssetGenerator $previewAssetGenerator,
         private readonly AtlasStorage $appStorage,
+        private readonly RemoteMediaProcessorClient $remoteProcessor,
     ) {}
 
     /**
@@ -25,11 +28,13 @@ class FileDownloadFinalizer
      */
     public function generatePreviewAssets(File $file, bool $force = false): array
     {
-        if ($force) {
-            return $this->previewAssetGenerator->regeneratePreviewAssets($file);
-        }
+        $updates = $force
+            ? $this->previewAssetGenerator->regeneratePreviewAssets($file)
+            : $this->previewAssetGenerator->generatePreviewAssets($file);
 
-        return $this->previewAssetGenerator->generatePreviewAssets($file);
+        $this->queueStreamableVideoIfNeeded($file);
+
+        return $updates;
     }
 
     /**
@@ -37,7 +42,10 @@ class FileDownloadFinalizer
      */
     public function regenerateVideoPreviewAssets(File $file): array
     {
-        return $this->previewAssetGenerator->regenerateVideoPreviewAssets($file);
+        $updates = $this->previewAssetGenerator->regenerateVideoPreviewAssets($file);
+        $this->queueStreamableVideoIfNeeded($file);
+
+        return $updates;
     }
 
     public function finalize(
@@ -136,6 +144,7 @@ class FileDownloadFinalizer
         }
 
         $file->update($updates);
+        $this->queueStreamableVideoIfNeeded($file);
         app(LibraryIndexSyncDispatcher::class)->files([$file->id]);
 
         $metrics->applyDownload($file, $wasDownloaded, $hadPath, $wasBlacklisted);
@@ -146,6 +155,15 @@ class FileDownloadFinalizer
                 hadTerminalPreviewCount: $hasTerminalPreviewCount,
             );
         }
+    }
+
+    private function queueStreamableVideoIfNeeded(File $file): void
+    {
+        if (! $file->path || ! FileMimeType::isVideo($file->mime_type) || ! $this->remoteProcessor->enabled()) {
+            return;
+        }
+
+        GenerateFileStreamableVideo::dispatch((int) $file->id);
     }
 
     private function resolveStoredFilename(File $file, string $extension): string

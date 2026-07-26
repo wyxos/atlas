@@ -250,7 +250,10 @@ class FileItemFormatter
 
             $isStored = $file->path && ($file->downloaded || $file->imported_at !== null);
             if ($isStored) {
-                $originalUrl = $file->downloaded ? FileApiPath::downloaded($file->id) : FileApiPath::serve($file->id);
+                $streamablePath = data_get($metadata, 'conversions.streamable_video');
+                $originalUrl = is_string($streamablePath) && $streamablePath !== ''
+                    ? FileApiPath::streamable($file->id)
+                    : ($file->downloaded ? FileApiPath::downloaded($file->id) : FileApiPath::serve($file->id));
                 if ($file->preview_path) {
                     $thumbnailUrl = FileApiPath::preview($file->id);
                 } elseif (FilePreviewGeneration::shouldSuppressRemotePreviewUrl($file)) {

@@ -160,6 +160,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/api/files/{file}/corrupted', [\App\Http\Controllers\FilesController::class, 'markCorrupted'])->name('api.files.corrupted');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::get('/api/files/{file}/downloaded', [\App\Http\Controllers\FilesController::class, 'serveDownloaded'])->name('api.files.downloaded');
+    Route::get('/api/files/{file}/streamable', \App\Http\Controllers\FileStreamableVideoController::class)->name('api.files.streamable');
     Route::get('/api/files/{file}/preview', [\App\Http\Controllers\FilesController::class, 'servePreview'])->name('api.files.preview');
     Route::get('/api/files/{file}/icon', [\App\Http\Controllers\FilesController::class, 'serveIcon'])->name('api.files.icon');
     Route::get('/api/files/{file}/poster', [\App\Http\Controllers\FilesController::class, 'serveVideoPoster'])->name('api.files.poster');

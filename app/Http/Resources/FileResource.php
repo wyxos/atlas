@@ -145,11 +145,15 @@ class FileResource extends JsonResource
         if ($this->downloaded && $this->path) {
             $diskUrl = FileApiPath::downloaded($this->id);
         }
+        $streamablePath = data_get($payload, 'conversions.streamable_video');
+        $streamableUrl = is_string($streamablePath) && $streamablePath !== ''
+            ? FileApiPath::streamable($this->id)
+            : null;
         $previewFileUrl = $this->preview_path ? FileApiPath::preview($this->id) : null;
         $posterUrl = $this->poster_path ? FileApiPath::poster($this->id) : null;
 
-        // For downloaded files, always prefer the local downloaded stream URL.
-        $fileUrl = $diskUrl;
+        // Prefer a browser-compatible copy for playback while preserving the original download URL.
+        $fileUrl = $streamableUrl ?? $diskUrl;
         if (! $fileUrl) {
             if ($this->url && $spotifyUri === null) {
                 $fileUrl = $this->url;
@@ -178,6 +182,7 @@ class FileResource extends JsonResource
 
         $fileUrl = self::toRelativeInternalApiUrl($fileUrl, $request);
         $diskUrl = self::toRelativeInternalApiUrl($diskUrl, $request);
+        $streamableUrl = self::toRelativeInternalApiUrl($streamableUrl, $request);
         $previewUrl = self::toRelativeInternalApiUrl($previewUrl, $request);
         $previewFileUrl = self::toRelativeInternalApiUrl($previewFileUrl, $request);
         $posterUrl = self::toRelativeInternalApiUrl($posterUrl, $request);
@@ -276,6 +281,7 @@ class FileResource extends JsonResource
             'source_media_preview_url' => $sourceMediaPreviewUrl,
             'cover_url' => $coverUrl,
             'disk_url' => $diskUrl,
+            'streamable_url' => $streamableUrl,
             'preview_file_url' => $previewFileUrl,
             'poster_url' => $posterUrl,
             'preview_generation' => $previewGeneration,

@@ -4,6 +4,7 @@ use App\Models\File;
 use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\Downloads\FileDownloadPreviewAssetGenerator;
 use App\Services\Downloads\FileThumbnailMemoryGuard;
+use App\Services\MediaProcessing\RemoteMediaProcessorClient;
 use App\Support\AtlasStorage;
 use Tests\TestCase;
 
@@ -80,7 +81,11 @@ it('uses normal preview generation unless force is requested', function () {
         ->andReturn($updates);
     $generator->shouldReceive('regeneratePreviewAssets')->never();
 
-    $finalizer = new FileDownloadFinalizer($generator, app(AtlasStorage::class));
+    $finalizer = new FileDownloadFinalizer(
+        $generator,
+        app(AtlasStorage::class),
+        app(RemoteMediaProcessorClient::class),
+    );
 
     expect($finalizer->generatePreviewAssets($file))->toBe($updates);
 });
@@ -96,7 +101,11 @@ it('uses preview regeneration when force is requested', function () {
         ->with($file)
         ->andReturn($updates);
 
-    $finalizer = new FileDownloadFinalizer($generator, app(AtlasStorage::class));
+    $finalizer = new FileDownloadFinalizer(
+        $generator,
+        app(AtlasStorage::class),
+        app(RemoteMediaProcessorClient::class),
+    );
 
     expect($finalizer->generatePreviewAssets($file, force: true))->toBe($updates);
 });

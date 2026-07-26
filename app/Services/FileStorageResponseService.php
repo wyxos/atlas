@@ -121,6 +121,14 @@ class FileStorageResponseService
         return $this->serveDiskPath($file->path, $file->mime_type);
     }
 
+    public function serveStreamableVideo(File $file)
+    {
+        $file->loadMissing('metadata');
+        $path = data_get($file->metadata?->payload, 'conversions.streamable_video');
+
+        return $this->serveDiskPath(is_string($path) ? $path : null, 'video/mp4');
+    }
+
     public function servePreview(File $file)
     {
         if (! $file->preview_path || ! AtlasPathResolver::resolveExistingPath($file->preview_path)) {
