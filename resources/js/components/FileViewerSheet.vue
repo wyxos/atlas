@@ -10,6 +10,7 @@ import FileViewerSheetContainerSection from './FileViewerSheetContainerSection.v
 import FileSourceMetadataRefreshAction from './FileSourceMetadataRefreshAction.vue';
 import FileViewerMetadataTree from './FileViewerMetadataTree.vue';
 import FileViewerPromptSection from './FileViewerPromptSection.vue';
+import FileProcessingFailureAlert from './FileProcessingFailureAlert.vue';
 
 interface Props {
     embedded?: boolean;
@@ -202,6 +203,8 @@ async function handleCopyText(text: string | null, label: string): Promise<void>
                     <Loader2 :size="24" class="animate-spin text-smart-blue-500" />
                 </div>
                 <div v-else-if="fileData" class="space-y-4 text-sm text-twilight-indigo-200">
+                    <FileProcessingFailureAlert :failure="fileData.processing_failure ?? null" />
+
                     <div>
                         <div class="font-semibold text-white mb-1">Source</div>
                         <div class="flex min-w-0 items-center gap-2">

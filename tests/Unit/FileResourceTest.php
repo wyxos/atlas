@@ -3,6 +3,7 @@
 use App\Http\Resources\FileResource;
 use App\Models\Album;
 use App\Models\AlbumCover;
+use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Support\FileApiPath;
@@ -134,6 +135,25 @@ it('uses a generated streamable video for playback while preserving the original
     expect($data['disk_url'])->toBe(FileApiPath::downloaded($file->id))
         ->and($data['streamable_url'])->toBe(FileApiPath::streamable($file->id))
         ->and($data['file_url'])->toBe(FileApiPath::streamable($file->id));
+});
+
+it('includes unresolved file processing failures', function () {
+    $file = resourceFile();
+    $file->setRelation('latestDownloadTransfer', new DownloadTransfer([
+        'status' => 'failed',
+        'error' => 'The source video timed out.',
+        'failed_at' => now(),
+    ]));
+    $file->setRelation('latestLibraryConversionTask', null);
+    $file->setRelation('latestStandaloneConversionMediaProcessorTask', null);
+
+    $data = FileResource::make($file)->toArray(Request::create('https://atlas.test/files'));
+
+    expect($data['processing_failure'])->toMatchArray([
+        'stage' => 'download',
+        'title' => 'Download failed',
+        'message' => 'The source video timed out.',
+    ]);
 });
 
 it('includes an audio cover url when an album cover relation is loaded', function () {

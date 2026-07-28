@@ -12,6 +12,7 @@ use App\Support\ContainerBrowseTabPayload;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
 use App\Support\FilePreviewGeneration;
+use App\Support\FileProcessingFailure;
 use App\Support\SourceAccessState;
 use App\Support\SpotifyTrack;
 use Illuminate\Container\Container as IoCContainer;
@@ -20,6 +21,12 @@ use Illuminate\Support\Collection as SupportCollection;
 
 class FileItemFormatter
 {
+    private const PROCESSING_FAILURE_RELATIONS = [
+        'latestDownloadTransfer',
+        'latestLibraryConversionTask',
+        'latestStandaloneConversionMediaProcessorTask',
+    ];
+
     private static function toRelativeInternalApiUrl(?string $url): ?string
     {
         if (! is_string($url) || $url === '') {
@@ -110,6 +117,16 @@ class FileItemFormatter
                 $persistedFilesMissingPreviewTasks->load('latestPreviewMediaProcessorTask');
             }
 
+            $persistedFilesMissingProcessingFailureRelations = $files->filter(
+                fn (File $file): bool => $file->exists
+                    && collect(self::PROCESSING_FAILURE_RELATIONS)
+                        ->contains(fn (string $relation): bool => ! $file->relationLoaded($relation))
+            );
+
+            if ($persistedFilesMissingProcessingFailureRelations->isNotEmpty()) {
+                $persistedFilesMissingProcessingFailureRelations->load(self::PROCESSING_FAILURE_RELATIONS);
+            }
+
             $audioFilesMissingCovers = $files->filter(
                 fn (File $file): bool => $file->exists
                     && FileMimeType::isAudio($file->mime_type)
@@ -162,6 +179,33 @@ class FileItemFormatter
                             'latestPreviewMediaProcessorTask',
                             $filesWithPreviewTasks[$file->id]->latestPreviewMediaProcessorTask
                         );
+                    }
+                }
+            }
+
+            $filesNeedingProcessingFailureRelations = array_values(array_filter(
+                $fileList,
+                fn (File $file): bool => $file->exists
+                    && collect(self::PROCESSING_FAILURE_RELATIONS)
+                        ->contains(fn (string $relation): bool => ! $file->relationLoaded($relation))
+            ));
+
+            if ($filesNeedingProcessingFailureRelations !== []) {
+                $fileIds = array_map(fn (File $file) => $file->id, $filesNeedingProcessingFailureRelations);
+                $filesWithProcessingFailureRelations = File::query()
+                    ->whereIn('id', $fileIds)
+                    ->with(self::PROCESSING_FAILURE_RELATIONS)
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($filesNeedingProcessingFailureRelations as $file) {
+                    $loadedFile = $filesWithProcessingFailureRelations->get($file->id);
+                    if (! $loadedFile) {
+                        continue;
+                    }
+
+                    foreach (self::PROCESSING_FAILURE_RELATIONS as $relation) {
+                        $file->setRelation($relation, $loadedFile->getRelation($relation));
                     }
                 }
             }
@@ -246,6 +290,7 @@ class FileItemFormatter
             $originalUrl = $file->url;
             $thumbnailUrl = $file->preview_url;
             $previewGeneration = FilePreviewGeneration::state($file);
+            $processingFailure = FileProcessingFailure::state($file);
             $usesDynamicSourceMedia = $sourceMediaRefreshes->usesDynamicMediaUrls($file);
 
             $isStored = $file->path && ($file->downloaded || $file->imported_at !== null);
@@ -330,6 +375,7 @@ class FileItemFormatter
                 'downloaded' => (bool) $file->downloaded,
                 'imported_at' => $file->imported_at?->toIso8601String(),
                 'preview_generation' => $previewGeneration,
+                'processing_failure' => $processingFailure,
                 'auto_blacklisted' => $file->auto_blacklisted ?? false,
                 'reaction' => $reaction, // Current user's reaction for this file
                 // Include metadata with prompt if available - full metadata loaded on-demand

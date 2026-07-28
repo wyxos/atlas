@@ -15,6 +15,7 @@ import BrowseGlobalStartPanel from './BrowseGlobalStartPanel.vue';
 import BrowseV2StatusBar from './BrowseV2StatusBar.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import DownloadedReactionDialog from './DownloadedReactionDialog.vue';
+import FileProcessingFailureAlert from './FileProcessingFailureAlert.vue';
 import FileViewerSheet from './FileViewerSheet.vue';
 import LoadedItemsBatchActionDialog from './LoadedItemsBatchActionDialog.vue';
 import LoadedItemsRemovalDialog from './LoadedItemsRemovalDialog.vue';
@@ -79,9 +80,7 @@ const pageLoadingLocked = computed(() => Boolean(props.vibeStatus.pageLoadingLoc
 const showFullscreenPageLoadingLock = computed(() => props.surfaceMode === 'fullscreen'
     && pageLoadingLocked.value && props.vibeStatus.hasNextPage && props.vibeStatus.activeIndex >= props.vibeStatus.itemCount);
 
-function closeGlobalStartPanel(): void {
-    globalStartPanel?.close();
-}
+function closeGlobalStartPanel(): void { globalStartPanel?.close(); }
 
 function handleGlobalStartPanelOpenChange(value: boolean): void {
     if (!value) {
@@ -332,6 +331,7 @@ useEventListener(document, 'keydown', handleRootKeydown, { capture: true });
                     </template>
                     <template #fullscreen-header-actions="{ item }">
                         <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                            <FileProcessingFailureAlert compact :failure="getFeedItemFromVibeItem(item as VibeViewerItem)?.processing_failure ?? null" />
                             <div
                                 v-if="getContainerPillTargets(item as VibeViewerItem, containerInteractions).length > 0"
                                 class="flex max-w-[min(34rem,45vw)] flex-row flex-wrap justify-end gap-1"

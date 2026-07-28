@@ -14,6 +14,7 @@ use App\Support\AtlasPathResolver;
 use App\Support\FileApiPath;
 use App\Support\FileMimeType;
 use App\Support\FilePreviewGeneration;
+use App\Support\FileProcessingFailure;
 use App\Support\SourceAccessState;
 use App\Support\SpotifyTrack;
 use Illuminate\Http\Request;
@@ -165,6 +166,7 @@ class FileResource extends JsonResource
 
         // For downloaded files with generated previews, prefer the internal preview route.
         $previewGeneration = FilePreviewGeneration::state($this->resource);
+        $processingFailure = FileProcessingFailure::state($this->resource);
         $previewUrl = $previewFileUrl ?: (
             FilePreviewGeneration::shouldSuppressRemotePreviewUrl($this->resource)
                 ? null
@@ -285,6 +287,7 @@ class FileResource extends JsonResource
             'preview_file_url' => $previewFileUrl,
             'poster_url' => $posterUrl,
             'preview_generation' => $previewGeneration,
+            'processing_failure' => $processingFailure,
             'preview_path' => $this->preview_path,
             'poster_path' => $this->poster_path,
             'tags' => $this->tags,

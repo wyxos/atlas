@@ -89,6 +89,7 @@ const showDeleteButton = computed(() => props.hovered
 const showRemoveFromTab = computed(() => Boolean(props.removeItemFromTab));
 const isRemovingFromTab = computed(() => props.isRemovingFromTab?.(props.item) ?? false);
 const previewGeneration = computed(() => props.item.preview_generation ?? null);
+const processingFailure = computed(() => props.item.processing_failure ?? null);
 const previewGenerationStatus = computed(() => previewGeneration.value?.status ?? null);
 const previewRegenerationQueued = computed(() => props.isPreviewRegenerationQueued?.(props.item) ?? false);
 const showPreviewGenerationState = computed(() => props.item.downloaded === true
@@ -263,7 +264,38 @@ const showReactions = computed(() => (
         </div>
 
         <div
-            v-if="showPreviewGenerationState"
+            v-if="processingFailure"
+            class="pointer-events-none absolute inset-0 flex items-center justify-center px-3"
+            data-test="file-processing-failure-state"
+            role="alert"
+        >
+            <div class="pointer-events-auto max-w-[15rem] border border-danger-300/60 bg-black/80 p-3 text-center shadow-2xl backdrop-blur">
+                <div class="mb-2 flex justify-center text-danger-200">
+                    <AlertTriangle :size="18" />
+                </div>
+                <div class="text-xs font-semibold text-white">
+                    {{ processingFailure.title }}
+                </div>
+                <div
+                    class="mt-1 line-clamp-4 wrap-break-word text-[11px] leading-snug text-white/75"
+                    :title="processingFailure.message"
+                >
+                    {{ processingFailure.message }}
+                </div>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="mt-3 h-7 border border-white/10 bg-white/10 px-2 text-[11px] text-white hover:bg-white/15"
+                    data-test="file-processing-failure-details"
+                    @click.stop="openFileSheet(item, index)"
+                >
+                    View details
+                </Button>
+            </div>
+        </div>
+
+        <div
+            v-else-if="showPreviewGenerationState"
             class="pointer-events-none absolute inset-0 flex items-center justify-center px-3"
             data-test="preview-generation-state"
         >

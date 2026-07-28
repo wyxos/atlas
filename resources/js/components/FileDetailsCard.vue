@@ -6,6 +6,7 @@ import { copyToClipboard } from '../utils/clipboard';
 import { formatFileSize, getMimeTypeBadgeClasses, getMimeTypeCategory } from '../utils/file';
 import { openUrl } from '../utils/url';
 import type { File } from '../types/file';
+import FileProcessingFailureAlert from './FileProcessingFailureAlert.vue';
 
 interface Props {
     file: File;
@@ -17,6 +18,8 @@ defineProps<Props>();
 
 <template>
     <div class="space-y-6">
+        <FileProcessingFailureAlert :failure="file.processing_failure ?? null" />
+
         <!-- Basic Information -->
         <div>
             <h5 class="text-lg font-semibold text-regal-navy-100 mb-4">Basic Information</h5>

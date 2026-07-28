@@ -10,7 +10,7 @@ import {
     store as tabsStore,
     update as tabsUpdate,
 } from '@/actions/App/Http/Controllers/TabController';
-import type { FileCapabilities, FileContainer, FileMetadataRecord, FileModerationRuleDetails, FilePreviewGeneration, FileSourceAccess } from '@/types/file';
+import type { FileCapabilities, FileContainer, FileMetadataRecord, FileModerationRuleDetails, FilePreviewGeneration, FileProcessingFailure, FileSourceAccess } from '@/types/file';
 
 const NO_CACHE_REQUEST_CONFIG = {
     headers: {
@@ -50,6 +50,7 @@ export type FeedItem = {
     blacklist_rule?: FileModerationRuleDetails | null;
     downloaded?: boolean;
     preview_generation?: FilePreviewGeneration | null;
+    processing_failure?: FileProcessingFailure | null;
     source?: string | null;
     source_id?: string | null;
     spotify_uri?: string | null;

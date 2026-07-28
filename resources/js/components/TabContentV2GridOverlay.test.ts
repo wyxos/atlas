@@ -199,6 +199,35 @@ describe('TabContentV2GridOverlay', () => {
         expect(wrapper.find('[data-test="preview-regeneration-trigger"]').exists()).toBe(false);
     });
 
+    it('shows file processing failures and opens the details sheet', async () => {
+        const props = createProps();
+        props.item.processing_failure = {
+            stage: 'download',
+            title: 'Download failed',
+            message: 'The source video timed out.',
+            error_code: null,
+            occurred_at: '2026-07-28T08:08:57Z',
+        };
+
+        const wrapper = mount(TabContentV2GridOverlay, {
+            props,
+            global: {
+                stubs: {
+                    Button: buttonStub,
+                    FileReactions: testStub,
+                    Pill: testStub,
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-test="file-processing-failure-state"]').text()).toContain('Download failed');
+        expect(wrapper.text()).toContain('The source video timed out.');
+
+        await wrapper.get('[data-test="file-processing-failure-details"]').trigger('click');
+
+        expect(props.openFileSheet).toHaveBeenCalledWith(props.item, props.index);
+    });
+
     it('marks non-sibling cards as dimmed while a container drawer is open', () => {
         const wrapper = mount(TabContentV2GridOverlay, {
             props: {

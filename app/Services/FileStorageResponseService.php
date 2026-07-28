@@ -23,6 +23,9 @@ class FileStorageResponseService
         $relations = [
             'metadata',
             'autoBlacklistModerationAction',
+            'latestDownloadTransfer',
+            'latestLibraryConversionTask',
+            'latestStandaloneConversionMediaProcessorTask',
             'containers' => function ($query) use ($userId) {
                 $query->withCount([
                     'files as unreacted_files_count' => function ($containerFilesQuery) use ($userId) {

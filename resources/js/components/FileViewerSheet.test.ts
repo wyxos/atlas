@@ -173,6 +173,30 @@ describe('FileViewerSheet', () => {
         expect(text).toContain('4');
     });
 
+    it('shows the unresolved file processing failure', () => {
+        const wrapper = mount(FileViewerSheet, {
+            props: {
+                isOpen: true,
+                fileId: 1,
+                isLoading: false,
+                fileData: makeFile({
+                    processing_failure: {
+                        stage: 'video_conversion',
+                        title: 'Video conversion failed',
+                        message: 'ffmpeg could not decode the input.',
+                        error_code: 'ffmpeg_failed',
+                        occurred_at: '2026-07-28T08:08:57Z',
+                    },
+                }),
+            },
+        });
+
+        const failure = wrapper.get('[data-test="file-processing-failure"]');
+
+        expect(failure.text()).toContain('Video conversion failed');
+        expect(failure.text()).toContain('ffmpeg could not decode the input.');
+    });
+
     it('supports embedded layout without fixed overlay width classes', () => {
         const wrapper = mount(FileViewerSheet, {
             props: {

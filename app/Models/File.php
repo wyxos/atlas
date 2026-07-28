@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ActionType;
+use App\Enums\LibraryScanMediaTask as LibraryScanMediaTaskType;
+use App\Enums\MediaProcessorOperation;
 use App\Support\FilePreviewGeneration;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -196,6 +198,32 @@ class File extends Model
     {
         return $this->hasOne(MediaProcessorTask::class)
             ->whereIn('operation', FilePreviewGeneration::operations())
+            ->latestOfMany('created_at');
+    }
+
+    public function latestDownloadTransfer(): HasOne
+    {
+        return $this->hasOne(DownloadTransfer::class)->latestOfMany();
+    }
+
+    public function latestLibraryConversionTask(): HasOne
+    {
+        return $this->hasOne(LibraryScanMediaTask::class)
+            ->whereIn('type', [
+                LibraryScanMediaTaskType::TASK_AUDIO_NORMALIZATION,
+                LibraryScanMediaTaskType::TASK_VIDEO_STREAMABLE,
+            ])
+            ->latestOfMany();
+    }
+
+    public function latestStandaloneConversionMediaProcessorTask(): HasOne
+    {
+        return $this->hasOne(MediaProcessorTask::class)
+            ->whereNull('library_scan_media_task_id')
+            ->whereIn('operation', [
+                MediaProcessorOperation::AUDIO_NORMALIZATION,
+                MediaProcessorOperation::STREAMABLE_VIDEO,
+            ])
             ->latestOfMany('created_at');
     }
 

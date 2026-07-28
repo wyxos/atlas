@@ -141,6 +141,7 @@ export function useFileViewerData(params: {
         item.blacklist_rule = file.blacklist_rule ?? null;
         item.downloaded = file.downloaded;
         item.preview_generation = file.preview_generation ?? null;
+        item.processing_failure = file.processing_failure ?? null;
         item.notFound = file.not_found;
         item.source = file.source;
         item.source_id = file.source_id;

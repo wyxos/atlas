@@ -57,6 +57,14 @@ export interface FilePreviewGeneration {
     progress?: number | null;
 }
 
+export interface FileProcessingFailure {
+    stage: 'download' | 'audio_conversion' | 'video_conversion' | 'media_conversion' | string;
+    title: string;
+    message: string;
+    error_code: string | null;
+    occurred_at: string | null;
+}
+
 export interface FileModerationRuleDetails {
     id: number;
     name: string;
@@ -94,6 +102,7 @@ export interface File {
     preview_file_url: string | null;
     poster_url: string | null;
     preview_generation: FilePreviewGeneration | null;
+    processing_failure?: FileProcessingFailure | null;
     preview_path: string | null;
     poster_path: string | null;
     tags: string[] | null;

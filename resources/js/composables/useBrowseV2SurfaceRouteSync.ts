@@ -71,6 +71,7 @@ export function mapBrowseV2FileToFeedItem(file: File): FeedItem {
         blacklist_rule: file.blacklist_rule ?? null,
         downloaded: file.downloaded,
         preview_generation: file.preview_generation ?? null,
+        processing_failure: file.processing_failure ?? null,
         title: file.title ?? file.filename,
         filename: file.filename,
         source: file.source,

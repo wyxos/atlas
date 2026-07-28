@@ -324,6 +324,30 @@ describe('TabContentV2View fullscreen chrome', () => {
         expect(props.containerInteractions.pillHandlers.onDismiss).toHaveBeenCalledWith(container);
     });
 
+    it('keeps processing failures visible in the fullscreen header', () => {
+        testState.item.feedItem = {
+            id: 11,
+            previewed_count: 1,
+            processing_failure: {
+                stage: 'download',
+                title: 'Download failed',
+                message: 'Source read timed out after 20 seconds.',
+                error_code: null,
+                occurred_at: '2026-07-28T08:08:57Z',
+            },
+            reaction: null,
+            seen_count: 0,
+        };
+
+        const wrapper = mount(TabContentV2View, { props: createProps(), global: { stubs: defaultStubs } });
+        const alert = wrapper.get('[data-testid="browse-fullscreen-processing-failure"]');
+
+        expect(wrapper.get('[data-testid="mock-vibe-header"]').element.contains(alert.element)).toBe(true);
+        expect(alert.attributes('role')).toBe('alert');
+        expect(alert.text()).toContain('Download failed');
+        expect(alert.text()).toContain('Source read timed out after 20 seconds.');
+    });
+
     it('renders the file sheet in the fullscreen aside slot', () => {
         const props = createProps();
         const sheetSpy = vi.fn();

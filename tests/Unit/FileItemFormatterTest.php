@@ -3,6 +3,7 @@
 use App\Models\Album;
 use App\Models\AlbumCover;
 use App\Models\Container;
+use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\MediaProcessorTask;
@@ -121,6 +122,25 @@ it('uses a generated streamable video as the viewer original', function () {
 
     expect($items[0]['original'])->toBe(FileApiPath::streamable($file->id))
         ->and($items[0]['originalUrl'])->toBe(FileApiPath::streamable($file->id));
+});
+
+it('includes unresolved file processing failures in feed items', function () {
+    $file = formatterFile(['id' => 113]);
+    $file->setRelation('latestDownloadTransfer', new DownloadTransfer([
+        'status' => 'failed',
+        'error' => 'The source video timed out.',
+        'failed_at' => now(),
+    ]));
+    $file->setRelation('latestLibraryConversionTask', null);
+    $file->setRelation('latestStandaloneConversionMediaProcessorTask', null);
+
+    $items = FileItemFormatter::format([$file], 1);
+
+    expect($items[0]['processing_failure'])->toMatchArray([
+        'stage' => 'download',
+        'title' => 'Download failed',
+        'message' => 'The source video timed out.',
+    ]);
 });
 
 it('does not fall back to a remote preview url for downloaded videos with failed preview generation', function () {
