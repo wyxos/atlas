@@ -89,7 +89,7 @@ class AudioMetadataAiGatewayClient
 
     private function model(): string
     {
-        return (string) config('services.audio_metadata.ai_model', 'local-fast');
+        return (string) config('services.audio_metadata.ai_model', 'gpt-5.6-sol');
     }
 
     private function timeoutSeconds(): int

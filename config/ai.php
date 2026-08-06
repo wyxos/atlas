@@ -112,19 +112,13 @@ return [
             'key' => env('MISTRAL_API_KEY'),
         ],
 
-        'ollama' => [
-            'driver' => 'ollama',
-            'key' => env('OLLAMA_API_KEY', ''),
-            'url' => env('OLLAMA_URL', 'http://localhost:11434'),
-        ],
-
         'audio_metadata' => [
             'driver' => 'openai',
-            'key' => env('AUDIO_METADATA_AI_TOKEN', env('LITELLM_MASTER_KEY', env('OPENAI_API_KEY'))),
-            'url' => env('AUDIO_METADATA_AI_BASE_URL', 'https://ai.wyxos.com/v1'),
+            'key' => env('OPENAI_API_KEY'),
+            'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
             'models' => [
                 'text' => [
-                    'default' => env('AUDIO_METADATA_AI_MODEL', 'local-fast'),
+                    'default' => env('OPENAI_MODEL', 'gpt-5.6-sol'),
                 ],
             ],
         ],
