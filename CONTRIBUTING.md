@@ -1,5 +1,5 @@
 # Contributing
 
-Thanks for your interest in Atlas.
+Atlas Web is discontinued and no longer accepts feature requests, bug reports, or pull requests for ongoing maintenance.
 
-There are no formal contribution rules here. If you want to help, jump in however you like.
+You are welcome to fork the source and maintain your own version under the [MIT license](LICENSE). The documentation and development commands remain available for reference, but maintainer support and reviews are no longer provided.

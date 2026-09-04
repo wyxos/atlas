@@ -2,11 +2,13 @@
     <img src="public/favicon.svg" alt="Atlas" width="96" height="96" />
 </p>
 
-<h1 align="center">Atlas</h1>
+<h1 align="center">Atlas Web (discontinued)</h1>
 
 <p align="center">
     Private media library, feed triage, and personal archive operations.
 </p>
+
+> **Atlas Web is discontinued.** This self-hosted web version of Atlas is no longer maintained. No further features, bug fixes, or security updates are planned. The source remains available for reference and community forks under the [MIT license](LICENSE). New installations are not recommended.
 
 <p align="center">
     <a href="https://youtu.be/g1Ogg5vivSM">Watch the demo video</a>
@@ -62,7 +64,7 @@ Current public-home sources include:
 - Wallhaven
 - Local Atlas library files
 
-More sources can be added as new collectors and adapters are built.
+These sources describe the final web version; adapter updates are no longer planned.
 
 ## Browser extension
 
@@ -78,6 +80,8 @@ Atlas can scan existing folders, queue imports, detect duplicates, rerun parsers
 - [Developer overview](docs/DEVELOPER_OVERVIEW.md) — application structure, frontend routing, and API shape
 
 ## Development
+
+The following commands are retained for anyone inspecting or maintaining their own fork.
 
 Atlas is a Laravel 12 + Vue 3 + TypeScript application using Vite, Tailwind CSS v4, shadcn-vue/Reka UI primitives, Pest, Vitest, and Playwright.
 
@@ -123,4 +127,4 @@ npm run check
 
 ## Status
 
-Atlas is an active private/self-hosted application. Expect the source adapters, import pipeline, metadata tools, and playback surfaces to evolve with real review workflows.
+Atlas Web has reached end of maintenance. This repository is retained for reference and community forks. See the [contribution policy](CONTRIBUTING.md) and [security policy](SECURITY.md) for the support status.

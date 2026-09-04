@@ -1,5 +1,7 @@
 # Security Policy
 
-If you find a security issue, please open a GitHub Issue with the details.
+Atlas Web is discontinued. No versions receive security updates, and vulnerability reports are no longer actively reviewed by the maintainer.
 
-Thanks for helping keep Atlas safe.
+New installations are not recommended. Existing operators are responsible for assessing and maintaining their own deployments and dependencies.
+
+If you use a maintained community fork, follow that fork's security reporting policy. Do not post credentials, private data, or sensitive vulnerability details in public issues.

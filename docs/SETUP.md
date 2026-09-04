@@ -1,5 +1,7 @@
 # Setup
 
+> **Discontinued:** Atlas Web no longer receives maintenance or security updates. New installations are not recommended. These instructions are retained for reference and community forks; installation support is no longer provided. See the [project status](../README.md#status).
+
 This guide mirrors a real-world install on a server.
 
 ## What you need

@@ -1,5 +1,7 @@
 # Developer Overview
 
+> **Discontinued:** This document describes the final Atlas Web implementation and is retained for reference and community forks. See the [project status](../README.md#status).
+
 Atlas is a Laravel 12 and Vue 3 application for fast media feed review, local library browsing, background downloads, moderation, and lightweight audio/video playback. It exposes a browser-extension API for the standalone Atlas extension.
 
 ## Main pieces
