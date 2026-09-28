@@ -119,6 +119,12 @@ php artisan test --compact
 php vendor/bin/pint --dirty --test
 ```
 
+`php artisan test` runs the Unit and Feature suites. Pest browser tests in `tests/Browser` need Playwright and built assets, so they run separately:
+
+```bash
+php artisan test --compact --testsuite=Browser
+```
+
 Run the project gate:
 
 ```bash

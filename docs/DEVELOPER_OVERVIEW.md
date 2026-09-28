@@ -29,7 +29,8 @@ Wayfinder is installed for typed route and controller helpers. When route defini
 
 Use the smallest check that covers the change:
 
-- PHP tests: `php artisan test --compact`
+- PHP tests: `php artisan test --compact` (Unit and Feature)
+- PHP browser tests: `php artisan test --compact --testsuite=Browser` (Pest browser tests, not in the default run)
 - Frontend unit tests: `npm run test`
 - Frontend typecheck: `npm run typecheck`
 - Frontend lint: `npm run lint`

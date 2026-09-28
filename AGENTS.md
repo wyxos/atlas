@@ -39,6 +39,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - If local browser verification reaches login, use the repo-defined seeded local account from `database/seeders/DatabaseSeeder.php` (`demo@atlas.test` / `password`) after confirming it exists and validates locally.
 - Treat that seeded account as local-only non-secret demo data. Never store or print production credentials, real-user credentials, generated secrets, tokens, environment-derived secrets, or session cookies.
 - If authenticated local browser verification cannot be completed, report it as incomplete instead of calling the browser-visible path verified.
+- Pest browser tests in `tests/Browser` are not part of the default `php artisan test` run. Run them with `php artisan test --compact --testsuite=Browser`.
 
 ## Application Structure & Architecture
 - Stick to existing directory structure; don't create new base folders without approval.
